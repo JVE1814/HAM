@@ -1,4 +1,4 @@
-import { addMonths, earliest } from './calendar'
+import { addMonths, earliest, isIsoDate } from './calendar'
 
 /** A Model's manufacturer support milestones (ISO dates). */
 export interface LifecycleDates {
@@ -48,4 +48,37 @@ export function refreshDueDate(inputs: RefreshInputs): string | null {
         case 'earliest':
             return earliest([byCycle, bySupport]) ?? null
     }
+}
+
+export type LifecycleRow = { pid: string } & { [K in keyof LifecycleDates]?: string }
+
+export type ParsedLifecycleRow = { ok: true; pid: string; dates: LifecycleDates } | { ok: false; reason: string }
+
+const MILESTONE_ORDER: ReadonlyArray<[keyof LifecycleDates, string]> = [
+    ['endOfSale', 'end of sale'],
+    ['endOfSupport', 'end of support'],
+    ['endOfExtendedSupport', 'end of extended support'],
+    ['endOfLife', 'end of life'],
+]
+
+/** Validate one CSV row of manufacturer milestones. */
+export function parseLifecycleRow(row: LifecycleRow): ParsedLifecycleRow {
+    const pid = row.pid.trim()
+    if (!pid) return { ok: false, reason: 'PID is required' }
+    const dates: LifecycleDates = {}
+    for (const [field] of MILESTONE_ORDER) {
+        const value = (row[field] ?? '').trim()
+        if (!value) continue
+        if (!isIsoDate(value)) return { ok: false, reason: `${field} must be YYYY-MM-DD` }
+        dates[field] = value
+    }
+    const present = MILESTONE_ORDER.filter(([field]) => dates[field])
+    for (let i = 1; i < present.length; i++) {
+        const [earlierField, earlierLabel] = present[i - 1]
+        const [laterField, laterLabel] = present[i]
+        if (dates[earlierField]! > dates[laterField]!) {
+            return { ok: false, reason: `Milestones must not go backwards (${earlierLabel} after ${laterLabel})` }
+        }
+    }
+    return { ok: true, pid, dates }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { planSourcing, sparePoolShortfall, type StockCandidate } from './sourcing'
+import { pickForSparePool, planSourcing, sparePoolShortfall, type StockCandidate } from './sourcing'
 
 const stock: StockCandidate[] = [
     { assetId: 'central-1', modelId: 'c9300', stage: 'available', stockroomId: 'depot', stockroomType: 'central_depot', reservedFor: '' },
@@ -49,5 +49,12 @@ describe('sparePoolShortfall', () => {
         expect(sparePoolShortfall({ deployed: 41, reserved: 1, ratio: 0.05 })).toBe(2)
         expect(sparePoolShortfall({ deployed: 40, reserved: 5, ratio: 0.05 })).toBe(0)
         expect(sparePoolShortfall({ deployed: 0, reserved: 0, ratio: 0.05 })).toBe(0)
+    })
+})
+
+describe('pickForSparePool', () => {
+    it('takes free central stock only, never reserved or customer-site stock', () => {
+        expect(pickForSparePool(stock, 'c9300', 5)).toEqual(['central-1', 'central-2', 'staging-1'])
+        expect(pickForSparePool(stock, 'c9300', 1)).toEqual(['central-1'])
     })
 })

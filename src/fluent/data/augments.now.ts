@@ -110,6 +110,11 @@ export const cmdb_model = Table({
         x_daas_ham_oem_pid: StringColumn({ label: 'OEM PID', maxLength: 100 }),
         x_daas_ham_track_as_asset: BooleanColumn({ label: 'Track as asset', default: true }),
         x_daas_ham_typical_power_w: IntegerColumn({ label: 'Typical power (W)', min: 0 }),
+        x_daas_ham_normalized_to: ReferenceColumn({
+            label: 'Normalized to',
+            referenceTable: 'cmdb_model',
+            readOnly: true,
+        }),
     },
     index: [{ name: 'x_daas_ham_model_pid', unique: false, element: 'x_daas_ham_oem_pid' }],
 })

@@ -76,3 +76,12 @@ export function planSourcing(request: SourcingRequest, stock: readonly StockCand
 export function sparePoolShortfall(input: { deployed: number; reserved: number; ratio: number }): number {
     return Math.max(0, Math.ceil(input.deployed * input.ratio - 1e-9) - input.reserved)
 }
+
+/** Free central stock of a model to move into a Customer's Spare pool (top-up). */
+export function pickForSparePool(stock: readonly StockCandidate[], modelId: string, count: number): string[] {
+    return stock
+        .filter((c) => c.modelId === modelId && sourceOf(c, '') === 'central_stock')
+        .sort((a, b) => a.stockroomId.localeCompare(b.stockroomId) || a.assetId.localeCompare(b.assetId))
+        .slice(0, Math.max(0, count))
+        .map((c) => c.assetId)
+}

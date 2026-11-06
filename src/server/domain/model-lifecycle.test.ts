@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lifecyclePhaseOn, refreshDueDate } from './model-lifecycle'
+import { lifecyclePhaseOn, parseLifecycleRow, refreshDueDate } from './model-lifecycle'
 
 const cisco = {
     endOfSale: '2024-04-30',
@@ -41,5 +41,27 @@ describe('refreshDueDate', () => {
         expect(refreshDueDate({ basis: 'cycle', refreshCycleMonths: 36 })).toBeNull()
         expect(refreshDueDate({ basis: 'end_of_support', inServiceDate: '2026-03-31', refreshCycleMonths: 36 })).toBeNull()
         expect(refreshDueDate({ basis: 'cycle', inServiceDate: '2026-03-31', refreshCycleMonths: 0 })).toBeNull()
+    })
+})
+
+describe('parseLifecycleRow', () => {
+    it('reads ISO milestone dates and leaves blanks out', () => {
+        expect(parseLifecycleRow({ pid: 'C9300-48P-E', endOfSale: '2024-04-30', endOfSupport: ' 2029-04-30 ', endOfExtendedSupport: '', endOfLife: '' })).toEqual({
+            ok: true,
+            pid: 'C9300-48P-E',
+            dates: { endOfSale: '2024-04-30', endOfSupport: '2029-04-30' },
+        })
+    })
+
+    it('rejects rows without a PID or with malformed dates', () => {
+        expect(parseLifecycleRow({ pid: ' ', endOfSale: '2024-04-30' })).toEqual({ ok: false, reason: 'PID is required' })
+        expect(parseLifecycleRow({ pid: 'X', endOfSupport: '30/04/2029' })).toEqual({ ok: false, reason: 'endOfSupport must be YYYY-MM-DD' })
+    })
+
+    it('rejects milestones out of order', () => {
+        expect(parseLifecycleRow({ pid: 'X', endOfSale: '2030-01-01', endOfSupport: '2029-01-01' })).toEqual({
+            ok: false,
+            reason: 'Milestones must not go backwards (end of sale after end of support)',
+        })
     })
 })

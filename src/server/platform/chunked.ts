@@ -1,4 +1,4 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { runChunked, type ChunkedJobResult } from '../domain/chunked-job'
 import { msToGlide, nowMs } from './clock'
 import { intProperty, PROPERTY } from './properties'
@@ -17,17 +17,7 @@ export function runTableJob<T>(spec: TableJob<T>): ChunkedJobResult {
     return runChunked<{ id: string; item: T }>(
         {
             loadCursor: () => String(cursorRecord.getValue('cursor') ?? ''),
-            fetchBatch: (after, size) => {
-                const gr = new GlideRecord(spec.table)
-                gr.addEncodedQuery(spec.query)
-                if (after) gr.addQuery('sys_id', '>', after)
-                gr.orderBy('sys_id')
-                gr.setLimit(size)
-                gr.query()
-                const batch: Array<{ id: string; item: T }> = []
-                while (gr.next()) batch.push({ id: gr.getUniqueValue(), item: spec.read(gr) })
-                return batch
-            },
+            fetchBatch: (after, size) => fetchBatch(spec, after, size),
             keyOf: (record) => record.id,
             handle: (record) => spec.handle(record.item, record.id),
             saveCursor: (cursor, processed, done) => {
@@ -53,4 +43,41 @@ function loadCursorRecord(job: string): GlideRecord {
     gr.setValue('job', job)
     gr.insert()
     return gr
+}
+
+/**
+ * The same runner driven by an event instead of a schedule: the cursor travels in the event's parm2
+ * and the event is queued again (with the new cursor) until the pass is complete.
+ */
+export function runEventTableJob<T>(
+    spec: Omit<TableJob<T>, 'job'> & { eventName: string; record: GlideRecord; parm1: string; cursor: string },
+): ChunkedJobResult {
+    return runChunked<{ id: string; item: T }>(
+        {
+            loadCursor: () => spec.cursor,
+            fetchBatch: (after, size) => fetchBatch(spec, after, size),
+            keyOf: (record) => record.id,
+            handle: (record) => spec.handle(record.item, record.id),
+            saveCursor: (cursor, _processed, done) => {
+                if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, cursor)
+            },
+            now: nowMs,
+        },
+        {
+            batchSize: intProperty(PROPERTY.jobBatchSize, 500),
+            budgetMs: intProperty(PROPERTY.jobBudgetSeconds, 120) * 1000,
+        },
+    )
+}
+
+function fetchBatch<T>(spec: Pick<TableJob<T>, 'table' | 'query' | 'read'>, after: string, size: number) {
+    const gr = new GlideRecord(spec.table)
+    gr.addEncodedQuery(spec.query)
+    if (after) gr.addQuery('sys_id', '>', after)
+    gr.orderBy('sys_id')
+    gr.setLimit(size)
+    gr.query()
+    const batch: Array<{ id: string; item: T }> = []
+    while (gr.next()) batch.push({ id: gr.getUniqueValue(), item: spec.read(gr) })
+    return batch
 }

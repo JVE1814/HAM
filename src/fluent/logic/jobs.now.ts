@@ -1,6 +1,8 @@
 import '@servicenow/sdk/global'
 import { ScheduledScript } from '@servicenow/sdk/core'
 import { evaluatePendingInService, purgeDeviceEvents } from '../../server/entry/in-service'
+import { normalizeRawModels, rollLifecyclePhases } from '../../server/entry/models'
+import { topUpSparePools } from '../../server/entry/spare-pool'
 
 /* Background jobs (chunked where they touch many assets, ADR 0007). */
 
@@ -23,4 +25,35 @@ ScheduledScript({
     executionTime: { hours: 3, minutes: 10, seconds: 0 },
     timeZone: 'UTC',
     script: purgeDeviceEvents,
+})
+
+ScheduledScript({
+    $id: Now.ID['job_normalize_raw_models'],
+    name: 'NaaS - normalize discovered models',
+    active: true,
+    frequency: 'periodically',
+    executionInterval: { hours: 1 },
+    executionStart: '2026-01-01 00:20:00',
+    timeZone: 'UTC',
+    script: normalizeRawModels,
+})
+
+ScheduledScript({
+    $id: Now.ID['job_roll_lifecycle_phases'],
+    name: 'NaaS - roll lifecycle phases',
+    active: true,
+    frequency: 'daily',
+    executionTime: { hours: 0, minutes: 15, seconds: 0 },
+    timeZone: 'UTC',
+    script: rollLifecyclePhases,
+})
+
+ScheduledScript({
+    $id: Now.ID['job_spare_pool_top_up'],
+    name: 'NaaS - spare pool top-up',
+    active: true,
+    frequency: 'daily',
+    executionTime: { hours: 2, minutes: 40, seconds: 0 },
+    timeZone: 'UTC',
+    script: topUpSparePools,
 })
