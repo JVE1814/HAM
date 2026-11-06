@@ -1,0 +1,17 @@
+{
+    "extends": "./src/server/tsconfig.json",
+    "compilerOptions": {
+        "rootDir": ".",
+        "types": [
+            "node"
+        ]
+    },
+    "include": [
+        "src/server/**/*.ts",
+        "src/client/**/*.test.ts",
+        "vitest.config.ts"
+    ],
+    "exclude": [
+        "**/*.now.ts"
+    ]
+}

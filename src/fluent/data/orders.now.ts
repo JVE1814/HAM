@@ -1,0 +1,133 @@
+import '@servicenow/sdk/global'
+import {
+    ChoiceColumn,
+    DateColumn,
+    IntegerColumn,
+    MultiLineTextColumn,
+    ReferenceColumn,
+    StringColumn,
+    Table,
+} from '@servicenow/sdk/core'
+
+/** A request to deliver equipment to a Site. */
+export const x_daas_ham_order = Table({
+    name: 'x_daas_ham_order',
+    label: 'Order',
+    extends: 'task',
+    schema: {
+        order_type: ChoiceColumn({
+            label: 'Order type',
+            choices: {
+                site_rollout: { label: 'Site rollout', sequence: 0 },
+                device_add: { label: 'Device add', sequence: 1 },
+                device_replace: { label: 'Device replace', sequence: 2 },
+                temporary: { label: 'Temporary deployment', sequence: 3 },
+            },
+            mandatory: true,
+            default: 'device_add',
+            dropdown: 'dropdown_without_none',
+        }),
+        customer: ReferenceColumn({ label: 'Customer', referenceTable: 'customer_account', mandatory: true }),
+        site: ReferenceColumn({ label: 'Site', referenceTable: 'cmn_location', mandatory: true }),
+        agreement: ReferenceColumn({ label: 'Agreement', referenceTable: 'x_daas_ham_agreement', mandatory: true }),
+        site_template: ReferenceColumn({ label: 'Site template', referenceTable: 'x_daas_ham_site_template' }),
+        requested_by_contact: ReferenceColumn({ label: 'Requested by', referenceTable: 'customer_contact' }),
+        install_mode: ChoiceColumn({
+            label: 'Install mode',
+            choices: {
+                fsm_engineer: { label: 'Provider field engineer', sequence: 0 },
+                self_install: { label: 'Customer self-install (ZTP)', sequence: 1 },
+                subcontractor: { label: 'Subcontractor', sequence: 2 },
+                remote_hands: { label: 'Data-centre remote hands', sequence: 3 },
+            },
+            mandatory: true,
+            default: 'fsm_engineer',
+            dropdown: 'dropdown_without_none',
+        }),
+        requested_date: DateColumn({ label: 'Requested install date' }),
+        end_date: DateColumn({ label: 'Deployment end date' }),
+        stage: ChoiceColumn({
+            label: 'Stage',
+            choices: {
+                draft: { label: 'Draft', sequence: 0 },
+                awaiting_approval: { label: 'Awaiting approval', sequence: 1 },
+                sourcing: { label: 'Sourcing', sequence: 2 },
+                preparing: { label: 'Preparing', sequence: 3 },
+                delivering: { label: 'Delivering', sequence: 4 },
+                installing: { label: 'Installing', sequence: 5 },
+                complete: { label: 'Complete', sequence: 6 },
+                rejected: { label: 'Rejected', sequence: 7 },
+                cancelled: { label: 'Cancelled', sequence: 8 },
+            },
+            default: 'draft',
+            readOnly: true,
+            dropdown: 'dropdown_without_none',
+        }),
+        entitlement_verdict: ChoiceColumn({
+            label: 'Entitlement',
+            readOnly: true,
+            choices: {
+                within_agreement: { label: 'Within agreement', sequence: 0 },
+                off_catalog: { label: 'Off catalog', sequence: 1 },
+                over_quota: { label: 'Over contracted quantity', sequence: 2 },
+            },
+        }),
+        entitlement_findings: MultiLineTextColumn({ label: 'Entitlement findings', maxLength: 4000, readOnly: true }),
+        change_request: ReferenceColumn({ label: 'Change request', referenceTable: 'change_request' }),
+        work_order: ReferenceColumn({ label: 'Work order', referenceTable: 'wm_order' }),
+        tracking_number: StringColumn({ label: 'Tracking number', maxLength: 100 }),
+        carrier: StringColumn({ label: 'Carrier', maxLength: 60 }),
+    },
+    autoNumber: { prefix: 'NORD', number: 1000, numberOfDigits: 7 },
+    index: [
+        { name: 'x_daas_ham_ord_customer', unique: false, element: 'customer' },
+        { name: 'x_daas_ham_ord_site', unique: false, element: 'site' },
+        { name: 'x_daas_ham_ord_stage', unique: false, element: 'stage' },
+    ],
+})
+
+/** One Model and quantity within an Order. */
+export const x_daas_ham_order_line = Table({
+    name: 'x_daas_ham_order_line',
+    label: 'Order line',
+    display: 'number',
+    schema: {
+        number: StringColumn({ label: 'Number', default: 'javascript:global.getNextObjNumberPadded();', readOnly: true }),
+        order: ReferenceColumn({
+            label: 'Order',
+            referenceTable: 'x_daas_ham_order',
+            mandatory: true,
+            cascadeRule: 'delete',
+        }),
+        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true }),
+        quantity: IntegerColumn({ label: 'Quantity', mandatory: true, default: 1, min: 1 }),
+        replaces_asset: ReferenceColumn({ label: 'Replaces asset', referenceTable: 'alm_hardware' }),
+        line_stage: ChoiceColumn({
+            label: 'Line stage',
+            choices: {
+                new: { label: 'New', sequence: 0 },
+                awaiting_stock: { label: 'Awaiting stock', sequence: 1 },
+                sourced: { label: 'Sourced', sequence: 2 },
+                staging: { label: 'Staging', sequence: 3 },
+                ready_to_ship: { label: 'Ready to ship', sequence: 4 },
+                shipped: { label: 'Shipped', sequence: 5 },
+                installed: { label: 'Installed', sequence: 6 },
+                in_service: { label: 'In service', sequence: 7 },
+                cancelled: { label: 'Cancelled', sequence: 8 },
+            },
+            default: 'new',
+            readOnly: true,
+            dropdown: 'dropdown_without_none',
+        }),
+        quantity_allocated: IntegerColumn({ label: 'Allocated from stock', readOnly: true, default: 0 }),
+        quantity_to_purchase: IntegerColumn({ label: 'To purchase', readOnly: true, default: 0 }),
+        sourcing_summary: StringColumn({ label: 'Sourcing', maxLength: 255, readOnly: true }),
+        transfer_order: ReferenceColumn({ label: 'Transfer order', referenceTable: 'alm_transfer_order' }),
+        purchase_order: ReferenceColumn({ label: 'Purchase order', referenceTable: 'proc_po' }),
+    },
+    autoNumber: { prefix: 'NOL', number: 1000, numberOfDigits: 7 },
+    index: [
+        { name: 'x_daas_ham_ol_order', unique: false, element: 'order' },
+        { name: 'x_daas_ham_ol_stage', unique: false, element: 'line_stage' },
+    ],
+})

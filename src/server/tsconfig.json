@@ -15,6 +15,12 @@
         "noImplicitReturns": true,
         "noFallthroughCasesInSwitch": true
     },
-    "include": ["./**/*.ts", "../../@types/**/*.modules.d.ts"],
-    "exclude": ["**/*.now.ts"]
+    "include": [
+        "./**/*.ts",
+        "../../@types/**/*.modules.d.ts"
+    ],
+    "exclude": [
+        "**/*.now.ts",
+        "**/*.test.ts"
+    ]
 }

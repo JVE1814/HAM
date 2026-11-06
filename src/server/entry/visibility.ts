@@ -1,0 +1,39 @@
+import type { GlideRecord } from '@servicenow/glide'
+import { visibilityFilter, type ScopingFields } from '../domain/visibility'
+import { currentSession } from '../platform/session'
+
+/** Before-query business rules that restrict lists and lookups to what the user may see (ADR 0005). */
+
+function restrict(current: GlideRecord, fields: ScopingFields): void {
+    const session = currentSession()
+    const filter = visibilityFilter(session.scope, fields, session)
+    if (filter) current.addEncodedQuery(filter)
+}
+
+export function scopeAssets(current: GlideRecord): void {
+    restrict(current, { stockroom: 'stockroom', customer: 'company', site: 'x_daas_ham_site' })
+}
+
+export function scopeStockrooms(current: GlideRecord): void {
+    restrict(current, { stockroom: 'sys_id', customer: 'x_daas_ham_customer' })
+}
+
+export function scopeTransferOrders(current: GlideRecord): void {
+    restrict(current, { stockroom: ['from_stockroom', 'to_stockroom'] })
+}
+
+export function scopeStagingTasks(current: GlideRecord): void {
+    restrict(current, { stockroom: 'asset.stockroom' })
+}
+
+export function scopeOrders(current: GlideRecord): void {
+    restrict(current, { customer: 'customer', site: 'site' })
+}
+
+export function scopeOrderLines(current: GlideRecord): void {
+    restrict(current, { customer: 'order.customer', site: 'order.site' })
+}
+
+export function scopeCustomerRecords(current: GlideRecord): void {
+    restrict(current, { customer: 'customer' })
+}
