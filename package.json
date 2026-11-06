@@ -15,7 +15,7 @@
         "transform": "now-sdk transform",
         "types": "now-sdk dependencies",
         "dev": "now-sdk run dev",
-        "typecheck": "tsc -p src/server/tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+        "typecheck": "tsc -p src/server/tsconfig.json --noEmit && tsc -p src/client/tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
         "test": "vitest run",
         "test:watch": "vitest",
         "lint": "eslint .",

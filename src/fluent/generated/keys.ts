@@ -205,6 +205,10 @@ declare global {
                         table: 'sys_security_acl'
                         id: '65c8557fe9e24fdb8b97b70cacb66e07'
                     }
+                    acl_page_warehouse: {
+                        table: 'sys_security_acl'
+                        id: '6d608091a82b485baeebd8bdfcc5548d'
+                    }
                     acl_site_template_create: {
                         table: 'sys_security_acl'
                         id: '387872bdcc1649ca89aa4846b86ac795'
@@ -521,6 +525,26 @@ declare global {
                         table: 'sys_ws_operation'
                         id: '3420cecc2054429c8bf6cf90bec268d8'
                     }
+                    rest_naas_lookup: {
+                        table: 'sys_ws_operation'
+                        id: '732f0e0fdfcb4d33b1675d78373ff959'
+                    }
+                    rest_naas_pick: {
+                        table: 'sys_ws_operation'
+                        id: '1d914ddd0ea5413eb6e2e7e25b941c58'
+                    }
+                    rest_naas_putaway: {
+                        table: 'sys_ws_operation'
+                        id: '39197dc6c02c44e7a375be2ff7f13aab'
+                    }
+                    rest_naas_receive: {
+                        table: 'sys_ws_operation'
+                        id: 'ba16ac8f45074fa38ddec4e7cba3daa3'
+                    }
+                    rest_naas_stockrooms: {
+                        table: 'sys_ws_operation'
+                        id: 'acdf5257c9bb49feba199e2d5b3cc8ef'
+                    }
                     rp_request_network_equipment: {
                         table: 'sc_cat_item_producer'
                         id: '5d455ea958a8443a8913cf053541396f'
@@ -641,6 +665,10 @@ declare global {
                         table: 'sys_module'
                         id: '3781fcd1162348a78455595994f00e3a'
                     }
+                    src_server_entry_warehouse_ts: {
+                        table: 'sys_module'
+                        id: '983d782a39784b5c9a50b47ed72d8efa'
+                    }
                     src_server_platform_agreements_ts: {
                         table: 'sys_module'
                         id: '7a6bee88125a4aae97d94ba2ee0807e6'
@@ -708,6 +736,10 @@ declare global {
                     src_server_platform_subscriptions_ts: {
                         table: 'sys_module'
                         id: '1fbd8b7c387d4742bbaeb2df4d112395'
+                    }
+                    src_server_platform_tags_ts: {
+                        table: 'sys_module'
+                        id: '9c28fc459ef5434ebad4ee6c96da3563'
                     }
                     src_server_platform_transfers_ts: {
                         table: 'sys_module'
@@ -920,6 +952,19 @@ declare global {
                                 id: 'd33813ebacca4b79aad41517026036d8'
                                 key: {
                                     name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '0032b380a5a74fe382a6855922ea94e9'
+                        key: {
+                            sys_security_acl: '6d608091a82b485baeebd8bdfcc5548d'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
                                 }
                             }
                         }
@@ -1640,6 +1685,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_model_match_rule'
                             element: 'order'
+                        }
+                    },
+                    {
+                        table: 'sn_glider_source_artifact_m2m'
+                        id: '0d31f59602cb48b9b2cd3921f853e02b'
+                        key: {
+                            application_file: 'a52d2309ef02498c8f2f2bcf8e9f13d4'
+                            source_artifact: '888663c7a08f49ebbf66191a4afa2175'
                         }
                     },
                     {
@@ -2676,6 +2729,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sn_glider_source_artifact_m2m'
+                        id: '27fe6b9c58d8452788c94e26d9f99201'
+                        key: {
+                            application_file: 'ac78f029ad284de4923492a694c71317'
+                            source_artifact: '888663c7a08f49ebbf66191a4afa2175'
+                        }
+                    },
+                    {
                         table: 'sys_db_object'
                         id: '28226696038446809d1e5b38906622a3'
                         key: {
@@ -2755,6 +2816,19 @@ declare global {
                             name: 'x_daas_ham_order'
                             element: 'customer'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '29ec38f2bc4a4a01adc0bf58a91c125a'
+                        key: {
+                            sys_security_acl: '6d608091a82b485baeebd8bdfcc5548d'
+                            sys_user_role: {
+                                id: 'b1a9a9832f01483a9c4e6fc55ca84188'
+                                key: {
+                                    name: 'x_daas_ham.field_tech'
+                                }
+                            }
                         }
                     },
                     {
@@ -4926,6 +5000,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sn_glider_source_artifact_m2m'
+                        id: '6ab5e322748f47228f9b2f9ab8b56e9a'
+                        key: {
+                            application_file: '8d4e5a21af6144ac8acdac640818908a'
+                            source_artifact: '888663c7a08f49ebbf66191a4afa2175'
+                        }
+                    },
+                    {
                         table: 'sys_db_object'
                         id: '6b04c9481f2542b19423f3a0e242011c'
                         key: {
@@ -6094,6 +6176,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sn_glider_source_artifact'
+                        id: '888663c7a08f49ebbf66191a4afa2175'
+                        key: {
+                            name: 'x_daas_ham_warehouse.do - BYOUI Files'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '88ce42602b8545eea7594c10912e3923'
                         key: {
@@ -6293,6 +6382,13 @@ declare global {
                             name: 'x_daas_ham_stockroom_member'
                             element: 'stockroom'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ux_lib_asset'
+                        id: '8d4e5a21af6144ac8acdac640818908a'
+                        key: {
+                            name: 'x_daas_ham/warehouse/main'
                         }
                     },
                     {
@@ -6591,6 +6687,14 @@ declare global {
                                     name: 'x_daas_ham.integration'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sn_glider_source_artifact_m2m'
+                        id: '91d99ce3138047d79bc632f084220c29'
+                        key: {
+                            application_file: 'cd1837f26ddb4deea75a4db3dfe89d76'
+                            source_artifact: '888663c7a08f49ebbf66191a4afa2175'
                         }
                     },
                     {
@@ -7296,6 +7400,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_page'
+                        id: 'a52d2309ef02498c8f2f2bcf8e9f13d4'
+                        key: {
+                            endpoint: 'x_daas_ham_warehouse.do'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'a536993d30c54b9abebbf7ed2decde5c'
                         key: {
@@ -7548,6 +7659,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ux_lib_asset'
+                        id: 'ac78f029ad284de4923492a694c71317'
+                        key: {
+                            name: 'x_daas_ham/warehouse/main.js.map'
+                        }
+                    },
+                    {
                         table: 'io_set_item'
                         id: 'acdc6c9f97cd48dfaac5921e0cbbaf2a'
                         key: {
@@ -7690,6 +7808,13 @@ declare global {
                             name: 'x_daas_ham_model_lifecycle'
                             element: 'source'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ux_lib_asset'
+                        id: 'b0978c99f340487e9f32eb3883dd6232'
+                        key: {
+                            name: 'x_daas_ham/vendor-react-dom--55da69dc'
                         }
                     },
                     {
@@ -8789,6 +8914,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ux_lib_asset'
+                        id: 'cd1837f26ddb4deea75a4db3dfe89d76'
+                        key: {
+                            name: 'x_daas_ham/vendor-react-dom--55da69dc.js.map'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'cd3dd6abe08a4ea49918f66f4b7e8843'
                         key: {
@@ -9547,6 +9679,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sn_glider_source_artifact_m2m'
+                        id: 'e04f8be0b14542b097a43ed3105b8cb0'
+                        key: {
+                            application_file: 'b0978c99f340487e9f32eb3883dd6232'
+                            source_artifact: '888663c7a08f49ebbf66191a4afa2175'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'e10589566ad74279ba1d75aad6395876'
                         key: {
@@ -9915,6 +10055,19 @@ declare global {
                         key: {
                             category: 'x_daas_ham_order'
                             prefix: 'NORD'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'ec01e9c511ac46638349bbece4acfa14'
+                        key: {
+                            sys_security_acl: '6d608091a82b485baeebd8bdfcc5548d'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {

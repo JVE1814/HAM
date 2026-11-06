@@ -8,6 +8,16 @@
             "DOM"
         ],
         "jsx": "preserve",
-        "skipLibCheck": true
-    }
+        "skipLibCheck": true,
+        "strict": true,
+        "noEmit": true,
+        "types": []
+    },
+    "include": [
+        "./**/*.ts",
+        "./**/*.tsx"
+    ],
+    "exclude": [
+        "./**/*.test.ts"
+    ]
 }
