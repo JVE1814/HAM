@@ -1,0 +1,225 @@
+# NaaS Hardware Asset Management
+
+The language of a Network-as-a-Service provider that supplies, installs, runs, replaces and refreshes
+network equipment at its customers' sites and bills it as a service.
+
+## Language
+
+### Parties and places
+
+**Provider**:
+The NaaS company operating this application and (usually) owning the equipment.
+_Avoid_: MSP, vendor, us
+
+**Customer**:
+An organisation that subscribes to the Provider's network services; represented by a CSM account.
+_Avoid_: client, tenant, company (except when naming the platform field)
+
+**Customer admin**:
+A person at the Customer who orders, raises faults, approves off-catalog requests and attests inventory.
+_Avoid_: customer IT, requester
+
+**Site contact**:
+A person at one of the Customer's Sites who confirms deliveries and installs and handles self-installs.
+_Avoid_: local contact, end user
+
+**Site**:
+A Customer location where equipment is installed (branch, campus, data centre).
+_Avoid_: location (too generic), premises
+
+**Room**:
+A space inside a Site that holds equipment, such as an MDF, IDF or data-centre hall.
+_Avoid_: closet, cabinet
+
+**Rack**:
+A frame in a Room whose rack units hold equipment.
+
+**Lessor**:
+A financier that legally owns leased equipment the Provider uses.
+_Avoid_: leasing company, bank
+
+### Equipment
+
+**Asset**:
+The tracked record of one serialised physical piece of equipment across its whole life.
+_Avoid_: device (for the record), CI, hardware
+
+**Chassis**:
+An Asset that is a complete network device (switch, AP, router, firewall).
+
+**FRU**:
+A serialised field-replaceable unit (module, supervisor, power supply) tracked as a child of its Chassis.
+_Avoid_: component, part
+
+**Stack member**:
+A Chassis that operates as one unit of a switch stack; tracked individually.
+
+**Optic**:
+A transceiver or cable counted as stock quantities rather than tracked individually, unless its Model is marked track-as-asset.
+_Avoid_: SFP (one kind of Optic), consumable
+
+**Model**:
+The canonical product an Asset is an instance of, identified by its OEM PID.
+_Avoid_: product, SKU, part number
+
+**OEM PID**:
+The manufacturer's product identifier for a Model (e.g. a Cisco product ID).
+
+**Device class**:
+The functional category of a Model (switch, AP, router, firewall, module, PSU, optic).
+
+**Configuration item**:
+The monitored/discovered representation of an Asset in the CMDB.
+_Avoid_: CI (in prose), device
+
+**Provider tag**:
+The barcode identifier the Provider prints and attaches to an Asset at receiving.
+_Avoid_: asset tag (ambiguous), label
+
+**Customer tag**:
+An optional identifier a Customer assigns to an Asset in its own numbering scheme.
+
+**Legal owner**:
+Who owns an Asset: the Provider, the Customer, or a Lessor.
+_Avoid_: owner (ambiguous with assigned person)
+
+### Lifecycle
+
+**Lifecycle stage**:
+Where an Asset is in its life (e.g. available, staging, in service, pending return), expressed through the platform's install status and substatus.
+_Avoid_: state, status (alone)
+
+**Lifecycle phase**:
+Where a Model is in its manufacturer's support life: available, end of sale, end of support, end of extended support, end of life.
+_Avoid_: EoX status, EOL (when meaning the phase in general)
+
+**In service**:
+An Asset installed at a Site and seen by monitoring; the moment billing starts.
+_Avoid_: live, active, deployed
+
+**Seen signal**:
+Evidence from Discovery, a connector or the Provider's NMS that an Asset is alive on the network.
+_Avoid_: heartbeat, ping
+
+**Refresh due date**:
+The date by which an in-service Asset must be replaced, from the Agreement's refresh cycle or its Model's end of support.
+
+### Commercial
+
+**Agreement**:
+The commercial contract between the Provider and a Customer that sets terms, quantities and service levels.
+_Avoid_: contract (also used for leases and OEM coverage), subscription
+
+**Contracted quantity**:
+How many Assets of a Device class or Model an Agreement allows to be deployed.
+_Avoid_: quota, entitlement
+
+**Subscription line**:
+A billable service line of an Agreement (a site package or a device-class line) that delivering Assets are attached to.
+_Avoid_: service line, billing line, subscription
+
+**Catalog entry**:
+A Model or Site template a Customer may order under its Agreement.
+_Avoid_: approved model list, customer catalog
+
+**Site template**:
+A named bill of materials describing the standard equipment for a kind of Site.
+_Avoid_: BOM, bundle, kit
+
+**Spare pool**:
+In-stock Assets reserved for one Customer's replacements, sized by the Agreement's spare-pool ratio.
+_Avoid_: spares, buffer stock
+
+**Fee event**:
+A one-off charge to a Customer for a lost, damaged or late-returned Asset.
+_Avoid_: penalty, surcharge
+
+### Fulfilment
+
+**Order**:
+A request to deliver equipment to a Site: a site rollout, a device add or a device replace.
+_Avoid_: request, RITM, ticket
+
+**Order line**:
+One Model and quantity within an Order, carried through sourcing, staging, delivery and install.
+
+**Sourcing**:
+Choosing where an Order line's Assets come from: the Customer's Spare pool, a customer-site stockroom, a central depot, or a purchase.
+_Avoid_: allocation, fulfilment
+
+**Stockroom**:
+A place holding stock: a central depot, a staging centre or a customer-site stockroom.
+_Avoid_: warehouse (one kind of Stockroom)
+
+**ASN**:
+An advance shipment notice from a distributor listing serials in transit for a purchase order.
+
+**Staging**:
+Preparing an Asset before shipment (golden firmware, base config, licensing, controller claim, burn-in, label).
+_Avoid_: imaging, provisioning, prep
+
+**Staging source**:
+Whether an Asset is staged in-house or pre-staged by the distributor (which then only needs verification).
+
+**Install mode**:
+How an Asset gets installed: FSM engineer, Customer self-install, subcontractor or data-centre remote hands.
+_Avoid_: delivery method
+
+**Maintenance window**:
+The recurring time at a Site during which on-site changes may be carried out.
+
+### After-sales
+
+**Replacement order**:
+The Provider's response to a failed in-service Asset: a replacement from a Spare pool or the OEM, raised from a case.
+_Avoid_: RMA (that is the OEM's), break-fix ticket, swap
+
+**OEM RMA**:
+A return authorisation the Provider opens with the manufacturer for a defective Asset.
+
+**OEM coverage**:
+The manufacturer support contract covering one Asset's serial number, with its service level and end date.
+_Avoid_: warranty (one kind of coverage), SmartNet
+
+**Refresh order**:
+A planned replacement of Assets reaching their Refresh due date, with the old Assets returned.
+
+**Return order**:
+Bringing Assets back from a Site (decommission, removal, refresh swap-back, agreement end, defective return).
+_Avoid_: reclamation, RMA
+
+**Disposal order**:
+Retiring Assets for good by resale, OEM takeback, recycling, or return to the Customer or Lessor.
+
+**Wipe evidence**:
+Proof that an Asset's configuration, keys and credentials were erased before it left the Provider's control.
+
+**Temporary deployment**:
+Equipment installed for a fixed period (event, pop-up site, trial) that returns automatically at the end.
+_Avoid_: loaner
+
+**Audit**:
+A check of what is physically present against what is expected, in a Stockroom (blind count) or at a Site.
+_Avoid_: stocktake, inventory
+
+**Attestation**:
+A Customer admin's periodic confirmation of the Assets installed at their Sites.
+
+**Reconciliation exception**:
+A disagreement between Assets and monitoring (seen but unknown, deployed but unseen, serial or location mismatch).
+
+### Money
+
+**Lease schedule**:
+A financing contract with a Lessor covering a set of Assets until an end date.
+
+**Billing period**:
+A calendar month of prorated Subscription line charges and Fee events, locked once closed.
+_Avoid_: invoice (issued by finance, not here)
+
+**Cost fact**:
+A cost attributed to an Asset or Site (purchase, lease, OEM support, field labour) used for Margin.
+
+**Margin**:
+Subscription and fee revenue minus Cost facts, per Customer or Site.
+_Avoid_: profit, TCO (cost only)
