@@ -91,9 +91,21 @@ export function assessOrder(request: OrderRequest, context: EntitlementContext):
     })
 
     const findings = [...offCatalog, ...overQuota]
-    if (overQuota.length > 0) return { verdict: 'over_quota', approvers: ['customer_admin', 'account_manager'], findings }
-    if (offCatalog.length > 0) return { verdict: 'off_catalog', approvers: ['customer_admin'], findings }
-    return { verdict: 'within_agreement', approvers: [], findings }
+    const verdict: EntitlementVerdict =
+        overQuota.length > 0 ? 'over_quota' : offCatalog.length > 0 ? 'off_catalog' : 'within_agreement'
+    return { verdict, approvers: approversFor(verdict), findings }
+}
+
+/** Who must approve an Order with this verdict. */
+export function approversFor(verdict: EntitlementVerdict | ''): Approver[] {
+    switch (verdict) {
+        case 'over_quota':
+            return ['customer_admin', 'account_manager']
+        case 'off_catalog':
+            return ['customer_admin']
+        default:
+            return []
+    }
 }
 
 function sum(values: number[]): number {

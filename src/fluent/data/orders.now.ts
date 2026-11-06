@@ -1,5 +1,6 @@
 import '@servicenow/sdk/global'
 import {
+    BooleanColumn,
     ChoiceColumn,
     DateColumn,
     IntegerColumn,
@@ -102,6 +103,7 @@ export const x_daas_ham_order_line = Table({
         model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true }),
         quantity: IntegerColumn({ label: 'Quantity', mandatory: true, default: 1, min: 1 }),
         replaces_asset: ReferenceColumn({ label: 'Replaces asset', referenceTable: 'alm_hardware' }),
+        from_site_template: BooleanColumn({ label: 'From site template', default: false, readOnly: true }),
         line_stage: ChoiceColumn({
             label: 'Line stage',
             choices: {

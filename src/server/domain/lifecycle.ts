@@ -99,7 +99,7 @@ const ALLOWED_MOVES: Record<Stage, readonly Stage[]> = {
     available: ['reserved', 'spare_pool', 'staging', 'pending_evaluation', 'pending_wipe', 'missing'],
     spare_pool: ['reserved', 'available', 'staging', 'shipped', 'pending_in_service', 'missing'],
     reserved: ['staging', 'available', 'spare_pool', 'missing'],
-    staging: ['staged', 'pending_evaluation'],
+    staging: ['staged', 'pending_evaluation', 'available'],
     staged: ['shipped', 'available', 'spare_pool'],
     shipped: ['pending_in_service', 'pending_return', 'missing'],
     pending_in_service: ['in_service', 'temporary_deployment', 'pending_return'],
@@ -185,4 +185,20 @@ function checkRetirement(to: Stage, facts: TransitionFacts): TransitionVerdict {
         return { allowed: false, reason: 'Record wipe evidence before the asset leaves the provider' }
     }
     return { allowed: true }
+}
+
+export const DEPLOYED_STAGES: readonly Stage[] = [...AT_OR_TOWARDS_SITE]
+
+/**
+ * An encoded query matching assets in any of `stages` (and `base`, repeated per clause because
+ * ^NQ starts a new top-level OR group).
+ */
+export function stagesQuery(stages: readonly Stage[], base = ''): string {
+    return stages
+        .map((stage) => {
+            const { installStatus, substatus } = STAGE_FIELDS[stage]
+            const clause = `install_status=${installStatus}^${substatus ? `substatus=${substatus}` : 'substatusISEMPTY'}`
+            return base ? `${base}^${clause}` : clause
+        })
+        .join('^NQ')
 }

@@ -1,0 +1,95 @@
+import '@servicenow/sdk/global'
+import { Property } from '@servicenow/sdk/core'
+import { admin } from '../security/roles.now'
+
+/* Tunables read via platform/properties.ts. */
+
+Property({
+    $id: Now.ID['prop_job_batch_size'],
+    name: 'x_daas_ham.job.batch_size',
+    type: 'integer',
+    value: 500,
+    description: 'Records fetched per batch by chunked background jobs.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_job_budget_seconds'],
+    name: 'x_daas_ham.job.budget_seconds',
+    type: 'integer',
+    value: 120,
+    description: 'Seconds a chunked job may run before pausing; the next run resumes where it stopped.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_provider_company'],
+    name: 'x_daas_ham.provider_company',
+    type: 'string',
+    value: '',
+    description: "sys_id of the Provider's own core_company record (company of unassigned stock).",
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_tag_prefix'],
+    name: 'x_daas_ham.tag.prefix',
+    type: 'string',
+    value: 'NAAS',
+    description: 'Prefix of Provider tags printed at receiving (e.g. NAAS-0000042).',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_tag_digits'],
+    name: 'x_daas_ham.tag.digits',
+    type: 'integer',
+    value: 7,
+    description: 'Digits in the number part of a Provider tag.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_staging_stockroom'],
+    name: 'x_daas_ham.staging.default_stockroom',
+    type: 'string',
+    value: '',
+    description: 'sys_id of the staging-centre stockroom reserved stock is transferred to and purchases are shipped to.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_events_max_batch'],
+    name: 'x_daas_ham.events.max_batch',
+    type: 'integer',
+    value: 500,
+    description: 'Maximum device events accepted per REST request.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_events_retention_days'],
+    name: 'x_daas_ham.events.retention_days',
+    type: 'integer',
+    value: 90,
+    description: 'Days device events are kept.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_spare_auto_purchase'],
+    name: 'x_daas_ham.spare_pool.auto_purchase',
+    type: 'boolean',
+    value: false,
+    description: 'When true, the spare-pool top-up job requests purchase orders for shortfalls central stock cannot cover.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_unseen_days'],
+    name: 'x_daas_ham.reconciliation.unseen_days',
+    type: 'integer',
+    value: 7,
+    description: 'Days without a Seen signal before a deployed asset is reported as unseen.',
+    roles: { read: [admin], write: [admin] },
+})

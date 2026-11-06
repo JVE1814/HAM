@@ -2,6 +2,9 @@ import type { GlideRecord } from '@servicenow/glide'
 import { visibilityFilter, type ScopingFields } from '../domain/visibility'
 import { currentSession } from '../platform/session'
 
+// Entry points: parameter names must be the platform globals (current, previous, event, request,
+// response) because the SDK's generated wrapper passes them by name.
+
 /** Before-query business rules that restrict lists and lookups to what the user may see (ADR 0005). */
 
 function restrict(current: GlideRecord, fields: ScopingFields): void {

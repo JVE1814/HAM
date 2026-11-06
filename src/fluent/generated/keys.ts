@@ -349,6 +349,18 @@ declare global {
                         table: 'sys_module'
                         id: '54fee68272ec4334b7a4324797f71ec7'
                     }
+                    br_asset_enforce_lifecycle: {
+                        table: 'sys_script'
+                        id: 'ae9cbf9985044de48fc8e2da45c5ff4d'
+                    }
+                    br_asset_stage_to_order_line: {
+                        table: 'sys_script'
+                        id: 'f712caf500154d8ea81c399fe85d3247'
+                    }
+                    br_order_approval_decision: {
+                        table: 'sys_script'
+                        id: '4daad0b1f16b413e96115bd4a55f946a'
+                    }
                     br_scope_agreement: {
                         table: 'sys_script'
                         id: 'f9e5be95c87b4c9f8b5bec4f5a3cc722'
@@ -385,21 +397,233 @@ declare global {
                         table: 'sys_script'
                         id: '1c7d831919994188a29a4ff738f62090'
                     }
+                    br_staging_closed: {
+                        table: 'sys_script'
+                        id: '129c2d2080bb470d8124f7125475bb6c'
+                    }
+                    br_staging_guard_closure: {
+                        table: 'sys_script'
+                        id: 'e984baa5527c44e89349b6959871301d'
+                    }
+                    br_staging_step_stamp: {
+                        table: 'sys_script'
+                        id: 'd93d4d0bcace4717b89350c742437a20'
+                    }
+                    br_work_order_closed: {
+                        table: 'sys_script'
+                        id: 'ebf8b2a2f98c4abdbe25b0004ce5cae0'
+                    }
+                    br_work_order_window: {
+                        table: 'sys_script'
+                        id: 'd3b862c478b84e1d8b164a8e6084e011'
+                    }
+                    event_order_source: {
+                        table: 'sysevent_register'
+                        id: 'd4fddacdde31412b82b69e2d52b83261'
+                    }
+                    job_in_service_detection: {
+                        table: 'sysauto_script'
+                        id: '3cb429e59cd649dfa00e1baa560e354e'
+                    }
+                    job_purge_device_events: {
+                        table: 'sysauto_script'
+                        id: 'ec83f327d74542ea858513e6a8c3edc3'
+                    }
                     package_json: {
                         table: 'sys_module'
                         id: '868b3cfa23784eeca9561f3bf685c420'
+                    }
+                    prop_events_max_batch: {
+                        table: 'sys_properties'
+                        id: '4c50c1db170e46449995461a795cfaf8'
+                    }
+                    prop_events_retention_days: {
+                        table: 'sys_properties'
+                        id: 'eeac203ddd7040dab35a11de29209092'
+                    }
+                    prop_job_batch_size: {
+                        table: 'sys_properties'
+                        id: '65a2a3d05b2e4066924c7f01d9ae7e3e'
+                    }
+                    prop_job_budget_seconds: {
+                        table: 'sys_properties'
+                        id: 'a5c243aed8664adf9af7adb5940ca36e'
+                    }
+                    prop_provider_company: {
+                        table: 'sys_properties'
+                        id: '91c10c87debf4437b7b4d8730f630fe6'
+                    }
+                    prop_spare_auto_purchase: {
+                        table: 'sys_properties'
+                        id: '988248bc7e6f4246aa57616152699889'
+                    }
+                    prop_staging_stockroom: {
+                        table: 'sys_properties'
+                        id: '2a873447a42948959ece66693261c580'
+                    }
+                    prop_tag_digits: {
+                        table: 'sys_properties'
+                        id: '58e64b5fcad645759216ee7f67d624a9'
+                    }
+                    prop_tag_prefix: {
+                        table: 'sys_properties'
+                        id: '99b3af8db83340799a2ecb6a3165e0f1'
+                    }
+                    prop_unseen_days: {
+                        table: 'sys_properties'
+                        id: '8978e214b7cc4ce5b4f7f9f239d65489'
+                    }
+                    rest_naas: {
+                        table: 'sys_ws_definition'
+                        id: 'b52375855cae443c8902244adc796d5f'
+                    }
+                    rest_naas_device_events: {
+                        table: 'sys_ws_operation'
+                        id: '3420cecc2054429c8bf6cf90bec268d8'
+                    }
+                    rp_request_network_equipment: {
+                        table: 'sc_cat_item_producer'
+                        id: '5d455ea958a8443a8913cf053541396f'
+                    }
+                    sa_order_source: {
+                        table: 'sysevent_script_action'
+                        id: '0adefbcda0cf4aaab63825b57a928fe4'
+                    }
+                    src_server_domain_approvals_ts: {
+                        table: 'sys_module'
+                        id: 'eec690c6e1934dc19c38fe85e60110f4'
+                    }
+                    src_server_domain_asn_ts: {
+                        table: 'sys_module'
+                        id: 'ca54425d553a43cd8416dee48a2da7b0'
+                    }
+                    src_server_domain_calendar_ts: {
+                        table: 'sys_module'
+                        id: '7461777040a24dc0a39e08bc4a774cc4'
+                    }
+                    'src_server_domain_chunked-job_ts': {
+                        table: 'sys_module'
+                        id: '66a9e5e6194444a49fe62905319c8113'
+                    }
+                    'src_server_domain_device-events_ts': {
+                        table: 'sys_module'
+                        id: 'e44a4df9fc464258a320aa05a33d25fc'
+                    }
+                    src_server_domain_entitlement_ts: {
+                        table: 'sys_module'
+                        id: 'a466182b22e144d0bef3523185c6cb68'
+                    }
+                    src_server_domain_fulfilment_ts: {
+                        table: 'sys_module'
+                        id: 'a9525a96b50a4fcaab6c97c42738645b'
+                    }
+                    'src_server_domain_in-service_ts': {
+                        table: 'sys_module'
+                        id: '8564a8a9d7d14e39b995ef679e5a0c70'
                     }
                     src_server_domain_lifecycle_ts: {
                         table: 'sys_module'
                         id: '66118dbddb2b499e9ec71d75e49c9d34'
                     }
+                    'src_server_domain_model-lifecycle_ts': {
+                        table: 'sys_module'
+                        id: '1ab1430e2cc24d0db5823748a547d90e'
+                    }
+                    src_server_domain_normalization_ts: {
+                        table: 'sys_module'
+                        id: '7f5e18f231284281a67768a258883020'
+                    }
+                    'src_server_domain_provider-tag_ts': {
+                        table: 'sys_module'
+                        id: '232e01a556fc4e95bea01c86f6baf5f5'
+                    }
+                    src_server_domain_scheduling_ts: {
+                        table: 'sys_module'
+                        id: '70901aff85264a03b64caaaaf627143d'
+                    }
+                    src_server_domain_sourcing_ts: {
+                        table: 'sys_module'
+                        id: '5d9175c379eb44d897c8d889b00da54f'
+                    }
+                    src_server_domain_staging_ts: {
+                        table: 'sys_module'
+                        id: '6544c45b3f2d4508ba508c33ebffe964'
+                    }
                     src_server_domain_visibility_ts: {
                         table: 'sys_module'
                         id: '41f4b809ba674a7b9783da8f02e6a629'
                     }
+                    src_server_entry_assets_ts: {
+                        table: 'sys_module'
+                        id: '95edc36f9b974249b1dff9dfe2d79015'
+                    }
+                    src_server_entry_delivery_ts: {
+                        table: 'sys_module'
+                        id: 'b52eda6b1d484aaa91c13d6057ea87bd'
+                    }
+                    'src_server_entry_in-service_ts': {
+                        table: 'sys_module'
+                        id: 'ad6b24c3723f412c8adfe16a8f65005f'
+                    }
+                    src_server_entry_orders_ts: {
+                        table: 'sys_module'
+                        id: 'e0455e5dc36d4b23880972354f003eb9'
+                    }
+                    src_server_entry_staging_ts: {
+                        table: 'sys_module'
+                        id: 'f1c5a52225e44c8d9c224a58ee4e8ecb'
+                    }
+                    'src_server_entry_ui-actions_ts': {
+                        table: 'sys_module'
+                        id: 'c63de99d64df41029e12f7b4897fec1e'
+                    }
                     src_server_entry_visibility_ts: {
                         table: 'sys_module'
                         id: '3781fcd1162348a78455595994f00e3a'
+                    }
+                    src_server_platform_agreements_ts: {
+                        table: 'sys_module'
+                        id: '7a6bee88125a4aae97d94ba2ee0807e6'
+                    }
+                    src_server_platform_approvals_ts: {
+                        table: 'sys_module'
+                        id: 'd468b0b5ac1a4e869f1728ab7ac91030'
+                    }
+                    src_server_platform_assets_ts: {
+                        table: 'sys_module'
+                        id: '64007da49c55498eac75188cbad4c7bc'
+                    }
+                    src_server_platform_chunked_ts: {
+                        table: 'sys_module'
+                        id: '3d992cdf9e2447bd89a824a94f2280bd'
+                    }
+                    src_server_platform_clock_ts: {
+                        table: 'sys_module'
+                        id: '401af081928d430898e921643f5942ce'
+                    }
+                    src_server_platform_events_ts: {
+                        table: 'sys_module'
+                        id: '33a35be1761245e380a76999fa5bd4fa'
+                    }
+                    'src_server_platform_field-work_ts': {
+                        table: 'sys_module'
+                        id: '548ae34d646d4099a4ccb4d9276df243'
+                    }
+                    src_server_platform_fulfilment_ts: {
+                        table: 'sys_module'
+                        id: '20f956463f92428b85a5cd4c6f22c388'
+                    }
+                    'src_server_platform_lifecycle-dates_ts': {
+                        table: 'sys_module'
+                        id: '799d3e78a7604861a5f1cfaeae905bf1'
+                    }
+                    src_server_platform_procurement_ts: {
+                        table: 'sys_module'
+                        id: '950b1f7403d94c8ea747daea130a24fd'
+                    }
+                    src_server_platform_properties_ts: {
+                        table: 'sys_module'
+                        id: '90f4209ae2a64e0cb258a8f62fdb940b'
                     }
                     src_server_platform_records_ts: {
                         table: 'sys_module'
@@ -408,6 +632,42 @@ declare global {
                     src_server_platform_session_ts: {
                         table: 'sys_module'
                         id: 'ff6163d33d6e493890b5e2c135ad7997'
+                    }
+                    'src_server_platform_staging-tasks_ts': {
+                        table: 'sys_module'
+                        id: '35e58e7c8cdf48499523a2fa163300d9'
+                    }
+                    src_server_platform_stock_ts: {
+                        table: 'sys_module'
+                        id: '526ee7b2694d440d9fa9bcb902dd11de'
+                    }
+                    src_server_platform_subscriptions_ts: {
+                        table: 'sys_module'
+                        id: '1fbd8b7c387d4742bbaeb2df4d112395'
+                    }
+                    src_server_platform_transfers_ts: {
+                        table: 'sys_module'
+                        id: '901d844c27ad469a80cd544e9e926b35'
+                    }
+                    ua_order_cancel: {
+                        table: 'sys_ui_action'
+                        id: 'c7072aadd3784b3fa524377fbc646e54'
+                    }
+                    ua_order_confirm_installed: {
+                        table: 'sys_ui_action'
+                        id: '8a112dc5b1f648bea3d1fa1667f7b338'
+                    }
+                    ua_order_ship: {
+                        table: 'sys_ui_action'
+                        id: '11a5a038729b42ba8af26144c152c48e'
+                    }
+                    ua_order_submit: {
+                        table: 'sys_ui_action'
+                        id: 'bf6325cd4aeb4308843702357c40b64c'
+                    }
+                    vs_order_devices: {
+                        table: 'item_option_new_set'
+                        id: '1db668e49f964e40bd59263b5c40a25b'
                     }
                     xsp_alm_asset_read: {
                         table: 'sys_scope_privilege'
@@ -614,6 +874,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_action_role'
+                        id: '0093e332e1d34401911241ffb084bda4'
+                        key: {
+                            sys_ui_action: '11a5a038729b42ba8af26144c152c48e'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '00a8f6b1a6ab4fdba82f073c8fa84751'
                         key: {
@@ -795,6 +1068,19 @@ declare global {
                             value: 'in_house'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: '03c17c5a704343a7af0410f7b826ec2e'
+                        key: {
+                            sys_ui_action: '11a5a038729b42ba8af26144c152c48e'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
                         }
                     },
                     {
@@ -999,6 +1285,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'question_choice'
+                        id: '0838bcbbd0a94cc59312c60ac75e2062'
+                        key: {
+                            question: {
+                                id: '36f05e19dce742b695f6db51de0ff636'
+                                key: {
+                                    cat_item: '5d455ea958a8443a8913cf053541396f'
+                                    variable_set: 'NULL'
+                                    name: 'install_mode'
+                                }
+                            }
+                            value: 'fsm_engineer'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '08427e6e1b1a40d488369694ba0e9216'
                         key: {
@@ -1106,6 +1407,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'item_option_new'
+                        id: '0992fd49d3ed40dc8c168709d2031b23'
+                        key: {
+                            cat_item: '5d455ea958a8443a8913cf053541396f'
+                            variable_set: 'NULL'
+                            name: 'site'
+                        }
+                    },
+                    {
                         table: 'sys_user_role_contains'
                         id: '09934c64d7224c5c9443fc3e3deb9216'
                         key: {
@@ -1200,6 +1510,19 @@ declare global {
                         id: '0c282c2eda924d48a5c2b0f454367ddd'
                         key: {
                             name: 'alm_hardware'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: '0c5c45de95174d029fdfafa26645ced4'
+                        key: {
+                            sys_ui_action: 'c7072aadd3784b3fa524377fbc646e54'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -1901,6 +2224,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_action_role'
+                        id: '1e6c1838a6dc4e6da903507b8cd0d39a'
+                        key: {
+                            sys_ui_action: '8a112dc5b1f648bea3d1fa1667f7b338'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '1e7dad1c9dd144aa9fb08166c9f4acb3'
                         key: {
@@ -1922,6 +2258,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_job_cursor'
                             element: 'last_run'
+                        }
+                    },
+                    {
+                        table: 'item_option_new'
+                        id: '1f2dd1b71fad477898b6d64230fdeec0'
+                        key: {
+                            cat_item: '5d455ea958a8443a8913cf053541396f'
+                            variable_set: 'NULL'
+                            name: 'site_template'
                         }
                     },
                     {
@@ -2042,6 +2387,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '22fdf3085a6f4f18b3fe94da6a89a56f'
+                        key: {
+                            name: 'x_daas_ham_order_line'
+                            element: 'from_site_template'
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: '23151682155d430593864dd231ca0397'
                         key: {
@@ -2115,6 +2468,19 @@ declare global {
                             name: 'x_daas_ham_order'
                             element: 'NULL'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: '25998807b642418487107a220b4ac47c'
+                        key: {
+                            sys_ui_action: '8a112dc5b1f648bea3d1fa1667f7b338'
+                            sys_user_role: {
+                                id: '104c293b21934f30966cd88c879e4008'
+                                key: {
+                                    name: 'x_daas_ham.site_contact'
+                                }
+                            }
                         }
                     },
                     {
@@ -2569,6 +2935,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'question_choice'
+                        id: '329bccf3b6554bdf80eaa15bb1aa6f46'
+                        key: {
+                            question: {
+                                id: '36f05e19dce742b695f6db51de0ff636'
+                                key: {
+                                    cat_item: '5d455ea958a8443a8913cf053541396f'
+                                    variable_set: 'NULL'
+                                    name: 'install_mode'
+                                }
+                            }
+                            value: 'remote_hands'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '32d2ed2970464c358b1f5bb3acd1ee35'
                         key: {
@@ -2619,6 +3000,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_order_line'
                             element: 'line_stage'
+                        }
+                    },
+                    {
+                        table: 'item_option_new'
+                        id: '346540a15e3d43a2a5e411888dfb522c'
+                        key: {
+                            cat_item: '5d455ea958a8443a8913cf053541396f'
+                            variable_set: 'NULL'
+                            name: 'end_date'
                         }
                     },
                     {
@@ -2677,6 +3067,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_action_role'
+                        id: '35545da768e045648d01ee7604272080'
+                        key: {
+                            sys_ui_action: 'c7072aadd3784b3fa524377fbc646e54'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '35afcb13b02a4f57be1a10101d2a3e0b'
                         key: {
@@ -2707,6 +3110,15 @@ declare global {
                         id: '369e4a1bcfc54fb38605149dc901ed02'
                         key: {
                             name: 'change_request'
+                        }
+                    },
+                    {
+                        table: 'item_option_new'
+                        id: '36f05e19dce742b695f6db51de0ff636'
+                        key: {
+                            cat_item: '5d455ea958a8443a8913cf053541396f'
+                            variable_set: 'NULL'
+                            name: 'install_mode'
                         }
                     },
                     {
@@ -3474,6 +3886,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_action_role'
+                        id: '4dbcfd4bbe3e4300b36608df070975c6'
+                        key: {
+                            sys_ui_action: '8a112dc5b1f648bea3d1fa1667f7b338'
+                            sys_user_role: {
+                                id: 'fd154cb7b91e4ef5aa4da43a7344134d'
+                                key: {
+                                    name: 'x_daas_ham.customer_admin'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '4dc3b17be1f3470dbade5145635f99a8'
                         key: {
@@ -3544,6 +3969,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_manufacturer_alias'
                             element: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'item_option_new'
+                        id: '510ded7de22e49ad8e73ce2e7cb114d2'
+                        key: {
+                            cat_item: '5d455ea958a8443a8913cf053541396f'
+                            variable_set: 'NULL'
+                            name: 'notes'
                         }
                     },
                     {
@@ -3987,6 +4421,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_action_role'
+                        id: '6176bf324a40454dafa7d3695efc24c2'
+                        key: {
+                            sys_ui_action: 'bf6325cd4aeb4308843702357c40b64c'
+                            sys_user_role: {
+                                id: '7437b61dfc9148a89190795888a94292'
+                                key: {
+                                    name: 'sn_customerservice_agent'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '61788fc798fd498bbe64a13718f19226'
                         key: {
@@ -4358,6 +4805,15 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'item_option_new'
+                        id: '6efa63316d6b442ea85e85d17069a440'
+                        key: {
+                            cat_item: 'NULL'
+                            variable_set: '1db668e49f964e40bd59263b5c40a25b'
+                            name: 'model'
                         }
                     },
                     {
@@ -4759,6 +5215,24 @@ declare global {
                         }
                     },
                     {
+                        table: 'item_option_new'
+                        id: '78fc660209cb4b7cb7a0e51bed34967d'
+                        key: {
+                            cat_item: '5d455ea958a8443a8913cf053541396f'
+                            variable_set: 'NULL'
+                            name: 'order_type'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '7923f6292ae44c69943dbd110ced326b'
+                        key: {
+                            name: 'x_daas_ham_order_line'
+                            element: 'from_site_template'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'ua_table_licensing_config'
                         id: '79336452863546b8b9c4667653dcd483'
                         key: {
@@ -4934,6 +5408,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'question_choice'
+                        id: '7f8196d48ca647c2bd3312a69cfbc014'
+                        key: {
+                            question: {
+                                id: '78fc660209cb4b7cb7a0e51bed34967d'
+                                key: {
+                                    cat_item: '5d455ea958a8443a8913cf053541396f'
+                                    variable_set: 'NULL'
+                                    name: 'order_type'
+                                }
+                            }
+                            value: 'device_replace'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '7fcc66261ab44681802e54e02deab6d8'
                         key: {
@@ -4955,6 +5444,19 @@ declare global {
                             value: 'pending_oem_rma'
                             language: 'en'
                             dependent_value: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: '804256cc85d549a09426373738a55d9f'
+                        key: {
+                            sys_ui_action: 'bf6325cd4aeb4308843702357c40b64c'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -5161,6 +5663,21 @@ declare global {
                         key: {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_lessor'
+                        }
+                    },
+                    {
+                        table: 'question_choice'
+                        id: '8598c9809cd14e53a3214121d37c0b44'
+                        key: {
+                            question: {
+                                id: '36f05e19dce742b695f6db51de0ff636'
+                                key: {
+                                    cat_item: '5d455ea958a8443a8913cf053541396f'
+                                    variable_set: 'NULL'
+                                    name: 'install_mode'
+                                }
+                            }
+                            value: 'subcontractor'
                         }
                     },
                     {
@@ -5567,6 +6084,15 @@ declare global {
                             value: 'optic'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'item_option_new'
+                        id: '8ec1c9e7df824f2fa7ac0a4bee96c8b2'
+                        key: {
+                            cat_item: '5d455ea958a8443a8913cf053541396f'
+                            variable_set: 'NULL'
+                            name: 'agreement'
                         }
                     },
                     {
@@ -6108,6 +6634,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_action_role'
+                        id: '9bbb713362e0453b9a05b93f00877104'
+                        key: {
+                            sys_ui_action: 'bf6325cd4aeb4308843702357c40b64c'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_db_object'
                         id: '9c0457590994499d8e6f4e7d5effcb8c'
                         key: {
@@ -6166,6 +6705,15 @@ declare global {
                         key: {
                             logical_table_name: 'wm_order'
                             col_name_string: 'x_daas_ham_order'
+                        }
+                    },
+                    {
+                        table: 'item_option_new'
+                        id: '9d97a575d7b640a2849cecd6841484e2'
+                        key: {
+                            cat_item: '5d455ea958a8443a8913cf053541396f'
+                            variable_set: 'NULL'
+                            name: 'customer'
                         }
                     },
                     {
@@ -6353,6 +6901,15 @@ declare global {
                         key: {
                             logical_table_name: 'x_daas_ham_staging_tmpl_item'
                             col_name_string: 'template'
+                        }
+                    },
+                    {
+                        table: 'item_option_new'
+                        id: 'a3ee16aae183402c8ba1a39a663a97cb'
+                        key: {
+                            cat_item: 'NULL'
+                            variable_set: '1db668e49f964e40bd59263b5c40a25b'
+                            name: 'quantity'
                         }
                     },
                     {
@@ -6662,6 +7219,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_norm_exception'
                             element: 'reason'
+                        }
+                    },
+                    {
+                        table: 'io_set_item'
+                        id: 'acdc6c9f97cd48dfaac5921e0cbbaf2a'
+                        key: {
+                            sc_cat_item: '5d455ea958a8443a8913cf053541396f'
+                            variable_set: '1db668e49f964e40bd59263b5c40a25b'
                         }
                     },
                     {
@@ -7192,6 +7757,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'item_option_new'
+                        id: 'be940f04d8d44d3aaf6abaa7a621d527'
+                        key: {
+                            cat_item: '5d455ea958a8443a8913cf053541396f'
+                            variable_set: 'NULL'
+                            name: 'requested_date'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'beb0039a70434ec6ac500b601205fe05'
                         key: {
@@ -7582,6 +8156,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_action_role'
+                        id: 'c8fcd444747a4ff8b29556eb7b82e8ec'
+                        key: {
+                            sys_ui_action: '8a112dc5b1f648bea3d1fa1667f7b338'
+                            sys_user_role: {
+                                id: 'b1a9a9832f01483a9c4e6fc55ca84188'
+                                key: {
+                                    name: 'x_daas_ham.field_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: 'c905889373e044a8ac651e4a94a8f6df'
                         key: {
@@ -7759,6 +8346,14 @@ declare global {
                                     name: 'x_daas_ham.customer_admin'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sc_cat_item_catalog'
+                        id: 'cc4cb1be8db1476cbe32f19326501197'
+                        key: {
+                            sc_cat_item: '5d455ea958a8443a8913cf053541396f'
+                            sc_catalog: 'e0d08b13c3330100c8b837659bba8fb4'
                         }
                     },
                     {
@@ -8309,6 +8904,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'question_choice'
+                        id: 'daf0f692e17b49c1b5cbe3d5e200221f'
+                        key: {
+                            question: {
+                                id: '36f05e19dce742b695f6db51de0ff636'
+                                key: {
+                                    cat_item: '5d455ea958a8443a8913cf053541396f'
+                                    variable_set: 'NULL'
+                                    name: 'install_mode'
+                                }
+                            }
+                            value: 'self_install'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'db06131b33fa4166a0673a6bc026df4a'
                         key: {
@@ -8799,6 +9409,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'question_choice'
+                        id: 'e8833ecde0c040d593477c5002ceae32'
+                        key: {
+                            question: {
+                                id: '78fc660209cb4b7cb7a0e51bed34967d'
+                                key: {
+                                    cat_item: '5d455ea958a8443a8913cf053541396f'
+                                    variable_set: 'NULL'
+                                    name: 'order_type'
+                                }
+                            }
+                            value: 'device_add'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: 'e8ef50f2303a452fa362f4f2ac209db7'
                         key: {
@@ -8881,6 +9506,21 @@ declare global {
                         key: {
                             name: 'x_daas_ham_staging_template'
                             element: 'staging_source'
+                        }
+                    },
+                    {
+                        table: 'question_choice'
+                        id: 'ec9c4f64d7b04bf99e5662590cc0c7d0'
+                        key: {
+                            question: {
+                                id: '78fc660209cb4b7cb7a0e51bed34967d'
+                                key: {
+                                    cat_item: '5d455ea958a8443a8913cf053541396f'
+                                    variable_set: 'NULL'
+                                    name: 'order_type'
+                                }
+                            }
+                            value: 'temporary'
                         }
                     },
                     {
@@ -9074,6 +9714,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_action_role'
+                        id: 'f4ee28d5505248bb9b4240b055e83d89'
+                        key: {
+                            sys_ui_action: 'bf6325cd4aeb4308843702357c40b64c'
+                            sys_user_role: {
+                                id: 'c5156577be814d2aa8bf557ddec8bf0e'
+                                key: {
+                                    name: 'x_daas_ham.noc'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_user_role_contains'
                         id: 'f5790411eee841178e30d98adad86b66'
                         key: {
@@ -9202,6 +9855,21 @@ declare global {
                         key: {
                             name: 'x_daas_ham_order'
                             element: 'carrier'
+                        }
+                    },
+                    {
+                        table: 'question_choice'
+                        id: 'fb04b92e197d49caaa3f42d46ee1c9b7'
+                        key: {
+                            question: {
+                                id: '78fc660209cb4b7cb7a0e51bed34967d'
+                                key: {
+                                    cat_item: '5d455ea958a8443a8913cf053541396f'
+                                    variable_set: 'NULL'
+                                    name: 'order_type'
+                                }
+                            }
+                            value: 'site_rollout'
                         }
                     },
                     {

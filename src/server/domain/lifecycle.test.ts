@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkTransition, fieldsOf, isDeployed, stageOf, type TransitionFacts } from './lifecycle'
+import { checkTransition, fieldsOf, isDeployed, stageOf, stagesQuery, type TransitionFacts } from './lifecycle'
 
 const deployable: TransitionFacts = {
     hasSite: true,
@@ -104,5 +104,17 @@ describe('isDeployed', () => {
         expect(isDeployed('pending_return')).toBe(true)
         expect(isDeployed('spare_pool')).toBe(false)
         expect(isDeployed(null)).toBe(false)
+    })
+})
+
+describe('stagesQuery', () => {
+    it('builds one OR-ed clause per stage, each carrying the base query', () => {
+        expect(stagesQuery(['in_service', 'shipped'], 'x_daas_ham_agreement=a1')).toBe(
+            'x_daas_ham_agreement=a1^install_status=1^substatusISEMPTY^NQx_daas_ham_agreement=a1^install_status=9^substatus=shipped_to_site',
+        )
+    })
+
+    it('works without a base query', () => {
+        expect(stagesQuery(['available'])).toBe('install_status=6^substatus=available')
     })
 })
