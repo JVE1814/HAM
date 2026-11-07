@@ -76,6 +76,8 @@ export const alm_hardware = Table({
         }),
         x_daas_ham_refresh_due: DateColumn({ label: 'Refresh due', readOnly: true }),
         x_daas_ham_coverage_end: DateColumn({ label: 'OEM coverage end', readOnly: true }),
+        x_daas_ham_coverage_level: StringColumn({ label: 'OEM service level', maxLength: 160, readOnly: true }),
+        x_daas_ham_coverage_checked: DateTimeColumn({ label: 'OEM coverage checked', readOnly: true }),
         x_daas_ham_wiped_on: DateColumn({ label: 'Wiped on' }),
         x_daas_ham_wipe_certificate: StringColumn({ label: 'Wipe certificate', maxLength: 100 }),
     },
@@ -88,6 +90,7 @@ export const alm_hardware = Table({
         { name: 'x_daas_ham_hw_last_seen', unique: false, element: 'x_daas_ham_last_seen' },
         { name: 'x_daas_ham_hw_refresh_due', unique: false, element: 'x_daas_ham_refresh_due' },
         { name: 'x_daas_ham_hw_rack', unique: false, element: 'x_daas_ham_rack' },
+        { name: 'x_daas_ham_hw_cov_checked', unique: false, element: 'x_daas_ham_coverage_checked' },
     ],
 })
 
@@ -110,6 +113,17 @@ export const cmdb_model = Table({
         x_daas_ham_oem_pid: StringColumn({ label: 'OEM PID', maxLength: 100 }),
         x_daas_ham_track_as_asset: BooleanColumn({ label: 'Track as asset', default: true }),
         x_daas_ham_typical_power_w: IntegerColumn({ label: 'Typical power (W)', min: 0 }),
+        x_daas_ham_oem_source: ChoiceColumn({
+            label: 'OEM data source',
+            choices: {
+                cisco: { label: 'Cisco Support APIs', sequence: 0 },
+                meraki: { label: 'Meraki Dashboard API', sequence: 1 },
+                aruba: { label: 'HPE Aruba (CSV)', sequence: 2 },
+                mist: { label: 'HPE Mist API', sequence: 3 },
+                fortinet: { label: 'Fortinet Asset Management API', sequence: 4 },
+                checkpoint: { label: 'Check Point (CSV)', sequence: 5 },
+            },
+        }),
         x_daas_ham_normalized_to: ReferenceColumn({
             label: 'Normalized to',
             referenceTable: 'cmdb_model',

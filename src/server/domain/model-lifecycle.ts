@@ -82,3 +82,13 @@ export function parseLifecycleRow(row: LifecycleRow): ParsedLifecycleRow {
     }
     return { ok: true, pid, dates }
 }
+
+/** Combine stored milestones with a newer source: present values win, missing ones keep what was there. */
+export function mergeLifecycle(existing: LifecycleDates, incoming: LifecycleDates): LifecycleDates {
+    return {
+        endOfSale: incoming.endOfSale || existing.endOfSale,
+        endOfSupport: incoming.endOfSupport || existing.endOfSupport,
+        endOfExtendedSupport: incoming.endOfExtendedSupport || existing.endOfExtendedSupport,
+        endOfLife: incoming.endOfLife || existing.endOfLife,
+    }
+}

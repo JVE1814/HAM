@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lifecyclePhaseOn, parseLifecycleRow, refreshDueDate } from './model-lifecycle'
+import { lifecyclePhaseOn, mergeLifecycle, parseLifecycleRow, refreshDueDate } from './model-lifecycle'
 
 const cisco = {
     endOfSale: '2024-04-30',
@@ -63,5 +63,13 @@ describe('parseLifecycleRow', () => {
             ok: false,
             reason: 'Milestones must not go backwards (end of sale after end of support)',
         })
+    })
+})
+
+describe('mergeLifecycle', () => {
+    it('lets newer data fill or replace milestones but never erase them', () => {
+        expect(
+            mergeLifecycle({ endOfSale: '2024-01-31', endOfSupport: '2029-01-31' }, { endOfSupport: '2029-06-30', endOfLife: undefined }),
+        ).toEqual({ endOfSale: '2024-01-31', endOfSupport: '2029-06-30', endOfExtendedSupport: undefined, endOfLife: undefined })
     })
 })

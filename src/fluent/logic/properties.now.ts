@@ -93,3 +93,84 @@ Property({
     description: 'Days without a Seen signal before a deployed asset is reported as unseen.',
     roles: { read: [admin], write: [admin] },
 })
+
+Property({
+    $id: Now.ID['prop_oem_cisco'],
+    name: 'x_daas_ham.oem.cisco.enabled',
+    type: 'boolean',
+    value: false,
+    description: 'Call the Cisco Support APIs (EoX, coverage, RMA status). Attach an OAuth profile to the "NaaS Cisco Support" REST message first.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_oem_meraki'],
+    name: 'x_daas_ham.oem.meraki.enabled',
+    type: 'boolean',
+    value: false,
+    description: 'Call the Meraki Dashboard API for EoX data.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_oem_fortinet'],
+    name: 'x_daas_ham.oem.fortinet.enabled',
+    type: 'boolean',
+    value: false,
+    description: 'Call the FortiCloud Asset Management API for coverage. Attach an OAuth profile to "NaaS FortiCare" first.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_oem_mist'],
+    name: 'x_daas_ham.oem.mist.enabled',
+    type: 'boolean',
+    value: false,
+    description: 'Call the HPE Mist API for lifecycle and warranty data.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_meraki_orgs'],
+    name: 'x_daas_ham.meraki.org_ids',
+    type: 'string',
+    value: '',
+    description: 'Comma-separated Meraki organisation ids searched for devices.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_mist_orgs'],
+    name: 'x_daas_ham.mist.org_ids',
+    type: 'string',
+    value: '',
+    description: 'Comma-separated Mist organisation ids searched for devices.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_meraki_key'],
+    name: 'x_daas_ham.meraki.api_key',
+    type: 'password2',
+    value: '',
+    description: 'Meraki Dashboard API key.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_mist_token'],
+    name: 'x_daas_ham.mist.api_token',
+    type: 'password2',
+    value: '',
+    description: 'HPE Mist API token.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_coverage_refresh'],
+    name: 'x_daas_ham.oem.coverage_refresh_days',
+    type: 'integer',
+    value: 7,
+    description: "Days before an asset's OEM coverage is checked again.",
+    roles: { read: [admin], write: [admin] },
+})

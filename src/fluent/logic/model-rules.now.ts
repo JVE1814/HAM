@@ -2,6 +2,7 @@ import '@servicenow/sdk/global'
 import { BusinessRule } from '@servicenow/sdk/core'
 import { processAsnRow, processLifecycleRow } from '../../server/entry/imports'
 import { onAgreementTermsChanged, onModelLifecycleChanged, onNormalizationResolved } from '../../server/entry/models'
+import { processCoverageRow } from '../../server/entry/oem-sync'
 
 /* Rules for model data, agreements' refresh terms and import-set rows. */
 
@@ -55,4 +56,14 @@ BusinessRule({
     action: ['insert'],
     order: 200,
     script: processLifecycleRow,
+})
+
+BusinessRule({
+    $id: Now.ID['br_coverage_row'],
+    name: 'NaaS - process OEM coverage import row',
+    table: 'x_daas_ham_coverage_import',
+    when: 'after',
+    action: ['insert'],
+    order: 200,
+    script: processCoverageRow,
 })
