@@ -28,7 +28,9 @@
 - **Usage** = Assets of the Agreement at or on their way to a Site (shipped, pending in service, in
   service, temporary deployment, pending return) + quantities on other open, not-yet-shipped Order
   lines of the Agreement. A line that has shipped never counts as open again, also when one of its
-  Assets is later returned.
+  Assets is later returned. An Asset still on an open Order line counts through that line's quantity,
+  not as deployed, so a unit sent by a partial Ship counts once; Assets on no line, or on a line that
+  has shipped or was cancelled, count as deployed.
 - A Contracted quantity caps either one Model (model-specific) or a Device class. Classes without a
   quantity are uncapped.
 - Verdict: **over quota** if any cap would be exceeded, else **off catalog** if anything is not
@@ -50,7 +52,8 @@
   If the Customer has no Customer admins, the provider-side approvers stand in for them. If there is
   no approver at all, the Order gets a work note and someone must add an approver manually.
 - A rejected Order cancels its lines, so they stop counting as usage. Usage also ignores draft and
-  cancelled Orders.
+  cancelled Orders. Units a cancelled line had already shipped count as deployed again, since
+  cancelling closes the line.
 
 ## Sourcing (`domain/sourcing.ts`)
 
@@ -71,9 +74,12 @@
   staging centre moves to *staging* at once, with a Staging task.
 - Stock already on an Order line is not picked: a hot spare linked to a line stays in the Spare pool but
   is taken.
+- Stock of a lease being returned to its Lessor (end action *Return to lessor*) is never picked or
+  claimed, wherever it sits.
 - Two sourcing runs never claim the same Asset, whether reserving it or linking a hot spare: each claim
   is made under a lock on that Asset and re-checks that it is still free stock or spare-pool stock on no
-  Order line. A run that finds it locked or taken leaves it, and that unit counts in the line's shortfall.
+  Order line and not on a lease being returned. A run that finds it locked or taken leaves it, and that
+  unit counts in the line's shortfall.
 - A claim that outlasts its lock (cleared as abandoned, ADR 0013) saves only while it still holds the
   lock. One that lost the lock during its save keeps the Asset only if a fresh read still shows it on the
   line. Otherwise it gives the Asset up with a warning, and the unit counts in the shortfall.
@@ -87,8 +93,9 @@
 - Hot spares at the site stay in the Spare pool, linked to the line (claimed the same way, under the
   Asset lock), until Ship hands them over where they are (shipped, with no package).
 - Each sourcing run with a shortfall requests one purchase order for the line (ship to the staging
-  centre). The line lists every one (*Purchase orders*; *Latest purchase order* is the newest). A
-  unit received on any of them is allocated to the line and comes off its *On order* count.
+  centre). The line lists every one (*Purchase orders*; *Latest purchase order* is the newest), and
+  both are shown on the Order line form and in the workspace list *Lines awaiting stock*. A unit
+  received on any of them is allocated to the line and comes off its *On order* count.
 - Without a staging stockroom (`x_daas_ham.staging.default_stockroom`) no purchase order is requested, and a
   line whose purchase order Procurement does not create, or creates without its line item (that PO is removed
   again, or named for cancelling), is treated the same way: the line waits for stock and its sourcing summary
@@ -113,6 +120,6 @@
 For each active Agreement with a spare-pool ratio, and each Model it has deployed:
 `shortfall = ceil(deployed × ratio) − reserved spares`. Free central stock is moved into the pool,
 each unit claimed under the same Asset lock as sourcing and only while it is still available on no Order
-line: a unit sourcing took in the meantime, or whose save is refused, is not moved and stays in the
-shortfall. If `x_daas_ham.spare_pool.auto_purchase` is true, purchase orders are requested for
-the rest, net of top-up purchases still open for that Agreement and Model.
+line and not on a lease being returned: a unit sourcing took in the meantime, or whose save is refused,
+is not moved and stays in the shortfall. If `x_daas_ham.spare_pool.auto_purchase` is true, purchase
+orders are requested for the rest, net of top-up purchases still open for that Agreement and Model.

@@ -22,18 +22,20 @@
 
 | Status | How it gets there | What can happen |
 |---|---|---|
-| Generating | A new period: the monthly job opens the previous month on day 1 unless it already has a period, or finance creates one by hand. Either way, the insert starts its generation once. Or *Regenerate* | Lines are written in time-boxed chunks (event-driven); a subscription line or fee event that fails to bill is counted on the period (*Lines that failed to bill*) with the last error (*Last generation error*). A chunk that cannot run at all (e.g. a month saved past the month rule) stops generation: its error is recorded and the period is held as *Ready for review*. *Close period* refuses while a line failed to bill or an error is recorded, until a *Regenerate* bills every line |
+| Generating | A new period: the monthly job opens the previous month on day 1 unless it already has a period, or finance creates one by hand for a month that has ended (before the current month by UTC date). Either way, the insert starts its generation once. Or *Regenerate* | Lines are written in time-boxed chunks (event-driven); a subscription line or fee event that fails to bill is counted on the period (*Lines that failed to bill*) with the last error (*Last generation error*). A chunk that cannot run at all (e.g. a month saved past the month rule) stops generation: its error is recorded and the period is held as *Ready for review*. *Close period* refuses while a line failed to bill or an error is recorded, until a *Regenerate* bills every line |
 | Ready for review | Generation finished and totals are set, or generation stopped on an error (held for review) | *Regenerate* (rebuild from current data); *Close period* |
 | Closed (locked) | *Close period* (finance) | Lines of fees waived since generation are dropped (Close refuses if a waived fee cannot leave the period) and the totals redone, and the fees become *billed*. The period and its lines can no longer change or be deleted, and none of its lines can be moved to another period (nor a line moved into it). The CSV export is attached in the background shortly after closing; *Re-export CSV* attaches it again if it is missing |
 
-- A period's month is entered as YYYY-MM (e.g. 2026-11); a business rule refuses a period saved
-  with any other month. The period's first and last day are set from its month whenever the month is
-  saved.
+- A period's month is entered as YYYY-MM (e.g. 2026-10); a business rule refuses a period saved
+  with any other month, or with a month that has not ended. The period's first and last day are set
+  from its month whenever the month is saved.
 - A period whose month is changed past the rule bills nothing: its generation stops with the error
   recorded, and *Close period* refuses until the month is corrected and *Regenerate* run. A period
   inserted without business rules does not start generating: delete it and create it again.
-- A period created before its month ends is generated from that day's data; *Regenerate* it once the
-  month has ended, before closing.
+- A period can be created, or its month changed, only for a month that has ended: one before the
+  current month by the instance's UTC date. The current or a later month is refused, since a new
+  period is generated at once and would bill part of the month, and the monthly job would then skip
+  it. The monthly job only opens last month, so it is never refused.
 
 ## Export
 

@@ -13,7 +13,9 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
 - Going to a Site (shipped, pending in service, in service, temporary deployment) needs a Site and an
   Agreement.
 - Leaving the Provider needs wipe evidence. Evidence counts only if it was recorded since the Asset
-  last came back from a Site: receipt at the depot clears it.
+  last came back from a Site or last entered staging: receipt at the depot clears it, and so does
+  every move into staging the app makes (staging loads a Customer's configuration). A stage set by
+  hand on the form does not clear it.
 - Leased Assets leave only to the Lessor, or to the OEM from pending OEM RMA (an OEM takeback from
   pending disposal is refused). Customer-owned Assets leave only back to the Customer.
 - Form edits that break the matrix are refused; administrators and background processes are not

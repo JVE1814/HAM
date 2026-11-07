@@ -18,10 +18,16 @@
   aggregator is off. With a tracking number entered by hand, no label is bought.
 - **Returns**: *Create return label* on a ship-back Return order buys a label from the Site to the
   depot for the awaited Assets. The customer page shows it as *Print return label*.
+- *Create return label* refuses while the Return order has an open return label. While that label is
+  *Label created* or *Exception*, it says to void it with the carrier and use *Mark label voided*.
+  While it is *In transit* or *Out for delivery*, it says the return is already under way and names
+  its tracking number, since *Mark label voided* is not offered then.
 - A return label voided with the carrier is closed with *Mark label voided* on its Shipment (asset
   managers, inventory techs and the NOC, while it is *Label created* or *Exception*). Nothing is sent
   to the aggregator. The Shipment becomes *Voided*, which is final, and the Return order gets a work
-  note. The customer page stops offering the label and a new return label can be created.
+  note. The customer page stops offering the label and a new return label can be created. Voided
+  Shipments, like delivered and returned ones, are left out of the workspace list *Shipments under
+  way*.
 - Addresses need a name, street, city, postal code and country (U.S. and Canadian states as their
   two-letter codes), and the sender a phone number (ShipEngine requires `ship_from.phone`): the
   location's phone, else `x_daas_ham.shipping.sender_phone` for the depot or the first site
@@ -88,5 +94,6 @@
   soon as the claim step is ticked done, by hand or by a run.
 - *Ship* and *Create return label* refuse more than 20 packages (one label's maximum): enter the
   carrier and tracking number by hand. A Return order gets one open return label at a time;
-  delivered, returned and voided labels are not open, so to replace a label, void it with the
-  carrier and mark it voided.
+  delivered, returned and voided labels are not open, so to replace a label still *Label created* or
+  *Exception*, void it with the carrier and mark it voided; one *In transit* or *Out for delivery* is
+  the return under way, and *Create return label* says so and names its tracking number.

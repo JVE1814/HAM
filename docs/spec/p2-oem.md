@@ -57,8 +57,8 @@
     serials a day, so a fleet above roughly 3,800 FortiGates is not fully refreshed within the
     default 7 days: raise `x_daas_ham.oem.coverage_refresh_days`, or use the CSV import for the rest.
 - **RMA status (hourly)**: open Cisco RMAs with an RMA number, at most 200 per run, least recently
-  synced first. Every RMA asked is stamped *Last synced*, answered or not, so all of them take turns.
-  *Last synced* is when the RMA was last asked, including when Cisco did not answer or the call
-  failed (failures are logged).
+  checked first. Every RMA asked is stamped *Last checked*, answered or not, so all of them take
+  turns. *Last checked* is when the RMA was last asked, including when Cisco did not answer or the
+  call failed (failures are logged).
 - **CSV**: rows loaded into *OEM coverage import rows* (vendor, serial, contract, service level,
   start, end) and *Lifecycle import rows* are processed on insert.

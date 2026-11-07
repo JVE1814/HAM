@@ -39,7 +39,7 @@
 |---|---|
 | Site decommission / device removal | Record producer *Return or decommission network equipment*, or the customer page |
 | Refresh swap-back, defective return | Install completion of refresh / replacement Orders (collected by the same work order) |
-| Agreement end | Daily job, once per Agreement after its end date: one Return per Site for all installed equipment there, each a field de-install with its own normal change and de-install work order |
+| Agreement end | Daily job, once per Agreement after its end date: one Return per Site for all equipment installed or still shipped there, each a field de-install with its own normal change and de-install work order |
 | Temporary end | Daily job, `x_daas_ham.returns.temporary_lead_days` before a temporary Order's end date |
 
 - Through the record producer, a return is raised only when the Return create rule lets its requester
@@ -47,13 +47,15 @@
   requests only for their own Customer, the others for any Customer, and site contacts never. The Site
   must be one of the Customer's Sites. Otherwise the request is removed again and the requester is
   told why (`domain/returns.ts` `returnRequestFindings`). The Site choices follow the chosen Customer.
-- Installed Assets on a return become *pending return*. The due date is the Agreement's return
-  allowance.
+- Installed and shipped Assets on a return become *pending return*. The due date is the Agreement's
+  return allowance.
 - An Asset already awaiting another return is not added again; completing an install twice raises
   one return. A return with nothing to bring back closes at once (a temporary Order still being
   installed waits until its equipment is installed or its end date passes).
-- A site decommission, from the record producer or the customer page, returns everything installed at
-  the Site (in service, temporary, pending in service), whatever devices the request lists.
+- A site decommission returns everything installed at the Site (in service, temporary, pending in
+  service), whatever devices the request lists. From the record producer it also returns units still
+  shipped to the Site (`domain/returns.ts` `SITE_RECOVERY_STAGES`), so none is left holding the site
+  package open; a decommission from the customer page leaves them.
 - Devices chosen for a device removal must be at the chosen Site; others are ignored.
 - Field de-install opens a normal change and a de-install work order. Ship-back relies on the Site
   contact.
@@ -76,7 +78,7 @@
 
   | Choice | Result |
   |---|---|
-  | refurbish | available, back under the Provider company; customer-owned units go to wiping instead |
+  | refurbish | available, back under the Provider company; customer-owned units, and lessor-owned units of a lease being returned, go to wiping instead (`domain/returns.ts` `evaluationTarget`) |
   | OEM RMA | pending OEM RMA |
   | scrap, return to owner | pending wipe |
 
@@ -119,9 +121,9 @@
     nothing), so an order whose line can never be retired can still be completed, and deleting an
     order takes its lines with it.
 - **Complete disposal** retires each line whose Asset is pending wipe or disposal, has wipe evidence
-  recorded since it was last received back at the depot (receipt clears earlier evidence), uses a
-  method allowed for its legal owner and, when customer-owned, belongs to the order's Customer (an
-  order with no Customer returns no customer-owned Asset):
+  recorded since it was last received back at the depot or last entered staging (both clear earlier
+  evidence), uses a method allowed for its legal owner and, when customer-owned, belongs to the
+  order's Customer (an order with no Customer returns no customer-owned Asset):
 
   | Legal owner | Allowed methods |
   |---|---|

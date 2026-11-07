@@ -35,7 +35,7 @@ routers and firewalls it installs at customer sites and bills as a service.
 
 | Area | Phase 3 |
 |---|---|
-| Leases | Lease schedules make their assets lessor-owned; mismatch alerts when a lease ends before the service; end-of-lease decisions (buy out, extend, return; one buy out or return per lease, returned stock withdrawn to pending wipe) ([spec](docs/spec/p3-contracts.md)) |
+| Leases | Lease schedules make their assets lessor-owned; mismatch alerts when a lease ends before the service; end-of-lease decisions (buy out, extend, return; one buy out or return per lease, returned stock withdrawn to pending wipe and swapped-back units evaluated into wiping, not stock) ([spec](docs/spec/p3-contracts.md)) |
 | Renewals | Agreement renewal warnings and *Renew agreement*; OEM coverage expiry warnings per customer |
 | Billing | Service intervals per asset; monthly billing periods prorated by day (site packages) and device-day (per-device lines) plus fees; review, regenerate, close and lock; CSV attachment and pull API ([spec](docs/spec/p3-billing.md)) |
 | Margin | Cost facts (purchase write-off, lease, OEM support, field labour) and margin per customer and site on period close; dashboard tab |
@@ -139,8 +139,9 @@ API, billed to `x_daas_ham.shipping.carrier_id`). Register the tracking webhook 
 `https://<instance>/api/x_daas_ham/naas/shipping/tracking` with the custom header
 `X-NaaS-Webhook-Token: <x_daas_ham.shipping.webhook_token>` (ShipEngine `headers`, EasyPost
 `custom_headers`; `?token=` also works where the URL keeps it). ShipEngine and EasyPost tracker
-payloads are accepted. Labels are not voided through the aggregator: void a return label with the
-carrier, then use *Mark label voided* on its Shipment so a new one can be created.
+payloads are accepted. Labels are not voided through the aggregator: while a return label is still
+*Label created* or *Exception*, void it with the carrier, then use *Mark label voided* on its
+Shipment so a new one can be created; a label in transit or out for delivery is the return under way.
 
 **OEM clouds**: REST messages *NaaS Meraki Dashboard*, *NaaS HPE Mist*, *NaaS HPE GreenLake*,
 *NaaS FortiCare*, *NaaS FortiZTP* and *NaaS Check Point Zero Touch*. Attach OAuth 2.0 profiles to
@@ -223,12 +224,15 @@ What remains can only be confirmed on an instance or behind a vendor login:
 - **Stock reservation lock** (Order sourcing and the spare-pool top-up): reserving an Asset for an Order
   line, linking a hot spare at the customer site to one, or moving free stock into a Spare pool takes the
   job lock `reserve_asset_<Asset sys_id>` in the same *Job lock* table and re-reads the Asset under it, so
-  two runs that pick the same Asset never both claim it. The run that finds the lock held leaves that
-  Asset to the other (the unit counts in its line's or pool's shortfall) and logs two *Unique Key
-  violation* errors, or one when the other run lets go in between and the re-read finds the Asset taken;
-  no `reserve_asset_` lock row is left once the run ends. A lock that cannot be taken for another reason
-  logs *[x_daas_ham] Asset <id> not claimed: job lock ... could not be taken*, and a claim that outlasts
-  its lock and gives the Asset up logs *[x_daas_ham] Asset <id> not claimed: its lock was lost while
+  two runs that pick the same Asset never both claim it. The re-read also refuses a unit whose lease is
+  being returned to its Lessor (end action *Return to lessor*), so such a unit is never reserved, linked
+  or pooled. The run that finds the lock held leaves that Asset to the other (the unit counts in its
+  line's or pool's shortfall) and logs two *Unique Key violation* errors, or one when the other run lets
+  go in between and the re-read finds the Asset taken, or three when the other run lets go between the
+  second try and the check that follows and another run wins the third try; no `reserve_asset_` lock
+  row is left once the run ends. A lock that cannot be taken for another reason logs
+  *[x_daas_ham] Asset <id> not claimed: job lock ... could not be taken*, and a claim that outlasts its
+  lock and gives the Asset up logs *[x_daas_ham] Asset <id> not claimed: its lock was lost while
   claiming it*.
 - **Inventory tech access** (ADR 0005), also after upgrading an existing install: the ACLs that
   `security/acls*.now.ts` give `broadStaff` (agreements, subscription lines, catalog entries, site
@@ -246,7 +250,14 @@ What remains can only be confirmed on an instance or behind a vendor login:
   declaring missing the never-seen new units then ends it. After an upgrade, site packages kept active
   by a unit declared missing before this release are not ended retroactively: list active
   site-package lines whose Site has no Asset under the Agreement shipped, pending in service, in
-  service, temporary or pending return, and end them by hand.
+  service, temporary or pending return, and end them by hand. Agreements that ended before this
+  release had their agreement-end Returns raised without the units still shipped to a Site: list
+  Assets whose Agreement has *End-of-agreement return raised* set and which are shipped, pending in
+  service, in service or temporary, and return them by hand (record producer, device removal).
+  Lessor-owned units of a returned lease that were evaluated as refurbish before this release may
+  still sit in available stock: sourcing no longer claims them, but they are not withdrawn. List
+  available Assets whose lease's end action is *Return to lessor*, move them to pending wipe and put
+  them on a *return to lessor* disposal order.
 - **Order create rule in jobs**: an Order is submitted only when its user passes the Order create rule
   (`GlideRecord.canCreate()`). The daily job *NaaS - raise refresh orders* relies on its *Run as* user
   (expected to be the system user) passing it; one without an Order raiser role leaves its refresh
