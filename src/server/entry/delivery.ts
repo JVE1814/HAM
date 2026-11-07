@@ -23,16 +23,24 @@ function orderAssets(orderId: string): GlideRecord {
     return asset
 }
 
-/** UI action "Ship": send every staged Asset to the Site (buying the label when the aggregator is on) and open the on-site work. */
+/**
+ * UI action "Ship": send every staged Asset to the Site (buying the label when the aggregator is on)
+ * and open the on-site work. Hot spares already at the Site are linked without shipping.
+ */
 export function shipOrder(order: GlideRecord): void {
-    const needsCarrier = !str(order, 'tracking_number') && str(order, 'install_mode') !== 'remote_hands'
+    const { staged, hotSpares } = countShippable(order.getUniqueValue())
+    if (staged + hotSpares === 0) {
+        gs.addErrorMessage('Nothing is staged for this order yet')
+        return
+    }
+    const needsCarrier = staged > 0 && !str(order, 'tracking_number') && str(order, 'install_mode') !== 'remote_hands'
     if (needsCarrier && !shippingEnabled()) {
         gs.addErrorMessage('Enter the carrier and tracking number before shipping')
         return
     }
     if (needsCarrier) {
-        // The shipping aggregator replaces manual tracking numbers (P3.26).
-        const label = labelOrder(order, countStaged(order.getUniqueValue()))
+        // The shipping aggregator replaces manual tracking numbers (P3.26): one package per staged Asset.
+        const label = labelOrder(order, staged)
         if (!label.ok) {
             gs.addErrorMessage(`No shipping label: ${label.error}`)
             return
@@ -42,33 +50,28 @@ export function shipOrder(order: GlideRecord): void {
     const siteId = str(order, 'site')
     const asset = orderAssets(order.getUniqueValue())
     let shipped = 0
-    let hotSpares = 0
     while (asset.next()) {
         const stage = readStage(asset)
         if (stage !== 'staged' && stage !== 'spare_pool') continue
         asset.setValue('x_daas_ham_site', siteId)
         asset.setValue('location', siteId)
-        if (stage === 'spare_pool') {
-            asset.update()
-            hotSpares++
-        } else if (moveAndSave(asset, 'shipped', `ship ${str(order, 'number')}`)) {
-            shipped++
-        }
-    }
-    if (shipped + hotSpares === 0) {
-        gs.addErrorMessage('Nothing is staged for this order yet')
-        return
+        if (stage === 'spare_pool') asset.update()
+        else if (moveAndSave(asset, 'shipped', `ship ${str(order, 'number')}`)) shipped++
     }
     if (str(order, 'install_mode') !== 'self_install' && !str(order, 'work_order')) openOnSiteWork(order)
     gs.addInfoMessage(`${shipped} asset(s) shipped to ${str(order, 'site.name')}`)
     recomputeOrder(order.getUniqueValue())
 }
 
-function countStaged(orderId: string): number {
+function countShippable(orderId: string): { staged: number; hotSpares: number } {
     const asset = orderAssets(orderId)
-    let staged = 0
-    while (asset.next()) if (readStage(asset) === 'staged') staged++
-    return staged
+    const counts = { staged: 0, hotSpares: 0 }
+    while (asset.next()) {
+        const stage = readStage(asset)
+        if (stage === 'staged') counts.staged++
+        else if (stage === 'spare_pool') counts.hotSpares++
+    }
+    return counts
 }
 
 function openOnSiteWork(order: GlideRecord): void {

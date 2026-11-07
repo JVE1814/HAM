@@ -19,8 +19,8 @@
 | Status | How it gets there | What can happen |
 |---|---|---|
 | Generating | Monthly job on day 1 (previous month), or *Regenerate* | Lines are written in time-boxed chunks (event-driven) |
-| Ready for review | Generation finished; totals are set | *Regenerate* (rebuild from current data, e.g. after waiving a fee); *Close period* |
-| Closed (locked) | *Close period* (finance) | The CSV export is attached, its fees become *billed*. The period and its lines can no longer change or be deleted |
+| Ready for review | Generation finished; totals are set | *Regenerate* (rebuild from current data); *Close period* |
+| Closed (locked) | *Close period* (finance) | Lines of fees waived since generation are dropped and the totals redone; the CSV export is attached and the fees become *billed*. The period and its lines can no longer change or be deleted |
 
 ## Export
 
@@ -38,12 +38,14 @@ Closing a period (or **Recompute margin** on a closed one) rebuilds its **Cost f
 
 | Cost type | Source | Attributed by |
 |---|---|---|
-| Purchase | The Asset's cost, written off over `x_daas_ham.margin.amortisation_months` (Provider-owned only; a buyout sets the cost to the Asset's share of the buyout price) | Service-interval days in the month |
-| Lease | The lease's monthly payment split evenly over the Assets it covers (lessor-owned) | Service-interval days |
+| Purchase | The Asset's cost, written off over `x_daas_ham.margin.amortisation_months` from its purchase date (else its in-service date), then no more (Provider-owned only; a buyout sets the cost to the Asset's share of the buyout price) | Service-interval days in the month |
+| Lease | The lease's monthly payment split evenly over the Assets it covers, in months the lease runs (lessor-owned) | Service-interval days |
 | OEM support | Annual cost of the coverage contracts covering the Asset today (`annual_cost`, from the coverage CSV or entered on the contract) ÷ 12 | Service-interval days |
 | Field labour | NaaS work orders closed in the month: their *NaaS field labour cost*, else `x_daas_ham.margin.visit_cost` | The work order's company and location |
 
 - Customer-owned Assets carry no capital cost.
+- Costs use the Assets' current ownership, cost and coverage: *Recompute margin* on an old period
+  reflects today's data. A recompute started while another is running supersedes it.
 - **Revenue** is the period's billing lines (subscriptions per Site, fees at Customer level).
 - **Margin** = revenue − cost; margin % = margin ÷ revenue (blank without revenue).
 - The workspace dashboard's **Margin** tab shows last month's revenue, cost and margin, margin by

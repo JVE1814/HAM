@@ -2,10 +2,11 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { buyLabel, parseTrackingWebhook, tokenMatches, type Address, type LabelResult } from '../domain/shipping'
+import { buyLabel, nextShipmentStatus, parseTrackingWebhook, tokenMatches, type Address, type LabelResult, type ShipmentStatus } from '../domain/shipping'
 import { boolProperty, intProperty, PROPERTY, stringProperty } from '../platform/properties'
 import { findById, str } from '../platform/records'
 import { restMessagePort } from '../platform/rest-port'
+import { queryParam, reply } from '../platform/rest-api'
 
 /** Shipping aggregator: labels for Orders and ship-back returns, tracking webhooks (P3.26, D73). */
 
@@ -129,36 +130,32 @@ export function uiCreateReturnLabel(current: GlideRecord): void {
     gs.addInfoMessage(`Return label ${result.trackingNumber} created`)
 }
 
-function reply(response: RESTAPIResponse, status: number, body: object): void {
-    response.setStatus(status)
-    response.setBody(body as never)
-}
-
 /** POST /shipping/tracking?token=...: tracking webhook from the aggregator (no platform login). */
 export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIResponse): void {
-    const token = String(([] as unknown[]).concat(request.queryParams?.token ?? [])[0] ?? '')
+    const token = queryParam(request, 'token')
     if (!tokenMatches(token, gs.getPropertySecured(PROPERTY.shippingWebhookToken, ''))) return reply(response, 401, { error: 'bad token' })
     const update = parseTrackingWebhook(request.body.data)
     if ('error' in update) return reply(response, 400, { error: update.error })
     const shipment = new GlideRecord('x_daas_ham_shipment')
     if (!shipment.get('tracking_number', update.trackingNumber)) return reply(response, 200, { matched: false })
 
-    const wasDelivered = str(shipment, 'status') === 'delivered'
-    shipment.setValue('status', update.status)
-    shipment.setValue('status_detail', update.description.slice(0, 255))
+    const previous = str(shipment, 'status') as ShipmentStatus
+    const status = nextShipmentStatus(previous, update.status)
+    shipment.setValue('status', status)
+    if (status === update.status) shipment.setValue('status_detail', update.description.slice(0, 255))
     if (update.estimatedDelivery) shipment.setValue('estimated_delivery', update.estimatedDelivery.slice(0, 10))
-    if (update.status === 'delivered') shipment.setValue('delivered_at', glideDateTime(update.deliveredAt))
+    if (status === 'delivered' && previous !== 'delivered') shipment.setValue('delivered_at', glideDateTime(update.deliveredAt))
     shipment.update()
     recordEvents(shipment.getUniqueValue(), update.events)
 
-    if (update.status === 'delivered' && !wasDelivered) {
+    if (status === 'delivered' && previous !== 'delivered') {
         const order = findById('x_daas_ham_order', str(shipment, 'order'))
         if (order) {
             order.setValue('work_notes', `Delivered to ${order.getDisplayValue('site')} (${str(shipment, 'carrier')} ${update.trackingNumber}).`)
             order.update()
         }
     }
-    reply(response, 200, { matched: true, status: update.status })
+    reply(response, 200, { matched: true, status })
 }
 
 /** A carrier timestamp as a Glide date-time (UTC), or now when it is missing or unreadable. */

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { HttpRequest } from './http'
-import { addressProblem, buyLabel, labelRequestBody, parseTrackingWebhook, tokenMatches, type Address, type LabelInput } from './shipping'
+import { addressProblem, buyLabel, countryCode, labelRequestBody, nextShipmentStatus, parseTrackingWebhook, tokenMatches, type Address, type LabelInput } from './shipping'
 
 const depot: Address = { name: 'NaaS Depot', company: 'Demo NaaS Provider', line1: '1 Depot Way', city: 'Utrecht', postalCode: '3511AA', country: 'nl' }
-const site: Address = { name: 'Acme HQ reception', phone: '+31 20 000', line1: '5 Main St', city: 'Amsterdam', postalCode: '1011AB', country: 'NL' }
+const site: Address = { name: 'Acme HQ reception', phone: '+31 20 000', line1: '5 Main St', city: 'Amsterdam', postalCode: '1011AB', country: 'The Netherlands' }
 const input: LabelInput = { serviceCode: 'ups_standard', from: depot, to: site, packages: 2, weightKg: 4.5, reference: 'NORD0001234' }
 
 describe('labelRequestBody', () => {
@@ -11,7 +11,7 @@ describe('labelRequestBody', () => {
         const body = JSON.parse(labelRequestBody(input))
         expect(body.shipment.service_code).toBe('ups_standard')
         expect(body.shipment.ship_from).toMatchObject({ address_line1: '1 Depot Way', country_code: 'NL', company_name: 'Demo NaaS Provider' })
-        expect(body.shipment.ship_to).toMatchObject({ name: 'Acme HQ reception', city_locality: 'Amsterdam', postal_code: '1011AB' })
+        expect(body.shipment.ship_to).toMatchObject({ name: 'Acme HQ reception', city_locality: 'Amsterdam', postal_code: '1011AB', country_code: 'NL' })
         expect(body.shipment.packages).toHaveLength(2)
         expect(body.shipment.packages[0]).toEqual({ weight: { value: 4.5, unit: 'kilogram' }, label_messages: { reference1: 'NORD0001234' } })
     })
@@ -21,6 +21,20 @@ describe('addressProblem', () => {
     it('names the missing parts', () => {
         expect(addressProblem({ ...site, line1: '', postalCode: '' })).toBe('missing line1, postalCode')
         expect(addressProblem(site)).toBeNull()
+    })
+
+    it('needs a country it can turn into an ISO code', () => {
+        expect(addressProblem({ ...site, country: 'Atlantis' })).toBe('unknown country "Atlantis" (use the ISO code)')
+    })
+})
+
+describe('countryCode', () => {
+    it('reads ISO codes and common country names', () => {
+        expect(countryCode('de')).toBe('DE')
+        expect(countryCode('Germany')).toBe('DE')
+        expect(countryCode(' United  Kingdom ')).toBe('GB')
+        expect(countryCode('Switzerland')).toBe('CH')
+        expect(countryCode('Narnia')).toBe('')
     })
 })
 
@@ -105,6 +119,24 @@ describe('parseTrackingWebhook', () => {
     it('rejects payloads without a tracking number', () => {
         expect(parseTrackingWebhook({ data: {} })).toEqual({ error: 'not a tracking update (no tracking number)' })
         expect(parseTrackingWebhook('nonsense')).toHaveProperty('error')
+    })
+})
+
+describe('nextShipmentStatus', () => {
+    it('follows the carrier until the shipment is delivered or returned', () => {
+        expect(nextShipmentStatus('label_created', 'in_transit')).toBe('in_transit')
+        expect(nextShipmentStatus('exception', 'in_transit')).toBe('in_transit')
+        expect(nextShipmentStatus('in_transit', 'delivered')).toBe('delivered')
+    })
+
+    it('ignores late or unknown updates', () => {
+        expect(nextShipmentStatus('delivered', 'in_transit')).toBe('delivered')
+        expect(nextShipmentStatus('returned', 'out_for_delivery')).toBe('returned')
+        expect(nextShipmentStatus('in_transit', 'unknown')).toBe('in_transit')
+    })
+
+    it('lets a return to sender override a delivery', () => {
+        expect(nextShipmentStatus('delivered', 'returned')).toBe('returned')
     })
 })
 

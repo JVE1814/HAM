@@ -50,7 +50,8 @@ BusinessRule({
     when: 'before',
     action: ['insert', 'update'],
     order: 150,
-    condition: 'current.x_daas_ham_rack.changes() || current.x_daas_ham_ru_start.changes() || current.x_daas_ham_rack_face.changes()',
+    condition:
+        "current.x_daas_ham_rack.changes() || current.x_daas_ham_ru_start.changes() || current.x_daas_ham_rack_face.changes() || (current.model.changes() && current.x_daas_ham_rack != '')",
     script: guardRackPlacement,
 })
 

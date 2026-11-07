@@ -12,6 +12,7 @@ import { findById, str } from '../platform/records'
 import { openStagingTask } from '../platform/staging-tasks'
 import { nextProviderTag } from '../platform/tags'
 import { receiveReturnedAsset } from './returns'
+import { reply } from '../platform/rest-api'
 
 /** Warehouse scanning API used by the warehouse React app (P1.5). */
 
@@ -41,11 +42,6 @@ function summarise(asset: GlideRecord): AssetSummary {
         customer: asset.getDisplayValue('company'),
         orderLine: asset.getDisplayValue('x_daas_ham_order_line'),
     }
-}
-
-function reply(response: RESTAPIResponse, status: number, body: object): void {
-    response.setStatus(status)
-    response.setBody(body as never)
 }
 
 function allowed(response: RESTAPIResponse): boolean {

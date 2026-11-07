@@ -2518,6 +2518,10 @@ declare global {
                         table: 'sys_module'
                         id: 'b7ff627b508a49f582d8a13d6b24276e'
                     }
+                    'src_server_platform_rest-api_ts': {
+                        table: 'sys_module'
+                        id: '67584be1604f489285fd778de108a4bb'
+                    }
                     'src_server_platform_rest-port_ts': {
                         table: 'sys_module'
                         id: '008ae84b1ad241d6af3a6d706d26061c'

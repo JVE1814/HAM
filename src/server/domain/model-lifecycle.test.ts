@@ -41,6 +41,7 @@ describe('refreshDueDate', () => {
         expect(refreshDueDate({ basis: 'cycle', inServiceDate: '2026-03-31', refreshCycleMonths: 36, returnBy: '2027-06-30' })).toBe('2027-06-30')
         expect(refreshDueDate({ basis: 'cycle', inServiceDate: '2026-03-31', refreshCycleMonths: 0, returnBy: '2027-06-30' })).toBe('2027-06-30')
         expect(refreshDueDate({ basis: 'cycle', inServiceDate: '2026-03-31', refreshCycleMonths: 12, returnBy: '2027-06-30' })).toBe('2027-03-31')
+        expect(refreshDueDate({ basis: 'cycle', refreshCycleMonths: 36, returnBy: '2027-06-30' })).toBe('2027-06-30')
     })
 
     it('has no due date for an asset not yet in service or without the needed data', () => {

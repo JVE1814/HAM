@@ -39,7 +39,8 @@ export interface RefreshInputs {
 
 /** When an in-service Asset must be refreshed under its Agreement, or null if it cannot be determined. */
 export function refreshDueDate(inputs: RefreshInputs): string | null {
-    if (!inputs.inServiceDate) return null
+    // A lease hand-back applies even before the Asset is in service (shipped, awaiting first sighting).
+    if (!inputs.inServiceDate) return inputs.returnBy || null
     return earliest([byBasis(inputs, inputs.inServiceDate), inputs.returnBy || undefined]) ?? null
 }
 

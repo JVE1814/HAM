@@ -36,6 +36,12 @@ describe('placementProblem with a power budget', () => {
         )
     })
 
+    it('lets devices move within a rack that is already over budget', () => {
+        const overloaded = { units: 42, powerCapacityW: 500 }
+        expect(placementProblem(overloaded, placed, { assetId: 'sw1', ruStart: 20, height: 1, face: 'front', powerW: 350 }, false)).toBeNull()
+        expect(placementProblem(overloaded, placed, { assetId: 'sw1', ruStart: 20, height: 1, face: 'front', powerW: 350 })).toMatch(/power budget/)
+    })
+
     it('does not count a device twice when it moves within the rack', () => {
         expect(placementProblem(budgeted, placed, { assetId: 'sw1', ruStart: 20, height: 1, face: 'front', powerW: 350 })).toBeNull()
     })

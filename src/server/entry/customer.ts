@@ -10,16 +10,12 @@ import { findById, str } from '../platform/records'
 import { raiseReturn } from '../platform/returns'
 import { completeAttestation } from './assurance'
 import { completeInstall } from './delivery'
+import { reply } from '../platform/rest-api'
 
 /*
  * Customer self-service API (P2.9, D49). Every query runs as the signed-in customer contact, so the
  * before-query visibility rules (ADR 0005) limit it to their Customer (site contacts: their Sites).
  */
-
-function reply(response: RESTAPIResponse, status: number, body: object): void {
-    response.setStatus(status)
-    response.setBody(body as never)
-}
 
 function isCustomerAdmin(): boolean {
     return gs.hasRole(ROLE.customerAdmin) || gs.hasRole(ROLE.assetManager)
@@ -80,22 +76,24 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
         })
     }
 
-    const returns: object[] = []
+    const returns: Array<{ id: string; number: string; site: string; trigger: string; dueDate: string; labelUrl: string; trackingNumber: string }> = []
     const ret = new GlideRecord('x_daas_ham_return_order')
     ret.addQuery('active', true)
     ret.setLimit(200)
     ret.query()
     while (ret.next()) {
-        const label = returnLabel(ret.getUniqueValue())
         returns.push({
+            id: ret.getUniqueValue(),
             number: str(ret, 'number'),
             site: ret.getDisplayValue('site'),
             trigger: ret.getDisplayValue('trigger'),
             dueDate: str(ret, 'due_date'),
-            labelUrl: label ? str(label, 'label_url') : '',
-            trackingNumber: label ? str(label, 'tracking_number') : '',
+            labelUrl: '',
+            trackingNumber: '',
         })
     }
+    const labels = returnLabels(returns.map((r) => r.id))
+    for (const entry of returns) Object.assign(entry, labels.get(entry.id) ?? {})
 
     const attestations: object[] = []
     const attestation = new GlideRecord('x_daas_ham_attestation')
@@ -129,15 +127,16 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
     })
 }
 
-/** The latest prepaid return label of a Return order, if one was bought. */
-function returnLabel(returnOrderId: string): GlideRecord | null {
+/** The latest prepaid return label of each Return order that has one. */
+function returnLabels(returnOrderIds: readonly string[]): Map<string, { labelUrl: string; trackingNumber: string }> {
+    const labels = new Map<string, { labelUrl: string; trackingNumber: string }>()
+    if (returnOrderIds.length === 0) return labels
     const shipment = new GlideRecord('x_daas_ham_shipment')
-    shipment.addQuery('return_order', returnOrderId)
-    shipment.addQuery('direction', 'return')
-    shipment.orderByDesc('sys_created_on')
-    shipment.setLimit(1)
+    shipment.addEncodedQuery(`direction=return^return_orderIN${returnOrderIds.join(',')}`)
+    shipment.orderBy('sys_created_on')
     shipment.query()
-    return shipment.next() ? shipment : null
+    while (shipment.next()) labels.set(str(shipment, 'return_order'), { labelUrl: str(shipment, 'label_url'), trackingNumber: str(shipment, 'tracking_number') })
+    return labels
 }
 
 /** POST /customer/faults { asset, description }: report a faulty device as a CSM case. */

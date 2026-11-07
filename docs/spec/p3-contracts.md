@@ -19,7 +19,7 @@
 |---|---|
 | Buy out | Every covered Asset becomes Provider-owned and leaves the schedule |
 | Extend | The lease runs to the new end date (which must be later); a new decision comes due before it |
-| Return | Stock (available, spare pool) goes on a draft *return to lessor* disposal order. Deployed Assets get a Refresh due date no later than the lease end, so automatic refresh replaces them; the swapped-back units are returned and evaluated as usual (lessor-owned units can only be returned to the lessor) |
+| Return | Stock (available, spare pool) goes on a draft *return to lessor* disposal order. Deployed Assets (including ones shipped or awaiting first sighting) get a Refresh due date no later than the lease end, so automatic refresh replaces them; the swapped-back units are returned and evaluated as usual (lessor-owned units can only be returned to the lessor) |
 
 ## Renewals
 

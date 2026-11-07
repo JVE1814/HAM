@@ -20,8 +20,12 @@ export interface RackSpec {
     powerCapacityW: number
 }
 
-/** Why `candidate` cannot go where it is placed, or null if it fits (space on its face, power for the whole rack). */
-export function placementProblem(rack: RackSpec, placements: readonly Placement[], candidate: Placement): string | null {
+/**
+ * Why `candidate` cannot go where it is placed, or null if it fits: space on its face, and power for
+ * the whole rack when the change adds draw (a device new to the rack, or a different Model). A move
+ * within the rack adds none, so it is allowed even in a rack already over its budget.
+ */
+export function placementProblem(rack: RackSpec, placements: readonly Placement[], candidate: Placement, addsPower = true): string | null {
     const top = candidate.ruStart + Math.max(1, candidate.height) - 1
     if (candidate.ruStart < 1 || top > rack.units) {
         return `Rack units ${candidate.ruStart}-${top} do not fit in a ${rack.units}U rack`
@@ -35,7 +39,7 @@ export function placementProblem(rack: RackSpec, placements: readonly Placement[
         }
     }
     const budget = powerBudget(rack.powerCapacityW, [...others, candidate])
-    if (budget.remainingW !== null && budget.remainingW < 0) {
+    if (addsPower && budget.remainingW !== null && budget.remainingW < 0) {
         return `The rack's power budget would be exceeded: ${budget.usedW} W of ${budget.capacityW} W`
     }
     return null

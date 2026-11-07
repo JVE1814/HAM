@@ -1,3 +1,4 @@
+import { addMonths } from './calendar'
 import type { LegalOwner } from './lifecycle'
 
 /** Cost facts and Margin per Customer and Site (P3.28, D72). */
@@ -5,13 +6,16 @@ import type { LegalOwner } from './lifecycle'
 export type CostType = 'purchase' | 'lease' | 'oem_support' | 'field_labour'
 
 export interface IntervalCostInput {
-    /** Days the Asset served in the month, and the month's length. */
+    /** Days the Asset served in the month, the month's first day and its length. */
     days: number
+    monthFirst: string
     daysInMonth: number
     legalOwner: LegalOwner
-    /** Purchase cost of the Asset, written off evenly over `amortisationMonths`. */
+    /** Purchase cost of the Asset, written off evenly over `amortisationMonths` from `purchasedOn`. */
     purchaseCost: number
     amortisationMonths: number
+    /** When the write-off started (purchase date, else first in service); unknown = still running. */
+    purchasedOn?: string
     /** The Asset's share of its lease's monthly payment (0 when not leased). */
     leaseMonthly: number
     /** Annual cost of the OEM coverage contracts covering the Asset. */
@@ -20,13 +24,14 @@ export interface IntervalCostInput {
 
 /**
  * The costs one Asset carried for the days it served in a month. Provider-owned Assets carry their
- * purchase write-off; leased ones the lease payment; customer-owned ones neither. Any Asset carries
- * the OEM support the Provider pays for it.
+ * purchase write-off until it is complete; leased ones the lease payment; customer-owned ones neither.
+ * Any Asset carries the OEM support the Provider pays for it.
  */
 export function intervalCosts(input: IntervalCostInput): Array<{ type: CostType; amount: number }> {
     const share = input.daysInMonth > 0 ? Math.max(0, input.days) / input.daysInMonth : 0
     const costs: Array<{ type: CostType; amount: number }> = []
-    if (input.legalOwner === 'provider' && input.purchaseCost > 0 && input.amortisationMonths > 0) {
+    const writtenOff = !!input.purchasedOn && addMonths(input.purchasedOn, input.amortisationMonths) <= input.monthFirst
+    if (input.legalOwner === 'provider' && input.purchaseCost > 0 && input.amortisationMonths > 0 && !writtenOff) {
         costs.push({ type: 'purchase', amount: (input.purchaseCost / input.amortisationMonths) * share })
     }
     if (input.legalOwner === 'lessor' && input.leaseMonthly > 0) costs.push({ type: 'lease', amount: input.leaseMonthly * share })
@@ -37,6 +42,11 @@ export function intervalCosts(input: IntervalCostInput): Array<{ type: CostType;
 /** A lease's monthly payment split evenly over the Assets it covers. */
 export function leaseShare(monthlyPayment: number, coveredAssets: number): number {
     return coveredAssets > 0 ? monthlyPayment / coveredAssets : 0
+}
+
+/** Whether a lease running from `starts` to `ends` (either open) is payable in the month. */
+export function leaseRunsIn(starts: string, ends: string, monthFirst: string, monthLast: string): boolean {
+    return (!starts || starts <= monthLast) && (!ends || ends >= monthFirst)
 }
 
 /** Where a cost or revenue belongs: a Customer, and a Site ('' for customer-level amounts such as fees). */

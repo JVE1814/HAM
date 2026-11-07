@@ -34,10 +34,31 @@ export type LabelResult =
     | { ok: true; labelId: string; trackingNumber: string; carrier: string; labelUrl: string; cost: number; currency: string }
     | { ok: false; error: string }
 
+/** ISO 3166-1 alpha-2 codes for country names as they are commonly written on locations. */
+const COUNTRY_CODES: Record<string, string> = {
+    'united states': 'US', 'united states of america': 'US', usa: 'US', canada: 'CA', mexico: 'MX', brazil: 'BR',
+    'united kingdom': 'GB', 'great britain': 'GB', uk: 'GB', england: 'GB', scotland: 'GB', wales: 'GB', ireland: 'IE',
+    netherlands: 'NL', 'the netherlands': 'NL', holland: 'NL', belgium: 'BE', luxembourg: 'LU', germany: 'DE',
+    deutschland: 'DE', france: 'FR', spain: 'ES', portugal: 'PT', italy: 'IT', switzerland: 'CH', austria: 'AT',
+    denmark: 'DK', norway: 'NO', sweden: 'SE', finland: 'FI', iceland: 'IS', poland: 'PL', czechia: 'CZ',
+    'czech republic': 'CZ', slovakia: 'SK', hungary: 'HU', romania: 'RO', bulgaria: 'BG', greece: 'GR',
+    croatia: 'HR', slovenia: 'SI', serbia: 'RS', estonia: 'EE', latvia: 'LV', lithuania: 'LT', turkey: 'TR',
+    israel: 'IL', 'united arab emirates': 'AE', uae: 'AE', 'saudi arabia': 'SA', qatar: 'QA', 'south africa': 'ZA',
+    india: 'IN', singapore: 'SG', japan: 'JP', china: 'CN', 'hong kong': 'HK', australia: 'AU', 'new zealand': 'NZ',
+}
+
+/** A location's country as an ISO alpha-2 code, or '' when it cannot be told. */
+export function countryCode(country: string): string {
+    const value = country.trim()
+    if (/^[A-Za-z]{2}$/.test(value)) return value.toUpperCase()
+    return COUNTRY_CODES[value.toLowerCase().replace(/\s+/g, ' ')] ?? ''
+}
+
 /** What is missing from an address before a carrier will accept it, or null. */
 export function addressProblem(address: Address): string | null {
     const missing = (['name', 'line1', 'city', 'postalCode', 'country'] as const).filter((key) => !address[key])
-    return missing.length > 0 ? `missing ${missing.join(', ')}` : null
+    if (missing.length > 0) return `missing ${missing.join(', ')}`
+    return countryCode(address.country) ? null : `unknown country "${address.country}" (use the ISO code)`
 }
 
 function toAggregatorAddress(address: Address): Record<string, string> {
@@ -50,7 +71,7 @@ function toAggregatorAddress(address: Address): Record<string, string> {
         city_locality: address.city,
         state_province: address.state ?? '',
         postal_code: address.postalCode,
-        country_code: address.country.toUpperCase().slice(0, 2),
+        country_code: countryCode(address.country),
     }
 }
 
@@ -172,6 +193,19 @@ export function parseTrackingWebhook(body: unknown): TrackingUpdate | { error: s
         }
     }
     return { error: 'not a tracking update (no tracking number)' }
+}
+
+const FINAL: ReadonlySet<ShipmentStatus> = new Set(['delivered', 'returned'])
+
+/**
+ * The status a shipment takes from a tracking update. Webhooks can arrive late or out of order, so a
+ * delivered or returned shipment keeps that status (only a return to sender overrides a delivery),
+ * and an `unknown` update never replaces a known status.
+ */
+export function nextShipmentStatus(current: ShipmentStatus, incoming: ShipmentStatus): ShipmentStatus {
+    if (incoming === 'unknown') return current
+    if (FINAL.has(current)) return incoming === 'returned' ? 'returned' : current
+    return incoming
 }
 
 /** Constant-time comparison of a webhook token with the configured secret (never matches an empty secret). */

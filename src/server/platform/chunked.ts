@@ -37,6 +37,24 @@ export function runTableJob<T>(spec: TableJob<T>): ChunkedJobResult {
     )
 }
 
+/**
+ * Start a new run of an event-driven `job`, superseding any run still in progress; returns the run's
+ * token, which the run carries in its events and checks with `isCurrentRun` before each chunk.
+ */
+export function startRun(job: string): string {
+    const record = loadCursorRecord(job)
+    const token = String(nowMs())
+    record.setValue('cursor', token)
+    record.setValue('last_run', msToGlide(nowMs()))
+    record.setValue('last_status', 'running')
+    record.update()
+    return token
+}
+
+export function isCurrentRun(job: string, token: string): boolean {
+    return String(loadCursorRecord(job).getValue('cursor') ?? '') === token
+}
+
 function loadCursorRecord(job: string): GlideRecord {
     const gr = new GlideRecord('x_daas_ham_job_cursor')
     if (gr.get('job', job)) return gr

@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { CostLedger, intervalCosts, leaseShare, marginKey, marginRows } from './margin'
+import { CostLedger, intervalCosts, leaseRunsIn, leaseShare, marginKey, marginRows } from './margin'
 
-const base = { days: 30, daysInMonth: 30, purchaseCost: 0, amortisationMonths: 60, leaseMonthly: 0, supportAnnual: 0 }
+const base = { days: 30, monthFirst: '2026-11-01', daysInMonth: 30, purchaseCost: 0, amortisationMonths: 60, leaseMonthly: 0, supportAnnual: 0 }
 
 describe('intervalCosts', () => {
     it('writes a provider-owned purchase off over the amortisation period', () => {
         expect(intervalCosts({ ...base, legalOwner: 'provider', purchaseCost: 6000 })).toEqual([{ type: 'purchase', amount: 100 }])
+    })
+
+    it('stops the write-off once the amortisation period has passed', () => {
+        expect(intervalCosts({ ...base, legalOwner: 'provider', purchaseCost: 6000, purchasedOn: '2021-11-01' })).toEqual([])
+        expect(intervalCosts({ ...base, legalOwner: 'provider', purchaseCost: 6000, purchasedOn: '2021-11-02' })).toEqual([{ type: 'purchase', amount: 100 }])
     })
 
     it('charges a leased asset its lease share instead, prorated by days', () => {
@@ -26,6 +31,15 @@ describe('leaseShare', () => {
     it('splits the monthly payment over the covered assets', () => {
         expect(leaseShare(180, 2)).toBe(90)
         expect(leaseShare(180, 0)).toBe(0)
+    })
+})
+
+describe('leaseRunsIn', () => {
+    it('is payable in months that overlap the lease', () => {
+        expect(leaseRunsIn('2024-02-01', '2027-01-31', '2026-11-01', '2026-11-30')).toBe(true)
+        expect(leaseRunsIn('2024-02-01', '2026-10-31', '2026-11-01', '2026-11-30')).toBe(false)
+        expect(leaseRunsIn('2026-12-01', '', '2026-11-01', '2026-11-30')).toBe(false)
+        expect(leaseRunsIn('', '', '2026-11-01', '2026-11-30')).toBe(true)
     })
 })
 

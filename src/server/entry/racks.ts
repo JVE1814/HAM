@@ -7,6 +7,7 @@ import { visibilityFilter } from '../domain/visibility'
 import { readStage } from '../platform/assets'
 import { currentSession } from '../platform/session'
 import { num, str } from '../platform/records'
+import { queryParam } from '../platform/rest-api'
 
 /** Rack placement and the rack elevation view (P2.8, D67). */
 
@@ -33,10 +34,11 @@ function placementsIn(rackId: string, exceptAssetId: string): Placement[] {
     return placements
 }
 
-/** Before-update rule on alm_hardware: a rack position must be free, inside the rack and within its power budget. */
-export function guardRackPlacement(current: GlideRecord): void {
+/** Before rule on alm_hardware: a rack position must be free, inside the rack and within its power budget. */
+export function guardRackPlacement(current: GlideRecord, previous: GlideRecord): void {
     const rackId = str(current, 'x_daas_ham_rack')
     if (!rackId || !str(current, 'x_daas_ham_ru_start')) return
+    const addsPower = !previous || str(previous, 'x_daas_ham_rack') !== rackId || str(previous, 'model') !== str(current, 'model')
     const rack = { units: num(current, 'x_daas_ham_rack.rack_units') || 42, powerCapacityW: num(current, 'x_daas_ham_rack.x_daas_ham_power_capacity_w') }
     const problem = placementProblem(rack, placementsIn(rackId, current.getUniqueValue()), {
         assetId: current.getUniqueValue(),
@@ -44,7 +46,7 @@ export function guardRackPlacement(current: GlideRecord): void {
         height: heightOf(current),
         face: (str(current, 'x_daas_ham_rack_face') || 'front') as RackFace,
         powerW: num(current, 'model.x_daas_ham_typical_power_w'),
-    })
+    }, addsPower)
     if (problem) {
         gs.addErrorMessage(problem)
         current.setAbortAction(true)
@@ -61,7 +63,7 @@ function forbidden(response: RESTAPIResponse): boolean {
 /** GET /racks?site={sys_id}: racks in the Site's rooms. */
 export function listRacks(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (forbidden(response)) return
-    const siteId = String(request.queryParams.site ?? '')
+    const siteId = queryParam(request, 'site')
     const rack = new GlideRecord('cmdb_ci_rack')
     const atSite = rack.addQuery('location', siteId)
     atSite.addOrCondition('location.parent', siteId)

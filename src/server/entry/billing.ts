@@ -8,6 +8,7 @@ import { runEventTableJob } from '../platform/chunked'
 import { todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
 import { findById, num, str } from '../platform/records'
+import { queryInt, reply } from '../platform/rest-api'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
 
@@ -118,6 +119,14 @@ function finishGeneration(period: GlideRecord): void {
         fee.setValue('billing_period', period.getUniqueValue())
         fee.update()
     }
+    setTotals(period)
+    period.setValue('generated_at', new GlideDateTime().getValue())
+    period.setValue('status', 'ready')
+    period.update()
+}
+
+/** Line count and total of the period (does not save). */
+function setTotals(period: GlideRecord): void {
     const totals = new GlideAggregate('x_daas_ham_billing_line')
     totals.addEncodedQuery(`billing_period=${period.getUniqueValue()}`)
     totals.addAggregate('COUNT', '')
@@ -126,9 +135,22 @@ function finishGeneration(period: GlideRecord): void {
     const hasTotals = totals.next()
     period.setValue('line_count', hasTotals ? Number(totals.getAggregate('COUNT', '')) : 0)
     period.setValue('total_amount', hasTotals ? Number(totals.getAggregate('SUM', 'amount')) || 0 : 0)
-    period.setValue('generated_at', new GlideDateTime().getValue())
-    period.setValue('status', 'ready')
-    period.update()
+}
+
+/** Fee lines whose fee was waived after generation (e.g. a missing unit turned up) are not billed. */
+function dropWaivedFeeLines(period: GlideRecord): void {
+    const line = new GlideRecord('x_daas_ham_billing_line')
+    line.addEncodedQuery(`billing_period=${period.getUniqueValue()}^kind=fee^fee_event.status=waived`)
+    line.query()
+    while (line.next()) {
+        const fee = findById('x_daas_ham_fee_event', str(line, 'fee_event'))
+        if (fee) {
+            fee.setValue('billing_period', '')
+            fee.update()
+        }
+        line.deleteRecord()
+    }
+    setTotals(period)
 }
 
 /** UI action "Regenerate" on a period ready for review: rebuild its lines from current data. */
@@ -155,6 +177,7 @@ const CSV_HEADER = ['period', 'kind', 'customer', 'agreement', 'subscription_lin
 /** UI action "Close period": attach the CSV export, mark its fees billed, lock it and compute its margin. */
 export function uiCloseBillingPeriod(current: GlideRecord): void {
     if (str(current, 'status') !== 'ready') return void gs.addErrorMessage('Only a period ready for review can be closed')
+    dropWaivedFeeLines(current)
     const rows: Array<Array<string | number>> = [CSV_HEADER]
     const line = linesOf(current.getUniqueValue())
     while (line.next()) rows.push(csvRow(current, line))
@@ -218,17 +241,6 @@ export function guardClosedBillingPeriod(current: GlideRecord, previous: GlideRe
 
 function canPull(): boolean {
     return gs.hasRole(ROLE.finance) || gs.hasRole(ROLE.integration)
-}
-
-function reply(response: RESTAPIResponse, status: number, body: object): void {
-    response.setStatus(status)
-    response.setBody(body as never)
-}
-
-function queryInt(request: RESTAPIRequest, name: string, fallback: number): number {
-    const raw = ([] as unknown[]).concat(request.queryParams?.[name] ?? [])[0]
-    const value = parseInt(String(raw ?? ''), 10)
-    return Number.isFinite(value) && value >= 0 ? value : fallback
 }
 
 /** GET /billing_periods: the most recent periods. */
