@@ -364,9 +364,20 @@ export function dueStepsQuery(vendor: OemVendor, action: ClaimAction): string {
     )
 }
 
-/** Encoded query: open `action` steps of `vendor` that used up their attempts (left for a person). */
-export function exhaustedStepsQuery(vendor: OemVendor, action: ClaimAction): string {
-    return `${openStepsQuery(vendor, action)}^automation_status=failed^attempts>=${MAX_CLAIM_ATTEMPTS}`
+/** A failed step that used up its attempts: it is left for a person. */
+export function isExhausted(step: { status: string; attempts: number }): boolean {
+    return step.status === 'failed' && step.attempts >= MAX_CLAIM_ATTEMPTS
+}
+
+/**
+ * automation_message of a step parked because its prerequisite step is exhausted: it is failed with
+ * attempts at the maximum, and goes back to pending when that prerequisite step is done.
+ */
+export const PARKED_MESSAGE = 'waits for the OEM claim step, which needs a person'
+
+/** The actions whose steps wait on an `action` step (CLAIM_PREREQUISITE). */
+export function dependentActions(action: string): ClaimAction[] {
+    return CLAIM_ORDER.filter((dependent) => CLAIM_PREREQUISITE[dependent] === action)
 }
 
 /** The candidates whose staging task is not waiting on a prerequisite step, at most `limit`, in order. */

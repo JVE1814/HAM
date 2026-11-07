@@ -3,7 +3,7 @@ import { BusinessRule } from '@servicenow/sdk/core'
 import { enforceLifecycle, onAllocatedAssetStageChange, onAssetServiceChange } from '../../server/entry/assets'
 import { guardWorkWindow, onWorkOrderClosed } from '../../server/entry/delivery'
 import { onOrderApprovalDecision } from '../../server/entry/orders'
-import { guardStagingClosure, onStagingClosed, stampStagingStep } from '../../server/entry/staging'
+import { guardStagingClosure, onStagingClosed, releaseWaitingSteps, stampStagingStep } from '../../server/entry/staging'
 
 /* Record-change rules driving the Order lifecycle (ADR 0004). */
 
@@ -60,6 +60,17 @@ BusinessRule({
     order: 100,
     condition: 'current.done.changes()',
     script: stampStagingStep,
+})
+
+BusinessRule({
+    $id: Now.ID['br_staging_step_release'],
+    name: 'NaaS - release OEM steps waiting on a done step',
+    table: 'x_daas_ham_staging_step',
+    when: 'after',
+    action: ['update'],
+    order: 200,
+    condition: "current.done.changes() && current.done == true && current.automation != ''",
+    script: releaseWaitingSteps,
 })
 
 BusinessRule({

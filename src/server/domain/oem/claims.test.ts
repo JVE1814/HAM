@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HttpRequest, HttpResponse } from '../http'
-import { CLAIM_PREREQUISITE, CLAIM_ROUTES, CLAIM_VENDORS, dueStepsQuery, openStepsQuery, readyTargets, runVendorClaims, type ClaimAction, type ClaimOutcome, type ClaimStore, type ClaimTarget } from './claims'
+import { CLAIM_PREREQUISITE, CLAIM_ROUTES, CLAIM_VENDORS, dependentActions, dueStepsQuery, isExhausted, MAX_CLAIM_ATTEMPTS, openStepsQuery, readyTargets, runVendorClaims, type ClaimAction, type ClaimOutcome, type ClaimStore, type ClaimTarget } from './claims'
 
 function fake(responses: Array<HttpResponse | ((request: HttpRequest) => HttpResponse)>) {
     const calls: HttpRequest[] = []
@@ -493,6 +493,18 @@ describe('CLAIM_PREREQUISITE', () => {
     it('makes licensing and zero-touch wait for the claim; the claim waits for nothing', () => {
         expect(CLAIM_PREREQUISITE).toEqual({ oem_licence: 'oem_claim', oem_ztp: 'oem_claim' })
         expect(CLAIM_PREREQUISITE.oem_claim).toBeUndefined()
+    })
+
+    it('lists the actions that wait on each action', () => {
+        expect(dependentActions('oem_claim')).toEqual(['oem_licence', 'oem_ztp'])
+        expect(dependentActions('oem_licence')).toEqual([])
+        expect(dependentActions('')).toEqual([])
+    })
+
+    it('treats a failed step at the attempt limit as exhausted, and nothing else', () => {
+        expect(isExhausted({ status: 'failed', attempts: MAX_CLAIM_ATTEMPTS })).toBe(true)
+        expect(isExhausted({ status: 'failed', attempts: MAX_CLAIM_ATTEMPTS - 1 })).toBe(false)
+        expect(isExhausted({ status: 'pending', attempts: MAX_CLAIM_ATTEMPTS })).toBe(false)
     })
 
     it('finds the open prerequisite steps of the vendor on active staging tasks', () => {

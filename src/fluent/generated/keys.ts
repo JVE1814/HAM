@@ -1293,6 +1293,10 @@ declare global {
                         table: 'sys_script'
                         id: 'e984baa5527c44e89349b6959871301d'
                     }
+                    br_staging_step_release: {
+                        table: 'sys_script'
+                        id: 'd94b95c9cbf54e698cb9d0c06f3f995b'
+                    }
                     br_staging_step_stamp: {
                         table: 'sys_script'
                         id: 'd93d4d0bcace4717b89350c742437a20'
