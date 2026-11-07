@@ -75,7 +75,7 @@ export const billing_period_form = Form({
                 {
                     layout: 'two-column',
                     leftElements: [{ field: 'period', type: 'table_field' }, { field: 'period_start', type: 'table_field' }, { field: 'period_end', type: 'table_field' }, { field: 'status', type: 'table_field' }],
-                    rightElements: [{ field: 'line_count', type: 'table_field' }, { field: 'total_amount', type: 'table_field' }, { field: 'generated_at', type: 'table_field' }, { field: 'closed_at', type: 'table_field' }, { field: 'closed_by', type: 'table_field' }],
+                    rightElements: [{ field: 'line_count', type: 'table_field' }, { field: 'total_amount', type: 'table_field' }, { field: 'generated_at', type: 'table_field' }, { field: 'failed_lines', type: 'table_field' }, { field: 'last_error', type: 'table_field' }, { field: 'closed_at', type: 'table_field' }, { field: 'closed_by', type: 'table_field' }],
                 },
             ],
         },

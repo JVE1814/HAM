@@ -53,6 +53,7 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
         },
         flush: () => writeCostFacts(periodId, ledger.drain()),
     })
+    if (result.failed > 0) gs.error(`[x_daas_ham] Margin of ${str(period, 'period')}: ${result.failed} service interval(s) failed: ${result.lastError}`)
     if (!result.done) return
     addFieldLabour(periodId, bounds)
     writeMargin(periodId)

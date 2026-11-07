@@ -76,6 +76,14 @@ export function generateBillingLines(event: GlideRecord, current: GlideRecord): 
             }
         },
     })
+    if (result.failed > 0) {
+        // A line that could not be billed must not vanish from the bill: count it on the period
+        // (Close period refuses until a regeneration bills every line).
+        gs.error(`[x_daas_ham] Billing period ${str(period, 'period')}: ${result.failed} subscription line(s) failed: ${result.lastError}`)
+        period.setValue('failed_lines', num(period, 'failed_lines') + result.failed)
+        period.setValue('last_error', result.lastError.slice(0, 255))
+        period.update()
+    }
     if (result.done) finishGeneration(period)
 }
 
@@ -191,6 +199,8 @@ export function uiRegenerateBillingPeriod(current: GlideRecord): void {
         fee.update()
     }
     current.setValue('status', 'generating')
+    current.setValue('failed_lines', 0)
+    current.setValue('last_error', '')
     current.update()
     fire(EVENT.billingGenerate, current, current.getUniqueValue())
     gs.addInfoMessage(`Regenerating ${str(current, 'period')}`)
@@ -201,6 +211,9 @@ const CSV_HEADER = ['period', 'kind', 'customer', 'agreement', 'subscription_lin
 /** UI action "Close period": mark its fees billed, lock it, then export its CSV and compute its margin in the background. */
 export function uiCloseBillingPeriod(current: GlideRecord): void {
     if (str(current, 'status') !== 'ready') return void gs.addErrorMessage('Only a period ready for review can be closed')
+    if (num(current, 'failed_lines') > 0) {
+        return void gs.addErrorMessage(`${num(current, 'failed_lines')} subscription line(s) failed to bill (${str(current, 'last_error')}); fix them and Regenerate before closing`)
+    }
     dropWaivedFeeLines(current)
     const fees = new GlideRecord('x_daas_ham_fee_event')
     fees.addQuery('billing_period', current.getUniqueValue())
@@ -321,7 +334,7 @@ export function listBillingPeriods(request: RESTAPIRequest, response: RESTAPIRes
     if (!canPull()) return reply(response, 403, { error: 'Requires the finance or integration role' })
     const period = new GlideRecord('x_daas_ham_billing_period')
     period.orderByDesc('period')
-    period.setLimit(queryInt(request, 'limit', 24))
+    period.setLimit(Math.min(Math.max(queryInt(request, 'limit', 24), 1), 120))
     period.query()
     const periods: object[] = []
     while (period.next()) {
@@ -342,7 +355,7 @@ export function getBillingLines(request: RESTAPIRequest, response: RESTAPIRespon
     const period = findById('x_daas_ham_billing_period', String(request.pathParams.id ?? ''))
     if (!period) return reply(response, 404, { error: 'Unknown billing period' })
     const offset = queryInt(request, 'offset', 0)
-    const limit = Math.min(queryInt(request, 'limit', 1000), 5000)
+    const limit = Math.min(Math.max(queryInt(request, 'limit', 1000), 1), 5000)
     const line = linesOf(period.getUniqueValue(), offset, limit)
     const lines: object[] = []
     while (line.next()) {

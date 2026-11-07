@@ -2,10 +2,11 @@
 
 ## What is billed
 
-- **Service intervals** record the days each Asset delivered a Subscription line. One opens when
-  in-service detection attaches the Asset to its line (first day = in-service date). It closes on
-  the day the Asset goes on a Return order (or, at the latest, when it is received back). Both
-  days are billed.
+- **Service intervals** record the days each Asset delivered a Subscription line. A rule on stage
+  changes opens one when the Asset enters service (in service or temporary): from its in-service
+  date on first go-live, else that day (e.g. a missing unit found again). The same rule closes it
+  the day the Asset leaves service (a Return order, declared missing, a manual move). Both days are
+  billed.
 - A **site package** line is billed from its start date to its end date (it ends when its last
   Asset is received back).
 - A **per-device** line is billed per device-day: `monthly rate × device-days ÷ days in month`, one
@@ -18,7 +19,7 @@
 
 | Status | How it gets there | What can happen |
 |---|---|---|
-| Generating | Monthly job on day 1 (previous month), or *Regenerate* | Lines are written in time-boxed chunks (event-driven) |
+| Generating | Monthly job on day 1 (previous month), or *Regenerate* | Lines are written in time-boxed chunks (event-driven); a subscription line that fails to bill is counted on the period with the last error, and *Close period* refuses until a *Regenerate* bills every line |
 | Ready for review | Generation finished; totals are set | *Regenerate* (rebuild from current data); *Close period* |
 | Closed (locked) | *Close period* (finance) | Lines of fees waived since generation are dropped and the totals redone, and the fees become *billed*. The period and its lines can no longer change or be deleted. The CSV export is attached in the background shortly after closing; *Re-export CSV* attaches it again if it is missing |
 

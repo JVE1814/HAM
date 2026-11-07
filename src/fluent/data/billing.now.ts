@@ -42,6 +42,8 @@ export const x_daas_ham_billing_period = Table({
             dropdown: 'dropdown_without_none',
         }),
         generated_at: DateTimeColumn({ label: 'Generated at', readOnly: true }),
+        failed_lines: IntegerColumn({ label: 'Subscription lines that failed to bill', default: 0, readOnly: true }),
+        last_error: StringColumn({ label: 'Last generation error', maxLength: 255, readOnly: true }),
         line_count: IntegerColumn({ label: 'Lines', readOnly: true }),
         total_amount: DecimalColumn({ label: 'Total', readOnly: true }),
         closed_at: DateTimeColumn({ label: 'Closed at', readOnly: true }),
