@@ -1,6 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { assetLifecycleStamp, type AssetLifecycleFacts, type LifecycleDates } from '../domain/model-lifecycle'
 import { toIsoDate } from '../domain/calendar'
+import { memoized } from '../domain/memo'
 import { runEventTableJob } from './chunked'
 import { glideToMs, todayIso } from './clock'
 import { findById, num, str } from './records'
@@ -35,15 +36,6 @@ export function modelLifecycle(modelId: string): LifecycleDates {
     }
 }
 
-/** `read` remembering each id's result for the returned reader's lifetime. */
-function memoized<T>(read: (id: string) => T): (id: string) => T {
-    const seen = new Map<string, T>()
-    return (id) => {
-        if (!seen.has(id)) seen.set(id, read(id))
-        return seen.get(id) as T
-    }
-}
-
 /** Reads x_daas_ham_model_lifecycle at most once per model for the reader's lifetime. Create one per job chunk or request, never at module scope. */
 export function modelLifecycles(): ModelLifecycles {
     return memoized(modelLifecycle)
@@ -73,19 +65,44 @@ export function lifecycleReaders(): LifecycleReaders {
     return { models: modelLifecycles(), agreements: agreementRefreshTerms(), leases: leaseTerms() }
 }
 
+/** The Asset fields its lifecycle stamp is worked out from, with the stamp it carries now. */
+interface StampInputs {
+    model: string
+    agreement: string
+    lease: string
+    inService: string
+    phase: string
+    refreshDue: string
+}
+
+function stampInputs(asset: GlideRecord): StampInputs {
+    return {
+        model: str(asset, 'model'),
+        agreement: str(asset, 'x_daas_ham_agreement'),
+        lease: str(asset, 'x_daas_ham_lease'),
+        inService: str(asset, 'x_daas_ham_in_service_date'),
+        phase: str(asset, 'x_daas_ham_lifecycle_phase'),
+        refreshDue: str(asset, 'x_daas_ham_refresh_due'),
+    }
+}
+
+function stampOf(inputs: StampInputs, readers: LifecycleReaders): { phase: string; refreshDue: string } {
+    const inService = glideToMs(inputs.inService)
+    const facts: AssetLifecycleFacts = {
+        ...readers.agreements(inputs.agreement),
+        inServiceDate: inService === undefined ? undefined : toIsoDate(inService),
+        lease: readers.leases(inputs.lease),
+    }
+    return assetLifecycleStamp(facts, readers.models(inputs.model), todayIso())
+}
+
 /** Set (without saving) the Asset's Lifecycle phase and Refresh due date; true if either changed. */
 export function applyLifecycleDates(asset: GlideRecord, readers: LifecycleReaders): boolean {
-    const inService = glideToMs(str(asset, 'x_daas_ham_in_service_date'))
-    const facts: AssetLifecycleFacts = {
-        ...readers.agreements(str(asset, 'x_daas_ham_agreement')),
-        inServiceDate: inService === undefined ? undefined : toIsoDate(inService),
-        lease: readers.leases(str(asset, 'x_daas_ham_lease')),
-    }
-    const { phase, refreshDue } = assetLifecycleStamp(facts, readers.models(str(asset, 'model')), todayIso())
-    const changed = str(asset, 'x_daas_ham_lifecycle_phase') !== phase || str(asset, 'x_daas_ham_refresh_due') !== refreshDue
+    const inputs = stampInputs(asset)
+    const { phase, refreshDue } = stampOf(inputs, readers)
     asset.setValue('x_daas_ham_lifecycle_phase', phase)
     asset.setValue('x_daas_ham_refresh_due', refreshDue)
-    return changed
+    return inputs.phase !== phase || inputs.refreshDue !== refreshDue
 }
 
 /** An event-driven pass recomputing the lifecycle dates of the Assets matching `query`. */
@@ -105,14 +122,22 @@ export interface LifecycleRefresh {
  * Lease schedule once per chunk; the event is queued again until the pass is complete.
  */
 export function refreshLifecycleDates(pass: LifecycleRefresh): void {
+    // Never run for a blank model, agreement or lease: the query would match every Asset without one.
+    if (!pass.parm1) return
     const readers = lifecycleReaders()
     runEventTableJob({
         ...pass,
         table: 'alm_hardware',
-        read: (asset) => asset.getUniqueValue(),
-        handle: (assetId) => {
+        read: stampInputs,
+        handle: (inputs, assetId) => {
+            // The stamp is worked out from the batch row; only Assets whose stamp changes are loaded and saved.
+            const { phase, refreshDue } = stampOf(inputs, readers)
+            if (inputs.phase === phase && inputs.refreshDue === refreshDue) return
             const asset = findById('alm_hardware', assetId)
-            if (asset && applyLifecycleDates(asset, readers)) asset.update()
+            if (!asset) return
+            asset.setValue('x_daas_ham_lifecycle_phase', phase)
+            asset.setValue('x_daas_ham_refresh_due', refreshDue)
+            asset.update()
         },
     })
 }
