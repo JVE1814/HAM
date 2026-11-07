@@ -131,9 +131,14 @@ function raiseDecision(lease: GlideRecord, mismatch: boolean): void {
  * - extend: the lease runs to the new end date;
  * - return: stock leaves circulation onto a draft return-to-lessor disposal, and Assets at Sites get a
  *   Refresh due date no later than the lease end so automatic refresh swaps them out in time.
- * A lease being bought out or returned takes no further decision (domain/leases `leaseDecisionProblem`).
+ * A lease being bought out or returned takes no further decision (domain/leases `leaseDecisionProblem`). The decision
+ * is closed before the lease changes, and a closed one is not applied, so it never stays open over a lease it already
+ * decided: applied again, an extension would extend once more (any new end date after the extended one passes), and
+ * while it is open the daily review raises no decision before the new end (`openDecision`).
  */
 export function uiApplyLeaseDecision(current: GlideRecord): void {
+    // A form opened before the decision was applied can still send it.
+    if (!bool(current, 'active')) return void gs.addErrorMessage('This decision is closed')
     const lease = findById('x_daas_ham_lease_schedule', str(current, 'lease'))
     if (!lease) return void gs.addErrorMessage('The lease schedule no longer exists')
     const decision = str(current, 'decision') as LeaseEndAction | ''
@@ -144,6 +149,10 @@ export function uiApplyLeaseDecision(current: GlideRecord): void {
         newEndDate: str(current, 'new_end_date'),
     })
     if (problem) return void gs.addErrorMessage(problem)
+    const openState = str(current, 'state')
+    current.setValue('state', 3)
+    // Closed first: a refused form save (the platform says why) leaves the lease as it was and the decision open.
+    if (!current.update()) return
 
     if (decision === 'extend') {
         lease.setValue('ends', str(current, 'new_end_date'))
@@ -159,8 +168,10 @@ export function uiApplyLeaseDecision(current: GlideRecord): void {
         lease.setValue('buyout_assets', covered)
         lease.setValue('buyout_share', evenShare(num(lease, 'buyout_price'), covered))
     }
-    // Refused: no transfer or return may act on a decision the lease does not record, and the decision stays open.
-    if (!lease.update()) return void gs.addErrorMessage(`Lease ${str(lease, 'number')} not saved: ${refusal(lease)}`)
+    if (!lease.update()) {
+        // Refused: no transfer or return may act on a decision the lease does not record, so the decision opens again.
+        return reopenDecision(current, openState, `Lease ${str(lease, 'number')} not saved: ${refusal(lease)}`)
+    }
     if (decision === 'buyout') {
         fire(EVENT.leaseBuyout, lease, lease.getUniqueValue())
         gs.addInfoMessage("The lease's assets become Provider-owned in the background")
@@ -178,8 +189,19 @@ export function uiApplyLeaseDecision(current: GlideRecord): void {
         }
         fire(EVENT.leaseAssets, lease, lease.getUniqueValue())
     }
-    current.setValue('state', 3)
-    current.update()
+}
+
+/**
+ * Put a decision closed by Apply back in `openState` once its lease was refused, to apply again. One the platform
+ * keeps closed is logged: its lease is still undecided, so the daily review raises a new decision (`reviewLeases`, up
+ * to 30 days past the lease end).
+ */
+function reopenDecision(decision: GlideRecord, openState: string, notApplied: string): void {
+    decision.setValue('state', openState)
+    if (decision.update()) return void gs.addErrorMessage(`${notApplied}. The decision is open again`)
+    gs.warn(`[x_daas_ham] Lease decision ${str(decision, 'number')} not reopened (${notApplied}): ${refusal(decision)}`)
+    const closed = 'The decision stays closed (see the system log); the daily lease review raises a new one'
+    gs.addErrorMessage(`${notApplied}. ${closed}`)
 }
 
 /** What a return did with the lease's stock. */

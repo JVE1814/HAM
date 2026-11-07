@@ -20,13 +20,25 @@ export interface ReturnRequester {
 }
 
 /**
- * Why a requested Return cannot be raised; empty when it can. As for an Order (domain/entitlement `ownershipFindings`):
- * only those the Return create rule lets in ask for returns, and site contacts never do; provider staff and the service
- * desk ask for any Customer, a customer admin only for their own; and the Site must be one of the Customer's sites.
+ * Why this person may not request a Return for the Customer, or null when they may. As for an Order (domain/entitlement
+ * `raiserRefusal`): only those the Return create rule lets in ask for returns, and site contacts never do; provider
+ * staff and the service desk ask for any Customer, a customer admin only for their own.
+ */
+export function returnRequesterRefusal(customerId: string, requester: ReturnRequester): string | null {
+    if (!requester.mayRequest || requester.scope === 'own_sites') return 'You may not request returns'
+    if (requester.scope === 'own_customer' && customerId !== requester.customerId) {
+        return 'You can only request returns for your own customer'
+    }
+    return null
+}
+
+/**
+ * Why a requested Return cannot be raised; empty when it can: the person must be allowed to request it for its Customer
+ * (`returnRequesterRefusal`), and the Site must be one of the Customer's sites.
  */
 export function returnRequestFindings(request: RequestedReturn, requester: ReturnRequester): string[] {
-    if (!requester.mayRequest || requester.scope === 'own_sites') return ['You may not request returns']
-    if (requester.scope === 'own_customer' && request.customerId !== requester.customerId) return ['You can only request returns for your own customer']
+    const refusal = returnRequesterRefusal(request.customerId, requester)
+    if (refusal) return [refusal]
     if (!request.customerId) return ['Choose the customer']
     if (!request.site) return ["Choose one of the customer's sites"]
     if (!request.site.isSite || request.site.customerId !== request.customerId) return ["The site is not one of the customer's sites"]

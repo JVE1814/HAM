@@ -10,6 +10,7 @@ import {
     overdueStep,
     returnDueDate,
     returnRequestFindings,
+    returnRequesterRefusal,
     shortfallRoute,
     SITE_RECOVERY_STAGES,
     sitePackageHoldersQuery,
@@ -60,6 +61,18 @@ describe('returnRequestFindings', () => {
         expect(returnRequestFindings(acmeSite, { mayRequest: true, scope: 'own_sites', customerId: 'acme' })).toEqual(['You may not request returns'])
         expect(returnRequestFindings(acmeSite, { mayRequest: false, scope: 'unscoped', customerId: '' })).toEqual(['You may not request returns'])
         expect(returnRequestFindings(acmeSite, { ...acmeAdmin, mayRequest: false })).toEqual(['You may not request returns'])
+    })
+})
+
+describe('returnRequesterRefusal', () => {
+    it('says only who may ask, so a caller can tell a refused requester from a wrong site', () => {
+        const acmeAdmin: ReturnRequester = { mayRequest: true, scope: 'own_customer', customerId: 'acme' }
+        const staff: ReturnRequester = { mayRequest: true, scope: 'everything', customerId: 'provider' }
+        expect(returnRequesterRefusal('acme', acmeAdmin)).toBeNull()
+        expect(returnRequesterRefusal('globex', staff)).toBeNull()
+        expect(returnRequesterRefusal('globex', acmeAdmin)).toBe('You can only request returns for your own customer')
+        expect(returnRequesterRefusal('acme', { ...acmeAdmin, mayRequest: false })).toBe('You may not request returns')
+        expect(returnRequesterRefusal('acme', { ...acmeAdmin, scope: 'own_sites' })).toBe('You may not request returns')
     })
 })
 

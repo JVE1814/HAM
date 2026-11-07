@@ -4,10 +4,11 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { awaitsSelfInstallConfirmation } from '../domain/install-confirmation'
 import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
+import { returnRequesterRefusal, returnRequestFindings, type RequestedReturn } from '../domain/returns'
 import { actsAsCustomerAdmin, ROLE } from '../domain/visibility'
 import { readStage } from '../platform/assets'
 import { currentSession } from '../platform/session'
-import { exists, findById, refusal, str } from '../platform/records'
+import { bool, exists, findById, refusal, str } from '../platform/records'
 import { installedAssetIds, raiseReturn } from '../platform/returns'
 import { returnLabels } from '../platform/shipments'
 import { completeAttestation } from './assurance'
@@ -214,21 +215,38 @@ function returnedAssetIds(siteId: string, decommission: boolean, listed: unknown
     })
 }
 
-/** POST /customer/returns { site, assets: [ids], decommission, method }: request equipment to be taken back. */
+/** A location named by a return request, as domain/returns reads it: whose it is and whether it is a Site at all. */
+function requestedSite(site: GlideRecord): NonNullable<RequestedReturn['site']> {
+    return { id: site.getUniqueValue(), customerId: str(site, 'company'), isSite: bool(site, 'x_daas_ham_is_site') }
+}
+
+/**
+ * POST /customer/returns { site, assets: [ids], decommission, method }: request equipment to be taken back, under the
+ * record producer's rule (domain/returns `returnRequestFindings`) for the caller's own Customer: 403 when the Return
+ * create rule leaves them out, 400 when the Site is not one of their Customer's Sites. Locations have no visibility
+ * rule (ADR 0005), so any location's sys_id is found: the Site is checked here, before its devices are read.
+ */
 export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     if (!isCustomerAdmin()) return reply(response, 403, { error: 'Only customer admins can request returns' })
     const input = data(request)
+    const { scope, customerId } = currentSession()
+    const requester = { mayRequest: new GlideRecord('x_daas_ham_return_order').canCreate(), scope, customerId }
+    const refused = returnRequesterRefusal(customerId, requester)
+    if (refused) return reply(response, 403, { error: refused })
     const site = findById('cmn_location', String(input.site ?? ''))
+    const findings = returnRequestFindings({ customerId, site: site ? requestedSite(site) : undefined }, requester)
+    if (!site || findings.length > 0) return reply(response, 400, { error: findings.join('. ') })
     const decommission = input.decommission === true
-    const assetIds = site ? returnedAssetIds(site.getUniqueValue(), decommission, input.assets) : []
-    if (!site || assetIds.length === 0) {
-        return reply(response, 400, { error: decommission ? 'Choose a site with installed devices' : 'Choose a site and at least one of its devices' })
+    const assetIds = returnedAssetIds(site.getUniqueValue(), decommission, input.assets)
+    if (assetIds.length === 0) {
+        const error = decommission ? 'The site has no installed devices' : "Choose at least one of the site's devices"
+        return reply(response, 400, { error })
     }
     const firstAsset = findById('alm_hardware', assetIds[0])
     const returnId = raiseReturn({
         trigger: decommission ? 'site_decommission' : 'device_removal',
-        customerId: str(firstAsset ?? site, 'company'),
+        customerId,
         siteId: site.getUniqueValue(),
         agreementId: firstAsset ? str(firstAsset, 'x_daas_ham_agreement') : '',
         method: input.method === 'fsm_deinstall' ? 'fsm_deinstall' : 'ship_back',
