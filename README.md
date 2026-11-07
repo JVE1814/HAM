@@ -33,8 +33,17 @@ routers and firewalls it installs at customer sites and bills as a service.
 | Racks | Placement guard and rack elevation page (`x_daas_ham_racks.do`) |
 | Customer self-service | `x_daas_ham_customer.do`: equipment, faults, returns, install confirmation, attestation |
 
-See [`docs/spec`](docs/spec) for the behaviour of each module. Phase 3 (leases, billing export,
-carriers, provisioning APIs, margin) follows the plan.
+| Area | Phase 3 |
+|---|---|
+| Leases | Lease schedules make their assets lessor-owned; mismatch alerts when a lease ends before the service; end-of-lease decisions (buy out, extend, return) ([spec](docs/spec/p3-contracts.md)) |
+| Renewals | Agreement renewal warnings and *Renew agreement*; OEM coverage expiry warnings per customer |
+| Billing | Service intervals per asset; monthly billing periods prorated by day (site packages) and device-day (per-device lines) plus fees; review, regenerate, close and lock; CSV attachment and pull API ([spec](docs/spec/p3-billing.md)) |
+| Margin | Cost facts (purchase write-off, lease, OEM support, field labour) and margin per customer and site on period close; dashboard tab |
+| Shipping | Labels bought through a shipping aggregator at *Ship* and for ship-back returns; tracking webhooks ([spec](docs/spec/p3-integrations.md)) |
+| OEM provisioning | Staging steps done by the OEM cloud: Meraki and Mist claim, GreenLake device add and subscription, FortiCloud registration and FortiZTP, Check Point Zero Touch |
+| Racks | Power budget per rack from model typical power |
+
+See [`docs/spec`](docs/spec) for the behaviour of each module. AI assistance is deferred (plan D68).
 
 ## Required plugins
 
@@ -79,6 +88,11 @@ Then configure (System Properties, `x_daas_ham.*`):
 | `x_daas_ham.returns.grace_days` / `.temporary_lead_days` | missing after due + grace (14); temporary returns raised ahead (7) |
 | `x_daas_ham.refresh.horizon_days` | refresh orders for assets due within (90) days |
 | `x_daas_ham.reconciliation.unseen_days` | installed but unseen threshold (7) |
+| `x_daas_ham.oem.coverage_warning_days` | warn about OEM coverage of deployed assets ending within (60) days |
+| `x_daas_ham.leases.decision_group` | group that end-of-lease decisions are assigned to |
+| `x_daas_ham.margin.amortisation_months` / `.visit_cost` | purchase write-off period (60) and standard field visit cost (250) |
+| `x_daas_ham.shipping.*` | shipping aggregator: `enabled`, `api_key`, `webhook_token`, `service_code`, `package_kg`, `sender_name` |
+| `x_daas_ham.oem.claim.<vendor>.enabled`, `.max_calls`, `x_daas_ham.checkpoint.api_key` | OEM claim and provisioning, see [integrations spec](docs/spec/p3-integrations.md) |
 
 Assign roles (`x_daas_ham.asset_manager`, `.inventory_tech`, `.field_tech`, `.noc`, `.account_manager`,
 `.finance`, `.admin`; customers: `.customer_admin`, `.site_contact`) and add inventory techs to
@@ -90,7 +104,8 @@ With `--demo-data`, the on-demand job **NaaS - load demo data** is installed. Ru
 ("Execute Now"): it creates two customers (Acme Retail, Globex Logistics) with sites, racks and
 stockrooms, models from Cisco/Meraki, HPE Aruba, Fortinet and Check Point, site templates, agreements,
 subscription lines, catalog entries, staging checklists, demo users (`naas.inventory`, `naas.field`,
-`acme.admin`, `acme.hq.contact`) and stock, and sets the two properties above. Lifecycle dates in the
+`acme.admin`, `acme.hq.contact`) and stock, in-service switches with OEM coverage, service intervals
+and a lease that ends before the Acme agreement, and sets the two properties above. Lifecycle dates in the
 demo data are illustrative, not vendor bulletins.
 
 ## Integrations
@@ -105,9 +120,25 @@ demo data are illustrative, not vendor bulletins.
 `identifier` is a serial number, provider tag or customer tag; `event` is `seen`, `down` or `up`.
 Responds `202` with accepted / unknown identifiers / rejected rows. Only state changes are stored.
 
-**Imports**: load CSVs into *ASN import rows* (`x_daas_ham_asn_import`) and *Lifecycle import rows*
-(`x_daas_ham_eox_import`) with System Import Sets > Load Data; each row is processed on insert and its
-import state/comment shows the outcome.
+**Imports**: load CSVs into *ASN import rows* (`x_daas_ham_asn_import`, including MAC address and
+OEM claim code), *Lifecycle import rows* (`x_daas_ham_eox_import`) and *OEM coverage import rows*
+(`x_daas_ham_coverage_import`, optionally with the contract's annual cost) with System Import Sets >
+Load Data; each row is processed on insert and its import state/comment shows the outcome.
+
+**Billing pull API** (role `x_daas_ham.finance` or `x_daas_ham.integration`):
+`GET /api/x_daas_ham/naas/billing_periods` and
+`GET /api/x_daas_ham/naas/billing_periods/{id}/lines?offset=0&limit=1000` (`final` once the period is
+closed, `nextOffset` null on the last page).
+
+**Shipping aggregator**: labels through the *NaaS Shipping aggregator* REST message (ShipEngine label
+API). Register the tracking webhook at
+`https://<instance>/api/x_daas_ham/naas/shipping/tracking?token=<x_daas_ham.shipping.webhook_token>`;
+ShipEngine and EasyPost payloads are accepted.
+
+**OEM clouds**: REST messages *NaaS Meraki Dashboard*, *NaaS HPE Mist*, *NaaS HPE GreenLake*,
+*NaaS FortiCare*, *NaaS FortiZTP* and *NaaS Check Point Zero Touch*. Attach OAuth 2.0 profiles to
+GreenLake, FortiCare and FortiZTP; Meraki, Mist and Check Point take keys from password2 properties.
+Each customer's org / subscription / FortiManager / template is an *OEM cloud account* record.
 
 ## Development
 
@@ -117,7 +148,7 @@ import state/comment shows the outcome.
 | `npm run lint` | ESLint |
 | `npm test` | Vitest unit tests for the domain core and client helpers |
 | `npm run build` | `now-sdk build` (Fluent type check, client bundle, app package) |
-| `npx now-sdk cicd testsuite run ...` | ATF suites **NaaS - P1** and **NaaS - P2** on an instance |
+| `npx now-sdk cicd testsuite run ...` | ATF suites **NaaS - P1**, **NaaS - P2** and **NaaS - P3** on an instance |
 
 Layout:
 
@@ -127,7 +158,7 @@ src/server/
   domain/        pure TypeScript business rules, unit-tested (ADR 0003)
   platform/      Glide adapters: repositories and gateways
   entry/         business-rule / job / REST / UI-action entry points
-src/client/      React UI pages (warehouse)
+src/client/      React UI pages (warehouse, rack elevation, customer self-service)
 ```
 
 Conventions that the build or tests enforce:
@@ -152,3 +183,9 @@ These cannot be checked without an instance:
 - FSM work-order state 3 = Closed Complete and the `expected_start` / `estimated_end` fields.
 - CI `last_discovered` / `discovery_source` as written by your connectors.
 - Before-query rule performance at your data volumes (indexes are declared on the scoped columns).
+- `wm_order.closed_at`, `company` and `location` for field-labour cost facts; `alm_asset.cost` as the
+  purchase cost.
+- Currency of the billing exports (amounts are written in each line's currency, default EUR).
+- OEM claim endpoints and payloads against each vendor's current API (recorded fixtures in
+  `domain/oem/claims.test.ts`); the Check Point Zero Touch endpoint in particular.
+- That the shipping aggregator account accepts the configured `service_code` and depot address.

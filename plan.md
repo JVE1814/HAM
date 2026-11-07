@@ -1,6 +1,7 @@
 # x_daas_ham — Hardware Asset Management for a NaaS Provider (ServiceNow Fluent)
 
-> Status: **design agreed, not yet built.** This document is the outcome of a structured design
+> Status: **Phases 1–3 built** (AI deferred, D68); the instance-only checks are listed in the
+> README under "Verify on the first install". This document is the outcome of a structured design
 > interview (76 questions, recorded in the [Decision log](#20-decision-log)). It is the plan of record
 > for building the app. Each module gets its own written spec in `docs/spec/` before it is built.
 

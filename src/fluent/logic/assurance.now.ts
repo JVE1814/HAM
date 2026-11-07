@@ -45,7 +45,7 @@ UiAction({
 
 BusinessRule({
     $id: Now.ID['br_rack_placement'],
-    name: 'NaaS - rack placement must be free',
+    name: 'NaaS - rack placement must be free and within power',
     table: 'alm_hardware',
     when: 'before',
     action: ['insert', 'update'],
