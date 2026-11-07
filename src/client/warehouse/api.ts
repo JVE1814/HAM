@@ -39,5 +39,7 @@ export const warehouseApi = {
         call<AssetSummary>('POST', '/receive', input),
     putAway: (input: { code: string; stockroom: string }) => call<AssetSummary>('POST', '/putaway', input),
     pick: (input: { code: string; order: string }) => call<AssetSummary>('POST', '/pick', input),
+    auditScan: (input: { audit: string; code: string }) =>
+        call<{ audit: string; scanned: string }>('POST', `/audits/${encodeURIComponent(input.audit)}/scan`, { code: input.code }),
     stockrooms: () => call<{ stockrooms: Stockroom[] }>('GET', '/stockrooms').then((r) => r.stockrooms),
 }

@@ -2,6 +2,8 @@ import '@servicenow/sdk/global'
 import { RestApi } from '@servicenow/sdk/core'
 import { postDeviceEvents } from '../../server/entry/in-service'
 import { listStockrooms, lookupAsset, pickAsset, putAwayAsset, receiveAsset } from '../../server/entry/warehouse'
+import { scanAudit } from '../../server/entry/assurance'
+import { getRack, listRacks, listSites } from '../../server/entry/racks'
 
 /* Scripted REST API: /api/x_daas_ham/naas/... */
 
@@ -69,6 +71,42 @@ RestApi({
             shortDescription: 'Stockrooms the user can receive into.',
             authentication: true,
             script: listStockrooms,
+        },
+        {
+            $id: Now.ID['rest_naas_audit_scan'],
+            name: 'audit_scan',
+            method: 'POST',
+            path: '/audits/{id}/scan',
+            shortDescription: 'Record a scan against an open audit (id = sys_id or audit number).',
+            authentication: true,
+            script: scanAudit,
+        },
+        {
+            $id: Now.ID['rest_naas_sites'],
+            name: 'sites',
+            method: 'GET',
+            path: '/sites',
+            shortDescription: 'Customer sites visible to the user.',
+            authentication: true,
+            script: listSites,
+        },
+        {
+            $id: Now.ID['rest_naas_racks'],
+            name: 'racks',
+            method: 'GET',
+            path: '/racks',
+            shortDescription: 'Racks in the rooms of a site (?site=sys_id).',
+            authentication: true,
+            script: listRacks,
+        },
+        {
+            $id: Now.ID['rest_naas_rack'],
+            name: 'rack',
+            method: 'GET',
+            path: '/racks/{id}',
+            shortDescription: 'A rack and the devices placed in it.',
+            authentication: true,
+            script: getRack,
         },
     ],
 })

@@ -3,12 +3,13 @@ import { warehouseApi, type AssetSummary, type Stockroom } from './api'
 import Label from './Label'
 import ScanField from './ScanField'
 
-type Mode = 'receive' | 'putaway' | 'pick' | 'lookup'
+type Mode = 'receive' | 'putaway' | 'pick' | 'audit' | 'lookup'
 
 const MODES: Array<{ id: Mode; title: string; prompt: string }> = [
     { id: 'receive', title: 'Receive', prompt: 'Scan the serial of each arriving unit' },
     { id: 'putaway', title: 'Put away', prompt: 'Scan the asset, it moves to the selected stockroom' },
     { id: 'pick', title: 'Pick', prompt: 'Scan each asset for the order' },
+    { id: 'audit', title: 'Audit', prompt: 'Scan every unit you can see (blind count / site audit)' },
     { id: 'lookup', title: 'Look up', prompt: 'Scan any serial, provider tag or customer tag' },
 ]
 
@@ -88,6 +89,12 @@ export default function App() {
                         <input value={pid} onChange={(e) => setPid(e.target.value)} placeholder="e.g. C9300-48P-E" />
                     </label>
                 )}
+                {mode === 'audit' && (
+                    <label>
+                        Audit number
+                        <input value={order} onChange={(e) => setOrder(e.target.value.trim())} placeholder="NAUD0001000" />
+                    </label>
+                )}
                 {mode === 'pick' && (
                     <label>
                         Order number
@@ -133,9 +140,17 @@ function perform(mode: Mode, code: string, context: { stockroom: string; order: 
         case 'pick':
             if (!context.order) return Promise.reject(new Error('Enter the order number first'))
             return warehouseApi.pick({ code, order: context.order })
+        case 'audit':
+            if (!context.order) return Promise.reject(new Error('Enter the audit number first'))
+            return warehouseApi.auditScan({ audit: context.order, code }).then(() => scannedOnly(code))
         case 'lookup':
             return warehouseApi.lookup(code)
     }
+}
+
+/** Audit scans are blind: nothing about the unit is shown back. */
+function scannedOnly(code: string): AssetSummary {
+    return { id: code, serial: code, providerTag: '', customerTag: '', model: '', pid: '', stage: '', stockroom: '', customer: '', orderLine: '' }
 }
 
 function describe(mode: Mode, asset: AssetSummary): string {
@@ -147,6 +162,8 @@ function describe(mode: Mode, asset: AssetSummary): string {
             return `${name} put away in ${asset.stockroom}`
         case 'pick':
             return `${name} picked`
+        case 'audit':
+            return `${asset.serial} counted`
         case 'lookup':
             return `${name}: ${asset.stage}, ${asset.stockroom || asset.customer || 'no location'}${asset.providerTag ? `, tag ${asset.providerTag}` : ''}`
     }
