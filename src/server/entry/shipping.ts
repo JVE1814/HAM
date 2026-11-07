@@ -20,6 +20,7 @@ import {
     type TrackingEvent,
 } from '../domain/shipping'
 import { msToGlide, nowMs } from '../platform/clock'
+import { withLock, type HeldLock } from '../platform/locks'
 import { boolProperty, intProperty, PROPERTY, stagingStockroom, stringProperty } from '../platform/properties'
 import { count, findById, refusal, str } from '../platform/records'
 import { restMessagePort } from '../platform/rest-port'
@@ -65,8 +66,16 @@ function depot(): GlideRecord | null {
  * shipping back as a `return`) and record the shipment against it. `packages` is one box per Asset
  * (buyLabel refuses more than one label covers); the label carries the parent's number as its reference.
  * A label bought whose Shipment the platform refuses is a failure that names the label, not a success.
+ * The caller holds `lock` on the parent so that two requests do not both buy its label. A holder that outlasted it
+ * (ADR 0013) may overlap the request that took it over: it buys only while it holds it, and one that lost it during the
+ * purchase is logged, as both may have bought one.
  */
-function createShipment(direction: 'to_site' | 'return', parent: GlideRecord, packages: number): LabelResult {
+function createShipment(
+    direction: 'to_site' | 'return',
+    parent: GlideRecord,
+    packages: number,
+    lock: HeldLock,
+): LabelResult {
     const carrierId = stringProperty(PROPERTY.shippingCarrierId)
     if (!carrierId) return { ok: false, error: `set ${PROPERTY.shippingCarrierId} to the ShipEngine carrier account (se-...) billed for labels` }
     const stockroom = depot()
@@ -78,6 +87,7 @@ function createShipment(direction: 'to_site' | 'return', parent: GlideRecord, pa
     const depotAddress = addressOf(depotLocation, { name: str(stockroom, 'name'), phone: stringProperty(PROPERTY.shippingSenderPhone) }, stringProperty(PROPERTY.shippingSenderName))
     const siteAddress = addressOf(site, siteContact(site), parent.getDisplayValue('customer'))
     const serviceCode = stringProperty(PROPERTY.shippingServiceCode)
+    if (!lock.held()) return { ok: false, error: 'another request took over buying this label: reload to see it' }
     const result = buyLabel(aggregator(), {
         carrierId,
         serviceCode,
@@ -104,17 +114,24 @@ function createShipment(direction: 'to_site' | 'return', parent: GlideRecord, pa
     shipment.setValue('cost', result.cost)
     shipment.setValue('currency', result.currency)
     shipment.setValue('status', 'label_created')
-    if (shipment.insert()) return result
+    const label = `${result.carrier} ${result.trackingNumber}, label ${result.labelId}`
+    if (shipment.insert()) {
+        const late = `Label ${label} bought for ${str(parent, 'number')} after its lock was lost`
+        if (!lock.held()) gs.warn(`[x_daas_ham] ${late}: void any second label bought for it meanwhile`)
+        return result
+    }
     // The label is paid for, yet tracking, a later Ship and the open-label check cannot find it: name it to be voided.
     const reason = refusal(shipment)
-    const label = `${result.carrier} ${result.trackingNumber}, label ${result.labelId}`
     gs.warn(`[x_daas_ham] Label bought for ${str(parent, 'number')} but no Shipment saved (${label}): ${reason}`)
     return { ok: false, error: `the label bought (${label}) was not recorded: ${reason}. Void it with the carrier` }
 }
 
-/** Buy the outbound label for an Order's staged Assets and put its tracking number on the Order (does not save). */
-export function labelOrder(order: GlideRecord, packages: number): LabelResult {
-    const result = createShipment('to_site', order, packages)
+/**
+ * Buy the outbound label for an Order's staged Assets and put its tracking number on the Order (does not save). The
+ * caller holds `lock` on the Order (entry/delivery shipOrder).
+ */
+export function labelOrder(order: GlideRecord, packages: number, lock: HeldLock): LabelResult {
+    const result = createShipment('to_site', order, packages, lock)
     if (result.ok) {
         order.setValue('carrier', result.carrier)
         order.setValue('tracking_number', result.trackingNumber)
@@ -122,15 +139,29 @@ export function labelOrder(order: GlideRecord, packages: number): LabelResult {
     return result
 }
 
-/** UI action "Create return label" on a ship-back Return order: the Site contact prints it. */
+/**
+ * UI action "Create return label" on a ship-back Return order: the Site contact prints it.
+ *
+ * Each label is paid for: one open return label per Return order (to replace it, void it and mark it voided). Two users
+ * pressing this while the first purchase is in flight would both find none open, so the check, the purchase and the
+ * Shipment are made under a lock on the Return order; one that finds it held buys nothing and is told a label is being
+ * bought. Taking the lock throws only when an insert is refused with no lock row (platform/locks); that error escapes.
+ */
 export function uiCreateReturnLabel(current: GlideRecord): void {
     const returnOrderId = current.getUniqueValue()
     const packages = count('x_daas_ham_return_order_line', `return_order=${returnOrderId}^status=awaiting`)
     if (packages === 0) return void gs.addErrorMessage('Nothing on this return is still awaited')
-    // Each label is paid for: one open return label per Return order (to replace it, void it and mark it voided).
-    const open = openReturnLabel(returnOrderId)
-    if (open) return void gs.addErrorMessage(returnLabelRefusal(open.trackingNumber, open.status))
-    const result = createShipment('return', current, packages)
+    // Set inside the lock; left null when an open label is found there.
+    let result = null as LabelResult | null
+    const taken = withLock(`return_label_${returnOrderId}`, (lock) => {
+        const open = openReturnLabel(returnOrderId)
+        if (open) return void gs.addErrorMessage(returnLabelRefusal(open.trackingNumber, open.status))
+        result = createShipment('return', current, packages, lock)
+    })
+    if (!taken) {
+        return void gs.addErrorMessage('A return label is already being bought for this return: reload it to see it')
+    }
+    if (!result) return
     if (!result.ok) return void gs.addErrorMessage(`No label: ${result.error}`)
     current.setValue('work_notes', `Return label ${result.trackingNumber} (${result.carrier}): ${result.labelUrl}`)
     current.update()

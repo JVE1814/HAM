@@ -3,7 +3,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { toIsoDate } from '../domain/calendar'
 import type { LeaseEndAction } from '../domain/leases'
-import type { LegalOwner } from '../domain/lifecycle'
+import { isDeployed, type LegalOwner } from '../domain/lifecycle'
 import {
     evaluationTarget,
     overdueStep,
@@ -17,6 +17,7 @@ import { clearRackPlacement, moveAndSave, moveAsset, readStage } from '../platfo
 import { customerAdminIds } from '../platform/approvals'
 import { runTableJob } from '../platform/chunked'
 import { EVENT } from '../platform/events'
+import { withLock, type HeldLock } from '../platform/locks'
 import { nowMs, todayIso } from '../platform/clock'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties'
 import { bool, findById, refusal, str } from '../platform/records'
@@ -98,7 +99,8 @@ function agreementOf(assetId: string | undefined): string {
  * A returned Asset arrived at the depot: it awaits evaluation, its subscription line no longer includes it, its earlier
  * wipe evidence no longer counts, and a late return is charged. Null when the unit is not coming back from a Site (it
  * is received as stock instead); otherwise why the platform refused the receipt, '' once received. A refused unit
- * stays pending return (or missing), with nothing settled, to scan again.
+ * stays pending return (or missing), with nothing settled, to scan again. The caller holds the unit's receive lock
+ * (entry/warehouse), which the overdue job's declaration takes too, so a unit is never received and declared at once.
  */
 export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): string | null {
     if (readStage(asset) !== 'pending_return' && readStage(asset) !== 'missing') return null
@@ -240,28 +242,69 @@ export function chaseOverdueReturns(): void {
                 const recipients = [...customerAdminIds(str(returnOrder, 'customer')), str(returnOrder, 'agreement.account_manager')]
                 gs.eventQueue(EVENT.returnOverdue, returnOrder, recipients.filter(Boolean).join(','), line.assetId)
             } else if (step === 'declare_missing') {
-                const asset = findById('alm_hardware', line.assetId)
-                if (asset) {
-                    clearRackPlacement(asset)
-                    // Refused (moveAndSave warns): the unit and its awaiting line stay as they are, for the next run.
-                    if (!moveAndSave(asset, 'missing', `return ${number} overdue`)) return
-                    recordFee('lost', asset, line.returnOrderId)
-                    // A missing unit no longer holds its site package open. It keeps its Site and line so that, found
-                    // again and back in service, it bills on that line again while it is open (entry/assets.ts
-                    // onAssetServiceChange).
-                    endSitePackageIfEmpty(str(asset, 'x_daas_ham_site'), str(asset, 'x_daas_ham_agreement'))
-                }
-                const record = findById('x_daas_ham_return_order_line', lineId)
-                if (!record) return
-                record.setValue('status', 'missing')
-                // Left awaiting, it is declared again on the next run, which finds the unit missing and charges no
-                // second fee (recordFee).
-                const unit = asset ? str(asset, 'serial_number') : line.assetId
-                if (!record.update()) return warnRefused(record, `Line of ${unit} on ${number} not declared missing`)
-                closeReturnIfDone(line.returnOrderId)
+                declareMissing({ lineId, assetId: line.assetId, returnOrderId: line.returnOrderId, number })
             }
         },
     })
+}
+
+/** An overdue return line to declare missing, with its Return order's number for the log. */
+interface OverdueLine {
+    lineId: string
+    assetId: string
+    returnOrderId: string
+    number: string
+}
+
+/**
+ * Declare an overdue unit missing and charge its lost fee. The unit may be scanned in at the depot meanwhile, and a
+ * receipt saved between this run's read and its saves would be overwritten: back on the shelf, yet its line missing and
+ * a lost fee billed. So this is done under the lock the receipt takes (entry/warehouse receiveAsset), from a fresh
+ * read. A run that finds the lock held leaves the line awaiting: the next day's run finds the unit received, or
+ * declares it then. Taking the lock throws only when an insert is refused with no lock row (platform/locks); the job
+ * counts that line as failed and goes on.
+ */
+function declareMissing(overdue: OverdueLine): void {
+    let declared = false as boolean
+    withLock(`receive_asset_${overdue.assetId}`, (lock) => {
+        declared = declareHolding(lock, overdue)
+    })
+    if (declared) closeReturnIfDone(overdue.returnOrderId)
+}
+
+/**
+ * The declaration, made holding the unit's receive `lock`: only while its line still awaits it and the Asset is still
+ * at or towards the Site, or missing already (an earlier run whose line was refused). True once the line is missing.
+ * A unit anywhere else (received, its line refused) is logged each run: no run settles that line.
+ */
+function declareHolding(lock: HeldLock, overdue: OverdueLine): boolean {
+    const record = findById('x_daas_ham_return_order_line', overdue.lineId)
+    if (!record || str(record, 'status') !== 'awaiting') return false
+    const asset = findById('alm_hardware', overdue.assetId)
+    const stage = asset ? readStage(asset) : null
+    if (asset && stage !== 'missing' && !isDeployed(stage)) {
+        const unit = `Line of ${str(asset, 'serial_number')} on ${overdue.number}`
+        gs.warn(`[x_daas_ham] ${unit} not declared missing: the unit is ${stage ?? 'unknown'}; settle the line by hand`)
+        return false
+    }
+    // A holder that outlasted the lock (ADR 0013) may overlap the next receipt: it saves only while it holds it.
+    if (!lock.held()) return false
+    if (asset) {
+        clearRackPlacement(asset)
+        // Refused (moveAndSave warns): the unit and its awaiting line stay as they are, for the next run.
+        if (!moveAndSave(asset, 'missing', `return ${overdue.number} overdue`)) return false
+        recordFee('lost', asset, overdue.returnOrderId)
+        // A missing unit no longer holds its site package open. It keeps its Site and line so that, found again and
+        // back in service, it bills on that line again while it is open (entry/assets.ts onAssetServiceChange).
+        endSitePackageIfEmpty(str(asset, 'x_daas_ham_site'), str(asset, 'x_daas_ham_agreement'))
+    }
+    record.setValue('status', 'missing')
+    // Left awaiting, it is declared again on the next run, which finds the unit missing and charges no second fee
+    // (recordFee).
+    if (record.update()) return true
+    const unit = asset ? str(asset, 'serial_number') : overdue.assetId
+    warnRefused(record, `Line of ${unit} on ${overdue.number} not declared missing`)
+    return false
 }
 
 /** Daily: agreements past their end date and temporary deployments ending soon bring their equipment back. */

@@ -6,6 +6,7 @@ import { moveAndSave, moveAsset, readStage } from '../platform/assets'
 import { glideToMs } from '../platform/clock'
 import { openFieldWork, type WorkContext } from '../platform/field-work'
 import { recomputeOrder } from '../platform/fulfilment'
+import { withLock, type HeldLock } from '../platform/locks'
 import { findById, refusal, str } from '../platform/records'
 import { returnReplacedAssets } from './returns'
 import { labelOrder, shippingEnabled } from './shipping'
@@ -26,8 +27,25 @@ function orderAssets(orderId: string): GlideRecord {
  * UI action "Ship": send every staged Asset the lifecycle lets ship to the Site (buying the label for
  * those when the aggregator is on) and open the on-site work. Hot spares already at the Site are handed
  * over as shipped, without a package. Which Assets may ship is checked before a label is bought.
+ *
+ * Two users pressing Ship while the first label purchase is in flight would both find the Order unshipped, and both
+ * buy a label and open a change and work order. So Ship runs under a lock on the Order, from the Order read again
+ * there; one that finds the lock held ships nothing and is told another Ship is running. Taking the lock throws only
+ * when an insert is refused with no lock row (platform/locks); that error escapes.
  */
 export function shipOrder(order: GlideRecord): void {
+    const orderId = order.getUniqueValue()
+    const taken = withLock(`ship_order_${orderId}`, (lock) => {
+        // A Ship that ran meanwhile has put its tracking number and work order on the Order, and shipped its units.
+        const fresh = findById('x_daas_ham_order', orderId)
+        if (!fresh) return void gs.addErrorMessage('Order not found')
+        shipHolding(lock, fresh)
+    })
+    if (!taken) gs.addErrorMessage('Another Ship of this Order is running: reload the Order to see what it shipped')
+}
+
+/** Ship, holding the Order's `lock` (the label is bought only while it is held, entry/shipping). */
+function shipHolding(lock: HeldLock, order: GlideRecord): void {
     const siteId = str(order, 'site')
     const found = shippable(order.getUniqueValue(), siteId)
     const trackingNumber = str(order, 'tracking_number')
@@ -46,7 +64,7 @@ export function shipOrder(order: GlideRecord): void {
     for (const error of plan.errors) gs.addErrorMessage(error)
     if (!plan.ok) return
     if (plan.labelPackages !== null) {
-        const label = labelOrder(order, plan.labelPackages)
+        const label = labelOrder(order, plan.labelPackages, lock)
         if (!label.ok) return void gs.addErrorMessage(`No shipping label: ${label.error}`)
         // The label is paid for and its Shipment saved, so the units still ship; only the Order lacks its tracking.
         if (!order.update()) {
