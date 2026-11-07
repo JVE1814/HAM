@@ -92,7 +92,8 @@ interface EventJobFields {
     /**
      * Make each fresh pass supersede one still running under `job`: `onStart` runs once at the start
      * of a pass, and a chunk that finds its pass superseded (as it starts or before it flushes) stops
-     * without flushing or queueing more events (see runEventTableJob).
+     * without flushing or queueing more events; a last chunk that finds it after flushing does not
+     * complete the pass (see runEventTableJob).
      */
     supersede?: { job: string; onStart(): void }
 }
@@ -106,9 +107,10 @@ export interface EventTableJobResult extends ChunkedJobResult {
  * The same runner driven by an event instead of a schedule: the cursor travels in the event's parm2
  * (with the pass token when `supersede` is set) and the event is queued again until the pass is
  * complete. A chunk of a superseded pass reports `done: false`. Whether its pass is still current is
- * checked as a chunk starts and again before it flushes, so a chunk superseded after that check still
- * flushes under its own pass's token, and a last one still completes its pass: whatever completes a
- * pass tells what it wrote from what a newer pass did by the token (see runsBefore).
+ * checked as a chunk starts, before it flushes and, for the last chunk, after it flushes, so a pass
+ * superseded meanwhile is not completed. A chunk superseded during its flush still flushes under its
+ * own pass's token: whatever completes a pass tells what it wrote from what an older pass did by the
+ * token (see runsBefore).
  */
 export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): EventTableJobResult {
     const supersede = spec.supersede
@@ -136,6 +138,8 @@ export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): EventTabl
             }
             spec.flush?.(token)
             if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, supersede ? `${token}:${next}` : next)
+            // What completes the pass must not run once a fresh pass has started (it would replace the fresh pass's results).
+            else if (supersede && !isCurrentRun(supersede.job, token)) superseded = true
         },
     })
     const out = { ...result, run: token }

@@ -37,7 +37,13 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
         record: current,
         parm1: periodId,
         cursor: str(event, 'parm2'),
-        supersede: { job: `margin_${periodId}`, onStart: () => clearPeriod(periodId) },
+        supersede: {
+            job: `margin_${periodId}`,
+            onStart: () => {
+                clearPeriod(periodId)
+                noteMarginError(periodId, '')
+            },
+        },
         table: 'x_daas_ham_service_interval',
         query: overlapsMonth(bounds),
         read: (interval) => ({
@@ -55,7 +61,12 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
         },
         flush: (run) => writeCostFacts(periodId, run, ledger.drain()),
     })
-    if (result.failed > 0) gs.error(`[x_daas_ham] Margin of ${str(period, 'period')}: ${result.failed} service interval(s) failed: ${result.lastError}`)
+    if (result.failed > 0) {
+        const error = `${result.failed} service interval(s) failed: ${result.lastError}`
+        gs.error(`[x_daas_ham] Margin of ${str(period, 'period')}: ${error}`)
+        // Margin is still written without them, so the period says it is incomplete.
+        noteMarginError(periodId, error)
+    }
     if (!result.done) return
     // Drop older passes' Cost facts (a superseded pass may have flushed a last batch after this one
     // started), but not a newer pass's: one may have started since this pass's last check.
@@ -68,6 +79,18 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
  * Empty the period's Cost facts and Margin as a pass starts: the dashboard reads Cost facts whatever
  * their run, so the period must not show an earlier pass's facts alongside this one's.
  */
+/**
+ * Record (or clear, with '') the latest margin computation's error on its Billing period. The period
+ * is closed and locked; this field is about Margin, not the bill, so the lock's rule is not run.
+ */
+function noteMarginError(periodId: string, error: string): void {
+    const period = findById('x_daas_ham_billing_period', periodId)
+    if (!period) return
+    period.setValue('margin_error', error.slice(0, 255))
+    period.setWorkflow(false)
+    period.update()
+}
+
 function clearPeriod(periodId: string): void {
     for (const table of ['x_daas_ham_cost_fact', 'x_daas_ham_margin']) deleteWhere(table, `billing_period=${periodId}`)
 }

@@ -28271,6 +28271,15 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
+                        id: '8be4bbf14a6848a3929b22f0bb907bc2'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'margin_error'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
                         id: '8be91034398f48bda9447faf519ca4de'
                         key: {
                             name: 'x_daas_ham_attestation'
@@ -38772,6 +38781,14 @@ declare global {
                                     name: 'x_daas_ham.site_contact'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'c774808fbcec46a78983117692cfa44f'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'margin_error'
                         }
                     },
                     {
