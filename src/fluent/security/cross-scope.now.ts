@@ -434,3 +434,12 @@ CrossScopePrivilege({
     targetScope: 'global',
     targetType: 'sys_db_object',
 })
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_sys_attachment_read'],
+    operation: 'read',
+    status: 'allowed',
+    targetName: 'sys_attachment',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})

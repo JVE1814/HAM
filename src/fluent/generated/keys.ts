@@ -1409,6 +1409,10 @@ declare global {
                         table: 'sysevent_register'
                         id: '2ee72d8d68e345ec871e4689ef4a3bc5'
                     }
+                    event_billing_export: {
+                        table: 'sysevent_register'
+                        id: 'f47c726a6c7f470b856cb9727b44f623'
+                    }
                     event_billing_generate: {
                         table: 'sysevent_register'
                         id: '68f942ccbb4549e6b4b6910fed1e3288'
@@ -1420,6 +1424,10 @@ declare global {
                     event_lease_assets: {
                         table: 'sysevent_register'
                         id: '7637b1cb39d54044b770a07fe383c959'
+                    }
+                    event_lease_buyout: {
+                        table: 'sysevent_register'
+                        id: '99a09a737dd040779ab3c8a02448ffec'
                     }
                     event_lease_mismatch: {
                         table: 'sysevent_register'
@@ -2181,6 +2189,10 @@ declare global {
                         table: 'sysevent_script_action'
                         id: 'd9d7971bfd144538bf7bc09e295dbcd2'
                     }
+                    sa_billing_export: {
+                        table: 'sysevent_script_action'
+                        id: 'be61b2532d5f4d22a08cf71611e0b3f3'
+                    }
                     sa_billing_generate: {
                         table: 'sysevent_script_action'
                         id: '89abf9e8734f4c60aec4ce84b955c738'
@@ -2188,6 +2200,10 @@ declare global {
                     sa_lease_assets: {
                         table: 'sysevent_script_action'
                         id: '3159a22dccc642e2959d500f7283c75e'
+                    }
+                    sa_lease_buyout: {
+                        table: 'sysevent_script_action'
+                        id: '205916ae164742139188a6eb1922a349'
                     }
                     sa_margin_compute: {
                         table: 'sysevent_script_action'
@@ -2585,6 +2601,10 @@ declare global {
                     ua_billing_recompute_margin: {
                         table: 'sys_ui_action'
                         id: '717d626484814bdda1dd68c818e81385'
+                    }
+                    ua_billing_reexport: {
+                        table: 'sys_ui_action'
+                        id: '761889b1316241718acc4e28919718b3'
                     }
                     ua_billing_regenerate: {
                         table: 'sys_ui_action'
@@ -3373,6 +3393,10 @@ declare global {
                     xsp_std_change_record_producer_read: {
                         table: 'sys_scope_privilege'
                         id: '924100e156864f019bfde512167b8434'
+                    }
+                    xsp_sys_attachment_read: {
+                        table: 'sys_scope_privilege'
+                        id: '1c4c085ba6e24a28aa855397075100d0'
                     }
                     xsp_sys_user_has_role_read: {
                         table: 'sys_scope_privilege'
@@ -8835,6 +8859,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_subscription_line'
                             element: 'site'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '1ea31d5e35db4cf4a886f62123cfadd0'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'buyout_share'
                         }
                     },
                     {
@@ -19061,6 +19093,19 @@ declare global {
                             name: 'x_daas_ham_return_order'
                             element: 'NULL'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: '5c03587abae641649a810ed9b92bb84c'
+                        key: {
+                            sys_ui_action: '761889b1316241718acc4e28919718b3'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
                         }
                     },
                     {
@@ -33981,6 +34026,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_norm_exception'
                             element: 'reason'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'ac59cbb32aab4acea2092558bdd93502'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'buyout_share'
+                            language: 'en'
                         }
                     },
                     {

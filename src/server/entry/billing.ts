@@ -7,7 +7,7 @@ import { ROLE } from '../domain/visibility'
 import { runEventTableJob } from '../platform/chunked'
 import { todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
-import { findById, num, str } from '../platform/records'
+import { count, findById, num, str } from '../platform/records'
 import { queryInt, reply } from '../platform/rest-api'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
@@ -196,17 +196,15 @@ export function uiRegenerateBillingPeriod(current: GlideRecord): void {
     gs.addInfoMessage(`Regenerating ${str(current, 'period')}`)
 }
 
+/** Fired by Close period and Re-export CSV (parm1 = period); belongs in EVENT once platform/events.ts is free. */
+const BILLING_EXPORT_EVENT = 'x_daas_ham.billing.export'
+
 const CSV_HEADER = ['period', 'kind', 'customer', 'agreement', 'subscription_line', 'site', 'description', 'units', 'monthly_rate', 'amount', 'currency']
 
-/** UI action "Close period": attach the CSV export, mark its fees billed, lock it and compute its margin. */
+/** UI action "Close period": mark its fees billed, lock it, then export its CSV and compute its margin in the background. */
 export function uiCloseBillingPeriod(current: GlideRecord): void {
     if (str(current, 'status') !== 'ready') return void gs.addErrorMessage('Only a period ready for review can be closed')
     dropWaivedFeeLines(current)
-    const rows: Array<Array<string | number>> = [CSV_HEADER]
-    const line = linesOf(current.getUniqueValue())
-    while (line.next()) rows.push(csvRow(current, line))
-    new GlideSysAttachment().write(current, `billing-${str(current, 'period')}.csv`, 'text/csv', toCsv(rows))
-
     const fees = new GlideRecord('x_daas_ham_fee_event')
     fees.addQuery('billing_period', current.getUniqueValue())
     fees.addQuery('status', 'open')
@@ -216,8 +214,41 @@ export function uiCloseBillingPeriod(current: GlideRecord): void {
     current.setValue('closed_at', new GlideDateTime().getValue())
     current.setValue('closed_by', gs.getUserID())
     current.update()
+    fire(BILLING_EXPORT_EVENT, current, current.getUniqueValue())
     fire(EVENT.marginCompute, current, current.getUniqueValue())
-    gs.addInfoMessage(`${str(current, 'period')} closed and locked; margin is being computed`)
+    gs.addInfoMessage(`${str(current, 'period')} closed and locked; the CSV export and margin are being prepared`)
+}
+
+/** UI action "Re-export CSV" on a closed period whose export is missing (never saves the period). */
+export function uiExportBillingPeriod(current: GlideRecord): void {
+    if (str(current, 'status') !== 'closed') return void gs.addErrorMessage('Only a closed period can be exported')
+    const fileName = exportFileName(current)
+    if (hasAttachment(current, fileName)) return void gs.addInfoMessage(`${fileName} is already attached; delete it to export again`)
+    fire(BILLING_EXPORT_EVENT, current, current.getUniqueValue())
+    gs.addInfoMessage(`The CSV export of ${str(current, 'period')} is being prepared`)
+}
+
+/**
+ * Script action on x_daas_ham.billing.export (parm1 = period): attach the CSV of a closed period's
+ * lines unless it is already attached. Only reads the period, so the closed-period lock is not hit.
+ */
+export function exportBillingPeriod(event: GlideRecord): void {
+    const period = findById('x_daas_ham_billing_period', str(event, 'parm1'))
+    if (!period || str(period, 'status') !== 'closed') return
+    const fileName = exportFileName(period)
+    if (hasAttachment(period, fileName)) return
+    const rows: Array<Array<string | number>> = [CSV_HEADER]
+    const line = linesOf(period.getUniqueValue())
+    while (line.next()) rows.push(csvRow(period, line))
+    new GlideSysAttachment().write(period, fileName, 'text/csv', toCsv(rows))
+}
+
+function exportFileName(period: GlideRecord): string {
+    return `billing-${str(period, 'period')}.csv`
+}
+
+function hasAttachment(period: GlideRecord, fileName: string): boolean {
+    return count('sys_attachment', `table_name=x_daas_ham_billing_period^table_sys_id=${period.getUniqueValue()}^file_name=${fileName}`) > 0
 }
 
 function linesOf(periodId: string, offset = 0, limit = 0): GlideRecord {

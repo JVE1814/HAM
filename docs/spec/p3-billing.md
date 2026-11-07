@@ -20,12 +20,14 @@
 |---|---|---|
 | Generating | Monthly job on day 1 (previous month), or *Regenerate* | Lines are written in time-boxed chunks (event-driven) |
 | Ready for review | Generation finished; totals are set | *Regenerate* (rebuild from current data); *Close period* |
-| Closed (locked) | *Close period* (finance) | Lines of fees waived since generation are dropped and the totals redone; the CSV export is attached and the fees become *billed*. The period and its lines can no longer change or be deleted |
+| Closed (locked) | *Close period* (finance) | Lines of fees waived since generation are dropped and the totals redone, and the fees become *billed*. The period and its lines can no longer change or be deleted. The CSV export is attached in the background shortly after closing; *Re-export CSV* attaches it again if it is missing |
 
 ## Export
 
 - **CSV** attachment `billing-YYYY-MM.csv`: period, kind, customer, agreement, subscription line,
-  site, description, units, monthly rate, amount, currency.
+  site, description, units, monthly rate, amount, currency. Built from the locked lines by the
+  `x_daas_ham.billing.export` event shortly after closing; attaching it does not update the period,
+  and a period that already has the file is skipped (delete it, then *Re-export CSV*, to rebuild it).
 - **Pull API** (finance or integration role):
   - `GET /api/x_daas_ham/naas/billing_periods` lists recent periods with status and totals;
   - `GET /api/x_daas_ham/naas/billing_periods/{id}/lines?offset=0&limit=1000` returns one page of
