@@ -1,3 +1,5 @@
+import type { LineStage } from './fulfilment'
+import { DEPLOYED_STAGES, stagesQuery } from './lifecycle'
 import type { VisibilityScope } from './visibility'
 
 /**
@@ -172,6 +174,23 @@ export function approversFor(verdict: EntitlementVerdict | ''): Approver[] {
         default:
             return []
     }
+}
+
+/** Order line stages before the line has shipped: such a line's whole quantity counts as in-flight usage. */
+export const OPEN_LINE_STAGES: readonly LineStage[] = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship']
+
+/**
+ * Encoded query on alm_hardware: the Agreement's Assets counted as deployed usage. One still on an open Order line is
+ * left out, as that line's quantity counts it in flight: a unit a partial Ship sent counts once.
+ */
+export function deployedUsageQuery(agreementId: string): string {
+    const notInFlight = `x_daas_ham_order_lineISEMPTY^ORx_daas_ham_order_line.line_stageNOT IN${OPEN_LINE_STAGES.join(',')}`
+    return stagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}^${notInFlight}`)
+}
+
+/** Encoded query on x_daas_ham_order_line: the Agreement's open lines on live Orders other than `excludeOrderId`. */
+export function inFlightLinesQuery(agreementId: string, excludeOrderId: string): string {
+    return `order.agreement=${agreementId}^order!=${excludeOrderId}^order.stageNOT INdraft,rejected,cancelled^line_stageIN${OPEN_LINE_STAGES.join(',')}`
 }
 
 function sum(values: number[]): number {

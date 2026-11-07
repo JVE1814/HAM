@@ -7,7 +7,9 @@ import {
     buyLabel,
     labelVoidable,
     newTrackingEvents,
+    OPEN_SHIPMENTS,
     parseTrackingWebhook,
+    returnLabelRefusal,
     tokenMatches,
     trackingEventKey,
     WEBHOOK_TOKEN_HEADER,
@@ -22,7 +24,6 @@ import { boolProperty, intProperty, PROPERTY, stagingStockroom, stringProperty }
 import { count, findById, str } from '../platform/records'
 import { restMessagePort } from '../platform/rest-port'
 import { queryParam, reply } from '../platform/rest-api'
-import { returnLabels } from '../platform/shipments'
 
 /** Shipping aggregator: labels for Orders and ship-back returns, tracking webhooks (P3.26, D73). */
 
@@ -122,16 +123,24 @@ export function uiCreateReturnLabel(current: GlideRecord): void {
     const packages = count('x_daas_ham_return_order_line', `return_order=${returnOrderId}^status=awaiting`)
     if (packages === 0) return void gs.addErrorMessage('Nothing on this return is still awaited')
     // Each label is paid for: one open return label per Return order (to replace it, void it and mark it voided).
-    const open = returnLabels([returnOrderId]).get(returnOrderId)
-    if (open) {
-        const step = 'void it with the carrier, then use Mark label voided on its Shipment, before buying another'
-        return void gs.addErrorMessage(`Return label ${open.trackingNumber} is still open; ${step}`)
-    }
+    const open = openReturnLabel(returnOrderId)
+    if (open) return void gs.addErrorMessage(returnLabelRefusal(open.trackingNumber, open.status))
     const result = createShipment('return', current, packages)
     if (!result.ok) return void gs.addErrorMessage(`No label: ${result.error}`)
     current.setValue('work_notes', `Return label ${result.trackingNumber} (${result.carrier}): ${result.labelUrl}`)
     current.update()
     gs.addInfoMessage(`Return label ${result.trackingNumber} created`)
+}
+
+/** The Return order's latest return label still in use (as platform/shipments returnLabels finds it), with its status. */
+function openReturnLabel(returnOrderId: string): { trackingNumber: string; status: ShipmentStatus } | null {
+    const shipment = new GlideRecord('x_daas_ham_shipment')
+    shipment.addEncodedQuery(`direction=return^${OPEN_SHIPMENTS}^return_order=${returnOrderId}`)
+    shipment.orderByDesc('sys_created_on')
+    shipment.setLimit(1)
+    shipment.query()
+    if (!shipment.next()) return null
+    return { trackingNumber: str(shipment, 'tracking_number'), status: str(shipment, 'status') as ShipmentStatus }
 }
 
 /**

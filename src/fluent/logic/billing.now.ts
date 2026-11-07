@@ -132,7 +132,7 @@ BusinessRule({
 
 BusinessRule({
     $id: Now.ID['br_billing_period_month'],
-    name: 'NaaS - billing period month is YYYY-MM and sets its days',
+    name: 'NaaS - billing period month is an ended YYYY-MM and sets its days',
     table: 'x_daas_ham_billing_period',
     when: 'before',
     action: ['insert', 'update'],

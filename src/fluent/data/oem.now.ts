@@ -68,7 +68,7 @@ export const x_daas_ham_oem_rma = Table({
             dropdown: 'dropdown_without_none',
         }),
         ship_back_due: DateColumn({ label: 'Return defective by' }),
-        last_synced: DateTimeColumn({ label: 'Last synced', readOnly: true }),
+        last_synced: DateTimeColumn({ label: 'Last checked', readOnly: true }),
     },
     index: [{ name: 'x_daas_ham_rma_number', unique: false, element: 'rma_number' }],
 })

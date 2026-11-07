@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { HttpRequest } from './http'
 import {
@@ -12,6 +13,7 @@ import {
     OPEN_SHIPMENTS,
     packageCount,
     parseTrackingWebhook,
+    returnLabelRefusal,
     tokenMatches,
     trackingEventKey,
     WEBHOOK_TOKEN_HEADER,
@@ -333,6 +335,14 @@ describe('OPEN_SHIPMENTS', () => {
     it('leaves out the final statuses, whose label is no longer in use', () => {
         expect(OPEN_SHIPMENTS).toBe('statusNOT INdelivered,returned,voided')
     })
+
+    it('is what the workspace list of shipments under way shows', () => {
+        const list = readFileSync(new URL('../../fluent/workspace/list-menu.now.ts', import.meta.url), 'utf8')
+            .split('$id: Now.ID[')
+            .find((source) => source.startsWith("'ws_shipments_open']"))
+        const condition = /condition:\s*'([^']*)'/.exec(list ?? '')?.[1] ?? ''
+        expect(condition.split('^ORDERBY')[0]).toBe(OPEN_SHIPMENTS)
+    })
 })
 
 describe('labelVoidable', () => {
@@ -351,6 +361,29 @@ describe('labelVoidable', () => {
         const cancelled = parseTrackingWebhook(easyPostEvent('tracker.updated', tracker))
         expect(cancelled).toMatchObject({ status: 'exception' })
         expect(labelVoidable(nextShipmentStatus('label_created', 'exception'))).toBe(true)
+    })
+})
+
+describe('returnLabelRefusal', () => {
+    it('advises voiding the open label where Mark label voided is offered', () => {
+        for (const status of ['label_created', 'exception'] as const) {
+            expect(returnLabelRefusal('1Z999', status)).toBe(
+                'Return label 1Z999 is still open; void it with the carrier, then use Mark label voided on its Shipment, before buying another',
+            )
+        }
+    })
+
+    it('names the label already under way instead of advising a void the Shipment does not offer', () => {
+        for (const status of ['in_transit', 'out_for_delivery'] as const) {
+            const refusal = returnLabelRefusal('1Z999', status)
+            expect(refusal).toBe('Return label 1Z999 is already under way with the carrier; no other label is needed')
+            expect(labelVoidable(status)).toBe(false)
+        }
+    })
+
+    it('never advises Mark label voided for a label whose status is unknown', () => {
+        expect(returnLabelRefusal('1Z999', 'unknown')).not.toContain('Mark label voided')
+        expect(returnLabelRefusal('1Z999', 'unknown')).toContain('1Z999')
     })
 })
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
     activeDays,
+    billingMonthProblem,
     billsFromIntervals,
     intervalEnd,
     isMonth,
@@ -50,6 +51,30 @@ describe('previousMonth', () => {
     it('steps back one calendar month, across years', () => {
         expect(previousMonth('2026-11-07')).toBe('2026-10')
         expect(previousMonth('2027-01-01')).toBe('2026-12')
+    })
+})
+
+describe('billingMonthProblem', () => {
+    it('accepts a YYYY-MM month that has ended', () => {
+        expect(billingMonthProblem('2026-10', '2026-11-07')).toBeNull()
+        expect(billingMonthProblem('2025-12', '2026-01-01')).toBeNull()
+        expect(billingMonthProblem(previousMonth('2026-11-01'), '2026-11-01')).toBeNull()
+    })
+
+    it('refuses a month that is not YYYY-MM, giving the last month as the example', () => {
+        expect(billingMonthProblem('2026-13', '2026-11-07')).toBe("'2026-13' is not a month: enter it as YYYY-MM (e.g. 2026-10)")
+        for (const bad of ['', 'Nov 2026', '2026-11-01']) expect(billingMonthProblem(bad, '2026-11-07')).toContain('enter it as YYYY-MM')
+    })
+
+    it('refuses the current month, even on its last day, so it is not generated from part of the month', () => {
+        expect(billingMonthProblem('2026-11', '2026-11-30')).toBe(
+            '2026-11 has not ended yet: a period is generated as soon as it is created, so it can be created from 2026-12-01 (the monthly job opens it then)',
+        )
+        expect(billingMonthProblem('2026-12', '2026-12-01')).toContain('can be created from 2027-01-01')
+    })
+
+    it('refuses a month still to come', () => {
+        expect(billingMonthProblem('2027-03', '2026-11-07')).toContain('2027-03 has not ended yet')
     })
 })
 

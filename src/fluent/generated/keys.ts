@@ -15162,6 +15162,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '3fea7e1713d44344ace9a48baa2d3ac7'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '15'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '4001e48e816641b1b7e3839ef4e0a5f4'
                         key: {
@@ -21104,6 +21126,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '630189b9b4ff47ae83937e31092c1116'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'dd586e2cd8b8499b9546de0069a7e385'
@@ -38573,6 +38596,28 @@ declare global {
                                     name: 'x_daas_ham.customer_admin'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'c26bd6f99e6c4d3aa2c92752281145dc'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'purchase_orders'
+                            position: '14'
                         }
                     },
                     {

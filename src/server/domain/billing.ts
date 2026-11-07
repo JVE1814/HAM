@@ -36,6 +36,18 @@ export function previousMonth(today: string): string {
     return addMonths(`${today.slice(0, 7)}-01`, -1).slice(0, 7)
 }
 
+/**
+ * Why a Billing period cannot be saved for `month` on `today`, or null. The month must be YYYY-MM and over: a new
+ * period is generated at once, so one for a month still running would bill part of it, and the monthly job would
+ * then skip that month.
+ */
+export function billingMonthProblem(month: string, today: string): string | null {
+    if (!isMonth(month)) return `'${month}' is not a month: enter it as YYYY-MM (e.g. ${previousMonth(today)})`
+    if (month < today.slice(0, 7)) return null
+    const from = addMonths(`${month}-01`, 1)
+    return `${month} has not ended yet: a period is generated as soon as it is created, so it can be created from ${from} (the monthly job opens it then)`
+}
+
 /** Days from `from` to `to` (both inclusive; open-ended without `to`) that fall in the month. */
 export function activeDays(bounds: MonthBounds, from: string, to?: string): number {
     if (!from) return 0

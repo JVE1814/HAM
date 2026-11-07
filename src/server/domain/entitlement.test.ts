@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { assessOrder, ownershipFindings, raiserRefusal, siteTemplateOffered, type EntitlementContext, type Orderer, type OrderParties } from './entitlement'
+import {
+    assessOrder,
+    deployedUsageQuery,
+    inFlightLinesQuery,
+    OPEN_LINE_STAGES,
+    ownershipFindings,
+    raiserRefusal,
+    siteTemplateOffered,
+    type EntitlementContext,
+    type Orderer,
+    type OrderParties,
+} from './entitlement'
+import { lineStageFor } from './fulfilment'
+import { DEPLOYED_STAGES } from './lifecycle'
 
 const context: EntitlementContext = {
     catalog: [
@@ -185,5 +198,25 @@ describe('siteTemplateOffered', () => {
         expect(siteTemplateOffered({ customerId: 'acme', siteTemplate: { id: 'acme-branch', customerId: 'acme' } })).toBe(true)
         expect(siteTemplateOffered({ customerId: 'acme', siteTemplate: { id: 'globex-campus', customerId: 'globex' } })).toBe(false)
         expect(siteTemplateOffered({ customerId: 'acme', siteTemplate: { id: 'gone', customerId: null } })).toBe(false)
+    })
+})
+
+describe('usage queries', () => {
+    const open = 'new,awaiting_stock,sourced,staging,ready_to_ship'
+
+    it("counts the Agreement's deployed Assets except those on an open Order line, in every stage clause", () => {
+        const clauses = deployedUsageQuery('a1').split('^NQ')
+        const base = `^x_daas_ham_agreement=a1^x_daas_ham_order_lineISEMPTY^ORx_daas_ham_order_line.line_stageNOT IN${open}`
+        expect(clauses).toHaveLength(DEPLOYED_STAGES.length)
+        for (const clause of clauses) expect(clause.endsWith(base)).toBe(true)
+    })
+
+    it('counts in flight the open lines of the Agreement on other live Orders', () => {
+        expect(inFlightLinesQuery('a1', 'o1')).toBe(`order.agreement=a1^order!=o1^order.stageNOT INdraft,rejected,cancelled^line_stageIN${open}`)
+    })
+
+    it('keeps a partly shipped line open, so its shipped units count once, through its quantity', () => {
+        expect(OPEN_LINE_STAGES).toContain(lineStageFor({ current: 'ready_to_ship', quantity: 2, assetStages: ['shipped', 'staged'] }))
+        expect(OPEN_LINE_STAGES).not.toContain(lineStageFor({ current: 'ready_to_ship', quantity: 2, assetStages: ['shipped', 'shipped'] }))
     })
 })

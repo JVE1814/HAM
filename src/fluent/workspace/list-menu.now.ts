@@ -100,7 +100,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 10,
                     table: 'x_daas_ham_order_line',
                     condition: 'line_stage=awaiting_stock^EQ',
-                    columns: 'number,order,model,quantity,quantity_allocated,quantity_to_purchase,purchase_order',
+                    columns: 'number,order,model,quantity,quantity_allocated,quantity_to_purchase,purchase_order,purchase_orders',
                     applicabilities: [{ $id: Now.ID['ws_lines_awaiting_stock_aud'], applicability: staffAudience }],
                 },
                 {
@@ -135,7 +135,7 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Shipments under way',
                     order: 90,
                     table: 'x_daas_ham_shipment',
-                    condition: 'statusNOT INdelivered,returned^ORDERBYestimated_delivery^EQ',
+                    condition: 'statusNOT INdelivered,returned,voided^ORDERBYestimated_delivery^EQ',
                     columns: 'number,direction,customer,site,carrier,tracking_number,status,status_detail,estimated_delivery',
                     applicabilities: [{ $id: Now.ID['ws_shipments_open_aud'], applicability: staffAudience }],
                 },

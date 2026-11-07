@@ -3,8 +3,8 @@
 import { GlideAggregate, GlideRecord, GlideSysAttachment, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import {
+    billingMonthProblem,
     billsFromIntervals,
-    isMonth,
     monthBounds,
     overlapsMonth,
     previousMonth,
@@ -433,18 +433,20 @@ export function guardClosedBillingLine(current: GlideRecord, previous: GlideReco
 }
 
 /**
- * Before insert/update rule on billing periods (when the month changes): the month is billed only as YYYY-MM, and the
- * period's first and last day follow it (a period created by hand has them too).
+ * Before insert/update rule on billing periods (when the month changes): the month is billed only as YYYY-MM and once
+ * it has ended (domain/billing `billingMonthProblem`), and the period's first and last day follow it (a period created
+ * by hand has them too).
  */
 export function guardBillingPeriodMonth(current: GlideRecord): void {
     const month = str(current, 'period')
-    if (isMonth(month)) {
+    const problem = billingMonthProblem(month, todayIso())
+    if (!problem) {
         const bounds = monthBounds(month)
         current.setValue('period_start', bounds.first)
         current.setValue('period_end', bounds.last)
         return
     }
-    gs.addErrorMessage(`'${month}' is not a month: enter it as YYYY-MM (e.g. 2026-11)`)
+    gs.addErrorMessage(problem)
     current.setAbortAction(true)
 }
 

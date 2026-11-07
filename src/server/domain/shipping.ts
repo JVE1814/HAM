@@ -305,6 +305,20 @@ export function labelVoidable(status: ShipmentStatus): boolean {
 }
 
 /**
+ * Why a Return order gets no new return label while label `trackingNumber` is still open in `status`. Voiding is
+ * advised only where Mark label voided is offered (labelVoidable); a label already moving is the return under way.
+ */
+export function returnLabelRefusal(trackingNumber: string, status: ShipmentStatus): string {
+    if (labelVoidable(status)) {
+        return `Return label ${trackingNumber} is still open; void it with the carrier, then use Mark label voided on its Shipment, before buying another`
+    }
+    if (status === 'in_transit' || status === 'out_for_delivery') {
+        return `Return label ${trackingNumber} is already under way with the carrier; no other label is needed`
+    }
+    return `Return label ${trackingNumber} is still open and its status is unknown; check it with the carrier before buying another`
+}
+
+/**
  * What a tracking update does to a shipment: its next status, the status detail to store (only when
  * the shipment took the update's status, at most 255 characters) and whether it was delivered just now.
  */
