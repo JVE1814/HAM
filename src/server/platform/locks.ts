@@ -31,6 +31,36 @@ export function withLock(name: string, work: (lock: HeldLock) => void): boolean 
     return true
 }
 
+/**
+ * `withLock` tried up to `tries` times, back to back, while other holders have the lock `name`: true once `work` ran,
+ * false when the lock was held through every try. A take that throws (see `withLock`) is tried again too, and its error
+ * escapes only when every try threw; `work`'s own errors escape at once. `work` runs once, unless it returns false to
+ * give its try up, having lost the lock before its result could be used (ADR 0013): that try counts as held, and the
+ * next runs `work` again. Only `work` that may safely run twice returns false.
+ */
+export function withLockTries(name: string, tries: number, work: (lock: HeldLock) => boolean | void): boolean {
+    let held = false
+    let takeError: unknown = null
+    for (let attempt = 0; attempt < tries; attempt++) {
+        // Set inside the lock.
+        let started = false as boolean
+        let gaveUp = false as boolean
+        try {
+            const taken = withLock(name, (lock) => {
+                started = true
+                gaveUp = work(lock) === false
+            })
+            if (taken && !gaveUp) return true
+            held = true
+        } catch (error) {
+            if (started) throw error
+            takeError = error
+        }
+    }
+    if (!held && takeError) throw takeError
+    return false
+}
+
 /** Whether a holder has the lock `name` now: a cheap probe only, since taking the lock is what decides. */
 export function isLocked(name: string): boolean {
     return exists(LOCK, `name=${name}`)

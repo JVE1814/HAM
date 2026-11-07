@@ -14,7 +14,7 @@ import {
 import { moveAndSave, readStage } from './assets'
 import { todayIso } from './clock'
 import { openFieldWork } from './field-work'
-import { withLock, type HeldLock } from './locks'
+import { withLockTries, type HeldLock } from './locks'
 import { exists, findById, num, refusal, str } from './records'
 
 /** Return orders, their lines and Fee events (P2.4). */
@@ -225,25 +225,21 @@ export function recordFee(type: FeeType, asset: GlideRecord, returnOrderId: stri
         late_return: agreement ? num(agreement, 'late_return_fee') : 0,
     })
     if (amount <= 0) return
-    let held = false
-    let takeError: unknown = null
-    for (let attempt = 0; attempt < FEE_LOCK_ATTEMPTS; attempt++) {
-        let started = false
-        try {
-            const taken = withLock(feeLockName(fee), (lock) => {
-                started = true
-                if (!isCharged(fee)) chargeHolding(lock, fee, asset, amount)
-            })
-            if (taken) return
-            held = true
-        } catch (error) {
-            if (started) throw error
-            takeError = error
-        }
+    // Set inside the lock: the fee's own errors escape, and only a lock that could not be taken is logged.
+    let started = false as boolean
+    let why = 'left to a run holding its lock, which has not recorded it yet'
+    try {
+        const ran = withLockTries(feeLockName(fee), FEE_LOCK_ATTEMPTS, (lock) => {
+            started = true
+            if (!isCharged(fee)) chargeHolding(lock, fee, asset, amount)
+        })
+        if (ran) return
+    } catch (error) {
+        if (started) throw error
+        why = errorText(error)
     }
     // The holder has normally charged it by now; one that has not may be slow, or have died holding the lock.
     if (isCharged(fee)) return
-    const why = held ? 'left to a run holding its lock, which has not recorded it yet' : errorText(takeError)
     gs.warn(`[x_daas_ham] ${type} fee for ${str(asset, 'serial_number')} not recorded: ${why}; check its Fee events`)
 }
 

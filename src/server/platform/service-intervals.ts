@@ -3,7 +3,7 @@ import { intervalEnd, restartInterval } from '../domain/billing'
 import { isBillable } from '../domain/lifecycle'
 import { readStage } from './assets'
 import { todayIso } from './clock'
-import { withLock, type HeldLock } from './locks'
+import { withLockTries, type HeldLock } from './locks'
 import { exists, refusal, str } from './records'
 
 /** Service intervals: the days each Asset delivered a Subscription line (P3.25). */
@@ -39,23 +39,18 @@ export function openServiceInterval(asset: GlideRecord, lineId: string, startIso
  * did not (held through every try, or the lock could not be taken), for the caller to log; `work`'s own errors escape.
  */
 function underIntervalLock(assetId: string, work: (lock: HeldLock) => void): string | null {
-    let held = false
-    let takeError: unknown = null
-    for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt++) {
-        let started = false
-        try {
-            const taken = withLock(`service_interval_${assetId}`, (lock) => {
-                started = true
-                work(lock)
-            })
-            if (taken) return null
-            held = true
-        } catch (error) {
-            if (started) throw error
-            takeError = error
-        }
+    // Set inside the lock: `work`'s errors escape, and only a lock that could not be taken is reported.
+    let started = false as boolean
+    try {
+        const ran = withLockTries(`service_interval_${assetId}`, LOCK_ATTEMPTS, (lock) => {
+            started = true
+            work(lock)
+        })
+        return ran ? null : 'left to another save holding its lock, which has not finished'
+    } catch (error) {
+        if (started) throw error
+        return errorText(error)
     }
-    return held ? 'left to another save holding its lock, which has not finished' : errorText(takeError)
 }
 
 function errorText(error: unknown): string {

@@ -1,7 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { ExceptionType } from '../domain/reconciliation'
 import { msToGlide, nowMs } from './clock'
-import { withLock } from './locks'
+import { withLockTries } from './locks'
 import { refusal } from './records'
 
 /** Reconciliation exceptions: at most one open exception per type and asset (or CI). */
@@ -21,29 +21,15 @@ const LOCK_ATTEMPTS = 5
  * audits closing at once) may raise the same one, and a unique index cannot allow closed duplicates beside the open
  * one, so the check and the insert are made under a lock on the type and subject, re-checking there. A run that finds
  * the lock held through every try leaves the exception to the holder, which is raising it. Taking the lock throws only
- * when an insert is refused with no lock row (platform/locks retries once when the holder lets go mid-take): that try
- * is made again, and only when every try throws does the error escape, as does one from the insert.
+ * when an insert is refused with no lock row (platform/locks `withLockTries` tries again, and that error escapes only
+ * when every try threw), as does an error from the insert.
  */
 export function openException(type: ExceptionType, subject: ExceptionSubject): void {
     // Most calls find the exception already open from an earlier run: those need no lock.
     if (isOpen(type, subject)) return
-    let held = false
-    let takeError: unknown = null
-    for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt++) {
-        let started = false
-        try {
-            const taken = withLock(`recon_exception_${type}_${subject.assetId || subject.ciId || ''}`, () => {
-                started = true
-                if (!isOpen(type, subject)) insertException(type, subject)
-            })
-            if (taken) return
-            held = true
-        } catch (error) {
-            if (started) throw error
-            takeError = error
-        }
-    }
-    if (!held && takeError) throw takeError
+    withLockTries(`recon_exception_${type}_${subject.assetId || subject.ciId || ''}`, LOCK_ATTEMPTS, () => {
+        if (!isOpen(type, subject)) insertException(type, subject)
+    })
 }
 
 function isOpen(type: ExceptionType, subject: ExceptionSubject): boolean {

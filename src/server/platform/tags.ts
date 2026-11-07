@@ -1,6 +1,6 @@
 import { GlideRecord } from '@servicenow/glide'
 import { formatProviderTag } from '../domain/provider-tag'
-import { withLock } from './locks'
+import { withLockTries } from './locks'
 import { intProperty, PROPERTY, stringProperty } from './properties'
 
 /** The counter's row in x_daas_ham_job_cursor, and the job lock taken while advancing it. */
@@ -12,34 +12,19 @@ const LOCK_ATTEMPTS = 5
 /**
  * The next Provider tag, or null while other receipts held the counter through every try. A tag is a scan key, so two
  * Assets must never share one: the counter is read and advanced under a job lock, its first row created there too.
- *
- * Taking the lock throws only when an insert is refused with no lock row (platform/locks retries once when the holder
- * lets go mid-take): that try is made again, and only when every try throws does the error escape, as does a failure
- * to save the counter.
+ * Taking the lock throws only when an insert is refused with no lock row (platform/locks `withLockTries` tries again,
+ * and that error escapes only when every try threw), as does a failure to save the counter.
  */
 export function nextProviderTag(): string | null {
-    let refused = false
-    let takeError: unknown = null
-    for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt++) {
-        let sequence = 0
-        let counted = false
-        try {
-            let lost = false
-            const taken = withLock(SEQUENCE_JOB, (lock) => {
-                counted = true
-                sequence = advanceCounter()
-                // A holder that outlasted the lock may share its number with the next holder: that number is not used.
-                lost = !lock.held()
-            })
-            if (taken && !lost) return formatProviderTag(stringProperty(PROPERTY.tagPrefix, 'NAAS'), sequence, intProperty(PROPERTY.tagDigits, 7))
-            refused = true
-        } catch (error) {
-            if (counted) throw error
-            takeError = error
-        }
-    }
-    if (!refused && takeError) throw takeError
-    return null
+    // Set inside the lock.
+    let sequence = 0
+    const counted = withLockTries(SEQUENCE_JOB, LOCK_ATTEMPTS, (lock) => {
+        sequence = advanceCounter()
+        // A holder that outlasted the lock may share its number with the next holder: that number is not used.
+        return lock.held()
+    })
+    if (!counted) return null
+    return formatProviderTag(stringProperty(PROPERTY.tagPrefix, 'NAAS'), sequence, intProperty(PROPERTY.tagDigits, 7))
 }
 
 /** Take the next number from the counter (the first is 1). The caller holds the lock. */
