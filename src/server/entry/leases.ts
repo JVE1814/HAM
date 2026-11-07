@@ -96,7 +96,8 @@ function raiseDecision(lease: GlideRecord, mismatch: boolean): void {
 
 /**
  * UI action "Apply decision" on an end-of-lease decision.
- * - buy out: the Provider owns the Assets from now on;
+ * - buy out: the Provider owns the Assets from now on (transferred in the background, see
+ *   transferLeaseAssets);
  * - extend: the lease runs to the new end date;
  * - return: stock goes on a draft return-to-lessor disposal, and Assets at Sites get a Refresh due
  *   date no later than the lease end so automatic refresh swaps them out in time.
@@ -115,8 +116,13 @@ export function uiApplyLeaseDecision(current: GlideRecord): void {
     } else {
         lease.setValue('end_action', decision)
     }
+    // Each Asset costs its share of the buyout price (for Margin), fixed now while all are still covered.
+    if (decision === 'buyout') lease.setValue('buyout_share', leaseShare(num(lease, 'buyout_price'), countAssets(lease.getUniqueValue())))
     lease.update()
-    if (decision === 'buyout') transferToProvider(lease)
+    if (decision === 'buyout') {
+        fire(EVENT.leaseBuyout, lease, lease.getUniqueValue())
+        gs.addInfoMessage("The lease's assets become Provider-owned in the background")
+    }
     if (decision === 'return') {
         const disposal = disposeStockToLessor(lease)
         if (disposal) gs.addInfoMessage(`Stock covered by the lease is on draft disposal order ${disposal}`)
@@ -124,21 +130,6 @@ export function uiApplyLeaseDecision(current: GlideRecord): void {
     }
     current.setValue('state', 3)
     current.update()
-}
-
-/** Buyout: the Provider owns the Assets, each costing its share of the buyout price (for Margin). */
-function transferToProvider(lease: GlideRecord): void {
-    const share = leaseShare(num(lease, 'buyout_price'), countAssets(lease.getUniqueValue()))
-    const asset = new GlideRecord('alm_hardware')
-    asset.addQuery('x_daas_ham_lease', lease.getUniqueValue())
-    asset.query()
-    while (asset.next()) {
-        asset.setValue('x_daas_ham_lease', '')
-        asset.setValue('x_daas_ham_lessor', '')
-        asset.setValue('x_daas_ham_legal_owner', 'provider')
-        if (share > 0) asset.setValue('cost', share)
-        asset.update()
-    }
 }
 
 /** Draft a return-to-lessor disposal for the lease's Assets still in stock; returns its number. */
@@ -178,6 +169,42 @@ export function refreshLeaseAssets(event: GlideRecord, current: GlideRecord): vo
         handle: (assetId) => {
             const asset = new GlideRecord('alm_hardware')
             if (asset.get(assetId) && applyLifecycleDates(asset, lifecycles)) asset.update()
+        },
+    })
+}
+
+/**
+ * Script action on x_daas_ham.lease.buyout: the Provider owns the lease's Assets, each costing the
+ * lease's Buyout cost per asset (for Margin).
+ *
+ * Every transferred Asset leaves the query set. The cursor (sys_id > last handled) still holds:
+ * batches run in ascending sys_id order, so the Assets that were on the lease when the pass reached
+ * them are all handled; ones at or below the cursor have left the set. (An Asset linked to the lease
+ * during the pass below the cursor is not picked up; buyout is not expected to overlap new links.)
+ * Keeping the cursor, rather than re-reading from the start, also stops an Asset whose update fails
+ * from being fetched again in every batch of the pass.
+ */
+export function transferLeaseAssets(event: GlideRecord, current: GlideRecord): void {
+    const leaseId = str(event, 'parm1')
+    // Never run with a blank lease: the query would match every Asset that has no lease.
+    if (!leaseId) return
+    const share = num(current, 'buyout_share')
+    runEventTableJob({
+        eventName: EVENT.leaseBuyout,
+        record: current,
+        parm1: leaseId,
+        cursor: str(event, 'parm2'),
+        table: 'alm_hardware',
+        query: `x_daas_ham_lease=${leaseId}`,
+        read: (asset) => asset.getUniqueValue(),
+        handle: (assetId) => {
+            const asset = new GlideRecord('alm_hardware')
+            if (!asset.get(assetId) || str(asset, 'x_daas_ham_lease') !== leaseId) return
+            asset.setValue('x_daas_ham_lease', '')
+            asset.setValue('x_daas_ham_lessor', '')
+            asset.setValue('x_daas_ham_legal_owner', 'provider')
+            if (share > 0) asset.setValue('cost', share)
+            asset.update()
         },
     })
 }

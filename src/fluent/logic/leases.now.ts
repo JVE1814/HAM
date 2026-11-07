@@ -1,6 +1,14 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, EmailNotification, Property, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
-import { onAssetLeaseChanged, refreshLeaseAssets, reviewLeases, uiApplyLeaseDecision, uiRenewAgreement, warnRenewals } from '../../server/entry/leases'
+import {
+    onAssetLeaseChanged,
+    refreshLeaseAssets,
+    reviewLeases,
+    transferLeaseAssets,
+    uiApplyLeaseDecision,
+    uiRenewAgreement,
+    warnRenewals,
+} from '../../server/entry/leases'
 import { accountManager, admin, assetManager, finance } from '../security/roles.now'
 
 /* Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
@@ -82,6 +90,28 @@ ScriptAction({
     active: true,
     script: refreshLeaseAssets,
     description: 'Brings refresh due dates forward to the lease end so automatic refresh swaps the equipment out in time.',
+})
+
+export const leaseBuyoutEvent = Record({
+    $id: Now.ID['event_lease_buyout'],
+    table: 'sysevent_register',
+    data: {
+        suffix: 'lease.buyout',
+        event_name: 'x_daas_ham.lease.buyout',
+        table: 'x_daas_ham_lease_schedule',
+        description: "A lease is being bought out; transfer its assets to the Provider at the lease's buyout cost per asset. parm1 = lease, parm2 = cursor.",
+        fired_by: 'entry/leases.ts uiApplyLeaseDecision',
+        priority: 200,
+    },
+})
+
+ScriptAction({
+    $id: Now.ID['sa_lease_buyout'],
+    name: 'NaaS - transfer a bought-out lease to the Provider',
+    eventName: 'x_daas_ham.lease.buyout',
+    active: true,
+    script: transferLeaseAssets,
+    description: 'Takes each asset off the lease, makes the Provider its legal owner and sets its cost to its share of the buyout price.',
 })
 
 export const leaseMismatchEvent = Record({

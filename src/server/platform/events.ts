@@ -7,6 +7,7 @@ export const EVENT = {
     agreementTermsChanged: 'x_daas_ham.agreement.terms',
     returnOverdue: 'x_daas_ham.return.overdue',
     leaseAssets: 'x_daas_ham.lease.assets',
+    leaseBuyout: 'x_daas_ham.lease.buyout',
     leaseMismatch: 'x_daas_ham.lease.mismatch',
     agreementRenewal: 'x_daas_ham.agreement.renewal',
     coverageExpiring: 'x_daas_ham.coverage.expiring',

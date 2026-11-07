@@ -20,6 +20,7 @@ export const x_daas_ham_lease_schedule = Table({
         schedule_number: StringColumn({ label: 'Schedule number', maxLength: 60 }),
         monthly_payment: DecimalColumn({ label: 'Monthly payment (all assets)' }),
         buyout_price: DecimalColumn({ label: 'Buyout price' }),
+        buyout_share: DecimalColumn({ label: 'Buyout cost per asset', readOnly: true, scale: 6 }),
         decision_lead_days: IntegerColumn({ label: 'Decide this many days before the end', default: 120, min: 0 }),
         end_action: ChoiceColumn({
             label: 'End-of-lease action',
