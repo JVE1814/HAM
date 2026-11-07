@@ -284,7 +284,7 @@ function dropWaivedFeeLines(period: GlideRecord): string[] {
             // A fee whose line survives stays on the period: unlinked, the closed period would keep a line it no
             // longer bills.
             const lines = `billing_period=${period.getUniqueValue()}^kind=fee^fee_event=${after}`
-            if (deleteWhere('x_daas_ham_billing_line', lines) > 0) {
+            if (!deleteWhere('x_daas_ham_billing_line', lines)) {
                 stuck.push(`${feeLabel(fee)}: its billing line could not be removed`)
                 continue
             }
@@ -306,7 +306,7 @@ export function uiRegenerateBillingPeriod(current: GlideRecord): void {
     // Without business rules: the period is generating, not closed, so the closed-line guard has nothing to stop.
     // Lines the delete left would be billed twice by the new generation.
     const lines = `billing_period=${current.getUniqueValue()}`
-    if (deleteWhere('x_daas_ham_billing_line', lines, { businessRules: false }) > 0) {
+    if (!deleteWhere('x_daas_ham_billing_line', lines, { businessRules: false })) {
         current.setValue('status', 'ready')
         current.setValue('last_error', 'Regenerate could not remove all of the old lines; remove them and Regenerate again')
         current.update()

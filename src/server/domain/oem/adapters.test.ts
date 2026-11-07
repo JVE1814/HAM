@@ -298,7 +298,7 @@ describe('enabledRoute', () => {
         expect(enabledRoute('meraki', 'coverage', only('meraki', 'cisco'))).toBe(OEM_ADAPTERS.meraki.coverage)
     })
 
-    it('runs a route served by the vendor itself whenever that vendor is enabled', () => {
+    it('runs a route the vendor serves itself exactly when that vendor is enabled', () => {
         expect(enabledRoute('meraki', 'lifecycle', only('meraki'))).toBe(OEM_ADAPTERS.meraki.lifecycle)
         expect(enabledRoute('cisco', 'coverage', only('cisco'))).toBe(OEM_ADAPTERS.cisco.coverage)
         expect(enabledRoute('cisco', 'rmaStatus', only('cisco'))).toBe(OEM_ADAPTERS.cisco.rmaStatus)

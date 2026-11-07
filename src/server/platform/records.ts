@@ -44,11 +44,11 @@ export function addAnyOf(gr: GlideRecord, field: string, values: readonly string
 
 /**
  * Delete every record matching an encoded query with one set-based delete (business rules run unless `businessRules`
- * is false), and return how many still match. deleteMultiple reports nothing and a rule can keep a record, so a
- * caller that must not go on past one checks this; it is counted past before-query rules, so one hidden from the user
- * still counts.
+ * is false), and return whether none is left. deleteMultiple reports nothing and a rule can keep a record, so a
+ * caller that must not go on past one checks this. It looks past before-query rules, so a record hidden from the user
+ * still counts as left.
  */
-export function deleteWhere(table: string, encodedQuery: string, options: { businessRules?: boolean } = {}): number {
+export function deleteWhere(table: string, encodedQuery: string, options: { businessRules?: boolean } = {}): boolean {
     const gr = new GlideRecord(table)
     gr.addEncodedQuery(encodedQuery)
     if (options.businessRules === false) gr.setWorkflow(false)
@@ -56,8 +56,10 @@ export function deleteWhere(table: string, encodedQuery: string, options: { busi
     const left = new GlideRecord(table)
     left.addEncodedQuery(encodedQuery)
     left.setWorkflow(false)
+    // One survivor is enough to tell; a full count would read every one (e.g. of a purge).
+    left.setLimit(1)
     left.query()
-    return left.getRowCount()
+    return !left.hasNext()
 }
 
 /** Whether any record matches an encoded query (stops at the first). */
