@@ -32,6 +32,12 @@ export function requestPurchase(input: { modelId: string; quantity: number; desc
     return noPurchase(input.description, removed ? 'Procurement did not create its line item' : `Procurement created ${str(po, 'number')} without its line item; cancel it`)
 }
 
+/** The sys_id of the purchase order numbered `number` (as an ASN or a received unit names it), or ''. */
+export function purchaseOrderId(number: string): string {
+    const po = new GlideRecord('proc_po')
+    return number && po.get('number', number) ? po.getUniqueValue() : ''
+}
+
 /** Statuses after which a PO, or a single line item, no longer counts as open. */
 const CLOSED_PURCHASE_STATUSES = 'received,canceled,cancelled'
 

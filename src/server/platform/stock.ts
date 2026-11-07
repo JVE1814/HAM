@@ -1,38 +1,55 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { stagesQuery, type Stage } from '../domain/lifecycle'
-import type { StockCandidate, StockroomType } from '../domain/sourcing'
+import type { Stage } from '../domain/lifecycle'
+import { stockQueries, type StockCandidate, type StockroomType, type StockScope } from '../domain/sourcing'
 import { moveAsset, readStage } from './assets'
 import { withLock, type HeldLock } from './locks'
-import { str } from './records'
+import { bool, str } from './records'
 
 /** Stock that can serve an Order line, and claiming it for one. */
 
-/** Free stock and spare-pool stock of `modelId` on no Order line: a hot spare linked to a line stays in the pool but is taken. */
-export function stockCandidates(modelId: string, limit: number): StockCandidate[] {
-    const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(stagesQuery(['available', 'spare_pool'], `model=${modelId}^x_daas_ham_order_lineISEMPTY`))
-    asset.setLimit(limit)
-    asset.query()
+/**
+ * Stock on no Order line that may serve `scope` (domain/sourcing `stockQueries`): up to `limit` per Source, by
+ * stockroom then sys_id so the limit cuts the same way each run. A hot spare linked to a line stays in the pool but
+ * is taken.
+ */
+export function stockCandidates(scope: StockScope, limit: number): StockCandidate[] {
     const candidates: StockCandidate[] = []
-    while (asset.next()) {
-        const stage = readStage(asset)
-        if (stage !== 'available' && stage !== 'spare_pool') continue
-        const stockroomType = (str(asset, 'stockroom.x_daas_ham_stockroom_type') || 'central_depot') as StockroomType
-        candidates.push({
-            assetId: asset.getUniqueValue(),
-            modelId,
-            stage,
-            stockroomId: str(asset, 'stockroom'),
-            stockroomType,
-            reservedFor:
-                stockroomType === 'customer_site'
-                    ? str(asset, 'stockroom.x_daas_ham_customer')
-                    : stage === 'spare_pool'
-                      ? str(asset, 'company')
-                      : '',
-        })
+    for (const query of stockQueries(scope)) {
+        const asset = new GlideRecord('alm_hardware')
+        asset.addEncodedQuery(query)
+        asset.orderBy('stockroom')
+        asset.orderBy('sys_id')
+        asset.setLimit(limit)
+        asset.query()
+        while (asset.next()) {
+            const candidate = candidateOf(asset, scope.modelId)
+            if (candidate) candidates.push(candidate)
+        }
     }
     return candidates
+}
+
+function candidateOf(asset: GlideRecord, modelId: string): StockCandidate | null {
+    const stage = readStage(asset)
+    if (stage !== 'available' && stage !== 'spare_pool') return null
+    const stockroomType = (str(asset, 'stockroom.x_daas_ham_stockroom_type') || 'central_depot') as StockroomType
+    const atCustomerSite = stockroomType === 'customer_site'
+    const pooledFor = stage === 'spare_pool' ? str(asset, 'company') : ''
+    return {
+        assetId: asset.getUniqueValue(),
+        modelId,
+        stage,
+        stockroomId: str(asset, 'stockroom'),
+        stockroomType,
+        reservedFor: atCustomerSite ? str(asset, 'stockroom.x_daas_ham_customer') : pooledFor,
+        siteId: atCustomerSite ? stockroomSite(asset) : '',
+    }
+}
+
+/** The Site the Asset's stockroom stands at: its location when that is a Site, else the Site of the Room it is in. */
+function stockroomSite(asset: GlideRecord): string {
+    const location = str(asset, 'stockroom.location')
+    return bool(asset, 'stockroom.location.x_daas_ham_is_site') ? location : str(asset, 'stockroom.location.parent')
 }
 
 export interface Reservation {

@@ -17707,6 +17707,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '4fdcc2fc04da4920b29c699f819b3e5e'
+                        key: {
+                            name: 'x_daas_ham_order_line'
+                            element: 'purchase_orders'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '4fe3516d2bdf4d3399512625a77be544'
                         key: {
@@ -42381,6 +42389,15 @@ declare global {
                                 }
                             }
                             sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'd79238e9fd404e04abb31c4b8dff3289'
+                        key: {
+                            name: 'x_daas_ham_order_line'
+                            element: 'purchase_orders'
+                            language: 'en'
                         }
                     },
                     {

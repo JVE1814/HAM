@@ -40,7 +40,10 @@ export function approvalsOf(taskId: string): Array<{ approverId: string; state: 
     return approvals
 }
 
-/** Cancel approvals still waiting once the outcome is decided. */
+/**
+ * Cancel approvals still waiting once the outcome is decided. Each cancellation is a saved state change, so the
+ * after-update rule that rolls approvals up runs again: save the task out of awaiting approval first.
+ */
 export function cancelPendingApprovals(taskId: string): void {
     const approval = new GlideRecord('sysapproval_approver')
     approval.addQuery('sysapproval', taskId)

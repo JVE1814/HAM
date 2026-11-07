@@ -1,19 +1,40 @@
 import { describe, expect, it, vi } from 'vitest'
-import { pickForSparePool, planSourcing, shortfallOutcome, sparePoolShortfall, type PurchaseResult, type StockCandidate } from './sourcing'
+import { stagesQuery } from './lifecycle'
+import {
+    freeStockOf,
+    pickForSparePool,
+    planSourcing,
+    shortfallOutcome,
+    sparePoolShortfall,
+    stockQueries,
+    type PurchaseResult,
+    type SourcingRequest,
+    type StockCandidate,
+} from './sourcing'
 
+const depot = { stockroomId: 'depot', stockroomType: 'central_depot', siteId: '' } as const
+const lab = { stockroomId: 'lab', stockroomType: 'staging_centre', siteId: '' } as const
+const hqSpares = { stockroomId: 'acme-hq', stockroomType: 'customer_site', siteId: 'hq' } as const
 const stock: StockCandidate[] = [
-    { assetId: 'central-1', modelId: 'c9300', stage: 'available', stockroomId: 'depot', stockroomType: 'central_depot', reservedFor: '' },
-    { assetId: 'central-2', modelId: 'c9300', stage: 'available', stockroomId: 'depot', stockroomType: 'central_depot', reservedFor: '' },
-    { assetId: 'pool-1', modelId: 'c9300', stage: 'spare_pool', stockroomId: 'depot', stockroomType: 'central_depot', reservedFor: 'acme' },
-    { assetId: 'site-1', modelId: 'c9300', stage: 'spare_pool', stockroomId: 'acme-hq', stockroomType: 'customer_site', reservedFor: 'acme' },
-    { assetId: 'other-pool', modelId: 'c9300', stage: 'spare_pool', stockroomId: 'depot', stockroomType: 'central_depot', reservedFor: 'globex' },
-    { assetId: 'staging-1', modelId: 'c9300', stage: 'available', stockroomId: 'lab', stockroomType: 'staging_centre', reservedFor: '' },
-    { assetId: 'ap-1', modelId: 'mr46', stage: 'available', stockroomId: 'depot', stockroomType: 'central_depot', reservedFor: '' },
+    { assetId: 'central-1', modelId: 'c9300', stage: 'available', ...depot, reservedFor: '' },
+    { assetId: 'central-2', modelId: 'c9300', stage: 'available', ...depot, reservedFor: '' },
+    { assetId: 'pool-1', modelId: 'c9300', stage: 'spare_pool', ...depot, reservedFor: 'acme' },
+    { assetId: 'site-1', modelId: 'c9300', stage: 'spare_pool', ...hqSpares, reservedFor: 'acme' },
+    { assetId: 'other-pool', modelId: 'c9300', stage: 'spare_pool', ...depot, reservedFor: 'globex' },
+    { assetId: 'staging-1', modelId: 'c9300', stage: 'available', ...lab, reservedFor: '' },
+    { assetId: 'ap-1', modelId: 'mr46', stage: 'available', ...depot, reservedFor: '' },
 ]
+
+/** A request for Acme at its HQ Site. */
+const acme = (request: Pick<SourcingRequest, 'modelId' | 'quantity' | 'purpose'>): SourcingRequest => ({
+    ...request,
+    customerId: 'acme',
+    siteId: 'hq',
+})
 
 describe('planSourcing', () => {
     it('serves new installs from the customer spare pool, then central stock, then purchase', () => {
-        const plan = planSourcing({ modelId: 'c9300', quantity: 5, customerId: 'acme', purpose: 'new' }, stock)
+        const plan = planSourcing(acme({ modelId: 'c9300', quantity: 5, purpose: 'new' }), stock)
         expect(plan.picks).toEqual([
             { assetId: 'pool-1', source: 'spare_pool' },
             { assetId: 'central-1', source: 'central_stock' },
@@ -24,7 +45,7 @@ describe('planSourcing', () => {
     })
 
     it('serves replacements from the hot spare at the customer site first', () => {
-        const plan = planSourcing({ modelId: 'c9300', quantity: 2, customerId: 'acme', purpose: 'replace' }, stock)
+        const plan = planSourcing(acme({ modelId: 'c9300', quantity: 2, purpose: 'replace' }), stock)
         expect(plan.picks).toEqual([
             { assetId: 'site-1', source: 'customer_site_stock' },
             { assetId: 'pool-1', source: 'spare_pool' },
@@ -32,15 +53,48 @@ describe('planSourcing', () => {
         expect(plan.toPurchase).toBe(0)
     })
 
+    it("does not install a hot spare at another of the Customer's Sites in place", () => {
+        const atStore = { ...acme({ modelId: 'c9300', quantity: 2, purpose: 'replace' }), siteId: 'store-42' }
+        const plan = planSourcing(atStore, stock)
+        expect(plan.picks).toEqual([
+            { assetId: 'pool-1', source: 'spare_pool' },
+            { assetId: 'central-1', source: 'central_stock' },
+        ])
+    })
+
     it("never takes another customer's spares or another model", () => {
-        const plan = planSourcing({ modelId: 'mr46', quantity: 2, customerId: 'acme', purpose: 'new' }, stock)
+        const plan = planSourcing(acme({ modelId: 'mr46', quantity: 2, purpose: 'new' }), stock)
         expect(plan.picks.map((p) => p.assetId)).toEqual(['ap-1'])
         expect(plan.toPurchase).toBe(1)
     })
 
     it('summarises where the line will come from', () => {
-        const plan = planSourcing({ modelId: 'c9300', quantity: 5, customerId: 'acme', purpose: 'new' }, stock)
+        const plan = planSourcing(acme({ modelId: 'c9300', quantity: 5, purpose: 'new' }), stock)
         expect(plan.summary).toBe('1 from spare pool, 3 from central stock, 1 to purchase')
+    })
+})
+
+describe('stockQueries', () => {
+    const base = 'model=m1^x_daas_ham_order_lineISEMPTY'
+    const type = 'stockroom.x_daas_ham_stockroom_type'
+    const provider = `${base}^${type}!=customer_site^OR${type}ISEMPTY`
+    const free = stagesQuery(['available'], provider)
+    const pool = stagesQuery(['spare_pool'], `${provider}^company=acme`)
+
+    it("asks for the Customer's own stock and free stock only, one query per source in priority order", () => {
+        expect(stockQueries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose: 'new' })).toEqual([pool, free])
+    })
+
+    it("adds the Customer's site stockroom stock at the Site or one of its Rooms for a replacement, first", () => {
+        const [site, ...rest] = stockQueries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose: 'replace' })
+        expect(rest).toEqual([pool, free])
+        const siteStockroom = 'stockroom.x_daas_ham_stockroom_type=customer_site^stockroom.x_daas_ham_customer=acme'
+        const atSite = 'stockroom.location=hq^ORstockroom.location.parent=hq'
+        expect(site).toBe(stagesQuery(['available', 'spare_pool'], `${base}^${siteStockroom}^${atSite}`))
+    })
+
+    it('asks for free stock only when stock is sought for no Customer (the spare-pool top-up)', () => {
+        expect(stockQueries(freeStockOf('m1'))).toEqual([free])
     })
 })
 

@@ -1,12 +1,13 @@
 import type { LineStage } from './fulfilment'
+import { stagesQuery } from './lifecycle'
 import type { ShortfallRoute } from './returns'
 
 /**
  * Sourcing: where an Order line's Assets come from.
  *
  * New installs: the Customer's Spare pool, then central stock, then purchase (the spare-pool top-up
- * job refills the pool afterwards). Replacements: the hot spare at a customer-site stockroom first,
- * then the Spare pool, then central stock, then purchase.
+ * job refills the pool afterwards). Replacements: the hot spare in a customer-site stockroom at the
+ * Order's Site first, then the Spare pool, then central stock, then purchase.
  */
 
 export type StockroomType = 'central_depot' | 'staging_centre' | 'customer_site'
@@ -20,12 +21,16 @@ export interface StockCandidate {
     stockroomType: StockroomType
     /** Customer the Asset is reserved for (spare pool) or whose site stockroom holds it; '' if free stock. */
     reservedFor: string
+    /** The Site a customer-site stockroom stands at; '' for the Provider's own stockrooms. */
+    siteId: string
 }
 
 export interface SourcingRequest {
     modelId: string
     quantity: number
     customerId: string
+    /** The Order's Site: a hot spare is installed from where it is, so only one there serves a replacement. */
+    siteId: string
     purpose: 'new' | 'replace'
 }
 
@@ -35,17 +40,52 @@ export interface SourcingPlan {
     summary: string
 }
 
-function sourceOf(candidate: StockCandidate, customerId: string): Source | null {
+/** Who stock is sought for: a line's Customer and Site, or no one (customerId '') for free stock only. */
+type Seeker = Pick<SourcingRequest, 'customerId' | 'siteId'>
+
+function sourceOf(candidate: StockCandidate, seeker: Seeker): Source | null {
     if (candidate.stockroomType === 'customer_site') {
-        return candidate.reservedFor === customerId ? 'customer_site_stock' : null
+        // A spare at another of the Customer's Sites is not shipped from there: it is no hot spare for this Site.
+        const here = candidate.reservedFor === seeker.customerId && candidate.siteId === seeker.siteId
+        return here ? 'customer_site_stock' : null
     }
-    if (candidate.stage === 'spare_pool') return candidate.reservedFor === customerId ? 'spare_pool' : null
+    if (candidate.stage === 'spare_pool') return candidate.reservedFor === seeker.customerId ? 'spare_pool' : null
     return candidate.reservedFor === '' ? 'central_stock' : null
 }
 
 const PRIORITY: Record<SourcingRequest['purpose'], readonly Source[]> = {
     new: ['spare_pool', 'central_stock'],
     replace: ['customer_site_stock', 'spare_pool', 'central_stock'],
+}
+
+/** What a sourcing run looks for: the line's request less its quantity; a customerId of '' wants free stock only. */
+export type StockScope = Omit<SourcingRequest, 'quantity'>
+
+/** Free stock of `modelId` sought for no Customer, as the spare-pool top-up moves into a pool. */
+export function freeStockOf(modelId: string): StockScope {
+    return { modelId, customerId: '', siteId: '', purpose: 'new' }
+}
+
+/**
+ * Encoded alm_hardware queries for the stock that may serve `scope`, one per Source in priority order, so a limit on
+ * each cuts within its Source only and other Customers' spares never crowd it out: the Customer's site stockroom
+ * stock at the Site or one of its Rooms (replacements), its Spare pool, and free stock outside customer-site
+ * stockrooms. Stock on an Order line is never a candidate. `sourceOf` still decides each one.
+ */
+export function stockQueries(scope: StockScope): string[] {
+    const base = `model=${scope.modelId}^x_daas_ham_order_lineISEMPTY`
+    const type = 'stockroom.x_daas_ham_stockroom_type'
+    // Not left to how != treats empty values: stock in a stockroom with no type, or in none, counts as a depot's.
+    const provider = `${base}^${type}!=customer_site^OR${type}ISEMPTY`
+    const customerSite = `${base}^${type}=customer_site^stockroom.x_daas_ham_customer=${scope.customerId}`
+    const atSite = `stockroom.location=${scope.siteId}^ORstockroom.location.parent=${scope.siteId}`
+    const bySource: Record<Source, string> = {
+        customer_site_stock: stagesQuery(['available', 'spare_pool'], `${customerSite}^${atSite}`),
+        spare_pool: stagesQuery(['spare_pool'], `${provider}^company=${scope.customerId}`),
+        central_stock: stagesQuery(['available'], provider),
+    }
+    const sources: readonly Source[] = scope.customerId ? PRIORITY[scope.purpose] : ['central_stock']
+    return sources.map((source) => bySource[source])
 }
 
 const LABEL: Record<Source, string> = {
@@ -58,7 +98,7 @@ export function planSourcing(request: SourcingRequest, stock: readonly StockCand
     const picks: SourcingPlan['picks'] = []
     for (const source of PRIORITY[request.purpose]) {
         const matching = stock
-            .filter((c) => c.modelId === request.modelId && sourceOf(c, request.customerId) === source)
+            .filter((c) => c.modelId === request.modelId && sourceOf(c, request) === source)
             .sort((a, b) => a.stockroomId.localeCompare(b.stockroomId) || a.assetId.localeCompare(b.assetId))
         for (const candidate of matching) {
             if (picks.length === request.quantity) break
@@ -104,8 +144,8 @@ export interface ShortfallOutcome {
  * to be purchased and `purchase` (called only then) brings no purchase order, or picked stock could not
  * be moved to the staging centre (`unmoved`), when the line waits for stock and its summary says why; an
  * OEM advance replacement is noted in the summary. `missing` is the shortfall routed and `onOrder` the
- * units already on the line's purchase order. Unmoved stock is not part of `missing`: it is still there,
- * so it is not bought, and the line picks it again when it is next sourced.
+ * units on the line's purchase orders not yet received. Unmoved stock is not part of `missing`: it is still
+ * there, so it is not bought, and the line picks it again when it is next sourced.
  */
 export function shortfallOutcome(
     route: ShortfallRoute,
@@ -135,7 +175,7 @@ export function sparePoolShortfall(input: { deployed: number; reserved: number; 
 /** Free central stock of a model to move into a Customer's Spare pool (top-up). */
 export function pickForSparePool(stock: readonly StockCandidate[], modelId: string, count: number): string[] {
     return stock
-        .filter((c) => c.modelId === modelId && sourceOf(c, '') === 'central_stock')
+        .filter((c) => c.modelId === modelId && sourceOf(c, freeStockOf(modelId)) === 'central_stock')
         .sort((a, b) => a.stockroomId.localeCompare(b.stockroomId) || a.assetId.localeCompare(b.assetId))
         .slice(0, Math.max(0, count))
         .map((c) => c.assetId)

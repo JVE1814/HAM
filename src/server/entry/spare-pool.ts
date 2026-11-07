@@ -1,6 +1,6 @@
 import { GlideAggregate, gs } from '@servicenow/glide'
 import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
-import { pickForSparePool, sparePoolShortfall } from '../domain/sourcing'
+import { freeStockOf, pickForSparePool, sparePoolShortfall } from '../domain/sourcing'
 import { runTableJob } from '../platform/chunked'
 import { openPurchaseQuantity, requestPurchase } from '../platform/procurement'
 import { boolProperty, PROPERTY, stagingStockroom } from '../platform/properties'
@@ -44,7 +44,7 @@ function topUpAgreement(agreementId: string, customerId: string, ratio: number, 
     for (const [modelId, deployedCount] of deployed) {
         const shortfall = sparePoolShortfall({ deployed: deployedCount, reserved: reserved.get(modelId) ?? 0, ratio })
         if (shortfall === 0) continue
-        const picked = pickForSparePool(stockCandidates(modelId, shortfall * 5 + 50), modelId, shortfall)
+        const picked = pickForSparePool(stockCandidates(freeStockOf(modelId), shortfall * 5 + 50), modelId, shortfall)
         // A unit sourcing claimed in the meantime (or whose save was refused) is not moved and stays in the shortfall.
         const moved = picked.filter((assetId) => moveToSparePool(assetId, customerId, agreementId)).length
         if (!autoPurchase) continue

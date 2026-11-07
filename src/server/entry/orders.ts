@@ -14,7 +14,13 @@ import {
     type RequestedLine,
 } from '../domain/entitlement'
 import { shortfallRoute } from '../domain/returns'
-import { planSourcing, shortfallOutcome, type Source, type UnmovedStock } from '../domain/sourcing'
+import {
+    planSourcing,
+    shortfallOutcome,
+    type Source,
+    type SourcingRequest,
+    type UnmovedStock,
+} from '../domain/sourcing'
 import { entitlementContext } from '../platform/agreements'
 import { approvalsOf, cancelPendingApprovals, customerAdminIds, providerApproverIds, requestApproval } from '../platform/approvals'
 import { moveAndSave, readStage } from '../platform/assets'
@@ -217,11 +223,14 @@ export function onOrderApprovalDecision(current: GlideRecord): void {
     const decisions = groupDecisions(approvalsOf(order.getUniqueValue()), customerAdminIds(str(order, 'customer')))
     const outcome = rollupApprovals(approversFor(str(order, 'entitlement_verdict') as EntitlementVerdict), decisions)
     if (outcome === 'requested') return
+    if (outcome === 'approved') startSourcing(order)
+    else rejectOrder(order)
+    // Each cancellation runs this rule again; the Order is already saved out of awaiting approval, so that run stops.
     cancelPendingApprovals(order.getUniqueValue())
-    if (outcome === 'approved') {
-        startSourcing(order)
-        return
-    }
+}
+
+/** A rejected Order cancels its lines, so they stop counting as usage. */
+function rejectOrder(order: GlideRecord): void {
     cancelOpenLines(order.getUniqueValue())
     order.setValue('approval', 'rejected')
     order.setValue('stage', 'rejected')
@@ -242,17 +251,17 @@ export function sourceOrder(event: GlideRecord, current: GlideRecord): void {
 function sourceLine(order: GlideRecord, line: GlideRecord): void {
     const quantity = num(line, 'quantity')
     const allocated = countAllocated(line.getUniqueValue())
-    const onOrder = str(line, 'purchase_order') ? num(line, 'quantity_to_purchase') : 0
+    // Units bought and not yet received: receiving one takes it off (warehouse allocateToWaitingLine).
+    const onOrder = num(line, 'quantity_to_purchase')
     const shortfall = quantity - allocated - onOrder - openRmaCount(line.getUniqueValue())
     if (shortfall <= 0) return
 
     const modelId = str(line, 'model')
     const customerId = str(order, 'customer')
     const breakFix = str(order, 'order_type') === 'device_replace'
-    const plan = planSourcing(
-        { modelId, quantity: shortfall, customerId, purpose: breakFix ? 'replace' : 'new' },
-        stockCandidates(modelId, shortfall * 5 + 50),
-    )
+    const purpose = breakFix ? 'replace' : 'new'
+    const request: SourcingRequest = { modelId, quantity: shortfall, customerId, siteId: str(order, 'site'), purpose }
+    const plan = planSourcing(request, stockCandidates(request, shortfall * 5 + 50))
 
     const stagingId = stagingStockroom()
     const reservation = { orderLineId: line.getUniqueValue(), customerId, agreementId: str(order, 'agreement') }
@@ -315,7 +324,12 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
             description: `${str(order, 'number')} ${str(line, 'number')}: ${toPurchase} x ${str(line, 'model.display_name')}`,
         })
     const outcome = shortfallOutcome(route, { planSummary: plan.summary, missing: toPurchase, onOrder, unmoved }, purchase)
-    if (outcome.purchaseOrder) line.setValue('purchase_order', outcome.purchaseOrder)
+    if (outcome.purchaseOrder) {
+        // Every purchase order stays listed, so units of an earlier one are still allocated to the line on receipt.
+        const listed = [str(line, 'purchase_orders'), outcome.purchaseOrder].filter(Boolean)
+        line.setValue('purchase_order', outcome.purchaseOrder)
+        line.setValue('purchase_orders', listed.join(','))
+    }
     line.setValue('quantity_allocated', allocated + reserved - released)
     line.setValue('quantity_to_purchase', outcome.quantityToPurchase)
     line.setValue('sourcing_summary', outcome.summary)
@@ -377,7 +391,7 @@ function cancelOpenLines(orderId: string): string[] {
         asset.addQuery('x_daas_ham_order_line', line.getUniqueValue())
         asset.query()
         while (asset.next()) releaseAsset(asset)
-        if (str(line, 'purchase_order')) purchases.push(line.getDisplayValue('purchase_order'))
+        if (str(line, 'purchase_orders')) purchases.push(line.getDisplayValue('purchase_orders'))
         line.setValue('line_stage', 'cancelled')
         line.update()
     }
@@ -398,11 +412,12 @@ export function cancelOrder(order: GlideRecord): void {
         return
     }
     const purchases = cancelOpenLines(order.getUniqueValue())
-    cancelPendingApprovals(order.getUniqueValue())
     order.setValue('stage', 'cancelled')
     order.setValue('state', 7)
     if (purchases.length > 0) order.setValue('work_notes', `Cancel these purchase orders in Procurement: ${purchases.join(', ')}`)
     order.update()
+    // After the save, so the approval rule each cancellation runs finds the Order no longer awaiting approval.
+    cancelPendingApprovals(order.getUniqueValue())
 }
 
 /** Re-source a line that lost an allocated Asset (failed staging). */

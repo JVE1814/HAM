@@ -10,7 +10,8 @@ import { findAssetByIdentifier, moveAndSave, moveAsset, newAsset, readStage } fr
 import { loadNormalizationData, resolveModel } from '../platform/normalization'
 import { PROPERTY, stringProperty } from '../platform/properties'
 import { lineAwaitingRma } from '../platform/oem-rma'
-import { findById, str } from '../platform/records'
+import { purchaseOrderId } from '../platform/procurement'
+import { findById, num, str } from '../platform/records'
 import { openStagingTask } from '../platform/staging-tasks'
 import { nextProviderTag } from '../platform/tags'
 import { receiveReturnedAsset } from './returns'
@@ -146,12 +147,18 @@ function allocateToWaitingLine(asset: GlideRecord): void {
         rma?.setValue('replacement_serial', str(asset, 'serial_number'))
         rma?.update()
     } else {
-        line.addQuery('purchase_order.number', poNumber)
+        // A line lists every purchase order it raised, so units of an earlier one still find it.
+        const poId = purchaseOrderId(poNumber)
+        if (!poId) return
+        line.addQuery('purchase_orders', 'CONTAINS', poId)
         line.addQuery('model', str(asset, 'model'))
         line.addQuery('line_stage', 'awaiting_stock')
         line.setLimit(1)
         line.query()
         if (!line.next()) return
+        // Arrived, so no longer on order: re-sourcing covers quantity - allocated - on order and must not wait for it.
+        line.setValue('quantity_to_purchase', Math.max(0, num(line, 'quantity_to_purchase') - 1))
+        line.update()
     }
     if (!moveAsset(asset, 'reserved').allowed) return
     asset.setValue('x_daas_ham_order_line', line.getUniqueValue())

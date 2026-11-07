@@ -126,10 +126,13 @@ export const x_daas_ham_order_line = Table({
             dropdown: 'dropdown_without_none',
         }),
         quantity_allocated: IntegerColumn({ label: 'Allocated from stock', readOnly: true, default: 0 }),
-        quantity_to_purchase: IntegerColumn({ label: 'To purchase', readOnly: true, default: 0 }),
+        /** Units bought for the line and not yet received: each one received on its purchase orders comes off. */
+        quantity_to_purchase: IntegerColumn({ label: 'On order', readOnly: true, default: 0 }),
         sourcing_summary: StringColumn({ label: 'Sourcing', maxLength: 255, readOnly: true }),
         transfer_orders: ListColumn({ label: 'Transfer orders', referenceTable: 'alm_transfer_order' }),
-        purchase_order: ReferenceColumn({ label: 'Purchase order', referenceTable: 'proc_po' }),
+        purchase_order: ReferenceColumn({ label: 'Latest purchase order', referenceTable: 'proc_po' }),
+        /** Every purchase order the line raised: a receipt on any of them is allocated to the line. */
+        purchase_orders: ListColumn({ label: 'Purchase orders', referenceTable: 'proc_po', readOnly: true }),
     },
     autoNumber: { prefix: 'NOL', number: 1000, numberOfDigits: 7 },
     index: [
