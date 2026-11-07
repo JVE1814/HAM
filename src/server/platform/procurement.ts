@@ -1,28 +1,28 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import type { PurchaseResult } from '../domain/returns'
-import { PROPERTY } from './properties'
+import type { PurchaseResult } from '../domain/sourcing'
 
 /**
  * Purchase orders through the Procurement plugin (proc_po / proc_po_item). Created in the
  * "requested" status for a buyer to complete; field names follow the base Procurement data model.
- * Ship to is a required field on the purchase order form, so no PO is created without a stockroom;
- * then, or when the PO is not inserted, a warning is logged and the result says why.
+ * When the PO is not inserted, a warning is logged and the result says why.
  */
 export function requestPurchase(input: {
     modelId: string
     quantity: number
-    /** The staging stockroom the units are shipped to; the reason given without one names its property. */
+    /** The stockroom the units are shipped to: required (Ship to is mandatory on a purchase order), so callers check one is set. */
     shipToStockroomId: string
     description: string
 }): PurchaseResult {
-    if (!input.shipToStockroomId) return noPurchase(input.description, `set ${PROPERTY.stagingStockroom}`)
     const po = new GlideRecord('proc_po')
     po.initialize()
     po.setValue('short_description', input.description)
     po.setValue('status', 'requested')
     po.setValue('ship_to', input.shipToStockroomId)
     const poId = po.insert()
-    if (!poId) return noPurchase(input.description, 'Procurement did not create it')
+    if (!poId) {
+        gs.warn(`[x_daas_ham] No purchase order (Procurement did not create it): ${input.description}`)
+        return { ok: false, reason: 'Procurement did not create it' }
+    }
 
     const item = new GlideRecord('proc_po_item')
     item.initialize()
@@ -32,11 +32,6 @@ export function requestPurchase(input: {
     item.setValue('status', 'requested')
     item.insert()
     return { ok: true, poId }
-}
-
-function noPurchase(description: string, reason: string): PurchaseResult {
-    gs.warn(`[x_daas_ham] No purchase order (${reason}): ${description}`)
-    return { ok: false, reason }
 }
 
 /** Statuses after which a PO, or a single line item, no longer counts as open. */

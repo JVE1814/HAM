@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { evaluationTarget, feeAmount, overdueStep, returnDueDate, shortfallOutcome, shortfallRoute } from './returns'
+import { evaluationTarget, feeAmount, overdueStep, returnDueDate, shortfallRoute } from './returns'
 
 describe('returnDueDate', () => {
     it('is the agreement allowance after the return was raised', () => {
@@ -58,39 +58,5 @@ describe('shortfallRoute', () => {
         expect(shortfallRoute({ missing: 1, purpose: 'replace', coveredToday: false })).toBe('purchase')
         expect(shortfallRoute({ missing: 2, purpose: 'new', coveredToday: true })).toBe('purchase')
         expect(shortfallRoute({ missing: 0, purpose: 'replace', coveredToday: true })).toBe('none')
-    })
-})
-
-describe('shortfallOutcome', () => {
-    const line = { planSummary: '1 from central stock, 2 to purchase', missing: 2, onOrder: 3 }
-
-    it('sources a line with nothing left to buy as planned', () => {
-        expect(shortfallOutcome({ route: 'none' }, { ...line, missing: 0 })).toEqual({ stage: 'sourced', summary: line.planSummary, quantityToPurchase: 3 })
-    })
-
-    it('notes an OEM advance replacement without buying anything', () => {
-        expect(shortfallOutcome({ route: 'oem_advance_replacement' }, { ...line, missing: 1 })).toEqual({
-            stage: 'sourced',
-            summary: '1 from central stock, 2 to purchase (OEM advance replacement under RMA)',
-            quantityToPurchase: 3,
-        })
-    })
-
-    it('links the purchase order created and counts its units on top of those already on order', () => {
-        expect(shortfallOutcome({ route: 'purchase', purchase: { ok: true, poId: 'po1' } }, line)).toEqual({
-            stage: 'sourced',
-            summary: line.planSummary,
-            purchaseOrder: 'po1',
-            quantityToPurchase: 5,
-        })
-    })
-
-    it('leaves the line waiting for stock, saying why, when no purchase order was created', () => {
-        const purchase = { ok: false, reason: 'set x_daas_ham.staging.default_stockroom' } as const
-        expect(shortfallOutcome({ route: 'purchase', purchase }, line)).toEqual({
-            stage: 'awaiting_stock',
-            summary: '1 from central stock, 2 to purchase (no purchase order: set x_daas_ham.staging.default_stockroom)',
-            quantityToPurchase: 3,
-        })
     })
 })

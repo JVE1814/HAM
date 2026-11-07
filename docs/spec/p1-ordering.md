@@ -54,6 +54,9 @@
   they are.
 - Shortfalls become one requested purchase order per line (ship to the staging centre); received units
   of that PO are allocated to the line on receipt.
+- Without a staging stockroom (`x_daas_ham.staging.default_stockroom`) no purchase order is requested, and a
+  line whose purchase order Procurement does not create is treated the same way: the line waits for stock and
+  its sourcing summary says why. The spare-pool top-up then buys nothing and logs a warning.
 - Re-sourcing a line only covers `quantity − allocated − on order`.
 - Several source stockrooms give several transfer orders, all listed on the line.
 - A failed staging takes the Asset off the line, which goes back to awaiting stock and is re-sourced.

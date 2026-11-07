@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { pickForSparePool, planSourcing, sparePoolShortfall, type StockCandidate } from './sourcing'
+import { describe, expect, it, vi } from 'vitest'
+import { pickForSparePool, planSourcing, shortfallOutcome, sparePoolShortfall, type PurchaseResult, type StockCandidate } from './sourcing'
 
 const stock: StockCandidate[] = [
     { assetId: 'central-1', modelId: 'c9300', stage: 'available', stockroomId: 'depot', stockroomType: 'central_depot', reservedFor: '' },
@@ -41,6 +41,61 @@ describe('planSourcing', () => {
     it('summarises where the line will come from', () => {
         const plan = planSourcing({ modelId: 'c9300', quantity: 5, customerId: 'acme', purpose: 'new' }, stock)
         expect(plan.summary).toBe('1 from spare pool, 3 from central stock, 1 to purchase')
+    })
+})
+
+describe('shortfallOutcome', () => {
+    const line = { planSummary: '1 from central stock, 2 to purchase', missing: 2, onOrder: 3 }
+    const purchasing = (stagingStockroomId: string, result: PurchaseResult = { ok: true, poId: 'po1' }) => ({
+        stagingStockroomId,
+        purchase: vi.fn((_shipToStockroomId: string) => result),
+        noStagingStockroom: vi.fn(() => 'set x_daas_ham.staging.default_stockroom'),
+    })
+
+    it('sources a line with nothing left to buy as planned, even while no staging stockroom is set', () => {
+        const procurement = purchasing('')
+        expect(shortfallOutcome('none', { ...line, missing: 0 }, procurement)).toEqual({ stage: 'sourced', summary: line.planSummary, quantityToPurchase: 3 })
+        expect(procurement.purchase).not.toHaveBeenCalled()
+        expect(procurement.noStagingStockroom).not.toHaveBeenCalled()
+    })
+
+    it('notes an OEM advance replacement without buying anything, even while no staging stockroom is set', () => {
+        const procurement = purchasing('')
+        expect(shortfallOutcome('oem_advance_replacement', { ...line, missing: 1 }, procurement)).toEqual({
+            stage: 'sourced',
+            summary: '1 from central stock, 2 to purchase (OEM advance replacement under RMA)',
+            quantityToPurchase: 3,
+        })
+        expect(procurement.purchase).not.toHaveBeenCalled()
+        expect(procurement.noStagingStockroom).not.toHaveBeenCalled()
+    })
+
+    it('buys for the staging stockroom, links the purchase order and counts its units on top of those already on order', () => {
+        const procurement = purchasing('lab')
+        expect(shortfallOutcome('purchase', line, procurement)).toEqual({ stage: 'sourced', summary: line.planSummary, purchaseOrder: 'po1', quantityToPurchase: 5 })
+        expect(procurement.purchase).toHaveBeenCalledExactlyOnceWith('lab')
+        expect(procurement.noStagingStockroom).not.toHaveBeenCalled()
+    })
+
+    it('leaves the line waiting for stock, saying why, when Procurement creates no purchase order', () => {
+        const procurement = purchasing('lab', { ok: false, reason: 'Procurement did not create it' })
+        expect(shortfallOutcome('purchase', line, procurement)).toEqual({
+            stage: 'awaiting_stock',
+            summary: '1 from central stock, 2 to purchase (no purchase order: Procurement did not create it)',
+            quantityToPurchase: 3,
+        })
+        expect(procurement.noStagingStockroom).not.toHaveBeenCalled()
+    })
+
+    it('requests no purchase while no staging stockroom is set and leaves the line waiting for stock, saying why', () => {
+        const procurement = purchasing('')
+        expect(shortfallOutcome('purchase', line, procurement)).toEqual({
+            stage: 'awaiting_stock',
+            summary: '1 from central stock, 2 to purchase (no purchase order: set x_daas_ham.staging.default_stockroom)',
+            quantityToPurchase: 3,
+        })
+        expect(procurement.purchase).not.toHaveBeenCalled()
+        expect(procurement.noStagingStockroom).toHaveBeenCalledOnce()
     })
 })
 
