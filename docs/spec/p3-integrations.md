@@ -1,4 +1,4 @@
-# Shipping aggregator and OEM claim adapters (P3.26–P3.27)
+# Shipping aggregator and OEM claims (P3.26–P3.27)
 
 ## Shipping aggregator (D73)
 
@@ -33,7 +33,7 @@
 | EX / failure, error, cancelled | Exception |
 | return_to_sender | Returned to sender |
 
-## OEM claim and provisioning (D70)
+## OEM claims (D70)
 
 - A staging template step can be **done by the OEM cloud**; its staging steps then start *pending*
   and are ticked automatically when the manufacturer confirms. Steps without automation stay manual,

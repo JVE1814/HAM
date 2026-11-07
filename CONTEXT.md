@@ -34,6 +34,10 @@ _Avoid_: closet, cabinet
 **Rack**:
 A frame in a Room whose rack units hold equipment.
 
+**Power budget**:
+The power a Rack can supply, set against the typical power of the Models placed in it.
+_Avoid_: power draw (measured, not budgeted)
+
 **Lessor**:
 A financier that legally owns leased equipment the Provider uses.
 _Avoid_: leasing company, bank
@@ -110,6 +114,10 @@ The date by which an in-service Asset must be replaced, from the Agreement's ref
 The commercial contract between the Provider and a Customer that sets terms, quantities and service levels.
 _Avoid_: contract (also used for leases and OEM coverage), subscription
 
+**Renewal**:
+Extending an Agreement's end date by its renewal term before it ends.
+_Avoid_: extension (used for leases)
+
 **Contracted quantity**:
 How many Assets of a Device class or Model an Agreement allows to be deployed.
 _Avoid_: quota, entitlement
@@ -160,6 +168,14 @@ _Avoid_: imaging, provisioning, prep
 
 **Staging source**:
 Whether an Asset is staged in-house or pre-staged by the distributor (which then only needs verification).
+
+**OEM claim**:
+A Staging step the manufacturer's cloud carries out: claiming, registering, subscribing or zero-touch provisioning a device into the Customer's OEM cloud account.
+_Avoid_: onboarding, activation
+
+**OEM cloud account**:
+A Customer's organization, subscription, FortiManager or template in a manufacturer's cloud that its devices are claimed into.
+_Avoid_: tenant, org (alone)
 
 **Shipment**:
 A carrier consignment bought through the shipping aggregator, to a Site or back to the depot, with its tracking.
@@ -221,19 +237,23 @@ A financing contract with a Lessor covering a set of Assets until an end date.
 The choice, due ahead of a Lease schedule's end, to buy its Assets out, extend it, or return them to the Lessor.
 
 **Lease mismatch**:
-A Lease schedule that ends before an Agreement its deployed Assets serve.
+A Lease schedule that ends while an Agreement its deployed Assets serve runs on (including an Agreement with no end date).
 
 **Billing period**:
 A calendar month of prorated Subscription line charges and Fee events, locked once closed.
 _Avoid_: invoice (issued by finance, not here)
 
+**Billing line**:
+One charge of a Billing period: a Subscription line at a Site, or one Fee event.
+_Avoid_: invoice line
+
 **Service interval**:
-The days one Asset delivered a Subscription line, from in service to the day it goes on a Return order.
+The days one Asset delivered a Subscription line, from the day it went in service to the day it left service.
 _Avoid_: usage, billable period
 
 **Cost fact**:
-A cost attributed to an Asset or Site (purchase, lease, OEM support, field labour) used for Margin.
+A cost of one kind (purchase write-off, lease, OEM support, field labour) attributed to a Customer and Site for one Billing period.
 
 **Margin**:
-Subscription and fee revenue minus Cost facts, per Customer or Site.
+A Billing period's subscription and fee revenue minus its Cost facts, per Customer and Site.
 _Avoid_: profit, TCO (cost only)

@@ -40,7 +40,7 @@ routers and firewalls it installs at customer sites and bills as a service.
 | Billing | Service intervals per asset; monthly billing periods prorated by day (site packages) and device-day (per-device lines) plus fees; review, regenerate, close and lock; CSV attachment and pull API ([spec](docs/spec/p3-billing.md)) |
 | Margin | Cost facts (purchase write-off, lease, OEM support, field labour) and margin per customer and site on period close; dashboard tab |
 | Shipping | Labels bought through a shipping aggregator at *Ship* and for ship-back returns; tracking webhooks ([spec](docs/spec/p3-integrations.md)) |
-| OEM provisioning | Staging steps done by the OEM cloud: Meraki and Mist claim, GreenLake device add and subscription, FortiCloud registration and FortiZTP, Check Point Zero Touch |
+| OEM claims | Staging steps done by the OEM cloud: Meraki and Mist claim, GreenLake device add and subscription, FortiCloud registration and FortiZTP, Check Point Zero Touch |
 | Racks | Power budget per rack from model typical power |
 
 See [`docs/spec`](docs/spec) for the behaviour of each module. AI assistance is deferred (plan D68).
@@ -92,7 +92,7 @@ Then configure (System Properties, `x_daas_ham.*`):
 | `x_daas_ham.leases.decision_group` | group that end-of-lease decisions are assigned to |
 | `x_daas_ham.margin.amortisation_months` / `.visit_cost` | purchase write-off period (60) and standard field visit cost (250) |
 | `x_daas_ham.shipping.*` | shipping aggregator: `enabled`, `api_key`, `webhook_token`, `service_code`, `package_kg`, `sender_name` |
-| `x_daas_ham.oem.claim.<vendor>.enabled`, `.max_calls`, `x_daas_ham.checkpoint.api_key` | OEM claim and provisioning, see [integrations spec](docs/spec/p3-integrations.md) |
+| `x_daas_ham.oem.claim.<vendor>.enabled`, `.max_calls`, `x_daas_ham.checkpoint.api_key` | OEM claims, see [integrations spec](docs/spec/p3-integrations.md) |
 
 Assign roles (`x_daas_ham.asset_manager`, `.inventory_tech`, `.field_tech`, `.noc`, `.account_manager`,
 `.finance`, `.admin`; customers: `.customer_admin`, `.site_contact`) and add inventory techs to

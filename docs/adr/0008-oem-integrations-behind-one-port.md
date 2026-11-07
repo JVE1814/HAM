@@ -9,3 +9,7 @@ are opened manually and only their status is synced (Cisco).
 The transport behind every port is one `HttpPort` (`domain/http.ts`): a named function of a REST
 message plus an optional JSON body. The shipping aggregator (P3) uses the same seam, so its label and
 tracking mapping is tested with fakes like the OEM adapters.
+
+Claim and provisioning calls run in a five-minute job with a per-vendor call budget (Meraki allows 10
+claim calls per 5 minutes), so a run loads only as many staging steps as its budget can send; the
+Customer's account in each vendor cloud is a configuration record, not code.
