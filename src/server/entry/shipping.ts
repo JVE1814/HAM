@@ -6,6 +6,7 @@ import {
     applyTracking,
     buyLabel,
     newTrackingEvents,
+    OPEN_SHIPMENTS,
     parseTrackingWebhook,
     tokenMatches,
     trackingEventKey,
@@ -133,7 +134,7 @@ export function uiCreateReturnLabel(current: GlideRecord): void {
     if (packages === 0) return void gs.addErrorMessage('Nothing on this return is still awaited')
     // Each label is paid for: one open return label per Return order (void it with the carrier to replace it).
     const open = new GlideRecord('x_daas_ham_shipment')
-    open.addEncodedQuery(`return_order=${current.getUniqueValue()}^direction=return^statusNOT INdelivered,returned`)
+    open.addEncodedQuery(`return_order=${current.getUniqueValue()}^direction=return^${OPEN_SHIPMENTS}`)
     open.setLimit(1)
     open.query()
     if (open.next()) return void gs.addErrorMessage(`Return label ${str(open, 'tracking_number')} is still open; void it with the carrier before buying another`)

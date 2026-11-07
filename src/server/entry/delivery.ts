@@ -1,8 +1,8 @@
-import { GlideAggregate, GlideDateTime, GlideRecord, GlideSchedule, gs } from '@servicenow/glide'
+import { GlideDateTime, GlideRecord, GlideSchedule, gs } from '@servicenow/glide'
 import { planShipment, type InstallMode, type OnSiteWork, type OrderType } from '../domain/delivery'
-import { isDeployed, stageOf, stagesQuery } from '../domain/lifecycle'
+import { checkTransition, isDeployed, stagesQuery } from '../domain/lifecycle'
 import { checkJobWindow } from '../domain/scheduling'
-import { moveAndSave, readStage } from '../platform/assets'
+import { moveAndSave, readStage, transitionFacts } from '../platform/assets'
 import { glideToMs } from '../platform/clock'
 import { openChange, openWorkOrder, type WorkContext } from '../platform/field-work'
 import { recomputeOrder } from '../platform/fulfilment'
@@ -23,28 +23,37 @@ function orderAssets(orderId: string): GlideRecord {
 }
 
 /**
- * UI action "Ship": send every staged Asset to the Site (buying the label when the aggregator is on)
- * and open the on-site work. Hot spares already at the Site are linked without shipping.
+ * UI action "Ship": send every staged Asset the lifecycle lets ship to the Site (buying the label for
+ * those when the aggregator is on) and open the on-site work. Hot spares already at the Site are linked
+ * without shipping. Which Assets may ship is checked before a label is bought.
  */
 export function shipOrder(order: GlideRecord): void {
-    const { staged, hotSpares } = countShippable(order.getUniqueValue())
+    const siteId = str(order, 'site')
+    const found = shippable(order.getUniqueValue(), siteId)
+    if (found.refused > 0) gs.addErrorMessage(`${found.refused} staged asset(s) cannot ship: ${found.reason}`)
     const plan = planShipment({
         orderType: str(order, 'order_type') as OrderType,
         installMode: str(order, 'install_mode') as InstallMode,
         hasTrackingNumber: !!str(order, 'tracking_number'),
         hasWorkOrder: !!str(order, 'work_order'),
-        staged,
-        hotSpares,
+        staged: found.staged.length,
+        hotSpares: found.hotSpares.length,
         shippingEnabled: shippingEnabled(),
     })
-    if (!plan.ok) return void gs.addErrorMessage(plan.error)
+    if (!plan.ok) {
+        // With every staged Asset refused, the refusal above already says why nothing ships.
+        const allRefused = found.refused > 0 && found.staged.length + found.hotSpares.length === 0
+        if (!allRefused) gs.addErrorMessage(plan.error)
+        return
+    }
     if (plan.labelPackages !== null) {
         const label = labelOrder(order, plan.labelPackages)
         if (!label.ok) return void gs.addErrorMessage(`No shipping label: ${label.error}`)
         order.update()
     }
-    const siteId = str(order, 'site')
-    const asset = orderAssets(order.getUniqueValue())
+    const asset = new GlideRecord('alm_hardware')
+    asset.addQuery('sys_id', 'IN', [...found.staged, ...found.hotSpares].join(','))
+    asset.query()
     let shipped = 0
     while (asset.next()) {
         const stage = readStage(asset)
@@ -59,22 +68,27 @@ export function shipOrder(order: GlideRecord): void {
     recomputeOrder(order.getUniqueValue())
 }
 
-/** The Order's staged Assets and hot spares, counted in one query grouped by the stage fields. */
-function countShippable(orderId: string): { staged: number; hotSpares: number } {
-    const ga = new GlideAggregate('alm_hardware')
-    ga.addEncodedQuery(stagesQuery(['staged', 'spare_pool'], `x_daas_ham_order_line.order=${orderId}`))
-    ga.addAggregate('COUNT', '')
-    ga.groupBy('install_status')
-    ga.groupBy('substatus')
-    ga.query()
-    const counts = { staged: 0, hotSpares: 0 }
-    while (ga.next()) {
-        const stage = stageOf({ installStatus: String(ga.getValue('install_status') ?? ''), substatus: String(ga.getValue('substatus') ?? '') })
-        const n = Number(ga.getAggregate('COUNT', ''))
-        if (stage === 'staged') counts.staged += n
-        else if (stage === 'spare_pool') counts.hotSpares += n
+/** The Order's staged Assets that may ship to `siteId` and its hot spares (sys_ids), with the staged ones refused and the first reason. */
+function shippable(orderId: string, siteId: string): { staged: string[]; hotSpares: string[]; refused: number; reason: string } {
+    const asset = new GlideRecord('alm_hardware')
+    asset.addEncodedQuery(stagesQuery(['staged', 'spare_pool'], `x_daas_ham_order_line.order=${orderId}`))
+    asset.query()
+    const found = { staged: [] as string[], hotSpares: [] as string[], refused: 0, reason: '' }
+    while (asset.next()) {
+        const stage = readStage(asset)
+        if (stage === 'spare_pool') {
+            found.hotSpares.push(asset.getUniqueValue())
+            continue
+        }
+        // Ship sets the Site first, so the check uses the Order's.
+        const verdict = checkTransition(stage, 'shipped', { ...transitionFacts(asset), hasSite: !!siteId })
+        if (verdict.allowed) found.staged.push(asset.getUniqueValue())
+        else {
+            found.refused++
+            found.reason ||= verdict.reason
+        }
     }
-    return counts
+    return found
 }
 
 function openOnSiteWork(order: GlideRecord, work: OnSiteWork): void {

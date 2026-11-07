@@ -8,6 +8,7 @@ import {
     labelRequestBody,
     newTrackingEvents,
     nextShipmentStatus,
+    OPEN_SHIPMENTS,
     packageCount,
     parseTrackingWebhook,
     tokenMatches,
@@ -326,6 +327,12 @@ describe('parseTrackingWebhook', () => {
     it('rejects payloads without a tracking number', () => {
         expect(parseTrackingWebhook({ data: {} })).toEqual({ error: 'not a tracking update (no tracking number)' })
         expect(parseTrackingWebhook('nonsense')).toHaveProperty('error')
+    })
+})
+
+describe('OPEN_SHIPMENTS', () => {
+    it('leaves out the final statuses, whose label is no longer in use', () => {
+        expect(OPEN_SHIPMENTS).toBe('statusNOT INdelivered,returned')
     })
 })
 

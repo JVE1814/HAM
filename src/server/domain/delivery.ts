@@ -11,7 +11,7 @@ export interface ShipFacts {
     hasTrackingNumber: boolean
     /** On-site work is already open (an earlier Ship). */
     hasWorkOrder: boolean
-    /** The Order's Assets in 'staged'. */
+    /** The Order's Assets in 'staged' that the lifecycle lets ship. */
     staged: number
     /** The Order's Assets in 'spare_pool': hot spares already at the Site. */
     hotSpares: number

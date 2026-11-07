@@ -272,6 +272,9 @@ export function parseTrackingWebhook(body: unknown): TrackingUpdate | { error: s
 
 const FINAL: ReadonlySet<ShipmentStatus> = new Set(['delivered', 'returned'])
 
+/** Encoded query on x_daas_ham_shipment: shipments not yet delivered or returned (their label is still in use). */
+export const OPEN_SHIPMENTS = `statusNOT IN${[...FINAL].join(',')}`
+
 /**
  * The status a shipment takes from a tracking update. Webhooks can arrive late or out of order, so a
  * delivered or returned shipment keeps that status (only a return to sender overrides a delivery),
