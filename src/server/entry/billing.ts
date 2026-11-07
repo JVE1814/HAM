@@ -304,9 +304,26 @@ export function uiRegenerateBillingPeriod(current: GlideRecord): void {
     lines.addQuery('billing_period', current.getUniqueValue())
     lines.setWorkflow(false)
     lines.deleteMultiple()
+    // deleteMultiple reports nothing, and lines it left would be billed twice by the new generation.
+    if (hasLines(current.getUniqueValue())) {
+        current.setValue('status', 'ready')
+        current.setValue('last_error', 'Regenerate could not remove all of the old lines; remove them and Regenerate again')
+        current.update()
+        return void gs.addErrorMessage(`${str(current, 'period')} not regenerated: some of its old lines could not be removed`)
+    }
     // The period's open fees stay linked to it: the generation bills them again (finishGeneration).
     fire(EVENT.billingGenerate, current, current.getUniqueValue())
     gs.addInfoMessage(`Regenerating ${str(current, 'period')}`)
+}
+
+/** Whether the period still has billing lines, read past business rules like the delete before it. */
+function hasLines(periodId: string): boolean {
+    const line = new GlideRecord('x_daas_ham_billing_line')
+    line.addQuery('billing_period', periodId)
+    line.setWorkflow(false)
+    line.setLimit(1)
+    line.query()
+    return line.hasNext()
 }
 
 const CSV_HEADER = ['period', 'kind', 'customer', 'agreement', 'subscription_line', 'site', 'description', 'units', 'monthly_rate', 'amount', 'currency']
