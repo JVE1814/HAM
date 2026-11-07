@@ -1,7 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { groupDecisions, rollupApprovals } from '../domain/approvals'
 import { approversFor, assessOrder, type EntitlementVerdict, type RequestedLine } from '../domain/entitlement'
-import { shortfallRoute } from '../domain/returns'
+import { shortfallOutcome, shortfallRoute, type RoutedShortfall } from '../domain/returns'
 import { planSourcing } from '../domain/sourcing'
 import { entitlementContext } from '../platform/agreements'
 import { approvalsOf, cancelPendingApprovals, customerAdminIds, providerApproverIds, requestApproval } from '../platform/approvals'
@@ -222,30 +222,26 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
     })
     if (route === 'oem_advance_replacement' && replaced) {
         openOemRma({ defectiveAsset: replaced, orderLineId: line.getUniqueValue(), caseId: str(order, 'case') })
-        line.setValue('sourcing_summary', `${plan.summary} (OEM advance replacement under RMA)`)
     }
-    // No PO without a ship-to stockroom; then, or when the PO is not created, the shortfall stays unsourced.
-    const purchaseOrder =
-        route === 'purchase' && stagingStockroom
-            ? requestPurchase({
-                  modelId,
-                  quantity: toPurchase,
-                  shipToStockroomId: stagingStockroom,
-                  description: `${str(order, 'number')} ${str(line, 'number')}: ${toPurchase} x ${str(line, 'model.display_name')}`,
-              })
-            : ''
-    const unsourced = route === 'purchase' && !purchaseOrder
-    if (purchaseOrder) line.setValue('purchase_order', purchaseOrder)
+    // Without a staging stockroom, or when Procurement creates no PO, the line waits for stock.
+    const routed: RoutedShortfall =
+        route === 'purchase'
+            ? {
+                  route,
+                  purchase: requestPurchase({
+                      modelId,
+                      quantity: toPurchase,
+                      shipToStockroomId: stagingStockroom,
+                      description: `${str(order, 'number')} ${str(line, 'number')}: ${toPurchase} x ${str(line, 'model.display_name')}`,
+                  }),
+              }
+            : { route }
+    const outcome = shortfallOutcome(routed, { planSummary: plan.summary, missing: toPurchase, onOrder })
+    if (outcome.purchaseOrder) line.setValue('purchase_order', outcome.purchaseOrder)
     line.setValue('quantity_allocated', allocated + reserved)
-    line.setValue('quantity_to_purchase', onOrder + (purchaseOrder ? toPurchase : 0))
-    if (unsourced) {
-        const why = stagingStockroom ? 'Procurement did not create it' : `set ${PROPERTY.stagingStockroom}`
-        gs.warn(`[x_daas_ham] ${str(line, 'number')}: no purchase order (${why})`)
-        line.setValue('sourcing_summary', `${plan.summary} (no purchase order: ${why})`)
-    } else if (route !== 'oem_advance_replacement') {
-        line.setValue('sourcing_summary', plan.summary)
-    }
-    line.setValue('line_stage', unsourced ? 'awaiting_stock' : 'sourced')
+    line.setValue('quantity_to_purchase', outcome.quantityToPurchase)
+    line.setValue('sourcing_summary', outcome.summary)
+    line.setValue('line_stage', outcome.stage)
     line.update()
     recomputeLine(line.getUniqueValue())
 }
