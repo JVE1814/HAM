@@ -1,0 +1,24 @@
+import { describe, expect, it } from 'vitest'
+import { preflightReport, REQUIRED_ROLES, REQUIRED_TABLES } from './preflight'
+
+describe('preflightReport', () => {
+    it('passes when every required table and role exists', () => {
+        const report = preflightReport({ tableExists: () => true, roleExists: () => true })
+        expect(report).toEqual({ ok: true, missing: [], summary: 'All prerequisites present' })
+    })
+
+    it('names each missing table with the plugin that provides it, and each missing role', () => {
+        const report = preflightReport({
+            tableExists: (t) => t !== 'wm_order',
+            roleExists: (r) => r !== 'procurement_user',
+        })
+        expect(report.ok).toBe(false)
+        expect(report.missing).toEqual(['table wm_order (Field Service Management)', 'role procurement_user'])
+        expect(report.summary).toBe('2 prerequisite(s) missing')
+    })
+
+    it('checks the tables and roles the app depends on', () => {
+        expect(REQUIRED_TABLES.map((t) => t.table)).toContain('customer_account')
+        expect(REQUIRED_ROLES).toContain('snc_external')
+    })
+})

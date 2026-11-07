@@ -1,0 +1,26 @@
+import { GlideRecord, gs } from '@servicenow/glide'
+import { preflightReport } from '../domain/preflight'
+import { msToGlide, nowMs } from '../platform/clock'
+
+/** On-demand job "NaaS - preflight check": verifies plugins/roles and records the result. */
+export function runPreflight(): void {
+    const report = preflightReport({
+        tableExists: (table) => new GlideRecord(table).isValid(),
+        roleExists: (role) => {
+            const gr = new GlideRecord('sys_user_role')
+            return gr.get('name', role)
+        },
+    })
+    for (const item of report.missing) gs.error(`[x_daas_ham] preflight: missing ${item}`)
+    gs.info(`[x_daas_ham] preflight: ${report.summary}`)
+
+    const cursor = new GlideRecord('x_daas_ham_job_cursor')
+    if (!cursor.get('job', 'preflight')) {
+        cursor.initialize()
+        cursor.setValue('job', 'preflight')
+        cursor.insert()
+    }
+    cursor.setValue('last_run', msToGlide(nowMs()))
+    cursor.setValue('last_status', `${report.summary}${report.missing.length ? `: ${report.missing.join('; ')}` : ''}`.slice(0, 255))
+    cursor.update()
+}

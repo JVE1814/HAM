@@ -49,6 +49,18 @@ declare global {
                         table: 'sys_security_acl'
                         id: '036f580adc0e4d6c946109f987d86529'
                     }
+                    acl_asn_import_create: {
+                        table: 'sys_security_acl'
+                        id: 'ddb0d6a52122449382f86f3045c257d4'
+                    }
+                    acl_asn_import_read: {
+                        table: 'sys_security_acl'
+                        id: 'd837b2e8a82f4463b1c27019154e2d06'
+                    }
+                    acl_asn_import_write: {
+                        table: 'sys_security_acl'
+                        id: 'e3170abeed9348e098277e524fc4010f'
+                    }
                     acl_catalog_entry_create: {
                         table: 'sys_security_acl'
                         id: '7d398babba5c46f7ad8ee9dfebaa9a50'
@@ -84,6 +96,18 @@ declare global {
                     acl_device_event_write: {
                         table: 'sys_security_acl'
                         id: '50a7aec888da4ebc9e97894d658d9983'
+                    }
+                    acl_eox_import_create: {
+                        table: 'sys_security_acl'
+                        id: 'b2588658bddf467ca80cedb061cea928'
+                    }
+                    acl_eox_import_read: {
+                        table: 'sys_security_acl'
+                        id: 'd5022cdebdeb45f0836e5d0b729dd013'
+                    }
+                    acl_eox_import_write: {
+                        table: 'sys_security_acl'
+                        id: '40e0a66d599a4e9da08d4bf2e5542afa'
                     }
                     acl_job_cursor_create: {
                         table: 'sys_security_acl'
@@ -349,6 +373,10 @@ declare global {
                         table: 'sys_security_acl'
                         id: 'e7703c7668964030a8199c3e8067bdc7'
                     }
+                    acl_ws_naas_assets: {
+                        table: 'sys_security_acl'
+                        id: '53561058881d4d578f4127523777e126'
+                    }
                     bom_json: {
                         table: 'sys_module'
                         id: '54fee68272ec4334b7a4324797f71ec7'
@@ -441,6 +469,54 @@ declare global {
                         table: 'sys_script'
                         id: 'd3b862c478b84e1d8b164a8e6084e011'
                     }
+                    dash_naas: {
+                        table: 'par_dashboard'
+                        id: '2201d220760d41669225280628c65eb8'
+                    }
+                    dash_tab_billing: {
+                        table: 'par_dashboard_tab'
+                        id: '0baf34b88b1d4f768aebd61feefd5369'
+                    }
+                    dash_tab_operations: {
+                        table: 'par_dashboard_tab'
+                        id: '111ed9a3503b465f898c4489af04d60e'
+                    }
+                    dash_w_awaiting_approval: {
+                        table: 'par_dashboard_widget'
+                        id: '37e75b0279654866a8247611f2c6e30e'
+                    }
+                    dash_w_lines_by_customer: {
+                        table: 'par_dashboard_widget'
+                        id: '4e59e6aee26f4e6e8a905b33ef7a1090'
+                    }
+                    dash_w_open_orders: {
+                        table: 'par_dashboard_widget'
+                        id: 'd6e257d21075474d855f412ea389edf0'
+                    }
+                    dash_w_open_staging: {
+                        table: 'par_dashboard_widget'
+                        id: '2fb32c205e744fa1a9e2903924f14db9'
+                    }
+                    dash_w_orders_by_stage: {
+                        table: 'par_dashboard_widget'
+                        id: '07ca5fa055c54be6b9fd485f8798cc8b'
+                    }
+                    dash_w_pending_in_service: {
+                        table: 'par_dashboard_widget'
+                        id: '31a61dad1aea4badb10bd3c5480de59d'
+                    }
+                    dash_w_pending_lines: {
+                        table: 'par_dashboard_widget'
+                        id: '6e0c17a1e9a54f39974c1ab07447e2e7'
+                    }
+                    dash_w_spares_by_customer: {
+                        table: 'par_dashboard_widget'
+                        id: '94568fdc5e164a3ca6fa837fbd0dcc73'
+                    }
+                    dash_w_unbilled_in_service: {
+                        table: 'par_dashboard_widget'
+                        id: '27ba5d2f3e2947d4be67a93379a463d1'
+                    }
                     event_agreement_terms: {
                         table: 'sysevent_register'
                         id: '2ee72d8d68e345ec871e4689ef4a3bc5'
@@ -461,6 +537,10 @@ declare global {
                         table: 'sysauto_script'
                         id: '7a20295a2aae40e0a60fd3d470be780d'
                     }
+                    job_preflight: {
+                        table: 'sysauto_script'
+                        id: '9da9aeaccfcf4f0e9d05443711ce5726'
+                    }
                     job_purge_device_events: {
                         table: 'sysauto_script'
                         id: 'ec83f327d74542ea858513e6a8c3edc3'
@@ -472,6 +552,138 @@ declare global {
                     job_spare_pool_top_up: {
                         table: 'sysauto_script'
                         id: '75bb2b23e13345cca1d5202d693f8b0c'
+                    }
+                    menu_naas: {
+                        table: 'sys_app_application'
+                        id: '7dc87f385ff842f789f1e4a291fbb6f7'
+                    }
+                    module_agreements: {
+                        table: 'sys_app_module'
+                        id: '62dafd32fbf440d19663697c6ea05ff9'
+                    }
+                    module_aliases: {
+                        table: 'sys_app_module'
+                        id: 'db451e7d11ed4d738f0a6ffb4ce9f278'
+                    }
+                    module_asn_import: {
+                        table: 'sys_app_module'
+                        id: 'ba2ad1f1c6ca4895a2830227b11e1bfb'
+                    }
+                    module_assets_in_service: {
+                        table: 'sys_app_module'
+                        id: 'e28ec7ed67234ffba7069da5839d1bcd'
+                    }
+                    module_assets_pending: {
+                        table: 'sys_app_module'
+                        id: '7423ac046ef64da8a65638ffcbd9ff9f'
+                    }
+                    module_catalog_entries: {
+                        table: 'sys_app_module'
+                        id: '4be39355dead4be7b460c7ffbad61b9b'
+                    }
+                    module_device_events: {
+                        table: 'sys_app_module'
+                        id: '5af2f56ff7e14994b32966708314f4c4'
+                    }
+                    module_eox_import: {
+                        table: 'sys_app_module'
+                        id: 'acf3e8775ba04d60b9082a71dce2d1c6'
+                    }
+                    module_job_cursors: {
+                        table: 'sys_app_module'
+                        id: 'c36eb87be7104dbc99d7f13cf1c6c13d'
+                    }
+                    module_load_data: {
+                        table: 'sys_app_module'
+                        id: '6d59a408593a43fb87a8669ec000e375'
+                    }
+                    module_match_rules: {
+                        table: 'sys_app_module'
+                        id: '453aa53a7c7d499ca1df67f5a8be473f'
+                    }
+                    module_model_lifecycle: {
+                        table: 'sys_app_module'
+                        id: 'bd25d475ac8e48d180cf22250e08c897'
+                    }
+                    module_norm_exceptions: {
+                        table: 'sys_app_module'
+                        id: 'f515146b3fe24a9e992407d4c46d06b9'
+                    }
+                    module_order_lines: {
+                        table: 'sys_app_module'
+                        id: '3f21e8fbdf184745a43b6020a5694b51'
+                    }
+                    module_orders_all: {
+                        table: 'sys_app_module'
+                        id: '5f73a30c48524d8abe2ddb6e6c7468e8'
+                    }
+                    module_orders_open: {
+                        table: 'sys_app_module'
+                        id: 'a224098b38474c4ba504c9efb564c648'
+                    }
+                    module_properties: {
+                        table: 'sys_app_module'
+                        id: 'bc87863eedcb4ef9aaefef193e35b7f6'
+                    }
+                    module_request: {
+                        table: 'sys_app_module'
+                        id: 'a3e0f236e19c4ee0a43f3edf52ab135c'
+                    }
+                    module_sep_admin: {
+                        table: 'sys_app_module'
+                        id: 'c802d4e4caa0466eb37184e118f7fcf4'
+                    }
+                    module_sep_base: {
+                        table: 'sys_app_module'
+                        id: '951e6f35476446e8b417ca2e2746516a'
+                    }
+                    module_sep_commercial: {
+                        table: 'sys_app_module'
+                        id: 'bd1528e846ae4e8a8f71e11388b65be1'
+                    }
+                    module_sep_imports: {
+                        table: 'sys_app_module'
+                        id: '1645589eb2f14ede8864ad027df3da1e'
+                    }
+                    module_sep_models: {
+                        table: 'sys_app_module'
+                        id: '23859cb01e10469ebb3e77b01220b325'
+                    }
+                    module_sep_orders: {
+                        table: 'sys_app_module'
+                        id: '8ff879802126427592fabb1b2716e16a'
+                    }
+                    module_site_templates: {
+                        table: 'sys_app_module'
+                        id: '227cab826cd24deb80978c557819fd54'
+                    }
+                    module_spare_pools: {
+                        table: 'sys_app_module'
+                        id: '586c8e983574433a83b14137d715fb84'
+                    }
+                    module_staging: {
+                        table: 'sys_app_module'
+                        id: 'a484bf9237234ac3a378e5136d2ab334'
+                    }
+                    module_staging_templates: {
+                        table: 'sys_app_module'
+                        id: '3e6994b3c3c0460e8696462854156751'
+                    }
+                    module_stockroom_members: {
+                        table: 'sys_app_module'
+                        id: '8bcf58da5c4f4ed2a891b8f02e6b47d2'
+                    }
+                    module_subscription_lines: {
+                        table: 'sys_app_module'
+                        id: '09a6acc79add469a909af36edfa37b13'
+                    }
+                    module_warehouse: {
+                        table: 'sys_app_module'
+                        id: 'bf497ce6864e43ee87a7ca553c2d5639'
+                    }
+                    module_workspace: {
+                        table: 'sys_app_module'
+                        id: '8deb7ae4cf52472b82a324ad63c4ef67'
                     }
                     package_json: {
                         table: 'sys_module'
@@ -605,6 +817,10 @@ declare global {
                         table: 'sys_module'
                         id: '7f5e18f231284281a67768a258883020'
                     }
+                    src_server_domain_preflight_ts: {
+                        table: 'sys_module'
+                        id: 'e09a575f75f4414892295f6c99476267'
+                    }
                     'src_server_domain_provider-tag_ts': {
                         table: 'sys_module'
                         id: '232e01a556fc4e95bea01c86f6baf5f5'
@@ -648,6 +864,10 @@ declare global {
                     src_server_entry_orders_ts: {
                         table: 'sys_module'
                         id: 'e0455e5dc36d4b23880972354f003eb9'
+                    }
+                    src_server_entry_preflight_ts: {
+                        table: 'sys_module'
+                        id: '45d949dfecee41e3beee1bb033be16db'
                     }
                     'src_server_entry_spare-pool_ts': {
                         table: 'sys_module'
@@ -764,6 +984,346 @@ declare global {
                     vs_order_devices: {
                         table: 'item_option_new_set'
                         id: '1db668e49f964e40bd59263b5c40a25b'
+                    }
+                    ws_admin_jobs: {
+                        table: 'sys_ux_list'
+                        id: '1e27464ca1584f43841d9d6ac6fe365a'
+                    }
+                    ws_admin_jobs_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '485b344ac76a417da6cd7d9e66e1f8b6'
+                    }
+                    ws_admin_members: {
+                        table: 'sys_ux_list'
+                        id: '14e85b37594e4cf1aa2d65fef3ebaced'
+                    }
+                    ws_admin_members_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '08de9a24b5fd45719b93808739c7e45e'
+                    }
+                    ws_agreements: {
+                        table: 'sys_ux_list'
+                        id: 'fa20ac4f6b534dd09ad3863d9bf30104'
+                    }
+                    ws_agreements_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: 'acc11777aaba450aa4250af34be09179'
+                    }
+                    ws_assets_data_gaps: {
+                        table: 'sys_ux_list'
+                        id: '58cde93022df43888e101dd72375c689'
+                    }
+                    ws_assets_gaps_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '9b467587f6bc4007b0b69f284d7cc004'
+                    }
+                    ws_assets_in_service: {
+                        table: 'sys_ux_list'
+                        id: 'be19f88b3c1b451f968cc66087c0e114'
+                    }
+                    ws_assets_in_service_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: 'f005e808f94f41ccaf794890ee20257f'
+                    }
+                    ws_assets_missing: {
+                        table: 'sys_ux_list'
+                        id: 'df7cd80996df4174bd47c9c4457775e3'
+                    }
+                    ws_assets_missing_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '9dd971bd19eb44aa87ca30277bee5a4d'
+                    }
+                    ws_assets_pending_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '3ab30c7fd3d341579ec7163447786b54'
+                    }
+                    ws_assets_pending_in_service: {
+                        table: 'sys_ux_list'
+                        id: '8a00309253cb4fd7a7a1ccc82ef5426c'
+                    }
+                    ws_assets_refresh_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: 'e1b8482779714b76981f36d4a161eed5'
+                    }
+                    ws_assets_refresh_due: {
+                        table: 'sys_ux_list'
+                        id: '5a8013216421491d89fa459db43d9130'
+                    }
+                    ws_audience_admin: {
+                        table: 'sys_ux_applicability'
+                        id: 'a9640dbb49654e7fa98ab9da0d8095fb'
+                    }
+                    ws_audience_staff: {
+                        table: 'sys_ux_applicability'
+                        id: '8f8defe08e26457ca2ab268c9924299e'
+                    }
+                    ws_cat_admin: {
+                        table: 'sys_ux_list_category'
+                        id: '174c393513f0424e85650502cba0926f'
+                    }
+                    ws_cat_commercial: {
+                        table: 'sys_ux_list_category'
+                        id: '134ce6249bf0422282a5a5a3cfd713ab'
+                    }
+                    ws_cat_fulfilment: {
+                        table: 'sys_ux_list_category'
+                        id: '9a219b68eeaf47fab7cc1e64ad3350eb'
+                    }
+                    ws_cat_installed_base: {
+                        table: 'sys_ux_list_category'
+                        id: '54c8c5b9b8bc4b43bb2436c020982b5f'
+                    }
+                    ws_cat_models: {
+                        table: 'sys_ux_list_category'
+                        id: 'ce2ac90f10ca4cffb1b97b05fad9f353'
+                    }
+                    ws_cat_orders: {
+                        table: 'sys_ux_list_category'
+                        id: '1b9de7e546c346ce847149268dd1f706'
+                    }
+                    ws_cat_stock: {
+                        table: 'sys_ux_list_category'
+                        id: 'b7ae1beaf2084d328e5f5a1b6d237d6f'
+                    }
+                    ws_catalog_entries: {
+                        table: 'sys_ux_list'
+                        id: 'aa1e96e894554819987cb0e0fb5d64f6'
+                    }
+                    ws_catalog_entries_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '28822af28b784baab057555168939767'
+                    }
+                    ws_lines_awaiting_stock: {
+                        table: 'sys_ux_list'
+                        id: '4ec7c0cd5eb642a08d8070e25a974da1'
+                    }
+                    ws_lines_awaiting_stock_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '6424f51f18204fecb5f2586853b0a233'
+                    }
+                    ws_list_menu: {
+                        table: 'sys_ux_list_menu_config'
+                        id: '199c5950d8f14416ae378252b536d482'
+                    }
+                    ws_models_canonical: {
+                        table: 'sys_ux_list'
+                        id: '694d2d3d932446d1bcdc72b193c23ff2'
+                    }
+                    ws_models_canonical_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '4b7dcb9c53da45b193cd19f6eab1cf10'
+                    }
+                    ws_models_exceptions: {
+                        table: 'sys_ux_list'
+                        id: 'c53e1cbe1e83474f96b0d2106ca674ad'
+                    }
+                    ws_models_exceptions_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: 'cf6a636343b042ff8c74cce16a1bce73'
+                    }
+                    ws_models_lifecycle: {
+                        table: 'sys_ux_list'
+                        id: 'd304a452443c4e12ba7fc63a75607272'
+                    }
+                    ws_models_lifecycle_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '34f7ddd584dc40eba7fd0ee834d7e289'
+                    }
+                    ws_models_rules: {
+                        table: 'sys_ux_list'
+                        id: '98eda84678354a9e9951bf0595f3fa09'
+                    }
+                    ws_models_rules_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '6493ea2faf754be3b7567b56cea8197e'
+                    }
+                    ws_naas_assets: {
+                        table: 'sys_ux_page_registry'
+                        id: '34fbc26324984aecb50f57319a8ad2b5'
+                    }
+                    ws_naas_assets_sys_ux_app_config_workspace: {
+                        table: 'sys_ux_app_config'
+                        id: '94e243dc127d48ddb64b3a29d43529d4'
+                    }
+                    ws_naas_assets_sys_ux_app_route_home: {
+                        table: 'sys_ux_app_route'
+                        id: 'b5fffeedb1fa4ee4b344900e5c01d2f6'
+                    }
+                    ws_naas_assets_sys_ux_app_route_list: {
+                        table: 'sys_ux_app_route'
+                        id: '9caea51eb6f64782b571613de7364351'
+                    }
+                    ws_naas_assets_sys_ux_app_route_record: {
+                        table: 'sys_ux_app_route'
+                        id: 'bf770c54a5c7421db747034e4c299791'
+                    }
+                    'ws_naas_assets_sys_ux_app_route_simple-list': {
+                        table: 'sys_ux_app_route'
+                        id: 'ffb6c1b70a9a440b9bc301e8e5badb96'
+                    }
+                    ws_naas_assets_sys_ux_macroponent_record: {
+                        table: 'sys_ux_macroponent'
+                        id: 'c95b72b86f8842f2b56a11ca62a52aa4'
+                    }
+                    ws_naas_assets_sys_ux_page_property_chrome_footer: {
+                        table: 'sys_ux_page_property'
+                        id: '459664327e174b35ae6524075bf875d6'
+                    }
+                    ws_naas_assets_sys_ux_page_property_chrome_header: {
+                        table: 'sys_ux_page_property'
+                        id: 'a8a151bea0c1464885e6a9db822efc42'
+                    }
+                    ws_naas_assets_sys_ux_page_property_chrome_tab: {
+                        table: 'sys_ux_page_property'
+                        id: '42b7fa6231d143489d4b5b63a3d4cada'
+                    }
+                    ws_naas_assets_sys_ux_page_property_chrome_toolbar: {
+                        table: 'sys_ux_page_property'
+                        id: 'abe127ce103f47b6af1c87f37305e56f'
+                    }
+                    ws_naas_assets_sys_ux_page_property_listConfigId: {
+                        table: 'sys_ux_page_property'
+                        id: '7c22626e3ee8433781b446cb72ea926e'
+                    }
+                    ws_naas_assets_sys_ux_page_property_view: {
+                        table: 'sys_ux_page_property'
+                        id: 'f92b9a03e3fe4bc3bff5be1b358ab934'
+                    }
+                    ws_naas_assets_sys_ux_page_property_wbApplicabilityConfigId: {
+                        table: 'sys_ux_page_property'
+                        id: '4c322dfbff1c493ebfd1662661616329'
+                    }
+                    ws_naas_assets_sys_ux_registry_m2m_category_unifiedNav: {
+                        table: 'sys_ux_registry_m2m_category'
+                        id: 'd1202994a6534c5b80744c308d14a6f8'
+                    }
+                    ws_naas_assets_sys_ux_screen_home: {
+                        table: 'sys_ux_screen'
+                        id: '76759de1553641e79564ddbc70df135d'
+                    }
+                    ws_naas_assets_sys_ux_screen_list: {
+                        table: 'sys_ux_screen'
+                        id: 'fae61d0f9ceb4a2d9246fdad41e3c6b8'
+                    }
+                    ws_naas_assets_sys_ux_screen_record: {
+                        table: 'sys_ux_screen'
+                        id: '2a5e9ed358d540a5bf2a6f137b908527'
+                    }
+                    'ws_naas_assets_sys_ux_screen_simple-list': {
+                        table: 'sys_ux_screen'
+                        id: '6307331c29c34b68b3dd4fce2fc2b6d1'
+                    }
+                    ws_naas_assets_sys_ux_screen_type_home: {
+                        table: 'sys_ux_screen_type'
+                        id: '534ac2e5bfc746f48f995357504fabe5'
+                    }
+                    ws_naas_assets_sys_ux_screen_type_list: {
+                        table: 'sys_ux_screen_type'
+                        id: '3c01cc074d964d89b1e5b2add44911ad'
+                    }
+                    ws_naas_assets_sys_ux_screen_type_record: {
+                        table: 'sys_ux_screen_type'
+                        id: '0e13b037f49246e29f6ab172cef6c889'
+                    }
+                    'ws_naas_assets_sys_ux_screen_type_simple-list': {
+                        table: 'sys_ux_screen_type'
+                        id: '6f472ee296c9474a9ca76dc60165f800'
+                    }
+                    ws_orders_all: {
+                        table: 'sys_ux_list'
+                        id: 'f3127fc3e8fe4d308ebe795d24358a15'
+                    }
+                    ws_orders_all_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '8ffcfd698cc14062b6abfb0727eef6bc'
+                    }
+                    ws_orders_approval: {
+                        table: 'sys_ux_list'
+                        id: 'a9c7de3ca1594315bc511d67e63f9c08'
+                    }
+                    ws_orders_approval_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '31cc5b58b78340dfa08eafdc35d9a1de'
+                    }
+                    ws_orders_installing: {
+                        table: 'sys_ux_list'
+                        id: '70c289da0fbf440d89cab2a8dfeb6a10'
+                    }
+                    ws_orders_installing_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '7975fdd3b9764bf2881a55f166e1cd29'
+                    }
+                    ws_orders_open: {
+                        table: 'sys_ux_list'
+                        id: 'af9d39b4bca84fe9bc4c259e498189a4'
+                    }
+                    ws_orders_open_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: 'a364b8de39694b53a7a4231e7eb04f7c'
+                    }
+                    ws_orders_to_ship: {
+                        table: 'sys_ux_list'
+                        id: 'c568d7a1ebcf4ff6acd349a51643fcb1'
+                    }
+                    ws_orders_to_ship_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '834edbd0e897482b988c033ada07fe50'
+                    }
+                    ws_site_templates: {
+                        table: 'sys_ux_list'
+                        id: '41e0abaf7ccc42d59b229f2c1ef0b312'
+                    }
+                    ws_site_templates_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '54a85fba51e7417bb4f78a091b35a457'
+                    }
+                    ws_staging_mine: {
+                        table: 'sys_ux_list'
+                        id: 'e87d3d0c737f4351a9ed827d47d63db8'
+                    }
+                    ws_staging_mine_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '5041d96c51d542c99e65e4375091c202'
+                    }
+                    ws_staging_open: {
+                        table: 'sys_ux_list'
+                        id: '36a1d0e2289341bbb29f6093bd6cae57'
+                    }
+                    ws_staging_open_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '1f953a9331e1496dacc3a7dadf0effe9'
+                    }
+                    ws_stock_available: {
+                        table: 'sys_ux_list'
+                        id: '51ba8f2fc850445ab4d1b98903908cf2'
+                    }
+                    ws_stock_available_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '167a25252cfa4297af448a8be1bbf56d'
+                    }
+                    ws_stock_in_transit: {
+                        table: 'sys_ux_list'
+                        id: 'c710fbaba4e44ed5b1a3e2c7c9d7b80a'
+                    }
+                    ws_stock_spare_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '0dbd2d6b8ee746d6a63418de07442968'
+                    }
+                    ws_stock_spare_pools: {
+                        table: 'sys_ux_list'
+                        id: '19bcca09f9ae4f8a85cce0387dd429cf'
+                    }
+                    ws_stock_transit_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '4c6e9a91bcee46b0ad4bb2a9a57d589e'
+                    }
+                    ws_subscription_lines: {
+                        table: 'sys_ux_list'
+                        id: '044a87cec62a49f0acb249fa9a4739cb'
+                    }
+                    ws_subscription_lines_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: 'a1748fb574fd44d4956af8f6be54d205'
                     }
                     xsp_alm_asset_read: {
                         table: 'sys_scope_privilege'
@@ -971,6 +1531,19 @@ declare global {
                     },
                     {
                         table: 'sys_security_acl_role'
+                        id: '003676d57c9c4b8fa79ee1b92fb29d3c'
+                        key: {
+                            sys_security_acl: '40e0a66d599a4e9da08d4bf2e5542afa'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
                         id: '0050d3b901174f8f91831eec0d53cd93'
                         key: {
                             sys_security_acl: 'dc7719a46a124c6a880543158e2afd45'
@@ -1017,6 +1590,41 @@ declare global {
                             value: 'device_add'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '01024f74d0764fe18113cc220ca9425b'
+                        key: {
+                            sys_ui_section: {
+                                id: '4cb552655250459cb29a726e237a6d8d'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Service terms'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '8'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '0112d5c2fdf64587aa72b1019581e73c'
+                        key: {
+                            sys_security_acl: 'b2588658bddf467ca80cedb061cea928'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -1092,6 +1700,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '020738673a7b4c9180203fbbe7a74a69'
+                        key: {
+                            list_id: {
+                                id: 'eeb6dba331fb49a7b9346ad5d3ce9ff1'
+                                key: {
+                                    name: 'x_daas_ham_staging_tmpl_item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'template'
+                        }
+                    },
+                    {
                         table: 'sys_db_object'
                         id: '024bdcbcdcd14b6084c677ebee8df502'
                         key: {
@@ -1110,6 +1741,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '028de1446b3b435884b62295795c1d5e'
+                        key: {
+                            sys_ui_section: {
+                                id: '9bee72ad266f4788ad02e6b7bb0f8aab'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Delivery'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'work_order'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '02ab82bd94f14e5a868ff9ac14ba67cb'
                         key: {
@@ -1120,6 +1773,28 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '02e1ca5907e94f1ba0f387e0128b18d9'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c8fb61bb330e4c9b972c8f3fb9255cba'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    caption: 'Catalog entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'entry_type'
+                            position: '2'
                         }
                     },
                     {
@@ -1214,6 +1889,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '043a2bc0ada74353b60e00b5b3541068'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'from_site_template'
+                            position: '6'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '04475dec23e643ebabdb42a1fa24dbf0'
                         key: {
@@ -1227,6 +1924,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '04492d9d30fc41cb875c07970b64a1a4'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'customer'
+                            position: '2'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '044d725a0b654fdaa45aa8fea776301e'
                         key: {
@@ -1235,11 +1954,72 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '049c1d4aa842473aadaa57ff5bb32388'
+                        key: {
+                            list_id: {
+                                id: '61ddbed2617e4cea819a301dc98b46b8'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'assigned_to'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '04a99e01d8984c85a4fa5b3f9a293f6e'
                         key: {
                             name: 'x_daas_ham_order_line'
                             element: 'order'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '04c22452ea2f4633816d0f4b42dad2b7'
+                        key: {
+                            list_id: {
+                                id: 'dea8313f1ca047c695aef30044c61f57'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'active'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '0548cd1125b5401b9f1ad2beaccb6e56'
+                        key: {
+                            name: 'x_daas_ham_order'
+                            caption: 'Entitlement'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -1321,12 +2101,78 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '06d3bb3f261648cc925e4f5c9ca32215'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ab14b9b2f3ba4e8db17d772c8d66c32a'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    caption: 'Rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '8'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '06e082ebd355443db74be3937052bd87'
                         key: {
                             name: 'x_daas_ham_manufacturer_alias'
                             element: 'NULL'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '0719f28d3fbd4c7d8b7db2265bd4ba73'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bc236aaa72bc4c0d9348055beabd2a2e'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'account_manager'
+                            position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '073fae3269dc4797b6d29852cfc950f8'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'quantity_allocated'
+                            position: '9'
                         }
                     },
                     {
@@ -1415,6 +2261,36 @@ declare global {
                             name: 'x_daas_ham_agreement'
                             element: 'overdue_return_days'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'par_dashboard_canvas'
+                        id: '0891f01e832344ada06de1e271f58525'
+                        key: {
+                            dashboard: '2201d220760d41669225280628c65eb8'
+                            dashboard_tab: '0baf34b88b1d4f768aebd61feefd5369'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '089deaaea4c64ea391ea8227ce3338c7'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'state'
+                            position: '9'
                         }
                     },
                     {
@@ -1574,6 +2450,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '0ad29ee4da614b7caaa2ece03d93a886'
+                        key: {
+                            sys_ui_section: {
+                                id: '81e257c64b1545eb88bddc11ed7fc4fc'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    caption: 'Template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '0b013470768c4f63ba5790ec3456852a'
                         key: {
@@ -1603,6 +2501,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_catalog_entry'
                             element: 'active'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '0bd2fb3cc1bd4e00b3400afde184fa98'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'sourcing_summary'
+                            position: '11'
                         }
                     },
                     {
@@ -1729,6 +2649,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '0e3901578889438ba60a6cf4e4d62440'
+                        key: {
+                            sys_ui_section: {
+                                id: '29b797bac2074759b376585e6879ff77'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_agreement.x_daas_ham_agreement_quantity.agreement'
+                            position: '0'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '0e4d92a1d5ae4388aa3e3b196c6baca0'
                         key: {
@@ -1747,6 +2689,28 @@ declare global {
                                     name: 'x_daas_ham.noc'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '0e713adcdc7e442a9a1ac35668e571b5'
+                        key: {
+                            sys_ui_section: {
+                                id: '4cb552655250459cb29a726e237a6d8d'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Service terms'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '5'
                         }
                     },
                     {
@@ -1771,10 +2735,55 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '0f1fb8b030e54d7ab17be14328b264a7'
+                        key: {
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '7'
+                        }
+                    },
+                    {
                         table: 'ua_table_licensing_config'
                         id: '0f4ad99ebce04078ad69ff7686045184'
                         key: {
                             name: 'x_daas_ham_model_lifecycle'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '0f4ec6fe8a9548aea4ac23ca0456a540'
+                        key: {
+                            list_id: {
+                                id: '81b68f80815e4f929da2ff4035c4241f'
+                                key: {
+                                    name: 'x_daas_ham_site_template_item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'optional'
                         }
                     },
                     {
@@ -1799,6 +2808,28 @@ declare global {
                         key: {
                             logical_table_name: 'x_daas_ham_subscription_line'
                             col_name_string: 'agreement'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '0fd78c18152e4d0588eec5008297a909'
+                        key: {
+                            sys_ui_section: {
+                                id: 'f8cda9df97fa4e34bef4ad2a51d89fb7'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    caption: 'Job'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'job'
+                            position: '1'
                         }
                     },
                     {
@@ -1903,6 +2934,72 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '1129608055cc4ce8aa697a459d2a839d'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd78118f473c54d33b100a228c24f085e'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    caption: 'Event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'asset'
+                            position: '1'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '1185489ea1f14c48a8f71f4a913fdeb4'
+                        key: {
+                            sys_ui_section: {
+                                id: '18c3820eab2b48f891ba42f9f4a43c23'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Staging'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'firmware_version'
+                            position: '9'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '11f383b2bcc543cd961e4effa5f9d8ea'
+                        key: {
+                            sys_ui_section: {
+                                id: '2e580ac854364c889e8bfc7b51773e37'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '11fe1b52a5f643d78d7c499ffdbfec55'
                         key: {
@@ -1932,6 +3029,29 @@ declare global {
                         id: '12366fa39a2c4b04b669a1ebe874e6e3'
                         key: {
                             name: 'x_daas_ham_order'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '126ddc32f5ba48568b0f47a71f93bb77'
+                        key: {
+                            list_id: {
+                                id: '8730bb7ee0d346f9a68764806f1efd2a'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'number'
                         }
                     },
                     {
@@ -1984,6 +3104,62 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: '12d5c481eb6549bf881e132b7cbf506f'
+                        key: {
+                            sys_ui_form: {
+                                id: '9c61858a8e8e4cc783f203b0b7c9662d'
+                                key: {
+                                    name: 'x_daas_ham_site_template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '6d044ac8ef2a46b6bbaa578a692753d8'
+                                key: {
+                                    name: 'x_daas_ham_site_template'
+                                    caption: 'Description'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '130e556132fd4126b95f5d93f214672f'
+                        key: {
+                            list_id: {
+                                id: '61ddbed2617e4cea819a301dc98b46b8'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'template'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '131352eb3719425bb01f7f4b09584df9'
                         key: {
@@ -1997,6 +3173,44 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '13138ca006564e24afe4f4ceb2a8d87c'
+                        key: {
+                            name: 'x_daas_ham_order'
+                            caption: 'Order'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '13604bd836064e15a9080602d45ad93b'
+                        key: {
+                            list_id: {
+                                id: '47a5e3f20a4c4c9480997f0b91496707'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'starts'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '137c8858ac194166b776b4b9a6a41c01'
                         key: {
@@ -2007,6 +3221,28 @@ declare global {
                                     name: 'x_daas_ham.field_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '13ad4018f699471b89fdc85fbb64741c'
+                        key: {
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'status'
+                            position: '10'
                         }
                     },
                     {
@@ -2060,6 +3296,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '14b4ac14836d4474a3132572b3bb0341'
+                        key: {
+                            sys_ui_section: {
+                                id: 'cd335fa4a3394c81ae06a89f0a396755'
+                                key: {
+                                    name: 'x_daas_ham_site_template'
+                                    caption: 'Site template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'active'
+                            position: '2'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '14c5171f4d224fcfa5c2a1eedaa55b4b'
                         key: {
@@ -2079,6 +3337,24 @@ declare global {
                             name: 'x_daas_ham_asn_import'
                             element: 'pid'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_user_role_contains'
+                        id: '14da7ed6f07d40d6b8d8ec6221c53495'
+                        key: {
+                            role: {
+                                id: 'c5156577be814d2aa8bf557ddec8bf0e'
+                                key: {
+                                    name: 'x_daas_ham.noc'
+                                }
+                            }
+                            contains: {
+                                id: 'c85dc53d47444da193787fe91660882c'
+                                key: {
+                                    name: 'canvas_user'
+                                }
+                            }
                         }
                     },
                     {
@@ -2115,6 +3391,28 @@ declare global {
                             value: 'shipped_to_site'
                             language: 'en'
                             dependent_value: '9'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '15d7b4b70ec3436e91508d039add703d'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bc236aaa72bc4c0d9348055beabd2a2e'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'ends'
+                            position: '8'
                         }
                     },
                     {
@@ -2216,11 +3514,63 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '1815a1a4ce744a72836f79e2107dac5f'
+                        key: {
+                            sys_ui_section: {
+                                id: '81e257c64b1545eb88bddc11ed7fc4fc'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    caption: 'Template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'manufacturer'
+                            position: '6'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '185b65ab6631429dab2aa56f3896d865'
+                        key: {
+                            name: 'x_daas_ham_manufacturer_alias'
+                            caption: 'Alias'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '18aeb5cbd5ec42478493aeacfda8f4b0'
                         key: {
                             name: 'x_daas_ham_staging_tmpl_item'
                             element: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '18c3820eab2b48f891ba42f9f4a43c23'
+                        key: {
+                            name: 'x_daas_ham_staging_task'
+                            caption: 'Staging'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -2234,6 +3584,50 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '18f8c25bdb3541ca81a178859b6ee448'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c8fb61bb330e4c9b972c8f3fb9255cba'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    caption: 'Catalog entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'model'
+                            position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '192f90a9873b42cf8a055fc0e4b70790'
+                        key: {
+                            sys_ui_section: {
+                                id: '7233999280c74fd5b5dc83d30981be49'
+                                key: {
+                                    name: 'x_daas_ham_agreement_quantity'
+                                    caption: 'Contracted quantity'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'agreement'
+                            position: '1'
                         }
                     },
                     {
@@ -2280,6 +3674,96 @@ declare global {
                         key: {
                             logical_table_name: 'alm_hardware'
                             col_name_string: 'x_daas_ham_order_line'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '19f348b54e2c4ceebfb6496d5e291bfe'
+                        key: {
+                            list_id: {
+                                id: '8730bb7ee0d346f9a68764806f1efd2a'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'entitlement_verdict'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '1aa757542d834b9ebe270a56a4d5ee90'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a33b84058a7f402b9db9058053a88b57'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Notes'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'short_description'
+                            position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '1aff187eb5584a118e81c3b8080642e6'
+                        key: {
+                            list_id: {
+                                id: 'f61ad36ce6774a58a595dcda55a5a7e8'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'number'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '1b4d38a2372b437e9cf59112851f9f4d'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'install_mode'
+                            position: '11'
                         }
                     },
                     {
@@ -2446,6 +3930,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '1eba13f9d0324185af2a52fd66f7b296'
+                        key: {
+                            sys_ui_section: {
+                                id: '81e257c64b1545eb88bddc11ed7fc4fc'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    caption: 'Template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'name'
+                            position: '1'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '1ee96b73dddc4c6e97f64b26d36f4413'
                         key: {
@@ -2463,11 +3969,79 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '1f30467054a943aaa25b7f382837e1af'
+                        key: {
+                            list_id: {
+                                id: '61ddbed2617e4cea819a301dc98b46b8'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'number'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '200827d1c6a946e7b1ffb6bfbebae4e0'
                         key: {
                             name: 'x_daas_ham_site_template_item'
                             element: 'model'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '200b3b7a13344a76b8b8ad8266b8fa52'
+                        key: {
+                            list_id: {
+                                id: 'ea1e62fe24dc41aaa02caf586070918f'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'active'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '2075bf2110e649f98dff1e272ff23ce1'
+                        key: {
+                            sys_ui_section: {
+                                id: '943012e02fae437b8d3a73790e192b34'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Notes'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'work_notes'
+                            position: '2'
                         }
                     },
                     {
@@ -2488,6 +4062,28 @@ declare global {
                             name: 'x_daas_ham_staging_task'
                             element: 'asset'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '20d7619ceb0e481eb5417b2850827306'
+                        key: {
+                            sys_ui_section: {
+                                id: '4dc23702dc524498a68859197f1e32e9'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    caption: 'Milestones'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'end_of_life'
+                            position: '6'
                         }
                     },
                     {
@@ -2530,6 +4126,51 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '21822f672e934e46ba6ffb2407fd2530'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ab14b9b2f3ba4e8db17d772c8d66c32a'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    caption: 'Rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'manufacturer'
+                            position: '2'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '2199633b0bd7447aa26482f6b467bfd6'
+                        key: {
+                            list_id: {
+                                id: 'eeb6dba331fb49a7b9346ad5d3ce9ff1'
+                                key: {
+                                    name: 'x_daas_ham_staging_tmpl_item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'label'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '21b111793138406ea62ae6cad9d65441'
                         key: {
@@ -2560,6 +4201,51 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '221bf64241a34c54a4b5eaf2ed7f95ee'
+                        key: {
+                            sys_ui_section: {
+                                id: '4c7b58447dc44981a0b116437b7fe5e7'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'activity.xml'
+                            position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '2232f4b3c69745618723fa60fa7e5a95'
+                        key: {
+                            list_id: {
+                                id: 'b735556915984070b746b370aa97e54e'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'entry_type'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '224aca2aa1d64b309d00a6d777ef63df'
                         key: {
@@ -2568,6 +4254,28 @@ declare global {
                             value: 'device_class'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '22d91ae7b5af4e53ba7f8b297d1551f7'
+                        key: {
+                            sys_ui_section: {
+                                id: '378d78af0c444e6f8ab68759417cf302'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    caption: 'Exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'occurrences'
+                            position: '4'
                         }
                     },
                     {
@@ -2588,11 +4296,49 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '23107fd8df984b1ca3adc733cdbbb900'
+                        key: {
+                            name: 'x_daas_ham_subscription_line'
+                            caption: 'Subscription line'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: '23151682155d430593864dd231ca0397'
                         key: {
                             logical_table_name: 'x_daas_ham_device_event'
                             col_name_string: 'asset'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '2360ddcfbe5649b3aac4b1ccb255c39a'
+                        key: {
+                            list_id: {
+                                id: '6afd066c9b5d40b4b0b27ef810fcf701'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'mandatory'
                         }
                     },
                     {
@@ -2641,6 +4387,28 @@ declare global {
                             value: 'provider'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '24b49fe510f34d65b680880cb0bd1d02'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'approval'
+                            position: '10'
                         }
                     },
                     {
@@ -2712,6 +4480,98 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '262379773e004f7f9a04b830bbacdbda'
+                        key: {
+                            sys_ui_section: {
+                                id: '7233999280c74fd5b5dc83d30981be49'
+                                key: {
+                                    name: 'x_daas_ham_agreement_quantity'
+                                    caption: 'Contracted quantity'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'model'
+                            position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '2655719accd9409595b8e2d195e335b2'
+                        key: {
+                            sys_ui_form: {
+                                id: 'ab9816eee9204f969e54898bc76812cd'
+                                key: {
+                                    name: 'x_daas_ham_staging_tmpl_item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'd586f712f31b44bdbafc8411d8ccd759'
+                                key: {
+                                    name: 'x_daas_ham_staging_tmpl_item'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '26ceac20956940cf8763aa98a42ee357'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'quantity_to_purchase'
+                            position: '10'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '26f338a8a5d741948f5ec74a2f971600'
+                        key: {
+                            name: 'x_daas_ham_order'
+                            caption: 'Related'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '26f9d6b2c69e4374b6eeb57184130b48'
                         key: {
@@ -2729,11 +4589,78 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '27fce360cd224aeb833176d2a3cd6080'
+                        key: {
+                            list_id: {
+                                id: 'eeb6dba331fb49a7b9346ad5d3ce9ff1'
+                                key: {
+                                    name: 'x_daas_ham_staging_tmpl_item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'mandatory'
+                        }
+                    },
+                    {
                         table: 'sn_glider_source_artifact_m2m'
                         id: '27fe6b9c58d8452788c94e26d9f99201'
                         key: {
                             application_file: 'ac78f029ad284de4923492a694c71317'
                             source_artifact: '888663c7a08f49ebbf66191a4afa2175'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '2802f65eec8a4058ae606ec2f9efe651'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bc236aaa72bc4c0d9348055beabd2a2e'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '9'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '2813168e2da04704ab3b574a1cfc1f49'
+                        key: {
+                            sys_ui_section: {
+                                id: '378d78af0c444e6f8ab68759417cf302'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    caption: 'Exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'resolved_model'
+                            position: '7'
                         }
                     },
                     {
@@ -2752,6 +4679,29 @@ declare global {
                             value: 'site_audit'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '295d8ea0c4ce46ab8d5fe6d4b44fd9e7'
+                        key: {
+                            list_id: {
+                                id: 'ddb3ce4f13e0414891cdcb9425bbb4ac'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'status'
                         }
                     },
                     {
@@ -2781,11 +4731,48 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '2995e47dad624bbc8720d62976a20334'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '29a4cf448ccc4304a8ea92cdcf379359'
                         key: {
                             name: 'cmdb_model'
                             element: 'x_daas_ham_normalized_to'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '29b797bac2074759b376585e6879ff77'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            caption: 'Related'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -2850,6 +4837,21 @@ declare global {
                                     name: 'x_daas_ham.finance'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '2a64545aa7824cdcb8dc5153584a410a'
+                        key: {
+                            name: 'x_daas_ham_stockroom_member'
+                            caption: 'Member'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -2972,6 +4974,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '2c99c31fb8c040b1a4026d80ac424234'
+                        key: {
+                            sys_ui_section: {
+                                id: '4dc23702dc524498a68859197f1e32e9'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    caption: 'Milestones'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'end_of_extended_support'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '2cba0a37aed74ff196e10151ce187fdc'
                         key: {
@@ -2986,6 +5010,29 @@ declare global {
                         key: {
                             name: 'x_daas_ham_device_event'
                             element: 'identifier'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '2ce49809a5f84b20ab6a23a11c6c9971'
+                        key: {
+                            list_id: {
+                                id: '47a5e3f20a4c4c9480997f0b91496707'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'ends'
                         }
                     },
                     {
@@ -3009,6 +5056,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '2d404405f0244beaac43c6f976b59fb6'
+                        key: {
+                            list_id: {
+                                id: '47a5e3f20a4c4c9480997f0b91496707'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'replacement_tier'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '2da5bba16a534128b1d49868723ad5fe'
                         key: {
@@ -3028,6 +5098,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '2e1cd02281f74006ab148c6fa6072895'
+                        key: {
+                            sys_ui_section: {
+                                id: '378d78af0c444e6f8ab68759417cf302'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    caption: 'Exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'status'
+                            position: '6'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '2e4cb84174474406978850724a392202'
                         key: {
@@ -3041,11 +5133,70 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '2e580ac854364c889e8bfc7b51773e37'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            caption: 'Step'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '2e6fcf63a8a44ea0b05dbdba7c3a0068'
+                        key: {
+                            sys_ui_section: {
+                                id: '943012e02fae437b8d3a73790e192b34'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Notes'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'short_description'
+                            position: '0'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '2e743bef53274d05a9415fc0ec7db318'
                         key: {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_staging_source'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '2ee5d078d8ec4c7b8fe628dba8ab66c1'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c8fb61bb330e4c9b972c8f3fb9255cba'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    caption: 'Catalog entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'valid_to'
+                            position: '9'
                         }
                     },
                     {
@@ -3115,6 +5266,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '2fec22dc62f147999fe1dd378bf73833'
+                        key: {
+                            list_id: {
+                                id: '47a5e3f20a4c4c9480997f0b91496707'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'customer'
+                        }
+                    },
+                    {
                         table: 'ua_table_licensing_config'
                         id: '300564c0ba3d4fddbcd36d51f72dbdcf'
                         key: {
@@ -3151,6 +5325,43 @@ declare global {
                         key: {
                             name: 'x_daas_ham_catalog_entry'
                             element: 'valid_to'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '31652c19b8c345998136cf0caf3f1a70'
+                        key: {
+                            list_id: {
+                                id: '81b68f80815e4f929da2ff4035c4241f'
+                                key: {
+                                    name: 'x_daas_ham_site_template_item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'site_template'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form'
+                        id: '3175dba01e414db6981c5bbb43d6b9d7'
+                        key: {
+                            name: 'x_daas_ham_order_line'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -3236,11 +5447,77 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '3398098bd50744e4b5dc8a647b5269be'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'site_template'
+                            position: '6'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '339a948c59a949ffbccc322b2cf5558d'
+                        key: {
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'customer'
+                            position: '3'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '33a56a1e0e4a4336b159f22c0f371c95'
                         key: {
                             name: 'x_daas_ham_agreement'
                             element: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '33f0152c2fca48438cbd4083621b0041'
+                        key: {
+                            sys_ui_section: {
+                                id: '378d78af0c444e6f8ab68759417cf302'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    caption: 'Exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -3265,6 +5542,51 @@ declare global {
                             cat_item: '5d455ea958a8443a8913cf053541396f'
                             variable_set: 'NULL'
                             name: 'end_date'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '34c9901223ce4f898c3f2603915728ff'
+                        key: {
+                            list_id: {
+                                id: '5d9dbd259a72495a8628d3f295365f75'
+                                key: {
+                                    name: 'x_daas_ham_stockroom_member'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'user'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '34cc2e8eb72441448defa7f33667f30d'
+                        key: {
+                            sys_ui_section: {
+                                id: '371cdc177b2145e7957b603d1d8ed84f'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    caption: 'Source'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'source_reference'
+                            position: '1'
                         }
                     },
                     {
@@ -3318,6 +5640,39 @@ declare global {
                                 id: '50893530c7b94924ba2610453d4ebd3e'
                                 key: {
                                     name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '354c61561e5d4a7580fe0b8f79d25a65'
+                        key: {
+                            sys_ui_form: {
+                                id: '550fe764e8ff468fa08bf917e2af1a10'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '4dc23702dc524498a68859197f1e32e9'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    caption: 'Milestones'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
                                 }
                             }
                         }
@@ -3386,6 +5741,43 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '371cdc177b2145e7957b603d1d8ed84f'
+                        key: {
+                            name: 'x_daas_ham_model_lifecycle'
+                            caption: 'Source'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '372d04ee214f4eb4adf25947df20135b'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bc236aaa72bc4c0d9348055beabd2a2e'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '374c108db616494393e1851fb38f0a8a'
                         key: {
@@ -3414,11 +5806,59 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '378d78af0c444e6f8ab68759417cf302'
+                        key: {
+                            name: 'x_daas_ham_norm_exception'
+                            caption: 'Exception'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '37cd886429864673a61f2a4ac2ccef0c'
                         key: {
                             name: 'x_daas_ham_staging_task'
                             element: 'order_line'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '3866ffb8d44d46e68b75a7b8226d2bb4'
+                        key: {
+                            sys_ui_form: {
+                                id: '8c556e30820a4de9bda0f6409aefa308'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'd78118f473c54d33b100a228c24f085e'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    caption: 'Event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
                         }
                     },
                     {
@@ -3430,6 +5870,19 @@ declare global {
                                 id: 'd33813ebacca4b79aad41517026036d8'
                                 key: {
                                     name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '3894d3459e554bd8beb6af549c7510ae'
+                        key: {
+                            sys_security_acl: '53561058881d4d578f4127523777e126'
+                            sys_user_role: {
+                                id: 'b1a9a9832f01483a9c4e6fc55ca84188'
+                                key: {
+                                    name: 'x_daas_ham.field_tech'
                                 }
                             }
                         }
@@ -3485,11 +5938,56 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '39904d30e7b4448593954f73c0483d24'
+                        key: {
+                            list_id: {
+                                id: '47a5e3f20a4c4c9480997f0b91496707'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'number'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '39fcd9dd714545c8b86828cc926426fe'
                         key: {
                             name: 'x_daas_ham_site_template'
                             element: 'name'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '3a3b6926f83a4f8eba3fead7378c4a64'
+                        key: {
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'device_class'
+                            position: '6'
                         }
                     },
                     {
@@ -3517,6 +6015,20 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: '3aa753e797704e4498c675b20c5f7162'
+                        key: {
+                            name: 'x_daas_ham_staging_task'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '3ada59fde0c843adb05a235d5f3272c4'
                         key: {
@@ -3525,6 +6037,39 @@ declare global {
                             value: 'exact'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '3aeaa8624f694b70bbd3e9f9bfa9506f'
+                        key: {
+                            sys_ui_form: {
+                                id: '758511249a86429181731c6b6bbb7060'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'bc236aaa72bc4c0d9348055beabd2a2e'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
                         }
                     },
                     {
@@ -3537,6 +6082,20 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: '3b4e4adfe8c44fe9b6976302df4090bc'
+                        key: {
+                            name: 'x_daas_ham_catalog_entry'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '3b707135aed247cd97a7609a150ea865'
                         key: {
@@ -3545,6 +6104,29 @@ declare global {
                             value: 'module'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '3b9b851f6eb14df7ae75dc8c1adec4c8'
+                        key: {
+                            list_id: {
+                                id: '8730bb7ee0d346f9a68764806f1efd2a'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'site'
                         }
                     },
                     {
@@ -3637,6 +6219,50 @@ declare global {
                             value: 'awaiting_stock'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '3d45b385255b47e09ccf3aeefade59ac'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'agreement'
+                            position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '3da26cc15f0b4c05815116a4a396838c'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'requested_date'
+                            position: '12'
                         }
                     },
                     {
@@ -3744,6 +6370,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '401666da955f454c8939b59c843e456b'
+                        key: {
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'end_date'
+                            position: '12'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '4072395325334115b49fbf702bd3ec32'
                         key: {
@@ -3773,6 +6421,51 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '41726ea4a1d94e12a93ca33521399ca9'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a2d1a850b4f74c4b8ef323b9e5b36db9'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Fees'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'damage_fee'
+                            position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '41b02276efb8493999d774b7085bd132'
+                        key: {
+                            list_id: {
+                                id: 'd65d853d305d42f894ff8f59feae4dff'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'reason'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '429ad467c4e94b909a4d7a64ad3cfdae'
                         key: {
@@ -3786,11 +6479,133 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '42bef29c6ab44b87bde904c74b3becea'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c8fb61bb330e4c9b972c8f3fb9255cba'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    caption: 'Catalog entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'valid_from'
+                            position: '8'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '4350f3df01da4317bbdbb2a30fd0b342'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '7'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '43653b7daf2f4b6f8de5162460e1c2d4'
+                        key: {
+                            sys_ui_form: {
+                                id: '758511249a86429181731c6b6bbb7060'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'a2d1a850b4f74c4b8ef323b9e5b36db9'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Fees'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '43b2728848ac4a0099db50a3c2337e43'
+                        key: {
+                            list_id: {
+                                id: 'f61ad36ce6774a58a595dcda55a5a7e8'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'order'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: '44d6dc4378cb461483ddc49d65fc09c3'
                         key: {
                             name: 'x_daas_ham_norm_exception'
                             element: 'status'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '44dd970d8e7f4f83917ad4ed65123bc9'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd78118f473c54d33b100a228c24f085e'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    caption: 'Event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '4'
                         }
                     },
                     {
@@ -3832,6 +6647,24 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_user_role_contains'
+                        id: '45a0406cce0b46fbbfd10f529dd1d672'
+                        key: {
+                            role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
+                            contains: {
+                                id: '724283c137f14d479651cc8aa8b75eb9'
+                                key: {
+                                    name: 'canvas_user'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '45a508dce75249b992242f7d45bbab8d'
                         key: {
@@ -3842,6 +6675,28 @@ declare global {
                                     name: 'x_daas_ham.inventory_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '45ded724578e403e9db02a656f4d5a16'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bbc5849e990345f59ba74d5f94e49cb5'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_subscription_line.alm_hardware.x_daas_ham_subscription_line'
+                            position: '0'
                         }
                     },
                     {
@@ -3862,11 +6717,55 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '4665908a88544cd3b237dc88632b0caa'
+                        key: {
+                            sys_ui_section: {
+                                id: '6d044ac8ef2a46b6bbaa578a692753d8'
+                                key: {
+                                    name: 'x_daas_ham_site_template'
+                                    caption: 'Description'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'description'
+                            position: '0'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '467ae6cb804240eab8193363f764f299'
                         key: {
                             name: 'cmn_location'
                             element: 'x_daas_ham_maintenance_schedule'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '46814e15dc5a41508375b3885cb54aa0'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'purchase_order'
+                            position: '13'
                         }
                     },
                     {
@@ -3881,11 +6780,48 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '469dab30e56141de8ddd6e8e8e10a905'
+                        key: {
+                            name: 'x_daas_ham_staging_template'
+                            caption: 'Related'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '46c06a7376de45e6a11407b25ed6b4e6'
                         key: {
                             name: 'cmdb_model'
                             element: 'x_daas_ham_track_as_asset'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '46d07171aa18490abf1f0f3361054fb6'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd78118f473c54d33b100a228c24f085e'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    caption: 'Event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'observed_at'
+                            position: '6'
                         }
                     },
                     {
@@ -3902,6 +6838,20 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: '476492610d5b4b2e8752d4ef6d2cc7fd'
+                        key: {
+                            name: 'x_daas_ham_site_template_item'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '47663eecf5274d38994ac04db3c426ec'
                         key: {
@@ -3912,6 +6862,60 @@ declare global {
                                     name: 'x_daas_ham.field_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '478d6202652e4c77bace0b9aff8c0d6b'
+                        key: {
+                            name: 'x_daas_ham_order_line'
+                            caption: 'Related'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '479ef1e484804735b9129a79fdb755d1'
+                        key: {
+                            sys_ui_section: {
+                                id: '0548cd1125b5401b9f1ad2beaccb6e56'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Entitlement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'entitlement_verdict'
+                            position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list'
+                        id: '47a5e3f20a4c4c9480997f0b91496707'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
                         }
                     },
                     {
@@ -3930,6 +6934,28 @@ declare global {
                             name: 'x_daas_ham_staging_template'
                             element: 'customer'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '48300b2aa7ac43dd944fcffc9f72d4ad'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a33b84058a7f402b9db9058053a88b57'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Notes'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'work_notes'
+                            position: '1'
                         }
                     },
                     {
@@ -4014,6 +7040,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '4a7a97f0c9fb40f4a83a9133a11e83b7'
+                        key: {
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'agreement'
+                            position: '2'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '4a80ea858c6144c786264bb77ec6a1a2'
                         key: {
@@ -4024,6 +7072,50 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '4a84f06af2be448e86317802dd93534f'
+                        key: {
+                            sys_ui_section: {
+                                id: '4cb552655250459cb29a726e237a6d8d'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Service terms'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '4a8baa95c049494d9ba4470d99277cba'
+                        key: {
+                            sys_ui_section: {
+                                id: '8f1b1ed7684647cea9a45c3838f8e78b'
+                                key: {
+                                    name: 'x_daas_ham_site_template_item'
+                                    caption: 'Item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'site_template'
+                            position: '1'
                         }
                     },
                     {
@@ -4072,6 +7164,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '4c7b58447dc44981a0b116437b7fe5e7'
+                        key: {
+                            name: 'x_daas_ham_staging_task'
+                            caption: 'Related'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '4c86c2deb1cf46419ac1ac76e8af486f'
                         key: {
@@ -4091,6 +7198,21 @@ declare global {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_lifecycle_phase'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '4cb552655250459cb29a726e237a6d8d'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            caption: 'Service terms'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -4148,6 +7270,23 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list'
+                        id: '4d7f38d1f0d94ff1aa2c85a0e9ab02e1'
+                        key: {
+                            name: 'x_daas_ham_site_template'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '4db13958ac8848e9ba496af1d9095892'
                         key: {
@@ -4172,6 +7311,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '4dc23702dc524498a68859197f1e32e9'
+                        key: {
+                            name: 'x_daas_ham_model_lifecycle'
+                            caption: 'Milestones'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '4dc3b17be1f3470dbade5145635f99a8'
                         key: {
@@ -4183,10 +7337,100 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '4dd4490ee62340bbb9aa748ff7950104'
+                        key: {
+                            list_id: {
+                                id: '6afd066c9b5d40b4b0b27ef810fcf701'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'label'
+                        }
+                    },
+                    {
                         table: 'sys_user_role'
                         id: '4e548db0cdee42dfb31bc76a4de6214d'
                         key: {
                             name: 'x_daas_ham.inventory_tech'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '4ea429e601d24a6dacaa23655f7f03db'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c8fb61bb330e4c9b972c8f3fb9255cba'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    caption: 'Catalog entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'site_template'
+                            position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '4ea7be7709b540d49fd5a4ada1e4b5df'
+                        key: {
+                            sys_ui_section: {
+                                id: '4cb552655250459cb29a726e237a6d8d'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Service terms'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'refresh_basis'
+                            position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '4f058e4f85bc438aa61cf44ac595934b'
+                        key: {
+                            list_id: {
+                                id: 'f61ad36ce6774a58a595dcda55a5a7e8'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'quantity_allocated'
                         }
                     },
                     {
@@ -4211,6 +7455,51 @@ declare global {
                         key: {
                             name: 'x_daas_ham_norm_exception'
                             element: 'source_record'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '4f97532d1a4440689da5dc263083dbb8'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c8fb61bb330e4c9b972c8f3fb9255cba'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    caption: 'Catalog entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '5'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '4fe37e6795ca4a2385b6ebc31f6b4f3d'
+                        key: {
+                            list_id: {
+                                id: 'd65d853d305d42f894ff8f59feae4dff'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'occurrences'
                         }
                     },
                     {
@@ -4245,6 +7534,50 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '5096002be297482c82149bfa11af5240'
+                        key: {
+                            sys_ui_section: {
+                                id: '943012e02fae437b8d3a73790e192b34'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Notes'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'description'
+                            position: '1'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '50a1298d3a7743609c15837ba2793662'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'order'
+                            position: '2'
+                        }
+                    },
+                    {
                         table: 'item_option_new'
                         id: '510ded7de22e49ad8e73ce2e7cb114d2'
                         key: {
@@ -4263,12 +7596,57 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '517944b30d894422966177be7a17ac9f'
+                        key: {
+                            sys_ui_section: {
+                                id: '81e257c64b1545eb88bddc11ed7fc4fc'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    caption: 'Template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'customer'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '518c324a22b64c479fc4643f95e93adb'
                         key: {
                             name: 'x_daas_ham_device_event'
                             element: 'observed_at'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '519ab8c0e01844eb8c162f77c6c107d7'
+                        key: {
+                            list_id: {
+                                id: '77618df067cf47ef89fe509e4c9e8dd5'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'last_status'
                         }
                     },
                     {
@@ -4316,6 +7694,61 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: '52399886ad74433797195ba02a27e6e2'
+                        key: {
+                            sys_ui_form: {
+                                id: '9c61858a8e8e4cc783f203b0b7c9662d'
+                                key: {
+                                    name: 'x_daas_ham_site_template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '58f7aa6a7b494d889b48a8c85d7478ee'
+                                key: {
+                                    name: 'x_daas_ham_site_template'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '52f0c4679822443f8f652c51ccdc5b44'
+                        key: {
+                            sys_ui_section: {
+                                id: '378d78af0c444e6f8ab68759417cf302'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    caption: 'Exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '5354a1f4d42b4a76a8d12dcd0ae74986'
                         key: {
@@ -4341,12 +7774,70 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '54a9d2d461094bcf854f299f4c690cef'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd586f712f31b44bdbafc8411d8ccd759'
+                                key: {
+                                    name: 'x_daas_ham_staging_tmpl_item'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'mandatory'
+                            position: '3'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '54ba267323124a0398a6f06b8342baf6'
                         key: {
                             name: 'x_daas_ham_order'
                             element: 'change_request'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '54c0824cb39b4710a2c2e658bfeb1bb5'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ab14b9b2f3ba4e8db17d772c8d66c32a'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    caption: 'Rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form'
+                        id: '550fe764e8ff468fa08bf917e2af1a10'
+                        key: {
+                            name: 'x_daas_ham_model_lifecycle'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -4358,6 +7849,69 @@ declare global {
                             value: 'firewall'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list'
+                        id: '5557f3940bf443098b2a511664dd9117'
+                        key: {
+                            name: 'x_daas_ham_model_lifecycle'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '55867fa87cef4d4dbddd503c5997c02e'
+                        key: {
+                            sys_security_acl: 'd5022cdebdeb45f0836e5d0b729dd013'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '55c0ce00f6e9441dbed613fa4dbe4583'
+                        key: {
+                            sys_ui_form: {
+                                id: '3aa753e797704e4498c675b20c5f7162'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '4c7b58447dc44981a0b116437b7fe5e7'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
                         }
                     },
                     {
@@ -4406,11 +7960,79 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '57761c39919f45a59e334681adc91052'
+                        key: {
+                            list_id: {
+                                id: 'b735556915984070b746b370aa97e54e'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'customer'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '5827f3069eb54708ada0d65b7d23c322'
+                        key: {
+                            list_id: {
+                                id: 'ea1e62fe24dc41aaa02caf586070918f'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'customer'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '5835615d6f5540b697a72acf501e86c9'
                         key: {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_last_seen'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '58480b4545a0487ab33b7c1236e2c38f'
+                        key: {
+                            sys_ui_section: {
+                                id: '378d78af0c444e6f8ab68759417cf302'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    caption: 'Exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '10'
                         }
                     },
                     {
@@ -4455,6 +8077,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '58f7aa6a7b494d889b48a8c85d7478ee'
+                        key: {
+                            name: 'x_daas_ham_site_template'
+                            caption: 'Related'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '596fc044899b4a0698d8ed129af3a1e1'
                         key: {
@@ -4484,6 +8121,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: '59c3907f30644667873a40093c9092da'
+                        key: {
+                            sys_ui_form: {
+                                id: '3b4e4adfe8c44fe9b6976302df4090bc'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'c8fb61bb330e4c9b972c8f3fb9255cba'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    caption: 'Catalog entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '59d7bbf5c9604bd5bfff2da4bdec6a99'
                         key: {
@@ -4494,6 +8164,94 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '5a36b55caa3c43b69f2ade5666dd07b2'
+                        key: {
+                            sys_ui_section: {
+                                id: '4dc23702dc524498a68859197f1e32e9'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    caption: 'Milestones'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'end_of_support'
+                            position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '5a91fffee3c94d7783416c6d23f370bb'
+                        key: {
+                            sys_ui_section: {
+                                id: '18c3820eab2b48f891ba42f9f4a43c23'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Staging'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'asset'
+                            position: '2'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '5afc636ef8f5467e9feb897a6bdfbb15'
+                        key: {
+                            sys_ui_section: {
+                                id: '2e580ac854364c889e8bfc7b51773e37'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'order'
+                            position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '5b313672f3ab4b459f69c91965638cc1'
+                        key: {
+                            sys_ui_section: {
+                                id: '7233999280c74fd5b5dc83d30981be49'
+                                key: {
+                                    name: 'x_daas_ham_agreement_quantity'
+                                    caption: 'Contracted quantity'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -4552,6 +8310,52 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '5cdd5bca6d814fab9e532f8b2634fefe'
+                        key: {
+                            list_id: {
+                                id: '98c2ff150d1e472cafbd50e11c581e36'
+                                key: {
+                                    name: 'x_daas_ham_agreement_quantity'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'model'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '5ce533d39b3246ebab0a18601f8c4429'
+                        key: {
+                            list_id: {
+                                id: '61ddbed2617e4cea819a301dc98b46b8'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'asset'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '5cf1423c48b1401f851ffa4910582534'
                         key: {
@@ -4560,6 +8364,28 @@ declare global {
                             value: 'rejected'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '5d10847c8a2b4943b23beeffa227e884'
+                        key: {
+                            sys_ui_section: {
+                                id: 'f8cda9df97fa4e34bef4ad2a51d89fb7'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    caption: 'Job'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'cursor'
+                            position: '2'
                         }
                     },
                     {
@@ -4581,6 +8407,67 @@ declare global {
                         key: {
                             logical_table_name: 'x_daas_ham_staging_task'
                             col_name_string: 'asset'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '5d435c04e41b4625bfa3e34cda9e392c'
+                        key: {
+                            sys_ui_section: {
+                                id: '81e257c64b1545eb88bddc11ed7fc4fc'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    caption: 'Template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '5d6be61f16cd4555ad942cfac2f54345'
+                        key: {
+                            sys_ui_section: {
+                                id: '2e580ac854364c889e8bfc7b51773e37'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'mandatory'
+                            position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list'
+                        id: '5d9dbd259a72495a8628d3f295365f75'
+                        key: {
+                            name: 'x_daas_ham_stockroom_member'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
                         }
                     },
                     {
@@ -4612,6 +8499,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'par_dashboard_visibility'
+                        id: '5ebb82822430408882e743ceebbc5e61'
+                        key: {
+                            dashboard: '2201d220760d41669225280628c65eb8'
+                            experience: '34fbc26324984aecb50f57319a8ad2b5'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '5ef393a1acf045efb975de2fcd2bd3cc'
                         key: {
@@ -4622,6 +8517,51 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '5fd2bcf90a5b41aa86d666a0c9efdfcd'
+                        key: {
+                            list_id: {
+                                id: 'ea1e62fe24dc41aaa02caf586070918f'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'manufacturer'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '5fe2cfbe8ddf416b85fe804e23b95959'
+                        key: {
+                            sys_ui_section: {
+                                id: '8f1b1ed7684647cea9a45c3838f8e78b'
+                                key: {
+                                    name: 'x_daas_ham_site_template_item'
+                                    caption: 'Item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'optional'
+                            position: '5'
                         }
                     },
                     {
@@ -4640,6 +8580,23 @@ declare global {
                             name: 'x_daas_ham_staging_task'
                             element: 'NULL'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list'
+                        id: '606dc51b32084e92b65cf8e9bc9768db'
+                        key: {
+                            name: 'x_daas_ham_device_event'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
                         }
                     },
                     {
@@ -4724,6 +8681,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '6182114e92ad44e4afbbc2e8b03fb440'
+                        key: {
+                            sys_ui_section: {
+                                id: 'cd335fa4a3394c81ae06a89f0a396755'
+                                key: {
+                                    name: 'x_daas_ham_site_template'
+                                    caption: 'Site template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'name'
+                            position: '0'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '618db54e7efa4b518e6090e9feedd967'
                         key: {
@@ -4742,6 +8721,23 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list'
+                        id: '61ddbed2617e4cea819a301dc98b46b8'
+                        key: {
+                            name: 'x_daas_ham_staging_task'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '61e361259c7b478ca9cb48ea2a3ad83d'
                         key: {
@@ -4755,12 +8751,67 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: '6236ff3379c546338d0b4df44c068523'
+                        key: {
+                            sys_ui_form: {
+                                id: 'fa0af5253bd14d9b9900cdb4baca960f'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'bbc5849e990345f59ba74d5f94e49cb5'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '62d3183b6f0b493db9cbbeac7a347ee8'
                         key: {
                             name: 'x_daas_ham_stockroom_member'
                             element: 'user'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '630189b9b4ff47ae83937e31092c1116'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '14'
                         }
                     },
                     {
@@ -4795,11 +8846,80 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: '63c77f7a77284bca9c04175a6098118d'
+                        key: {
+                            name: 'x_daas_ham_agreement_quantity'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '63ecf20698c44dc29d52f3a1ead2fc4f'
                         key: {
                             name: 'x_daas_ham_asn_import'
                             element: 'distributor'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '63f72f5b0a464b9986076140d7e2079f'
+                        key: {
+                            sys_ui_form: {
+                                id: 'f78eba76c56c473a853b7509e00765c5'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '943012e02fae437b8d3a73790e192b34'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Notes'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '64950b2175254b769e195c02015cca88'
+                        key: {
+                            sys_ui_section: {
+                                id: '4dc23702dc524498a68859197f1e32e9'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    caption: 'Milestones'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '4'
                         }
                     },
                     {
@@ -4832,6 +8952,28 @@ declare global {
                             name: 'x_daas_ham_model_lifecycle'
                             element: 'last_refreshed'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '65ea4574813b4ce0b9c1a13c4b5ca3bf'
+                        key: {
+                            sys_ui_section: {
+                                id: '478d6202652e4c77bace0b9aff8c0d6b'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_order_line.alm_hardware.x_daas_ham_order_line'
+                            position: '0'
                         }
                     },
                     {
@@ -4890,6 +9032,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '67ae5305c1a04dc28665d92d82321a15'
+                        key: {
+                            sys_ui_section: {
+                                id: '26f338a8a5d741948f5ec74a2f971600'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'activity.xml'
+                            position: '0'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '67d691435f9a48af85902a2a43028866'
                         key: {
@@ -4919,6 +9083,29 @@ declare global {
                             value: 'connector'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '6811f915f053440f8bf464688b98a6b7'
+                        key: {
+                            list_id: {
+                                id: '8730bb7ee0d346f9a68764806f1efd2a'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'requested_date'
                         }
                     },
                     {
@@ -4974,6 +9161,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '6a23c2692b594c3e8c687c765f1a4c95'
+                        key: {
+                            sys_ui_section: {
+                                id: '9bee72ad266f4788ad02e6b7bb0f8aab'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Delivery'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '6'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: '6a2420ef65d6460ea4ceb34c37799315'
                         key: {
@@ -5008,10 +9217,50 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list'
+                        id: '6afd066c9b5d40b4b0b27ef810fcf701'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_db_object'
                         id: '6b04c9481f2542b19423f3a0e242011c'
                         key: {
                             name: 'x_daas_ham_site_template'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '6b71122e2f42455db223aefe956539a6'
+                        key: {
+                            list_id: {
+                                id: 'ddb3ce4f13e0414891cdcb9425bbb4ac'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'customer'
                         }
                     },
                     {
@@ -5023,6 +9272,39 @@ declare global {
                             value: 'up'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '6ba4822036084be19bcc9898fdb8849b'
+                        key: {
+                            sys_ui_form: {
+                                id: '3175dba01e414db6981c5bbb43d6b9d7'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '478d6202652e4c77bace0b9aff8c0d6b'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
                         }
                     },
                     {
@@ -5079,6 +9361,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '6cc3a25cd0f041b391a5a88f6a4f17f3'
+                        key: {
+                            list_id: {
+                                id: '77618df067cf47ef89fe509e4c9e8dd5'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'cursor'
+                        }
+                    },
+                    {
                         table: 'sys_user_role_contains'
                         id: '6cd238d8cb3b4d5b9f6008a50a91b556'
                         key: {
@@ -5110,6 +9415,88 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '6d044ac8ef2a46b6bbaa578a692753d8'
+                        key: {
+                            name: 'x_daas_ham_site_template'
+                            caption: 'Description'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '6d28162b5f6840ae80fb55fe2cb938c5'
+                        key: {
+                            list_id: {
+                                id: 'ddb3ce4f13e0414891cdcb9425bbb4ac'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'line_type'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '6d5c597b9e354cd9b491d79d8518bbf7'
+                        key: {
+                            sys_ui_section: {
+                                id: '4cb552655250459cb29a726e237a6d8d'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Service terms'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'overdue_return_days'
+                            position: '6'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '6d84f277a08c44f0a6e2bbfc905d88bc'
+                        key: {
+                            sys_ui_section: {
+                                id: '478d6202652e4c77bace0b9aff8c0d6b'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_order_line.x_daas_ham_staging_task.order_line'
+                            position: '1'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '6db40786879c404f9cc0664c1f87a358'
                         key: {
@@ -5120,6 +9507,96 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '6e3aec256fb44b788f8f1c7e46d6edc7'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a2d1a850b4f74c4b8ef323b9e5b36db9'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Fees'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '5'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '6e40da195ede4a8f8f0d5630d3eb78c1'
+                        key: {
+                            list_id: {
+                                id: '6afd066c9b5d40b4b0b27ef810fcf701'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'done_by'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '6e504d2a29364ada95fa455bd82d5648'
+                        key: {
+                            sys_ui_section: {
+                                id: '9bee72ad266f4788ad02e6b7bb0f8aab'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Delivery'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '6ee1d10fea004c4dbadcc9b6aaa9424c'
+                        key: {
+                            list_id: {
+                                id: 'd65d853d305d42f894ff8f59feae4dff'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'raw_manufacturer'
                         }
                     },
                     {
@@ -5167,6 +9644,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '6f88eaaf3e3d448588443d066c385f04'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'quantity'
+                            position: '4'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '6fde1f62a99f48799dec6b58336e478c'
                         key: {
@@ -5189,6 +9688,63 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '70315e865b744997af2d440a1aa61b30'
+                        key: {
+                            sys_ui_section: {
+                                id: '4dc23702dc524498a68859197f1e32e9'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    caption: 'Milestones'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '7045db889e414bbeaff489aacc15bff5'
+                        key: {
+                            sys_security_acl: 'ddb0d6a52122449382f86f3045c257d4'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '709bf5a467ab42c488b04985c640fbf7'
+                        key: {
+                            sys_ui_section: {
+                                id: '2a64545aa7824cdcb8dc5153584a410a'
+                                key: {
+                                    name: 'x_daas_ham_stockroom_member'
+                                    caption: 'Member'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'user'
+                            position: '0'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '70cacf8459134824a0ce9769a34b4691'
                         key: {
@@ -5206,6 +9762,28 @@ declare global {
                             value: 'switch'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '71382c59f4cd43619055ecd459220c7b'
+                        key: {
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'description'
+                            position: '1'
                         }
                     },
                     {
@@ -5273,6 +9851,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '7233999280c74fd5b5dc83d30981be49'
+                        key: {
+                            name: 'x_daas_ham_agreement_quantity'
+                            caption: 'Contracted quantity'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '7246a4240c794b0699ec1437a167cb93'
                         key: {
@@ -5315,6 +9908,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '7331486a58e2439faf2139fc7f0cbca5'
+                        key: {
+                            sys_ui_section: {
+                                id: '18c3820eab2b48f891ba42f9f4a43c23'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Staging'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '6'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '73509e1cdcb14395bcb35f33490cc9b1'
                         key: {
@@ -5325,6 +9940,28 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '737637db99c944d2b84a0ab60d5f53fb'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd78118f473c54d33b100a228c24f085e'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    caption: 'Event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -5386,6 +10023,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '74db41704f404bfcb0380c6b03193e5c'
+                        key: {
+                            list_id: {
+                                id: 'b735556915984070b746b370aa97e54e'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'model'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '74f94c4eb21843b196a36f57d4e67169'
                         key: {
@@ -5394,6 +10054,50 @@ declare global {
                             value: 'ap'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '7519f9ae9e6943dbaa699c79984932e6'
+                        key: {
+                            sys_ui_section: {
+                                id: '18c3820eab2b48f891ba42f9f4a43c23'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Staging'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'staging_source'
+                            position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '7528845100374cb3b33d1ef087b04240'
+                        key: {
+                            sys_ui_section: {
+                                id: '2e580ac854364c889e8bfc7b51773e37'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'staging_task'
+                            position: '1'
                         }
                     },
                     {
@@ -5409,6 +10113,20 @@ declare global {
                         id: '756e06fe791d4da28691694bb688b102'
                         key: {
                             name: 'x_daas_ham.finance'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form'
+                        id: '758511249a86429181731c6b6bbb7060'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -5432,6 +10150,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '75d0b5c7797a4d33bc4e61d09d9921ea'
+                        key: {
+                            sys_ui_section: {
+                                id: 'f8cda9df97fa4e34bef4ad2a51d89fb7'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    caption: 'Job'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '3'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '75eee04598b746148e6a429223bdb012'
                         key: {
@@ -5442,6 +10182,28 @@ declare global {
                                     name: 'x_daas_ham.inventory_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '767212c6aeb046b5a4926e49d8b85980'
+                        key: {
+                            sys_ui_section: {
+                                id: '8f1b1ed7684647cea9a45c3838f8e78b'
+                                key: {
+                                    name: 'x_daas_ham_site_template_item'
+                                    caption: 'Item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -5476,6 +10238,45 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list'
+                        id: '77618df067cf47ef89fe509e4c9e8dd5'
+                        key: {
+                            name: 'x_daas_ham_job_cursor'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '7778c982f8fd459283eb329d4d8260a3'
+                        key: {
+                            sys_ui_section: {
+                                id: '4cb552655250459cb29a726e237a6d8d'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Service terms'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'spare_pool_ratio'
+                            position: '4'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '77bb3cc4fca640e0a3a069d43c66fd8d'
                         key: {
@@ -5488,6 +10289,28 @@ declare global {
                         id: '77f2d030798e4b68a4fad1a29c7f265a'
                         key: {
                             name: 'x_daas_ham_staging_task'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '7855da7184564b23b5c6df8a1b0bf457'
+                        key: {
+                            sys_ui_section: {
+                                id: '185b65ab6631429dab2aa56f3896d865'
+                                key: {
+                                    name: 'x_daas_ham_manufacturer_alias'
+                                    caption: 'Alias'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'manufacturer'
+                            position: '1'
                         }
                     },
                     {
@@ -5519,6 +10342,75 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '78ad0cad70c0499487ebfc1fc660eb95'
+                        key: {
+                            list_id: {
+                                id: 'dea8313f1ca047c695aef30044c61f57'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'match_type'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '78ca72b058de47a69a5389431422cd50'
+                        key: {
+                            list_id: {
+                                id: 'dea8313f1ca047c695aef30044c61f57'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'pattern'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '78caccb624e842daa925515370463382'
+                        key: {
+                            list_id: {
+                                id: '5557f3940bf443098b2a511664dd9117'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'end_of_sale'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '78d384db7802479496c8e7b7eca26003'
                         key: {
@@ -5527,6 +10419,28 @@ declare global {
                             value: 'meraki'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '78eff266b304424f84dbc91904ad357a'
+                        key: {
+                            sys_ui_section: {
+                                id: '18c3820eab2b48f891ba42f9f4a43c23'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Staging'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -5552,6 +10466,28 @@ declare global {
                         id: '79336452863546b8b9c4667653dcd483'
                         key: {
                             name: 'x_daas_ham_norm_exception'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '794438e05a034e03bd3f5b25b3366a61'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c8fb61bb330e4c9b972c8f3fb9255cba'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    caption: 'Catalog entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'customer'
+                            position: '1'
                         }
                     },
                     {
@@ -5642,6 +10578,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '7bab5f9cf2414de59643a85e0d1606f5'
+                        key: {
+                            sys_security_acl: 'e3170abeed9348e098277e524fc4010f'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '7c0a766f344c4224beb9181f30412dd2'
                         key: {
@@ -5659,6 +10608,20 @@ declare global {
                             value: 'available'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form'
+                        id: '7cc4bf7571d4435daf24d57b337f0bec'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -5696,12 +10659,57 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '7dac7a3069864479b4da7fc98d9d879c'
+                        key: {
+                            list_id: {
+                                id: 'f61ad36ce6774a58a595dcda55a5a7e8'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'model'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '7e5874b3fcea448985aea26df49c0b12'
                         key: {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_lessor'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '7e781687a44a4f21bcbee925a29ded23'
+                        key: {
+                            sys_ui_section: {
+                                id: '8f1b1ed7684647cea9a45c3838f8e78b'
+                                key: {
+                                    name: 'x_daas_ham_site_template_item'
+                                    caption: 'Item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'quantity'
+                            position: '4'
                         }
                     },
                     {
@@ -5731,6 +10739,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '7f47a178158e40f6b7996fba2f6c7a17'
+                        key: {
+                            sys_ui_section: {
+                                id: '29b797bac2074759b376585e6879ff77'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_agreement.x_daas_ham_subscription_line.agreement'
+                            position: '1'
+                        }
+                    },
+                    {
                         table: 'question_choice'
                         id: '7f8196d48ca647c2bd3312a69cfbc014'
                         key: {
@@ -5743,6 +10773,28 @@ declare global {
                                 }
                             }
                             value: 'device_replace'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '7f8e1314b5b14c0187eb9b3b1740530b'
+                        key: {
+                            sys_ui_section: {
+                                id: '371cdc177b2145e7957b603d1d8ed84f'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    caption: 'Source'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'source'
+                            position: '0'
                         }
                     },
                     {
@@ -5882,6 +10934,83 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list'
+                        id: '81b68f80815e4f929da2ff4035c4241f'
+                        key: {
+                            name: 'x_daas_ham_site_template_item'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '81e257c64b1545eb88bddc11ed7fc4fc'
+                        key: {
+                            name: 'x_daas_ham_staging_template'
+                            caption: 'Template'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '81e5366eb24e45e8b1ab9c357f18238f'
+                        key: {
+                            list_id: {
+                                id: 'b735556915984070b746b370aa97e54e'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'valid_to'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '81e6ec5c623f4c50b02809356d16ec50'
+                        key: {
+                            sys_ui_section: {
+                                id: '9bee72ad266f4788ad02e6b7bb0f8aab'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Delivery'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'tracking_number'
+                            position: '2'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '823a2397b48348b683a692f80e848359'
                         key: {
@@ -5906,6 +11035,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '824fb102b54a4b52874edb8f900ed5bb'
+                        key: {
+                            list_id: {
+                                id: 'b735556915984070b746b370aa97e54e'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'monthly_rate'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '8280b3720138441da2cef4e58aaec630'
                         key: {
@@ -5920,6 +11072,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_order_line'
                             element: 'purchase_order'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '8295ade44e84417895a7e3faa470fa98'
+                        key: {
+                            sys_ui_section: {
+                                id: 'f8cda9df97fa4e34bef4ad2a51d89fb7'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    caption: 'Job'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '7'
                         }
                     },
                     {
@@ -5943,6 +11117,50 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '82d0df84d4d34896a797d4a837975e26'
+                        key: {
+                            sys_ui_section: {
+                                id: '378d78af0c444e6f8ab68759417cf302'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    caption: 'Exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'raw_manufacturer'
+                            position: '1'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '82e53b4f82c8427ba12d409297bb5cfc'
+                        key: {
+                            sys_ui_section: {
+                                id: '18c3820eab2b48f891ba42f9f4a43c23'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Staging'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'state'
+                            position: '7'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '8311371245984a6895fd415e1c4193d9'
                         key: {
@@ -5956,6 +11174,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '838123496b594d1baf8d3cff9efa8f3d'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c8fb61bb330e4c9b972c8f3fb9255cba'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    caption: 'Catalog entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'monthly_rate'
+                            position: '6'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '839478d4518b4e0e9eb6404d0a61e8d4'
                         key: {
@@ -5966,6 +11206,28 @@ declare global {
                                     name: 'x_daas_ham.finance'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '845c43a55bd44cf99ffd71415e77aad6'
+                        key: {
+                            sys_ui_section: {
+                                id: '4cb552655250459cb29a726e237a6d8d'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Service terms'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'replacement_tier'
+                            position: '1'
                         }
                     },
                     {
@@ -5988,6 +11250,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: '84fb4af0cfff478e8ab29cc74ec1ff45'
+                        key: {
+                            sys_ui_form: {
+                                id: 'fc2d21d1f49d4ea89a738ff14bdd72dc'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'f8cda9df97fa4e34bef4ad2a51d89fb7'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    caption: 'Job'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '84feaef0f28a48d68932f843375ec058'
                         key: {
@@ -6004,6 +11299,29 @@ declare global {
                             value: 'psu'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '857a1ad75ae84acdaac20de1dea0fa93'
+                        key: {
+                            list_id: {
+                                id: 'b4b1c215906b4591932fe6cd1b8551d1'
+                                key: {
+                                    name: 'x_daas_ham_manufacturer_alias'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'alias'
                         }
                     },
                     {
@@ -6066,11 +11384,88 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: '864d0918273c4abf81f94251bf7abfc3'
+                        key: {
+                            sys_ui_form: {
+                                id: '3175dba01e414db6981c5bbb43d6b9d7'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '86584f503cf948dea2fbb32ec41c3ede'
                         key: {
                             name: 'x_daas_ham_asn_import'
                             element: 'tracking_number'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '8699a677d01848148efa03af7425ddfd'
+                        key: {
+                            sys_ui_section: {
+                                id: '81e257c64b1545eb88bddc11ed7fc4fc'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    caption: 'Template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'device_class'
+                            position: '7'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '869eb5fc8e5a426db1e2ffbbe917b156'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a2d1a850b4f74c4b8ef323b9e5b36db9'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Fees'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -6092,6 +11487,23 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list'
+                        id: '8730bb7ee0d346f9a68764806f1efd2a'
+                        key: {
+                            name: 'x_daas_ham_order'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
                         }
                     },
                     {
@@ -6126,6 +11538,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '8741560048224c25abc852bf3898d3e1'
+                        key: {
+                            sys_ui_section: {
+                                id: '4cb552655250459cb29a726e237a6d8d'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Service terms'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'attestation_interval_months'
+                            position: '7'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '874902fb0a2f4d0580afa841cd3b1ad5'
                         key: {
@@ -6156,6 +11590,52 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '87c4e7d74c0a452e9db0351d8b57ca04'
+                        key: {
+                            list_id: {
+                                id: '606dc51b32084e92b65cf8e9bc9768db'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'identifier'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '87f126a40f3e4c0c9d939842c31e957c'
+                        key: {
+                            list_id: {
+                                id: '77618df067cf47ef89fe509e4c9e8dd5'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'last_run'
+                        }
+                    },
+                    {
                         table: 'ua_table_licensing_config'
                         id: '880bf8bbe743487793f2764e5e4ed42e'
                         key: {
@@ -6173,6 +11653,51 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '8850c48b976143ecaea8c77385447c33'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a2d1a850b4f74c4b8ef323b9e5b36db9'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Fees'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'late_return_fee'
+                            position: '2'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '8873166193934400922378ae72c83ed2'
+                        key: {
+                            list_id: {
+                                id: '4d7f38d1f0d94ff1aa2c85a0e9ab02e1'
+                                key: {
+                                    name: 'x_daas_ham_site_template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'customer'
                         }
                     },
                     {
@@ -6205,6 +11730,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '892e774bbc304b4980c6a98678118973'
+                        key: {
+                            list_id: {
+                                id: '47a5e3f20a4c4c9480997f0b91496707'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'account_manager'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '892fd247bf184fa9bfeaac98351bac9c'
                         key: {
@@ -6223,6 +11771,29 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '89bed7bb024f439981418d38b6143bad'
+                        key: {
+                            list_id: {
+                                id: 'dea8313f1ca047c695aef30044c61f57'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'manufacturer'
                         }
                     },
                     {
@@ -6280,6 +11851,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '8a768c28b6f4481cbe2a65553179fc37'
+                        key: {
+                            sys_ui_section: {
+                                id: '378d78af0c444e6f8ab68759417cf302'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    caption: 'Exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'source_table'
+                            position: '8'
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: '8aa23064a4994a8db43539bda16199ed'
                         key: {
@@ -6313,6 +11906,28 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '8bd0923fea3a4ed38522ebddbb7828f2'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ab14b9b2f3ba4e8db17d772c8d66c32a'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    caption: 'Rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'order'
+                            position: '1'
                         }
                     },
                     {
@@ -6359,6 +11974,42 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '8c50fd13e7b14c72ab97d429cccdf71a'
+                        key: {
+                            sys_ui_section: {
+                                id: '9bee72ad266f4788ad02e6b7bb0f8aab'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Delivery'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'change_request'
+                            position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form'
+                        id: '8c556e30820a4de9bda0f6409aefa308'
+                        key: {
+                            name: 'x_daas_ham_device_event'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '8c6caff4332a40228dedf5bf1bed6109'
                         key: {
@@ -6389,6 +12040,29 @@ declare global {
                         id: '8d4e5a21af6144ac8acdac640818908a'
                         key: {
                             name: 'x_daas_ham/warehouse/main'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '8db14a1215484df5a6b453fd9631ecd6'
+                        key: {
+                            list_id: {
+                                id: '98c2ff150d1e472cafbd50e11c581e36'
+                                key: {
+                                    name: 'x_daas_ham_agreement_quantity'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'contracted_quantity'
                         }
                     },
                     {
@@ -6447,6 +12121,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '8e9a9907b93444c2968851f45e86049d'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd586f712f31b44bdbafc8411d8ccd759'
+                                key: {
+                                    name: 'x_daas_ham_staging_tmpl_item'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'label'
+                            position: '1'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '8eb7d6a778b9483193822666ee1ce0f9'
                         key: {
@@ -6495,6 +12191,44 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '8f1a4a56850b4494b632f3e7c70ae6f6'
+                        key: {
+                            list_id: {
+                                id: 'eeb6dba331fb49a7b9346ad5d3ce9ff1'
+                                key: {
+                                    name: 'x_daas_ham_staging_tmpl_item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'order'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '8f1b1ed7684647cea9a45c3838f8e78b'
+                        key: {
+                            name: 'x_daas_ham_site_template_item'
+                            caption: 'Item'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '8f375cf6d338499a8089ea83eee63ffb'
                         key: {
@@ -6505,6 +12239,28 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '8f3809fe871446bbb616a2d239eb4e21'
+                        key: {
+                            sys_ui_section: {
+                                id: '81e257c64b1545eb88bddc11ed7fc4fc'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    caption: 'Template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'staging_source'
+                            position: '2'
                         }
                     },
                     {
@@ -6646,6 +12402,52 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '9188c79a25a24db89a4647329f76a8db'
+                        key: {
+                            list_id: {
+                                id: 'f61ad36ce6774a58a595dcda55a5a7e8'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'quantity'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '91a854619fbb44b381ae92c2213f4ef5'
+                        key: {
+                            list_id: {
+                                id: '47a5e3f20a4c4c9480997f0b91496707'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'refresh_cycle_months'
+                        }
+                    },
+                    {
                         table: 'sys_user_role_contains'
                         id: '91abb7e14a2d495ba0326821ea33137f'
                         key: {
@@ -6698,6 +12500,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: '91f6dd6c736f4a85ab73efade96badb9'
+                        key: {
+                            sys_ui_form: {
+                                id: 'fa0af5253bd14d9b9900cdb4baca960f'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '920cd52778454bcc8c4ff1ebea2a3fde'
                         key: {
@@ -6714,12 +12549,58 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '928021c4be194cadb72c8bea203d631a'
+                        key: {
+                            list_id: {
+                                id: '4d7f38d1f0d94ff1aa2c85a0e9ab02e1'
+                                key: {
+                                    name: 'x_daas_ham_site_template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'name'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '929b88d12d234bdcbc1b91c60aa25b3a'
                         key: {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_last_seen'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '92b28bfd06794886853e5d38761c4e60'
+                        key: {
+                            list_id: {
+                                id: '6afd066c9b5d40b4b0b27ef810fcf701'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'done'
                         }
                     },
                     {
@@ -6770,11 +12651,92 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '943012e02fae437b8d3a73790e192b34'
+                        key: {
+                            name: 'x_daas_ham_order'
+                            caption: 'Notes'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '94645a9927654dc5b4e32ed6fb5b00cd'
+                        key: {
+                            sys_ui_section: {
+                                id: '0548cd1125b5401b9f1ad2beaccb6e56'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Entitlement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'entitlement_findings'
+                            position: '1'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '94721ad9a4a045ec80a472ad678c54c6'
+                        key: {
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'site'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '9475a4bfa3d4492789ec6caec47c23b4'
                         key: {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_customer_tag'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '948df3652fff45ab9a79cce1298bd0b1'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bc236aaa72bc4c0d9348055beabd2a2e'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'short_description'
+                            position: '4'
                         }
                     },
                     {
@@ -6784,6 +12746,28 @@ declare global {
                             name: 'x_daas_ham_order'
                             element: 'site'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '94eb178d956b4ea4a986894db2e86508'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ab14b9b2f3ba4e8db17d772c8d66c32a'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    caption: 'Rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'model'
+                            position: '6'
                         }
                     },
                     {
@@ -6800,6 +12784,74 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '950f2745b24f45b4b546e96a281c9b00'
+                        key: {
+                            sys_ui_section: {
+                                id: '7233999280c74fd5b5dc83d30981be49'
+                                key: {
+                                    name: 'x_daas_ham_agreement_quantity'
+                                    caption: 'Contracted quantity'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'device_class'
+                            position: '2'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '951ec49c3fb2417a927f5ed1223ac7c4'
+                        key: {
+                            list_id: {
+                                id: '47a5e3f20a4c4c9480997f0b91496707'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'state'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '960fa43d057e4fb28d816b497d8b8b0d'
+                        key: {
+                            list_id: {
+                                id: '81b68f80815e4f929da2ff4035c4241f'
+                                key: {
+                                    name: 'x_daas_ham_site_template_item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'model'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '96175f73d6c147b0a03fde6af1cf2fab'
                         key: {
@@ -6809,11 +12861,111 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: '964656fc903c4c03b36f8b057a5cd4d2'
+                        key: {
+                            sys_ui_form: {
+                                id: 'f78eba76c56c473a853b7509e00765c5'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '26f338a8a5d741948f5ec74a2f971600'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '96748ad5d5a04dada80f5bfe7dc5b5c0'
+                        key: {
+                            sys_ui_section: {
+                                id: 'cd335fa4a3394c81ae06a89f0a396755'
+                                key: {
+                                    name: 'x_daas_ham_site_template'
+                                    caption: 'Site template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'customer'
+                            position: '1'
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: '96aeadb4d9e2448aa5b408d089ba4861'
                         key: {
                             logical_table_name: 'x_daas_ham_order'
                             col_name_string: 'stage'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '96d0ef970c914e0d8c013fd8f3a5eeff'
+                        key: {
+                            sys_ui_section: {
+                                id: '185b65ab6631429dab2aa56f3896d865'
+                                key: {
+                                    name: 'x_daas_ham_manufacturer_alias'
+                                    caption: 'Alias'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'alias'
+                            position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '971f3abeb3b149ac81aa0f3fa11d0d0a'
+                        key: {
+                            list_id: {
+                                id: '61ddbed2617e4cea819a301dc98b46b8'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'state'
                         }
                     },
                     {
@@ -6852,6 +13004,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '9783fc275f5448f1b2ca362a49147924'
+                        key: {
+                            list_id: {
+                                id: 'f61ad36ce6774a58a595dcda55a5a7e8'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'line_stage'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '979dc2cf9fa54c5185d267edfa1d07d9'
                         key: {
@@ -6879,6 +13054,101 @@ declare global {
                             name: 'cmn_location'
                             element: 'NULL'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '98a45d2452414da0b79465d0bc749af5'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '98bd313533df45e6b96be1c6823682a0'
+                        key: {
+                            list_id: {
+                                id: '5557f3940bf443098b2a511664dd9117'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'model'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list'
+                        id: '98c2ff150d1e472cafbd50e11c581e36'
+                        key: {
+                            name: 'x_daas_ham_agreement_quantity'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '98e8ac71913944f9ab763b81d4d9577f'
+                        key: {
+                            sys_ui_form: {
+                                id: 'f78eba76c56c473a853b7509e00765c5'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '0548cd1125b5401b9f1ad2beaccb6e56'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Entitlement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
                         }
                     },
                     {
@@ -6933,6 +13203,51 @@ declare global {
                         key: {
                             name: 'x_daas_ham_agreement'
                             element: 'replacement_tier'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '99ac823f782247918303352844def18f'
+                        key: {
+                            list_id: {
+                                id: '61ddbed2617e4cea819a301dc98b46b8'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'result'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '99eb09b6115e4c439031a575af9476c6'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'order_type'
+                            position: '5'
                         }
                     },
                     {
@@ -7010,6 +13325,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '9add88623ef0444b928a65ddaf9d8104'
+                        key: {
+                            list_id: {
+                                id: '77618df067cf47ef89fe509e4c9e8dd5'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'processed_total'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '9ae92e73f8464fcab003a8e3067b915a'
                         key: {
@@ -7030,6 +13368,51 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '9b21a2360d0c45fa9bb4722dbf8228f5'
+                        key: {
+                            list_id: {
+                                id: '8730bb7ee0d346f9a68764806f1efd2a'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'stage'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '9bb1662b68b040b7a39b2cc36e47f11f'
+                        key: {
+                            sys_ui_section: {
+                                id: '2e580ac854364c889e8bfc7b51773e37'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '9'
+                        }
+                    },
+                    {
                         table: 'sys_ui_action_role'
                         id: '9bbb713362e0453b9a05b93f00877104'
                         key: {
@@ -7040,6 +13423,21 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '9bee72ad266f4788ad02e6b7bb0f8aab'
+                        key: {
+                            name: 'x_daas_ham_order'
+                            caption: 'Delivery'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -7058,11 +13456,70 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: '9c61858a8e8e4cc783f203b0b7c9662d'
+                        key: {
+                            name: 'x_daas_ham_site_template'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '9c705a628a634faf994d43ca614bc9cb'
+                        key: {
+                            sys_ui_section: {
+                                id: '18c3820eab2b48f891ba42f9f4a43c23'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Staging'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'number'
+                            position: '1'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '9cafa659cc634524b3e8b53e77fc0db6'
                         key: {
                             name: 'x_daas_ham_norm_exception'
                             element: 'resolved_model'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '9cb08d9121ea4146adc888a8edfdd682'
+                        key: {
+                            list_id: {
+                                id: '6afd066c9b5d40b4b0b27ef810fcf701'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'done_at'
                         }
                     },
                     {
@@ -7096,6 +13553,51 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '9ce053ccbfb24b1985668c4d6d5aa5bf'
+                        key: {
+                            list_id: {
+                                id: '5557f3940bf443098b2a511664dd9117'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'end_of_support'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '9cfebbf5c2384ae881ce0a992750804c'
+                        key: {
+                            sys_ui_section: {
+                                id: '4dc23702dc524498a68859197f1e32e9'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    caption: 'Milestones'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'end_of_sale'
+                            position: '2'
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: '9d4041f64af246979d68dcbb557b08cb'
                         key: {
@@ -7122,11 +13624,79 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '9e3ab77785ad4c429cb47b6d1f3c9042'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ab14b9b2f3ba4e8db17d772c8d66c32a'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    caption: 'Rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'active'
+                            position: '7'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '9e6893f80e59464d8667d7f5065106e6'
                         key: {
                             name: 'x_daas_ham_order'
                             element: 'change_request'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '9e7aeb6852ad4095a2578f3501d6a629'
+                        key: {
+                            list_id: {
+                                id: '606dc51b32084e92b65cf8e9bc9768db'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'event'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '9eacb6af80c64dbc9d091ea14548260e'
+                        key: {
+                            list_id: {
+                                id: 'ddb3ce4f13e0414891cdcb9425bbb4ac'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'start_date'
                         }
                     },
                     {
@@ -7157,6 +13727,39 @@ declare global {
                         key: {
                             logical_table_name: 'alm_hardware'
                             col_name_string: 'x_daas_ham_agreement'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '9fb1b92912384d219e6921a767a2d848'
+                        key: {
+                            sys_ui_form: {
+                                id: '3aa753e797704e4498c675b20c5f7162'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '18c3820eab2b48f891ba42f9f4a43c23'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Staging'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
                         }
                     },
                     {
@@ -7225,6 +13828,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'a0f5c110633440149c995a832f04abad'
+                        key: {
+                            sys_security_acl: 'e3170abeed9348e098277e524fc4010f'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: 'a15e9ed79c0042bdaa65a0911663d191'
                         key: {
@@ -7249,6 +13865,87 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'a19aa59bfd094f92bb123c2ca0abb326'
+                        key: {
+                            sys_security_acl: '53561058881d4d578f4127523777e126'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: 'a1a7573cd9b54afb851d2b5111c5e4d6'
+                        key: {
+                            sys_ui_form: {
+                                id: 'f2201cad3dd84c82aa50a1189acf9919'
+                                key: {
+                                    name: 'x_daas_ham_manufacturer_alias'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '185b65ab6631429dab2aa56f3896d865'
+                                key: {
+                                    name: 'x_daas_ham_manufacturer_alias'
+                                    caption: 'Alias'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'a1bc15e351d440398f06247052c57a19'
+                        key: {
+                            sys_ui_section: {
+                                id: '2e580ac854364c889e8bfc7b51773e37'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'done'
+                            position: '6'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'a1ed8988c595439bb172e5132fff3858'
+                        key: {
+                            sys_security_acl: 'ddb0d6a52122449382f86f3045c257d4'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'a1ffde81b9fe4bd48b5ac1e7c7c800f4'
                         key: {
@@ -7257,11 +13954,136 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: 'a20eb19b037146f583afd091c4a34f8c'
+                        key: {
+                            sys_ui_form: {
+                                id: '758511249a86429181731c6b6bbb7060'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '29b797bac2074759b376585e6879ff77'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'a229a326185f49179515d3c1e23fc336'
                         key: {
                             name: 'x_daas_ham_norm_exception'
                             element: 'source_table'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: 'a239356b327e412681c413ec1d16856b'
+                        key: {
+                            sys_ui_form: {
+                                id: 'f78eba76c56c473a853b7509e00765c5'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'a26b7481db9841208e9fd94630a7ace8'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'stage'
+                            position: '8'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'a293e2aff1e84f4cb0e613e073a436e9'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'transfer_order'
+                            position: '12'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: 'a2d1a850b4f74c4b8ef323b9e5b36db9'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            caption: 'Fees'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -7291,6 +14113,43 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: 'a33b84058a7f402b9db9058053a88b57'
+                        key: {
+                            name: 'x_daas_ham_staging_task'
+                            caption: 'Notes'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'a3886711a6ec415786823aef3ec18f6c'
+                        key: {
+                            sys_ui_section: {
+                                id: '8f1b1ed7684647cea9a45c3838f8e78b'
+                                key: {
+                                    name: 'x_daas_ham_site_template_item'
+                                    caption: 'Item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '3'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'a3886a3390db47ffb286a7752f1a117e'
                         key: {
@@ -7317,11 +14176,42 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: 'a3cb1524863643d980660213b36cc08b'
+                        key: {
+                            list_id: {
+                                id: 'd65d853d305d42f894ff8f59feae4dff'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'status'
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: 'a3d4b7e3040d4cd499b68dac75ddd36d'
                         key: {
                             logical_table_name: 'x_daas_ham_staging_tmpl_item'
                             col_name_string: 'template'
+                        }
+                    },
+                    {
+                        table: 'par_dashboard_canvas'
+                        id: 'a3d9e715006045d5b141b4a442fbd648'
+                        key: {
+                            dashboard: '2201d220760d41669225280628c65eb8'
+                            dashboard_tab: '111ed9a3503b465f898c4489af04d60e'
                         }
                     },
                     {
@@ -7353,12 +14243,67 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: 'a42acab267224a048729c028b0fecb9d'
+                        key: {
+                            sys_ui_form: {
+                                id: 'f78eba76c56c473a853b7509e00765c5'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '9bee72ad266f4788ad02e6b7bb0f8aab'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Delivery'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'a47ce068c94c4411ae9577cd7bd816c2'
                         key: {
                             name: 'x_daas_ham_norm_exception'
                             element: 'raw_manufacturer'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'a4a57d1b37f3462e83095269533b4865'
+                        key: {
+                            sys_ui_section: {
+                                id: 'f8cda9df97fa4e34bef4ad2a51d89fb7'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    caption: 'Job'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -7424,12 +14369,56 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'a5459bd3ed0244588ceb15289dffad4f'
+                        key: {
+                            sys_ui_section: {
+                                id: '81e257c64b1545eb88bddc11ed7fc4fc'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    caption: 'Template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '8'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'a559c25d2f5c4b0792913e2439f889c6'
                         key: {
                             name: 'x_daas_ham_site_template'
                             element: 'description'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'a57c9937fd7c4cae85eaa9a29ae7d53a'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ab14b9b2f3ba4e8db17d772c8d66c32a'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    caption: 'Rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -7469,6 +14458,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'a6cd6a7ccffd4ab496cf3563412bdfca'
+                        key: {
+                            sys_ui_section: {
+                                id: '7233999280c74fd5b5dc83d30981be49'
+                                key: {
+                                    name: 'x_daas_ham_agreement_quantity'
+                                    caption: 'Contracted quantity'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'contracted_quantity'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'a700ee61c5f74d4a81058bfe99461b6a'
                         key: {
@@ -7495,12 +14506,67 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'a7a5ff9493804563a9e5d10c840af75e'
+                        key: {
+                            sys_ui_section: {
+                                id: '18c3820eab2b48f891ba42f9f4a43c23'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Staging'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'result'
+                            position: '10'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'a7d5ed8b5a4446329586f76590f63830'
                         key: {
                             name: 'x_daas_ham_order'
                             element: 'stage'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: 'a81698b94fd7487bab0c2eab0651bf73'
+                        key: {
+                            sys_ui_form: {
+                                id: '63c77f7a77284bca9c04175a6098118d'
+                                key: {
+                                    name: 'x_daas_ham_agreement_quantity'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '7233999280c74fd5b5dc83d30981be49'
+                                key: {
+                                    name: 'x_daas_ham_agreement_quantity'
+                                    caption: 'Contracted quantity'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
                         }
                     },
                     {
@@ -7532,6 +14598,28 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'a8ff446f341b4d588c7750f6e147b04f'
+                        key: {
+                            sys_ui_section: {
+                                id: '7233999280c74fd5b5dc83d30981be49'
+                                key: {
+                                    name: 'x_daas_ham_agreement_quantity'
+                                    caption: 'Contracted quantity'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '3'
                         }
                     },
                     {
@@ -7612,6 +14700,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'aa6ea1f1f7b54d8b9e4c2940bd432b26'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bc236aaa72bc4c0d9348055beabd2a2e'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'customer'
+                            position: '2'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'aa7559d8f459423fadf1d813304ee267'
                         key: {
@@ -7643,6 +14753,58 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: 'ab14b9b2f3ba4e8db17d772c8d66c32a'
+                        key: {
+                            name: 'x_daas_ham_model_match_rule'
+                            caption: 'Rule'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form'
+                        id: 'ab9816eee9204f969e54898bc76812cd'
+                        key: {
+                            name: 'x_daas_ham_staging_tmpl_item'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'abb0a943563f4d809bcb57d437db68ee'
+                        key: {
+                            list_id: {
+                                id: '606dc51b32084e92b65cf8e9bc9768db'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'source'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: 'abb436d7c2d1401e85d8931fd2c24dc4'
                         key: {
@@ -7651,11 +14813,55 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'ac05cfa0ba6d489e809b519433e7c68e'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd78118f473c54d33b100a228c24f085e'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    caption: 'Event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '7'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'ac3db62520214a7eaeb428d8f41e1fbd'
                         key: {
                             name: 'x_daas_ham_norm_exception'
                             element: 'reason'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'ac6a11f1d21247d0827b0bc612d870ac'
+                        key: {
+                            sys_ui_section: {
+                                id: '26f338a8a5d741948f5ec74a2f971600'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_order.x_daas_ham_order_line.order'
+                            position: '1'
                         }
                     },
                     {
@@ -7695,6 +14901,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: 'ad7a8f02604b48498e4bd76f39c966c9'
+                        key: {
+                            sys_ui_form: {
+                                id: 'f2b4dcb600554f80be05cdd466a8b4c9'
+                                key: {
+                                    name: 'x_daas_ham_stockroom_member'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '2a64545aa7824cdcb8dc5153584a410a'
+                                key: {
+                                    name: 'x_daas_ham_stockroom_member'
+                                    caption: 'Member'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'ae18fb3cf60647b79ff43aac2ed6c0a7'
                         key: {
@@ -7708,6 +14947,29 @@ declare global {
                         key: {
                             logical_table_name: 'alm_hardware'
                             col_name_string: 'x_daas_ham_rack'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'aeb628a2093a4457ac58177abfe8b5a6'
+                        key: {
+                            list_id: {
+                                id: 'ddb3ce4f13e0414891cdcb9425bbb4ac'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'site'
                         }
                     },
                     {
@@ -7728,6 +14990,43 @@ declare global {
                             name: 'x_daas_ham_model_lifecycle'
                             element: 'source_reference'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'af00345305e242c8af912b8278bb89e9'
+                        key: {
+                            list_id: {
+                                id: '5557f3940bf443098b2a511664dd9117'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'end_of_extended_support'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form'
+                        id: 'afd7930f88964c8a96e9bd168bdd3d7d'
+                        key: {
+                            name: 'x_daas_ham_staging_template'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -7768,6 +15067,28 @@ declare global {
                         id: 'b00f044df3fd4f61ad8a0a68ea81475a'
                         key: {
                             name: 'x_daas_ham_asn_import'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'b01008c085a7460b89b8553d033fab5a'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'site'
+                            position: '4'
                         }
                     },
                     {
@@ -7818,11 +15139,66 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: 'b0ab9d5eb6034770b22acdbdfe4fe031'
+                        key: {
+                            sys_ui_form: {
+                                id: 'c68c272fd03f4f38a0fa00aa3080be57'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'ab14b9b2f3ba4e8db17d772c8d66c32a'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    caption: 'Rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'b0c8c26ab21045ddad5760cca898c257'
                         key: {
                             name: 'x_daas_ham_norm_exception'
                             element: 'raw_manufacturer'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'b0f67d0f38994c08a587f290f9e00bce'
+                        key: {
+                            sys_ui_section: {
+                                id: '81e257c64b1545eb88bddc11ed7fc4fc'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    caption: 'Template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'active'
+                            position: '3'
                         }
                     },
                     {
@@ -7872,6 +15248,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'b1ad401dab47409e90e5858e70052798'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bc236aaa72bc4c0d9348055beabd2a2e'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'state'
+                            position: '6'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'b253cdf9ee4641f59bbe6b28443c3a7e'
                         key: {
@@ -7904,6 +15302,28 @@ declare global {
                             value: 'ready_to_ship'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'b344b32b552b4b8db05acc01e8511a5d'
+                        key: {
+                            sys_ui_section: {
+                                id: '2e580ac854364c889e8bfc7b51773e37'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -7942,6 +15362,45 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'b4acfdf94db14f08a02de3d12125d7e5'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd586f712f31b44bdbafc8411d8ccd759'
+                                key: {
+                                    name: 'x_daas_ham_staging_tmpl_item'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'template'
+                            position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list'
+                        id: 'b4b1c215906b4591932fe6cd1b8551d1'
+                        key: {
+                            name: 'x_daas_ham_manufacturer_alias'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_number'
                         id: 'b523082b82d74167a3edeea1ee3a31fb'
                         key: {
@@ -7955,6 +15414,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_agreement'
                             element: 'damage_fee'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'b54d145b4ced4320a34ed509ed5bc6aa'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd586f712f31b44bdbafc8411d8ccd759'
+                                key: {
+                                    name: 'x_daas_ham_staging_tmpl_item'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'order'
+                            position: '2'
                         }
                     },
                     {
@@ -8024,12 +15505,73 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'b6714375784448d890ecf3cb19f9c7e8'
+                        key: {
+                            sys_ui_section: {
+                                id: '378d78af0c444e6f8ab68759417cf302'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    caption: 'Exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'reason'
+                            position: '3'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'b6d534d602264cfabca20319ccd6f971'
                         key: {
                             name: 'x_daas_ham_order_line'
                             element: 'sourcing_summary'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'b7329ddd9e16423dbea6c81abb6a8179'
+                        key: {
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'currency'
+                            position: '9'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list'
+                        id: 'b735556915984070b746b370aa97e54e'
+                        key: {
+                            name: 'x_daas_ham_catalog_entry'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
                         }
                     },
                     {
@@ -8055,6 +15597,29 @@ declare global {
                         key: {
                             name: 'x_daas_ham_order'
                             element: 'order_type'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'b810885cdff943fd9bc99e2c83d22d46'
+                        key: {
+                            list_id: {
+                                id: '606dc51b32084e92b65cf8e9bc9768db'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'observed_at'
                         }
                     },
                     {
@@ -8113,11 +15678,91 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'b92aaf0954374a7b8ab3b395ef9f5fca'
+                        key: {
+                            sys_ui_section: {
+                                id: '7233999280c74fd5b5dc83d30981be49'
+                                key: {
+                                    name: 'x_daas_ham_agreement_quantity'
+                                    caption: 'Contracted quantity'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '6'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'b9b2972a121d45748e6d67e77da1ab0c'
+                        key: {
+                            sys_security_acl: '53561058881d4d578f4127523777e126'
+                            sys_user_role: {
+                                id: 'c5156577be814d2aa8bf557ddec8bf0e'
+                                key: {
+                                    name: 'x_daas_ham.noc'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'ba0cb09308384ff2962fcf2e21d0d6fc'
                         key: {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_order_line'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'ba0e8033f16844da864fb02fbcf529e4'
+                        key: {
+                            list_id: {
+                                id: '6afd066c9b5d40b4b0b27ef810fcf701'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'order'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'ba1b73ce845e43458cb16426ef700234'
+                        key: {
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'line_type'
+                            position: '4'
                         }
                     },
                     {
@@ -8139,6 +15784,43 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'bb49d975aaab48ee9444cfcb7f029f07'
+                        key: {
+                            sys_ui_section: {
+                                id: '2e580ac854364c889e8bfc7b51773e37'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'label'
+                            position: '2'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: 'bbc5849e990345f59ba74d5f94e49cb5'
+                        key: {
+                            name: 'x_daas_ham_subscription_line'
+                            caption: 'Related'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: 'bc094ad61746401897530c9f572ea706'
                         key: {
@@ -8150,11 +15832,48 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'bc0c2f8d697a45ca9bf323018b829d39'
+                        key: {
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '13'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'bc15844722cd45e3a81ef16e5260bbb8'
                         key: {
                             name: 'x_daas_ham_eox_import'
                             element: 'manufacturer'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: 'bc236aaa72bc4c0d9348055beabd2a2e'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            caption: 'Agreement'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -8214,12 +15933,68 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: 'bd47d327cf1442af927c315fcf1f286e'
+                        key: {
+                            sys_ui_form: {
+                                id: '476492610d5b4b2e8752d4ef6d2cc7fd'
+                                key: {
+                                    name: 'x_daas_ham_site_template_item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '8f1b1ed7684647cea9a45c3838f8e78b'
+                                key: {
+                                    name: 'x_daas_ham_site_template_item'
+                                    caption: 'Item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'bd6d277869744ab2a2b7ff8f8089570f'
                         key: {
                             name: 'cmdb_model'
                             element: 'x_daas_ham_device_class'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'bd85dd3ab5b448a990c5167887452820'
+                        key: {
+                            list_id: {
+                                id: 'b735556915984070b746b370aa97e54e'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'active'
                         }
                     },
                     {
@@ -8311,6 +16086,51 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: 'c0e5bfedaae5424ca3779c5cbe24da35'
+                        key: {
+                            list_id: {
+                                id: 'd65d853d305d42f894ff8f59feae4dff'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'resolved_model'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'c133d1c85e624e48bee2fbb79979f9c6'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c8fb61bb330e4c9b972c8f3fb9255cba'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    caption: 'Catalog entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '10'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'c14f5050669641609101b7ebb3d76d8f'
                         key: {
@@ -8326,6 +16146,41 @@ declare global {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_ru_start'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'c18694875a7a43e4b26f9b3c0c14680f'
+                        key: {
+                            sys_security_acl: 'd837b2e8a82f4463b1c27019154e2d06'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'c1b19a8fef6d40368d47ea4549772290'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ab14b9b2f3ba4e8db17d772c8d66c32a'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    caption: 'Rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'pattern'
+                            position: '5'
                         }
                     },
                     {
@@ -8413,6 +16268,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'c37d378a3e6d47e3908a49b9f04c9d1c'
+                        key: {
+                            sys_ui_section: {
+                                id: '9bee72ad266f4788ad02e6b7bb0f8aab'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Delivery'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '3'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'c3b152d9a4004326aeaa9531c601a328'
                         key: {
@@ -8423,6 +16300,28 @@ declare global {
                                     name: 'x_daas_ham.field_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'c3c56e492a2c44dd92f313470d276279'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'replaces_asset'
+                            position: '5'
                         }
                     },
                     {
@@ -8462,11 +16361,56 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: 'c463ce14a0e2412ab232840451bbee8a'
+                        key: {
+                            list_id: {
+                                id: '98c2ff150d1e472cafbd50e11c581e36'
+                                key: {
+                                    name: 'x_daas_ham_agreement_quantity'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'device_class'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'c4666c73ae1a4c6f9c85470105364262'
                         key: {
                             name: 'x_daas_ham_norm_exception'
                             element: 'occurrences'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'c47e2a00f23648a8b88742d1d8d11be7'
+                        key: {
+                            sys_ui_section: {
+                                id: '2e580ac854364c889e8bfc7b51773e37'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'done_at'
+                            position: '8'
                         }
                     },
                     {
@@ -8504,6 +16448,52 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: 'c4c36c3c145a423aa687ceace7034478'
+                        key: {
+                            list_id: {
+                                id: 'b735556915984070b746b370aa97e54e'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'site_template'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'c4f0594844b64a738204d863dfec5d25'
+                        key: {
+                            list_id: {
+                                id: '8730bb7ee0d346f9a68764806f1efd2a'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'order_type'
+                        }
+                    },
+                    {
                         table: 'sys_user_role'
                         id: 'c5156577be814d2aa8bf557ddec8bf0e'
                         key: {
@@ -8516,6 +16506,24 @@ declare global {
                         key: {
                             name: 'x_daas_ham_order_line'
                             element: 'quantity_allocated'
+                        }
+                    },
+                    {
+                        table: 'sys_user_role_contains'
+                        id: 'c5ce65a6d25443afa1c7aa5d390b5e38'
+                        key: {
+                            role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                            contains: {
+                                id: '93abb5ee48f64012840efa9c791ac8c5'
+                                key: {
+                                    name: 'canvas_user'
+                                }
+                            }
                         }
                     },
                     {
@@ -8551,6 +16559,42 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: 'c68c272fd03f4f38a0fa00aa3080be57'
+                        key: {
+                            name: 'x_daas_ham_model_match_rule'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'c6cfbaf52e154831b6907bf6980bba3e'
+                        key: {
+                            sys_ui_section: {
+                                id: '4dc23702dc524498a68859197f1e32e9'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    caption: 'Milestones'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'model'
+                            position: '1'
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: 'c6d05cdc14a84b36a689178a58192166'
                         key: {
@@ -8568,10 +16612,55 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: 'c6e30f3971f44e0c953d5e51c24e6123'
+                        key: {
+                            list_id: {
+                                id: '61ddbed2617e4cea819a301dc98b46b8'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'staging_source'
+                        }
+                    },
+                    {
                         table: 'sys_db_object'
                         id: 'c7123b12fb634e17b32499a02faae9a4'
                         key: {
                             name: 'alm_stockroom'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'c72078c495bf4576afd66318304f1f57'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ab14b9b2f3ba4e8db17d772c8d66c32a'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    caption: 'Rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'match_type'
+                            position: '3'
                         }
                     },
                     {
@@ -8606,6 +16695,74 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'c784561cf58c4e388a9d4c56b3d68608'
+                        key: {
+                            sys_ui_section: {
+                                id: '4cb552655250459cb29a726e237a6d8d'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Service terms'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'refresh_cycle_months'
+                            position: '2'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'c784a5a362d246e1a051471185af0b50'
+                        key: {
+                            list_id: {
+                                id: '98c2ff150d1e472cafbd50e11c581e36'
+                                key: {
+                                    name: 'x_daas_ham_agreement_quantity'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'agreement'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'c7e3b8c862e24d9a976b20ac8866509c'
+                        key: {
+                            list_id: {
+                                id: 'ea1e62fe24dc41aaa02caf586070918f'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'name'
+                        }
+                    },
+                    {
                         table: 'ua_table_licensing_config'
                         id: 'c7fd6b9e565446e9bb5c4b531210d85b'
                         key: {
@@ -8636,6 +16793,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'c8a2980b7fff4822ba61104e56e925fb'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a2d1a850b4f74c4b8ef323b9e5b36db9'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Fees'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'lost_asset_fee'
+                            position: '1'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: 'c8a4000705a84fe3b59421b76f3b5fc7'
                         key: {
@@ -8644,6 +16823,21 @@ declare global {
                             value: 'installed'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: 'c8fb61bb330e4c9b972c8f3fb9255cba'
+                        key: {
+                            name: 'x_daas_ham_catalog_entry'
+                            caption: 'Catalog entry'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -8657,6 +16851,28 @@ declare global {
                                     name: 'x_daas_ham.field_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'c9047e85bd5a466b9c829161e84aad19'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bc236aaa72bc4c0d9348055beabd2a2e'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -8684,6 +16900,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: 'c94c251a49b845c3bb54a46f06940f18'
+                        key: {
+                            sys_ui_form: {
+                                id: '9c61858a8e8e4cc783f203b0b7c9662d'
+                                key: {
+                                    name: 'x_daas_ham_site_template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'cd335fa4a3394c81ae06a89f0a396755'
+                                key: {
+                                    name: 'x_daas_ham_site_template'
+                                    caption: 'Site template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'c952eca4565f47709dc4ba64758692b1'
                         key: {
@@ -8692,11 +16941,66 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'c95733fc6c514504b792f996140c0acd'
+                        key: {
+                            sys_ui_section: {
+                                id: '2e580ac854364c889e8bfc7b51773e37'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'done_by'
+                            position: '7'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: 'c95fb601270f4d2e93a5fa491e85b5c6'
                         key: {
                             name: 'cmn_location'
                             element: 'x_daas_ham_site_tier'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: 'c964c441b6974c178da73c8ec475d05c'
+                        key: {
+                            sys_ui_form: {
+                                id: '7cc4bf7571d4435daf24d57b337f0bec'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '2e580ac854364c889e8bfc7b51773e37'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
                         }
                     },
                     {
@@ -8741,6 +17045,24 @@ declare global {
                                 id: 'd33813ebacca4b79aad41517026036d8'
                                 key: {
                                     name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_user_role_contains'
+                        id: 'ca59ec32ad1d4da0958a628231b53246'
+                        key: {
+                            role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                            contains: {
+                                id: '884fb29b75274c738d8202d3387b92b2'
+                                key: {
+                                    name: 'canvas_user'
                                 }
                             }
                         }
@@ -8793,6 +17115,61 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: 'cad8a5778ca34fee8f229fec4ac36f71'
+                        key: {
+                            sys_ui_form: {
+                                id: 'afd7930f88964c8a96e9bd168bdd3d7d'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '81e257c64b1545eb88bddc11ed7fc4fc'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    caption: 'Template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'cae3dfeac7d94f219d45244cd6b86ae7'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a2d1a850b4f74c4b8ef323b9e5b36db9'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Fees'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '3'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'caffc7ed202a486da14955cf0ec2e81d'
                         key: {
@@ -8815,6 +17192,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_order'
                             element: 'requested_date'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'cb8c81fb791940b5a8ddf6c81a64b08d'
+                        key: {
+                            sys_ui_section: {
+                                id: '378d78af0c444e6f8ab68759417cf302'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    caption: 'Exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'raw_model'
+                            position: '2'
                         }
                     },
                     {
@@ -8914,10 +17313,47 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'ccfe90bf48f3498295f8a86200b765e0'
+                        key: {
+                            sys_ui_section: {
+                                id: '371cdc177b2145e7957b603d1d8ed84f'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    caption: 'Source'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'last_refreshed'
+                            position: '2'
+                        }
+                    },
+                    {
                         table: 'sys_ux_lib_asset'
                         id: 'cd1837f26ddb4deea75a4db3dfe89d76'
                         key: {
                             name: 'x_daas_ham/vendor-react-dom--55da69dc.js.map'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: 'cd335fa4a3394c81ae06a89f0a396755'
+                        key: {
+                            name: 'x_daas_ham_site_template'
+                            caption: 'Site template'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -8940,6 +17376,28 @@ declare global {
                             name: 'x_daas_ham_subscription_line'
                             element: 'start_date'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'cd44f945026745d6a54d4a0fbcb5f9fa'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd78118f473c54d33b100a228c24f085e'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    caption: 'Event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'identifier'
+                            position: '2'
                         }
                     },
                     {
@@ -8970,6 +17428,28 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'ce04ab8208c54571bf8a9c25f96fa46f'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'number'
+                            position: '1'
                         }
                     },
                     {
@@ -9041,6 +17521,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'cf127613f2304b62a5d3e8f7df534596'
+                        key: {
+                            sys_ui_section: {
+                                id: '18c3820eab2b48f891ba42f9f4a43c23'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Staging'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'order_line'
+                            position: '3'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: 'cf6aedccc08a48c08e83e45c53ac6f7d'
                         key: {
@@ -9095,6 +17597,61 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'd09cee795fc64e599fb61443f24bd090'
+                        key: {
+                            sys_ui_section: {
+                                id: '18c3820eab2b48f891ba42f9f4a43c23'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Staging'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '11'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: 'd0b7c210fe9a41aea7460289f08e5c97'
+                        key: {
+                            sys_ui_form: {
+                                id: '3aa753e797704e4498c675b20c5f7162'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'a33b84058a7f402b9db9058053a88b57'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Notes'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'd18f4858b55e4e15a01484939cf87223'
                         key: {
@@ -9130,6 +17687,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_model_match_rule'
                             element: 'pattern'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'd27f466e618d4e29ab0705be8c5dd476'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'model'
+                            position: '3'
                         }
                     },
                     {
@@ -9197,6 +17776,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: 'd39f6e004b6746f983f4a09d147eaa66'
+                        key: {
+                            list_id: {
+                                id: '606dc51b32084e92b65cf8e9bc9768db'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'asset'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: 'd3b6613506d24f808a1dc52621f2944a'
                         key: {
@@ -9221,6 +17823,19 @@ declare global {
                         key: {
                             logical_table_name: 'alm_stockroom'
                             col_name_string: 'x_daas_ham_customer'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'd48edff7fc5e4695841cb04f712aa389'
+                        key: {
+                            sys_security_acl: '53561058881d4d578f4127523777e126'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
                         }
                     },
                     {
@@ -9252,12 +17867,67 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: 'd586f712f31b44bdbafc8411d8ccd759'
+                        key: {
+                            name: 'x_daas_ham_staging_tmpl_item'
+                            caption: 'Step'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'd5f16dee81784f2e90bf7212916b3536'
+                        key: {
+                            list_id: {
+                                id: '4d7f38d1f0d94ff1aa2c85a0e9ab02e1'
+                                key: {
+                                    name: 'x_daas_ham_site_template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'active'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'd643e90308314d51a6c99fe5e5b4d2a3'
                         key: {
                             name: 'x_daas_ham_job_cursor'
                             element: 'cursor'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list'
+                        id: 'd65d853d305d42f894ff8f59feae4dff'
+                        key: {
+                            name: 'x_daas_ham_norm_exception'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
                         }
                     },
                     {
@@ -9289,6 +17959,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'd6bdc6f3d44f45bc868a9bbbb9057edd'
+                        key: {
+                            sys_ui_section: {
+                                id: '58f7aa6a7b494d889b48a8c85d7478ee'
+                                key: {
+                                    name: 'x_daas_ham_site_template'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_site_template.x_daas_ham_site_template_item.site_template'
+                            position: '0'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'd6e9e32ebc444446abe428b918182722'
                         key: {
@@ -9298,11 +17990,71 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'd6f62b47985d4f8598767e456ea747b4'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'line_stage'
+                            position: '8'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'd6f6ebc38a5b46cd9d72f29946f39c92'
                         key: {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_rack'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: 'd78118f473c54d33b100a228c24f085e'
+                        key: {
+                            name: 'x_daas_ham_device_event'
+                            caption: 'Event'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'd7a21186d7944d7b9b2ab9a8c27ef609'
+                        key: {
+                            list_id: {
+                                id: 'b4b1c215906b4591932fe6cd1b8551d1'
+                                key: {
+                                    name: 'x_daas_ham_manufacturer_alias'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'manufacturer'
                         }
                     },
                     {
@@ -9364,6 +18116,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'd93d5fe7ca024a7293b450f742733bc6'
+                        key: {
+                            sys_ui_section: {
+                                id: '2a64545aa7824cdcb8dc5153584a410a'
+                                key: {
+                                    name: 'x_daas_ham_stockroom_member'
+                                    caption: 'Member'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'stockroom'
+                            position: '1'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'd93e24079cc342fa812d8e2b9564c689'
                         key: {
@@ -9419,6 +18193,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: 'da3b1a6b6769453eb380a9f4110e174f'
+                        key: {
+                            list_id: {
+                                id: 'ea1e62fe24dc41aaa02caf586070918f'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'staging_source'
+                        }
+                    },
+                    {
                         table: 'question_choice'
                         id: 'daf0f692e17b49c1b5cbe3d5e200221f'
                         key: {
@@ -9439,6 +18236,61 @@ declare global {
                         key: {
                             name: 'x_daas_ham_site_template'
                             element: 'description'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: 'db171b62c0b44790b7a06360ff47778a'
+                        key: {
+                            sys_ui_form: {
+                                id: 'afd7930f88964c8a96e9bd168bdd3d7d'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '469dab30e56141de8ddd6e8e8e10a905'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'db56747967c74a2599a5b67f04ace7ed'
+                        key: {
+                            sys_ui_section: {
+                                id: '4c7b58447dc44981a0b116437b7fe5e7'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_staging_task.x_daas_ham_staging_step.staging_task'
+                            position: '1'
                         }
                     },
                     {
@@ -9503,6 +18355,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'dc60192152be466a8fbfa8560c525d6e'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bc236aaa72bc4c0d9348055beabd2a2e'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'number'
+                            position: '1'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'dc8f2aa0b9c04a6283f5e22c11572724'
                         key: {
@@ -9527,6 +18401,51 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'dcb550c40b6342848fb80fe844cb37ba'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '7'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'dcc08b8c4d8a4ea3be11a96e774f5cf6'
+                        key: {
+                            list_id: {
+                                id: 'dea8313f1ca047c695aef30044c61f57'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'model'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: 'dcca1a511ea84908a72008ac89b3c7da'
                         key: {
@@ -9545,6 +18464,71 @@ declare global {
                                     name: 'x_daas_ham.customer_admin'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: 'dd31ecf5e18b4994b3296834123c22bc'
+                        key: {
+                            sys_ui_form: {
+                                id: 'e1b647a673c24263a123a24b9dc42f28'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '378d78af0c444e6f8ab68759417cf302'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    caption: 'Exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: 'dd586e2cd8b8499b9546de0069a7e385'
+                        key: {
+                            name: 'x_daas_ham_order_line'
+                            caption: 'Line'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list'
+                        id: 'ddb3ce4f13e0414891cdcb9425bbb4ac'
+                        key: {
+                            name: 'x_daas_ham_subscription_line'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
                         }
                     },
                     {
@@ -9604,6 +18588,23 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list'
+                        id: 'dea8313f1ca047c695aef30044c61f57'
+                        key: {
+                            name: 'x_daas_ham_model_match_rule'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: 'df03cdf26e224c35b9325458d38bdad5'
                         key: {
@@ -9628,6 +18629,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: 'df582d234e75460f973728146d012e50'
+                        key: {
+                            list_id: {
+                                id: '77618df067cf47ef89fe509e4c9e8dd5'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'job'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'df5e6ccccb21448f91a39cbb8d851fa5'
                         key: {
@@ -9642,6 +18666,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_agreement'
                             element: 'replacement_tier'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'df73522382d94e0480a0d37eea98754c'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'end_date'
+                            position: '13'
                         }
                     },
                     {
@@ -9679,11 +18725,77 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'dfec6feaba8b4b09be801de35e257d9c'
+                        key: {
+                            sys_ui_section: {
+                                id: '378d78af0c444e6f8ab68759417cf302'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    caption: 'Exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'source_record'
+                            position: '9'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'e04ba8cad9ff4bd99105ab49f8c1a575'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd78118f473c54d33b100a228c24f085e'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    caption: 'Event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'source'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'sn_glider_source_artifact_m2m'
                         id: 'e04f8be0b14542b097a43ed3105b8cb0'
                         key: {
                             application_file: 'b0978c99f340487e9f32eb3883dd6232'
                             source_artifact: '888663c7a08f49ebbf66191a4afa2175'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'e0a17dca398945eb9ee6d3c6a1e01729'
+                        key: {
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'start_date'
+                            position: '11'
                         }
                     },
                     {
@@ -9695,11 +18807,48 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: 'e1329622745c4bc28bb75e8c0ca523f7'
+                        key: {
+                            list_id: {
+                                id: 'ddb3ce4f13e0414891cdcb9425bbb4ac'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'monthly_rate'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'e1b4c5d797534d04bfa25f5b2f69e5c4'
                         key: {
                             name: 'x_daas_ham_staging_template'
                             element: 'active'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form'
+                        id: 'e1b647a673c24263a123a24b9dc42f28'
+                        key: {
+                            name: 'x_daas_ham_norm_exception'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -9733,6 +18882,50 @@ declare global {
                             value: 'site_package'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'e2b59ff564f142828fe8e4d92f454cba'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd78118f473c54d33b100a228c24f085e'
+                                key: {
+                                    name: 'x_daas_ham_device_event'
+                                    caption: 'Event'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'event'
+                            position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'e2bd2183c5df4a84b64122ef3a94ab11'
+                        key: {
+                            sys_ui_section: {
+                                id: '469dab30e56141de8ddd6e8e8e10a905'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_staging_template.x_daas_ham_staging_tmpl_item.template'
+                            position: '0'
                         }
                     },
                     {
@@ -9773,6 +18966,29 @@ declare global {
                             value: 'same_day'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'e308ba7f8b8d4053bc45cfd8a7fb8cbe'
+                        key: {
+                            list_id: {
+                                id: '5557f3940bf443098b2a511664dd9117'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'source'
                         }
                     },
                     {
@@ -9846,6 +19062,51 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'e54fa04787504307bd3f806e96a2981b'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bc236aaa72bc4c0d9348055beabd2a2e'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'starts'
+                            position: '7'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'e55db10d25df46e6a7920e31cd20e9a2'
+                        key: {
+                            list_id: {
+                                id: 'ddb3ce4f13e0414891cdcb9425bbb4ac'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'description'
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: 'e5c9a39d6c4843d88df1b20d672e3528'
                         key: {
@@ -9863,11 +19124,51 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_user_role_contains'
+                        id: 'e5eaf7d22839456f8139c325e8e51ec6'
+                        key: {
+                            role: {
+                                id: 'b1a9a9832f01483a9c4e6fc55ca84188'
+                                key: {
+                                    name: 'x_daas_ham.field_tech'
+                                }
+                            }
+                            contains: {
+                                id: '0200327aa5c04482adcb05c5ac34e7ce'
+                                key: {
+                                    name: 'canvas_user'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: 'e5ee57498a11496387b1af7b001687f9'
                         key: {
                             name: 'x_daas_ham_device_event'
                             element: 'source'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'e606e07e483946ceb6556b032b4b166e'
+                        key: {
+                            sys_ui_section: {
+                                id: '18c3820eab2b48f891ba42f9f4a43c23'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Staging'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'template'
+                            position: '5'
                         }
                     },
                     {
@@ -9921,6 +19222,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_order'
                             element: 'tracking_number'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'e767c3fac12242a59dac037be4819cdb'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'number'
+                            position: '1'
                         }
                     },
                     {
@@ -9985,6 +19308,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'e95b403cb40a43979c83dd708b31c2a8'
+                        key: {
+                            sys_ui_section: {
+                                id: 'f8cda9df97fa4e34bef4ad2a51d89fb7'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    caption: 'Job'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'processed_total'
+                            position: '6'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'e969d37042fc429fa405a477101f95bd'
                         key: {
@@ -9998,6 +19343,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: 'e985d43ab9ed4746a3f44b3eec7d389b'
+                        key: {
+                            list_id: {
+                                id: '5557f3940bf443098b2a511664dd9117'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'end_of_life'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'e9e41058cf9e41f5aef5f2194f8e35cb'
                         key: {
@@ -10008,6 +19376,78 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: 'e9fb242a419b49b082331ac23bb5f1b7'
+                        key: {
+                            sys_ui_form: {
+                                id: '758511249a86429181731c6b6bbb7060'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '4cb552655250459cb29a726e237a6d8d'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Service terms'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'ea0ea4330f144915b25864e2c6f82aff'
+                        key: {
+                            sys_ui_section: {
+                                id: 'f8cda9df97fa4e34bef4ad2a51d89fb7'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    caption: 'Job'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'last_status'
+                            position: '5'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list'
+                        id: 'ea1e62fe24dc41aaa02caf586070918f'
+                        key: {
+                            name: 'x_daas_ham_staging_template'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
                         }
                     },
                     {
@@ -10058,6 +19498,50 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'ebec25246925434a99185f7380e9dfe9'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c8fb61bb330e4c9b972c8f3fb9255cba'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    caption: 'Catalog entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'ebf6502aef294d04a0dbb0e640ee1884'
+                        key: {
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'ec01e9c511ac46638349bbece4acfa14'
                         key: {
@@ -10076,6 +19560,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_staging_template'
                             element: 'staging_source'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'ec4a7431643f419cbf437548e0e7212a'
+                        key: {
+                            sys_ui_section: {
+                                id: '8f1b1ed7684647cea9a45c3838f8e78b'
+                                key: {
+                                    name: 'x_daas_ham_site_template_item'
+                                    caption: 'Item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'model'
+                            position: '2'
                         }
                     },
                     {
@@ -10113,6 +19619,52 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: 'ed5d29625c604e02a47b8844de28c74f'
+                        key: {
+                            list_id: {
+                                id: '8730bb7ee0d346f9a68764806f1efd2a'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'install_mode'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'edd68b923ff04f8cb6c02f001cec6387'
+                        key: {
+                            list_id: {
+                                id: '5d9dbd259a72495a8628d3f295365f75'
+                                key: {
+                                    name: 'x_daas_ham_stockroom_member'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'stockroom'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'ee4336281beb4f76a6581ef2cc7e6299'
                         key: {
@@ -10139,6 +19691,23 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list'
+                        id: 'eeb6dba331fb49a7b9346ad5d3ce9ff1'
+                        key: {
+                            name: 'x_daas_ham_staging_tmpl_item'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
+                        }
+                    },
+                    {
                         table: 'ua_table_licensing_config'
                         id: 'eebe2c8293a8451fbd071a9ca186cc3b'
                         key: {
@@ -10160,6 +19729,29 @@ declare global {
                             name: 'x_daas_ham_asn_import'
                             element: 'carrier'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'ef71ad81ce614f61846c51eaa9480edd'
+                        key: {
+                            list_id: {
+                                id: '8730bb7ee0d346f9a68764806f1efd2a'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'customer'
                         }
                     },
                     {
@@ -10232,11 +19824,61 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: 'f2201cad3dd84c82aa50a1189acf9919'
+                        key: {
+                            name: 'x_daas_ham_manufacturer_alias'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: 'f294cc1583434aebb395e352a952f483'
                         key: {
                             name: 'x_daas_ham_agreement_quantity'
                             element: 'device_class'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form'
+                        id: 'f2b4dcb600554f80be05cdd466a8b4c9'
+                        key: {
+                            name: 'x_daas_ham_stockroom_member'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'f2c0ae989f424d5e84e92ceb565ae2e8'
+                        key: {
+                            sys_ui_section: {
+                                id: '9bee72ad266f4788ad02e6b7bb0f8aab'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Delivery'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'carrier'
+                            position: '1'
                         }
                     },
                     {
@@ -10246,6 +19888,19 @@ declare global {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_customer_tag'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'f365c607063441058945a860c525eddc'
+                        key: {
+                            sys_security_acl: '53561058881d4d578f4127523777e126'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -10268,6 +19923,51 @@ declare global {
                             name: 'x_daas_ham_subscription_line'
                             element: 'status'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'f38bafe929d447eca0a5e6154e50a2ef'
+                        key: {
+                            list_id: {
+                                id: 'dea8313f1ca047c695aef30044c61f57'
+                                key: {
+                                    name: 'x_daas_ham_model_match_rule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'order'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'f3e19306bf1e46f3a354ee97ce015efc'
+                        key: {
+                            sys_ui_section: {
+                                id: '4dc23702dc524498a68859197f1e32e9'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    caption: 'Milestones'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '7'
                         }
                     },
                     {
@@ -10324,11 +20024,72 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'f5b74e90ffd548d8ad1d773a756330f3'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c8fb61bb330e4c9b972c8f3fb9255cba'
+                                key: {
+                                    name: 'x_daas_ham_catalog_entry'
+                                    caption: 'Catalog entry'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'active'
+                            position: '7'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list'
+                        id: 'f61ad36ce6774a58a595dcda55a5a7e8'
+                        key: {
+                            name: 'x_daas_ham_order_line'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'f62050fa0d5a48d3aba70831115a9c54'
                         key: {
                             name: 'x_daas_ham_staging_template'
                             element: 'manufacturer'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'f68d502815a94482910f3aa169944381'
+                        key: {
+                            sys_ui_section: {
+                                id: '18c3820eab2b48f891ba42f9f4a43c23'
+                                key: {
+                                    name: 'x_daas_ham_staging_task'
+                                    caption: 'Staging'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'assigned_to'
+                            position: '8'
                         }
                     },
                     {
@@ -10347,12 +20108,94 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: 'f70263447a824682882563ff37e2e491'
+                        key: {
+                            sys_ui_form: {
+                                id: '550fe764e8ff468fa08bf917e2af1a10'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '371cdc177b2145e7957b603d1d8ed84f'
+                                key: {
+                                    name: 'x_daas_ham_model_lifecycle'
+                                    caption: 'Source'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'f71a2005e745412098da84f10c96cdaa'
                         key: {
                             name: 'x_daas_ham_device_event'
                             element: 'source'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'f722da438bbd4069894d961248256a9e'
+                        key: {
+                            sys_security_acl: '53561058881d4d578f4127523777e126'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form'
+                        id: 'f78eba76c56c473a853b7509e00765c5'
+                        key: {
+                            name: 'x_daas_ham_order'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'f7ab6744832a49ac9c522be663a21010'
+                        key: {
+                            sys_ui_section: {
+                                id: '23107fd8df984b1ca3adc733cdbbb900'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    caption: 'Subscription line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'monthly_rate'
+                            position: '8'
                         }
                     },
                     {
@@ -10364,11 +20207,48 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'f80788ccd9a24abd84272718499f45ce'
+                        key: {
+                            sys_ui_section: {
+                                id: '13138ca006564e24afe4f4ceb2a8d87c'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Order'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '14'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'f824afb4da7b463280dc30699c19cea0'
                         key: {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_wiped_on'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: 'f8cda9df97fa4e34bef4ad2a51d89fb7'
+                        key: {
+                            name: 'x_daas_ham_job_cursor'
+                            caption: 'Job'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -10386,6 +20266,29 @@ declare global {
                         key: {
                             name: 'x_daas_ham_order'
                             element: 'stage'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'f92e56cb6be544c0b39de0b8ac77a81d'
+                        key: {
+                            list_id: {
+                                id: 'd65d853d305d42f894ff8f59feae4dff'
+                                key: {
+                                    name: 'x_daas_ham_norm_exception'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'raw_model'
                         }
                     },
                     {
@@ -10418,6 +20321,42 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: 'fa0af5253bd14d9b9900cdb4baca960f'
+                        key: {
+                            name: 'x_daas_ham_subscription_line'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'fa294267fcad41e68072ba74c9ae9310'
+                        key: {
+                            sys_ui_section: {
+                                id: '8f1b1ed7684647cea9a45c3838f8e78b'
+                                key: {
+                                    name: 'x_daas_ham_site_template_item'
+                                    caption: 'Item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '6'
+                        }
+                    },
+                    {
                         table: 'sys_user_role_contains'
                         id: 'fa5860f46ff34c9eaddcaa0d65504a82'
                         key: {
@@ -10441,6 +20380,29 @@ declare global {
                         key: {
                             name: 'x_daas_ham_asn_import'
                             element: 'serial'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'faaeecf9eb904472b47d243c71581209'
+                        key: {
+                            list_id: {
+                                id: '81b68f80815e4f929da2ff4035c4241f'
+                                key: {
+                                    name: 'x_daas_ham_site_template_item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'quantity'
                         }
                     },
                     {
@@ -10510,11 +20472,60 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: 'fc2d21d1f49d4ea89a738ff14bdd72dc'
+                        key: {
+                            name: 'x_daas_ham_job_cursor'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'fc95018e225d45b2b2b7f249d23367e9'
                         key: {
                             name: 'x_daas_ham_staging_tmpl_item'
                             element: 'order'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'fcbab132d70c473ca913fee0dc31d005'
+                        key: {
+                            sys_ui_section: {
+                                id: 'f8cda9df97fa4e34bef4ad2a51d89fb7'
+                                key: {
+                                    name: 'x_daas_ham_job_cursor'
+                                    caption: 'Job'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'last_run'
+                            position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'fcdf6bc1691a4e83a40bed8286916085'
+                        key: {
+                            sys_security_acl: 'd837b2e8a82f4463b1c27019154e2d06'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -10539,6 +20550,29 @@ declare global {
                         key: {
                             name: 'x_daas_ham_norm_exception'
                             element: 'status'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'fdb288f21e984d8db55948448bf72edb'
+                        key: {
+                            list_id: {
+                                id: 'ddb3ce4f13e0414891cdcb9425bbb4ac'
+                                key: {
+                                    name: 'x_daas_ham_subscription_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'device_class'
                         }
                     },
                     {
@@ -10596,6 +20630,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: 'fec0c2609e53499e8fd91ec0598daa55'
+                        key: {
+                            list_id: {
+                                id: 'f61ad36ce6774a58a595dcda55a5a7e8'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'quantity_to_purchase'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'fec0c26d84b24f788f37726437dfb684'
                         key: {
@@ -10622,6 +20679,29 @@ declare global {
                             value: 'prefix'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'ff7daee7076c4c02a40aadfdfb5a0761'
+                        key: {
+                            list_id: {
+                                id: 'ea1e62fe24dc41aaa02caf586070918f'
+                                key: {
+                                    name: 'x_daas_ham_staging_template'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'device_class'
                         }
                     },
                     {

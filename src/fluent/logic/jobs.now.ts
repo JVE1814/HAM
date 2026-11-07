@@ -2,6 +2,7 @@ import '@servicenow/sdk/global'
 import { ScheduledScript } from '@servicenow/sdk/core'
 import { evaluatePendingInService, purgeDeviceEvents } from '../../server/entry/in-service'
 import { normalizeRawModels, rollLifecyclePhases } from '../../server/entry/models'
+import { runPreflight } from '../../server/entry/preflight'
 import { topUpSparePools } from '../../server/entry/spare-pool'
 
 /* Background jobs (chunked where they touch many assets, ADR 0007). */
@@ -56,4 +57,12 @@ ScheduledScript({
     executionTime: { hours: 2, minutes: 40, seconds: 0 },
     timeZone: 'UTC',
     script: topUpSparePools,
+})
+
+ScheduledScript({
+    $id: Now.ID['job_preflight'],
+    name: 'NaaS - preflight check',
+    active: true,
+    frequency: 'on_demand',
+    script: runPreflight,
 })

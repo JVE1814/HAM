@@ -708,3 +708,50 @@ Acl({
     roles: customerRoles,
     script: "answer = current.getValue('company') == gs.getUser().getCompanyID();",
 })
+Acl({
+    $id: Now.ID['acl_asn_import_read'],
+    type: 'record',
+    table: 'x_daas_ham_asn_import',
+    operation: 'read',
+    roles: [inventoryTech, assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_asn_import_create'],
+    type: 'record',
+    table: 'x_daas_ham_asn_import',
+    operation: 'create',
+    roles: [inventoryTech, assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_asn_import_write'],
+    type: 'record',
+    table: 'x_daas_ham_asn_import',
+    operation: 'write',
+    roles: [inventoryTech, assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_eox_import_read'],
+    type: 'record',
+    table: 'x_daas_ham_eox_import',
+    operation: 'read',
+    roles: [assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_eox_import_create'],
+    type: 'record',
+    table: 'x_daas_ham_eox_import',
+    operation: 'create',
+    roles: [assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_eox_import_write'],
+    type: 'record',
+    table: 'x_daas_ham_eox_import',
+    operation: 'write',
+    roles: [assetManager],
+})

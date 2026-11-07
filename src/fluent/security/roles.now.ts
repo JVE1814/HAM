@@ -9,29 +9,31 @@ import { Role } from '@servicenow/sdk/core'
 export const inventoryTech = Role({
     name: 'x_daas_ham.inventory_tech',
     description: 'Depot and staging-centre technician: receiving, put-away, picking, staging and stockroom audits for assigned stockrooms.',
-    containsRoles: ['asset', 'inventory_user'],
+    containsRoles: ['asset', 'inventory_user', 'canvas_user'],
 })
 
 export const fieldTech = Role({
     name: 'x_daas_ham.field_tech',
     description: 'Field engineer: installs, swaps, collects and audits equipment at customer sites (in addition to FSM roles).',
-    containsRoles: ['asset'],
+    containsRoles: ['asset', 'canvas_user'],
 })
 
 export const noc = Role({
     name: 'x_daas_ham.noc',
     description: 'Network operations centre: reads the installed base, coverage and lifecycle data and raises proactive cases.',
+    containsRoles: ['canvas_user'],
 })
 
 export const accountManager = Role({
     name: 'x_daas_ham.account_manager',
     description: 'Owns customer agreements, catalog entries and site templates; approves over-quota orders.',
+    containsRoles: ['canvas_user'],
 })
 
 export const finance = Role({
     name: 'x_daas_ham.finance',
     description: 'Reads subscription lines and fee events; runs and closes billing periods.',
-    containsRoles: ['report_user'],
+    containsRoles: ['report_user', 'canvas_user'],
 })
 
 export const assetManager = Role({
