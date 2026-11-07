@@ -2880,6 +2880,10 @@ declare global {
                         table: 'sys_ui_action'
                         id: '2cf1342ae5b044f180f0a09c46a34bbe'
                     }
+                    ua_shipment_mark_voided: {
+                        table: 'sys_ui_action'
+                        id: '332bf33a8f5e43ebba8a93bdd525c735'
+                    }
                     ua_site_audit: {
                         table: 'sys_ui_action'
                         id: 'e5019b9acaa945d7ab3e684e75f63d48'
@@ -3804,6 +3808,17 @@ declare global {
                             name: 'x_daas_ham_fee_event'
                             element: 'return_order'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '00880137f9c54944b62ab276a4db7936'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'status'
+                            value: 'voided'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -19723,6 +19738,19 @@ declare global {
                     },
                     {
                         table: 'sys_ui_action_role'
+                        id: '5bf5524eb1cd4da099b49cfe09250263'
+                        key: {
+                            sys_ui_action: '332bf33a8f5e43ebba8a93bdd525c735'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
                         id: '5c03587abae641649a810ed9b92bb84c'
                         key: {
                             sys_ui_action: '761889b1316241718acc4e28919718b3'
@@ -26387,6 +26415,17 @@ declare global {
                             }
                             element: 'quantity'
                             position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '7e7fc63ad5aa41e9a1238eeeb02d14f4'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'status'
+                            value: 'voided'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -38855,6 +38894,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_action_role'
+                        id: 'c463bf047d3f4c20b45c0477135196b2'
+                        key: {
+                            sys_ui_action: '332bf33a8f5e43ebba8a93bdd525c735'
+                            sys_user_role: {
+                                id: 'c5156577be814d2aa8bf557ddec8bf0e'
+                                key: {
+                                    name: 'x_daas_ham.noc'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: 'c463ce14a0e2412ab232840451bbee8a'
                         key: {
@@ -42963,6 +43015,19 @@ declare global {
                         key: {
                             name: 'x_daas_ham_margin'
                             element: 'margin_pct'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: 'dac942accc7c430c86838aec52eb8def'
+                        key: {
+                            sys_ui_action: '332bf33a8f5e43ebba8a93bdd525c735'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {

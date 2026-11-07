@@ -7,7 +7,16 @@ import { asArray, field, isoDate, parseJson, text } from './json'
  * Provider can use either.
  */
 
-export type ShipmentStatus = 'label_created' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'returned' | 'unknown'
+/** A shipment's status: `voided` is set by a person who voided the label with the carrier, never by tracking. */
+export type ShipmentStatus =
+    | 'label_created'
+    | 'in_transit'
+    | 'out_for_delivery'
+    | 'delivered'
+    | 'exception'
+    | 'returned'
+    | 'unknown'
+    | 'voided'
 
 export interface Address {
     name: string
@@ -270,20 +279,29 @@ export function parseTrackingWebhook(body: unknown): TrackingUpdate | { error: s
     return { error: 'not a tracking update (no tracking number)' }
 }
 
-const FINAL: ReadonlySet<ShipmentStatus> = new Set(['delivered', 'returned'])
+const FINAL: ReadonlySet<ShipmentStatus> = new Set(['delivered', 'returned', 'voided'])
 
-/** Encoded query on x_daas_ham_shipment: shipments not yet delivered or returned (their label is still in use). */
+/** Encoded query on x_daas_ham_shipment: shipments not delivered, returned or voided (their label is still in use). */
 export const OPEN_SHIPMENTS = `statusNOT IN${[...FINAL].join(',')}`
 
 /**
  * The status a shipment takes from a tracking update. Webhooks can arrive late or out of order, so a
- * delivered or returned shipment keeps that status (only a return to sender overrides a delivery),
- * and an `unknown` update never replaces a known status.
+ * delivered, returned or voided shipment keeps that status (only a return to sender overrides a
+ * delivery), and an `unknown` update never replaces a known status.
  */
 export function nextShipmentStatus(current: ShipmentStatus, incoming: ShipmentStatus): ShipmentStatus {
     if (incoming === 'unknown') return current
-    if (FINAL.has(current)) return incoming === 'returned' ? 'returned' : current
+    if (current === 'delivered' && incoming === 'returned') return 'returned'
+    if (FINAL.has(current)) return current
     return incoming
+}
+
+/**
+ * Whether a person may mark a shipment's label voided once they voided it with the carrier: while it is
+ * bought but not moving (label created) or stuck (exception). Nothing is sent to the aggregator.
+ */
+export function labelVoidable(status: ShipmentStatus): boolean {
+    return status === 'label_created' || status === 'exception'
 }
 
 /**

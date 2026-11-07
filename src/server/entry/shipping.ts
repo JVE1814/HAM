@@ -5,6 +5,7 @@ import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_in
 import {
     applyTracking,
     buyLabel,
+    labelVoidable,
     newTrackingEvents,
     parseTrackingWebhook,
     tokenMatches,
@@ -120,14 +121,39 @@ export function uiCreateReturnLabel(current: GlideRecord): void {
     const returnOrderId = current.getUniqueValue()
     const packages = count('x_daas_ham_return_order_line', `return_order=${returnOrderId}^status=awaiting`)
     if (packages === 0) return void gs.addErrorMessage('Nothing on this return is still awaited')
-    // Each label is paid for: one open return label per Return order (void it with the carrier to replace it).
+    // Each label is paid for: one open return label per Return order (to replace it, void it and mark it voided).
     const open = returnLabels([returnOrderId]).get(returnOrderId)
-    if (open) return void gs.addErrorMessage(`Return label ${open.trackingNumber} is still open; void it with the carrier before buying another`)
+    if (open) {
+        const step = 'void it with the carrier, then use Mark label voided on its Shipment, before buying another'
+        return void gs.addErrorMessage(`Return label ${open.trackingNumber} is still open; ${step}`)
+    }
     const result = createShipment('return', current, packages)
     if (!result.ok) return void gs.addErrorMessage(`No label: ${result.error}`)
     current.setValue('work_notes', `Return label ${result.trackingNumber} (${result.carrier}): ${result.labelUrl}`)
     current.update()
     gs.addInfoMessage(`Return label ${result.trackingNumber} created`)
+}
+
+/**
+ * UI action "Mark label voided" on a return Shipment, once the person voided the label with the carrier
+ * (nothing is sent to the aggregator): the label stops counting as open, so the Return order can get a
+ * new one and the customer page stops offering it.
+ */
+export function uiMarkLabelVoided(current: GlideRecord): void {
+    const trackingNumber = str(current, 'tracking_number')
+    if (!labelVoidable(str(current, 'status') as ShipmentStatus)) {
+        const status = current.getDisplayValue('status')
+        return void gs.addErrorMessage(`Label ${trackingNumber} is ${status}, so it cannot be marked voided`)
+    }
+    current.setValue('status', 'voided')
+    current.setValue('status_detail', `Voided with the carrier (marked by ${gs.getUserDisplayName()})`)
+    current.update()
+    const returnOrder = findById('x_daas_ham_return_order', str(current, 'return_order'))
+    if (returnOrder) {
+        returnOrder.setValue('work_notes', `Return label ${trackingNumber} voided with the carrier: do not ship on it.`)
+        returnOrder.update()
+    }
+    gs.addInfoMessage(`Label ${trackingNumber} marked voided`)
 }
 
 /**

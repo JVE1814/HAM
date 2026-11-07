@@ -6,6 +6,7 @@ import {
     buyLabel,
     countryCode,
     labelRequestBody,
+    labelVoidable,
     newTrackingEvents,
     nextShipmentStatus,
     OPEN_SHIPMENTS,
@@ -330,7 +331,26 @@ describe('parseTrackingWebhook', () => {
 
 describe('OPEN_SHIPMENTS', () => {
     it('leaves out the final statuses, whose label is no longer in use', () => {
-        expect(OPEN_SHIPMENTS).toBe('statusNOT INdelivered,returned')
+        expect(OPEN_SHIPMENTS).toBe('statusNOT INdelivered,returned,voided')
+    })
+})
+
+describe('labelVoidable', () => {
+    it('lets a label be marked voided while it is not moving or stuck', () => {
+        expect(labelVoidable('label_created')).toBe(true)
+        expect(labelVoidable('exception')).toBe(true)
+    })
+
+    it('keeps a label on the move, finished or already voided', () => {
+        const kept: ShipmentStatus[] = ['in_transit', 'out_for_delivery', 'delivered', 'returned', 'unknown', 'voided']
+        for (const status of kept) expect(labelVoidable(status)).toBe(false)
+    })
+
+    it('can mark voided a label EasyPost reports cancelled, which still maps to an exception', () => {
+        const tracker = { object: 'Tracker', tracking_code: 'EZ200', status: 'cancelled', tracking_details: [] }
+        const cancelled = parseTrackingWebhook(easyPostEvent('tracker.updated', tracker))
+        expect(cancelled).toMatchObject({ status: 'exception' })
+        expect(labelVoidable(nextShipmentStatus('label_created', 'exception'))).toBe(true)
     })
 })
 
@@ -349,6 +369,12 @@ describe('nextShipmentStatus', () => {
 
     it('lets a return to sender override a delivery', () => {
         expect(nextShipmentStatus('delivered', 'returned')).toBe('returned')
+    })
+
+    it('keeps a voided label voided whatever the carrier sends', () => {
+        for (const status of ['label_created', 'in_transit', 'delivered', 'exception', 'returned'] as const) {
+            expect(nextShipmentStatus('voided', status)).toBe('voided')
+        }
     })
 })
 

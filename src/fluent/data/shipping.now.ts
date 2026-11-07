@@ -11,6 +11,8 @@ const statusChoices = {
     exception: { label: 'Exception', sequence: 4 },
     returned: { label: 'Returned to sender', sequence: 5 },
     unknown: { label: 'Unknown', sequence: 6 },
+    // Set by Mark label voided, never by tracking: a final status, like delivered and returned.
+    voided: { label: 'Voided', sequence: 7 },
 }
 
 export const x_daas_ham_shipment = Table({

@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Property, RestMessage, UiAction } from '@servicenow/sdk/core'
-import { uiCreateReturnLabel } from '../../server/entry/shipping'
+import { uiCreateReturnLabel, uiMarkLabelVoided } from '../../server/entry/shipping'
 import { admin, assetManager, inventoryTech, noc } from '../security/roles.now'
 
 /*
@@ -43,6 +43,20 @@ UiAction({
     form: { showButton: true },
     showUpdate: true,
     script: uiCreateReturnLabel,
+})
+
+// No aggregator call: the person voids the label with the carrier first, as Create return label's refusal says.
+UiAction({
+    $id: Now.ID['ua_shipment_mark_voided'],
+    name: 'Mark label voided',
+    table: 'x_daas_ham_shipment',
+    actionName: 'x_daas_ham_mark_label_voided',
+    hint: 'After voiding this return label with the carrier: stop counting it as open, so a new one can be created.',
+    condition: "current.direction == 'return' && (current.status == 'label_created' || current.status == 'exception')",
+    roles: [assetManager, inventoryTech, noc],
+    form: { showButton: true, style: 'destructive' },
+    showUpdate: true,
+    script: uiMarkLabelVoided,
 })
 
 Property({

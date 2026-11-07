@@ -42,7 +42,11 @@ function take(name: string): string | null {
     clearAbandoned(name)
     const second = insertLock(name)
     if (second.id) return second.id
-    if (!isLocked(name)) throw new Error(`job lock ${name} could not be taken: ${second.error || 'insert refused'}`)
+    if (isLocked(name)) return null
+    // The holder let go between the refusal and the probe: one more try, so only a refusal with no lock row throws.
+    const third = insertLock(name)
+    if (third.id) return third.id
+    if (!isLocked(name)) throw new Error(`job lock ${name} could not be taken: ${third.error || 'insert refused'}`)
     return null
 }
 

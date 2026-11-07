@@ -82,44 +82,59 @@ function upsertLifecycle(modelId: string, incoming: LifecycleDates, vendor: OemV
     else lifecycle.insert()
 }
 
+type CoverageRoute = NonNullable<(typeof OEM_ADAPTERS)[OemVendor]['coverage']>
+
 /**
  * Every 4 hours: OEM coverage of assets not checked for x_daas_ham.oem.coverage_refresh_days, oldest
- * first, until the time budget is spent (a rate-limited vendor: one batch of its maxKeysPerRun). Checked
- * assets drop out of the query, so no cursor is needed. A batch reads and writes its serials' stored
- * coverage with one query, and updates its Assets from another.
+ * first, until the time budget is spent. The enabled vendors take turns, one batch each per round, so one
+ * with a backlog cannot starve the others and none leaves the budget unused while another is behind. The
+ * first round runs whatever the time, so each vendor gets at least one batch per run. Checked assets drop
+ * out of the query, so no cursor is needed.
  */
 export function syncOemCoverage(): void {
     const started = nowMs()
     const budgetMs = intProperty('x_daas_ham.job.budget_seconds', 120) * 1000
     const staleBefore = new GlideDateTime()
     staleBefore.addDaysUTC(-intProperty('x_daas_ham.oem.coverage_refresh_days', 7))
-    for (const vendor of VENDORS) {
+    let due = VENDORS.flatMap((vendor) => {
         const route = OEM_ADAPTERS[vendor].coverage
-        if (!route || !oemEnabled(route.via)) continue
-        for (;;) {
-            if (nowMs() - started > budgetMs) return
-            const assets = staleAssets(vendor, staleBefore.getValue(), route.maxKeysPerRun ?? COVERAGE_BATCH)
-            if (assets.size === 0) break
-            const result = route.run([...assets.keys()], oemContext(route.via))
-            report(`coverage ${vendor}`, result.errors)
-            const dispositionOf = coverageDisposition(result)
-            const answered = new Map<string, string>()
-            const answers: CoverageAnswer[] = []
-            const stamped: string[] = []
-            for (const [serial, assetIds] of assets) {
-                const disposition = dispositionOf(serial)
-                if (disposition.kind === 'stamp') stamped.push(...assetIds)
-                if (disposition.kind !== 'apply') continue
-                for (const assetId of assetIds) answered.set(assetId, serial)
-                // The serial's coverage records point at its last answered Asset.
-                const lastAsset = assetIds[assetIds.length - 1]
-                for (const fact of disposition.facts) answers.push({ assetId: lastAsset, fact })
-            }
-            applyCoverage(vendor, 'api', answered, answers, stamped)
-            // A batch with errors ends the vendor's run; a rate-limited vendor gets one batch per run.
-            if (result.errors.length > 0 || route.maxKeysPerRun !== undefined) break
+        return route && oemEnabled(route.via) ? [{ vendor, route }] : []
+    })
+    for (let round = 0; due.length > 0; round++) {
+        const behind: typeof due = []
+        for (const turn of due) {
+            if (round > 0 && nowMs() - started > budgetMs) return
+            if (syncCoverageBatch(turn.vendor, turn.route, staleBefore.getValue())) behind.push(turn)
         }
+        due = behind
     }
+}
+
+/**
+ * One batch of `vendor`'s stale Assets; returns whether the vendor gets another batch this run. A batch reads
+ * and writes its serials' stored coverage with one query, and updates its Assets from another.
+ */
+function syncCoverageBatch(vendor: OemVendor, route: CoverageRoute, staleBefore: string): boolean {
+    const assets = staleAssets(vendor, staleBefore, route.maxKeysPerRun ?? COVERAGE_BATCH)
+    if (assets.size === 0) return false
+    const result = route.run([...assets.keys()], oemContext(route.via))
+    report(`coverage ${vendor}`, result.errors)
+    const dispositionOf = coverageDisposition(result)
+    const answered = new Map<string, string>()
+    const answers: CoverageAnswer[] = []
+    const stamped: string[] = []
+    for (const [serial, assetIds] of assets) {
+        const disposition = dispositionOf(serial)
+        if (disposition.kind === 'stamp') stamped.push(...assetIds)
+        if (disposition.kind !== 'apply') continue
+        for (const assetId of assetIds) answered.set(assetId, serial)
+        // The serial's coverage records point at its last answered Asset.
+        const lastAsset = assetIds[assetIds.length - 1]
+        for (const fact of disposition.facts) answers.push({ assetId: lastAsset, fact })
+    }
+    applyCoverage(vendor, 'api', answered, answers, stamped)
+    // A batch with errors ends the vendor's run; a rate-limited vendor (maxKeysPerRun) gets one batch per run.
+    return result.errors.length === 0 && route.maxKeysPerRun === undefined
 }
 
 /** Stale Assets by normalized serial (a serial can be shared by duplicate records). */
@@ -232,7 +247,10 @@ function refreshAssetCoverage(answered: ReadonlyMap<string, string>, coverageOf:
     }
 }
 
-/** Hourly: status of open OEM RMAs for vendors with an RMA lookup API. */
+/**
+ * Hourly: status of open OEM RMAs for vendors with an RMA lookup API, at most 200 per vendor, least recently
+ * synced (never synced) first. Every RMA asked is stamped synced, answered or not, so the whole set rotates.
+ */
 export function syncOemRmaStatus(): void {
     for (const vendor of VENDORS) {
         const route = OEM_ADAPTERS[vendor].rmaStatus
@@ -241,18 +259,28 @@ export function syncOemRmaStatus(): void {
         rma.addQuery('vendor', vendor)
         rma.addQuery('state', 'IN', 'open,replacement_received')
         rma.addNotNullQuery('rma_number')
+        rma.orderBy('last_synced')
         rma.setLimit(200)
         rma.query()
-        const records = new Map<string, string>()
-        while (rma.next()) records.set(str(rma, 'rma_number'), rma.getUniqueValue())
-        const result = route.run([...records.keys()], oemContext(route.via))
+        const ids: string[] = []
+        const rmaNumbers = new Set<string>()
+        while (rma.next()) {
+            ids.push(rma.getUniqueValue())
+            rmaNumbers.add(str(rma, 'rma_number'))
+        }
+        if (ids.length === 0) continue
+        const result = route.run([...rmaNumbers], oemContext(route.via))
         report(`rma ${vendor}`, result.errors)
-        for (const fact of result.facts) {
-            const record = new GlideRecord('x_daas_ham_oem_rma')
-            if (!record.get(records.get(fact.rmaNumber) ?? '')) continue
-            record.setValue('status', fact.status)
-            record.setValue('last_synced', msToGlide(nowMs()))
-            record.update()
+        const statusOf = new Map(result.facts.map((fact) => [fact.rmaNumber, fact.status]))
+        const syncedAt = msToGlide(nowMs())
+        const asked = new GlideRecord('x_daas_ham_oem_rma')
+        asked.addQuery('sys_id', 'IN', ids.join(','))
+        asked.query()
+        while (asked.next()) {
+            const status = statusOf.get(str(asked, 'rma_number'))
+            if (status !== undefined) asked.setValue('status', status)
+            asked.setValue('last_synced', syncedAt)
+            asked.update()
         }
     }
 }

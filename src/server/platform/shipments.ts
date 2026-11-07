@@ -10,7 +10,7 @@ export interface ReturnLabel {
     trackingNumber: string
 }
 
-/** The latest prepaid return label still in use (not delivered or returned) of each Return order that has one. */
+/** The latest prepaid return label still in use (not delivered, returned or voided) of each Return order with one. */
 export function returnLabels(returnOrderIds: readonly string[]): Map<string, ReturnLabel> {
     const labels = new Map<string, ReturnLabel>()
     if (returnOrderIds.length === 0) return labels
