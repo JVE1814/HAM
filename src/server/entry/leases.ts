@@ -222,7 +222,11 @@ export function transferLeaseAssets(event: GlideRecord, current: GlideRecord): v
             asset.setValue('x_daas_ham_lease', '')
             asset.setValue('x_daas_ham_lessor', '')
             asset.setValue('x_daas_ham_legal_owner', 'provider')
-            if (share > 0) asset.setValue('cost', share)
+            // The Provider bought it today: its write-off (Margin) runs from the buyout, not its first go-live.
+            if (share > 0) {
+                asset.setValue('cost', share)
+                asset.setValue('purchase_date', todayIso())
+            }
             asset.update()
         },
     })
@@ -263,6 +267,12 @@ function warnExpiringCoverage(today: string): void {
         const customer = findById('customer_account', customerId)
         if (customer) fire(EVENT.coverageExpiring, customer, recipients, `${group.count} OEM coverage contract(s), the first ending ${group.firstEnd}`)
     }
+}
+
+/** Before-update rule on agreements whose end date changed by hand: warn about the new end in time. */
+export function onAgreementEndChanged(current: GlideRecord): void {
+    current.setValue('renewal_notified', false)
+    if (str(current, 'ends') >= todayIso()) current.setValue('end_return_raised', false)
 }
 
 /** UI action "Renew agreement": extend the end date by the renewal term and re-arm the warnings. */

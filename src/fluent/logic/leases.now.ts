@@ -1,14 +1,6 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, EmailNotification, Property, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
-import {
-    onAssetLeaseChanged,
-    refreshLeaseAssets,
-    reviewLeases,
-    transferLeaseAssets,
-    uiApplyLeaseDecision,
-    uiRenewAgreement,
-    warnRenewals,
-} from '../../server/entry/leases'
+import { onAgreementEndChanged, onAssetLeaseChanged, refreshLeaseAssets, reviewLeases, transferLeaseAssets, uiApplyLeaseDecision, uiRenewAgreement, warnRenewals } from '../../server/entry/leases'
 import { accountManager, admin, assetManager, finance } from '../security/roles.now'
 
 /* Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
@@ -35,6 +27,17 @@ UiAction({
     form: { showButton: true, style: 'primary' },
     showUpdate: true,
     script: uiApplyLeaseDecision,
+})
+
+BusinessRule({
+    $id: Now.ID['br_agreement_end_changed'],
+    name: 'NaaS - re-arm renewal warning when the agreement end changes',
+    table: 'x_daas_ham_agreement',
+    when: 'before',
+    action: ['update'],
+    order: 100,
+    condition: "current.ends.changes() && current.ends != ''",
+    script: onAgreementEndChanged,
 })
 
 UiAction({

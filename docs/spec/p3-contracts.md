@@ -17,15 +17,16 @@
 
 | Decision | Effect |
 |---|---|
-| Buy out | Every covered Asset becomes Provider-owned and leaves the schedule, in a background job (chunked, so large leases do not time out the UI action); when a buyout price is recorded, each Asset's cost becomes its share of it, fixed once on the lease (*Buyout cost per asset*, *Assets covered at buyout*) when the decision is applied. The daily review queues the transfer again for a bought-out lease that still has Assets |
+| Buy out | Every covered Asset becomes Provider-owned and leaves the schedule, in a background job (chunked, so large leases do not time out the UI action); when a buyout price is recorded, each Asset's cost becomes its share of it and its purchase date the buyout day (its write-off starts then), fixed once on the lease (*Buyout cost per asset*, *Assets covered at buyout*) when the decision is applied. The daily review queues the transfer again for a bought-out lease that still has Assets |
 | Extend | The lease runs to the new end date (which must be later); a new decision comes due before it |
 | Return | Stock (available, spare pool) goes on a draft *return to lessor* disposal order. Deployed Assets (including ones shipped or awaiting first sighting) get a Refresh due date no later than the lease end, so automatic refresh replaces them; the swapped-back units are returned and evaluated as usual (lessor-owned units can only be returned to the lessor) |
 
 ## Renewals
 
 - **Agreements** (daily): within *renewal lead days* of the end date the account manager (or the
-  asset managers) is emailed once. **Renew agreement** extends the end date by the renewal term
-  and re-arms the warning and the end-of-agreement return.
+  asset managers) is emailed once. **Renew agreement** extends the end date by the renewal term;
+  any change of the end date (by the action or by hand) re-arms the warning, and a future end
+  re-arms the end-of-agreement return.
 - **OEM coverage** (daily): covered contracts of deployed Assets ending within
   `x_daas_ham.oem.coverage_warning_days` are warned about once, one email per Customer. Renewing
   with the manufacturer changes the end date at the next sync or CSV import, which re-arms the
