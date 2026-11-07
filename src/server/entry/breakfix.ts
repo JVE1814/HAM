@@ -15,7 +15,10 @@ export function onCaseFailedAsset(current: GlideRecord): void {
     if (!str(current, 'account')) current.setValue('account', str(asset, 'company'))
 }
 
-/** UI action "Raise replacement" on a case: an Order replacing the failed Asset like-for-like. */
+/**
+ * UI action "Raise replacement" on a case: an Order replacing the failed Asset like-for-like. One that cannot be
+ * submitted as raised stays a draft, still linked to the case so a second one is not raised, for the user to correct.
+ */
 export function uiRaiseReplacement(current: GlideRecord): void {
     current.update()
     const failed = findById('alm_hardware', str(current, 'x_daas_ham_failed_asset'))
@@ -48,8 +51,8 @@ export function uiRaiseReplacement(current: GlideRecord): void {
 
     current.setValue('x_daas_ham_replacement_order', order.getUniqueValue())
     current.update()
-    submitOrder(order)
-    gs.addInfoMessage(`Replacement order ${str(order, 'number')} raised`)
+    if (submitOrder(order)) gs.addInfoMessage(`Replacement order ${str(order, 'number')} raised`)
+    else gs.addInfoMessage(`Replacement order ${str(order, 'number')} is left as a draft: correct it and submit it`)
 }
 
 /** UI action on an OEM RMA: the defective unit went back to the manufacturer. */

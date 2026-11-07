@@ -36,7 +36,8 @@ UiAction({
     table: 'x_daas_ham_order',
     actionName: 'x_daas_ham_confirm_installed',
     hint: 'Record that the shipped equipment is installed (self-install, or when the work order is closed elsewhere).',
-    condition: "current.stage == 'installing'",
+    // Customer contacts confirm only a self-install; staff any install (uiConfirmInstalled checks the same on the server).
+    condition: "current.stage == 'installing' && (current.install_mode == 'self_install' || gs.hasRole('x_daas_ham.asset_manager') || gs.hasRole('x_daas_ham.field_tech'))",
     roles: [assetManager, fieldTech, customerAdmin, siteContact],
     form: { showButton: true },
     showUpdate: true,

@@ -1,6 +1,7 @@
 import '@servicenow/sdk/global'
 import { Test, TestSuite } from '@servicenow/sdk/core'
 import { assetManager } from '../security/roles.now'
+import { inventoryTechAuditVisibilityTest } from './audit-visibility.now'
 import { customerAdminVisibilityTest, inventoryTechVisibilityTest } from './visibility.now'
 
 /* ATF: order entitlement routing (D35). */
@@ -22,7 +23,7 @@ export const withinAgreementOrderTest = Test(
         const site = atf.server.recordInsert({
             $id: Now.ID['atf_owa_site'],
             table: 'cmn_location',
-            fieldValues: { name: 'ATF Order Site', x_daas_ham_is_site: true },
+            fieldValues: { name: 'ATF Order Site', x_daas_ham_is_site: true, company: customer.record_id },
         })
         const model = atf.server.recordInsert({
             $id: Now.ID['atf_owa_model'],
@@ -105,7 +106,7 @@ export const offCatalogOrderTest = Test(
         const site = atf.server.recordInsert({
             $id: Now.ID['atf_ooc_site'],
             table: 'cmn_location',
-            fieldValues: { name: 'ATF Off-catalog Site', x_daas_ham_is_site: true },
+            fieldValues: { name: 'ATF Off-catalog Site', x_daas_ham_is_site: true, company: customer.record_id },
         })
         const model = atf.server.recordInsert({
             $id: Now.ID['atf_ooc_model'],
@@ -164,5 +165,5 @@ export const offCatalogOrderTest = Test(
 export const phase1Suite = TestSuite({
     $id: Now.ID['atf_suite_p1'],
     name: 'NaaS - P1',
-    tests: [customerAdminVisibilityTest, inventoryTechVisibilityTest, withinAgreementOrderTest, offCatalogOrderTest],
+    tests: [customerAdminVisibilityTest, inventoryTechVisibilityTest, inventoryTechAuditVisibilityTest, withinAgreementOrderTest, offCatalogOrderTest],
 })

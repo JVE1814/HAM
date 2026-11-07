@@ -10,7 +10,10 @@ import {
 } from '@servicenow/sdk/core'
 import { afterOrderProduced } from '../../server/entry/orders'
 
-/* "Request network equipment": the one catalog entry point for Orders (D42/D50). */
+/*
+ * "Request network equipment": the one catalog entry point for Orders (D42/D50). The Agreement, Site and Site template
+ * choices follow the chosen Customer; submitting checks the same again (domain/entitlement ownershipFindings).
+ */
 
 const SERVICE_CATALOG = 'e0d08b13c3330100c8b837659bba8fb4'
 
@@ -57,6 +60,9 @@ export const requestNetworkEquipment = CatalogItemRecordProducer({
         agreement: ReferenceVariable({
             question: 'Agreement',
             referenceTable: 'x_daas_ham_agreement',
+            useReferenceQualifier: 'advanced',
+            referenceQual: "javascript:'customer=' + current.variables.customer",
+            attributes: 'ref_qual_elements=customer',
             mandatory: true,
             mapToField: true,
             field: 'agreement',
@@ -65,7 +71,9 @@ export const requestNetworkEquipment = CatalogItemRecordProducer({
         site: ReferenceVariable({
             question: 'Site',
             referenceTable: 'cmn_location',
-            referenceQualCondition: 'x_daas_ham_is_site=true',
+            useReferenceQualifier: 'advanced',
+            referenceQual: "javascript:'x_daas_ham_is_site=true^company=' + current.variables.customer",
+            attributes: 'ref_qual_elements=customer',
             mandatory: true,
             mapToField: true,
             field: 'site',
@@ -87,7 +95,10 @@ export const requestNetworkEquipment = CatalogItemRecordProducer({
         site_template: ReferenceVariable({
             question: 'Site template',
             referenceTable: 'x_daas_ham_site_template',
-            referenceQualCondition: 'active=true',
+            useReferenceQualifier: 'advanced',
+            // A Site template with no Customer is offered to every Customer.
+            referenceQual: "javascript:'active=true^customerISEMPTY^ORcustomer=' + current.variables.customer",
+            attributes: 'ref_qual_elements=customer',
             mapToField: true,
             field: 'site_template',
             order: 500,

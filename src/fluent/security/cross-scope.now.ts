@@ -112,6 +112,15 @@ CrossScopePrivilege({
 })
 
 CrossScopePrivilege({
+    $id: Now.ID['xsp_alm_transfer_order_delete'],
+    operation: 'delete',
+    status: 'allowed',
+    targetName: 'alm_transfer_order',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
     $id: Now.ID['xsp_alm_transfer_order_line_read'],
     operation: 'read',
     status: 'allowed',
@@ -132,6 +141,15 @@ CrossScopePrivilege({
 CrossScopePrivilege({
     $id: Now.ID['xsp_alm_transfer_order_line_create'],
     operation: 'create',
+    status: 'allowed',
+    targetName: 'alm_transfer_order_line',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_alm_transfer_order_line_delete'],
+    operation: 'delete',
     status: 'allowed',
     targetName: 'alm_transfer_order_line',
     targetScope: 'global',
@@ -348,6 +366,15 @@ CrossScopePrivilege({
 CrossScopePrivilege({
     $id: Now.ID['xsp_proc_po_create'],
     operation: 'create',
+    status: 'allowed',
+    targetName: 'proc_po',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_proc_po_delete'],
+    operation: 'delete',
     status: 'allowed',
     targetName: 'proc_po',
     targetScope: 'global',

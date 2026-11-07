@@ -21,7 +21,7 @@ export const replacementWithinAgreementTest = Test(
         const site = atf.server.recordInsert({
             $id: Now.ID['atf_rwa_site'],
             table: 'cmn_location',
-            fieldValues: { name: 'ATF Replacement Site', x_daas_ham_is_site: true },
+            fieldValues: { name: 'ATF Replacement Site', x_daas_ham_is_site: true, company: customer.record_id },
         })
         const model = atf.server.recordInsert({
             $id: Now.ID['atf_rwa_model'],
