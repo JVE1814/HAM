@@ -211,3 +211,9 @@ const BILLABLE: ReadonlySet<Stage> = new Set(['in_service', 'temporary_deploymen
 export function isBillable(stage: Stage | null): boolean {
     return stage !== null && BILLABLE.has(stage)
 }
+
+/** Whether a stage change starts or stops an Asset's billing (its Service interval), or neither. */
+export function billingChange(before: Stage | null, after: Stage | null): 'start' | 'stop' | null {
+    if (isBillable(before) === isBillable(after)) return null
+    return isBillable(after) ? 'start' : 'stop'
+}

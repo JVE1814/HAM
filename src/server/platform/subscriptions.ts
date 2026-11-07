@@ -2,9 +2,8 @@ import { GlideRecord } from '@servicenow/glide'
 import { toIsoDate } from '../domain/calendar'
 import { chooseSubscriptionLine, type SubscriptionLineView } from '../domain/in-service'
 import { findById, str } from './records'
-import { openServiceInterval } from './service-intervals'
 
-/** Attach an in-service Asset to the Subscription line it delivers and start billing it (and the line). */
+/** Attach an Asset going into service to the Subscription line it delivers, and start that line. */
 export function attachToSubscription(asset: GlideRecord, inServiceAt: number): string | null {
     const lines: SubscriptionLineView[] = []
     const gr = new GlideRecord('x_daas_ham_subscription_line')
@@ -25,8 +24,8 @@ export function attachToSubscription(asset: GlideRecord, inServiceAt: number): s
         deviceClass: str(asset, 'model.x_daas_ham_device_class'),
     })
     if (!lineId) return null
+    // The Service interval opens when the Asset actually enters service (entry/assets.ts onAssetServiceChange).
     asset.setValue('x_daas_ham_subscription_line', lineId)
-    openServiceInterval(asset, lineId, toIsoDate(inServiceAt))
     if (lines.find((l) => l.id === lineId)?.status === 'pending') {
         const line = findById('x_daas_ham_subscription_line', lineId)
         line?.setValue('status', 'active')

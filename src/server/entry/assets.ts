@@ -1,10 +1,11 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { checkTransition, isBillable, stageOf } from '../domain/lifecycle'
+import { toIsoDate } from '../domain/calendar'
+import { billingChange, checkTransition, stageOf } from '../domain/lifecycle'
 import { readStage, transitionFacts } from '../platform/assets'
-import { todayIso } from '../platform/clock'
+import { glideToMs, todayIso } from '../platform/clock'
 import { recomputeLine } from '../platform/fulfilment'
 import { str } from '../platform/records'
-import { closeServiceIntervals } from '../platform/service-intervals'
+import { closeServiceIntervals, openServiceInterval } from '../platform/service-intervals'
 import { ROLE } from '../domain/visibility'
 
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
@@ -37,10 +38,16 @@ export function onAllocatedAssetStageChange(current: GlideRecord): void {
 }
 
 /**
- * After-update rule on alm_hardware stage changes: billing stops the day an Asset leaves service
- * (goes on a Return order, is declared missing, or is moved by hand), whatever moved it (D52).
+ * After-update rule on alm_hardware stage changes: billing (the Service interval) starts when an Asset
+ * enters service — from its in-service date on first go-live, else today (e.g. found after being
+ * missing) — and stops the day it leaves service, whatever moved it (D52, ADR 0009).
  */
-export function onAssetLeftService(current: GlideRecord, previous: GlideRecord): void {
+export function onAssetServiceChange(current: GlideRecord, previous: GlideRecord): void {
     const before = stageOf({ installStatus: str(previous, 'install_status'), substatus: str(previous, 'substatus') })
-    if (isBillable(before) && !isBillable(readStage(current))) closeServiceIntervals(current.getUniqueValue(), todayIso())
+    const change = billingChange(before, readStage(current))
+    if (change === 'stop') closeServiceIntervals(current.getUniqueValue(), todayIso())
+    if (change !== 'start') return
+    const inService = glideToMs(str(current, 'x_daas_ham_in_service_date'))
+    const start = before === 'pending_in_service' && inService !== undefined ? toIsoDate(inService) : todayIso()
+    openServiceInterval(current, str(current, 'x_daas_ham_subscription_line'), start)
 }

@@ -58,7 +58,7 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
         const asset = findById('alm_hardware', assetId)
         if (!asset || latestReturnLine(assetId, 'awaiting')) continue
         const stage = readStage(asset)
-        // Leaving service closes the Asset's service interval (entry/assets.ts onAssetLeftService).
+        // Leaving service closes the Asset's service interval (entry/assets.ts onAssetServiceChange).
         if (isDeployed(stage) && stage !== 'pending_return') moveAndSave(asset, 'pending_return', `return ${str(order, 'number')}`)
         const line = new GlideRecord('x_daas_ham_return_order_line')
         line.initialize()

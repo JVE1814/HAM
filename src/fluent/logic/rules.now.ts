@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { BusinessRule } from '@servicenow/sdk/core'
-import { enforceLifecycle, onAllocatedAssetStageChange, onAssetLeftService } from '../../server/entry/assets'
+import { enforceLifecycle, onAllocatedAssetStageChange, onAssetServiceChange } from '../../server/entry/assets'
 import { guardWorkWindow, onWorkOrderClosed } from '../../server/entry/delivery'
 import { onOrderApprovalDecision } from '../../server/entry/orders'
 import { guardStagingClosure, onStagingClosed, stampStagingStep } from '../../server/entry/staging'
@@ -31,13 +31,13 @@ BusinessRule({
 
 BusinessRule({
     $id: Now.ID['br_asset_left_service'],
-    name: 'NaaS - stop billing when an asset leaves service',
+    name: 'NaaS - start or stop billing on service changes',
     table: 'alm_hardware',
     when: 'after',
     action: ['update'],
     order: 210,
     condition: "(current.install_status.changes() || current.substatus.changes()) && current.x_daas_ham_subscription_line != ''",
-    script: onAssetLeftService,
+    script: onAssetServiceChange,
 })
 
 BusinessRule({

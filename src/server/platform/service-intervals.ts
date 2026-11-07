@@ -1,10 +1,11 @@
 import { GlideRecord } from '@servicenow/glide'
-import { str } from './records'
+import { count, str } from './records'
 
 /** Service intervals: the days each Asset delivered a Subscription line (P3.25). */
 
-/** Start billing an Asset on a Subscription line from `startIso`. */
+/** Start billing an Asset on a Subscription line from `startIso`, unless an interval is already open for it. */
 export function openServiceInterval(asset: GlideRecord, lineId: string, startIso: string): void {
+    if (count('x_daas_ham_service_interval', `asset=${asset.getUniqueValue()}^end_dateISEMPTY`) > 0) return
     const interval = new GlideRecord('x_daas_ham_service_interval')
     interval.initialize()
     interval.setValue('asset', asset.getUniqueValue())

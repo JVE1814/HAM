@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkTransition, fieldsOf, isBillable, isDeployed, stageOf, stagesQuery, type Stage, type TransitionFacts } from './lifecycle'
+import { billingChange, checkTransition, fieldsOf, isBillable, isDeployed, stageOf, stagesQuery, type Stage, type TransitionFacts } from './lifecycle'
 
 const deployable: TransitionFacts = {
     hasSite: true,
@@ -122,6 +122,15 @@ describe('stagesQuery', () => {
         expect(stagesQuery(['in_service', 'available'], 'covered=true', 'asset.')).toBe(
             'asset.install_status=1^asset.substatusISEMPTY^covered=true^NQasset.install_status=6^asset.substatus=available^covered=true',
         )
+    })
+
+    it('starts billing on entering service and stops it on leaving, whatever the route', () => {
+        expect(billingChange('pending_in_service', 'in_service')).toBe('start')
+        expect(billingChange('missing', 'in_service')).toBe('start')
+        expect(billingChange('in_service', 'pending_return')).toBe('stop')
+        expect(billingChange('in_service', 'missing')).toBe('stop')
+        expect(billingChange('in_service', 'temporary_deployment')).toBeNull()
+        expect(billingChange('pending_return', 'pending_evaluation')).toBeNull()
     })
 
     it('marks in-service and temporary assets as billable', () => {
