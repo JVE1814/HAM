@@ -52,8 +52,13 @@ function placementOf(slot: Slot, models: ReadonlyMap<string, RackModel>): Placem
     return { assetId: slot.assetId, ruStart: slot.ruStart, height: Math.max(1, model.rackUnits), face: slot.face, powerW: model.powerW }
 }
 
+/**
+ * Every other device placed in the rack, past the visibility rules (ADR 0005): an inventory tech sees only their
+ * Stockrooms' Assets, and a device they cannot see still fills its units and draws power. Only read, never saved.
+ */
 function slotsIn(rackId: string, exceptAssetId: string): Slot[] {
     const asset = new GlideRecord('alm_hardware')
+    asset.setWorkflow(false)
     asset.addQuery('x_daas_ham_rack', rackId)
     asset.addQuery('sys_id', '!=', exceptAssetId)
     asset.addNotNullQuery('x_daas_ham_ru_start')

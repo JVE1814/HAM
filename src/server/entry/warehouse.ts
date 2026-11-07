@@ -202,10 +202,11 @@ function allocateToWaitingLine(asset: GlideRecord): GlideRecord {
         agreementId: str(line, 'order.agreement'),
     })
     if (!reserved) {
-        // The receipt is saved; the reservation is not, so no Staging task opens and the reply shows the unit as saved.
+        // The receipt is saved; the reservation is not, so no Staging task opens. Read again for the reply: a run that
+        // claimed the unit first has put it on its own line.
         const why = 'another run claimed it, or the save was refused'
         gs.warn(`[x_daas_ham] Received ${str(asset, 'serial_number')} not reserved for ${str(line, 'number')}: ${why}`)
-        return asset
+        return findById('alm_hardware', asset.getUniqueValue()) ?? asset
     }
     // Without its Staging task the Asset stays reserved for the line, not staging with no task to finish. A refused
     // move (moveAndSave warns) leaves it reserved too, so it is read again for the reply.
