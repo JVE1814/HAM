@@ -42,15 +42,13 @@
     error of its own (FortiCloud status other than 0, an SN2INFO answer without `serial_numbers`),
     the serials keep their coverage and are asked again only after the refresh interval, so
     permanent rejections do not hold the queue.
-  - A vendor's own newer lifecycle answer replaces the dates it stored before; dates from CSV or
-    another source are only filled in where missing. A response without a coverage start date keeps
-    the stored one.
+  - Lifecycle answers are merged: a new date replaces the stored one, and dates a vendor does not
+    give (for example an end of life from the CSV import) are kept. A coverage response without a
+    start date keeps the stored one.
   - Fortinet: one batch of at most 90 serials per run. FortiCloud allows 100 calls per minute and
     1000 per hour, and `products/list` takes one serial per call. Every 4 hours that is about 540
     serials a day, so a fleet above roughly 3,800 FortiGates is not fully refreshed within the
     default 7 days: raise `x_daas_ham.oem.coverage_refresh_days`, or use the CSV import for the rest.
-  - A numbered API contract retires an unnumbered row stored for the same serial by an earlier sync
-    (it stops covering), so it neither keeps the Asset covered nor raises expiry warnings.
 - **RMA status (hourly)**: open Cisco RMAs with an RMA number.
 - **CSV**: rows loaded into *OEM coverage import rows* (vendor, serial, contract, service level,
   start, end) and *Lifecycle import rows* are processed on insert.

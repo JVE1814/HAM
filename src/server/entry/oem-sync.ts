@@ -57,20 +57,16 @@ function upsertLifecycle(modelId: string, incoming: LifecycleDates, vendor: OemV
         lifecycle.initialize()
         lifecycle.setValue('model', modelId)
     }
-    // The vendor's own latest answer replaces what it wrote before (so a remapped field does not
-    // linger); dates from another source (CSV, another vendor) are only filled in where missing.
-    const sameSource = exists && str(lifecycle, 'source') === vendor
-    const merged = sameSource
-        ? incoming
-        : mergeLifecycle(
-              {
-                  endOfSale: str(lifecycle, 'end_of_sale') || undefined,
-                  endOfSupport: str(lifecycle, 'end_of_support') || undefined,
-                  endOfExtendedSupport: str(lifecycle, 'end_of_extended_support') || undefined,
-                  endOfLife: str(lifecycle, 'end_of_life') || undefined,
-              },
-              incoming,
-          )
+    // New dates win; dates the vendor does not give (e.g. a CSV end of life) are kept.
+    const merged = mergeLifecycle(
+        {
+            endOfSale: str(lifecycle, 'end_of_sale') || undefined,
+            endOfSupport: str(lifecycle, 'end_of_support') || undefined,
+            endOfExtendedSupport: str(lifecycle, 'end_of_extended_support') || undefined,
+            endOfLife: str(lifecycle, 'end_of_life') || undefined,
+        },
+        incoming,
+    )
     lifecycle.setValue('end_of_sale', merged.endOfSale ?? '')
     lifecycle.setValue('end_of_support', merged.endOfSupport ?? '')
     lifecycle.setValue('end_of_extended_support', merged.endOfExtendedSupport ?? '')
@@ -173,23 +169,6 @@ function upsertCoverage(assetId: string, vendor: OemVendor, fact: CoverageFact, 
     coverage.setValue('last_checked', msToGlide(nowMs()))
     if (exists) coverage.update()
     else coverage.insert()
-    if (source === 'api' && vendor === 'fortinet' && fact.contractNumber) retireUnnumberedFortinetRows(normalizeSerial(fact.serial))
-}
-
-/**
- * Earlier Fortinet syncs stored contracts without a number (FortiCloud's lives on contracts[], read
- * since the contract fix). Once the numbered contract arrives, an unnumbered row not refreshed in the
- * last day stops covering, so it neither keeps the Asset covered nor raises expiry warnings; rows
- * written by this sync run are left alone.
- */
-function retireUnnumberedFortinetRows(serial: string): void {
-    const stale = new GlideRecord('x_daas_ham_oem_coverage')
-    stale.addEncodedQuery(`serial_number=${serial}^vendor=fortinet^source=api^contract_numberISEMPTY^covered=true^last_checked<javascript:gs.daysAgoStart(1)`)
-    stale.query()
-    while (stale.next()) {
-        stale.setValue('covered', false)
-        stale.update()
-    }
 }
 
 /** Stamp an asset's coverage as checked without changing it (the vendor answered with an error). */
