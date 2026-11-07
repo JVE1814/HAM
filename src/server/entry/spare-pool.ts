@@ -1,23 +1,22 @@
-import { GlideAggregate, GlideRecord } from '@servicenow/glide'
+import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
 import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
 import { pickForSparePool, sparePoolShortfall } from '../domain/sourcing'
 import { moveAsset } from '../platform/assets'
 import { runTableJob } from '../platform/chunked'
-import { openPurchaseQuantity, requestPurchase } from '../platform/procurement'
-import { boolProperty, PROPERTY, stringProperty } from '../platform/properties'
+import { openPurchaseQuantity, requestPurchase, stagingStockroom } from '../platform/procurement'
+import { boolProperty, PROPERTY } from '../platform/properties'
 import { num, str } from '../platform/records'
 import { stockCandidates } from '../platform/stock'
 
 /** Daily job: keep every Customer's Spare pool at its Agreement's spare-pool ratio (P1.4). */
 export function topUpSparePools(): void {
-    // Read once per run: null when spares are not bought (auto-purchase off), else the staging stockroom they ship to.
-    const buyFor = boolProperty(PROPERTY.autoPurchaseSpares, false) ? stringProperty(PROPERTY.stagingStockroom) : null
+    const autoPurchase = boolProperty(PROPERTY.autoPurchaseSpares, false) && canPurchase()
     runTableJob({
         job: 'spare_pool_top_up',
         table: 'x_daas_ham_agreement',
         query: 'state=active^spare_pool_ratio>0',
         read: (agreement) => ({ customerId: str(agreement, 'customer'), ratio: num(agreement, 'spare_pool_ratio') }),
-        handle: (agreement, agreementId) => topUpAgreement(agreementId, agreement.customerId, agreement.ratio, buyFor),
+        handle: (agreement, agreementId) => topUpAgreement(agreementId, agreement.customerId, agreement.ratio, autoPurchase),
     })
 }
 
@@ -32,8 +31,15 @@ function countByModel(query: string): Map<string, number> {
     return counts
 }
 
-/** `buyFor`: the stockroom purchased spares ship to, '' to request purchases without one (refused with a warning), null to buy none. */
-function topUpAgreement(agreementId: string, customerId: string, ratio: number, buyFor: string | null): void {
+/** Purchased spares ship to the staging stockroom: without one, the run buys none and says so once. */
+function canPurchase(): boolean {
+    if (stagingStockroom()) return true
+    gs.warn(`[x_daas_ham] Spare-pool top-up buys no spares: set ${PROPERTY.stagingStockroom}`)
+    return false
+}
+
+/** Move free central stock into the Customer's Spare pool, and buy what is still missing when `autoPurchase`. */
+function topUpAgreement(agreementId: string, customerId: string, ratio: number, autoPurchase: boolean): void {
     const deployed = countByModel(stagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}`))
     const reserved = countByModel(stagesQuery(['spare_pool'], `company=${customerId}`))
     for (const [modelId, deployedCount] of deployed) {
@@ -47,9 +53,9 @@ function topUpAgreement(agreementId: string, customerId: string, ratio: number, 
             asset.setValue('x_daas_ham_agreement', agreementId)
             asset.update()
         }
-        if (buyFor === null) continue
+        if (!autoPurchase) continue
         const prefix = `Spare-pool top-up ${agreementId}:`
         const missing = shortfall - picked.length - openPurchaseQuantity(prefix, modelId)
-        if (missing > 0) requestPurchase({ modelId, quantity: missing, shipToStockroomId: buyFor, description: `${prefix} ${missing} unit(s)` })
+        if (missing > 0) requestPurchase({ modelId, quantity: missing, description: `${prefix} ${missing} unit(s)` })
     }
 }

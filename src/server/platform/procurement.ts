@@ -1,26 +1,26 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { PurchaseResult } from '../domain/sourcing'
-import { PROPERTY } from './properties'
+import { PROPERTY, stringProperty } from './properties'
+
+/** The staging centre's stockroom: where purchased units ship to and Assets are staged ('' while none is set). */
+export function stagingStockroom(): string {
+    return stringProperty(PROPERTY.stagingStockroom)
+}
 
 /**
- * Purchase orders through the Procurement plugin (proc_po / proc_po_item). Created in the
- * "requested" status for a buyer to complete; field names follow the base Procurement data model.
- * Ship to is mandatory on a purchase order, so none is requested without a stockroom; then, or when
- * the PO is not inserted, a warning is logged and the result says why.
+ * Purchase orders through the Procurement plugin (proc_po / proc_po_item), shipped to the staging
+ * stockroom. Created in the "requested" status for a buyer to complete; field names follow the base
+ * Procurement data model. Ship to is mandatory on a purchase order, so none is requested while no
+ * staging stockroom is set; then, or when the PO is not inserted, a warning is logged and the result says why.
  */
-export function requestPurchase(input: {
-    modelId: string
-    quantity: number
-    /** The staging stockroom the units ship to (purchases always ship there); '' while none is set. */
-    shipToStockroomId: string
-    description: string
-}): PurchaseResult {
-    if (!input.shipToStockroomId) return noPurchase(input.description, `set ${PROPERTY.stagingStockroom}`)
+export function requestPurchase(input: { modelId: string; quantity: number; description: string }): PurchaseResult {
+    const shipTo = stagingStockroom()
+    if (!shipTo) return noPurchase(input.description, `set ${PROPERTY.stagingStockroom}`)
     const po = new GlideRecord('proc_po')
     po.initialize()
     po.setValue('short_description', input.description)
     po.setValue('status', 'requested')
-    po.setValue('ship_to', input.shipToStockroomId)
+    po.setValue('ship_to', shipTo)
     const poId = po.insert()
     if (!poId) return noPurchase(input.description, 'Procurement did not create it')
 

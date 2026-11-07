@@ -11,7 +11,7 @@ import { EVENT, fire } from '../platform/events'
 import { recomputeLine, recomputeOrder } from '../platform/fulfilment'
 import { todayIso } from '../platform/clock'
 import { openOemRma, openRmaCount } from '../platform/oem-rma'
-import { requestPurchase } from '../platform/procurement'
+import { requestPurchase, stagingStockroom } from '../platform/procurement'
 import { PROPERTY, stringProperty } from '../platform/properties'
 import { bool, count, findById, num, str } from '../platform/records'
 import { openStagingTask } from '../platform/staging-tasks'
@@ -186,7 +186,7 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
         stockCandidates(modelId, shortfall * 5 + 50),
     )
 
-    const stagingStockroom = stringProperty(PROPERTY.stagingStockroom)
+    const stagingId = stagingStockroom()
     const toTransfer = new Map<string, Array<{ assetId: string; modelId: string }>>()
     let reserved = 0
     for (const pick of plan.picks) {
@@ -199,12 +199,12 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
         if (!asset) continue
         reserved++
         const from = str(asset, 'stockroom')
-        if (stagingStockroom && from && from !== stagingStockroom) appendTo(toTransfer, from, { assetId: pick.assetId, modelId })
+        if (stagingId && from && from !== stagingId) appendTo(toTransfer, from, { assetId: pick.assetId, modelId })
         openStagingTask(asset, line.getUniqueValue())
         moveAndSave(asset, 'staging', 'sourcing')
     }
     const transfers = [...toTransfer].map(([from, assets]) =>
-        requestTransfer({ fromStockroomId: from, toStockroomId: stagingStockroom, assets }),
+        requestTransfer({ fromStockroomId: from, toStockroomId: stagingId, assets }),
     )
     if (transfers.length > 0) {
         line.setValue('transfer_orders', [str(line, 'transfer_orders'), ...transfers].filter(Boolean).join(','))
@@ -226,7 +226,6 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
         requestPurchase({
             modelId,
             quantity: toPurchase,
-            shipToStockroomId: stagingStockroom,
             description: `${str(order, 'number')} ${str(line, 'number')}: ${toPurchase} x ${str(line, 'model.display_name')}`,
         })
     const outcome = shortfallOutcome(route, { planSummary: plan.summary, missing: toPurchase, onOrder }, purchase)
