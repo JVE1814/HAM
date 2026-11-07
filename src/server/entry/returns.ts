@@ -92,10 +92,16 @@ export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): b
     return true
 }
 
-/** A site package whose last Asset came back ends on the day of receipt. */
+/**
+ * A site package whose last Asset came back ends on the day of receipt. Its remaining Assets are counted past the
+ * before-query visibility rules (ADR 0005): the receiving tech sees only Assets in their stockrooms, so the units
+ * still at the Site would be missed and the line would end on the first unit back.
+ */
 function endLineIfEmpty(lineId: string): void {
     if (!lineId) return
     const remaining = new GlideRecord('alm_hardware')
+    // Only counted, never updated, so the rules need not be turned back on.
+    remaining.setWorkflow(false)
     remaining.addQuery('x_daas_ham_subscription_line', lineId)
     remaining.setLimit(1)
     remaining.query()

@@ -29,8 +29,21 @@ async function call<T>(method: 'GET' | 'POST', path: string, body?: object): Pro
     })
     const payload = await response.json().catch(() => ({}))
     const result = payload.result ?? payload
-    if (!response.ok) throw new Error(result.error ?? `HTTP ${response.status}`)
+    if (!response.ok) throw new Error(errorMessage(result.error, response.status))
     return result as T
+}
+
+/**
+ * The text of a failed call's error: the app's own replies carry `{ error: 'text' }`, ServiceNow's REST errors
+ * `{ error: { message, detail } }`.
+ */
+function errorMessage(error: unknown, status: number): string {
+    if (typeof error === 'string' && error) return error
+    if (error && typeof error === 'object') {
+        const { message, detail } = error as { message?: unknown; detail?: unknown }
+        if (typeof message === 'string' && message) return typeof detail === 'string' && detail ? `${message}: ${detail}` : message
+    }
+    return `HTTP ${status}`
 }
 
 export const warehouseApi = {

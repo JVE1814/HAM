@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeModel, type ModelMatchRule } from './normalization'
+import { manufacturerKey, normalizeModel, shouldLearnAlias, type ModelMatchRule } from './normalization'
 
 const aliases = [
     { alias: 'Cisco Systems, Inc.', manufacturerId: 'cisco' },
     { alias: 'cisco', manufacturerId: 'cisco' },
     { alias: 'Fortinet', manufacturerId: 'fortinet' },
+    { alias: 'Hewlett Packard Enterprise', manufacturerId: 'hpe' },
+    { alias: '--', manufacturerId: 'placeholder' },
 ]
 
 const rules: ModelMatchRule[] = [
@@ -19,6 +21,22 @@ describe('normalizeModel', () => {
     it('resolves the manufacturer through aliases regardless of case and punctuation', () => {
         const result = normalizeModel({ manufacturer: '  CISCO SYSTEMS INC ', model: 'c9300-48p-e' }, aliases, rules)
         expect(result).toEqual({ matched: true, manufacturerId: 'cisco', modelId: 'c9300-48p', ruleId: 'r1' })
+    })
+
+    it('treats any punctuation as a word break when matching manufacturer aliases', () => {
+        expect(manufacturerKey('Hewlett-Packard Enterprise')).toBe(manufacturerKey('Hewlett Packard Enterprise'))
+        expect(manufacturerKey('Hewlett Packard (Enterprise)')).toBe('hewlett packard enterprise')
+        expect(manufacturerKey('Hewlett/Packard_Enterprise')).toBe('hewlett packard enterprise')
+        expect(manufacturerKey('Hewlett\u2013Packard Enterprise\u2122')).toBe('hewlett packard enterprise')
+        expect(manufacturerKey('\u2018Dell\u2019 Technologies\u00ae')).toBe('dell technologies')
+        expect(manufacturerKey('Cisco Systems,Inc.')).toBe('cisco systems inc')
+        const result = normalizeModel({ manufacturer: 'Hewlett-Packard Enterprise', model: 'DL380' }, aliases, rules)
+        expect(result).toEqual({ matched: false, manufacturerId: 'hpe', reason: 'no_matching_rule' })
+    })
+
+    it('never matches a manufacturer that is only punctuation or blank', () => {
+        expect(normalizeModel({ manufacturer: '-', model: 'X1' }, aliases, rules)).toEqual({ matched: false, reason: 'unknown_manufacturer' })
+        expect(normalizeModel({ manufacturer: '', model: 'X1' }, aliases, rules)).toEqual({ matched: false, reason: 'unknown_manufacturer' })
     })
 
     it('applies the first matching rule in rule order', () => {
@@ -41,5 +59,23 @@ describe('normalizeModel', () => {
             matched: false,
             reason: 'unknown_manufacturer',
         })
+    })
+})
+
+describe('shouldLearnAlias', () => {
+    it('learns a manufacturer name that no alias covers yet', () => {
+        expect(shouldLearnAlias('Arista Networks', aliases)).toBe(true)
+    })
+
+    it('does not learn a name an existing alias already covers once case and punctuation are ignored', () => {
+        expect(shouldLearnAlias('CISCO SYSTEMS INC', aliases)).toBe(false)
+        expect(shouldLearnAlias('Hewlett-Packard Enterprise', aliases)).toBe(false)
+    })
+
+    it('never learns a blank or punctuation-only name, because no alias could ever match it', () => {
+        expect(shouldLearnAlias('', aliases)).toBe(false)
+        expect(shouldLearnAlias('   ', aliases)).toBe(false)
+        expect(shouldLearnAlias('-', [])).toBe(false)
+        expect(shouldLearnAlias('?*', [])).toBe(false)
     })
 })

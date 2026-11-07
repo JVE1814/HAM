@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { manufacturerKey, normalizeModel, type ManufacturerAlias, type ModelMatchRule } from '../domain/normalization'
+import { normalizeModel, shouldLearnAlias, type ManufacturerAlias, type ModelMatchRule } from '../domain/normalization'
 import { bool, num, str } from './records'
 
 /** Resolving raw manufacturer/model strings to canonical Models (domain/normalization). */
@@ -80,14 +80,17 @@ export function recordNormalizationException(
     exception.insert()
 }
 
-/** Teach the rules: an exact rule (and alias, if the manufacturer was unknown) for a resolved exception. */
+/**
+ * Teach the rules: an exact rule for a resolved exception, and an alias when its manufacturer name was unknown. A blank
+ * or punctuation-only name gets no alias, since none could ever match it; the exact rule still serves rows that name a
+ * known manufacturer.
+ */
 export function learnFromResolution(exception: GlideRecord, data: NormalizationData): void {
     const modelId = str(exception, 'resolved_model')
     const manufacturerId = str(exception, 'resolved_model.manufacturer')
     if (!modelId || !manufacturerId) return
     const rawManufacturer = str(exception, 'raw_manufacturer')
-    const knownAlias = data.aliases.some((a) => manufacturerKey(a.alias) === manufacturerKey(rawManufacturer))
-    if (rawManufacturer && !knownAlias) {
+    if (shouldLearnAlias(rawManufacturer, data.aliases)) {
         const alias = new GlideRecord('x_daas_ham_manufacturer_alias')
         alias.initialize()
         alias.setValue('alias', rawManufacturer)

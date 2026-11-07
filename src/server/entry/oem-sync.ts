@@ -271,7 +271,7 @@ export function processCoverageRow(current: GlideRecord): void {
     const cost = str(current, 'annual_cost').trim()
     if (!VENDORS.includes(vendor)) return finish('error', `vendor must be one of ${VENDORS.join(', ')}`)
     if (!serial) return finish('error', 'serial number is required')
-    if ((start && !isIsoDate(start)) || (end && !isIsoDate(end))) return finish('error', 'dates must be YYYY-MM-DD')
+    if ((start && !isIsoDate(start)) || (end && !isIsoDate(end))) return finish('error', 'dates must be real calendar dates (YYYY-MM-DD)')
     if (cost && !Number.isFinite(Number(cost))) return finish('error', 'annual cost must be a number')
     const asset = new GlideRecord('alm_hardware')
     if (!asset.get('serial_number', serial)) return finish('error', `no asset with serial ${serial}`)
