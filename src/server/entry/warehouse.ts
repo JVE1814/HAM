@@ -2,7 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { normalizeSerial } from '../domain/asn'
+import { normalizeSerial, receiveSerialLockName } from '../domain/asn'
 import type { StockroomType } from '../domain/sourcing'
 import { ROLE } from '../domain/visibility'
 import { awaitsReceipt, putAwayProblem, RECEIVING_STOCKROOM_TYPES, receivingProblem } from '../domain/warehouse'
@@ -196,17 +196,18 @@ function arrivingAsset(assetId: string): GlideRecord | null {
 
 /**
  * The Asset of an unknown serial scanned with its PID. The check that no Asset has the serial and the insert are made
- * under a lock on the serial, checking again there, so two first scans of one unit create it once; a scan that finds
- * the lock held is told to scan again, and the rescan finds the Asset by serial.
+ * under a lock on the serial (domain/asn `receiveSerialLockName`), checking again there, so two first scans of one
+ * unit, or a scan and its ASN row, create it once; a scan that finds the lock held is told to scan again, and the
+ * rescan finds the Asset by serial.
  */
 function createReceivedAsset(input: Record<string, string>): { asset: GlideRecord } | Unsaved {
     const resolution = resolveModel({ manufacturer: input.manufacturer ?? '', model: input.pid }, loadNormalizationData())
     const modelId = resolution.modelId
     if (!modelId) return { status: 422, error: `PID ${input.pid} does not map to a model` }
     const serial = normalizeSerial(input.code)
-    // Set inside the serial's lock. A serial too long for a lock name shares its lock with those it starts like.
+    // Set inside the serial's lock, which an ASN row for the serial takes too (entry/imports).
     let created = SCAN_AGAIN as { asset: GlideRecord } | Unsaved
-    withLock(`receive_serial_${serial}`.slice(0, 100), (lock) => {
+    withLock(receiveSerialLockName(serial), (lock) => {
         const found = findAssetByIdentifier(input.code, { beyondVisibility: true })
         created = found ? { asset: found } : insertReceivedAsset(lock, modelId, serial)
     })

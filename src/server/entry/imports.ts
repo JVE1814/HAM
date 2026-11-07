@@ -1,33 +1,52 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
-import { GlideDateTime, GlideRecord } from '@servicenow/glide'
-import { normalizeSerial, validateAsnRows } from '../domain/asn'
+import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
+import { normalizeSerial, receiveSerialLockName, validateAsnRows, type AsnRowCheck } from '../domain/asn'
 import { parseLifecycleRow } from '../domain/model-lifecycle'
 import { newAsset } from '../platform/assets'
+import { withLockTries, type HeldLock } from '../platform/locks'
 import { loadNormalizationData, recordNormalizationException, resolveModel } from '../platform/normalization'
 import { PROPERTY, stringProperty } from '../platform/properties'
 import { refusal, str } from '../platform/records'
 
 /** Import-set rows processed on insert (ASN, lifecycle CSV). */
 
-function finish(row: GlideRecord, state: 'inserted' | 'updated' | 'error' | 'ignored', comment: string): void {
+type ImportState = 'inserted' | 'updated' | 'error' | 'ignored'
+
+/** How a row ends: the import state and comment it is saved with. */
+interface RowOutcome {
+    state: ImportState
+    comment: string
+}
+
+function finish(row: GlideRecord, state: ImportState, comment: string): void {
     row.setValue('sys_import_state', state)
     row.setValue('sys_import_state_comment', comment)
     row.update()
 }
 
-/** After-insert rule on ASN import rows: create the in-transit Asset (ASN = scan-to-confirm receiving). */
+/** Tries at a serial's lock before the row is left to load again: a holder keeps it for one check and one insert. */
+const SERIAL_LOCK_TRIES = 5
+
+/**
+ * After-insert rule on ASN import rows: create the in-transit Asset (ASN = scan-to-confirm receiving).
+ *
+ * A first scan of the serial without an ASN (entry/warehouse) could create its Asset between this row's check and its
+ * insert, and both would stand. So the check and the insert are made under the serial's lock, which that scan takes
+ * too (domain/asn `receiveSerialLockName`), checking again there. A row that finds the lock held through every try, or
+ * whose lock cannot be taken (platform/locks throws), is marked error with why, to load again; loaded again once the
+ * scan has created the Asset, it is refused as a serial that already exists.
+ */
 export function processAsnRow(current: GlideRecord): void {
     const serial = normalizeSerial(str(current, 'serial'))
-    const [check] = validateAsnRows(
-        [{ serial, pid: str(current, 'pid'), poNumber: str(current, 'po_number') }],
-        serialExists(serial) ? new Set([serial]) : new Set(),
-    )
+    // Most refused rows (a missing field, a serial known long since) are refused here, without the lock.
+    const check = checkAsnRow(current, serial)
     if (!check.ok) return finish(current, 'error', check.reason)
 
     const raw = { manufacturer: str(current, 'manufacturer'), model: str(current, 'pid') }
     const resolution = resolveModel(raw, loadNormalizationData())
-    if (!resolution.modelId) {
+    const modelId = resolution.modelId
+    if (!modelId) {
         recordNormalizationException(raw, 'reason' in resolution ? resolution.reason : '', {
             table: 'x_daas_ham_asn_import',
             id: current.getUniqueValue(),
@@ -35,21 +54,63 @@ export function processAsnRow(current: GlideRecord): void {
         return finish(current, 'error', `PID ${raw.model} does not map to a model; see normalization exceptions`)
     }
 
-    const asset = newAsset(resolution.modelId, 'in_transit')
-    asset.setValue('serial_number', serial)
-    asset.setValue('po_number', str(current, 'po_number'))
-    asset.setValue('company', stringProperty(PROPERTY.providerCompany))
-    asset.setValue('x_daas_ham_legal_owner', 'provider')
-    asset.setValue('x_daas_ham_customer_tag', str(current, 'customer_tag'))
-    asset.setValue('x_daas_ham_mac_address', str(current, 'mac_address'))
-    asset.setValue('x_daas_ham_claim_code', str(current, 'claim_code'))
-    asset.setValue('x_daas_ham_staging_source', str(current, 'staging_source') === 'distributor' ? 'distributor' : 'in_house')
-    if (!asset.insert()) return finish(current, 'error', `Asset insert failed: ${refusal(asset)}`)
-    finish(current, 'inserted', `Asset ${serial} in transit`)
+    // Set inside the serial's lock: the insert's own errors escape, and only a lock that could not be taken is marked.
+    let started = false as boolean
+    let outcome = loadAgain(serial, 'a scan or another row is receiving it')
+    try {
+        withLockTries(receiveSerialLockName(serial), SERIAL_LOCK_TRIES, (lock) => {
+            started = true
+            outcome = insertHolding(lock, current, serial, modelId)
+        })
+    } catch (error) {
+        if (started) throw error
+        outcome = loadAgain(serial, error instanceof Error ? error.message : String(error))
+    }
+    finish(current, outcome.state, outcome.comment)
 }
 
+/** A row the serial's lock kept from importing, marked error with why: loading it again imports or refuses it. */
+function loadAgain(serial: string, why: string): RowOutcome {
+    return { state: 'error', comment: `serial ${serial} not imported: ${why}; load this row again` }
+}
+
+/** The row checked (domain/asn `validateAsnRows`): its mandatory fields, and that no Asset has its serial yet. */
+function checkAsnRow(row: GlideRecord, serial: string): AsnRowCheck {
+    const fields = { serial, pid: str(row, 'pid'), poNumber: str(row, 'po_number') }
+    return validateAsnRows([fields], serialExists(serial) ? new Set([serial]) : new Set())[0]
+}
+
+/**
+ * Check the row again and insert its Asset, holding the serial's `lock`. A holder that outlasted the lock (ADR 0013)
+ * may overlap the scan or row that took it over: it inserts only while it holds it, and one that lost it during the
+ * insert is logged.
+ */
+function insertHolding(lock: HeldLock, row: GlideRecord, serial: string, modelId: string): RowOutcome {
+    const check = checkAsnRow(row, serial)
+    if (!check.ok) return { state: 'error', comment: check.reason }
+    if (!lock.held()) return loadAgain(serial, 'its lock was lost while checking it')
+    const asset = newAsset(modelId, 'in_transit')
+    asset.setValue('serial_number', serial)
+    asset.setValue('po_number', str(row, 'po_number'))
+    asset.setValue('company', stringProperty(PROPERTY.providerCompany))
+    asset.setValue('x_daas_ham_legal_owner', 'provider')
+    asset.setValue('x_daas_ham_customer_tag', str(row, 'customer_tag'))
+    asset.setValue('x_daas_ham_mac_address', str(row, 'mac_address'))
+    asset.setValue('x_daas_ham_claim_code', str(row, 'claim_code'))
+    const stagingSource = str(row, 'staging_source') === 'distributor' ? 'distributor' : 'in_house'
+    asset.setValue('x_daas_ham_staging_source', stagingSource)
+    if (!asset.insert()) return { state: 'error', comment: `Asset insert failed: ${refusal(asset)}` }
+    if (!lock.held()) gs.warn(`[x_daas_ham] Asset ${serial} created after its lock was lost: check it exists once`)
+    return { state: 'inserted', comment: `Asset ${serial} in transit` }
+}
+
+/**
+ * Whether an Asset has the serial, read past the importer's before-query rules (ADR 0005): an inventory tech sees only
+ * their stockrooms' Assets, and an Asset in transit or on order is in none yet. Only read, never saved.
+ */
 function serialExists(serial: string): boolean {
     const asset = new GlideRecord('alm_hardware')
+    asset.setWorkflow(false)
     asset.addQuery('serial_number', serial)
     asset.setLimit(1)
     asset.query()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateAsnRows } from './asn'
+import { receiveSerialLockName, validateAsnRows } from './asn'
 
 describe('validateAsnRows', () => {
     it('accepts rows with a serial, a PID and a purchase order', () => {
@@ -24,5 +24,18 @@ describe('validateAsnRows', () => {
             { row: 3, ok: false, reason: 'serial FOC3 appears more than once in this ASN' },
             { row: 4, ok: false, reason: 'serial FOC9 already exists' },
         ])
+    })
+})
+
+describe('receiveSerialLockName', () => {
+    it('names one lock for a serial however it is typed, so a scan and an ASN row take the same one', () => {
+        expect(receiveSerialLockName(' foc123 ')).toBe('receive_serial_FOC123')
+        expect(receiveSerialLockName('FOC123')).toBe(receiveSerialLockName('foc123'))
+    })
+
+    it('fits the Job lock name (100 characters)', () => {
+        const name = receiveSerialLockName('X'.repeat(100))
+        expect(name).toHaveLength(100)
+        expect(name.startsWith('receive_serial_XXX')).toBe(true)
     })
 })
