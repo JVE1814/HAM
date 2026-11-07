@@ -19,7 +19,7 @@ export function onCaseFailedAsset(current: GlideRecord): void {
 /**
  * UI action "Raise replacement" on a case: an Order replacing the failed Asset like-for-like. One that cannot be
  * submitted as raised stays a draft, still linked to the case so a second one is not raised, for the user to correct.
- * The action is offered only while the case links no Order, but a form opened before the first one was raised can
+ * The action is offered while the case links no Order or one rejected or cancelled, but a form opened before then can
  * still send it: then a linked draft is submitted again and a linked Order going ahead is kept (domain/breakfix).
  */
 export function uiRaiseReplacement(current: GlideRecord): void {

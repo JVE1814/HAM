@@ -23,7 +23,9 @@ UiAction({
     table: 'sn_customerservice_case',
     actionName: 'x_daas_ham_raise_replacement',
     hint: 'Order a like-for-like replacement of the failed asset (spare at the site, spare pool, stock, OEM advance replacement or purchase).',
-    condition: "current.x_daas_ham_failed_asset != '' && current.x_daas_ham_replacement_order == '' && current.active == true",
+    // Offered while no replacement goes ahead: none linked, or the linked one rejected or cancelled (domain/breakfix).
+    condition:
+        "current.x_daas_ham_failed_asset != '' && current.active == true && (current.x_daas_ham_replacement_order == '' || ['rejected', 'cancelled'].indexOf(String(current.x_daas_ham_replacement_order.stage)) >= 0)",
     roles: [noc, assetManager, 'sn_customerservice_agent'],
     form: { showButton: true, style: 'primary' },
     showUpdate: true,

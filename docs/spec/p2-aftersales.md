@@ -7,10 +7,10 @@
 - **Raise replacement** (NOC, asset manager, CSM agent) creates a *device replace* Order: one line,
   same Model, *replaces asset* = the failed unit. The Order is submitted at once; one that Submit
   refuses (ordering spec) stays a draft, linked to the case, to correct and submit.
-- **Raise replacement** is offered only while the case links no Order. A form opened before the link
-  can still send it: a linked draft is then submitted again, a linked Order awaiting approval, going
-  ahead or complete is kept, and only one that was rejected or cancelled is replaced by a new Order
-  (`domain/breakfix.ts`).
+- **Raise replacement** is offered while the case links no Order, or one that was rejected or
+  cancelled: a new Order then takes its place on the case. A form opened before the link can still send
+  it: a linked draft is then submitted again, and a linked Order awaiting approval, going ahead or
+  complete is kept (`domain/breakfix.ts`).
 - Replacement lines skip the entitlement checks: a like-for-like swap is not a new catalog choice and
   adds no usage.
 - Sourcing follows the replacement priority: hot spare at the Site → Spare pool → central stock.

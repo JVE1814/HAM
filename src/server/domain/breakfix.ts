@@ -7,8 +7,11 @@
  */
 export type ReplacementStep = 'raise' | 'submit_draft' | 'keep'
 
-/** Stages in which an Order ended without replacing anything: a new one may take its place on the case. */
-const ENDED_UNFULFILLED = ['rejected', 'cancelled']
+/**
+ * Stages in which an Order ended without replacing anything: a new one may take its place on the case, and the
+ * "Raise replacement" action is offered again (its condition lists these stages).
+ */
+export const ENDED_UNFULFILLED: readonly string[] = ['rejected', 'cancelled']
 
 /** The step for a case whose linked replacement Order is in `linkedStage`, or links none (null, also when it is gone). */
 export function replacementStep(linkedStage: string | null): ReplacementStep {
