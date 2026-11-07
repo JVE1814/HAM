@@ -6,8 +6,6 @@ import {
     applyTracking,
     buyLabel,
     newTrackingEvents,
-    MAX_LABEL_PACKAGES,
-    packageCount,
     parseTrackingWebhook,
     tokenMatches,
     trackingEventKey,
@@ -64,6 +62,7 @@ interface ShipmentSpec {
     siteId: string
     /** The Order or Return order, whose `customer` the shipment is for. */
     parent: GlideRecord
+    /** One box per Asset (buyLabel refuses more than one label covers). */
     packages: number
     reference: string
     link: { field: 'order' | 'return_order'; id: string }
@@ -71,27 +70,22 @@ interface ShipmentSpec {
 
 /** Buy a label between the depot and a Site and record the shipment. */
 function createShipment(spec: ShipmentSpec): LabelResult {
-    // One package per Asset: never buy a label that leaves boxes unlabelled.
-    if (spec.packages > MAX_LABEL_PACKAGES) {
-        return { ok: false, error: `${spec.packages} packages is more than one label covers (${MAX_LABEL_PACKAGES}); enter the carrier and tracking number by hand` }
-    }
     const carrierId = stringProperty(PROPERTY.shippingCarrierId)
-    if (!carrierId) return { ok: false, error: 'set x_daas_ham.shipping.carrier_id to the ShipEngine carrier account (se-...) billed for labels' }
+    if (!carrierId) return { ok: false, error: `set ${PROPERTY.shippingCarrierId} to the ShipEngine carrier account (se-...) billed for labels` }
     const stockroom = depot()
-    if (!stockroom) return { ok: false, error: 'set x_daas_ham.staging.default_stockroom to the depot that ships' }
+    if (!stockroom) return { ok: false, error: `set ${PROPERTY.stagingStockroom} to the depot that ships` }
     const depotLocation = findById('cmn_location', str(stockroom, 'location'))
     const site = findById('cmn_location', spec.siteId)
     if (!depotLocation || !site) return { ok: false, error: 'the depot or the Site has no location' }
     const depotAddress = addressOf(depotLocation, { name: str(stockroom, 'name'), phone: stringProperty(PROPERTY.shippingSenderPhone) }, stringProperty(PROPERTY.shippingSenderName))
     const siteAddress = addressOf(site, siteContact(site), spec.parent.getDisplayValue('customer'))
     const serviceCode = stringProperty(PROPERTY.shippingServiceCode)
-    const packages = packageCount(spec.packages)
     const result = buyLabel(aggregator(), {
         carrierId,
         serviceCode,
         from: spec.direction === 'to_site' ? depotAddress : siteAddress,
         to: spec.direction === 'to_site' ? siteAddress : depotAddress,
-        packages,
+        packages: spec.packages,
         weightKg: intProperty(PROPERTY.shippingPackageKg, 5),
         reference: spec.reference,
     })
@@ -105,7 +99,7 @@ function createShipment(spec: ShipmentSpec): LabelResult {
     shipment.setValue('stockroom', stockroom.getUniqueValue())
     shipment.setValue('carrier', result.carrier)
     shipment.setValue('service_code', serviceCode)
-    shipment.setValue('packages', packages)
+    shipment.setValue('packages', spec.packages)
     shipment.setValue('tracking_number', result.trackingNumber)
     shipment.setValue('label_id', result.labelId)
     shipment.setValue('label_url', result.labelUrl)

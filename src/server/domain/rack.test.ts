@@ -68,11 +68,11 @@ describe('placementProblem in a rack already over its power budget', () => {
 
 describe('powerBudget', () => {
     it('sums typical power against the capacity', () => {
-        expect(powerBudget(1000, placed)).toEqual({ capacityW: 1000, usedW: 600, remainingW: 400, utilisation: 60 })
+        expect(powerBudget(1000, placed)).toEqual({ capacityW: 1000, usedW: 600, utilisation: 60 })
     })
 
-    it('has no remaining power or utilisation without a capacity', () => {
-        expect(powerBudget(0, [...placed, { assetId: 'x', ruStart: 1, height: 1, face: 'front' }])).toEqual({ capacityW: 0, usedW: 600, remainingW: null, utilisation: null })
+    it('has no utilisation without a capacity', () => {
+        expect(powerBudget(0, [...placed, { assetId: 'x', ruStart: 1, height: 1, face: 'front' }])).toEqual({ capacityW: 0, usedW: 600, utilisation: null })
     })
 })
 

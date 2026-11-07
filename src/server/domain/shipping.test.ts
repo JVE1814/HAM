@@ -194,6 +194,21 @@ describe('buyLabel', () => {
         expect(buyLabel(http, { ...input, from: { ...site, phone: '' }, to: depot })).toEqual({ ok: false, error: 'from address missing phone' })
         expect(called).toBe(false)
     })
+
+    it('refuses more boxes than one label covers without calling out', () => {
+        const calls: HttpRequest[] = []
+        const http = (request: HttpRequest) => {
+            calls.push(request)
+            return { status: 200, body: JSON.stringify(LABEL_RESPONSE) }
+        }
+        expect(buyLabel(http, { ...input, packages: 21 })).toEqual({
+            ok: false,
+            error: '21 packages is more than one label covers (20); enter the carrier and tracking number by hand',
+        })
+        expect(calls).toHaveLength(0)
+        expect(buyLabel(http, { ...input, packages: 20 })).toMatchObject({ ok: true })
+        expect(JSON.parse(calls[0].body ?? '').shipment.packages).toHaveLength(20)
+    })
 })
 
 /** An EasyPost Event envelope as in the Events reference; `result` is the object the Event is about. */

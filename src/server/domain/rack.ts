@@ -42,7 +42,7 @@ export function placementProblem(rack: RackSpec, placements: readonly Placement[
     const budget = powerBudget(rack.powerCapacityW, [...others, candidate])
     // The other devices draw the same before and after, so only the candidate's own draw can raise it.
     const raisesDraw = previousPowerW === undefined || drawW(candidate) > Math.max(0, previousPowerW)
-    if (raisesDraw && budget.remainingW !== null && budget.remainingW < 0) {
+    if (raisesDraw && budget.capacityW > 0 && budget.usedW > budget.capacityW) {
         return `The rack's power budget would be exceeded: ${budget.usedW} W of ${budget.capacityW} W`
     }
     return null
@@ -55,17 +55,15 @@ function drawW(placement: Placement): number {
 export interface PowerBudget {
     capacityW: number
     usedW: number
-    /** Null without a recorded capacity. */
-    remainingW: number | null
-    /** Used share of the capacity, in percent. */
+    /** Used share of the capacity, in percent; null without a recorded capacity. */
     utilisation: number | null
 }
 
 /** Typical power drawn by the placed devices against the rack's capacity. */
 export function powerBudget(capacityW: number, placements: readonly Placement[]): PowerBudget {
     const usedW = placements.reduce((sum, p) => sum + drawW(p), 0)
-    if (capacityW <= 0) return { capacityW: 0, usedW, remainingW: null, utilisation: null }
-    return { capacityW, usedW, remainingW: capacityW - usedW, utilisation: Math.round((usedW / capacityW) * 100) }
+    if (capacityW <= 0) return { capacityW: 0, usedW, utilisation: null }
+    return { capacityW, usedW, utilisation: Math.round((usedW / capacityW) * 100) }
 }
 
 export interface ElevationRow {

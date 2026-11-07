@@ -2000,10 +2000,12 @@ declare global {
                     rm_checkpoint_claim_sid: {
                         table: 'sys_rest_message_fn_parameters'
                         id: '0c65661a1b4649d0b4f6cfd8e77b94de'
+                        deleted: true
                     }
                     rm_checkpoint_claim_sid_header: {
                         table: 'sys_rest_message_fn_headers'
                         id: '0410646806aa49cf81b5c7d569948676'
+                        deleted: true
                     }
                     rm_checkpoint_ct: {
                         table: 'sys_rest_message_headers'
@@ -2030,10 +2032,12 @@ declare global {
                     rm_checkpoint_logout_sid: {
                         table: 'sys_rest_message_fn_parameters'
                         id: 'e046df20822c4d7e9b4e2a235d360c4c'
+                        deleted: true
                     }
                     rm_checkpoint_logout_sid_header: {
                         table: 'sys_rest_message_fn_headers'
                         id: 'da615ef216f444dd948bd1ed5d11d316'
+                        deleted: true
                     }
                     rm_checkpoint_zt: {
                         table: 'sys_rest_message'

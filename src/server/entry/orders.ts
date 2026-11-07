@@ -12,7 +12,7 @@ import { todayIso } from '../platform/clock'
 import { openOemRma, openRmaCount } from '../platform/oem-rma'
 import { requestPurchase } from '../platform/procurement'
 import { PROPERTY, stringProperty } from '../platform/properties'
-import { bool, findById, num, str } from '../platform/records'
+import { bool, count, findById, num, str } from '../platform/records'
 import { openStagingTask } from '../platform/staging-tasks'
 import { reserveAsset, stockCandidates } from '../platform/stock'
 import { requestTransfer } from '../platform/transfers'
@@ -224,9 +224,9 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
         openOemRma({ defectiveAsset: replaced, orderLineId: line.getUniqueValue(), caseId: str(order, 'case') })
         line.setValue('sourcing_summary', `${plan.summary} (OEM advance replacement under RMA)`)
     }
-    // No PO without a ship-to stockroom (requestPurchase returns ''): the shortfall stays unsourced.
+    // No PO without a ship-to stockroom; then, or when the PO is not created, the shortfall stays unsourced.
     const purchaseOrder =
-        route === 'purchase'
+        route === 'purchase' && stagingStockroom
             ? requestPurchase({
                   modelId,
                   quantity: toPurchase,
@@ -234,28 +234,23 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
                   description: `${str(order, 'number')} ${str(line, 'number')}: ${toPurchase} x ${str(line, 'model.display_name')}`,
               })
             : ''
+    const unsourced = route === 'purchase' && !purchaseOrder
     if (purchaseOrder) line.setValue('purchase_order', purchaseOrder)
-    const purchased = purchaseOrder ? toPurchase : 0
     line.setValue('quantity_allocated', allocated + reserved)
-    line.setValue('quantity_to_purchase', onOrder + purchased)
-    if (route !== 'oem_advance_replacement') line.setValue('sourcing_summary', plan.summary)
-    if (route === 'purchase' && !purchaseOrder) {
-        line.setValue('sourcing_summary', `${plan.summary} (no purchase order: set x_daas_ham.staging.default_stockroom)`)
-        line.setValue('line_stage', 'awaiting_stock')
-        line.update()
-        recomputeLine(line.getUniqueValue())
-        return
+    line.setValue('quantity_to_purchase', onOrder + (purchaseOrder ? toPurchase : 0))
+    if (unsourced) {
+        const why = stagingStockroom ? 'Procurement did not create it' : `set ${PROPERTY.stagingStockroom}`
+        line.setValue('sourcing_summary', `${plan.summary} (no purchase order: ${why})`)
+    } else if (route !== 'oem_advance_replacement') {
+        line.setValue('sourcing_summary', plan.summary)
     }
-    line.setValue('line_stage', 'sourced')
+    line.setValue('line_stage', unsourced ? 'awaiting_stock' : 'sourced')
     line.update()
     recomputeLine(line.getUniqueValue())
 }
 
 function countAllocated(lineId: string): number {
-    const asset = new GlideRecord('alm_hardware')
-    asset.addQuery('x_daas_ham_order_line', lineId)
-    asset.query()
-    return asset.getRowCount()
+    return count('alm_hardware', `x_daas_ham_order_line=${lineId}`)
 }
 
 /**

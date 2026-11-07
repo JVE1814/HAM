@@ -119,8 +119,15 @@ export function labelRequestBody(input: LabelInput): string {
     })
 }
 
-/** Buy a label: POST to the aggregator's `create_label` function. */
+/**
+ * Buy a label: POST to the aggregator's `create_label` function. Nothing is called for more boxes
+ * than one label covers or for an address a carrier would refuse.
+ */
 export function buyLabel(http: HttpPort, input: LabelInput): LabelResult {
+    // One package per Asset: never buy a label that leaves boxes unlabelled.
+    if (input.packages > MAX_LABEL_PACKAGES) {
+        return { ok: false, error: `${input.packages} packages is more than one label covers (${MAX_LABEL_PACKAGES}); enter the carrier and tracking number by hand` }
+    }
     for (const [side, address] of [['from', input.from], ['to', input.to]] as const) {
         const problem = addressProblem(address, side)
         if (problem) return { ok: false, error: `${side} address ${problem}` }
@@ -206,7 +213,7 @@ function latestDetail(details: readonly unknown[]): unknown {
     for (const detail of details) {
         const ms = Date.parse(text(field(detail, 'datetime')))
         const at = Number.isFinite(ms) ? ms : -Infinity
-        if (latest === undefined || at >= latestMs) {
+        if (at >= latestMs) {
             latest = detail
             latestMs = at
         }

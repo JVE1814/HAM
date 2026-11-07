@@ -1,12 +1,12 @@
-import { GlideDateTime, GlideRecord, GlideSchedule, gs } from '@servicenow/glide'
+import { GlideAggregate, GlideDateTime, GlideRecord, GlideSchedule, gs } from '@servicenow/glide'
 import { planShipment, type InstallMode, type OnSiteWork, type OrderType } from '../domain/delivery'
-import { isDeployed, stagesQuery } from '../domain/lifecycle'
+import { isDeployed, stageOf, stagesQuery } from '../domain/lifecycle'
 import { checkJobWindow } from '../domain/scheduling'
 import { moveAndSave, readStage } from '../platform/assets'
 import { glideToMs } from '../platform/clock'
 import { openChange, openWorkOrder, type WorkContext } from '../platform/field-work'
 import { recomputeOrder } from '../platform/fulfilment'
-import { count, findById, str } from '../platform/records'
+import { findById, str } from '../platform/records'
 import { returnReplacedAssets } from './returns'
 import { labelOrder, shippingEnabled } from './shipping'
 
@@ -59,12 +59,22 @@ export function shipOrder(order: GlideRecord): void {
     recomputeOrder(order.getUniqueValue())
 }
 
+/** The Order's staged Assets and hot spares, counted in one query grouped by the stage fields. */
 function countShippable(orderId: string): { staged: number; hotSpares: number } {
-    const ofOrder = `x_daas_ham_order_line.order=${orderId}`
-    return {
-        staged: count('alm_hardware', stagesQuery(['staged'], ofOrder)),
-        hotSpares: count('alm_hardware', stagesQuery(['spare_pool'], ofOrder)),
+    const ga = new GlideAggregate('alm_hardware')
+    ga.addEncodedQuery(stagesQuery(['staged', 'spare_pool'], `x_daas_ham_order_line.order=${orderId}`))
+    ga.addAggregate('COUNT', '')
+    ga.groupBy('install_status')
+    ga.groupBy('substatus')
+    ga.query()
+    const counts = { staged: 0, hotSpares: 0 }
+    while (ga.next()) {
+        const stage = stageOf({ installStatus: String(ga.getValue('install_status') ?? ''), substatus: String(ga.getValue('substatus') ?? '') })
+        const n = Number(ga.getAggregate('COUNT', ''))
+        if (stage === 'staged') counts.staged += n
+        else if (stage === 'spare_pool') counts.hotSpares += n
     }
+    return counts
 }
 
 function openOnSiteWork(order: GlideRecord, work: OnSiteWork): void {
