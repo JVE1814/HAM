@@ -3,7 +3,7 @@
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
 import { monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing'
 import type { LegalOwner } from '../domain/lifecycle'
-import { cents, CostLedger, marginRows, serviceIntervalCosts, type Amount, type CostType, type LeaseTerms } from '../domain/margin'
+import { cents, CostLedger, marginRows, serviceIntervalCosts, type Amount, type AssetCostFacts, type CostType, type LeaseTerms } from '../domain/margin'
 import { runEventTableJob } from '../platform/chunked'
 import { EVENT, fire } from '../platform/events'
 import { intProperty, PROPERTY } from '../platform/properties'
@@ -29,6 +29,7 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     const amortisationMonths = intProperty(PROPERTY.amortisationMonths, 60)
     const ledger = new CostLedger()
     const leases = new Map<string, LeaseTerms | null>()
+    const assets = new Map<string, AssetFields>()
     const result = runEventTableJob({
         eventName: EVENT.marginCompute,
         record: current,
@@ -42,15 +43,12 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
             siteId: str(interval, 'site'),
             start: str(interval, 'start_date'),
             end: str(interval, 'end_date') || undefined,
-            legalOwner: str(interval, 'asset.x_daas_ham_legal_owner') as LegalOwner,
-            purchaseCost: num(interval, 'asset.cost'),
-            purchaseDate: str(interval, 'asset.purchase_date'),
-            inServiceDate: str(interval, 'asset.x_daas_ham_in_service_date'),
-            supportAnnual: num(interval, 'asset.x_daas_ham_support_cost'),
-            leaseId: str(interval, 'asset.x_daas_ham_lease'),
+            assetId: str(interval, 'asset'),
         }),
+        prefetch: (intervals) => loadAssets(intervals.map((interval) => interval.assetId), assets),
         handle: (interval) => {
-            const costs = serviceIntervalCosts(interval, { ...interval, lease: leaseOf(interval.leaseId, leases) }, bounds, amortisationMonths)
+            const asset = assets.get(interval.assetId) ?? NO_ASSET
+            const costs = serviceIntervalCosts(interval, { ...asset, lease: leaseOf(asset.leaseId, leases) }, bounds, amortisationMonths)
             for (const cost of costs) ledger.add(interval.customerId, interval.siteId, cost.type, cost.amount)
         },
         flush: () => writeCostFacts(periodId, ledger.drain()),
@@ -65,6 +63,32 @@ function clearPeriod(periodId: string): void {
         const gr = new GlideRecord(table)
         gr.addQuery('billing_period', periodId)
         gr.deleteMultiple()
+    }
+}
+
+/** An Asset's cost fields as stored, with its Lease schedule's sys_id. */
+type AssetFields = Omit<AssetCostFacts, 'lease'> & { leaseId: string }
+
+/** A deleted Asset reads as a dot-walk through a broken reference did: empty strings and zeros. */
+const NO_ASSET: AssetFields = { legalOwner: '', purchaseCost: 0, purchaseDate: '', inServiceDate: '', supportAnnual: 0, leaseId: '' }
+
+/** Replace `into` with the cost fields of the batch's distinct Assets, read with one query. */
+function loadAssets(assetIds: readonly string[], into: Map<string, AssetFields>): void {
+    into.clear()
+    const ids = [...new Set(assetIds.filter(Boolean))]
+    if (ids.length === 0) return
+    const asset = new GlideRecord('alm_hardware')
+    asset.addEncodedQuery(`sys_idIN${ids.join(',')}`)
+    asset.query()
+    while (asset.next()) {
+        into.set(asset.getUniqueValue(), {
+            legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner,
+            purchaseCost: num(asset, 'cost'),
+            purchaseDate: str(asset, 'purchase_date'),
+            inServiceDate: str(asset, 'x_daas_ham_in_service_date'),
+            supportAnnual: num(asset, 'x_daas_ham_support_cost'),
+            leaseId: str(asset, 'x_daas_ham_lease'),
+        })
     }
 }
 

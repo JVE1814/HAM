@@ -10,6 +10,11 @@ export interface TableJob<T> {
     table: string
     query: string
     read(record: GlideRecord): T
+    /**
+     * Load what a whole batch needs in one go (e.g. its referenced records): called once per batch,
+     * after every row of it is read and before any of it is handled.
+     */
+    prefetch?: (items: readonly T[]) => void
     handle(item: T, sysId: string): void
 }
 
@@ -121,7 +126,7 @@ export function runEventTableJob<T>(spec: EventTableJob<T>): ChunkedJobResult {
     return superseded ? { ...result, done: false, lastError: 'superseded' } : result
 }
 
-function fetchBatch<T>(spec: Pick<TableJob<T>, 'table' | 'query' | 'read'>, after: string, size: number) {
+function fetchBatch<T>(spec: Pick<TableJob<T>, 'table' | 'query' | 'read' | 'prefetch'>, after: string, size: number) {
     const gr = new GlideRecord(spec.table)
     gr.addEncodedQuery(after ? andEachClause(spec.query, `sys_id>${after}`) : spec.query)
     gr.orderBy('sys_id')
@@ -129,5 +134,6 @@ function fetchBatch<T>(spec: Pick<TableJob<T>, 'table' | 'query' | 'read'>, afte
     gr.query()
     const batch: Array<{ id: string; item: T }> = []
     while (gr.next()) batch.push({ id: gr.getUniqueValue(), item: spec.read(gr) })
+    spec.prefetch?.(batch.map((record) => record.item))
     return batch
 }
