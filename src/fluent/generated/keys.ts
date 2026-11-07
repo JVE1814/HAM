@@ -577,6 +577,10 @@ declare global {
                         table: 'sys_script'
                         id: 'bab50b0cdf7b44bd8c8f592bbe4615d2'
                     }
+                    br_disposal_approval_decision: {
+                        table: 'sys_script'
+                        id: '4130c64898904cb48dc19b3da973e124'
+                    }
                     br_eox_row: {
                         table: 'sys_script'
                         id: '4411888922fd4cf2b2aedb7b9e439df9'
@@ -752,6 +756,10 @@ declare global {
                     job_purge_device_events: {
                         table: 'sysauto_script'
                         id: 'ec83f327d74542ea858513e6a8c3edc3'
+                    }
+                    job_raise_refresh_orders: {
+                        table: 'sysauto_script'
+                        id: '00fa703da54c475fafc5902b3a6933c0'
                     }
                     job_roll_lifecycle_phases: {
                         table: 'sysauto_script'
@@ -1177,6 +1185,10 @@ declare global {
                         table: 'sys_module'
                         id: 'e44a4df9fc464258a320aa05a33d25fc'
                     }
+                    src_server_domain_disposal_ts: {
+                        table: 'sys_module'
+                        id: 'b3859fe2442547cca4609d3880b6486f'
+                    }
                     src_server_domain_entitlement_ts: {
                         table: 'sys_module'
                         id: 'a466182b22e144d0bef3523185c6cb68'
@@ -1221,6 +1233,10 @@ declare global {
                         table: 'sys_module'
                         id: '232e01a556fc4e95bea01c86f6baf5f5'
                     }
+                    src_server_domain_refresh_ts: {
+                        table: 'sys_module'
+                        id: 'fd1e31be05fa4ed8bbea0b137ba3cb52'
+                    }
                     src_server_domain_returns_ts: {
                         table: 'sys_module'
                         id: '67756814d0ef4e529e29a655dfcb2bdf'
@@ -1257,6 +1273,10 @@ declare global {
                         table: 'sys_module'
                         id: 'ddc90a1a74954336b44c9ffca19aaf48'
                     }
+                    src_server_entry_disposal_ts: {
+                        table: 'sys_module'
+                        id: '9b1d4b3ebc3b4d0db91b14c2628546bb'
+                    }
                     src_server_entry_imports_ts: {
                         table: 'sys_module'
                         id: '343b74934a804be5833c19f80461877f'
@@ -1280,6 +1300,10 @@ declare global {
                     src_server_entry_preflight_ts: {
                         table: 'sys_module'
                         id: '45d949dfecee41e3beee1bb033be16db'
+                    }
+                    src_server_entry_refresh_ts: {
+                        table: 'sys_module'
+                        id: '1103f50a93384eb2afc4a3119bbd23e8'
                     }
                     src_server_entry_returns_ts: {
                         table: 'sys_module'
@@ -1396,6 +1420,14 @@ declare global {
                     ua_case_raise_replacement: {
                         table: 'sys_ui_action'
                         id: 'f5745332e6164057b49474374e5179f4'
+                    }
+                    ua_disposal_complete: {
+                        table: 'sys_ui_action'
+                        id: '41bb1a5530524e86a40c867283bc5c16'
+                    }
+                    ua_disposal_submit: {
+                        table: 'sys_ui_action'
+                        id: 'b2f35dcebf9942fd88b13b8a0d8e73cb'
                     }
                     ua_order_cancel: {
                         table: 'sys_ui_action'
@@ -1950,6 +1982,14 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '0016782acc3b4da8ae107b09e225b6d7'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'disposal_vendor'
                         }
                     },
                     {
@@ -2585,6 +2625,15 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '060d5b0d0d774093b5e0fc0b36f8598d'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'disposal_vendor'
+                            language: 'en'
                         }
                     },
                     {
@@ -3712,6 +3761,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '12c57f70564a40999c690d061bd02699'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'sale_amount'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_user_role_contains'
                         id: '12cc286529fd43b2b29a529fc0569293'
                         key: {
@@ -4097,6 +4155,15 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
+                        id: '163b45ffcfc24ce5a5e7a5660b4dd1d4'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'NULL'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
                         id: '1671ce92bceb45d1aa3b0640d54ea168'
                         key: {
                             name: 'x_daas_ham_oem_coverage'
@@ -4145,6 +4212,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_staging_template'
                             element: 'device_class'
+                        }
+                    },
+                    {
+                        table: 'sys_choice_set'
+                        id: '1727d7af7add4de19bc3357f2915a2c4'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'status'
                         }
                     },
                     {
@@ -4279,6 +4354,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '18d0acfb796f4a06b770c2ec2d022fc2'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'status'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '18ea621db27e492b9bdcf02363f0c531'
                         key: {
@@ -4371,6 +4454,17 @@ declare global {
                             name: 'x_daas_ham_order'
                             element: 'carrier'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '19d92c48c8ff44f08bfd3a312430fee0'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'status'
+                            value: 'done'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -4539,6 +4633,17 @@ declare global {
                     },
                     {
                         table: 'sys_choice'
+                        id: '1bdb503d0ad645f0becd4d0a11b0f896'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'stage'
+                            value: 'rejected'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
                         id: '1be36b25a95c410c84c94502f6a1cdf8'
                         key: {
                             name: 'x_daas_ham_subscription_line'
@@ -4554,6 +4659,17 @@ declare global {
                         key: {
                             document_key: '02073d3ed26e485bbbb9d3ea80fe4b5f'
                             variable: '1778a7480f20101091d0f00c97767e03'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '1ca4a643708a43b69f575c1bd86c512f'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'method'
+                            value: 'return_to_lessor'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -4576,6 +4692,14 @@ declare global {
                             value: 'discovery'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '1cb1ba451ecc434d87becf57887c4d90'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'certificate_number'
                         }
                     },
                     {
@@ -4643,6 +4767,17 @@ declare global {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_legal_owner'
                             value: 'lessor'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '1dc840e2656f4315a4f5811bad25a9cf'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'status'
+                            value: 'pending'
                             language: 'en'
                             dependent_value: 'NULL'
                         }
@@ -4989,6 +5124,15 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '2180923fe0184df3bef272df6a2ac254'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'customer'
+                            language: 'en'
                         }
                     },
                     {
@@ -6085,6 +6229,15 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
+                        id: '2cb60e6edcb9452bb54c4958f6e1cf4f'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'method'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
                         id: '2cba0a37aed74ff196e10151ce187fdc'
                         key: {
                             name: 'x_daas_ham_eox_import'
@@ -6191,6 +6344,14 @@ declare global {
                             value: 'switch'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_index'
+                        id: '2dcaa2ce2dc44267926a3675568123b1'
+                        key: {
+                            logical_table_name: 'x_daas_ham_disposal_line'
+                            col_name_string: 'disposal_order'
                         }
                     },
                     {
@@ -6614,6 +6775,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_staging_task'
                             element: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '33527329b9624e05aa85210e024266e0'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'asset'
+                            language: 'en'
                         }
                     },
                     {
@@ -7800,6 +7970,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '408f09dda1014eea9b138cc8c9d55fad'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'certificate_number'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '412ad938123c4b49ba69924bc4fa8fb3'
                         key: {
@@ -8439,6 +8618,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '47b46257d7f7482b87da45f5e4a9975d'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'method'
+                            value: 'broker_resale'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '47e63005253d4c1d920ef8ba67e143d1'
                         key: {
@@ -8492,6 +8682,14 @@ declare global {
                         key: {
                             logical_table_name: 'x_daas_ham_return_order_line'
                             col_name_string: 'asset'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '488d7c75a198497984bb4d5d3784afaa'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'method'
                         }
                     },
                     {
@@ -8780,6 +8978,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice_set'
+                        id: '4c7ba6058f9d4a03a63c1a490a928eb3'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'stage'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '4c86c2deb1cf46419ac1ac76e8af486f'
                         key: {
@@ -8966,6 +9172,14 @@ declare global {
                                 }
                             }
                             element: 'label'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '4dedaf2613da4596a41aabde3b908a11'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'NULL'
                         }
                     },
                     {
@@ -9243,6 +9457,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '50c7fa608e594c1ebb61b60000122e6e'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'method'
+                            value: 'return_to_customer'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'item_option_new'
                         id: '510ded7de22e49ad8e73ce2e7cb114d2'
                         key: {
@@ -9355,6 +9580,17 @@ declare global {
                             name: 'x_daas_ham_subscription_line'
                             element: 'monthly_rate'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '51dbded07e914acfaf12527e33ea5f0e'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'method'
+                            value: 'broker_resale'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -9852,6 +10088,14 @@ declare global {
                     },
                     {
                         table: 'sys_dictionary'
+                        id: '5919b2515f0a4e5ba217788c7777203f'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'credit_amount'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
                         id: '5961cff978c24db89813ad2c9dc07ffa'
                         key: {
                             name: 'x_daas_ham_return_order'
@@ -10330,6 +10574,17 @@ declare global {
                     },
                     {
                         table: 'sys_choice'
+                        id: '5e3b53201c0d440f8f20a0193b3a7e21'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'method'
+                            value: 'oem_takeback'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
                         id: '5e59a3d69d90422eba088c2ca4da2fbc'
                         key: {
                             name: 'x_daas_ham_order'
@@ -10599,6 +10854,15 @@ declare global {
                         key: {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_in_service_date'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '617e91ae95ce4e87923a5624c302ab87'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'stage'
                             language: 'en'
                         }
                     },
@@ -10964,11 +11228,33 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '651c92f520eb484280f33cfdd598be29'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'status'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '65bdd55798a0471c860dc154c59f27c2'
                         key: {
                             document_key: '03d1f417909e48be827ff23da1555a02'
                             variable: '9024a37f671003007ba405225685efe5'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: '65bf57b81f104da9a041c21413587390'
+                        key: {
+                            sys_ui_action: 'b2f35dcebf9942fd88b13b8a0d8e73cb'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
                         }
                     },
                     {
@@ -11275,6 +11561,26 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '6a33c58e891b488483f2597be39c2463'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'method'
+                            value: 'return_to_customer'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '6a3a32dc2a254ecab4b88f863d20b0a2'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'NULL'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '6a44c2f9744a483ba0577caa176a5096'
                         key: {
@@ -11414,6 +11720,14 @@ declare global {
                                     sys_domain: 'global'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '6bb88b94267c4109b184349f34ebeca2'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'disposal_order'
                         }
                     },
                     {
@@ -11657,6 +11971,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_db_object'
+                        id: '6dd46926ce4749948a21725682334a2e'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '6e3aec256fb44b788f8f1c7e46d6edc7'
                         key: {
@@ -11785,6 +12106,19 @@ declare global {
                         key: {
                             name: 'x_daas_ham_site_template_item'
                             element: 'optional'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: '6f5b83bbc76048d6971d8863b5656d55'
+                        key: {
+                            sys_ui_action: '41bb1a5530524e86a40c867283bc5c16'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -12111,6 +12445,22 @@ declare global {
                         }
                     },
                     {
+                        table: 'ua_table_licensing_config'
+                        id: '72a71fb72c2641dd9ecbb02f1cebd804'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '72f5f14404524a10a2cc1e245ec2aef8'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'credit_amount'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '7331486a58e2439faf2139fc7f0cbca5'
                         key: {
@@ -12383,6 +12733,14 @@ declare global {
                         id: '7570337b9c12451798b8e10d3c2a836b'
                         key: {
                             name: 'x_daas_ham_coverage_import'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '75827cdbf7a946cb84f710cfcaddb6a9'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'sale_amount'
                         }
                     },
                     {
@@ -13260,6 +13618,14 @@ declare global {
                     },
                     {
                         table: 'sys_choice_set'
+                        id: '808f7727cd4c43bebe454d1d746e6606'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'method'
+                        }
+                    },
+                    {
+                        table: 'sys_choice_set'
                         id: '809ba0cc28c84e8fb2ad00efed967eb6'
                         key: {
                             name: 'cmdb_model'
@@ -13627,6 +13993,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'ua_table_licensing_config'
+                        id: '83075caeb2c1409d8204adf349af9514'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '8311371245984a6895fd415e1c4193d9'
                         key: {
@@ -13692,6 +14065,19 @@ declare global {
                             id: '02073d3ed26e485bbbb9d3ea80fe4b5f'
                             table: 'var__m_atf_input_variable_d9bc5f21ff6033008d3f5d9ad53bf12d'
                             field: 'field_values'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: '83edef836994432186153d28ce929a20'
+                        key: {
+                            sys_ui_action: '41bb1a5530524e86a40c867283bc5c16'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
                         }
                     },
                     {
@@ -14424,6 +14810,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '8a254bc872354e7c9e176ec9ac2b4a88'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'stage'
+                            value: 'awaiting_approval'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '8a2a9564cf2c462eacae969989018a54'
                         key: {
@@ -15045,6 +15442,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '90bf6702098143c9935a449cb0956318'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'stage'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '90d0d22dd4af45a18eb6907dcb460e15'
                         key: {
@@ -15068,6 +15473,14 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '9128a900a47647c28acb3b8248fea4a9'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'method'
                         }
                     },
                     {
@@ -15352,6 +15765,17 @@ declare global {
                             name: 'x_daas_ham_agreement'
                             element: 'lost_asset_fee'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '9334123620494915b1ea754f06bcd478'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'stage'
+                            value: 'approved'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -15934,6 +16358,17 @@ declare global {
                             element: 'NULL'
                             relationship: 'NULL'
                             parent: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '98e648dc9ea447dbbd6e0e38c0daa293'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'status'
+                            value: 'blocked'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -16803,6 +17238,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_action_role'
+                        id: 'a0a7b8b8c5f24b61866b7df7e8257974'
+                        key: {
+                            sys_ui_action: 'b2f35dcebf9942fd88b13b8a0d8e73cb'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'a0af4ba672fd4c259e62e958a45116bc'
                         key: {
@@ -17177,6 +17625,14 @@ declare global {
                                     name: 'asset'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'a3b595a93d694f32864bf2878e4967fc'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'asset'
                         }
                     },
                     {
@@ -17864,6 +18320,17 @@ declare global {
                     },
                     {
                         table: 'sys_choice'
+                        id: 'aac005c4aa304c6b9c82d290d522404e'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'method'
+                            value: 'return_to_lessor'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
                         id: 'aae79f18af1f424cb697ea249d9830b9'
                         key: {
                             name: 'x_daas_ham_return_order'
@@ -18461,6 +18928,17 @@ declare global {
                         id: 'b169a33395e24f23bde8ef3364e1defb'
                         key: {
                             name: 'cmn_location'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'b19efc2a6b2943d7b830aa5a923b6a90'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'method'
+                            value: 'oem_takeback'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -19173,6 +19651,17 @@ declare global {
                             name: 'x_daas_ham_return_order'
                             element: 'trigger'
                             value: 'device_removal'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'bac23123f3ca43c1abcd6f93fb3dcaf6'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'method'
+                            value: 'itad_recycle'
                             language: 'en'
                             dependent_value: 'NULL'
                         }
@@ -20005,6 +20494,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: 'c4b4afac8d724835abe3a7b057dccc50'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'method'
+                            value: 'itad_recycle'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'c4be2e7f1edb4cc18a0b798326317c35'
                         key: {
@@ -20355,6 +20855,14 @@ declare global {
                                 }
                             }
                             element: 'agreement'
+                        }
+                    },
+                    {
+                        table: 'sys_choice_set'
+                        id: 'c7a0eee59f1c4425a8a1883adcf0a511'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'method'
                         }
                     },
                     {
@@ -20833,6 +21341,17 @@ declare global {
                             id: '637c8bee2eea4a4086c16522e8a93cd9'
                             table: 'var__m_atf_input_variable_14872288df60220062fe6c7a4df26319'
                             field: 'field_values'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'cb4b2a25d1794997a35edc12268975ba'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'stage'
+                            value: 'draft'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -21942,6 +22461,14 @@ declare global {
                     },
                     {
                         table: 'sys_dictionary'
+                        id: 'd7f5e92b915e4488af50a3c409955089'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'customer'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
                         id: 'd861a61e01ad4c44a39f1d0af88b4896'
                         key: {
                             name: 'x_daas_ham_agreement'
@@ -22610,6 +23137,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'ded944f7265846969eec0e6f84e641c9'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'blockers'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: 'df03cdf26e224c35b9325458d38bdad5'
                         key: {
@@ -22727,6 +23263,13 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_db_object'
+                        id: 'dfe5c8d8732d4388be89859d7263ce40'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
                         }
                     },
                     {
@@ -22878,6 +23421,17 @@ declare global {
                                 }
                             }
                             sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'e1d4528a12bf410f8a852ba623e7e9c7'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'stage'
+                            value: 'completed'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -24014,6 +24568,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_number'
+                        id: 'efa12459d87142cebfc3212a1f7d7c63'
+                        key: {
+                            category: 'x_daas_ham_disposal_order'
+                            prefix: 'NDSP'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'efaefe4eab0a4bf8b89e252ad9051d4e'
                         key: {
@@ -24059,6 +24621,14 @@ declare global {
                                     name: 'x_daas_ham.admin'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'f0fce8e3c3384044a6f7ad32a06e998e'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'blockers'
                         }
                     },
                     {
@@ -24274,6 +24844,14 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'f4d58cfe3ce54eba9434fff52da1a522'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'NULL'
                         }
                     },
                     {
@@ -24888,6 +25466,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'fc6cc405639144debc568a6a2a199ad2'
+                        key: {
+                            name: 'x_daas_ham_disposal_line'
+                            element: 'disposal_order'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'fc95018e225d45b2b2b7f249d23367e9'
                         key: {
@@ -25038,6 +25625,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_staging_step'
                             element: 'done'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'feac40d20ea64723997c008a257939a4'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'method'
+                            language: 'en'
                         }
                     },
                     {

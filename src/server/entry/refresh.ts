@@ -1,0 +1,80 @@
+import { GlideRecord } from '@servicenow/glide'
+import { refreshWaves, replacementModel, type RefreshCandidate } from '../domain/refresh'
+import type { LifecycleDates } from '../domain/model-lifecycle'
+import { toIsoDate } from '../domain/calendar'
+import { nowMs, todayIso } from '../platform/clock'
+import { modelLifecycle } from '../platform/lifecycle-dates'
+import { intProperty, PROPERTY } from '../platform/properties'
+import { pluck, str } from '../platform/records'
+import { submitOrder } from './orders'
+
+/** Daily: refresh Orders for in-service Assets due within the horizon (P2.2, D48: fully automatic). */
+export function raiseRefreshOrders(): void {
+    const horizon = toIsoDate(nowMs() + intProperty(PROPERTY.refreshHorizonDays, 90) * 86_400_000)
+    const onOrder = new Set(
+        pluck('x_daas_ham_order_line', 'replaces_assetISNOTEMPTY^order.stageNOT INcomplete,cancelled,rejected', 'replaces_asset'),
+    )
+    const candidates: RefreshCandidate[] = []
+    const asset = new GlideRecord('alm_hardware')
+    asset.addEncodedQuery(`install_status=1^substatusISEMPTY^x_daas_ham_refresh_due<=${horizon}^x_daas_ham_agreementISNOTEMPTY`)
+    asset.orderBy('x_daas_ham_refresh_due')
+    asset.setLimit(2000)
+    asset.query()
+    while (asset.next()) {
+        if (onOrder.has(asset.getUniqueValue())) continue
+        candidates.push({
+            assetId: asset.getUniqueValue(),
+            agreementId: str(asset, 'x_daas_ham_agreement'),
+            customerId: str(asset, 'company'),
+            siteId: str(asset, 'x_daas_ham_site'),
+            modelId: str(asset, 'model'),
+            deviceClass: str(asset, 'model.x_daas_ham_device_class'),
+        })
+    }
+    for (const wave of refreshWaves(candidates)) raiseWave(wave.customerId, wave.siteId, wave.agreementId, wave.assets)
+}
+
+function catalogModels(customerId: string): Array<{ modelId: string; deviceClass: string }> {
+    const entry = new GlideRecord('x_daas_ham_catalog_entry')
+    entry.addQuery('customer', customerId)
+    entry.addQuery('entry_type', 'model')
+    entry.addQuery('active', true)
+    entry.query()
+    const models: Array<{ modelId: string; deviceClass: string }> = []
+    while (entry.next()) models.push({ modelId: str(entry, 'model'), deviceClass: str(entry, 'model.x_daas_ham_device_class') })
+    return models
+}
+
+function raiseWave(customerId: string, siteId: string, agreementId: string, assets: readonly RefreshCandidate[]): void {
+    const catalog = catalogModels(customerId)
+    const lifecycle = new Map<string, LifecycleDates>()
+    for (const modelId of new Set([...catalog.map((c) => c.modelId), ...assets.map((a) => a.modelId)])) lifecycle.set(modelId, modelLifecycle(modelId))
+
+    const order = new GlideRecord('x_daas_ham_order')
+    order.initialize()
+    order.setValue('order_type', 'refresh')
+    order.setValue('customer', customerId)
+    order.setValue('site', siteId)
+    order.setValue('agreement', agreementId)
+    order.setValue('install_mode', 'fsm_engineer')
+    order.setValue('short_description', `Refresh of ${assets.length} asset(s) due by ${todayIso()}`)
+    order.insert()
+    const unmatched: string[] = []
+    for (const candidate of assets) {
+        const modelId = replacementModel(candidate, catalog, lifecycle, todayIso())
+        if (!modelId) unmatched.push(candidate.assetId)
+        const line = new GlideRecord('x_daas_ham_order_line')
+        line.initialize()
+        line.setValue('order', order.getUniqueValue())
+        line.setValue('model', modelId ?? candidate.modelId)
+        line.setValue('quantity', 1)
+        line.setValue('replaces_asset', candidate.assetId)
+        line.insert()
+    }
+    if (unmatched.length > 0) {
+        order.setValue('work_notes', `${unmatched.length} asset(s) have no sellable catalogued successor; their lines reuse the current model. Review before submitting.`)
+        order.update()
+        return // left in draft for the account manager to adjust
+    }
+    submitOrder(order)
+}
