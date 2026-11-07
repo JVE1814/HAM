@@ -6,7 +6,10 @@ import { admin, assetManager, inventoryTech, noc } from '../security/roles.now'
 /*
  * Shipping aggregator (P3.26, D73). The message targets ShipEngine's label API; point the endpoint at
  * another aggregator with the same request shape if needed. Tracking webhooks are registered at
- * /api/x_daas_ham/naas/shipping/tracking?token=<x_daas_ham.shipping.webhook_token> (see rest.now.ts).
+ * /api/x_daas_ham/naas/shipping/tracking with the custom header
+ * X-NaaS-Webhook-Token: <x_daas_ham.shipping.webhook_token> (ShipEngine `headers: [{ key, value }]`,
+ * EasyPost `custom_headers: [{ name, value }]`); ?token=<...> in the URL is still accepted as a
+ * fallback (see rest.now.ts).
  */
 
 RestMessage({
@@ -65,7 +68,16 @@ Property({
     name: 'x_daas_ham.shipping.webhook_token',
     type: 'password2',
     value: '',
-    description: 'Shared secret the tracking webhook URL carries as ?token= (webhooks are refused while it is empty).',
+    description: 'Shared secret the tracking webhook sends in the X-NaaS-Webhook-Token header, or as ?token= (webhooks are refused while it is empty).',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_shipping_carrier_id'],
+    name: 'x_daas_ham.shipping.carrier_id',
+    type: 'string',
+    value: '',
+    description: 'ShipEngine carrier account id (se-...) billed for labels (labels are refused while it is empty).',
     roles: { read: [admin], write: [admin] },
 })
 
@@ -74,7 +86,7 @@ Property({
     name: 'x_daas_ham.shipping.service_code',
     type: 'string',
     value: 'ups_standard',
-    description: 'Aggregator service code used for labels (carrier and service level).',
+    description: 'Aggregator service code used for labels (service level of the carrier account in x_daas_ham.shipping.carrier_id).',
     roles: { read: [admin], write: [admin] },
 })
 

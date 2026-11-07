@@ -21,6 +21,7 @@ export const PROPERTY = {
     visitCost: 'x_daas_ham.margin.visit_cost',
     shippingEnabled: 'x_daas_ham.shipping.enabled',
     shippingWebhookToken: 'x_daas_ham.shipping.webhook_token',
+    shippingCarrierId: 'x_daas_ham.shipping.carrier_id',
     shippingServiceCode: 'x_daas_ham.shipping.service_code',
     shippingPackageKg: 'x_daas_ham.shipping.package_kg',
     shippingSenderName: 'x_daas_ham.shipping.sender_name',

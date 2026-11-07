@@ -22,6 +22,8 @@ export interface Address {
 }
 
 export interface LabelInput {
+    /** ShipEngine carrier account (se-...) billed for the label. */
+    carrierId: string
     serviceCode: string
     from: Address
     to: Address
@@ -54,15 +56,29 @@ export function countryCode(country: string): string {
     return COUNTRY_CODES[value.toLowerCase().replace(/\s+/g, ' ')] ?? ''
 }
 
-/** What is missing from an address before a carrier will accept it, or null. */
-export function addressProblem(address: Address): string | null {
-    const missing = (['name', 'line1', 'city', 'postalCode', 'country'] as const).filter((key) => !address[key])
-    if (missing.length > 0) return `missing ${missing.join(', ')}`
-    return countryCode(address.country) ? null : `unknown country "${address.country}" (use the ISO code)`
+/** Countries whose carriers need a state or province (ShipEngine allows only abbreviations for the U.S.). */
+const STATE_REQUIRED: ReadonlySet<string> = new Set(['US', 'CA'])
+
+const ADDRESS_PARTS = ['name', 'phone', 'line1', 'city', 'state', 'postalCode', 'country'] as const
+
+/** Whether a carrier needs this part: the phone only on the sender (`ship_from`) side, the state only in the U.S. and Canada. */
+function partRequired(part: (typeof ADDRESS_PARTS)[number], side: 'from' | 'to', country: string): boolean {
+    if (part === 'phone') return side === 'from'
+    if (part === 'state') return STATE_REQUIRED.has(country)
+    return true
 }
 
+/** What is missing from the sender (`from`) or recipient (`to`) address before a carrier will accept it, or null. */
+export function addressProblem(address: Address, side: 'from' | 'to' = 'to'): string | null {
+    const country = countryCode(address.country)
+    const missing = ADDRESS_PARTS.filter((part) => !address[part] && partRequired(part, side, country))
+    if (missing.length > 0) return `missing ${missing.join(', ')}`
+    return country ? null : `unknown country "${address.country}" (use the ISO code)`
+}
+
+/** An address in ShipEngine's shape, leaving out empty parts (the API rejects `''` where it needs a value). */
 function toAggregatorAddress(address: Address): Record<string, string> {
-    return {
+    const parts: Record<string, string> = {
         name: address.name,
         company_name: address.company ?? '',
         phone: address.phone ?? '',
@@ -73,6 +89,7 @@ function toAggregatorAddress(address: Address): Record<string, string> {
         postal_code: address.postalCode,
         country_code: countryCode(address.country),
     }
+    return Object.fromEntries(Object.entries(parts).filter(([, value]) => value !== ''))
 }
 
 /** How many boxes a label covers: a whole number from 1 to 20. */
@@ -86,6 +103,7 @@ export function labelRequestBody(input: LabelInput): string {
     const weight = Math.max(0.1, input.weightKg)
     return JSON.stringify({
         shipment: {
+            carrier_id: input.carrierId,
             service_code: input.serviceCode,
             ship_from: toAggregatorAddress(input.from),
             ship_to: toAggregatorAddress(input.to),
@@ -98,7 +116,7 @@ export function labelRequestBody(input: LabelInput): string {
 /** Buy a label: POST to the aggregator's `create_label` function. */
 export function buyLabel(http: HttpPort, input: LabelInput): LabelResult {
     for (const [side, address] of [['from', input.from], ['to', input.to]] as const) {
-        const problem = addressProblem(address)
+        const problem = addressProblem(address, side)
         if (problem) return { ok: false, error: `${side} address ${problem}` }
     }
     const response = http({ fn: 'create_label', params: {}, body: labelRequestBody(input) })
@@ -175,9 +193,25 @@ function placeName(...parts: string[]): string {
     return parts.filter(Boolean).join(', ')
 }
 
+/** The EasyPost scan with the latest `datetime` (the docs promise no order); undated scans lose, ties go to the later one listed. */
+function latestDetail(details: readonly unknown[]): unknown {
+    let latest: unknown = undefined
+    let latestMs = -Infinity
+    for (const detail of details) {
+        const ms = Date.parse(text(field(detail, 'datetime')))
+        const at = Number.isFinite(ms) ? ms : -Infinity
+        if (latest === undefined || at >= latestMs) {
+            latest = detail
+            latestMs = at
+        }
+    }
+    return latest
+}
+
 /**
- * A tracking webhook in ShipEngine (`data.status_code`) or EasyPost (`result.status`) shape. The
- * estimated delivery is a YYYY-MM-DD date; `deliveredAt` is the carrier's own timestamp.
+ * A tracking webhook in ShipEngine (`data.status_code`) or EasyPost (`result.status`) shape. EasyPost
+ * Events about other objects (e.g. an Insurance in `insurance.cancelled`) are refused. The estimated
+ * delivery is a YYYY-MM-DD date; `deliveredAt` is the carrier's own timestamp.
  */
 export function parseTrackingWebhook(body: unknown): TrackingUpdate | { error: string } {
     const shipEngine = field(body, 'data')
@@ -199,17 +233,19 @@ export function parseTrackingWebhook(body: unknown): TrackingUpdate | { error: s
         }
     }
     const easyPost = field(body, 'result')
+    const kind = text(field(easyPost, 'object'))
+    if (kind && kind !== 'Tracker') return { error: `not a tracking update (${kind})` }
     const easyPostNumber = text(field(easyPost, 'tracking_code'))
     if (easyPostNumber) {
         const status = easyPostStatus(field(easyPost, 'status'))
         const details = asArray(field(easyPost, 'tracking_details'))
-        const last = details[details.length - 1]
+        const latest = latestDetail(details)
         return {
             trackingNumber: easyPostNumber,
             status,
-            description: text(field(last, 'message')) || text(field(easyPost, 'status_detail')),
+            description: text(field(latest, 'message')) || text(field(easyPost, 'status_detail')),
             estimatedDelivery: isoDate(field(easyPost, 'est_delivery_date')),
-            deliveredAt: status === 'delivered' ? text(field(last, 'datetime')) || undefined : undefined,
+            deliveredAt: status === 'delivered' ? text(field(latest, 'datetime')) || undefined : undefined,
             events: details.map((detail) => ({
                 occurredAt: text(field(detail, 'datetime')),
                 status: easyPostStatus(field(detail, 'status')),
@@ -263,6 +299,15 @@ export function newTrackingEvents(known: ReadonlySet<string>, events: readonly T
         fresh.push({ occurredAt: event.occurredAt, status: event.status, description: event.description.slice(0, 255), location: event.location.slice(0, 120) })
     }
     return fresh
+}
+
+/** The header the aggregators are registered to send the webhook token in (registered as X-NaaS-Webhook-Token; names are case-insensitive). */
+export const WEBHOOK_TOKEN_HEADER = 'x-naas-webhook-token'
+
+/** The webhook token: the header when sent (ShipEngine `headers`, EasyPost `custom_headers`), else the `?token=` fallback. */
+export function webhookToken(header: unknown, query: string): string {
+    const given = header === undefined || header === null ? '' : String(header)
+    return given || query
 }
 
 /** Constant-time comparison of a webhook token with the configured secret (never matches an empty secret). */

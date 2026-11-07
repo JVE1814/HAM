@@ -179,7 +179,7 @@ RestApi({
             name: 'shipping_tracking',
             method: 'POST',
             path: '/shipping/tracking',
-            shortDescription: 'Tracking webhook from the shipping aggregator (ShipEngine or EasyPost shape); authenticated by ?token=.',
+            shortDescription: 'Tracking webhook from the shipping aggregator (ShipEngine or EasyPost shape); authenticated by the X-NaaS-Webhook-Token header (or ?token=).',
             authentication: false,
             authorization: false,
             script: postTrackingUpdate,

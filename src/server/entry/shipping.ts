@@ -10,6 +10,8 @@ import {
     parseTrackingWebhook,
     tokenMatches,
     trackingEventKey,
+    WEBHOOK_TOKEN_HEADER,
+    webhookToken,
     type Address,
     type LabelResult,
     type ShipmentStatus,
@@ -68,6 +70,8 @@ interface ShipmentSpec {
 
 /** Buy a label between the depot and a Site and record the shipment. */
 function createShipment(spec: ShipmentSpec): LabelResult {
+    const carrierId = stringProperty(PROPERTY.shippingCarrierId)
+    if (!carrierId) return { ok: false, error: 'set x_daas_ham.shipping.carrier_id to the ShipEngine carrier account (se-...) billed for labels' }
     const stockroom = depot()
     if (!stockroom) return { ok: false, error: 'set x_daas_ham.staging.default_stockroom to the depot that ships' }
     const depotLocation = findById('cmn_location', str(stockroom, 'location'))
@@ -78,6 +82,7 @@ function createShipment(spec: ShipmentSpec): LabelResult {
     const serviceCode = stringProperty(PROPERTY.shippingServiceCode)
     const packages = packageCount(spec.packages)
     const result = buyLabel(aggregator(), {
+        carrierId,
         serviceCode,
         from: spec.direction === 'to_site' ? depotAddress : siteAddress,
         to: spec.direction === 'to_site' ? siteAddress : depotAddress,
@@ -141,9 +146,12 @@ export function uiCreateReturnLabel(current: GlideRecord): void {
     gs.addInfoMessage(`Return label ${result.trackingNumber} created`)
 }
 
-/** POST /shipping/tracking?token=...: tracking webhook from the aggregator (no platform login). */
+/**
+ * POST /shipping/tracking: tracking webhook from the aggregator (no platform login), authenticated by
+ * the X-NaaS-Webhook-Token header, or by ?token= when the header is absent.
+ */
 export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIResponse): void {
-    const token = queryParam(request, 'token')
+    const token = webhookToken(request.getHeader(WEBHOOK_TOKEN_HEADER), queryParam(request, 'token'))
     if (!tokenMatches(token, gs.getPropertySecured(PROPERTY.shippingWebhookToken, ''))) return reply(response, 401, { error: 'bad token' })
     const update = parseTrackingWebhook(request.body.data)
     if ('error' in update) return reply(response, 400, { error: update.error })
