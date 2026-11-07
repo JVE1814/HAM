@@ -6,7 +6,6 @@ import {
     applyTracking,
     buyLabel,
     newTrackingEvents,
-    OPEN_SHIPMENTS,
     parseTrackingWebhook,
     tokenMatches,
     trackingEventKey,
@@ -22,6 +21,7 @@ import { boolProperty, intProperty, PROPERTY, stringProperty } from '../platform
 import { count, findById, str } from '../platform/records'
 import { restMessagePort } from '../platform/rest-port'
 import { queryParam, reply } from '../platform/rest-api'
+import { returnLabels } from '../platform/shipments'
 
 /** Shipping aggregator: labels for Orders and ship-back returns, tracking webhooks (P3.26, D73). */
 
@@ -115,24 +115,13 @@ export function labelOrder(order: GlideRecord, packages: number): LabelResult {
     return result
 }
 
-/** The latest prepaid return label still in use (not delivered or returned) of each Return order that has one. */
-export function returnLabels(returnOrderIds: readonly string[]): Map<string, { labelUrl: string; trackingNumber: string }> {
-    const labels = new Map<string, { labelUrl: string; trackingNumber: string }>()
-    if (returnOrderIds.length === 0) return labels
-    const shipment = new GlideRecord('x_daas_ham_shipment')
-    shipment.addEncodedQuery(`direction=return^${OPEN_SHIPMENTS}^return_orderIN${returnOrderIds.join(',')}`)
-    shipment.orderBy('sys_created_on')
-    shipment.query()
-    while (shipment.next()) labels.set(str(shipment, 'return_order'), { labelUrl: str(shipment, 'label_url'), trackingNumber: str(shipment, 'tracking_number') })
-    return labels
-}
-
 /** UI action "Create return label" on a ship-back Return order: the Site contact prints it. */
 export function uiCreateReturnLabel(current: GlideRecord): void {
-    const packages = count('x_daas_ham_return_order_line', `return_order=${current.getUniqueValue()}^status=awaiting`)
+    const returnOrderId = current.getUniqueValue()
+    const packages = count('x_daas_ham_return_order_line', `return_order=${returnOrderId}^status=awaiting`)
     if (packages === 0) return void gs.addErrorMessage('Nothing on this return is still awaited')
     // Each label is paid for: one open return label per Return order (void it with the carrier to replace it).
-    const open = returnLabels([current.getUniqueValue()]).get(current.getUniqueValue())
+    const open = returnLabels([returnOrderId]).get(returnOrderId)
     if (open) return void gs.addErrorMessage(`Return label ${open.trackingNumber} is still open; void it with the carrier before buying another`)
     const result = createShipment('return', current, packages)
     if (!result.ok) return void gs.addErrorMessage(`No label: ${result.error}`)

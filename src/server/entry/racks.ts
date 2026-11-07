@@ -2,12 +2,11 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { memoized } from '../domain/memo'
 import { placementProblem, powerBudget, type Placement, type RackFace } from '../domain/rack'
 import { visibilityFilter } from '../domain/visibility'
 import { readStage } from '../platform/assets'
 import { currentSession } from '../platform/session'
-import { findById, num, recordsById, str } from '../platform/records'
+import { num, recordsById, str } from '../platform/records'
 import { queryParam, reply } from '../platform/rest-api'
 
 /** Rack placement and the rack elevation view (P2.8, D67). */
@@ -119,31 +118,29 @@ export function getRack(request: RESTAPIRequest, response: RESTAPIResponse): voi
     asset.addQuery('x_daas_ham_rack', rack.getUniqueValue())
     asset.addNotNullQuery('x_daas_ham_ru_start')
     asset.query()
-    // Each Customer's name is read once.
-    const customerName = memoized((companyId) => {
-        const company = findById('core_company', companyId)
-        return company ? str(company, 'name') : ''
-    })
-    const found: Array<{ slot: Slot; device: Record<string, unknown> }> = []
+    const found: Array<{ slot: Slot; companyId: string; device: Record<string, unknown> }> = []
     while (asset.next()) {
         found.push({
             slot: slotOf(asset),
+            companyId: str(asset, 'company'),
             device: {
                 id: asset.getUniqueValue(),
                 tag: str(asset, 'asset_tag'),
                 serial: str(asset, 'serial_number'),
                 stage: readStage(asset) ?? 'unknown',
-                customer: customerName(str(asset, 'company')),
                 lifecyclePhase: str(asset, 'x_daas_ham_lifecycle_phase'),
                 coverageEnd: str(asset, 'x_daas_ham_coverage_end'),
                 refreshDue: str(asset, 'x_daas_ham_refresh_due'),
             },
         })
     }
+    // Models and Customer names each read with one query.
     const models = rackModels(found.map(({ slot }) => slot.modelId))
+    const customerNames = recordsById('core_company', found.map(({ companyId }) => companyId), (company) => str(company, 'name'))
     const placements = found.map(({ slot }) => placementOf(slot, models))
-    const devices = found.map(({ slot, device }, i) => ({
+    const devices = found.map(({ slot, companyId, device }, i) => ({
         ...device,
+        customer: customerNames.get(companyId) ?? '',
         model: (models.get(slot.modelId) ?? NO_MODEL).name,
         ruStart: placements[i].ruStart,
         height: placements[i].height,

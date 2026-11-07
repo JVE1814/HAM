@@ -43,7 +43,7 @@ export function restMessagePort(message: string): HttpPort {
             const rest = new RestMessage(message, request.fn)
             for (const [name, value] of Object.entries(request.params)) rest.setStringParameterNoEscape(name, encodeURIComponent(value).replace(/%2C/g, ','))
             for (const [name, value] of Object.entries(request.headers ?? {})) rest.setRequestHeader(name, value)
-            for (const setting of settings) rest.setStringParameterNoEscape(setting.variable, stringProperty(setting.property, setting.fallback).trim() || setting.fallback)
+            for (const setting of settings) rest.setStringParameterNoEscape(setting.variable, stringProperty(setting.property, setting.fallback))
             for (const secret of secrets) {
                 const value = gs.getPropertySecured(secret.property, '')
                 rest.setStringParameterNoEscape(secret.variable, secret.inJson ? JSON.stringify(value).slice(1, -1) : value)

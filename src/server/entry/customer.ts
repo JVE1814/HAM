@@ -8,9 +8,9 @@ import { readStage } from '../platform/assets'
 import { currentSession } from '../platform/session'
 import { findById, str } from '../platform/records'
 import { raiseReturn } from '../platform/returns'
+import { returnLabels } from '../platform/shipments'
 import { completeAttestation } from './assurance'
 import { completeInstall } from './delivery'
-import { returnLabels } from './shipping'
 import { reply } from '../platform/rest-api'
 
 /*
