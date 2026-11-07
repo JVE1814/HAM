@@ -6,7 +6,9 @@
   changes opens one when the Asset enters service (in service or temporary): from its in-service
   date on first go-live, else that day (e.g. a missing unit found again). The same rule closes it
   the day the Asset leaves service (a Return order, declared missing, a manual move). Both days are
-  billed.
+  billed. An Asset back in service on or before the day its interval on the same line closed gets
+  that interval reopened, so no day is billed twice. The rule also runs when the stage change clears
+  the Asset's Subscription line, so the interval still closes.
 - A **site package** line is billed from its start date to its end date (it ends when its last
   Asset is received back).
 - A **per-device** line is billed per device-day: `monthly rate × device-days ÷ days in month`, one

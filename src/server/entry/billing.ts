@@ -2,8 +2,9 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideAggregate, GlideRecord, GlideSysAttachment, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { monthBounds, overlapsMonth, previousMonth, subscriptionCharges, toCsv, type MonthBounds, type ServiceInterval } from '../domain/billing'
+import { isMonth, monthBounds, overlapsMonth, previousMonth, subscriptionCharges, toCsv, type MonthBounds, type ServiceInterval } from '../domain/billing'
 import { ROLE } from '../domain/visibility'
+import { memoized } from '../domain/memo'
 import { runEventTableJob } from '../platform/chunked'
 import { msToGlide, nowMs, todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
@@ -36,8 +37,9 @@ function boundsOf(period: GlideRecord): MonthBounds {
 export function generateBillingLines(event: GlideRecord, current: GlideRecord): void {
     const period = findById('x_daas_ham_billing_period', str(event, 'parm1'))
     if (!period || str(period, 'status') !== 'generating') return
+    if (!isMonth(str(period, 'period'))) return void gs.error(`[x_daas_ham] Billing period ${period.getUniqueValue()} not generated: malformed month '${str(period, 'period')}'`)
     const bounds = boundsOf(period)
-    const siteNames = new Map<string, string>()
+    const siteName = memoized(siteNameOf)
     const result = runEventTableJob({
         eventName: EVENT.billingGenerate,
         record: current,
@@ -59,7 +61,7 @@ export function generateBillingLines(event: GlideRecord, current: GlideRecord): 
             currency: str(line, 'currency') || 'EUR',
         }),
         handle: (line, lineId) => {
-            const sources = { intervals: () => intervalsOf(lineId, bounds), siteName: (siteId: string) => siteName(siteId, siteNames) }
+            const sources = { intervals: () => intervalsOf(lineId, bounds), siteName }
             for (const charge of subscriptionCharges(line.terms, bounds, sources)) {
                 insertLine(period, {
                     kind: 'subscription',
@@ -77,25 +79,17 @@ export function generateBillingLines(event: GlideRecord, current: GlideRecord): 
         },
     })
     if (result.failed > 0) {
-        // A line that could not be billed must not vanish from the bill: count it on the period
-        // (Close period refuses until a regeneration bills every line).
-        gs.error(`[x_daas_ham] Billing period ${str(period, 'period')}: ${result.failed} subscription line(s) failed: ${result.lastError}`)
-        period.setValue('failed_lines', num(period, 'failed_lines') + result.failed)
-        period.setValue('last_error', result.lastError.slice(0, 255))
+        // A line that could not be billed must not vanish from the bill.
+        addFailedLines(period, result.failed, result.lastError)
         period.update()
     }
     if (result.done) finishGeneration(period)
 }
 
-/** A Site's name, read once per Site and chunk ('' without a Site). */
-function siteName(siteId: string, cache: Map<string, string>): string {
-    let name = cache.get(siteId)
-    if (name === undefined) {
-        const site = findById('cmn_location', siteId)
-        name = site ? str(site, 'name') : ''
-        cache.set(siteId, name)
-    }
-    return name
+/** A Site's name ('' without a Site); generateBillingLines reads each once per chunk. */
+function siteNameOf(siteId: string): string {
+    const site = findById('cmn_location', siteId)
+    return site ? str(site, 'name') : ''
 }
 
 /** The line's Service intervals in the month, one row per Site and dates with the number of Assets sharing them. */
@@ -119,12 +113,20 @@ function intervalsOf(lineId: string, bounds: MonthBounds): ServiceInterval[] {
     return intervals
 }
 
+/** Insert a Billing line; throws when the platform refuses it, so the line counts as failed instead of vanishing. */
 function insertLine(period: GlideRecord, values: { [field: string]: string | number }): void {
     const line = new GlideRecord('x_daas_ham_billing_line')
     line.initialize()
     line.setValue('billing_period', period.getUniqueValue())
     for (const [field, value] of Object.entries(values)) line.setValue(field, value)
-    line.insert()
+    if (!line.insert()) throw new Error(`billing line not saved: ${line.getLastErrorMessage() || 'insert refused'}`)
+}
+
+/** Count lines that failed to bill on the period (does not save): Close period refuses until a regeneration bills them. */
+function addFailedLines(period: GlideRecord, failed: number, lastError: string): void {
+    gs.error(`[x_daas_ham] Billing period ${str(period, 'period')}: ${failed} line(s) failed: ${lastError}`)
+    period.setValue('failed_lines', num(period, 'failed_lines') + failed)
+    period.setValue('last_error', lastError.slice(0, 255))
 }
 
 /** Add the open Fee events up to the month end, then total the period for review. */
@@ -134,20 +136,30 @@ function finishGeneration(period: GlideRecord): void {
     fee.addNullQuery('billing_period')
     fee.addQuery('occurred_on', '<=', boundsOf(period).last)
     fee.query()
+    let failed = 0
+    let lastError = ''
     while (fee.next()) {
-        insertLine(period, {
-            kind: 'fee',
-            customer: str(fee, 'customer'),
-            agreement: str(fee, 'agreement'),
-            fee_event: fee.getUniqueValue(),
-            description: `${fee.getDisplayValue('fee_type')} fee: ${fee.getDisplayValue('asset')} (${str(fee, 'occurred_on')})`,
-            units: 1,
-            amount: num(fee, 'amount'),
-            currency: str(fee, 'currency') || 'EUR',
-        })
+        try {
+            insertLine(period, {
+                kind: 'fee',
+                customer: str(fee, 'customer'),
+                agreement: str(fee, 'agreement'),
+                fee_event: fee.getUniqueValue(),
+                description: `${fee.getDisplayValue('fee_type')} fee: ${fee.getDisplayValue('asset')} (${str(fee, 'occurred_on')})`,
+                units: 1,
+                amount: num(fee, 'amount'),
+                currency: str(fee, 'currency') || 'EUR',
+            })
+        } catch (error) {
+            // The fee stays open without a period, so a regeneration bills it.
+            failed++
+            lastError = `${fee.getUniqueValue()}: ${error instanceof Error ? error.message : String(error)}`
+            continue
+        }
         fee.setValue('billing_period', period.getUniqueValue())
         fee.update()
     }
+    if (failed > 0) addFailedLines(period, failed, lastError)
     setTotals(period)
     period.setValue('generated_at', msToGlide(nowMs()))
     period.setValue('status', 'ready')

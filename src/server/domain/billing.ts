@@ -10,6 +10,11 @@ export interface MonthBounds {
     days: number
 }
 
+/** A calendar month as YYYY-MM (what monthBounds takes). */
+export function isMonth(value: string): boolean {
+    return /^\d{4}-(0[1-9]|1[0-2])$/.test(value)
+}
+
 export function monthBounds(month: string): MonthBounds {
     const first = `${month}-01`
     const next = addMonths(first, 1)
@@ -54,6 +59,22 @@ export interface ServiceInterval {
 /** The last day (inclusive) of a Service interval that started on `start` and is closed on `closedOn`: never before it started. */
 export function intervalEnd(start: string, closedOn: string): string {
     return closedOn < start ? start : closedOn
+}
+
+/** Where an Asset delivers (or delivered) a Subscription line. */
+export interface IntervalPlace {
+    lineId: string
+    siteId: string
+}
+
+/**
+ * How billing restarts on `start` at `place` for an Asset whose latest closed Service interval is
+ * `latest` (end inclusive): one at the same place that ends on or after `start` is reopened, so no day
+ * is billed twice; one elsewhere makes the new interval start the day after it ends; otherwise it starts on `start`.
+ */
+export function restartInterval(latest: (IntervalPlace & { end: string }) | null, place: IntervalPlace, start: string): { reopen: true } | { start: string } {
+    if (!latest || latest.end < start) return { start }
+    return latest.lineId === place.lineId && latest.siteId === place.siteId ? { reopen: true } : { start: addDays(latest.end, 1) }
 }
 
 /** What a Subscription line is billed by, as stored on it. */

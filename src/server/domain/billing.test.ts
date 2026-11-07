@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activeDays, intervalEnd, monthBounds, overlapsMonth, previousMonth, prorate, subscriptionCharges, toCsv, type ChargeSources, type ServiceInterval } from './billing'
+import { activeDays, intervalEnd, isMonth, restartInterval, monthBounds, overlapsMonth, previousMonth, prorate, subscriptionCharges, toCsv, type ChargeSources, type ServiceInterval } from './billing'
 
 const nov = monthBounds('2026-11')
 const feb = monthBounds('2028-02')
@@ -9,6 +9,14 @@ describe('monthBounds', () => {
         expect(nov).toEqual({ month: '2026-11', first: '2026-11-01', last: '2026-11-30', days: 30 })
         expect(feb.days).toBe(29)
         expect(monthBounds('2026-12').last).toBe('2026-12-31')
+    })
+})
+
+describe('isMonth', () => {
+    it('accepts YYYY-MM months only', () => {
+        expect(isMonth('2026-11')).toBe(true)
+        expect(isMonth('2026-12')).toBe(true)
+        for (const bad of ['', 'abc', '2026-13', '2026-00', '2026-3', '2026-11-01', ' 2026-11']) expect(isMonth(bad)).toBe(false)
     })
 })
 
@@ -183,5 +191,24 @@ describe('subscriptionCharges', () => {
 describe('toCsv', () => {
     it('quotes fields that need it and ends rows with CRLF', () => {
         expect(toCsv([['customer', 'amount'], ['Acme, Inc.', 12.5], ['say "hi"', 0]])).toBe('customer,amount\r\n"Acme, Inc.",12.5\r\n"say ""hi""",0\r\n')
+    })
+})
+
+describe('restartInterval', () => {
+    const here = { lineId: 'L1', siteId: 'S1' }
+
+    it('starts a new interval when there is none, or the latest ended before the restart', () => {
+        expect(restartInterval(null, here, '2026-11-10')).toEqual({ start: '2026-11-10' })
+        expect(restartInterval({ ...here, end: '2026-11-09' }, here, '2026-11-10')).toEqual({ start: '2026-11-10' })
+    })
+
+    it('reopens an interval at the same line and Site that ends on or after the restart day', () => {
+        expect(restartInterval({ ...here, end: '2026-11-10' }, here, '2026-11-10')).toEqual({ reopen: true })
+        expect(restartInterval({ ...here, end: '2026-11-12' }, here, '2026-11-10')).toEqual({ reopen: true })
+    })
+
+    it('starts the day after an interval elsewhere that covers the restart day', () => {
+        expect(restartInterval({ ...here, end: '2026-11-10' }, { ...here, lineId: 'L2' }, '2026-11-10')).toEqual({ start: '2026-11-11' })
+        expect(restartInterval({ ...here, end: '2026-11-10' }, { ...here, siteId: 'S2' }, '2026-11-10')).toEqual({ start: '2026-11-11' })
     })
 })

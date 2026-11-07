@@ -48,6 +48,7 @@ export function onAssetServiceChange(current: GlideRecord, previous: GlideRecord
         today: todayIso(),
     })
     if (!change) return
+    const lineId = str(current, 'x_daas_ham_subscription_line')
     if ('stop' in change) closeServiceIntervals(current.getUniqueValue(), change.stop)
-    else openServiceInterval(current, str(current, 'x_daas_ham_subscription_line'), change.start)
+    else if (lineId) openServiceInterval(current, lineId, change.start)
 }

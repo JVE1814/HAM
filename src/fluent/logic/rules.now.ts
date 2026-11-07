@@ -36,7 +36,8 @@ BusinessRule({
     when: 'after',
     action: ['update'],
     order: 210,
-    condition: "(current.install_status.changes() || current.substatus.changes()) && current.x_daas_ham_subscription_line != ''",
+    // Also when the same save clears the line, so a stop still closes the open interval.
+    condition: "(current.install_status.changes() || current.substatus.changes()) && (current.x_daas_ham_subscription_line != '' || previous.x_daas_ham_subscription_line != '')",
     script: onAssetServiceChange,
 })
 
