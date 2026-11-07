@@ -54,8 +54,8 @@ Closing a period (or **Recompute margin** on a closed one) rebuilds its **Cost f
 - Customer-owned Assets carry no capital cost.
 - Costs use the Assets' current ownership, cost and coverage: *Recompute margin* on an old period
   reflects today's data. A recompute started while another is running supersedes it: each Cost fact
-  records the recompute that wrote it (*Computation run*), and a recompute that completes keeps only
-  its own Cost facts before adding field labour and rebuilding Margin.
+  records the recompute that wrote it (*Computation run*), and a recompute that completes drops the
+  Cost facts of earlier ones, adds field labour and rebuilds Margin from its own.
 - While a buyout transfer is still running, a lease's payment keeps being split over the Assets it
   covered when the buyout was decided.
 - **Revenue** is the period's billing lines (subscriptions per Site, fees at Customer level).

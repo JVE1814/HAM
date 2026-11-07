@@ -56,10 +56,11 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     })
     if (result.failed > 0) gs.error(`[x_daas_ham] Margin of ${str(period, 'period')}: ${result.failed} service interval(s) failed: ${result.lastError}`)
     if (!result.done) return
-    // Keep only this pass's Cost facts: a superseded pass may have flushed a last batch after this one started.
-    deleteWhere('x_daas_ham_cost_fact', `billing_period=${periodId}^run!=${result.run}`)
+    // Drop older passes' Cost facts (a superseded pass may have flushed a last batch after this one
+    // started), but not a newer pass's: one may have started since this pass's last check.
+    deleteWhere('x_daas_ham_cost_fact', `billing_period=${periodId}^run<${result.run}`)
     addFieldLabour(periodId, result.run, bounds)
-    writeMargin(periodId)
+    writeMargin(periodId, result.run)
 }
 
 function clearPeriod(periodId: string): void {
@@ -162,10 +163,10 @@ function addFieldLabour(periodId: string, run: string, bounds: MonthBounds): voi
     writeCostFacts(periodId, run, ledger.drain())
 }
 
-/** The period's amounts in a table, summed per Customer and Site. */
-function sumsBy(table: string, periodId: string): Amount[] {
+/** The amounts of a table's records matching an encoded query, summed per Customer and Site. */
+function sumsBy(table: string, encodedQuery: string): Amount[] {
     const ga = new GlideAggregate(table)
-    ga.addEncodedQuery(`billing_period=${periodId}`)
+    ga.addEncodedQuery(encodedQuery)
     ga.addAggregate('SUM', 'amount')
     ga.groupBy('customer')
     ga.groupBy('site')
@@ -181,9 +182,12 @@ function sumsBy(table: string, periodId: string): Amount[] {
     return sums
 }
 
-function writeMargin(periodId: string): void {
+/** Replace the period's Margin rows with its revenue against the Cost facts of the pass `run`. */
+function writeMargin(periodId: string, run: string): void {
     deleteWhere('x_daas_ham_margin', `billing_period=${periodId}`)
-    for (const row of marginRows(sumsBy('x_daas_ham_billing_line', periodId), sumsBy('x_daas_ham_cost_fact', periodId))) {
+    const revenue = sumsBy('x_daas_ham_billing_line', `billing_period=${periodId}`)
+    const cost = sumsBy('x_daas_ham_cost_fact', `billing_period=${periodId}^run=${run}`)
+    for (const row of marginRows(revenue, cost)) {
         const margin = new GlideRecord('x_daas_ham_margin')
         margin.initialize()
         margin.setValue('billing_period', periodId)

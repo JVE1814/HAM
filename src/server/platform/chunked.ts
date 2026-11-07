@@ -42,7 +42,10 @@ export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
     })
 }
 
-/** Start a new run of `job`, superseding any run still in progress; returns the run's token. */
+/**
+ * Start a new run of `job`, superseding any run still in progress; returns the run's token, the start
+ * time in epoch ms, so a later run's token sorts after an earlier one's (as text too, both 13 digits).
+ */
 function startRun(job: string): string {
     const record = loadCursorRecord(job)
     const token = String(nowMs())
