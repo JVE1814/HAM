@@ -11,11 +11,17 @@ export function todayIso(): string {
     return toIsoDate(nowMs())
 }
 
-/** Epoch ms of a stored date/time value, or undefined when empty. */
+/** Epoch ms of a stored date/time value, or undefined when it is empty or unreadable. */
 export function glideToMs(value: string): number | undefined {
     if (!value) return undefined
     const ms = Date.parse(`${value.replace(' ', 'T')}Z`)
     return Number.isNaN(ms) ? undefined : ms
+}
+
+/** The calendar date (YYYY-MM-DD, UTC) of a stored date/time value, or undefined when it is empty or unreadable. */
+export function glideToIsoDate(value: string): string | undefined {
+    const ms = glideToMs(value)
+    return ms === undefined ? undefined : toIsoDate(ms)
 }
 
 export function msToGlide(ms: number): string {

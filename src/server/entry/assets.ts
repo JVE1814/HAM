@@ -1,8 +1,7 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { toIsoDate } from '../domain/calendar'
 import { billingChange, checkTransition } from '../domain/lifecycle'
 import { readStage, transitionFacts } from '../platform/assets'
-import { glideToMs, todayIso } from '../platform/clock'
+import { glideToIsoDate, todayIso } from '../platform/clock'
 import { recomputeLine } from '../platform/fulfilment'
 import { str } from '../platform/records'
 import { closeServiceIntervals, openServiceInterval } from '../platform/service-intervals'
@@ -42,9 +41,8 @@ export function onAllocatedAssetStageChange(current: GlideRecord): void {
  * enters service and stops when it leaves, on the day billingChange gives (D52, ADR 0009).
  */
 export function onAssetServiceChange(current: GlideRecord, previous: GlideRecord): void {
-    const inService = glideToMs(str(current, 'x_daas_ham_in_service_date'))
     const change = billingChange(readStage(previous), readStage(current), {
-        inServiceDate: inService === undefined ? undefined : toIsoDate(inService),
+        inServiceDate: glideToIsoDate(str(current, 'x_daas_ham_in_service_date')),
         today: todayIso(),
     })
     if (!change) return

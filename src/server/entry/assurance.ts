@@ -3,13 +3,12 @@
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { attestationDue, compareAudit, type ExpectedAsset } from '../domain/audit'
-import { toIsoDate } from '../domain/calendar'
 import { stagesQuery, type Stage } from '../domain/lifecycle'
 import { reconcileAsset, type ExceptionType } from '../domain/reconciliation'
 import { ROLE } from '../domain/visibility'
 import { customerAdminIds } from '../platform/approvals'
 import { runTableJob } from '../platform/chunked'
-import { glideToMs, nowMs, todayIso } from '../platform/clock'
+import { glideToIsoDate, glideToMs, nowMs, todayIso } from '../platform/clock'
 import { openChange, openWorkOrder } from '../platform/field-work'
 import { openException, resolveExceptions } from '../platform/exceptions'
 import { intProperty, PROPERTY } from '../platform/properties'
@@ -198,8 +197,7 @@ function lastAttestedOn(siteId: string): string | undefined {
     last.orderByDesc('attested_at')
     last.setLimit(1)
     last.query()
-    const at = last.next() ? glideToMs(str(last, 'attested_at')) : undefined
-    return at === undefined ? undefined : toIsoDate(at)
+    return last.next() ? glideToIsoDate(str(last, 'attested_at')) : undefined
 }
 
 function openAttestation(agreement: GlideRecord, siteId: string): void {

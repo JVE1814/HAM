@@ -1,6 +1,7 @@
 import { gs } from '@servicenow/glide'
 import { RESTMessageV2 } from '@servicenow/glide/sn_ws'
 import type { HttpPort } from '../domain/http'
+import { stringProperty } from './properties'
 
 /** RESTMessageV2 transport behind the HttpPort seam (ADR 0008). */
 
@@ -23,10 +24,10 @@ const SECRETS: Record<string, Array<{ variable: string; property: string; inJson
 }
 
 /**
- * Non-secret settings substituted at call time from string properties (gs.getProperty), as they are
- * (not URL-encoded); `fallback` applies when the property is empty. The API host variables sit in the
- * host part of each function endpoint: confirm on an instance that RESTMessageV2 substitutes ${} there,
- * and fall back to rest.setEndpoint() with the host put in if it does not.
+ * Non-secret settings substituted at call time from string properties, trimmed but otherwise as they
+ * are (not URL-encoded); `fallback` applies when the property is empty or blank. The API host
+ * variables sit in the host part of each function endpoint: confirm on an instance that RESTMessageV2
+ * substitutes ${} there, and fall back to rest.setEndpoint() with the host put in if it does not.
  */
 const SETTINGS: Record<string, Array<{ variable: string; property: string; fallback: string }>> = {
     'NaaS Meraki Dashboard': [{ variable: 'meraki_host', property: 'x_daas_ham.meraki.api_host', fallback: 'api.meraki.com' }],
@@ -42,7 +43,7 @@ export function restMessagePort(message: string): HttpPort {
             const rest = new RestMessage(message, request.fn)
             for (const [name, value] of Object.entries(request.params)) rest.setStringParameterNoEscape(name, encodeURIComponent(value).replace(/%2C/g, ','))
             for (const [name, value] of Object.entries(request.headers ?? {})) rest.setRequestHeader(name, value)
-            for (const setting of settings) rest.setStringParameterNoEscape(setting.variable, (gs.getProperty(setting.property, setting.fallback) || '').trim() || setting.fallback)
+            for (const setting of settings) rest.setStringParameterNoEscape(setting.variable, stringProperty(setting.property, setting.fallback).trim() || setting.fallback)
             for (const secret of secrets) {
                 const value = gs.getPropertySecured(secret.property, '')
                 rest.setStringParameterNoEscape(secret.variable, secret.inJson ? JSON.stringify(value).slice(1, -1) : value)
