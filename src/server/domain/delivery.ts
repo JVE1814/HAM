@@ -13,6 +13,10 @@ export interface ShipFacts {
     hasWorkOrder: boolean
     /** The Order's Assets in 'staged' that the lifecycle lets ship. */
     staged: number
+    /** The Order's Assets in 'staged' that the lifecycle refuses to ship. */
+    refused: number
+    /** Why the first refused Asset may not ship ('' when none is refused). */
+    refusedReason: string
     /** The Order's Assets in 'spare_pool': hot spares already at the Site. */
     hotSpares: number
     /** The shipping aggregator is on. */
@@ -26,19 +30,25 @@ export interface OnSiteWork {
     subcontracted: boolean
 }
 
-export type ShipPlan =
-    | { ok: false; error: string }
-    | { ok: true; labelPackages: number | null; onSiteWork: OnSiteWork | null }
+/**
+ * The errors to show the user (refused Assets first) and, unless Ship is refused, the label to buy
+ * and the on-site work to open. Refused Assets alone do not stop the others from shipping.
+ */
+export type ShipPlan = { errors: string[] } & ({ ok: false } | { ok: true; labelPackages: number | null; onSiteWork: OnSiteWork | null })
 
 /** What "Ship" does for an Order: refuse, buy a label for N packages, open on-site work. Total, no I/O. */
 export function planShipment(facts: ShipFacts): ShipPlan {
-    if (facts.staged + facts.hotSpares === 0) return { ok: false, error: 'Nothing is staged for this order yet' }
+    const refusals = facts.refused > 0 ? [`${facts.refused} staged asset(s) cannot ship: ${facts.refusedReason}`] : []
+    if (facts.staged + facts.hotSpares === 0) {
+        return { ok: false, errors: refusals.length > 0 ? refusals : ['Nothing is staged for this order yet'] }
+    }
     const needsCarrier = facts.staged > 0 && !facts.hasTrackingNumber && facts.installMode !== 'remote_hands'
     if (needsCarrier && !facts.shippingEnabled) {
-        return { ok: false, error: 'Enter the carrier and tracking number before shipping' }
+        return { ok: false, errors: [...refusals, 'Enter the carrier and tracking number before shipping'] }
     }
     return {
         ok: true,
+        errors: refusals,
         // The shipping aggregator replaces manual tracking numbers (P3.26): one package per staged Asset.
         // Hot spares are already at the Site, so they are never packaged.
         labelPackages: needsCarrier ? facts.staged : null,

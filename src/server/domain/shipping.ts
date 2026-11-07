@@ -98,10 +98,10 @@ function toAggregatorAddress(address: Address): Record<string, string> {
 /** The most boxes one label covers; larger shipments get their tracking numbers by hand. */
 export const MAX_LABEL_PACKAGES = 20
 
-/** How many boxes a label covers: a whole number from 1 to MAX_LABEL_PACKAGES. */
+/** How many boxes a label covers: a whole number, at least 1 (buyLabel refuses more than MAX_LABEL_PACKAGES first). */
 export function packageCount(n: number): number {
     if (Number.isNaN(n)) return 1
-    return Math.min(MAX_LABEL_PACKAGES, Math.max(1, Math.floor(n)))
+    return Math.max(1, Math.floor(n))
 }
 
 export function labelRequestBody(input: LabelInput): string {

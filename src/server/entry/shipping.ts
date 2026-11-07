@@ -58,49 +58,43 @@ function depot(): GlideRecord | null {
     return findById('alm_stockroom', stringProperty(PROPERTY.stagingStockroom))
 }
 
-interface ShipmentSpec {
-    direction: 'to_site' | 'return'
-    siteId: string
-    /** The Order or Return order, whose `customer` the shipment is for. */
-    parent: GlideRecord
-    /** One box per Asset (buyLabel refuses more than one label covers). */
-    packages: number
-    reference: string
-    link: { field: 'order' | 'return_order'; id: string }
-}
-
-/** Buy a label between the depot and a Site and record the shipment. */
-function createShipment(spec: ShipmentSpec): LabelResult {
+/**
+ * Buy a label between the depot and the Site of `parent` (an Order shipping `to_site`, or a Return order
+ * shipping back as a `return`) and record the shipment against it. `packages` is one box per Asset
+ * (buyLabel refuses more than one label covers); the label carries the parent's number as its reference.
+ */
+function createShipment(direction: 'to_site' | 'return', parent: GlideRecord, packages: number): LabelResult {
     const carrierId = stringProperty(PROPERTY.shippingCarrierId)
     if (!carrierId) return { ok: false, error: `set ${PROPERTY.shippingCarrierId} to the ShipEngine carrier account (se-...) billed for labels` }
     const stockroom = depot()
     if (!stockroom) return { ok: false, error: `set ${PROPERTY.stagingStockroom} to the depot that ships` }
+    const siteId = str(parent, 'site')
     const depotLocation = findById('cmn_location', str(stockroom, 'location'))
-    const site = findById('cmn_location', spec.siteId)
+    const site = findById('cmn_location', siteId)
     if (!depotLocation || !site) return { ok: false, error: 'the depot or the Site has no location' }
     const depotAddress = addressOf(depotLocation, { name: str(stockroom, 'name'), phone: stringProperty(PROPERTY.shippingSenderPhone) }, stringProperty(PROPERTY.shippingSenderName))
-    const siteAddress = addressOf(site, siteContact(site), spec.parent.getDisplayValue('customer'))
+    const siteAddress = addressOf(site, siteContact(site), parent.getDisplayValue('customer'))
     const serviceCode = stringProperty(PROPERTY.shippingServiceCode)
     const result = buyLabel(aggregator(), {
         carrierId,
         serviceCode,
-        from: spec.direction === 'to_site' ? depotAddress : siteAddress,
-        to: spec.direction === 'to_site' ? siteAddress : depotAddress,
-        packages: spec.packages,
+        from: direction === 'to_site' ? depotAddress : siteAddress,
+        to: direction === 'to_site' ? siteAddress : depotAddress,
+        packages,
         weightKg: intProperty(PROPERTY.shippingPackageKg, 5),
-        reference: spec.reference,
+        reference: str(parent, 'number'),
     })
     if (!result.ok) return result
     const shipment = new GlideRecord('x_daas_ham_shipment')
     shipment.initialize()
-    shipment.setValue('direction', spec.direction)
-    shipment.setValue(spec.link.field, spec.link.id)
-    shipment.setValue('customer', str(spec.parent, 'customer'))
-    shipment.setValue('site', spec.siteId)
+    shipment.setValue('direction', direction)
+    shipment.setValue(direction === 'to_site' ? 'order' : 'return_order', parent.getUniqueValue())
+    shipment.setValue('customer', str(parent, 'customer'))
+    shipment.setValue('site', siteId)
     shipment.setValue('stockroom', stockroom.getUniqueValue())
     shipment.setValue('carrier', result.carrier)
     shipment.setValue('service_code', serviceCode)
-    shipment.setValue('packages', spec.packages)
+    shipment.setValue('packages', packages)
     shipment.setValue('tracking_number', result.trackingNumber)
     shipment.setValue('label_id', result.labelId)
     shipment.setValue('label_url', result.labelUrl)
@@ -113,14 +107,7 @@ function createShipment(spec: ShipmentSpec): LabelResult {
 
 /** Buy the outbound label for an Order's staged Assets and put its tracking number on the Order (does not save). */
 export function labelOrder(order: GlideRecord, packages: number): LabelResult {
-    const result = createShipment({
-        direction: 'to_site',
-        siteId: str(order, 'site'),
-        parent: order,
-        packages,
-        reference: str(order, 'number'),
-        link: { field: 'order', id: order.getUniqueValue() },
-    })
+    const result = createShipment('to_site', order, packages)
     if (result.ok) {
         order.setValue('carrier', result.carrier)
         order.setValue('tracking_number', result.trackingNumber)
@@ -128,24 +115,26 @@ export function labelOrder(order: GlideRecord, packages: number): LabelResult {
     return result
 }
 
+/** The latest prepaid return label still in use (not delivered or returned) of each Return order that has one. */
+export function returnLabels(returnOrderIds: readonly string[]): Map<string, { labelUrl: string; trackingNumber: string }> {
+    const labels = new Map<string, { labelUrl: string; trackingNumber: string }>()
+    if (returnOrderIds.length === 0) return labels
+    const shipment = new GlideRecord('x_daas_ham_shipment')
+    shipment.addEncodedQuery(`direction=return^${OPEN_SHIPMENTS}^return_orderIN${returnOrderIds.join(',')}`)
+    shipment.orderBy('sys_created_on')
+    shipment.query()
+    while (shipment.next()) labels.set(str(shipment, 'return_order'), { labelUrl: str(shipment, 'label_url'), trackingNumber: str(shipment, 'tracking_number') })
+    return labels
+}
+
 /** UI action "Create return label" on a ship-back Return order: the Site contact prints it. */
 export function uiCreateReturnLabel(current: GlideRecord): void {
     const packages = count('x_daas_ham_return_order_line', `return_order=${current.getUniqueValue()}^status=awaiting`)
     if (packages === 0) return void gs.addErrorMessage('Nothing on this return is still awaited')
     // Each label is paid for: one open return label per Return order (void it with the carrier to replace it).
-    const open = new GlideRecord('x_daas_ham_shipment')
-    open.addEncodedQuery(`return_order=${current.getUniqueValue()}^direction=return^${OPEN_SHIPMENTS}`)
-    open.setLimit(1)
-    open.query()
-    if (open.next()) return void gs.addErrorMessage(`Return label ${str(open, 'tracking_number')} is still open; void it with the carrier before buying another`)
-    const result = createShipment({
-        direction: 'return',
-        siteId: str(current, 'site'),
-        parent: current,
-        packages,
-        reference: str(current, 'number'),
-        link: { field: 'return_order', id: current.getUniqueValue() },
-    })
+    const open = returnLabels([current.getUniqueValue()]).get(current.getUniqueValue())
+    if (open) return void gs.addErrorMessage(`Return label ${open.trackingNumber} is still open; void it with the carrier before buying another`)
+    const result = createShipment('return', current, packages)
     if (!result.ok) return void gs.addErrorMessage(`No label: ${result.error}`)
     current.setValue('work_notes', `Return label ${result.trackingNumber} (${result.carrier}): ${result.labelUrl}`)
     current.update()

@@ -67,19 +67,17 @@ describe('labelRequestBody', () => {
         expect(full.shipment.ship_to).toMatchObject({ company_name: 'Acme', address_line2: 'Floor 3', state_province: 'NH' })
     })
 
-    it('sends between 1 and 20 boxes', () => {
+    it('sends at least one box', () => {
         expect(JSON.parse(labelRequestBody({ ...input, packages: 0 })).shipment.packages).toHaveLength(1)
-        expect(JSON.parse(labelRequestBody({ ...input, packages: 35 })).shipment.packages).toHaveLength(20)
     })
 })
 
 describe('packageCount', () => {
-    it('is a whole number from 1 to 20', () => {
+    it('is a whole number of at least 1', () => {
         expect(packageCount(3)).toBe(3)
         expect(packageCount(2.7)).toBe(2)
         expect(packageCount(0)).toBe(1)
         expect(packageCount(-4)).toBe(1)
-        expect(packageCount(21)).toBe(20)
         expect(packageCount(Number.NaN)).toBe(1)
     })
 })

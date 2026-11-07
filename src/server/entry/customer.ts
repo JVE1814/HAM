@@ -3,7 +3,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
-import { OPEN_SHIPMENTS } from '../domain/shipping'
 import { ROLE } from '../domain/visibility'
 import { readStage } from '../platform/assets'
 import { currentSession } from '../platform/session'
@@ -11,6 +10,7 @@ import { findById, str } from '../platform/records'
 import { raiseReturn } from '../platform/returns'
 import { completeAttestation } from './assurance'
 import { completeInstall } from './delivery'
+import { returnLabels } from './shipping'
 import { reply } from '../platform/rest-api'
 
 /*
@@ -124,18 +124,6 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
         returns: labelledReturns,
         attestations,
     })
-}
-
-/** The latest prepaid return label still in use (not delivered or returned) of each Return order that has one. */
-function returnLabels(returnOrderIds: readonly string[]): Map<string, { labelUrl: string; trackingNumber: string }> {
-    const labels = new Map<string, { labelUrl: string; trackingNumber: string }>()
-    if (returnOrderIds.length === 0) return labels
-    const shipment = new GlideRecord('x_daas_ham_shipment')
-    shipment.addEncodedQuery(`direction=return^${OPEN_SHIPMENTS}^return_orderIN${returnOrderIds.join(',')}`)
-    shipment.orderBy('sys_created_on')
-    shipment.query()
-    while (shipment.next()) labels.set(str(shipment, 'return_order'), { labelUrl: str(shipment, 'label_url'), trackingNumber: str(shipment, 'tracking_number') })
-    return labels
 }
 
 /** POST /customer/faults { asset, description }: report a faulty device as a CSM case. */
