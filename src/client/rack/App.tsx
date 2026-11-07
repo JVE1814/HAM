@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { rackElevation } from '../../server/domain/rack'
-import { rackApi, type Rack, type RackDevice, type Site } from './api'
+import { rackApi, type PowerBudget, type Rack, type RackDevice, type Site } from './api'
 
 type ColourBy = 'stage' | 'customer' | 'risk'
 
@@ -93,6 +93,7 @@ export default function App() {
                     </select>
                 </label>
             </section>
+            {detail?.rack.power && <PowerBar power={detail.rack.power} />}
             {detail && (
                 <section className="faces">
                     {(['front', 'rear'] as const).map((face) => (
@@ -124,5 +125,20 @@ export default function App() {
                 </section>
             )}
         </main>
+    )
+}
+
+function PowerBar({ power }: { power: PowerBudget }) {
+    if (power.utilisation === null) return <section className="power">Typical power {power.usedW} W (no rack capacity recorded)</section>
+    const over = power.utilisation > 100
+    return (
+        <section className={over ? 'power over' : 'power'}>
+            <span>
+                Power {power.usedW} W of {power.capacityW} W ({power.utilisation}%)
+            </span>
+            <span className="meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(power.utilisation, 100)}>
+                <span style={{ width: `${Math.min(power.utilisation, 100)}%` }} />
+            </span>
+        </section>
     )
 }

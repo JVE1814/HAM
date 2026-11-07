@@ -38,6 +38,9 @@ Network-gear CIs discovered recently with no Asset raise *seen without asset*.
 - Placement is the lowest rack unit plus the face; the height comes from the Model's rack units
   (minimum 1).
 - Saving a placement that leaves the rack or overlaps another device on the same face is refused.
+- **Power budget (P3.29)**: a rack with a *power capacity (W)* also refuses a placement that would
+  take the typical power (the Models' *typical power (W)*) of all devices in it, both faces, over
+  the capacity. The elevation page shows used against available power.
 - The **rack elevation** page (`x_daas_ham_racks.do`) shows the front and rear of the racks in a
   Site's rooms. Colours are by stage, customer, or risk:
   - *high*: past end of support, or no current coverage;

@@ -47,8 +47,8 @@ export function loadDemoData(): void {
     const globexDc = site('Globex DC Frankfurt', globex, 'critical', 'Frankfurt')
     const acmeMdf = ensure('cmn_location', { name: 'Acme HQ Amsterdam - MDF' }, { parent: acmeHq, company: acme })
     const globexHall = ensure('cmn_location', { name: 'Globex DC Frankfurt - Hall A' }, { parent: globexDc, company: globex })
-    const acmeRack = ensure('cmdb_ci_rack', { name: 'ACME-HQ-MDF-R01' }, { location: acmeMdf, company: acme, rack_units: 42 })
-    ensure('cmdb_ci_rack', { name: 'GLX-FRA-A-R12' }, { location: globexHall, company: globex, rack_units: 47 })
+    const acmeRack = ensure('cmdb_ci_rack', { name: 'ACME-HQ-MDF-R01' }, { location: acmeMdf, company: acme, rack_units: 42, x_daas_ham_power_capacity_w: 3000 })
+    ensure('cmdb_ci_rack', { name: 'GLX-FRA-A-R12' }, { location: globexHall, company: globex, rack_units: 47, x_daas_ham_power_capacity_w: 6000 })
 
     const stockroom = (name: string, type: string, extra: Fields = {}) =>
         ensure('alm_stockroom', { name }, { x_daas_ham_stockroom_type: type, ...extra })

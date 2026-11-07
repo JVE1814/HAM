@@ -2,7 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { placementProblem, type Placement, type RackFace } from '../domain/rack'
+import { placementProblem, powerBudget, type Placement, type RackFace } from '../domain/rack'
 import { visibilityFilter } from '../domain/visibility'
 import { readStage } from '../platform/assets'
 import { currentSession } from '../platform/session'
@@ -27,20 +27,23 @@ function placementsIn(rackId: string, exceptAssetId: string): Placement[] {
             ruStart: num(asset, 'x_daas_ham_ru_start'),
             height: heightOf(asset),
             face: (str(asset, 'x_daas_ham_rack_face') || 'front') as RackFace,
+            powerW: num(asset, 'model.x_daas_ham_typical_power_w'),
         })
     }
     return placements
 }
 
-/** Before-update rule on alm_hardware: a rack position must be free and inside the rack. */
+/** Before-update rule on alm_hardware: a rack position must be free, inside the rack and within its power budget. */
 export function guardRackPlacement(current: GlideRecord): void {
     const rackId = str(current, 'x_daas_ham_rack')
     if (!rackId || !str(current, 'x_daas_ham_ru_start')) return
-    const problem = placementProblem(num(current, 'x_daas_ham_rack.rack_units') || 42, placementsIn(rackId, current.getUniqueValue()), {
+    const rack = { units: num(current, 'x_daas_ham_rack.rack_units') || 42, powerCapacityW: num(current, 'x_daas_ham_rack.x_daas_ham_power_capacity_w') }
+    const problem = placementProblem(rack, placementsIn(rackId, current.getUniqueValue()), {
         assetId: current.getUniqueValue(),
         ruStart: num(current, 'x_daas_ham_ru_start'),
         height: heightOf(current),
         face: (str(current, 'x_daas_ham_rack_face') || 'front') as RackFace,
+        powerW: num(current, 'model.x_daas_ham_typical_power_w'),
     })
     if (problem) {
         gs.addErrorMessage(problem)
@@ -100,10 +103,13 @@ export function getRack(request: RESTAPIRequest, response: RESTAPIResponse): voi
             lifecyclePhase: str(asset, 'x_daas_ham_lifecycle_phase'),
             coverageEnd: str(asset, 'x_daas_ham_coverage_end'),
             refreshDue: str(asset, 'x_daas_ham_refresh_due'),
+            powerW: num(asset, 'model.x_daas_ham_typical_power_w'),
         })
     }
+    // The budget counts every placed device, including ones the viewer may not see.
+    const power = powerBudget(num(rack, 'x_daas_ham_power_capacity_w'), placementsIn(rack.getUniqueValue(), ''))
     response.setStatus(200)
-    response.setBody({ rack: { id: rack.getUniqueValue(), name: str(rack, 'name'), units: num(rack, 'rack_units') || 42 }, devices } as never)
+    response.setBody({ rack: { id: rack.getUniqueValue(), name: str(rack, 'name'), units: num(rack, 'rack_units') || 42, power }, devices } as never)
 }
 
 /** GET /sites: customer Sites the user may see (customers only their own, site contacts only theirs). */

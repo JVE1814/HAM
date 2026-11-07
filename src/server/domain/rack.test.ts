@@ -1,24 +1,53 @@
 import { describe, expect, it } from 'vitest'
-import { placementProblem, rackElevation } from './rack'
+import { placementProblem, powerBudget, rackElevation } from './rack'
 
+const rack42 = { units: 42, powerCapacityW: 0 }
 const placed = [
-    { assetId: 'sw1', ruStart: 40, height: 1, face: 'front' as const },
-    { assetId: 'fw1', ruStart: 30, height: 2, face: 'front' as const },
+    { assetId: 'sw1', ruStart: 40, height: 1, face: 'front' as const, powerW: 350 },
+    { assetId: 'fw1', ruStart: 30, height: 2, face: 'front' as const, powerW: 250 },
 ]
 
 describe('placementProblem', () => {
     it('accepts a free slot inside the rack', () => {
-        expect(placementProblem(42, placed, { assetId: 'new', ruStart: 35, height: 2, face: 'front' })).toBeNull()
+        expect(placementProblem(rack42, placed, { assetId: 'new', ruStart: 35, height: 2, face: 'front' })).toBeNull()
     })
 
     it('rejects slots outside the rack or overlapping another device on the same face', () => {
-        expect(placementProblem(42, placed, { assetId: 'new', ruStart: 42, height: 2, face: 'front' })).toBe('Rack units 42-43 do not fit in a 42U rack')
-        expect(placementProblem(42, placed, { assetId: 'new', ruStart: 31, height: 1, face: 'front' })).toBe('Rack unit 31 is taken by fw1')
-        expect(placementProblem(42, placed, { assetId: 'new', ruStart: 31, height: 1, face: 'rear' })).toBeNull()
+        expect(placementProblem(rack42, placed, { assetId: 'new', ruStart: 42, height: 2, face: 'front' })).toBe('Rack units 42-43 do not fit in a 42U rack')
+        expect(placementProblem(rack42, placed, { assetId: 'new', ruStart: 31, height: 1, face: 'front' })).toBe('Rack unit 31 is taken by fw1')
+        expect(placementProblem(rack42, placed, { assetId: 'new', ruStart: 31, height: 1, face: 'rear' })).toBeNull()
     })
 
     it('lets a device keep its own slot', () => {
-        expect(placementProblem(42, placed, { assetId: 'fw1', ruStart: 30, height: 2, face: 'front' })).toBeNull()
+        expect(placementProblem(rack42, placed, { assetId: 'fw1', ruStart: 30, height: 2, face: 'front' })).toBeNull()
+    })
+})
+
+describe('placementProblem with a power budget', () => {
+    const budgeted = { units: 42, powerCapacityW: 1000 }
+
+    it('accepts a device that fits the remaining power', () => {
+        expect(placementProblem(budgeted, placed, { assetId: 'new', ruStart: 10, height: 1, face: 'rear', powerW: 400 })).toBeNull()
+    })
+
+    it('refuses a device that would exceed it, counting both faces', () => {
+        expect(placementProblem(budgeted, placed, { assetId: 'new', ruStart: 10, height: 1, face: 'rear', powerW: 401 })).toBe(
+            "The rack's power budget would be exceeded: 1001 W of 1000 W",
+        )
+    })
+
+    it('does not count a device twice when it moves within the rack', () => {
+        expect(placementProblem(budgeted, placed, { assetId: 'sw1', ruStart: 20, height: 1, face: 'front', powerW: 350 })).toBeNull()
+    })
+})
+
+describe('powerBudget', () => {
+    it('sums typical power against the capacity', () => {
+        expect(powerBudget(1000, placed)).toEqual({ capacityW: 1000, usedW: 600, remainingW: 400, utilisation: 60 })
+    })
+
+    it('has no remaining power or utilisation without a capacity', () => {
+        expect(powerBudget(0, [...placed, { assetId: 'x', ruStart: 1, height: 1, face: 'front' }])).toEqual({ capacityW: 0, usedW: 600, remainingW: null, utilisation: null })
     })
 })
 

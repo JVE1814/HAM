@@ -228,3 +228,10 @@ export const change_request = Table({
     },
     index: [{ name: 'x_daas_ham_chg_order', unique: false, element: 'x_daas_ham_order' }],
 })
+
+export const cmdb_ci_rack = Table({
+    augments: 'cmdb_ci_rack',
+    schema: {
+        x_daas_ham_power_capacity_w: IntegerColumn({ label: 'Power capacity (W)', min: 0 }),
+    },
+})

@@ -6,11 +6,19 @@ export interface Site {
     customer: string
 }
 
+export interface PowerBudget {
+    capacityW: number
+    usedW: number
+    remainingW: number | null
+    utilisation: number | null
+}
+
 export interface Rack {
     id: string
     name: string
     units: number
     room?: string
+    power?: PowerBudget
 }
 
 export interface RackDevice {
@@ -26,6 +34,7 @@ export interface RackDevice {
     lifecyclePhase: string
     coverageEnd: string
     refreshDue: string
+    powerW: number
 }
 
 async function get<T>(path: string): Promise<T> {

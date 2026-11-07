@@ -6526,6 +6526,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '122e5cc4c7654cd6ac2388bf0f8390a7'
+                        key: {
+                            name: 'cmdb_ci_rack'
+                            element: 'x_daas_ham_power_capacity_w'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: '12309d925b7b49f7b405d8599dc42eb4'
                         key: {
@@ -11225,6 +11233,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '2de601ee46464cb9aacaad8ccf341668'
+                        key: {
+                            name: 'x_daas_ham_asn_import'
+                            element: 'claim_code'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '2e1cd02281f74006ab148c6fa6072895'
                         key: {
@@ -14199,6 +14216,15 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
+                        id: '406a4119b6c54a9aaa523a0ca7ef1415'
+                        key: {
+                            name: 'cmdb_ci_rack'
+                            element: 'NULL'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
                         id: '4072395325334115b49fbf702bd3ec32'
                         key: {
                             name: 'alm_hardware'
@@ -14220,6 +14246,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_disposal_order'
                             element: 'certificate_number'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '40c4fe5d3a2d430f880695109f5fe628'
+                        key: {
+                            name: 'cmdb_ci_rack'
+                            element: 'x_daas_ham_power_capacity_w'
                             language: 'en'
                         }
                     },
@@ -29060,6 +29095,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '96061d3b2295456eb8c30218faf34ca0'
+                        key: {
+                            name: 'x_daas_ham_asn_import'
+                            element: 'claim_code'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: '960fa43d057e4fb28d816b497d8b8b0d'
                         key: {
@@ -32243,6 +32286,13 @@ declare global {
                                     name: 'x_daas_ham.admin'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'ua_table_licensing_config'
+                        id: 'a6e34cdcb80743c884ff0ce74d331907'
+                        key: {
+                            name: 'cmdb_ci_rack'
                         }
                     },
                     {
@@ -42500,6 +42550,13 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_db_object'
+                        id: 'e70624ebd14d453f8f2bd112c32345df'
+                        key: {
+                            name: 'cmdb_ci_rack'
                         }
                     },
                     {

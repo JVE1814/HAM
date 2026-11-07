@@ -86,3 +86,35 @@ select {
 .error {
     color: var(--error);
 }
+
+.power {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 16px;
+    color: var(--fg);
+}
+
+.power .meter {
+    flex: 1 1 200px;
+    height: 10px;
+    border-radius: 5px;
+    background: var(--bg);
+    border: 1px solid var(--muted);
+    overflow: hidden;
+}
+
+.power .meter span {
+    display: block;
+    height: 100%;
+    background: var(--ok);
+}
+
+.power.over {
+    color: var(--error);
+}
+
+.power.over .meter span {
+    background: var(--error);
+}
