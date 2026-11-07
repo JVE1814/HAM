@@ -27,7 +27,8 @@
 Each installed Asset is checked for:
 - **unseen**: no Seen signal for `x_daas_ham.reconciliation.unseen_days`, or never seen;
 - **serial mismatch** with its CI;
-- **site mismatch** with its CI's location (or that location's parent).
+- **site mismatch** with its CI's location: the CI's location, or the location two levels up
+  (room → building → site), must be the Asset's Site.
 
 Exceptions open once per type and Asset, and resolve themselves when the condition clears.
 Network-gear CIs discovered recently with no Asset raise *seen without asset*.

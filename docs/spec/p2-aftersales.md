@@ -11,7 +11,8 @@
 - Sourcing follows the replacement priority: hot spare at the Site → Spare pool → central stock.
 - If no stock is left:
   - a failed unit with **OEM coverage today** gets an **OEM RMA** record (advance replacement, *to
-    open*) instead of a purchase;
+    open*) instead of a purchase, when the line is for the failed unit's own Model (refresh lines
+    and replacements by a different Model are purchased);
   - the RMA is opened with the vendor manually;
   - the OEM's replacement unit is received with the RMA number in the PO field (ASN or warehouse
     app), allocated to the waiting line, and the RMA becomes *replacement received*.
@@ -33,12 +34,18 @@
 
 - Installed Assets on a return become *pending return*. The due date is the Agreement's return
   allowance.
+- An Asset already awaiting another return is not added again; completing an install twice raises
+  one return. A return with nothing to bring back closes at once (a temporary Order still being
+  installed waits until its equipment is installed or its end date passes).
+- Devices chosen on the record producer must be at the chosen Site; others are ignored.
 - Field de-install opens a normal change and a de-install work order. Ship-back relies on the Site
   contact.
 - **Receipt** at the depot (warehouse app, Receive), for units pending return (or missing):
-  - the unit goes to *pending evaluation* and leaves its Site and subscription line;
+  - the unit goes to *pending evaluation* and leaves its Site, Rack position and subscription line;
   - a site package with no Assets left ends that day;
-  - a unit received after the due date incurs a **late-return fee**.
+  - a unit received after the due date incurs a **late-return fee**;
+  - a unit declared missing that turns up settles its line again: the open lost-asset fee is
+    waived, the late-return fee applies, and the Return order reopens for evaluation.
 - **Evaluation** on the return line:
 
   | Choice | Result |
@@ -50,10 +57,10 @@
   A *damaged* condition incurs a damage fee. The Return order closes when every line is evaluated
   or missing.
 - **Overdue** (daily):
-  - the first day after the due date, the return is escalated once and the Customer admins and
-    account manager are emailed;
-  - after `x_daas_ham.returns.grace_days`, the Asset is declared *missing* and a lost-asset fee is
-    recorded.
+  - the first day after the due date, the return is escalated once per Return order and the
+    Customer admins and account manager are emailed;
+  - after `x_daas_ham.returns.grace_days`, the Asset is declared *missing* (its Rack position is
+    freed) and a lost-asset fee is recorded.
 - Fees use the Agreement's lost / late / damage amounts. A zero amount records nothing.
 
 ## Refresh (D48)

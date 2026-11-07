@@ -96,7 +96,9 @@ function retireReplacedAssets(order: GlideRecord): void {
     const replaced: string[] = []
     while (line.next()) {
         const asset = findById('alm_hardware', str(line, 'replaces_asset'))
-        if (asset && isDeployed(readStage(asset))) replaced.push(asset.getUniqueValue())
+        const stage = asset ? readStage(asset) : null
+        // Already pending return: an earlier completion (UI action, then work order close) raised it.
+        if (asset && isDeployed(stage) && stage !== 'pending_return') replaced.push(asset.getUniqueValue())
     }
     returnReplacedAssets(order, replaced)
 }

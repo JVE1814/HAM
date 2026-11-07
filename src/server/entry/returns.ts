@@ -4,22 +4,23 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import { toIsoDate } from '../domain/calendar'
 import type { LegalOwner } from '../domain/lifecycle'
 import { evaluationTarget, overdueStep, type EvaluationOutcome } from '../domain/returns'
-import { moveAndSave, moveAsset, readStage } from '../platform/assets'
+import { clearRackPlacement, moveAndSave, moveAsset, readStage } from '../platform/assets'
 import { customerAdminIds } from '../platform/approvals'
 import { runTableJob } from '../platform/chunked'
 import { EVENT } from '../platform/events'
 import { nowMs, todayIso } from '../platform/clock'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties'
-import { findById, str } from '../platform/records'
+import { bool, findById, str } from '../platform/records'
 import {
-    awaitingReturnLine,
     closeReturnIfDone,
     completeReturn,
+    expectedReturnLine,
     installedAssetIds,
     raiseReturn,
     recordFee,
     stampNow,
     type ReturnTrigger,
+    waiveOpenFees,
 } from '../platform/returns'
 
 /** Returns, decommissions, depot evaluation and overdue chasing (P2.4). */
@@ -31,15 +32,20 @@ import {
 export function afterReturnProduced(producer: Record<string, unknown>, current: unknown): void {
     const order = current as GlideRecord
     const decommission = str(order, 'trigger') === 'site_decommission'
+    const siteId = str(order, 'site')
+    // Only devices actually at the chosen Site: the list collector cannot be qualified by the Site.
     const chosen = String(producer.assets ?? '')
         .split(',')
         .map((id) => id.trim())
-        .filter(Boolean)
-    const assetIds = decommission ? installedAssetIds({ siteId: str(order, 'site') }) : chosen
+        .filter((id) => {
+            const asset = id ? findById('alm_hardware', id) : null
+            return !!asset && str(asset, 'x_daas_ham_site') === siteId
+        })
+    const assetIds = decommission ? installedAssetIds({ siteId }) : chosen
     completeReturn(order, {
         trigger: str(order, 'trigger') as ReturnTrigger,
         customerId: str(order, 'customer'),
-        siteId: str(order, 'site'),
+        siteId,
         agreementId: str(order, 'agreement') || agreementOf(assetIds[0]),
         method: (str(order, 'method') || 'ship_back') as 'fsm_deinstall' | 'ship_back',
         assetIds,
@@ -59,19 +65,28 @@ function agreementOf(assetId: string | undefined): string {
  */
 export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): boolean {
     if (readStage(asset) !== 'pending_return' && readStage(asset) !== 'missing') return false
-    const line = awaitingReturnLine(asset.getUniqueValue())
+    const line = expectedReturnLine(asset.getUniqueValue())
     const subscriptionLine = str(asset, 'x_daas_ham_subscription_line')
     asset.setValue('stockroom', stockroomId)
     asset.setValue('x_daas_ham_site', '')
     asset.setValue('x_daas_ham_subscription_line', '')
+    clearRackPlacement(asset)
     if (!moveAndSave(asset, 'pending_evaluation', 'return received')) return false
     endLineIfEmpty(subscriptionLine)
     if (!line) return true
+    const turnedUp = str(line, 'status') === 'missing'
     line.setValue('status', 'received')
     stampNow(line, 'received_at')
     line.update()
     const returnOrder = findById('x_daas_ham_return_order', str(line, 'return_order'))
-    if (returnOrder && str(returnOrder, 'due_date') && todayIso() > str(returnOrder, 'due_date')) {
+    if (!returnOrder) return true
+    if (turnedUp) {
+        // Declared missing, then found: it is late, not lost, and its line needs evaluating again.
+        waiveOpenFees('lost', asset.getUniqueValue(), returnOrder.getUniqueValue())
+        returnOrder.setValue('state', 2)
+        returnOrder.update()
+    }
+    if (str(returnOrder, 'due_date') && todayIso() > str(returnOrder, 'due_date')) {
         recordFee('late_return', asset, returnOrder.getUniqueValue())
     }
     return true
@@ -128,12 +143,12 @@ export function chaseOverdueReturns(): void {
             assetId: str(line, 'asset'),
             returnOrderId: str(line, 'return_order'),
             dueDate: str(line, 'return_order.due_date'),
-            escalated: str(line, 'return_order.escalated') === '1' || str(line, 'return_order.escalated') === 'true',
         }),
         handle: (line, lineId) => {
-            const step = overdueStep({ dueDate: line.dueDate, today, graceDays: grace, received: false, escalated: line.escalated })
+            // Read the header fresh: an earlier line of the same order may have escalated it in this batch.
             const returnOrder = findById('x_daas_ham_return_order', line.returnOrderId)
             if (!returnOrder) return
+            const step = overdueStep({ dueDate: line.dueDate, today, graceDays: grace, received: false, escalated: bool(returnOrder, 'escalated') })
             if (step === 'escalate') {
                 returnOrder.setValue('escalated', true)
                 returnOrder.setValue('work_notes', `Return overdue since ${line.dueDate}; customer and account manager notified.`)
@@ -142,6 +157,7 @@ export function chaseOverdueReturns(): void {
                 gs.eventQueue(EVENT.returnOverdue, returnOrder, recipients.filter(Boolean).join(','), line.assetId)
             } else if (step === 'declare_missing') {
                 const asset = findById('alm_hardware', line.assetId)
+                if (asset) clearRackPlacement(asset)
                 if (asset && moveAndSave(asset, 'missing', `return ${returnOrder.getDisplayValue('number')} overdue`)) {
                     recordFee('lost', asset, line.returnOrderId)
                 }
@@ -189,20 +205,26 @@ export function raiseScheduledReturns(): void {
     order.addNotNullQuery('end_date')
     order.addQuery('end_date', '<=', horizon)
     order.addQuery('stage', 'IN', 'installing,complete')
+    order.orderBy('end_date')
     order.setLimit(50)
     order.query()
     while (order.next()) {
-        raiseReturn({
-            trigger: 'temporary_end',
-            customerId: str(order, 'customer'),
-            siteId: str(order, 'site'),
-            agreementId: str(order, 'agreement'),
-            method: str(order, 'install_mode') === 'self_install' ? 'ship_back' : 'fsm_deinstall',
-            assetIds: installedAssetIds({ orderId: order.getUniqueValue() }),
-            sourceOrderId: order.getUniqueValue(),
-            openFieldWork: true,
-            description: `Temporary deployment ${str(order, 'number')} ends ${str(order, 'end_date')}`,
-        })
+        const assetIds = installedAssetIds({ orderId: order.getUniqueValue() })
+        // Still being installed and not yet ended: wait for the equipment to arrive before raising.
+        if (assetIds.length === 0 && str(order, 'stage') === 'installing' && str(order, 'end_date') >= today) continue
+        if (assetIds.length > 0) {
+            raiseReturn({
+                trigger: 'temporary_end',
+                customerId: str(order, 'customer'),
+                siteId: str(order, 'site'),
+                agreementId: str(order, 'agreement'),
+                method: str(order, 'install_mode') === 'self_install' ? 'ship_back' : 'fsm_deinstall',
+                assetIds,
+                sourceOrderId: order.getUniqueValue(),
+                openFieldWork: true,
+                description: `Temporary deployment ${str(order, 'number')} ends ${str(order, 'end_date')}`,
+            })
+        }
         order.setValue('return_raised', true)
         order.update()
     }

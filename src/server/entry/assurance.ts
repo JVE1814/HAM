@@ -258,7 +258,10 @@ export function reconcileInstalledBase(): void {
                 siteId: str(asset, 'x_daas_ham_site'),
                 lastSeenAt: glideToMs(str(asset, 'x_daas_ham_last_seen')),
                 ci: str(asset, 'ci')
-                    ? { serial: str(asset, 'ci.serial_number'), siteId: str(asset, 'ci.location.parent') || str(asset, 'ci.location') }
+                    ? {
+                          serial: str(asset, 'ci.serial_number'),
+                          locationIds: [str(asset, 'ci.location'), str(asset, 'ci.location.parent'), str(asset, 'ci.location.parent.parent')],
+                      }
                     : undefined,
             },
         }),

@@ -179,8 +179,9 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
 
     const modelId = str(line, 'model')
     const customerId = str(order, 'customer')
+    const breakFix = str(order, 'order_type') === 'device_replace'
     const plan = planSourcing(
-        { modelId, quantity: shortfall, customerId, purpose: str(order, 'order_type') === 'device_replace' ? 'replace' : 'new' },
+        { modelId, quantity: shortfall, customerId, purpose: breakFix ? 'replace' : 'new' },
         stockCandidates(modelId, shortfall * 5 + 50),
     )
 
@@ -210,11 +211,14 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
         line.setValue('transfer_orders', [str(line, 'transfer_orders'), ...transfers].filter(Boolean).join(','))
     }
     const toPurchase = shortfall - reserved
-    const replaced = findById('alm_hardware', str(line, 'replaces_asset'))
+    // Only a break-fix line for the same Model can be served by the OEM's advance replacement; a
+    // refresh line also names the Asset it replaces, but that Asset is healthy.
+    const replaced = breakFix ? findById('alm_hardware', str(line, 'replaces_asset')) : null
+    const sameModel = !!replaced && str(replaced, 'model') === modelId
     const route = shortfallRoute({
         missing: toPurchase,
-        purpose: replaced ? 'replace' : 'new',
-        coveredToday: !!replaced && str(replaced, 'x_daas_ham_coverage_end') >= todayIso(),
+        purpose: sameModel ? 'replace' : 'new',
+        coveredToday: !!replaced && sameModel && str(replaced, 'x_daas_ham_coverage_end') >= todayIso(),
     })
     if (route === 'oem_advance_replacement' && replaced) {
         openOemRma({ defectiveAsset: replaced, orderLineId: line.getUniqueValue(), caseId: str(order, 'case') })

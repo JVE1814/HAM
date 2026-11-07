@@ -91,15 +91,24 @@ export function syncOemCoverage(): void {
                 const key = normalizeSerial(fact.serial)
                 factsBySerial.set(key, [...(factsBySerial.get(key) ?? []), fact])
             }
-            for (const [serial, assetId] of assets) {
-                for (const fact of factsBySerial.get(serial) ?? []) upsertCoverage(assetId, vendor, fact, 'api')
-                refreshAssetCoverage(assetId)
+            // A failed call says nothing about its serials: leave them stale for the next run and
+            // move on, rather than stamping them checked or asking again straight away.
+            const failed = result.errors.length > 0
+            for (const [serial, assetIds] of assets) {
+                const facts = factsBySerial.get(serial) ?? []
+                if (failed && facts.length === 0) continue
+                for (const assetId of assetIds) {
+                    for (const fact of facts) upsertCoverage(assetId, vendor, fact, 'api')
+                    refreshAssetCoverage(assetId)
+                }
             }
+            if (failed) break
         }
     }
 }
 
-function staleAssets(vendor: OemVendor, staleBefore: string, limit: number): Map<string, string> {
+/** Stale Assets by normalized serial (a serial can be shared by duplicate records). */
+function staleAssets(vendor: OemVendor, staleBefore: string, limit: number): Map<string, string[]> {
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery('model.x_daas_ham_oem_source', vendor)
     asset.addQuery('install_status', '!=', 7)
@@ -108,8 +117,11 @@ function staleAssets(vendor: OemVendor, staleBefore: string, limit: number): Map
     asset.orderBy('x_daas_ham_coverage_checked')
     asset.setLimit(limit)
     asset.query()
-    const assets = new Map<string, string>()
-    while (asset.next()) assets.set(normalizeSerial(str(asset, 'serial_number')), asset.getUniqueValue())
+    const assets = new Map<string, string[]>()
+    while (asset.next()) {
+        const serial = normalizeSerial(str(asset, 'serial_number'))
+        assets.set(serial, [...(assets.get(serial) ?? []), asset.getUniqueValue()])
+    }
     return assets
 }
 

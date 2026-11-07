@@ -35,7 +35,9 @@
     first.
   - Contracts are upserted per serial + contract number.
   - Each Asset gets its coverage end and service level (latest covering contract) and is stamped as
-    checked.
+    checked. Records sharing a serial are all updated.
+  - When a vendor call fails, serials without an answer are left unchecked and that vendor waits
+    for the next run.
 - **RMA status (hourly)**: open Cisco RMAs with an RMA number.
 - **CSV**: rows loaded into *OEM coverage import rows* (vendor, serial, contract, service level,
   start, end) and *Lifecycle import rows* are processed on insert.

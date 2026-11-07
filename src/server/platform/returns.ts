@@ -53,9 +53,10 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
     order.setValue('due_date', returnDueDate(todayIso(), allowance))
     order.setValue('state', 2)
 
+    let lines = 0
     for (const assetId of request.assetIds) {
         const asset = findById('alm_hardware', assetId)
-        if (!asset) continue
+        if (!asset || latestReturnLine(assetId, 'awaiting')) continue
         const stage = readStage(asset)
         if (isDeployed(stage) && stage !== 'pending_return') moveAndSave(asset, 'pending_return', `return ${str(order, 'number')}`)
         const line = new GlideRecord('x_daas_ham_return_order_line')
@@ -63,9 +64,14 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
         line.setValue('return_order', order.getUniqueValue())
         line.setValue('asset', assetId)
         line.insert()
+        lines++
     }
 
-    if (request.openFieldWork && request.method === 'fsm_deinstall') {
+    if (lines === 0) {
+        // Nothing installed (or everything already on another Return order): close straight away.
+        order.setValue('state', 3)
+        order.setValue('work_notes', 'No equipment to bring back.')
+    } else if (request.openFieldWork && request.method === 'fsm_deinstall') {
         const context = {
             customerId: request.customerId,
             siteId: request.siteId,
@@ -96,14 +102,33 @@ export function installedAssetIds(filter: { agreementId?: string; siteId?: strin
     return ids
 }
 
-/** The open (awaiting) return line of an Asset, if it is expected back. */
-export function awaitingReturnLine(assetId: string): GlideRecord | null {
+/** The return line an arriving Asset settles: awaiting, or declared missing and now turning up late. */
+export function expectedReturnLine(assetId: string): GlideRecord | null {
+    return latestReturnLine(assetId, 'awaiting,missing')
+}
+
+function latestReturnLine(assetId: string, statuses: string): GlideRecord | null {
     const line = new GlideRecord('x_daas_ham_return_order_line')
     line.addQuery('asset', assetId)
-    line.addQuery('status', 'awaiting')
+    line.addQuery('status', 'IN', statuses)
+    line.orderByDesc('sys_created_on')
     line.setLimit(1)
     line.query()
     return line.next() ? line : null
+}
+
+/** Waive the not-yet-billed fees of one type charged for an Asset on a Return order. */
+export function waiveOpenFees(type: FeeType, assetId: string, returnOrderId: string): void {
+    const fee = new GlideRecord('x_daas_ham_fee_event')
+    fee.addQuery('fee_type', type)
+    fee.addQuery('asset', assetId)
+    fee.addQuery('return_order', returnOrderId)
+    fee.addQuery('status', 'open')
+    fee.query()
+    while (fee.next()) {
+        fee.setValue('status', 'waived')
+        fee.update()
+    }
 }
 
 export function recordFee(type: FeeType, asset: GlideRecord, returnOrderId: string): void {

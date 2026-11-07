@@ -29,6 +29,5 @@ Acl({
     type: 'ux_route',
     operation: 'read',
     roles: [assetManager, inventoryTech, fieldTech, noc, accountManager, finance],
-    table: 'now',
-    field: 'naas-assets.*',
+    name: 'now.naas-assets.*',
 })

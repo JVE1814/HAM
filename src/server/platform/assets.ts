@@ -51,6 +51,13 @@ export function moveAndSave(asset: GlideRecord, to: Stage, context: string): boo
     return true
 }
 
+/** The Asset left its Site: free its Rack units (the caller saves). */
+export function clearRackPlacement(asset: GlideRecord): void {
+    asset.setValue('x_daas_ham_rack', '')
+    asset.setValue('x_daas_ham_ru_start', '')
+    asset.setValue('x_daas_ham_rack_face', '')
+}
+
 /**
  * A new, unsaved hardware Asset of `modelId` in `stage`. Sets the fields the platform treats as
  * mandatory on assets (model category, quantity), which GlideRecord inserts do not enforce.
