@@ -19,6 +19,18 @@ export function pluck(table: string, encodedQuery: string, field: string, limit 
     return values
 }
 
+/** Each record of `table` with one of `ids`, read with one query, by sys_id; blank ids are skipped and records not found left out. */
+export function recordsById<T>(table: string, ids: Iterable<string>, read: (record: GlideRecord) => T): Map<string, T> {
+    const found = new Map<string, T>()
+    const unique = [...new Set(ids)].filter(Boolean)
+    if (unique.length === 0) return found
+    const gr = new GlideRecord(table)
+    gr.addEncodedQuery(`sys_idIN${unique.join(',')}`)
+    gr.query()
+    while (gr.next()) found.set(gr.getUniqueValue(), read(gr))
+    return found
+}
+
 /** Whether any record matches an encoded query (stops at the first). */
 export function exists(table: string, encodedQuery: string): boolean {
     const gr = new GlideRecord(table)
