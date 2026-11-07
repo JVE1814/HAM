@@ -13,9 +13,9 @@ const LOCK_ATTEMPTS = 5
  * The next Provider tag, or null while other receipts held the counter through every try. A tag is a scan key, so two
  * Assets must never share one: the counter is read and advanced under a job lock, its first row created there too.
  *
- * Taking the lock also throws when the holder lets go between refusing this taker and the check that it still holds
- * the lock; that try counts as refused too. Only when every try throws is the lock itself broken, and that error
- * escapes, as does a failure to save the counter.
+ * Taking the lock throws only when an insert is refused with no lock row (platform/locks retries once when the holder
+ * lets go mid-take): that try is made again, and only when every try throws does the error escape, as does a failure
+ * to save the counter.
  */
 export function nextProviderTag(): string | null {
     let refused = false

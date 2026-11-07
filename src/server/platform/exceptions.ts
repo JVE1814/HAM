@@ -19,9 +19,9 @@ const LOCK_ATTEMPTS = 5
  * Open an exception of `type` for the subject unless one is already open. Two runs (an overlapping reconciliation, two
  * audits closing at once) may raise the same one, and a unique index cannot allow closed duplicates beside the open
  * one, so the check and the insert are made under a lock on the type and subject, re-checking there. A run that finds
- * the lock held through every try leaves the exception to the holder, which is raising it. Taking the lock can also
- * throw when the holder lets go mid-take; that try counts as held too, and only when every try throws does the error
- * escape, as does one from the insert.
+ * the lock held through every try leaves the exception to the holder, which is raising it. Taking the lock throws only
+ * when an insert is refused with no lock row (platform/locks retries once when the holder lets go mid-take): that try
+ * is made again, and only when every try throws does the error escape, as does one from the insert.
  */
 export function openException(type: ExceptionType, subject: ExceptionSubject): void {
     // Most calls find the exception already open from an earlier run: those need no lock.

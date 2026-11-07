@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { stagesQuery } from './lifecycle'
 import {
     freeStockOf,
+    isClaimable,
+    isFree,
     pickForSparePool,
     planSourcing,
     shortfallOutcome,
@@ -10,6 +12,7 @@ import {
     type PurchaseResult,
     type SourcingRequest,
     type StockCandidate,
+    type StockUnit,
 } from './sourcing'
 
 const depot = { stockroomId: 'depot', stockroomType: 'central_depot', siteId: '' } as const
@@ -74,8 +77,31 @@ describe('planSourcing', () => {
     })
 })
 
+describe('isFree and isClaimable', () => {
+    const unit: StockUnit = { stage: 'available', orderLineId: '', leaseEndAction: '' }
+    const inStock = ['available', 'spare_pool'] as const
+
+    it('takes stock still in one of the stages and on no Order line', () => {
+        expect(isClaimable(unit, inStock)).toBe(true)
+        expect(isClaimable({ ...unit, stage: 'spare_pool', leaseEndAction: 'undecided' }, inStock)).toBe(true)
+        expect(isFree({ ...unit, stage: 'reserved' }, inStock)).toBe(false)
+        expect(isFree({ ...unit, stage: null }, inStock)).toBe(false)
+        expect(isFree({ ...unit, orderLineId: 'line-1' }, inStock)).toBe(false)
+    })
+
+    it('never claims stock of a lease being returned to its Lessor, though it is free', () => {
+        const returning: StockUnit = { ...unit, leaseEndAction: 'return' }
+        expect(isFree(returning, inStock)).toBe(true)
+        expect(isClaimable(returning, inStock)).toBe(false)
+        for (const leaseEndAction of ['undecided', 'extend', 'buyout'] as const) {
+            expect(isClaimable({ ...unit, leaseEndAction }, inStock)).toBe(true)
+        }
+    })
+})
+
 describe('stockQueries', () => {
-    const base = 'model=m1^x_daas_ham_order_lineISEMPTY'
+    const lease = 'x_daas_ham_lease.end_action'
+    const base = `model=m1^x_daas_ham_order_lineISEMPTY^${lease}!=return^OR${lease}ISEMPTY`
     const type = 'stockroom.x_daas_ham_stockroom_type'
     const provider = `${base}^${type}!=customer_site^OR${type}ISEMPTY`
     const free = stagesQuery(['available'], provider)
@@ -95,6 +121,14 @@ describe('stockQueries', () => {
 
     it('asks for free stock only when stock is sought for no Customer (the spare-pool top-up)', () => {
         expect(stockQueries(freeStockOf('m1'))).toEqual([free])
+    })
+
+    it('leaves stock of a lease being returned to its Lessor out of every clause of every query', () => {
+        for (const purpose of ['new', 'replace'] as const) {
+            for (const query of stockQueries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose })) {
+                for (const clause of query.split('^NQ')) expect(clause).toContain(`^${lease}!=return^OR${lease}ISEMPTY`)
+            }
+        }
     })
 })
 

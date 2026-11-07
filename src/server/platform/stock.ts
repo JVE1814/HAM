@@ -1,6 +1,13 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { Stage } from '../domain/lifecycle'
-import { stockQueries, type StockCandidate, type StockroomType, type StockScope } from '../domain/sourcing'
+import {
+    isClaimable,
+    stockQueries,
+    type StockCandidate,
+    type StockroomType,
+    type StockScope,
+    type StockUnit,
+} from '../domain/sourcing'
 import { moveAsset, readStage } from './assets'
 import { withLock, type HeldLock } from './locks'
 import { bool, str } from './records'
@@ -100,8 +107,10 @@ interface Claim {
 
 /**
  * Make `wanted` on an in-stock Asset. Sourcing runs and the spare-pool top-up may pick the same Asset, so the claim is
- * made under a lock on that Asset and checks a fresh read: still in one of the `from` stages, and on no Order line. A
- * run that finds the lock held (or cannot take it, when the holder lets go mid-take) leaves the Asset to the other one.
+ * made under a lock on that Asset and checks a fresh read: still in one of the `from` stages, on no Order line, and not
+ * bound for its Lessor (domain/sourcing `isClaimable`). A run that finds the lock held leaves the Asset to the other
+ * one. Taking the lock throws only when an insert is refused with no lock row (platform/locks retries once when the
+ * holder lets go mid-take); that run logs why and leaves the Asset unclaimed.
  */
 function claim(assetId: string, wanted: Claim): GlideRecord | null {
     let claimed: GlideRecord | null = null
@@ -112,7 +121,7 @@ function claim(assetId: string, wanted: Claim): GlideRecord | null {
             claimed = claimHolding(lock, assetId, wanted)
         })
     } catch (error) {
-        // An error from the claim itself is the claim's to report; one from taking the lock only means not now.
+        // An error from the claim itself is the claim's to report; one from taking the lock leaves the Asset unclaimed.
         if (started) throw error
         gs.warn(`[x_daas_ham] Asset ${assetId} not claimed: ${error instanceof Error ? error.message : String(error)}`)
     }
@@ -126,7 +135,8 @@ function claim(assetId: string, wanted: Claim): GlideRecord | null {
  */
 function claimHolding(lock: HeldLock, assetId: string, wanted: Claim): GlideRecord | null {
     const asset = new GlideRecord('alm_hardware')
-    if (!asset.get(assetId) || !isFree(asset, wanted.from) || !moveAsset(asset, wanted.to).allowed) return null
+    if (!asset.get(assetId) || !isClaimable(stockUnit(asset), wanted.from)) return null
+    if (!moveAsset(asset, wanted.to).allowed) return null
     for (const [field, value] of Object.entries(wanted.values)) asset.setValue(field, value)
     if (!lock.held()) return lockLost(assetId)
     if (!asset.update()) return null
@@ -135,10 +145,13 @@ function claimHolding(lock: HeldLock, assetId: string, wanted: Claim): GlideReco
     return fresh.get(assetId) && shows(fresh, wanted) ? fresh : lockLost(assetId)
 }
 
-/** In one of the `from` stages, and on no Order line. */
-function isFree(asset: GlideRecord, from: readonly Stage[]): boolean {
-    const stage = readStage(asset)
-    return stage !== null && from.includes(stage) && !str(asset, 'x_daas_ham_order_line')
+/** The Asset as domain/sourcing judges whether it is still free stock (`isFree`, `isClaimable`). */
+export function stockUnit(asset: GlideRecord): StockUnit {
+    return {
+        stage: readStage(asset),
+        orderLineId: str(asset, 'x_daas_ham_order_line'),
+        leaseEndAction: str(asset, 'x_daas_ham_lease.end_action') as StockUnit['leaseEndAction'],
+    }
 }
 
 function shows(asset: GlideRecord, wanted: Claim): boolean {

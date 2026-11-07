@@ -193,6 +193,14 @@ function checkRetirement(from: Stage, to: Stage, facts: TransitionFacts): Transi
     return { allowed: true }
 }
 
+/**
+ * Whether a move voids the Asset's wipe evidence: entering staging loads a Customer's configuration, which a wipe
+ * recorded before does not cover. (Receipt from a Site voids it too, in entry/returns.)
+ */
+export function voidsWipeEvidence(from: Stage | null, to: Stage): boolean {
+    return to === 'staging' && from !== 'staging'
+}
+
 export const DEPLOYED_STAGES: readonly Stage[] = [...AT_OR_TOWARDS_SITE]
 
 /** At or on the way to a customer Site and not coming back: what leases, coverage warnings and lifecycle refreshes count as serving. */

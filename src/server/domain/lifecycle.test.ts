@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { billingChange, checkTransition, DEPLOYED_STAGES, fieldsOf, isBillable, isDeployed, SERVING_STAGES, stageOf, stagesQuery, type Stage, type TransitionFacts } from './lifecycle'
+import {
+    billingChange,
+    checkTransition,
+    DEPLOYED_STAGES,
+    fieldsOf,
+    isBillable,
+    isDeployed,
+    SERVING_STAGES,
+    stageOf,
+    stagesQuery,
+    voidsWipeEvidence,
+    type Stage,
+    type TransitionFacts,
+} from './lifecycle'
 
 const deployable: TransitionFacts = {
     hasSite: true,
@@ -105,6 +118,21 @@ describe('checkTransition', () => {
 
     it('accepts a no-op move to the same stage', () => {
         expect(checkTransition('in_service', 'in_service', deployable)).toEqual({ allowed: true })
+    })
+})
+
+describe('voidsWipeEvidence', () => {
+    it("voids it when an asset enters staging from wherever it comes, as it takes a Customer's configuration", () => {
+        for (const from of ['available', 'reserved', 'spare_pool', null] as const) {
+            expect(voidsWipeEvidence(from, 'staging')).toBe(true)
+        }
+    })
+
+    it('leaves it on every other move, and on staying in staging', () => {
+        expect(voidsWipeEvidence('staging', 'staging')).toBe(false)
+        expect(voidsWipeEvidence('staging', 'pending_evaluation')).toBe(false)
+        expect(voidsWipeEvidence('pending_wipe', 'pending_disposal')).toBe(false)
+        expect(voidsWipeEvidence('pending_evaluation', 'available')).toBe(false)
     })
 })
 

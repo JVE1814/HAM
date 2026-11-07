@@ -8,6 +8,7 @@ import {
     type Stage,
     type TransitionFacts,
     type TransitionVerdict,
+    voidsWipeEvidence,
 } from '../domain/lifecycle'
 import { str } from './records'
 
@@ -27,15 +28,21 @@ export function transitionFacts(asset: GlideRecord): TransitionFacts {
 }
 
 /**
- * Move an Asset to `to` if the lifecycle allows it (set its fields; the caller saves the record).
+ * Move an Asset to `to` if the lifecycle allows it (set its fields; the caller saves the record). A move into staging
+ * also clears the wipe evidence (domain/lifecycle `voidsWipeEvidence`), so every path that stages an Asset does.
  * `force` lets administrators correct assets in stages the app does not model.
  */
 export function moveAsset(asset: GlideRecord, to: Stage, options: { force?: boolean } = {}): TransitionVerdict {
-    const verdict = options.force ? ({ allowed: true } as const) : checkTransition(readStage(asset), to, transitionFacts(asset))
+    const from = readStage(asset)
+    const verdict = options.force ? ({ allowed: true } as const) : checkTransition(from, to, transitionFacts(asset))
     if (verdict.allowed) {
         const fields = fieldsOf(to)
         asset.setValue('install_status', fields.installStatus)
         asset.setValue('substatus', fields.substatus ?? '')
+        if (voidsWipeEvidence(from, to)) {
+            asset.setValue('x_daas_ham_wiped_on', '')
+            asset.setValue('x_daas_ham_wipe_certificate', '')
+        }
     }
     return verdict
 }

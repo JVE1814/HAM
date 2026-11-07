@@ -1,5 +1,6 @@
 import type { LineStage } from './fulfilment'
-import { stagesQuery } from './lifecycle'
+import type { LeaseEndAction } from './leases'
+import { stagesQuery, type Stage } from './lifecycle'
 import type { ShortfallRoute } from './returns'
 
 /**
@@ -66,14 +67,43 @@ export function freeStockOf(modelId: string): StockScope {
     return { modelId, customerId: '', siteId: '', purpose: 'new' }
 }
 
+/** The end action of a lease whose units go back to its Lessor. */
+const RETURNING: LeaseEndAction = 'return'
+
+/** An in-stock Asset as a fresh read shows it, to decide whether it may still be claimed or withdrawn. */
+export interface StockUnit {
+    stage: Stage | null
+    /** The Order line it is on; '' for none. */
+    orderLineId: string
+    /** Its lease's end action; '' without a lease. */
+    leaseEndAction: LeaseEndAction | ''
+}
+
+/** In one of the `from` stages and on no Order line: nothing has taken it since it was found. */
+export function isFree(unit: StockUnit, from: readonly Stage[]): boolean {
+    return unit.stage !== null && from.includes(unit.stage) && !unit.orderLineId
+}
+
+/**
+ * Free, and not bound for its Lessor (on a lease being returned). A returned lease's units can reach free stock after
+ * the decision (a swapped-back unit evaluated as refurbish, a released reservation), so this check on the claim's fresh
+ * read is the guard that holds; `stockQueries` leaves them out too.
+ */
+export function isClaimable(unit: StockUnit, from: readonly Stage[]): boolean {
+    return isFree(unit, from) && unit.leaseEndAction !== RETURNING
+}
+
 /**
  * Encoded alm_hardware queries for the stock that may serve `scope`, one per Source in priority order, so a limit on
  * each cuts within its Source only and other Customers' spares never crowd it out: the Customer's site stockroom
  * stock at the Site or one of its Rooms (replacements), its Spare pool, and free stock outside customer-site
- * stockrooms. Stock on an Order line is never a candidate. `sourceOf` still decides each one.
+ * stockrooms. Stock on an Order line or bound for its Lessor (`isClaimable`) is never a candidate. `sourceOf` still
+ * decides each one.
  */
 export function stockQueries(scope: StockScope): string[] {
-    const base = `model=${scope.modelId}^x_daas_ham_order_lineISEMPTY`
+    // Not left to how != treats empty values either: stock on no lease has no end action.
+    const lease = 'x_daas_ham_lease.end_action'
+    const base = `model=${scope.modelId}^x_daas_ham_order_lineISEMPTY^${lease}!=${RETURNING}^OR${lease}ISEMPTY`
     const type = 'stockroom.x_daas_ham_stockroom_type'
     // Not left to how != treats empty values: stock in a stockroom with no type, or in none, counts as a depot's.
     const provider = `${base}^${type}!=customer_site^OR${type}ISEMPTY`

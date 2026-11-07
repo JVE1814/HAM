@@ -16,6 +16,7 @@ import {
     type LeaseEndAction,
 } from '../domain/leases'
 import { isRetired, SERVING_STAGES, stagesQuery, type Stage } from '../domain/lifecycle'
+import { isFree } from '../domain/sourcing'
 import { providerApproverIds } from '../platform/approvals'
 import { moveAsset, readStage } from '../platform/assets'
 import { runEventTableJob } from '../platform/chunked'
@@ -24,6 +25,7 @@ import { EVENT, fire } from '../platform/events'
 import { refreshLifecycleDates } from '../platform/lifecycle-dates'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties'
 import { bool, count, exists, findById, num, str } from '../platform/records'
+import { stockUnit } from '../platform/stock'
 
 /** Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
 
@@ -181,15 +183,20 @@ interface StockReturn {
  * Take the lease's stock out of circulation onto a draft return-to-lessor disposal: each unit is saved at pending
  * wipe, so sourcing and the spare-pool top-up can no longer claim it, and only then gets its line. A hot spare already
  * linked to an Order line is left to that line; once at a Site, its Refresh due date is the lease end like the rest.
+ * Each unit is read again and moved only while still free, so one reserved since the query keeps its reservation. No
+ * lock is taken: the return is saved first, and from then on sourcing and the top-up refuse the lease's units on their
+ * own fresh read (domain/sourcing `isClaimable`).
  */
 function disposeStockToLessor(lease: GlideRecord): StockReturn {
-    const asset = new GlideRecord('alm_hardware')
+    const found = new GlideRecord('alm_hardware')
     const unclaimed = `x_daas_ham_lease=${lease.getUniqueValue()}^x_daas_ham_order_lineISEMPTY`
-    asset.addEncodedQuery(stagesQuery(IN_STOCK, unclaimed))
-    asset.query()
+    found.addEncodedQuery(stagesQuery(IN_STOCK, unclaimed))
+    found.query()
     let order: GlideRecord | null = null
     let refused = 0
-    while (asset.next()) {
+    while (found.next()) {
+        const asset = findById('alm_hardware', found.getUniqueValue())
+        if (!asset || !isFree(stockUnit(asset), IN_STOCK)) continue
         if (!withdrawFromStock(asset)) {
             refused++
             continue
