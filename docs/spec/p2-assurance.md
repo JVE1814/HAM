@@ -6,6 +6,9 @@
 - **Start site audit** on a Site lists its installed Assets and dispatches a site-audit work order
   under a standard change.
 - Technicians scan in the warehouse app's **Audit** mode. Scans are blind: no unit details are shown.
+- An inventory tech sees, scans and closes only the blind counts of their Stockrooms; site audits are
+  for field techs. Other staff work on any open audit. An audit the user may not see answers *No open
+  audit with that number*.
 - **Close audit**:
   - scans are matched to expected Assets by serial, provider tag or customer tag (case-insensitive);
   - unmatched expected Assets become *missing in audit* exceptions;
@@ -18,6 +21,9 @@
   an attestation when:
   - none is open; and
   - the last one was attested more than the interval ago (or never).
+- A Site has one attestation at a time, listing every Asset installed there, whichever Agreement it
+  is under. A Site served by several attesting Agreements follows the shortest of their intervals, and
+  the attestation records the Agreement whose interval raised it.
 - It is assigned to a Customer admin.
 - Customer admins answer each device (present / not present / don't know) on the customer page and
   submit once all are answered. *Not present* answers become *customer reports missing* exceptions.
@@ -46,6 +52,9 @@ Network-gear CIs discovered recently with no Asset raise *seen without asset*.
   Site's rooms. Colours are by stage, customer, or risk:
   - *high*: past end of support, or no current coverage;
   - *medium*: end of sale, or refresh due within 180 days.
+- The page and its endpoints show Customer contacts only the racks at Sites they can see (their
+  Customer's; a Site contact's own Sites). Other Sites and racks answer *not found*. Staff see every
+  Site.
 
 ## Customer self-service (D49)
 
@@ -58,3 +67,7 @@ portal menu. Visibility rules limit everything to the user's Customer (Site cont
 | Customer admins | request returns of selected devices or a site decommission; answer attestations |
 
 New equipment is ordered through the *Request network equipment* catalog item.
+
+On the Order form too, Customer contacts can use *Confirm installed* only on self-install Orders; asset
+managers and field techs confirm any Order being installed (for instance when its work order was closed
+elsewhere).

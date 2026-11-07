@@ -5,7 +5,8 @@
 - A CSM case names the **failed asset**. The case takes the Agreement's replacement service level
   and the Asset's Customer.
 - **Raise replacement** (NOC, asset manager, CSM agent) creates a *device replace* Order: one line,
-  same Model, *replaces asset* = the failed unit. The Order is submitted at once.
+  same Model, *replaces asset* = the failed unit. The Order is submitted at once; one that Submit
+  refuses (ordering spec) stays a draft, linked to the case, to correct and submit.
 - Replacement lines skip the entitlement checks: a like-for-like swap is not a new catalog choice and
   adds no usage.
 - Sourcing follows the replacement priority: hot spare at the Site → Spare pool → central stock.
@@ -37,12 +38,15 @@
 - An Asset already awaiting another return is not added again; completing an install twice raises
   one return. A return with nothing to bring back closes at once (a temporary Order still being
   installed waits until its equipment is installed or its end date passes).
-- Devices chosen on the record producer must be at the chosen Site; others are ignored.
+- A site decommission, from the record producer or the customer page, returns everything installed at
+  the Site (in service, temporary, pending in service), whatever devices the request lists.
+- Devices chosen for a device removal must be at the chosen Site; others are ignored.
 - Field de-install opens a normal change and a de-install work order. Ship-back relies on the Site
   contact.
 - **Receipt** at the depot (warehouse app, Receive), for units pending return (or missing):
   - the unit goes to *pending evaluation* and leaves its Site, Rack position and subscription line;
-  - a site package with no Assets left ends that day;
+  - a site package with no Assets left ends that day (all its units count, not only those the
+    receiving tech can see);
   - a unit received after the due date incurs a **late-return fee**;
   - a unit declared missing that turns up settles its line again: the open lost-asset fee is
     waived, the late-return fee applies, and the Return order reopens for evaluation.
@@ -71,7 +75,8 @@
 - **Successor model**: the same Model while it is a current catalog entry and not past end of sale.
   Otherwise, the catalogued Model of the same device class with the latest end of support.
 - Waves where some Asset has no successor stay **draft** with a work note for review. All others are
-  submitted (within the agreement) and fulfilled like any Order.
+  submitted (within the agreement) and fulfilled like any Order; one that Submit refuses stays a draft
+  with the reasons in its work notes.
 - Shipping opens a **normal** change for the Customer's approval inside the maintenance window.
 
 ## Disposal (D61)

@@ -80,7 +80,7 @@ Then configure (System Properties, `x_daas_ham.*`):
 | `x_daas_ham.provider_company` | sys_id of the provider's own `core_company` (company of unassigned stock) |
 | `x_daas_ham.staging.default_stockroom` | sys_id of the staging-centre stockroom |
 | `x_daas_ham.tag.prefix` / `.digits` | provider tag format (default `NAAS-0000001`) |
-| `x_daas_ham.job.batch_size` / `.budget_seconds` | chunked-job tuning (defaults 500 / 120 s) |
+| `x_daas_ham.job.batch_size` / `.budget_seconds` | chunked-job tuning (defaults 500 / 120 s; a batch size below 1 counts as 1, and a budget of 0 or less handles one record per run) |
 | `x_daas_ham.events.max_batch` / `.retention_days` | NMS event API limits (500 / 90 days) |
 | `x_daas_ham.spare_pool.auto_purchase` | `true` to raise POs for spare-pool shortfalls |
 | `x_daas_ham.oem.<vendor>.enabled`, `x_daas_ham.meraki.*`, `x_daas_ham.mist.*` | OEM API access, see [OEM spec](docs/spec/p2-oem.md) |
@@ -188,7 +188,9 @@ What remains can only be confirmed on an instance or behind a vendor login:
   before the first install, and if it exists drop the app's `pending_evaluation` choice (and its
   `keys.ts` entry) and map the stage to the out-of-box value.
 - **Cross-scope access**: the privileges in `security/cross-scope.now.ts` match the scopes the instance
-  reports (`alm_hardware`, `change_request`, `wm_order`, `proc_po`, `sys_attachment`, ...).
+  reports (`alm_hardware`, `change_request`, `wm_order`, `proc_po`, `sys_attachment`, ...), including
+  delete on `alm_transfer_order`, its lines and `proc_po`, which sourcing uses to remove a transfer order
+  or purchase order created only in part (otherwise the line's sourcing summary names it for cancelling).
 - **Procurement and FSM data**: the stored `proc_po` / `proc_po_item` status values and column names,
   `wm_order` state 3 = Closed Complete, and `last_discovered` / `discovery_source` as your connectors
   write them.
@@ -200,10 +202,30 @@ What remains can only be confirmed on an instance or behind a vendor login:
   need `/v1/tracking/start`.
 - **Job lock** (margin recomputes, ADR 0013): *Job lock* shows a unique database index on *Lock*; a
   second row with the same name is refused (`GlideRecord.insert()` returns no sys_id) without throwing,
-  and the `x_daas_ham.margin.compute` event still ends as processed (one *Unique Key violation* error in
-  the system log per contention is expected); a lock row created over 10 minutes ago is cleared by the
-  next recompute and a fresh one is not; a chunk that finds the lock held runs again about a minute
-  later; and no lock row is left once a recompute completes.
+  and the `x_daas_ham.margin.compute` event still ends as processed (a refused take tries the insert
+  twice, before and after clearing abandoned locks, so two *Unique Key violation* errors in the system
+  log per refused take are expected); a lock row created over 10 minutes ago is cleared by the next
+  recompute and a fresh one is not; a chunk that finds the lock held runs again about a minute later; a
+  recompute whose lock was cleared while it was writing logs a *job lock lost while writing* warning and
+  starts a fresh pass, which recomputes the period from scratch; and no lock row is left once a
+  recompute completes.
+- **Provider tag counter** (warehouse Receive): the counter is advanced under the job lock
+  `provider_tag_sequence`, so two units received at the same moment get different tags. A receipt that
+  finds the lock held 5 times in a row answers HTTP 503 *Other receipts are taking Provider tags: scan
+  again* and leaves the unit unreceived; each refused try logs two *Unique Key violation* errors (up to
+  10 for one 503), and so does a try that meets the lock being released.
+- **Inventory tech access** (ADR 0005), also after upgrading an existing install: the ACLs that
+  `security/acls*.now.ts` give `broadStaff` (agreements, subscription lines, catalog entries, site
+  templates, fee events, attestations, leases, OEM coverage and cloud accounts, model data, device
+  events, reconciliation exceptions, stockroom members, ...) no longer list `x_daas_ham.inventory_tech`
+  in `sys_security_acl_role`. Impersonating an inventory-tech-only user, the Agreements list is denied,
+  other stockrooms' blind counts and site audits are not listed, and in the warehouse app receiving one
+  returned unit of a multi-unit site package keeps its subscription line active, receiving the last one
+  ends it, and a late one records the late-return fee.
+- **Order create rule in jobs**: an Order is submitted only when its user passes the Order create rule
+  (`GlideRecord.canCreate()`). The daily job *NaaS - raise refresh orders* relies on its *Run as* user
+  (expected to be the system user) passing it; one without an Order raiser role leaves its refresh
+  Orders as drafts with the work note *You may not raise orders*.
 - **Scale**: before-query rule performance and the chunked jobs at your data volumes (indexes are
   declared on the scoped columns).
 - **Currency**: amounts are written in each line's currency (default EUR); confirm the session

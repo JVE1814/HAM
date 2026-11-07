@@ -9,6 +9,16 @@
   temporary deployment) and Install mode.
 - Lines come from the chosen Site template (its non-optional items, flagged *from site template*)
   plus any individual device rows.
+- Only Order raisers raise Orders (the Order create rule: asset managers, account managers, NOC, the
+  service desk and Customer admins); site contacts never do. A Customer admin orders only for their
+  own Customer.
+- The Agreement must be the Customer's, the Site one of the Customer's Sites, and the Site template the
+  Customer's own or one offered to every Customer. **Submit** checks both rules every time, break-fix
+  and refresh Orders included: otherwise the Order stays a draft, the user is told why and the reasons
+  go in its work notes.
+- Through the record producer, an Order its requester may not raise is removed again. One that names
+  records not of its Customer stays a draft with its lines (except those of a Site template not offered
+  to the Customer), to correct and submit.
 
 ## Entitlement (`domain/entitlement.ts`)
 
@@ -48,15 +58,21 @@
 
 - Another Customer's spares are never used. Picks are ordered by stockroom, then asset, for
   determinism.
-- Reserved Assets take the Customer as `company` and the Agreement (ADR 0006); in-house stock moves to
-  *staging* with a Staging task. Stock outside the staging centre gets a transfer order to it.
+- Reserved Assets take the Customer as `company` and the Agreement (ADR 0006); in-house stock at the
+  staging centre moves to *staging* at once, with a Staging task.
+- Stock outside the staging centre is reserved and gets a transfer order to it, and only then its
+  Staging task and the move to *staging*. If Inventory does not create the transfer order or all its
+  lines, what was created is removed (or named in the summary for cancelling) and the stock is put back:
+  Spare-pool stock to the pool, the rest to free stock. That stock is not bought: the line waits for
+  stock, its sourcing summary says why, and it picks the stock again when next sourced.
 - Hot spares at the site stay in the Spare pool, linked to the line, and are installed from where
   they are.
 - Shortfalls become one requested purchase order per line (ship to the staging centre); received units
   of that PO are allocated to the line on receipt.
 - Without a staging stockroom (`x_daas_ham.staging.default_stockroom`) no purchase order is requested, and a
-  line whose purchase order Procurement does not create is treated the same way: the line waits for stock and
-  its sourcing summary says why. The spare-pool top-up then buys nothing and logs a warning.
+  line whose purchase order Procurement does not create, or creates without its line item (that PO is removed
+  again, or named for cancelling), is treated the same way: the line waits for stock and its sourcing summary
+  says why. The spare-pool top-up then buys nothing and logs a warning.
 - Re-sourcing a line only covers `quantity − allocated − on order`.
 - Several source stockrooms give several transfer orders, all listed on the line.
 - A failed staging takes the Asset off the line, which goes back to awaiting stock and is re-sourced.

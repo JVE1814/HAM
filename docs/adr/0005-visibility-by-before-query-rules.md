@@ -5,3 +5,13 @@ Customer (and Site contacts only their Sites). This is enforced by before-query 
 add indexed filters, backed by ACLs. ACL-only row filtering at 100k–1M Assets produces slow lists and
 "rows removed by security constraints" gaps. Provider staff other than inventory techs see all
 Customers; per-account-team scoping is deliberately left out until a contract demands it.
+
+The rules only narrow rows. For inventory techs they filter the tables that carry a Stockroom: stock,
+Stockrooms, transfer orders, Staging tasks, and Audits with their lines (a site audit has no Stockroom,
+so it drops out). The other tables of their work, such as Orders, Shipments and Return orders, serve
+every Customer and are not narrowed. Tables a role may not read at all (for inventory techs, the
+customer, commercial and configuration tables) are closed by the read ACLs' role lists, not by a
+match-nothing filter: a before-query rule also applies to the server logic the user's actions set off.
+Receiving a returned Asset, for example, reads and can end its Subscription line and record a
+late-return Fee event. Server logic that must count past the user's rules, such as the units of a site
+package still at the Site, queries with business rules off.

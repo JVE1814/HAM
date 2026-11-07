@@ -55,9 +55,11 @@ Closing a period (or **Recompute margin** on a closed one) rebuilds its **Cost f
 - Costs use the Assets' current ownership, cost and coverage: *Recompute margin* on an old period
   reflects today's data. A recompute started while another is running supersedes it: the new one
   starts afresh and the older one writes nothing more (its start, each batch it writes and its
-  completion take a job lock, ADR 0013), so the latest recompute's results are the ones left. Service intervals
-  that fail to cost are left out, counted on the period (*Service intervals that failed to cost*) with
-  the last error (*Last margin error*); both are cleared when a recompute starts.
+  completion take a job lock, ADR 0013), so the latest recompute's results are the ones left. One that
+  held the lock so long that it was taken as abandoned and cleared writes nothing more and starts the
+  recompute over, so the period is recomputed from scratch. Service intervals that fail to cost are
+  left out, counted on the period (*Service intervals that failed to cost*) with the last error (*Last
+  margin error*); both are cleared when a recompute starts.
 - While a buyout transfer is still running, a lease's payment keeps being split over the Assets it
   covered when the buyout was decided.
 - **Revenue** is the period's billing lines (subscriptions per Site, fees at Customer level).
