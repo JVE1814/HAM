@@ -36,7 +36,7 @@ UiAction({
     condition: "current.status == 'closed'",
     roles: [finance],
     form: { showButton: true },
-    showUpdate: false,
+    showUpdate: true,
     script: uiRecomputeMargin,
 })
 
