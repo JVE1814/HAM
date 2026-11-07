@@ -100,11 +100,18 @@ export const returnEvaluationTest = Test(
             table: 'customer_account',
             fieldValues: { name: 'ATF Return Customer', customer: true },
         })
+        // The tech sees only the Assets of their Stockrooms (ADR 0005), so the unit waits in a depot they work at.
+        const depot = atf.server.recordInsert({
+            $id: Now.ID['atf_rev_stockroom'],
+            table: 'alm_stockroom',
+            fieldValues: { name: 'ATF Return Depot', x_daas_ham_stockroom_type: 'central_depot' },
+        })
         const asset = atf.server.recordInsert({
             $id: Now.ID['atf_rev_asset'],
             table: 'alm_hardware',
             fieldValues: {
                 serial_number: 'ATF-REV-0001',
+                stockroom: depot.record_id,
                 company: customer.record_id,
                 install_status: 6,
                 substatus: 'pending_evaluation',
@@ -122,7 +129,19 @@ export const returnEvaluationTest = Test(
             table: 'x_daas_ham_return_order_line',
             fieldValues: { return_order: returnOrder.record_id, asset: asset.record_id, status: 'received' },
         })
-        atf.server.createUser({ $id: Now.ID['atf_rev_user'], firstName: 'ATF', lastName: 'Inventory Tech', roles: [inventoryTech] })
+        const tech = atf.server.createUser({
+            $id: Now.ID['atf_rev_user'],
+            firstName: 'ATF',
+            lastName: 'Inventory Tech',
+            roles: [inventoryTech],
+            impersonate: false,
+        })
+        atf.server.recordInsert({
+            $id: Now.ID['atf_rev_member'],
+            table: 'x_daas_ham_stockroom_member',
+            fieldValues: { user: tech.user, stockroom: depot.record_id },
+        })
+        atf.server.impersonate({ $id: Now.ID['atf_rev_impersonate'], user: tech.user })
         atf.server.recordUpdate({
             $id: Now.ID['atf_rev_evaluate'],
             table: 'x_daas_ham_return_order_line',

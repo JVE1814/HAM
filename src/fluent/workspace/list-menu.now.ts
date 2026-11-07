@@ -4,7 +4,7 @@ import { accountManager, admin, assetManager, fieldTech, finance, inventoryTech,
 
 /* Lists of the NaaS asset workspace, grouped by the job they serve. */
 
-/** Every provider-staff role, for the lists of tables inventory techs also read (INVENTORY_TECH_TABLES in domain/visibility.ts). */
+/** Every provider-staff role, for the lists of tables inventory techs also read: INVENTORY_TECH_TABLES in domain/visibility.ts, and the platform's cmdb_model. */
 export const staffAudience = Applicability({
     $id: Now.ID['ws_audience_staff'],
     name: 'NaaS provider staff',
