@@ -85,8 +85,8 @@ function upsertLifecycle(modelId: string, incoming: LifecycleDates, vendor: OemV
 /**
  * Every 4 hours: OEM coverage of assets not checked for x_daas_ham.oem.coverage_refresh_days, oldest
  * first, until the time budget is spent (a rate-limited vendor: one batch of its maxKeysPerRun). Checked
- * assets drop out of the query, so no cursor is needed. A batch reads its stored coverage, its serials'
- * contracts and the Assets with one query each.
+ * assets drop out of the query, so no cursor is needed. A batch reads and writes its serials' stored
+ * coverage with one query, and updates its Assets from another.
  */
 export function syncOemCoverage(): void {
     const started = nowMs()
@@ -116,8 +116,9 @@ export function syncOemCoverage(): void {
                 for (const fact of disposition.facts) answers.push({ assetId: lastAsset, fact })
             }
             const checkedAt = msToGlide(nowMs())
-            writeCoverage(vendor, 'api', answers, checkedAt)
-            refreshAssetCoverage(answered, stamped, checkedAt)
+            const serials = [...new Set(answered.values())]
+            const contracts = writeCoverage(vendor, 'api', serials, answers, checkedAt)
+            refreshAssetCoverage(answered, coverageBySerial(serials, contracts, todayIso()), stamped, checkedAt)
             // A batch with errors ends the vendor's run; a rate-limited vendor gets one batch per run.
             if (result.errors.length > 0 || route.maxKeysPerRun !== undefined) break
         }
@@ -140,29 +141,44 @@ function staleAssets(vendor: OemVendor, staleBefore: string, limit: number): Map
 }
 
 /**
- * Write the answered contracts onto their coverage records, found by serial and contract number with one query
- * for all the answers' serials (of duplicate stored records, the first found is updated) and created when missing.
- * Answers for the same contract are set on its record one after the other and saved once.
+ * Write the answered contracts of `serials` (normalised) onto their coverage records, found by serial and
+ * contract number with one query (of duplicate stored records, the first found is updated) and created when
+ * missing; answers for the same contract are set on its record one after the other and saved once. Returns
+ * every stored contract of `serials` as it is after the write, which the Assets are summarised from.
  */
-function writeCoverage(vendor: OemVendor, source: 'api' | 'csv', answers: readonly CoverageAnswer[], checkedAt: string): void {
+function writeCoverage(vendor: OemVendor, source: 'api' | 'csv', serials: readonly string[], answers: readonly CoverageAnswer[], checkedAt: string): SerialCoverage[] {
+    const contracts: SerialCoverage[] = []
+    if (serials.length === 0) return contracts
     const pending = answersByContract(answers)
-    if (pending.size === 0) return
     const stored = new GlideRecord('x_daas_ham_oem_coverage')
-    addAnyOf(stored, 'serial_number', [...new Set(answers.map((answer) => normalizeSerial(answer.fact.serial)))])
+    addAnyOf(stored, 'serial_number', serials)
     stored.query()
     while (stored.next()) {
         const key = contractKey(str(stored, 'serial_number'), str(stored, 'contract_number'))
         const contractAnswers = pending.get(key)
-        if (!contractAnswers) continue
-        pending.delete(key)
-        for (const answer of contractAnswers) setCoverage(stored, vendor, source, answer, checkedAt)
-        stored.update()
+        if (contractAnswers) {
+            pending.delete(key)
+            for (const answer of contractAnswers) setCoverage(stored, vendor, source, answer, checkedAt)
+            stored.update()
+        }
+        contracts.push(contractOf(stored))
     }
     for (const contractAnswers of pending.values()) {
         const fresh = new GlideRecord('x_daas_ham_oem_coverage')
         fresh.initialize()
         for (const answer of contractAnswers) setCoverage(fresh, vendor, source, answer, checkedAt)
-        fresh.insert()
+        if (fresh.insert()) contracts.push(contractOf(fresh))
+    }
+    return contracts
+}
+
+function contractOf(coverage: GlideRecord): SerialCoverage {
+    return {
+        serial: str(coverage, 'serial_number'),
+        covered: bool(coverage, 'covered'),
+        endDate: str(coverage, 'end_date') || undefined,
+        serviceLevel: str(coverage, 'service_level'),
+        annualCost: num(coverage, 'annual_cost'),
     }
 }
 
@@ -189,14 +205,12 @@ function setCoverage(coverage: GlideRecord, vendor: OemVendor, source: 'api' | '
 }
 
 /**
- * Re-summarise each answered Asset (by sys_id, with its normalised serial) from its serial's coverage contracts,
- * and stamp it and each `stamped` Asset (the vendor answered with an error: its coverage is kept) checked, with
- * one query for the contracts and one for the Assets.
+ * Give each answered Asset (by sys_id, with its normalised serial) its serial's coverage, and stamp it and each
+ * `stamped` Asset (the vendor answered with an error: its coverage is kept) checked, with one query for the Assets.
  */
-function refreshAssetCoverage(answered: ReadonlyMap<string, string>, stamped: readonly string[], checkedAt: string): void {
+function refreshAssetCoverage(answered: ReadonlyMap<string, string>, coverageOf: ReadonlyMap<string, AssetCoverage>, stamped: readonly string[], checkedAt: string): void {
     const ids = [...answered.keys(), ...stamped]
     if (ids.length === 0) return
-    const coverageOf = readCoverageBySerial([...new Set(answered.values())])
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery('sys_id', 'IN', ids.join(','))
     asset.query()
@@ -211,26 +225,6 @@ function refreshAssetCoverage(answered: ReadonlyMap<string, string>, stamped: re
         asset.setValue('x_daas_ham_coverage_checked', checkedAt)
         asset.update()
     }
-}
-
-/** The coverage of each of `serials` (normalised), summarised from its stored contracts read with one query. */
-function readCoverageBySerial(serials: readonly string[]): Map<string, AssetCoverage> {
-    const contracts: SerialCoverage[] = []
-    if (serials.length > 0) {
-        const coverage = new GlideRecord('x_daas_ham_oem_coverage')
-        addAnyOf(coverage, 'serial_number', serials)
-        coverage.query()
-        while (coverage.next()) {
-            contracts.push({
-                serial: str(coverage, 'serial_number'),
-                covered: bool(coverage, 'covered'),
-                endDate: str(coverage, 'end_date') || undefined,
-                serviceLevel: str(coverage, 'service_level'),
-                annualCost: num(coverage, 'annual_cost'),
-            })
-        }
-    }
-    return coverageBySerial(serials, contracts, todayIso())
 }
 
 /** Hourly: status of open OEM RMAs for vendors with an RMA lookup API. */
@@ -286,7 +280,7 @@ export function processCoverageRow(current: GlideRecord): void {
         endDate: end || undefined,
     }
     const checkedAt = msToGlide(nowMs())
-    writeCoverage(vendor, 'csv', [{ assetId, fact, annualCost: cost ? Number(cost) : undefined }], checkedAt)
-    refreshAssetCoverage(new Map([[assetId, serial]]), [], checkedAt)
+    const contracts = writeCoverage(vendor, 'csv', [serial], [{ assetId, fact, annualCost: cost ? Number(cost) : undefined }], checkedAt)
+    refreshAssetCoverage(new Map([[assetId, serial]]), coverageBySerial([serial], contracts, todayIso()), [], checkedAt)
     finish('inserted', `Coverage for ${serial}`)
 }
