@@ -52,7 +52,7 @@ export function afterReturnProduced(producer: Record<string, unknown>, current: 
     }
     const decommission = str(order, 'trigger') === 'site_decommission'
     const siteId = str(order, 'site')
-    // Only devices actually at the chosen Site: the list collector cannot be qualified by the Site.
+    // Only devices actually at the chosen Site: the list collector's Site qualifier holds only in the browser.
     const chosen = String(producer.assets ?? '')
         .split(',')
         .map((id) => id.trim())
@@ -246,9 +246,10 @@ export function raiseScheduledReturns(): void {
         // One Return per Site, each a field de-install with its own change and work order there. Units still shipped
         // there go too (domain/returns `SITE_RECOVERY_STAGES`): the job does not look at this Agreement again.
         const bySite = installedAssetIdsBySite({ agreementId: agreement.getUniqueValue(), wholeSite: true })
+        let refused = false
         for (const [siteId, assetIds] of bySite) {
             const site = findById('cmn_location', siteId)
-            raiseReturn({
+            const returnId = raiseReturn({
                 trigger: 'agreement_end',
                 customerId: str(agreement, 'customer'),
                 siteId,
@@ -258,7 +259,10 @@ export function raiseScheduledReturns(): void {
                 openFieldWork: true,
                 description: site ? `${recover} from ${str(site, 'name')}` : recover,
             })
+            if (!returnId) refused = true
         }
+        // A refused Return is raised on the next run; the Sites raised now are pending return and not found again.
+        if (refused) continue
         agreement.setValue('end_return_raised', true)
         agreement.update()
     }
@@ -279,7 +283,7 @@ export function raiseScheduledReturns(): void {
         // Still being installed and not yet ended: wait for the equipment to arrive before raising.
         if (assetIds.length === 0 && str(order, 'stage') === 'installing' && str(order, 'end_date') >= today) continue
         if (assetIds.length > 0) {
-            raiseReturn({
+            const returnId = raiseReturn({
                 trigger: 'temporary_end',
                 customerId: str(order, 'customer'),
                 siteId: str(order, 'site'),
@@ -290,6 +294,8 @@ export function raiseScheduledReturns(): void {
                 openFieldWork: true,
                 description: `Temporary deployment ${str(order, 'number')} ends ${str(order, 'end_date')}`,
             })
+            // Refused: raised on the next run.
+            if (!returnId) continue
         }
         order.setValue('return_raised', true)
         order.update()

@@ -9,7 +9,7 @@ import { ROLE, visibilityFilter } from '../domain/visibility'
 import { customerAdminIds } from '../platform/approvals'
 import { runTableJob } from '../platform/chunked'
 import { glideToIsoDate, glideToMs, nowMs, todayIso } from '../platform/clock'
-import { openChange, openWorkOrder } from '../platform/field-work'
+import { openFieldWork } from '../platform/field-work'
 import { openException, resolveExceptions } from '../platform/exceptions'
 import { intProperty, PROPERTY } from '../platform/properties'
 import { exists, num, str } from '../platform/records'
@@ -59,7 +59,8 @@ export function uiStartSiteAudit(current: GlideRecord): void {
     audit.setValue('customer', str(current, 'company'))
     audit.setValue('short_description', `Site audit of ${str(current, 'name')}`)
     audit.setValue('state', 2)
-    const auditId = audit.insert() ?? ''
+    const auditId = audit.insert()
+    if (!auditId) return void gs.addErrorMessage(`Site audit not started: ${audit.getLastErrorMessage() || 'save refused'}`)
     const assets = installedAssetIds({ siteId: current.getUniqueValue() })
     for (const assetId of assets) expectedLine(auditId, assetId)
     const context = {
@@ -68,8 +69,10 @@ export function uiStartSiteAudit(current: GlideRecord): void {
         description: `Site audit ${str(audit, 'number')} at ${str(current, 'name')}`,
         source: { field: 'x_daas_ham_audit' as const, id: auditId },
     }
+    const work = openFieldWork(context, { changeType: 'standard', purpose: 'site_audit', subcontracted: false })
     audit.setValue('expected_count', assets.length)
-    audit.setValue('work_order', openWorkOrder(context, 'site_audit', openChange(context, 'standard'), false))
+    if (work) audit.setValue('work_order', work.workOrderId)
+    else gs.addErrorMessage(`No work order for ${str(audit, 'number')} (see the system log): open one by hand`)
     audit.update()
 }
 

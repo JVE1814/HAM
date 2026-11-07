@@ -4,7 +4,8 @@ import { afterReturnProduced } from '../../server/entry/returns'
 
 /*
  * "Return or decommission equipment": customer admins and the service desk raise returns (D60). The Site choices follow
- * the chosen Customer; submitting checks the same again, and that the requester may raise it (domain/returns returnRequestFindings).
+ * the chosen Customer and the device choices the chosen Site; submitting checks the same again, and that the requester
+ * may raise it (domain/returns returnRequestFindings).
  */
 
 export const requestReturn = CatalogItemRecordProducer({
@@ -48,7 +49,9 @@ export const requestReturn = CatalogItemRecordProducer({
         assets: ListCollectorVariable({
             question: 'Devices to return (selected devices only)',
             listTable: 'alm_hardware',
-            referenceQual: "install_status=1^x_daas_ham_siteISNOTEMPTY",
+            // The chosen Site's devices (none before a Site is chosen); submitting checks the same again.
+            referenceQual: "javascript:'install_status=1^x_daas_ham_siteISNOTEMPTY^x_daas_ham_site=' + current.variables.site",
+            attributes: 'ref_qual_elements=site',
             order: 400,
         }),
         method: SelectBoxVariable({

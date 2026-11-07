@@ -1,4 +1,5 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
+import { str } from './records'
 
 /**
  * On-site work: an FSM work order (wm_order) and the change request it runs under (D57).
@@ -16,26 +17,57 @@ export interface WorkContext {
     source: { field: 'x_daas_ham_order' | 'x_daas_ham_return_order' | 'x_daas_ham_audit'; id: string }
 }
 
-export function openChange(context: WorkContext, type: 'standard' | 'normal'): string {
-    const change = new GlideRecord('change_request')
-    change.initialize()
-    change.setValue('type', type)
-    change.setValue('short_description', context.description)
-    change.setValue('company', context.customerId)
-    change.setValue('location', context.siteId)
-    change.setValue(context.source.field, context.source.id)
-    return change.insert() ?? ''
+/** The job: the change type it runs under, what it is for and whether a subcontractor does it. */
+export interface FieldJob {
+    changeType: 'standard' | 'normal'
+    purpose: FieldPurpose
+    subcontracted: boolean
 }
 
-export function openWorkOrder(context: WorkContext, purpose: FieldPurpose, changeId: string, subcontracted: boolean): string {
-    const workOrder = new GlideRecord('wm_order')
-    workOrder.initialize()
-    workOrder.setValue('short_description', context.description)
-    workOrder.setValue('company', context.customerId)
-    workOrder.setValue('location', context.siteId)
-    workOrder.setValue(context.source.field, context.source.id)
-    workOrder.setValue('x_daas_ham_purpose', purpose)
-    if (changeId) workOrder.setValue('parent', changeId)
-    if (subcontracted) workOrder.setValue('work_notes', 'Dispatch to subcontractor / remote hands.')
-    return workOrder.insert() ?? ''
+/** The saved change and the work order that runs under it. */
+export interface FieldWork {
+    changeId: string
+    workOrderId: string
+}
+
+/**
+ * Open the change and the work order that runs under it. Null, with a warning, when the platform refuses either: no
+ * work order runs without its change, and the caller links neither. A change left without its work order is named in
+ * the warning, to cancel by hand (the app may not delete changes).
+ */
+export function openFieldWork(context: WorkContext, job: FieldJob): FieldWork | null {
+    const change = workRecord('change_request', context)
+    change.setValue('type', job.changeType)
+    const changeId = change.insert()
+    if (!changeId) {
+        gs.warn(`[x_daas_ham] No change for ${context.description}: ${refusal(change)}`)
+        return null
+    }
+    const workOrder = workRecord('wm_order', context)
+    workOrder.setValue('x_daas_ham_purpose', job.purpose)
+    workOrder.setValue('parent', changeId)
+    if (job.subcontracted) workOrder.setValue('work_notes', 'Dispatch to subcontractor / remote hands.')
+    const workOrderId = workOrder.insert()
+    if (!workOrderId) {
+        const orphan = `${str(change, 'number')} has none, cancel it`
+        gs.warn(`[x_daas_ham] No work order for ${context.description}: ${refusal(workOrder)}; ${orphan}`)
+        return null
+    }
+    return { changeId, workOrderId }
+}
+
+/** A new change or work order with the context's description, Customer, Site and source record (the caller saves). */
+function workRecord(table: 'change_request' | 'wm_order', context: WorkContext): GlideRecord {
+    const record = new GlideRecord(table)
+    record.initialize()
+    record.setValue('short_description', context.description)
+    record.setValue('company', context.customerId)
+    record.setValue('location', context.siteId)
+    record.setValue(context.source.field, context.source.id)
+    return record
+}
+
+/** Why the platform refused to save `record`, for the log. */
+function refusal(record: GlideRecord): string {
+    return record.getLastErrorMessage() || 'insert refused'
 }

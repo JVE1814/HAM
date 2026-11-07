@@ -1,10 +1,10 @@
-import { GlideDateTime, GlideRecord } from '@servicenow/glide'
+import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import { appendTo } from '../domain/collections'
 import { isDeployed, stagesQuery } from '../domain/lifecycle'
 import { feeAmount, INSTALLED_STAGES, returnDueDate, SITE_RECOVERY_STAGES, type FeeType } from '../domain/returns'
 import { moveAndSave, readStage } from './assets'
 import { todayIso } from './clock'
-import { openChange, openWorkOrder } from './field-work'
+import { openFieldWork } from './field-work'
 import { findById, num, str } from './records'
 
 /** Return orders, their lines and Fee events (P2.4). */
@@ -30,8 +30,11 @@ export interface ReturnRequest {
     description: string
 }
 
-/** Create a Return order with one line per Asset; installed or shipped Assets become pending return. */
-export function raiseReturn(request: ReturnRequest): string {
+/**
+ * Create a Return order with one line per Asset; installed or shipped Assets become pending return. Null, with a
+ * warning, when the platform refuses the Return order: no Asset is touched, so the caller can raise it again.
+ */
+export function raiseReturn(request: ReturnRequest): string | null {
     const order = new GlideRecord('x_daas_ham_return_order')
     order.initialize()
     order.setValue('trigger', request.trigger)
@@ -41,9 +44,14 @@ export function raiseReturn(request: ReturnRequest): string {
     order.setValue('method', request.method)
     order.setValue('source_order', request.sourceOrderId ?? '')
     order.setValue('short_description', request.description)
-    order.insert()
+    const orderId = order.insert()
+    if (!orderId) {
+        const reason = order.getLastErrorMessage() || 'insert refused'
+        gs.warn(`[x_daas_ham] Return not raised (${request.description}): ${reason}`)
+        return null
+    }
     completeReturn(order, request)
-    return order.getUniqueValue()
+    return orderId
 }
 
 /** Fill in a saved Return order header: due date, lines, de-install work. */
@@ -55,24 +63,32 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
     order.setValue('state', 2)
 
     let lines = 0
+    let refused = 0
     for (const assetId of request.assetIds) {
         const asset = findById('alm_hardware', assetId)
         if (!asset || latestReturnLine(assetId, 'awaiting')) continue
-        const stage = readStage(asset)
-        // Leaving service closes the Asset's service interval (entry/assets.ts onAssetServiceChange).
-        if (isDeployed(stage) && stage !== 'pending_return') moveAndSave(asset, 'pending_return', `return ${str(order, 'number')}`)
+        // The line first: an Asset whose line is refused stays as it is, off this Return order.
         const line = new GlideRecord('x_daas_ham_return_order_line')
         line.initialize()
         line.setValue('return_order', order.getUniqueValue())
         line.setValue('asset', assetId)
-        line.insert()
+        if (!line.insert()) {
+            const reason = line.getLastErrorMessage() || 'insert refused'
+            gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left off return ${str(order, 'number')}: ${reason}`)
+            refused++
+            continue
+        }
         lines++
+        const stage = readStage(asset)
+        // Leaving service closes the Asset's service interval (entry/assets.ts onAssetServiceChange).
+        if (isDeployed(stage) && stage !== 'pending_return') moveAndSave(asset, 'pending_return', `return ${str(order, 'number')}`)
     }
 
     if (lines === 0) {
-        // Nothing installed (or everything already on another Return order): close straight away.
+        // Nothing installed, everything already on another Return order, or every line refused: close straight away.
         order.setValue('state', 3)
-        order.setValue('work_notes', 'No equipment to bring back.')
+        const note = refused > 0 ? 'No return line could be saved (see the system log).' : 'No equipment to bring back.'
+        order.setValue('work_notes', note)
     } else if (request.openFieldWork && request.method === 'fsm_deinstall') {
         const context = {
             customerId: request.customerId,
@@ -80,9 +96,13 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
             description: request.description,
             source: { field: 'x_daas_ham_return_order' as const, id: order.getUniqueValue() },
         }
-        const changeId = openChange(context, 'normal')
-        order.setValue('change_request', changeId)
-        order.setValue('work_order', openWorkOrder(context, 'de_install', changeId, false))
+        const work = openFieldWork(context, { changeType: 'normal', purpose: 'de_install', subcontracted: false })
+        if (work) {
+            order.setValue('change_request', work.changeId)
+            order.setValue('work_order', work.workOrderId)
+        } else {
+            order.setValue('work_notes', 'De-install work not opened (see the system log): open it by hand.')
+        }
     }
     order.update()
 }

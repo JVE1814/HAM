@@ -4,7 +4,7 @@ import { isDeployed, stagesQuery } from '../domain/lifecycle'
 import { checkJobWindow } from '../domain/scheduling'
 import { moveAndSave, moveAsset, readStage } from '../platform/assets'
 import { glideToMs } from '../platform/clock'
-import { openChange, openWorkOrder, type WorkContext } from '../platform/field-work'
+import { openFieldWork, type WorkContext } from '../platform/field-work'
 import { recomputeOrder } from '../platform/fulfilment'
 import { findById, str } from '../platform/records'
 import { returnReplacedAssets } from './returns'
@@ -116,6 +116,7 @@ function placeAtSite(asset: GlideRecord, siteId: string): void {
     asset.setValue('location', siteId)
 }
 
+/** Open the Order's change and work order; when the platform refuses either, link neither and say so. */
 function openOnSiteWork(order: GlideRecord, work: OnSiteWork): void {
     const context: WorkContext = {
         customerId: str(order, 'customer'),
@@ -123,10 +124,10 @@ function openOnSiteWork(order: GlideRecord, work: OnSiteWork): void {
         description: `${str(order, 'number')}: ${str(order, 'order_type')} at ${str(order, 'site.name')}`,
         source: { field: 'x_daas_ham_order', id: order.getUniqueValue() },
     }
-    const changeId = openChange(context, work.changeType)
-    const workOrderId = openWorkOrder(context, work.purpose, changeId, work.subcontracted)
-    order.setValue('change_request', changeId)
-    order.setValue('work_order', workOrderId)
+    const opened = openFieldWork(context, work)
+    if (!opened) return void gs.addErrorMessage('On-site work not opened (see the system log): open it by hand')
+    order.setValue('change_request', opened.changeId)
+    order.setValue('work_order', opened.workOrderId)
     order.update()
 }
 

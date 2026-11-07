@@ -183,11 +183,12 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
 }
 
 /**
- * The Assets a return request covers (visibility rules apply): for a decommission everything installed at the Site,
- * as the record producer does, whatever the request lists; otherwise the listed devices that are at the Site.
+ * The Assets a return request covers (visibility rules apply): for a decommission everything installed or shipped at
+ * the Site (domain/returns `SITE_RECOVERY_STAGES`), as the record producer does, whatever the request lists; otherwise
+ * the listed devices that are at the Site.
  */
 function returnedAssetIds(siteId: string, decommission: boolean, listed: unknown): string[] {
-    if (decommission) return installedAssetIds({ siteId })
+    if (decommission) return installedAssetIds({ siteId, wholeSite: true })
     return (Array.isArray(listed) ? (listed as unknown[]) : []).map(String).filter((id) => {
         const asset = findById('alm_hardware', id)
         return !!asset && str(asset, 'x_daas_ham_site') === siteId
@@ -216,5 +217,7 @@ export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPI
         openFieldWork: true,
         description: `Customer return request from ${str(site, 'name')}`,
     })
+    // Refused: nothing was moved, so the request can be sent again.
+    if (!returnId) return reply(response, 422, { error: 'Return not raised: the platform refused it' })
     reply(response, 201, { returnOrder: findById('x_daas_ham_return_order', returnId)?.getDisplayValue('number') ?? returnId })
 }
