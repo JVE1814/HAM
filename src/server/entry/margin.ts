@@ -5,10 +5,10 @@ import { monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing'
 import type { LegalOwner } from '../domain/lifecycle'
 import { cents, CostLedger, costFactKey, marginRows, serviceIntervalCosts, type Amount, type AssetCostFacts, type CostEntry, type LeaseTerms } from '../domain/margin'
 import { memoized } from '../domain/memo'
-import { runEventTableJob } from '../platform/chunked'
+import { runEventTableJob, runsBefore } from '../platform/chunked'
 import { EVENT, fire } from '../platform/events'
 import { intProperty, PROPERTY } from '../platform/properties'
-import { count, findById, num, recordsById, str } from '../platform/records'
+import { count, deleteWhere, findById, num, recordsById, str } from '../platform/records'
 
 /** Cost facts and Margin per Customer and Site, computed when a Billing period closes (P3.28). */
 
@@ -21,7 +21,8 @@ export function uiRecomputeMargin(current: GlideRecord): void {
 /**
  * Script action on x_daas_ham.margin.compute (parm1 = period): Asset costs over the month's service
  * intervals, then labour and margin. A fresh trigger supersedes a pass still in progress: each pass
- * writes Cost facts under its own run, and the pass that completes keeps only its own.
+ * writes Cost facts under its own run, and a pass that completes drops older passes' facts and sums
+ * Margin from its own.
  */
 export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     const periodId = str(event, 'parm1')
@@ -58,19 +59,17 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     if (!result.done) return
     // Drop older passes' Cost facts (a superseded pass may have flushed a last batch after this one
     // started), but not a newer pass's: one may have started since this pass's last check.
-    deleteWhere('x_daas_ham_cost_fact', `billing_period=${periodId}^run<${result.run}`)
+    deleteWhere('x_daas_ham_cost_fact', `billing_period=${periodId}^${runsBefore('run', result.run)}`)
     addFieldLabour(periodId, result.run, bounds)
     writeMargin(periodId, result.run)
 }
 
+/**
+ * Empty the period's Cost facts and Margin as a pass starts: the dashboard reads Cost facts whatever
+ * their run, so the period must not show an earlier pass's facts alongside this one's.
+ */
 function clearPeriod(periodId: string): void {
     for (const table of ['x_daas_ham_cost_fact', 'x_daas_ham_margin']) deleteWhere(table, `billing_period=${periodId}`)
-}
-
-function deleteWhere(table: string, encodedQuery: string): void {
-    const gr = new GlideRecord(table)
-    gr.addEncodedQuery(encodedQuery)
-    gr.deleteMultiple()
 }
 
 /** A Service interval as stored, with its Asset's sys_id. */
@@ -118,12 +117,12 @@ function leaseTermsOf(leaseId: string): LeaseTerms | null {
 }
 
 /**
- * Add a batch's totals (at most one per Customer, Site and type, as CostLedger.drain gives them) to
- * the Cost facts the pass `run` wrote for the period, reading the ones they add to with one query.
+ * Add a batch's totals by costFactKey (as CostLedger.drain hands them over; this uses them up) to the
+ * Cost facts the pass `run` wrote for the period, reading the ones they add to with one query.
  */
-function writeCostFacts(periodId: string, run: string, entries: readonly CostEntry[]): void {
-    if (entries.length === 0) return
-    const pending = new Map(entries.map((entry) => [costFactKey(entry.customerId, entry.siteId, entry.type), entry]))
+function writeCostFacts(periodId: string, run: string, pending: Map<string, CostEntry>): void {
+    if (pending.size === 0) return
+    const entries = [...pending.values()]
     const customers = [...new Set(entries.map((entry) => entry.customerId))]
     const types = [...new Set(entries.map((entry) => entry.type))]
     const fact = new GlideRecord('x_daas_ham_cost_fact')

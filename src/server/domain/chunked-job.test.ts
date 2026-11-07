@@ -50,4 +50,12 @@ describe('runChunked', () => {
         expect(result.failed).toBe(1)
         expect(result.lastError).toBe('b: boom b')
     })
+
+    it('moves on past a batch whose every record fails', () => {
+        const { ports, handled, saved } = fakePorts(['a', 'b', 'c', 'd'], { failOn: ['a', 'b'] })
+        const result = runChunked(ports, { batchSize: 2, budgetMs: 100 })
+        expect(handled).toEqual(['c', 'd'])
+        expect(result).toEqual({ processed: 2, failed: 2, done: true, cursor: '', lastError: 'b: boom b' })
+        expect(saved).toEqual([{ cursor: '', processed: 2, done: true }])
+    })
 })

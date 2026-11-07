@@ -1,5 +1,4 @@
 import { addDays, addMonths } from './calendar'
-import type { LegalOwner } from './lifecycle'
 
 /** Lease schedules, end-of-lease decisions and renewals (P3.23–P3.24). */
 
@@ -33,36 +32,13 @@ export function leaseDecisionProblem(input: LeaseDecisionInput): string | null {
     return null
 }
 
-/** A buyout's terms, fixed on the lease once, when the decision is applied while every Asset is still covered. */
-export interface BuyoutTerms {
-    /** Assets covered at buyout: Margin keeps splitting the lease payment over that many while the transfer runs. */
-    buyoutAssets: number
-    /** Each Asset's share of the buyout price, its cost once bought out (0 without a price or Assets). */
-    buyoutShare: number
-}
-
-/** The terms of buying out a lease that covers `coveredAssets` Assets: its buyout price split evenly over them. */
-export function buyoutTerms(buyoutPrice: number, coveredAssets: number): BuyoutTerms {
-    return { buyoutAssets: coveredAssets, buyoutShare: coveredAssets > 0 ? buyoutPrice / coveredAssets : 0 }
-}
-
-/** What a bought-out Asset becomes. */
-export interface BoughtOutAsset {
-    legalOwner: LegalOwner
-    /** The Asset leaves its Lease schedule and its Lessor: both are cleared. */
-    leaseId: ''
-    lessorId: ''
-    /**
-     * When the buyout has a price: the Asset costs its share of it, bought on the buyout day (its
-     * write-off for Margin starts then). Without one, the Asset keeps its cost and purchase date.
-     */
-    purchase?: { cost: number; date: string }
-}
-
-/** A bought-out Asset is Provider-owned, off the lease, and bought at its share of the buyout price on `buyoutDay`. */
-export function boughtOutAsset(buyoutShare: number, buyoutDay: string): BoughtOutAsset {
-    const transferred: BoughtOutAsset = { legalOwner: 'provider', leaseId: '', lessorId: '' }
-    return buyoutShare > 0 ? { ...transferred, purchase: { cost: buyoutShare, date: buyoutDay } } : transferred
+/**
+ * The purchase to record on a bought-out Asset: when the buyout has a price, the Asset costs its share
+ * of it (`buyoutShare`), bought on `buyoutDay` (its write-off for Margin starts then). Without one
+ * there is none, and the Asset keeps its cost and purchase date.
+ */
+export function buyoutPurchase(buyoutShare: number, buyoutDay: string): { cost: number; date: string } | undefined {
+    return buyoutShare > 0 ? { cost: buyoutShare, date: buyoutDay } : undefined
 }
 
 /** The Agreement's end after renewing it for `termMonths`. */

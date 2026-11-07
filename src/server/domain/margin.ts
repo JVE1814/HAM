@@ -80,8 +80,12 @@ function writtenOff(start: string, bounds: MonthBounds, amortisationMonths: numb
  * the Assets it covered when the buyout was decided.
  */
 export function leaseShare(lease: Pick<LeaseTerms, 'monthlyPayment' | 'coveredAssets' | 'buyoutAssets'>): number {
-    const assets = Math.max(lease.coveredAssets, lease.buyoutAssets)
-    return assets > 0 ? lease.monthlyPayment / assets : 0
+    return evenShare(lease.monthlyPayment, Math.max(lease.coveredAssets, lease.buyoutAssets))
+}
+
+/** One share of `amount` split evenly over `count` (0 when `count` is 0), e.g. an Asset's share of a lease payment or a buyout price. */
+export function evenShare(amount: number, count: number): number {
+    return count > 0 ? amount / count : 0
 }
 
 /** Whether the lease (either end open) is payable in the month. */
@@ -108,7 +112,7 @@ export function costFactKey(customerId: string, siteId: string, type: string): s
 
 /** Running totals of cost per Customer, Site and type, flushed to Cost facts in batches. */
 export class CostLedger {
-    private readonly totals = new Map<string, CostEntry>()
+    private totals = new Map<string, CostEntry>()
 
     add(customerId: string, siteId: string, type: CostType, amount: number): void {
         if (!customerId || amount === 0) return
@@ -118,11 +122,11 @@ export class CostLedger {
         else this.totals.set(key, { customerId, siteId, type, amount })
     }
 
-    /** The totals so far, one per Customer, Site and type, emptying the ledger. */
-    drain(): CostEntry[] {
-        const entries = [...this.totals.values()]
-        this.totals.clear()
-        return entries
+    /** The totals so far by costFactKey, handed over: the ledger starts afresh, so later amounts leave them as they are. */
+    drain(): Map<string, CostEntry> {
+        const drained = this.totals
+        this.totals = new Map()
+        return drained
     }
 }
 

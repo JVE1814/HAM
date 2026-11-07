@@ -9,7 +9,7 @@ import { runTableJob } from '../platform/chunked'
 import { glideToMs, msToGlide, nowMs } from '../platform/clock'
 import { applyLifecycleDates, lifecycleReaders, type LifecycleReaders } from '../platform/lifecycle-dates'
 import { intProperty, PROPERTY } from '../platform/properties'
-import { str } from '../platform/records'
+import { deleteWhere, str } from '../platform/records'
 import { reply } from '../platform/rest-api'
 import { attachToSubscription } from '../platform/subscriptions'
 
@@ -120,8 +120,6 @@ export function evaluatePendingInService(): void {
 export function purgeDeviceEvents(): void {
     const cutoff = new GlideDateTime()
     cutoff.addDaysUTC(-intProperty(PROPERTY.eventsRetentionDays, 90))
-    const gr = new GlideRecord('x_daas_ham_device_event')
-    gr.addQuery('sys_created_on', '<', cutoff.getValue())
-    gr.deleteMultiple()
+    deleteWhere('x_daas_ham_device_event', `sys_created_on<${cutoff.getValue()}`)
 }
 

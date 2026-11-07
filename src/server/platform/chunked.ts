@@ -21,7 +21,8 @@ interface TableJobFields<T, R> {
  * Turn a batch's rows into the items handled, one per row and in the same order, loading what the
  * whole batch needs in one go (e.g. its referenced records with one query): called once per batch,
  * after every row of it is read and before any of it is handled. Required whenever the items handled
- * are not the rows read.
+ * are not the rows read. If it throws, every row of the batch fails with that error when it is handled,
+ * and the pass moves on past them as past any other failed record.
  */
 type Prepare<T, R> = [R] extends [T] ? { prepare?: (rows: readonly R[]) => T[] } : { prepare: (rows: readonly R[]) => T[] }
 
@@ -42,10 +43,7 @@ export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
     })
 }
 
-/**
- * Start a new run of `job`, superseding any run still in progress; returns the run's token, the start
- * time in epoch ms, so a later run's token sorts after an earlier one's (as text too, both 13 digits).
- */
+/** Start a new run of `job`, superseding any run still in progress; returns the run's token (see runsBefore). */
 function startRun(job: string): string {
     const record = loadCursorRecord(job)
     const token = String(nowMs())
@@ -54,6 +52,15 @@ function startRun(job: string): string {
     record.setValue('last_status', 'running')
     record.update()
     return token
+}
+
+/**
+ * An encoded query clause matching records whose `field` holds the token of a run started before the
+ * run `token`. A run's token is its start time in epoch ms, and all tokens have the same length (13
+ * digits), so a later run's token sorts after an earlier one's as text too.
+ */
+export function runsBefore(field: string, token: string): string {
+    return `${field}<${token}`
 }
 
 function isCurrentRun(job: string, token: string): boolean {
@@ -84,7 +91,8 @@ interface EventJobFields {
     flush?: (run: string) => void
     /**
      * Make each fresh pass supersede one still running under `job`: `onStart` runs once at the start
-     * of a pass, and chunks of a superseded pass stop without flushing or queueing more events.
+     * of a pass, and a chunk that finds its pass superseded (as it starts or before it flushes) stops
+     * without flushing or queueing more events (see runEventTableJob).
      */
     supersede?: { job: string; onStart(): void }
 }
@@ -97,14 +105,16 @@ export interface EventTableJobResult extends ChunkedJobResult {
 /**
  * The same runner driven by an event instead of a schedule: the cursor travels in the event's parm2
  * (with the pass token when `supersede` is set) and the event is queued again until the pass is
- * complete. A superseded chunk reports `done: false`, as does a last chunk whose pass is superseded
- * while it flushes; a chunk superseded between its check and its flush still flushes, under its own
- * pass's token.
+ * complete. A chunk of a superseded pass reports `done: false`. Whether its pass is still current is
+ * checked as a chunk starts and again before it flushes, so a chunk superseded after that check still
+ * flushes under its own pass's token, and a last one still completes its pass: whatever completes a
+ * pass tells what it wrote from what a newer pass did by the token (see runsBefore).
  */
 export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): EventTableJobResult {
     const supersede = spec.supersede
     let token = ''
     let cursor = spec.cursor
+    let superseded = false
     if (supersede) {
         const separator = spec.cursor.indexOf(':')
         token = separator < 0 ? '' : spec.cursor.slice(0, separator)
@@ -112,12 +122,12 @@ export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): EventTabl
         if (!token) {
             token = startRun(supersede.job)
             supersede.onStart()
-        } else if (!isCurrentRun(supersede.job, token)) {
-            return { processed: 0, failed: 0, done: false, cursor, lastError: 'superseded', run: token }
+        } else {
+            superseded = !isCurrentRun(supersede.job, token)
         }
     }
-    let superseded = false
-    const result = runOverTable(spec, {
+    // A chunk of a pass superseded before it starts handles nothing.
+    const result = superseded ? { processed: 0, failed: 0, done: false, cursor, lastError: '' } : runOverTable(spec, {
         loadCursor: () => cursor,
         saveCursor: (next, _processed, done) => {
             if (supersede && !isCurrentRun(supersede.job, token)) {
@@ -126,24 +136,29 @@ export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): EventTabl
             }
             spec.flush?.(token)
             if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, supersede ? `${token}:${next}` : next)
-            // Whatever completes the pass must not run once a fresh pass has started.
-            else if (supersede && !isCurrentRun(supersede.job, token)) superseded = true
         },
     })
-    return superseded ? { ...result, done: false, lastError: 'superseded', run: token } : { ...result, run: token }
+    const out = { ...result, run: token }
+    return superseded ? { ...out, done: false, lastError: 'superseded' } : out
 }
 
 type TableSource<T, R> = Pick<TableJobFields<T, R>, 'table' | 'query' | 'read' | 'handle'> & { prepare?: (rows: readonly R[]) => T[] }
 
+/** A record of a batch as handled: its item, or the error its batch's `prepare` threw. */
+type BatchRecord<T> = { id: string; item: T } | { id: string; prepareError: unknown }
+
 /** The runner over a table's records in sys_id order, with the batch size and time budget from properties. */
 function runOverTable<T, R>(spec: TableSource<T, R>, cursor: Pick<ChunkedJobPorts<unknown>, 'loadCursor' | 'saveCursor'>): ChunkedJobResult {
-    return runChunked<{ id: string; item: T }>(
+    return runChunked<BatchRecord<T>>(
         {
             loadCursor: cursor.loadCursor,
             saveCursor: cursor.saveCursor,
             fetchBatch: (after, size) => fetchBatch(spec, after, size),
             keyOf: (record) => record.id,
-            handle: (record) => spec.handle(record.item, record.id),
+            handle: (record) => {
+                if ('prepareError' in record) throw record.prepareError
+                spec.handle(record.item, record.id)
+            },
             now: nowMs,
         },
         {
@@ -153,7 +168,7 @@ function runOverTable<T, R>(spec: TableSource<T, R>, cursor: Pick<ChunkedJobPort
     )
 }
 
-function fetchBatch<T, R>(spec: TableSource<T, R>, after: string, size: number): Array<{ id: string; item: T }> {
+function fetchBatch<T, R>(spec: TableSource<T, R>, after: string, size: number): Array<BatchRecord<T>> {
     const gr = new GlideRecord(spec.table)
     gr.addEncodedQuery(after ? andEachClause(spec.query, `sys_id>${after}`) : spec.query)
     gr.orderBy('sys_id')
@@ -165,7 +180,13 @@ function fetchBatch<T, R>(spec: TableSource<T, R>, after: string, size: number):
         ids.push(gr.getUniqueValue())
         rows.push(spec.read(gr))
     }
-    // Without `prepare` the rows are the items (T defaults to R).
-    const items = spec.prepare ? spec.prepare(rows) : (rows as unknown[] as T[])
+    let items: T[]
+    try {
+        // Without `prepare` the rows are the items (T defaults to R).
+        items = spec.prepare ? spec.prepare(rows) : (rows as unknown[] as T[])
+    } catch (error) {
+        // Thrown from here, outside the runner's per-record handling, it would stop the chunk with no cursor saved.
+        return ids.map((id) => ({ id, prepareError: error }))
+    }
     return ids.map((id, index) => ({ id, item: items[index] }))
 }

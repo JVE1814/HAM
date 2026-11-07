@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { monthBounds } from './billing'
-import { CostLedger, costFactKey, leaseShare, marginRows, serviceIntervalCosts, type AssetCostFacts, type LeaseTerms } from './margin'
+import { CostLedger, costFactKey, evenShare, leaseShare, marginRows, serviceIntervalCosts, type AssetCostFacts, type LeaseTerms } from './margin'
 
 const november = monthBounds('2026-11')
 const wholeMonth = { start: '2026-01-15' }
@@ -104,6 +104,17 @@ describe('leaseShare', () => {
     })
 })
 
+describe('evenShare', () => {
+    it('splits an amount evenly, e.g. a buyout price over the Assets covered', () => {
+        expect(evenShare(9000, 3)).toBe(3000)
+        expect(evenShare(0, 3)).toBe(0)
+    })
+
+    it('gives no share when there is none to split it over', () => {
+        expect(evenShare(9000, 0)).toBe(0)
+    })
+})
+
 describe('costFactKey', () => {
     it('tells Cost facts apart by customer, site and type', () => {
         const keys = [costFactKey('acme', 'hq', 'lease'), costFactKey('acme', 'hq', 'purchase'), costFactKey('acme', '', 'lease'), costFactKey('globex', 'hq', 'lease')]
@@ -113,28 +124,30 @@ describe('costFactKey', () => {
 })
 
 describe('CostLedger', () => {
-    it('sums per customer, site and type and empties on drain', () => {
+    it('sums per customer, site and type, by cost fact key, and empties on drain', () => {
         const ledger = new CostLedger()
         ledger.add('acme', 'hq', 'purchase', 10)
         ledger.add('acme', 'hq', 'purchase', 5)
         ledger.add('acme', 'hq', 'lease', 7)
         ledger.add('acme', '', 'field_labour', 250)
         ledger.add('', 'hq', 'purchase', 99)
-        expect(ledger.drain()).toEqual([
-            { customerId: 'acme', siteId: 'hq', type: 'purchase', amount: 15 },
-            { customerId: 'acme', siteId: 'hq', type: 'lease', amount: 7 },
-            { customerId: 'acme', siteId: '', type: 'field_labour', amount: 250 },
-        ])
-        expect(ledger.drain()).toEqual([])
+        expect(ledger.drain()).toEqual(
+            new Map([
+                [costFactKey('acme', 'hq', 'purchase'), { customerId: 'acme', siteId: 'hq', type: 'purchase', amount: 15 }],
+                [costFactKey('acme', 'hq', 'lease'), { customerId: 'acme', siteId: 'hq', type: 'lease', amount: 7 }],
+                [costFactKey('acme', '', 'field_labour'), { customerId: 'acme', siteId: '', type: 'field_labour', amount: 250 }],
+            ]),
+        )
+        expect(ledger.drain().size).toBe(0)
     })
 
-    it('drains one entry per cost fact key', () => {
+    it('leaves drained totals as they are when more is added', () => {
         const ledger = new CostLedger()
         ledger.add('acme', 'hq', 'purchase', 10)
+        const drained = ledger.drain()
         ledger.add('acme', 'hq', 'purchase', 5)
-        ledger.add('acme', '', 'purchase', 1)
-        const keys = ledger.drain().map((entry) => costFactKey(entry.customerId, entry.siteId, entry.type))
-        expect(keys).toEqual([costFactKey('acme', 'hq', 'purchase'), costFactKey('acme', '', 'purchase')])
+        expect(drained.get(costFactKey('acme', 'hq', 'purchase'))?.amount).toBe(10)
+        expect(ledger.drain().get(costFactKey('acme', 'hq', 'purchase'))?.amount).toBe(5)
     })
 })
 
