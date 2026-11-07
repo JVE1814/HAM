@@ -207,12 +207,12 @@ const FEE_LOCK_ATTEMPTS = 5
 /**
  * Charge a Fee event of `type` for the Asset on the Return order, once (domain/returns `chargedFeeQuery`): a step
  * retried after a refused save (an evaluation chosen again, a line declared missing again) does not charge it twice.
- * Two runs may also charge it at the same time (a receipt scanned twice, an evaluation saved twice, overlapping overdue
- * runs). A unique index on the fee's identity would also refuse a fee charged after a waived one, so the check and the
- * insert are made under a lock on the fee, re-checking there (as platform/exceptions `openException`). A run that finds
- * the lock held through every try leaves the fee to the holder, which is charging it. A fee that is refused, that the
- * holder has still not charged when this run gives up, or whose lock cannot be taken (platform/locks throws) is logged,
- * not thrown.
+ * Two runs may also charge it at the same time (two users saving one line's evaluation, overlapping overdue runs; two
+ * scans of one unit already take turns under its receive lock, entry/warehouse). A unique index on the fee's identity
+ * would also refuse a fee charged after a waived one, so the check and the insert are made under a lock on the fee,
+ * re-checking there (as platform/exceptions `openException`). A run that finds the lock held through every try leaves
+ * the fee to the holder, which is charging it. A fee that is refused, that the holder has still not charged when this
+ * run gives up, or whose lock cannot be taken (platform/locks throws) is logged, not thrown.
  */
 export function recordFee(type: FeeType, asset: GlideRecord, returnOrderId: string): void {
     const fee: FeeIdentity = { type, assetId: asset.getUniqueValue(), returnOrderId }
