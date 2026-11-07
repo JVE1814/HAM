@@ -1,7 +1,36 @@
 import { addDays } from './calendar'
+import type { NamedRecord } from './entitlement'
 import type { LegalOwner, Stage } from './lifecycle'
+import type { VisibilityScope } from './visibility'
 
 /** Returns, depot evaluation, Fee events and break-fix shortfalls (P2.3–P2.4). */
+
+/** The Customer a requested Return is for and the Site it names, with the Customer that Site belongs to. */
+export interface RequestedReturn {
+    customerId: string
+    site?: NamedRecord & { isSite: boolean }
+}
+
+/** The person requesting a Return: whether the Return create rule lets them, how far they see (ADR 0005) and their own Customer. */
+export interface ReturnRequester {
+    mayRequest: boolean
+    scope: VisibilityScope
+    customerId: string
+}
+
+/**
+ * Why a requested Return cannot be raised; empty when it can. As for an Order (domain/entitlement `ownershipFindings`):
+ * only those the Return create rule lets in ask for returns, and site contacts never do; provider staff and the service
+ * desk ask for any Customer, a customer admin only for their own; and the Site must be one of the Customer's sites.
+ */
+export function returnRequestFindings(request: RequestedReturn, requester: ReturnRequester): string[] {
+    if (!requester.mayRequest || requester.scope === 'own_sites') return ['You may not request returns']
+    if (requester.scope === 'own_customer' && request.customerId !== requester.customerId) return ['You can only request returns for your own customer']
+    if (!request.customerId) return ['Choose the customer']
+    if (!request.site) return ["Choose one of the customer's sites"]
+    if (!request.site.isSite || request.site.customerId !== request.customerId) return ["The site is not one of the customer's sites"]
+    return []
+}
 
 export function returnDueDate(raisedOn: string, allowanceDays: number): string {
     return addDays(raisedOn, allowanceDays)

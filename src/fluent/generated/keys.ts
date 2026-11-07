@@ -11267,6 +11267,7 @@ declare global {
                     {
                         table: 'sys_security_acl_role'
                         id: '2a9eaeb68ad04a63ab91b0311c58bf1f'
+                        deleted: true
                         key: {
                             sys_security_acl: 'f88430a6babb4aacbc87af1219abd7c3'
                             sys_user_role: {

@@ -3,7 +3,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { toIsoDate } from '../domain/calendar'
 import type { LegalOwner } from '../domain/lifecycle'
-import { evaluationTarget, overdueStep, type EvaluationOutcome } from '../domain/returns'
+import { evaluationTarget, overdueStep, returnRequestFindings, type EvaluationOutcome, type RequestedReturn, type ReturnRequester } from '../domain/returns'
 import { clearRackPlacement, moveAndSave, moveAsset, readStage } from '../platform/assets'
 import { customerAdminIds } from '../platform/approvals'
 import { runTableJob } from '../platform/chunked'
@@ -11,6 +11,7 @@ import { EVENT } from '../platform/events'
 import { nowMs, todayIso } from '../platform/clock'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties'
 import { bool, findById, str } from '../platform/records'
+import { currentSession } from '../platform/session'
 import {
     closeReturnIfDone,
     completeReturn,
@@ -27,10 +28,19 @@ import {
 
 /**
  * Record producer "Return or decommission equipment". A site decommission returns everything
- * installed at the Site; a device removal returns the chosen Assets.
+ * installed at the Site; a device removal returns the chosen Assets. The producer does not apply the
+ * Return create rule and its Customer and Site are only qualified in the browser, so a Return its
+ * requester may not raise, or for a Site that is not its Customer's, is removed again
+ * (domain/returns `returnRequestFindings`).
  */
 export function afterReturnProduced(producer: Record<string, unknown>, current: unknown): void {
     const order = current as GlideRecord
+    const findings = returnRequestFindings(requestedReturn(order), returnRequester(order))
+    if (findings.length > 0) {
+        gs.addErrorMessage(`Return not raised. ${findings.join('. ')}.`)
+        order.deleteRecord()
+        return
+    }
     const decommission = str(order, 'trigger') === 'site_decommission'
     const siteId = str(order, 'site')
     // Only devices actually at the chosen Site: the list collector cannot be qualified by the Site.
@@ -52,6 +62,21 @@ export function afterReturnProduced(producer: Record<string, unknown>, current: 
         openFieldWork: true,
         description: str(order, 'short_description') || `Return from ${order.getDisplayValue('site')}`,
     })
+}
+
+/** The Customer the produced Return is for and its Site, with the Customer the Site belongs to. */
+function requestedReturn(order: GlideRecord): RequestedReturn {
+    const customerId = str(order, 'customer')
+    const siteId = str(order, 'site')
+    if (!siteId) return { customerId }
+    const site = findById('cmn_location', siteId)
+    return { customerId, site: { id: siteId, customerId: site ? str(site, 'company') : null, isSite: !!site && bool(site, 'x_daas_ham_is_site') } }
+}
+
+/** The signed-in user as the requester of `order`: a Return requester when the Return create rule lets them create it. */
+function returnRequester(order: GlideRecord): ReturnRequester {
+    const { scope, customerId } = currentSession()
+    return { mayRequest: order.canCreate(), scope, customerId }
 }
 
 function agreementOf(assetId: string | undefined): string {

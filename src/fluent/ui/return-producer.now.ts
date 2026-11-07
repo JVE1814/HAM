@@ -2,7 +2,10 @@ import '@servicenow/sdk/global'
 import { CatalogItemRecordProducer, ListCollectorVariable, ReferenceVariable, SelectBoxVariable, SingleLineTextVariable } from '@servicenow/sdk/core'
 import { afterReturnProduced } from '../../server/entry/returns'
 
-/* "Return or decommission equipment": customer admins and the service desk raise returns (D60). */
+/*
+ * "Return or decommission equipment": customer admins and the service desk raise returns (D60). The Site choices follow
+ * the chosen Customer; submitting checks the same again, and that the requester may raise it (domain/returns returnRequestFindings).
+ */
 
 export const requestReturn = CatalogItemRecordProducer({
     $id: Now.ID['rp_request_return'],
@@ -23,7 +26,9 @@ export const requestReturn = CatalogItemRecordProducer({
         site: ReferenceVariable({
             question: 'Site',
             referenceTable: 'cmn_location',
-            referenceQualCondition: 'x_daas_ham_is_site=true',
+            useReferenceQualifier: 'advanced',
+            referenceQual: "javascript:'x_daas_ham_is_site=true^company=' + current.variables.customer",
+            attributes: 'ref_qual_elements=customer',
             mandatory: true,
             mapToField: true,
             field: 'site',

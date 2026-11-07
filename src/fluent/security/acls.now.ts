@@ -17,7 +17,9 @@ import {
 
 /*
  * Access controls for app tables. Reads are also narrowed by the before-query rules in
- * visibility.now.ts (ADR 0005); customer ACLs re-check the customer so a direct link cannot leak data.
+ * visibility.now.ts (ADR 0005); customer ACLs re-check the customer, and for a site contact (no customer admin role)
+ * that the record's Site lists them as a contact, so neither a direct link nor a dot-walk from a visible record leaks
+ * data. Return lines, attestation items and shipment events have no before-query rule: their ACL is the only check.
  * Inventory techs read only the tables of their stockroom work (providerStaff or a list naming inventoryTech); other
  * staff reads use broadStaff or a narrower list.
  */
@@ -279,7 +281,7 @@ Acl({
     table: 'x_daas_ham_order',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID();",
+    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
 })
 
 Acl({
@@ -320,7 +322,7 @@ Acl({
     table: 'x_daas_ham_order_line',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.order.customer.toString() == gs.getUser().getCompanyID();",
+    script: "answer = current.order.customer.toString() == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.order.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
 })
 
 Acl({
@@ -729,7 +731,7 @@ Acl({
     table: 'alm_hardware',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.getValue('company') == gs.getUser().getCompanyID();",
+    script: "answer = current.getValue('company') == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.x_daas_ham_site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
 })
 Acl({
     $id: Now.ID['acl_asn_import_read'],
@@ -1049,7 +1051,7 @@ Acl({
     table: 'x_daas_ham_return_order',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID();",
+    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
 })
 
 Acl({
@@ -1066,7 +1068,7 @@ Acl({
     table: 'x_daas_ham_attestation',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID();",
+    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
 })
 
 Acl({
@@ -1082,7 +1084,8 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_fee_event',
     operation: 'read',
-    roles: customerRoles,
+    // Fee events carry no Site, so site contacts get none (ADR 0005).
+    roles: [customerAdmin],
     script: "answer = current.getValue('customer') == gs.getUser().getCompanyID();",
 })
 
@@ -1124,7 +1127,7 @@ Acl({
     table: 'x_daas_ham_return_order_line',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.return_order.customer.toString() == gs.getUser().getCompanyID();",
+    script: "answer = current.return_order.customer.toString() == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.return_order.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
 })
 
 Acl({
@@ -1189,7 +1192,7 @@ Acl({
     table: 'x_daas_ham_attestation_item',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.attestation.customer.toString() == gs.getUser().getCompanyID();",
+    script: "answer = current.attestation.customer.toString() == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.attestation.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
 })
 
 Acl({
