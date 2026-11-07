@@ -79,10 +79,14 @@ function computeMarginChunk(period: GlideRecord, cursor: string, current: GlideR
     // Failed Service intervals are left out of Margin, so the period counts them to show it is incomplete.
     if (result.failed > 0) addMarginFailures(periodId, result.run, result.failed, result.lastError)
     if (!result.done) return
+    // Each completion step first checks that no fresh pass has started meanwhile: its own completion owns the period then.
     // Drop older passes' Cost facts (a superseded pass may have flushed a last batch after this one
-    // started), but not a newer pass's: one may have started since this pass's last check.
+    // started), but not a newer pass's.
+    if (!result.stillCurrent()) return
     deleteWhere('x_daas_ham_cost_fact', `billing_period=${periodId}^${runsBefore('run', result.run)}`)
+    if (!result.stillCurrent()) return
     addFieldLabour(periodId, result.run, bounds)
+    if (!result.stillCurrent()) return
     writeMargin(periodId, result.run)
 }
 
