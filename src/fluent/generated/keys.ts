@@ -35477,6 +35477,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: 'b381b77cdf8b430d953e06c8d049f847'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'margin_run'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: 'b38664f0c8184ff981b117af1cc45737'
                         key: {
@@ -46532,6 +46540,15 @@ declare global {
                         key: {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_wiped_on'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'f858e00b1e7849afbb5678f690e8ed48'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'margin_run'
+                            language: 'en'
                         }
                     },
                     {

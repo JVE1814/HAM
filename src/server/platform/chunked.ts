@@ -70,6 +70,14 @@ export function runsBefore(field: string, token: string): string {
     return `${field}<${token}`
 }
 
+/** Mark the current run of `job` complete (a run still 'running' with an old last run has stalled). */
+function completeRun(job: string): void {
+    const record = loadCursorRecord(job)
+    record.setValue('last_run', msToGlide(nowMs()))
+    record.setValue('last_status', 'complete')
+    record.update()
+}
+
 function isCurrentRun(job: string, token: string): boolean {
     return str(loadCursorRecord(job), 'cursor') === token
 }
@@ -93,8 +101,8 @@ interface EventJobFields {
     cursor: string
     /** Write out anything accumulated in memory before the next chunk can start; `run` is the pass's token ('' without `supersede`). */
     flush?: (run: string) => void
-    /** Make each fresh pass supersede one still running under `job`; `onStart` runs once as a pass starts (see runEventTableJob). */
-    supersede?: { job: string; onStart(): void }
+    /** Make each fresh pass supersede one still running under `job`; `onStart` runs once as a pass starts, with its token (see runEventTableJob). */
+    supersede?: { job: string; onStart(run: string): void }
 }
 
 export interface EventTableJobResult extends ChunkedJobResult {
@@ -110,7 +118,8 @@ export interface EventTableJobResult extends ChunkedJobResult {
  *
  * With `supersede`, a chunk checks that its pass is still current as it starts (else it handles nothing),
  * before it flushes (else it neither flushes nor queues the next chunk) and once it has flushed (else it
- * reports `superseded`, so its last chunk does not complete the pass). A chunk superseded during its
+ * queues no next chunk and reports `superseded`: the caller ignores the chunk's counts, and a last chunk
+ * does not complete the pass; a pass that completes is marked complete on its job cursor). A chunk superseded during its
  * flush still flushes under its own pass's token, so whatever completes a pass tells its own records from
  * an older pass's by the token (see runsBefore). A fresh pass starting while a last chunk completes its
  * pass is not seen; the fresh pass's own completion replaces what that one wrote.
@@ -127,7 +136,7 @@ export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): EventTabl
         cursor = separator < 0 ? '' : spec.cursor.slice(separator + 1)
         if (!token) {
             token = startRun(supersede.job)
-            supersede.onStart()
+            supersede.onStart(token)
         } else {
             superseded = !stillCurrent()
         }
@@ -141,8 +150,10 @@ export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): EventTabl
                 return
             }
             spec.flush?.(token)
-            if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, supersede ? `${token}:${next}` : next)
             superseded = !stillCurrent()
+            if (superseded) return
+            if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, supersede ? `${token}:${next}` : next)
+            else if (supersede) completeRun(supersede.job)
         },
     })
     return { ...result, done: result.done && !superseded, run: token, superseded }

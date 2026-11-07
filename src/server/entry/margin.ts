@@ -28,6 +28,20 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     const periodId = str(event, 'parm1')
     const period = findById('x_daas_ham_billing_period', periodId)
     if (!period) return
+    try {
+        computeMarginChunk(period, str(event, 'parm2'), current)
+    } catch (error) {
+        // A chunk that throws queues no next one: the pass stops, and the period must not read as complete.
+        const message = error instanceof Error ? error.message : String(error)
+        gs.error(`[x_daas_ham] Margin of ${str(period, 'period')} stopped: ${message}`)
+        const fresh = findById('x_daas_ham_billing_period', periodId)
+        if (fresh) saveMarginStatus(fresh, { run: str(fresh, 'margin_run'), failed: num(fresh, 'margin_failed'), error: `stopped: ${message}` })
+    }
+}
+
+/** One chunk of a margin pass over the period's Service intervals after `cursor`; the last one adds field labour and writes Margin. */
+function computeMarginChunk(period: GlideRecord, cursor: string, current: GlideRecord): void {
+    const periodId = period.getUniqueValue()
     const bounds = monthBounds(str(period, 'period'))
     const amortisationMonths = intProperty(PROPERTY.amortisationMonths, 60)
     const ledger = new CostLedger()
@@ -36,12 +50,12 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
         eventName: EVENT.marginCompute,
         record: current,
         parm1: periodId,
-        cursor: str(event, 'parm2'),
+        cursor,
         supersede: {
             job: `margin_${periodId}`,
-            onStart: () => {
+            onStart: (run) => {
                 clearPeriod(periodId)
-                saveMarginStatus(period, 0, '')
+                saveMarginStatus(period, { run, failed: 0, error: '' })
             },
         },
         table: 'x_daas_ham_service_interval',
@@ -62,8 +76,8 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
         flush: (run) => writeCostFacts(periodId, run, ledger.drain()),
     })
     if (result.superseded) return
-    // Margin is still written without them, so the period says it is incomplete.
-    if (result.failed > 0) addMarginFailures(period, result.failed, result.lastError)
+    // Failed Service intervals are left out of Margin, so the period counts them to show it is incomplete.
+    if (result.failed > 0) addMarginFailures(periodId, result.run, result.failed, result.lastError)
     if (!result.done) return
     // Drop older passes' Cost facts (a superseded pass may have flushed a last batch after this one
     // started), but not a newer pass's: one may have started since this pass's last check.
@@ -72,19 +86,27 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     writeMargin(periodId, result.run)
 }
 
-/** Count Service intervals a chunk of the current margin computation failed to cost on its Billing period, with the last error. */
-function addMarginFailures(period: GlideRecord, failed: number, lastError: string): void {
+/**
+ * Count Service intervals a chunk of the pass `run` failed to cost on its Billing period, with the last
+ * error. The period is read as the count is added, and only while `run` is the pass its status belongs to.
+ */
+function addMarginFailures(periodId: string, run: string, failed: number, lastError: string): void {
+    const period = findById('x_daas_ham_billing_period', periodId)
+    if (!period) return
     gs.error(`[x_daas_ham] Margin of ${str(period, 'period')}: ${failed} service interval(s) failed: ${lastError}`)
-    saveMarginStatus(period, num(period, 'margin_failed') + failed, lastError)
+    if (str(period, 'margin_run') !== run) return
+    saveMarginStatus(period, { run, failed: num(period, 'margin_failed') + failed, error: lastError })
 }
 
 /**
- * Save the margin computation's failure count and last error on its Billing period (0 and '' clear them).
- * The period is closed and locked; these fields are about Margin, not the bill, so the lock's rule is not run.
+ * Save a margin pass's status on its Billing period: its run, how many Service intervals it failed to cost
+ * and the last error. The period is closed and locked; these fields are about Margin, not the bill, so the
+ * lock's rule is not run.
  */
-function saveMarginStatus(period: GlideRecord, failed: number, error: string): void {
-    period.setValue('margin_failed', failed)
-    period.setValue('margin_error', error.slice(0, 255))
+function saveMarginStatus(period: GlideRecord, status: { run: string; failed: number; error: string }): void {
+    period.setValue('margin_run', status.run)
+    period.setValue('margin_failed', status.failed)
+    period.setValue('margin_error', status.error.slice(0, 255))
     period.setWorkflow(false)
     period.update()
 }
