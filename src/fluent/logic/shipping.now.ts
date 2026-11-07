@@ -107,3 +107,12 @@ Property({
     description: 'Company name printed as the depot sender / return recipient.',
     roles: { read: [admin], write: [admin] },
 })
+
+Property({
+    $id: Now.ID['prop_shipping_sender_phone'],
+    name: 'x_daas_ham.shipping.sender_phone',
+    type: 'string',
+    value: '',
+    description: "Depot phone number for labels when the depot's location has none (carriers require the sender's phone).",
+    roles: { read: [admin], write: [admin] },
+})

@@ -111,6 +111,20 @@ describe('addressProblem', () => {
     })
 })
 
+describe('addressProblem for U.S. and Canadian states', () => {
+    const us: Address = { name: 'Depot', phone: '+1 555 0100', line1: '1 Main St', city: 'Austin', state: 'TX', postalCode: '78701', country: 'US' }
+
+    it('needs the two-letter state or province code', () => {
+        expect(addressProblem(us, 'from')).toBeNull()
+        expect(addressProblem({ ...us, state: 'Texas' }, 'from')).toBe('state "Texas" must be the two-letter code')
+        expect(addressProblem({ ...us, state: '' }, 'from')).toBe('missing state')
+    })
+
+    it('does not ask for a state elsewhere', () => {
+        expect(addressProblem({ ...us, state: '', country: 'NL' }, 'from')).toBeNull()
+    })
+})
+
 describe('countryCode', () => {
     it('reads ISO codes and common country names', () => {
         expect(countryCode('de')).toBe('DE')

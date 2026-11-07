@@ -73,7 +73,10 @@ export function addressProblem(address: Address, side: 'from' | 'to' = 'to'): st
     const country = countryCode(address.country)
     const missing = ADDRESS_PARTS.filter((part) => !address[part] && partRequired(part, side, country))
     if (missing.length > 0) return `missing ${missing.join(', ')}`
-    return country ? null : `unknown country "${address.country}" (use the ISO code)`
+    if (!country) return `unknown country "${address.country}" (use the ISO code)`
+    // ShipEngine takes U.S. and Canadian states and provinces as their two-letter codes only.
+    if (STATE_REQUIRED.has(country) && !/^[A-Za-z]{2}$/.test((address.state ?? '').trim())) return `state "${address.state}" must be the two-letter code`
+    return null
 }
 
 /** An address in ShipEngine's shape, leaving out empty parts (the API rejects `''` where it needs a value). */

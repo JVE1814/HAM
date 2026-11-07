@@ -1877,6 +1877,10 @@ declare global {
                         table: 'sys_properties'
                         id: '8a04662e324c47eeb70dd346d285314f'
                     }
+                    prop_shipping_sender_phone: {
+                        table: 'sys_properties'
+                        id: '5624f680251f426c92d2f1edf1c974fd'
+                    }
                     prop_shipping_service_code: {
                         table: 'sys_properties'
                         id: '231e944df8ca47ba84e069a249aac9c0'
@@ -2386,6 +2390,10 @@ declare global {
                     src_server_domain_oem_claims_ts: {
                         table: 'sys_module'
                         id: '56f7a0a317d2447bbb3e28c63281cd56'
+                    }
+                    src_server_domain_oem_forticloud_ts: {
+                        table: 'sys_module'
+                        id: 'b5520157fcdd4ac4ab57e1f2cb93713e'
                     }
                     src_server_domain_oem_json_ts: {
                         table: 'sys_module'

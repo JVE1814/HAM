@@ -33,12 +33,12 @@ function aggregator() {
     return restMessagePort('NaaS Shipping aggregator')
 }
 
-/** A cmn_location as a carrier address, addressed to `name`. */
-function addressOf(location: GlideRecord, name: string, company: string): Address {
+/** A cmn_location as a carrier address for `contact` (a name and phone; the location's phone first). */
+function addressOf(location: GlideRecord, contact: { name: string; phone: string }, company: string): Address {
     return {
-        name: name || str(location, 'name'),
+        name: contact.name || str(location, 'name'),
         company,
-        phone: str(location, 'phone'),
+        phone: str(location, 'phone') || contact.phone,
         line1: str(location, 'street'),
         city: str(location, 'city'),
         state: str(location, 'state'),
@@ -47,11 +47,11 @@ function addressOf(location: GlideRecord, name: string, company: string): Addres
     }
 }
 
-/** The name of a Site's first contact, or '' when it has none. */
-function siteContactName(site: GlideRecord): string {
+/** A Site's first contact: name and phone (business, else mobile); empty when it has none. */
+function siteContact(site: GlideRecord): { name: string; phone: string } {
     const first = str(site, 'x_daas_ham_site_contacts').split(',')[0]
     const contact = first ? findById('customer_contact', first) : null
-    return contact ? str(contact, 'name') : ''
+    return contact ? { name: str(contact, 'name'), phone: str(contact, 'phone') || str(contact, 'mobile_phone') } : { name: '', phone: '' }
 }
 
 function depot(): GlideRecord | null {
@@ -77,8 +77,8 @@ function createShipment(spec: ShipmentSpec): LabelResult {
     const depotLocation = findById('cmn_location', str(stockroom, 'location'))
     const site = findById('cmn_location', spec.siteId)
     if (!depotLocation || !site) return { ok: false, error: 'the depot or the Site has no location' }
-    const depotAddress = addressOf(depotLocation, str(stockroom, 'name'), stringProperty(PROPERTY.shippingSenderName))
-    const siteAddress = addressOf(site, siteContactName(site), spec.parent.getDisplayValue('customer'))
+    const depotAddress = addressOf(depotLocation, { name: str(stockroom, 'name'), phone: stringProperty(PROPERTY.shippingSenderPhone) }, stringProperty(PROPERTY.shippingSenderName))
+    const siteAddress = addressOf(site, siteContact(site), spec.parent.getDisplayValue('customer'))
     const serviceCode = stringProperty(PROPERTY.shippingServiceCode)
     const packages = packageCount(spec.packages)
     const result = buyLabel(aggregator(), {

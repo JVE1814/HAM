@@ -25,6 +25,7 @@ export const PROPERTY = {
     shippingServiceCode: 'x_daas_ham.shipping.service_code',
     shippingPackageKg: 'x_daas_ham.shipping.package_kg',
     shippingSenderName: 'x_daas_ham.shipping.sender_name',
+    shippingSenderPhone: 'x_daas_ham.shipping.sender_phone',
     claimMaxCalls: 'x_daas_ham.oem.claim.max_calls',
 } as const
 

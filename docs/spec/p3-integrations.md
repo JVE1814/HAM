@@ -15,9 +15,11 @@
   no carrier.
 - **Returns**: *Create return label* on a ship-back Return order buys a label from the Site to the
   depot for the awaited Assets. The customer page shows it as *Print return label*.
-- Addresses need a name, street, city, postal code and country, and the sender a phone number
-  (ShipEngine requires `ship_from.phone`); a missing part is reported before anything is bought, and
-  empty optional parts are left out of the request. Countries are sent as ISO codes: a location's two-letter code, or a common
+- Addresses need a name, street, city, postal code and country (U.S. and Canadian states as their
+  two-letter codes), and the sender a phone number (ShipEngine requires `ship_from.phone`): the
+  location's phone, else `x_daas_ham.shipping.sender_phone` for the depot or the first site
+  contact's phone for a Site. A missing part is reported before anything is bought, and empty
+  optional parts are left out of the request. Countries are sent as ISO codes: a location's two-letter code, or a common
   country name translated (an unknown name is reported).
 - **Tracking webhook**: `POST /api/x_daas_ham/naas/shipping/tracking` (no platform login). The token
   comes in the custom header `X-NaaS-Webhook-Token` (configure it on the ShipEngine webhook's
