@@ -1,3 +1,4 @@
+import type { LineStage } from './fulfilment'
 import type { Stage } from './lifecycle'
 import type { StockroomType } from './sourcing'
 
@@ -23,6 +24,25 @@ export const RECEIVING_STOCKROOM_TYPES: readonly StockroomType[] = ['central_dep
 /** Why an arriving unit cannot be received into a Stockroom of this type, or null when it can. */
 export function receivingProblem(into: StockroomType): string | null {
     return RECEIVING_STOCKROOM_TYPES.includes(into) ? null : 'Receive into a central depot or a staging centre'
+}
+
+/** An Order line as a receipt reads it again under the line's lock, to decide whether the unit still goes to it. */
+export interface ReceivingLine {
+    stage: LineStage | ''
+    quantity: number
+    /** Assets on the line, in any stage. */
+    allocated: number
+}
+
+/**
+ * Why a received unit no longer goes to the Order line it was found for, or null when it does: the line must still
+ * await stock and have room (fewer Assets on it than ordered). It is found before its lock is taken, so another
+ * receipt or a sourcing run may have filled it since, or it may have moved on (cancelled, say).
+ */
+export function allocationProblem(line: ReceivingLine): string | null {
+    if (line.stage !== 'awaiting_stock') return `it is no longer awaiting stock (${line.stage || 'unknown stage'})`
+    if (line.allocated >= line.quantity) return `it already has all ${line.quantity} unit(s)`
+    return null
 }
 
 /** In-stock stages whose Stockroom no allocation depends on: free stock and returned units still being worked on. */

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { ALL_STAGES, type Stage } from './lifecycle'
 import type { StockroomType } from './sourcing'
-import { awaitsReceipt, putAwayProblem, RECEIVING_STOCKROOM_TYPES, receivingProblem } from './warehouse'
+import {
+    allocationProblem,
+    awaitsReceipt,
+    putAwayProblem,
+    RECEIVING_STOCKROOM_TYPES,
+    receivingProblem,
+} from './warehouse'
 
 describe('awaitsReceipt', () => {
     it('accepts units bought but not yet in stock', () => {
@@ -29,6 +35,27 @@ describe('receivingProblem', () => {
     it('lists exactly the types it receives into, for the stockroom picker', () => {
         const TYPES: readonly StockroomType[] = ['central_depot', 'staging_centre', 'customer_site']
         expect(TYPES.filter((type) => receivingProblem(type) === null)).toEqual([...RECEIVING_STOCKROOM_TYPES])
+    })
+})
+
+describe('allocationProblem', () => {
+    const waiting = { stage: 'awaiting_stock', quantity: 2, allocated: 1 } as const
+
+    it('gives the unit to a line still awaiting stock with room for it', () => {
+        expect(allocationProblem(waiting)).toBeNull()
+        expect(allocationProblem({ ...waiting, allocated: 0 })).toBeNull()
+    })
+
+    it('leaves the unit free once the line has all its units, as when two receipts raced for its last one', () => {
+        expect(allocationProblem({ ...waiting, allocated: 2 })).toBe('it already has all 2 unit(s)')
+        expect(allocationProblem({ ...waiting, quantity: 1, allocated: 3 })).toBe('it already has all 1 unit(s)')
+    })
+
+    it('leaves the unit free once the line has moved on, whatever room it shows', () => {
+        expect(allocationProblem({ ...waiting, stage: 'sourced' })).toBe('it is no longer awaiting stock (sourced)')
+        const cancelled = allocationProblem({ ...waiting, stage: 'cancelled', allocated: 0 })
+        expect(cancelled).toBe('it is no longer awaiting stock (cancelled)')
+        expect(allocationProblem({ ...waiting, stage: '' })).toBe('it is no longer awaiting stock (unknown stage)')
     })
 })
 

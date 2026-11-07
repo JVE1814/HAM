@@ -23,9 +23,10 @@ import { runEventTableJob } from '../platform/chunked'
 import { todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
 import { refreshLifecycleDates } from '../platform/lifecycle-dates'
+import type { HeldLock } from '../platform/locks'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties'
 import { bool, count, exists, findById, num, refusal, str } from '../platform/records'
-import { stockUnit } from '../platform/stock'
+import { changeStock, stockUnit } from '../platform/stock'
 
 /** Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
 
@@ -195,10 +196,9 @@ interface StockReturn {
  * Take the lease's stock out of circulation onto a draft return-to-lessor disposal: each unit is saved at pending
  * wipe, so sourcing and the spare-pool top-up can no longer claim it, and only then gets its line. A hot spare already
  * linked to an Order line is left to that line; once at a Site, its Refresh due date is the lease end like the rest.
- * Each unit is read again and moved only while still free, so one reserved since the query keeps its reservation. No
- * lock is taken: the return is saved first, and from then on sourcing and the top-up refuse the lease's units on their
- * own fresh read (domain/sourcing `isClaimable`). A unit whose line, or the disposal itself, is refused stays at
- * pending wipe on no disposal and is counted as unlisted, to be put on one by hand.
+ * Each unit is withdrawn under the lock stock claims take, from a fresh read (`withdrawFromStock`), so one reserved
+ * since the query keeps its reservation. A unit whose line, or the disposal itself, is refused stays at pending wipe on
+ * no disposal and is counted as unlisted, to be put on one by hand.
  */
 function disposeStockToLessor(lease: GlideRecord): StockReturn {
     const found = new GlideRecord('alm_hardware')
@@ -210,9 +210,9 @@ function disposeStockToLessor(lease: GlideRecord): StockReturn {
     let refused = 0
     let unlisted = 0
     while (found.next()) {
-        const asset = findById('alm_hardware', found.getUniqueValue())
-        if (!asset || !isFree(stockUnit(asset), IN_STOCK)) continue
-        if (!withdrawFromStock(asset)) {
+        const asset = withdrawFromStock(found)
+        if (asset === 'taken') continue
+        if (asset === 'refused') {
             refused++
             continue
         }
@@ -233,8 +233,29 @@ function disposeStockToLessor(lease: GlideRecord): StockReturn {
     return { disposal: order ? str(order, 'number') : null, refused, unlisted }
 }
 
-/** Save the Asset through its stock-return moves (domain/leases `stockReturnMoves`); false when one is refused. */
-function withdrawFromStock(asset: GlideRecord): boolean {
+/**
+ * Withdraw a unit the query found, under the lock stock claims take and from a fresh read (platform/stock
+ * `changeStock`): a claim whose own fresh read came before the return was saved may still be saving it. A unit gone,
+ * or no longer free stock on no Order line, is left to whoever took it ('taken'). The Asset at pending wipe, or
+ * 'refused' (logged) when a move is refused or the lock cannot be taken.
+ */
+function withdrawFromStock(found: GlideRecord): GlideRecord | 'taken' | 'refused' {
+    // Set inside the Asset's stock lock.
+    let withdrawn = 'refused' as GlideRecord | 'taken' | 'refused'
+    const ran = changeStock(found.getUniqueValue(), 'withdrawn for its lessor', (asset, lock) => {
+        if (!asset || !isFree(stockUnit(asset), IN_STOCK)) withdrawn = 'taken'
+        else if (moveOutOfStock(lock, asset)) withdrawn = asset
+    })
+    const serial = str(found, 'serial_number')
+    if (!ran) gs.warn(`[x_daas_ham] Lease return: ${serial} not withdrawn: its stock lock could not be taken`)
+    return withdrawn
+}
+
+/**
+ * Save the Asset through its stock-return moves (domain/leases `stockReturnMoves`) holding its stock `lock`; false
+ * (logged) when one is refused, or the lock was lost: a holder that outlasted it (ADR 0013) may overlap a claim.
+ */
+function moveOutOfStock(lock: HeldLock, asset: GlideRecord): boolean {
     const moves = stockReturnMoves(readStage(asset))
     for (const to of moves) {
         if (to === 'available') {
@@ -243,13 +264,16 @@ function withdrawFromStock(asset: GlideRecord): boolean {
             asset.setValue('x_daas_ham_agreement', '')
         }
         const verdict = moveAsset(asset, to)
-        if (!verdict.allowed || !asset.update()) {
-            const reason = verdict.allowed ? refusal(asset) : verdict.reason
-            gs.warn(`[x_daas_ham] Lease return: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
-            return false
-        }
+        if (!verdict.allowed) return notMoved(asset, to, verdict.reason)
+        if (!lock.held()) return notMoved(asset, to, 'its stock lock was lost')
+        if (!asset.update()) return notMoved(asset, to, refusal(asset))
     }
     return moves.length > 0
+}
+
+function notMoved(asset: GlideRecord, to: Stage, reason: string): false {
+    gs.warn(`[x_daas_ham] Lease return: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
+    return false
 }
 
 /** A draft return-to-lessor disposal order for the lease's stock; null when the platform refuses it (logged). */
