@@ -1,3 +1,4 @@
+import { activeDays, type MonthBounds } from './billing'
 import { addMonths } from './calendar'
 import type { LegalOwner } from './lifecycle'
 
@@ -5,38 +6,62 @@ import type { LegalOwner } from './lifecycle'
 
 export type CostType = 'purchase' | 'lease' | 'oem_support' | 'field_labour'
 
-export interface IntervalCostInput {
-    /** Days the Asset served in the month, the month's first day and its length. */
-    days: number
-    monthFirst: string
-    daysInMonth: number
+/** What an Asset's Lease schedule charges, as stored on it. */
+export interface LeaseTerms {
+    /** Lease schedule start and end, date or date-time; '' = open. */
+    starts: string
+    ends: string
+    /** Monthly payment for every Asset on the schedule. */
+    monthlyPayment: number
+    /** Assets on the schedule today. */
+    coveredAssets: number
+}
+
+/** What an Asset's costs are worked out from, as stored on it. */
+export interface AssetCostFacts {
+    /** As stored; '' counts as provider. */
     legalOwner: LegalOwner
-    /** Purchase cost of the Asset, written off evenly over `amortisationMonths` from `purchasedOn`. */
     purchaseCost: number
-    amortisationMonths: number
-    /** When the write-off started (purchase date, else first in service); unknown = still running. */
-    purchasedOn?: string
-    /** The Asset's share of its lease's monthly payment (0 when not leased). */
-    leaseMonthly: number
+    /** '' when unknown. */
+    purchaseDate: string
+    /** Date-time first in service ('' when unknown). The write-off starts here when there is no purchase date. */
+    inServiceDate: string
     /** Annual cost of the OEM coverage contracts covering the Asset. */
     supportAnnual: number
+    /** The Asset's Lease schedule; null when it has none or it was not found. */
+    lease: LeaseTerms | null
 }
 
 /**
- * The costs one Asset carried for the days it served in a month. Provider-owned Assets carry their
- * purchase write-off until it is complete; leased ones the lease payment; customer-owned ones neither.
- * Any Asset carries the OEM support the Provider pays for it.
+ * The costs one Asset carried over one Service interval, prorated by the interval's days in the month.
+ * Provider-owned Assets carry their purchase write-off until it is complete; leased ones their share of
+ * the lease payment while the lease runs; customer-owned ones neither. Any Asset carries the OEM support
+ * the Provider pays for it.
  */
-export function intervalCosts(input: IntervalCostInput): Array<{ type: CostType; amount: number }> {
-    const share = input.daysInMonth > 0 ? Math.max(0, input.days) / input.daysInMonth : 0
+export function serviceIntervalCosts(
+    interval: { start: string; end?: string },
+    asset: AssetCostFacts,
+    bounds: MonthBounds,
+    amortisationMonths: number,
+): Array<{ type: CostType; amount: number }> {
+    const share = bounds.days > 0 ? activeDays(bounds, interval.start, interval.end) / bounds.days : 0
     const costs: Array<{ type: CostType; amount: number }> = []
-    const writtenOff = !!input.purchasedOn && addMonths(input.purchasedOn, input.amortisationMonths) <= input.monthFirst
-    if (input.legalOwner === 'provider' && input.purchaseCost > 0 && input.amortisationMonths > 0 && !writtenOff) {
-        costs.push({ type: 'purchase', amount: (input.purchaseCost / input.amortisationMonths) * share })
+    const owner = asset.legalOwner || 'provider'
+    if (owner === 'provider' && asset.purchaseCost > 0 && amortisationMonths > 0 && !writtenOff(asset, bounds, amortisationMonths)) {
+        costs.push({ type: 'purchase', amount: (asset.purchaseCost / amortisationMonths) * share })
     }
-    if (input.legalOwner === 'lessor' && input.leaseMonthly > 0) costs.push({ type: 'lease', amount: input.leaseMonthly * share })
-    if (input.supportAnnual > 0) costs.push({ type: 'oem_support', amount: (input.supportAnnual / 12) * share })
+    if (owner === 'lessor' && asset.lease && leaseRunsIn(asset.lease, bounds)) {
+        const monthly = leaseShare(asset.lease.monthlyPayment, asset.lease.coveredAssets)
+        if (monthly > 0) costs.push({ type: 'lease', amount: monthly * share })
+    }
+    if (asset.supportAnnual > 0) costs.push({ type: 'oem_support', amount: (asset.supportAnnual / 12) * share })
     return costs
+}
+
+/** Whether the write-off (from the purchase date, else first in service) ended by the month; an unknown start = still running. */
+function writtenOff(asset: AssetCostFacts, bounds: MonthBounds, amortisationMonths: number): boolean {
+    const start = asset.purchaseDate || asset.inServiceDate.slice(0, 10)
+    return !!start && addMonths(start, amortisationMonths) <= bounds.first
 }
 
 /** A lease's monthly payment split evenly over the Assets it covers. */
@@ -44,13 +69,15 @@ export function leaseShare(monthlyPayment: number, coveredAssets: number): numbe
     return coveredAssets > 0 ? monthlyPayment / coveredAssets : 0
 }
 
-/** Whether a lease running from `starts` to `ends` (either open) is payable in the month. */
-export function leaseRunsIn(starts: string, ends: string, monthFirst: string, monthLast: string): boolean {
-    return (!starts || starts <= monthLast) && (!ends || ends >= monthFirst)
+/** Whether the lease (either end open) is payable in the month. */
+function leaseRunsIn(lease: LeaseTerms, bounds: MonthBounds): boolean {
+    const starts = lease.starts.slice(0, 10)
+    const ends = lease.ends.slice(0, 10)
+    return (!starts || starts <= bounds.last) && (!ends || ends >= bounds.first)
 }
 
 /** Where a cost or revenue belongs: a Customer, and a Site ('' for customer-level amounts such as fees). */
-export function marginKey(customerId: string, siteId: string): string {
+function marginKey(customerId: string, siteId: string): string {
     return `${customerId}|${siteId}`
 }
 
@@ -80,6 +107,13 @@ export class CostLedger {
     }
 }
 
+/** Revenue or cost for a Customer and Site ('' for customer-level amounts such as fees). */
+export interface Amount {
+    customerId: string
+    siteId: string
+    amount: number
+}
+
 export interface MarginRow {
     customerId: string
     siteId: string
@@ -95,12 +129,14 @@ export function cents(value: number): number {
     return Math.round(value * 100) / 100
 }
 
-/** Margin for every Customer/Site that had revenue or cost. */
-export function marginRows(revenue: ReadonlyMap<string, number>, cost: ReadonlyMap<string, number>): MarginRow[] {
-    const keys = new Set([...revenue.keys(), ...cost.keys()])
+/** Margin for every Customer/Site with revenue or cost; amounts for the same Customer and Site are summed. */
+export function marginRows(revenue: Iterable<Amount>, cost: Iterable<Amount>): MarginRow[] {
+    const revenues = sumByKey(revenue)
+    const costs = sumByKey(cost)
+    const keys = new Set([...revenues.keys(), ...costs.keys()])
     return [...keys].sort().map((key) => {
-        const r = cents(revenue.get(key) ?? 0)
-        const c = cents(cost.get(key) ?? 0)
+        const r = cents(revenues.get(key) ?? 0)
+        const c = cents(costs.get(key) ?? 0)
         return {
             ...splitMarginKey(key),
             revenue: r,
@@ -109,4 +145,13 @@ export function marginRows(revenue: ReadonlyMap<string, number>, cost: ReadonlyM
             marginPct: r !== 0 ? Math.round(((r - c) / r) * 1000) / 10 : null,
         }
     })
+}
+
+function sumByKey(amounts: Iterable<Amount>): Map<string, number> {
+    const sums = new Map<string, number>()
+    for (const { customerId, siteId, amount } of amounts) {
+        const key = marginKey(customerId, siteId)
+        sums.set(key, (sums.get(key) ?? 0) + amount)
+    }
+    return sums
 }

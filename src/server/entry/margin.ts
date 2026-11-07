@@ -1,9 +1,9 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
-import { activeDays, monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing'
+import { monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing'
 import type { LegalOwner } from '../domain/lifecycle'
-import { cents, CostLedger, intervalCosts, leaseRunsIn, leaseShare, marginKey, marginRows, type CostType } from '../domain/margin'
+import { cents, CostLedger, marginRows, serviceIntervalCosts, type Amount, type CostType, type LeaseTerms } from '../domain/margin'
 import { runEventTableJob } from '../platform/chunked'
 import { EVENT, fire } from '../platform/events'
 import { intProperty, PROPERTY } from '../platform/properties'
@@ -28,7 +28,7 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     const bounds = monthBounds(str(period, 'period'))
     const amortisationMonths = intProperty(PROPERTY.amortisationMonths, 60)
     const ledger = new CostLedger()
-    const leaseShares = new Map<string, number>()
+    const leases = new Map<string, LeaseTerms | null>()
     const result = runEventTableJob({
         eventName: EVENT.marginCompute,
         record: current,
@@ -42,24 +42,15 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
             siteId: str(interval, 'site'),
             start: str(interval, 'start_date'),
             end: str(interval, 'end_date') || undefined,
-            legalOwner: (str(interval, 'asset.x_daas_ham_legal_owner') || 'provider') as LegalOwner,
+            legalOwner: str(interval, 'asset.x_daas_ham_legal_owner') as LegalOwner,
             purchaseCost: num(interval, 'asset.cost'),
-            purchasedOn: str(interval, 'asset.purchase_date') || str(interval, 'asset.x_daas_ham_in_service_date').slice(0, 10) || undefined,
-            leaseId: str(interval, 'asset.x_daas_ham_lease'),
+            purchaseDate: str(interval, 'asset.purchase_date'),
+            inServiceDate: str(interval, 'asset.x_daas_ham_in_service_date'),
             supportAnnual: num(interval, 'asset.x_daas_ham_support_cost'),
+            leaseId: str(interval, 'asset.x_daas_ham_lease'),
         }),
         handle: (interval) => {
-            const costs = intervalCosts({
-                days: activeDays(bounds, interval.start, interval.end),
-                monthFirst: bounds.first,
-                daysInMonth: bounds.days,
-                legalOwner: interval.legalOwner,
-                purchaseCost: interval.purchaseCost,
-                amortisationMonths,
-                purchasedOn: interval.purchasedOn,
-                leaseMonthly: interval.leaseId ? shareOf(interval.leaseId, bounds, leaseShares) : 0,
-                supportAnnual: interval.supportAnnual,
-            })
+            const costs = serviceIntervalCosts(interval, { ...interval, lease: leaseOf(interval.leaseId, leases) }, bounds, amortisationMonths)
             for (const cost of costs) ledger.add(interval.customerId, interval.siteId, cost.type, cost.amount)
         },
         flush: () => writeCostFacts(periodId, ledger.drain()),
@@ -77,18 +68,20 @@ function clearPeriod(periodId: string): void {
     }
 }
 
-/** The Asset's share of its lease's payment for the month (0 outside the lease term). */
-function shareOf(leaseId: string, bounds: MonthBounds, cache: Map<string, number>): number {
+/** The Lease schedule's terms, read once per schedule; null without one or when it is not found. */
+function leaseOf(leaseId: string, cache: Map<string, LeaseTerms | null>): LeaseTerms | null {
+    if (!leaseId) return null
     const cached = cache.get(leaseId)
     if (cached !== undefined) return cached
     const lease = findById('x_daas_ham_lease_schedule', leaseId)
-    if (!lease || !leaseRunsIn(str(lease, 'starts').slice(0, 10), str(lease, 'ends').slice(0, 10), bounds.first, bounds.last)) {
-        cache.set(leaseId, 0)
-        return 0
+    const terms = lease && {
+        starts: str(lease, 'starts'),
+        ends: str(lease, 'ends'),
+        monthlyPayment: num(lease, 'monthly_payment'),
+        coveredAssets: count('alm_hardware', `x_daas_ham_lease=${leaseId}`),
     }
-    const share = leaseShare(num(lease, 'monthly_payment'), count('alm_hardware', `x_daas_ham_lease=${leaseId}`))
-    cache.set(leaseId, share)
-    return share
+    cache.set(leaseId, terms)
+    return terms
 }
 
 /** Add amounts to the period's Cost facts (one per Customer, Site and type). */
@@ -129,16 +122,21 @@ function addFieldLabour(periodId: string, bounds: MonthBounds): void {
     writeCostFacts(periodId, ledger.drain())
 }
 
-function sumsBy(table: string, periodId: string): Map<string, number> {
+/** The period's amounts in a table, summed per Customer and Site. */
+function sumsBy(table: string, periodId: string): Amount[] {
     const ga = new GlideAggregate(table)
     ga.addEncodedQuery(`billing_period=${periodId}`)
     ga.addAggregate('SUM', 'amount')
     ga.groupBy('customer')
     ga.groupBy('site')
     ga.query()
-    const sums = new Map<string, number>()
+    const sums: Amount[] = []
     while (ga.next()) {
-        sums.set(marginKey(String(ga.getValue('customer') ?? ''), String(ga.getValue('site') ?? '')), Number(ga.getAggregate('SUM', 'amount')) || 0)
+        sums.push({
+            customerId: String(ga.getValue('customer') ?? ''),
+            siteId: String(ga.getValue('site') ?? ''),
+            amount: Number(ga.getAggregate('SUM', 'amount')) || 0,
+        })
     }
     return sums
 }
