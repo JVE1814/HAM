@@ -243,9 +243,11 @@ export const CLAIM_ROUTES: Partial<Record<OemVendor, Partial<Record<ClaimAction,
 /** Vendors with at least one automated step (Cisco has none). */
 export const CLAIM_VENDORS: readonly OemVendor[] = Object.keys(CLAIM_ROUTES) as OemVendor[]
 
-/** The order a vendor's actions run in: a device is claimed before it is licensed or provisioned (every action ranked). */
-const CLAIM_RANK: Record<ClaimAction, number> = { oem_claim: 0, oem_licence: 1, oem_ztp: 2 }
-const CLAIM_ORDER = (Object.keys(CLAIM_RANK) as ClaimAction[]).sort((a, b) => CLAIM_RANK[a] - CLAIM_RANK[b])
+/** The order a vendor's actions run in: a device is claimed before it is licensed or provisioned. */
+const CLAIM_ORDER = ['oem_claim', 'oem_licence', 'oem_ztp'] as const satisfies readonly ClaimAction[]
+/** Compile-time check that CLAIM_ORDER lists every ClaimAction (a new action fails to compile here). */
+const everyActionOrdered: [Exclude<ClaimAction, (typeof CLAIM_ORDER)[number]>] extends [never] ? true : never = true
+void everyActionOrdered
 
 /** Steps loaded per action and run at most. */
 const MAX_STEPS_PER_LOAD = 200

@@ -3394,6 +3394,10 @@ declare global {
                         table: 'sys_scope_privilege'
                         id: '924100e156864f019bfde512167b8434'
                     }
+                    xsp_sys_attachment_delete: {
+                        table: 'sys_scope_privilege'
+                        id: '939cd0a9d3df4a81b23285d8781e4c40'
+                    }
                     xsp_sys_attachment_read: {
                         table: 'sys_scope_privilege'
                         id: '1c4c085ba6e24a28aa855397075100d0'
@@ -10746,6 +10750,15 @@ declare global {
                         key: {
                             logical_table_name: 'cmdb_model'
                             col_name_string: 'x_daas_ham_oem_pid'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '29d842260e9344278f8d2c4c5a5eaa2f'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'buyout_assets'
+                            language: 'en'
                         }
                     },
                     {
@@ -23373,6 +23386,14 @@ declare global {
                                 }
                             }
                             sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '72441efdc8614dbab1ff3d0870818b60'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'buyout_assets'
                         }
                     },
                     {

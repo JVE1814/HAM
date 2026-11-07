@@ -28,6 +28,7 @@
   site, description, units, monthly rate, amount, currency. Built from the locked lines by the
   `x_daas_ham.billing.export` event shortly after closing; attaching it does not update the period,
   and a period that already has the file is skipped (delete it, then *Re-export CSV*, to rebuild it).
+  Racing exports keep only the oldest copy; a failed export is logged as an error naming the period.
 - **Pull API** (finance or integration role):
   - `GET /api/x_daas_ham/naas/billing_periods` lists recent periods with status and totals;
   - `GET /api/x_daas_ham/naas/billing_periods/{id}/lines?offset=0&limit=1000` returns one page of
@@ -48,6 +49,8 @@ Closing a period (or **Recompute margin** on a closed one) rebuilds its **Cost f
 - Customer-owned Assets carry no capital cost.
 - Costs use the Assets' current ownership, cost and coverage: *Recompute margin* on an old period
   reflects today's data. A recompute started while another is running supersedes it.
+- While a buyout transfer is still running, a lease's payment keeps being split over the Assets it
+  covered when the buyout was decided.
 - **Revenue** is the period's billing lines (subscriptions per Site, fees at Customer level).
 - **Margin** = revenue − cost; margin % = margin ÷ revenue (blank without revenue).
 - The workspace dashboard's **Margin** tab shows last month's revenue, cost and margin, margin by

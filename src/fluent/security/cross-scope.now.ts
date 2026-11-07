@@ -443,3 +443,12 @@ CrossScopePrivilege({
     targetScope: 'global',
     targetType: 'sys_db_object',
 })
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_sys_attachment_delete'],
+    operation: 'delete',
+    status: 'allowed',
+    targetName: 'sys_attachment',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})

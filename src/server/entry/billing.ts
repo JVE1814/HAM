@@ -196,9 +196,6 @@ export function uiRegenerateBillingPeriod(current: GlideRecord): void {
     gs.addInfoMessage(`Regenerating ${str(current, 'period')}`)
 }
 
-/** Fired by Close period and Re-export CSV (parm1 = period); belongs in EVENT once platform/events.ts is free. */
-const BILLING_EXPORT_EVENT = 'x_daas_ham.billing.export'
-
 const CSV_HEADER = ['period', 'kind', 'customer', 'agreement', 'subscription_line', 'site', 'description', 'units', 'monthly_rate', 'amount', 'currency']
 
 /** UI action "Close period": mark its fees billed, lock it, then export its CSV and compute its margin in the background. */
@@ -214,7 +211,7 @@ export function uiCloseBillingPeriod(current: GlideRecord): void {
     current.setValue('closed_at', new GlideDateTime().getValue())
     current.setValue('closed_by', gs.getUserID())
     current.update()
-    fire(BILLING_EXPORT_EVENT, current, current.getUniqueValue())
+    fire(EVENT.billingExport, current, current.getUniqueValue())
     fire(EVENT.marginCompute, current, current.getUniqueValue())
     gs.addInfoMessage(`${str(current, 'period')} closed and locked; the CSV export and margin are being prepared`)
 }
@@ -224,31 +221,55 @@ export function uiExportBillingPeriod(current: GlideRecord): void {
     if (str(current, 'status') !== 'closed') return void gs.addErrorMessage('Only a closed period can be exported')
     const fileName = exportFileName(current)
     if (hasAttachment(current, fileName)) return void gs.addInfoMessage(`${fileName} is already attached; delete it to export again`)
-    fire(BILLING_EXPORT_EVENT, current, current.getUniqueValue())
+    fire(EVENT.billingExport, current, current.getUniqueValue())
     gs.addInfoMessage(`The CSV export of ${str(current, 'period')} is being prepared`)
 }
 
 /**
  * Script action on x_daas_ham.billing.export (parm1 = period): attach the CSV of a closed period's
  * lines unless it is already attached. Only reads the period, so the closed-period lock is not hit.
+ * Two exports racing each other converge on one file: each keeps only the oldest copy. A failure is
+ * logged as an error naming the period, and Re-export CSV can be used once it is fixed.
  */
 export function exportBillingPeriod(event: GlideRecord): void {
     const period = findById('x_daas_ham_billing_period', str(event, 'parm1'))
     if (!period || str(period, 'status') !== 'closed') return
     const fileName = exportFileName(period)
     if (hasAttachment(period, fileName)) return
-    const rows: Array<Array<string | number>> = [CSV_HEADER]
-    const line = linesOf(period.getUniqueValue())
-    while (line.next()) rows.push(csvRow(period, line))
-    new GlideSysAttachment().write(period, fileName, 'text/csv', toCsv(rows))
+    try {
+        const rows: Array<Array<string | number>> = [CSV_HEADER]
+        const line = linesOf(period.getUniqueValue())
+        while (line.next()) rows.push(csvRow(period, line))
+        new GlideSysAttachment().write(period, fileName, 'text/csv', toCsv(rows))
+        keepOldestExport(period, fileName)
+    } catch (error) {
+        gs.error(`[x_daas_ham] CSV export of billing period ${str(period, 'period')} failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+}
+
+/** Delete every copy of the export but the oldest (a deterministic choice every racing export agrees on). */
+function keepOldestExport(period: GlideRecord, fileName: string): void {
+    const copy = new GlideRecord('sys_attachment')
+    copy.addEncodedQuery(`${exportQuery(period, fileName)}^ORDERBYsys_created_on^ORDERBYsys_id`)
+    copy.query()
+    const attachments = new GlideSysAttachment()
+    let first = true
+    while (copy.next()) {
+        if (!first) attachments.deleteAttachment(copy.getUniqueValue())
+        first = false
+    }
 }
 
 function exportFileName(period: GlideRecord): string {
     return `billing-${str(period, 'period')}.csv`
 }
 
+function exportQuery(period: GlideRecord, fileName: string): string {
+    return `table_name=x_daas_ham_billing_period^table_sys_id=${period.getUniqueValue()}^file_name=${fileName}`
+}
+
 function hasAttachment(period: GlideRecord, fileName: string): boolean {
-    return count('sys_attachment', `table_name=x_daas_ham_billing_period^table_sys_id=${period.getUniqueValue()}^file_name=${fileName}`) > 0
+    return count('sys_attachment', exportQuery(period, fileName)) > 0
 }
 
 function linesOf(periodId: string, offset = 0, limit = 0): GlideRecord {

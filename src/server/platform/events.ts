@@ -8,6 +8,7 @@ export const EVENT = {
     returnOverdue: 'x_daas_ham.return.overdue',
     leaseAssets: 'x_daas_ham.lease.assets',
     leaseBuyout: 'x_daas_ham.lease.buyout',
+    billingExport: 'x_daas_ham.billing.export',
     leaseMismatch: 'x_daas_ham.lease.mismatch',
     agreementRenewal: 'x_daas_ham.agreement.renewal',
     coverageExpiring: 'x_daas_ham.coverage.expiring',
