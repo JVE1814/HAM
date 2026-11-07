@@ -28,8 +28,12 @@ export function onAssetLeaseChanged(current: GlideRecord): void {
     current.setValue('x_daas_ham_lessor', str(lease, 'lessor'))
 }
 
-/** Daily: flag leases that end before the service they support, and raise decisions ahead of lease ends. */
+/**
+ * Daily: flag leases that end before the service they support, raise decisions ahead of lease ends,
+ * and queue the transfer again for a bought-out lease that still has Assets (an update was refused).
+ */
 export function reviewLeases(): void {
+    resumeBuyouts()
     const today = todayIso()
     const lease = new GlideRecord('x_daas_ham_lease_schedule')
     lease.addQuery('end_action', 'undecided')
@@ -46,6 +50,13 @@ export function reviewLeases(): void {
         }
         if (withinLead(str(lease, 'ends'), today, num(lease, 'decision_lead_days')) && !openDecision(leaseId)) raiseDecision(lease, mismatch)
     }
+}
+
+function resumeBuyouts(): void {
+    const lease = new GlideRecord('x_daas_ham_lease_schedule')
+    lease.addQuery('end_action', 'buyout')
+    lease.query()
+    while (lease.next()) if (countAssets(lease.getUniqueValue()) > 0) fire(EVENT.leaseBuyout, lease, lease.getUniqueValue())
 }
 
 /** Agreement end dates of the Assets a lease covers that are serving customers ('' = open-ended). */
@@ -116,8 +127,14 @@ export function uiApplyLeaseDecision(current: GlideRecord): void {
     } else {
         lease.setValue('end_action', decision)
     }
-    // Each Asset costs its share of the buyout price (for Margin), fixed now while all are still covered.
-    if (decision === 'buyout') lease.setValue('buyout_share', leaseShare(num(lease, 'buyout_price'), countAssets(lease.getUniqueValue())))
+    // Fixed once, while every Asset is still covered: each one's share of the buyout price (its cost
+    // for Margin) and how many there were (Margin keeps splitting the lease over that many while the
+    // transfer runs).
+    if (decision === 'buyout' && !num(lease, 'buyout_assets')) {
+        const covered = countAssets(lease.getUniqueValue())
+        lease.setValue('buyout_assets', covered)
+        lease.setValue('buyout_share', leaseShare(num(lease, 'buyout_price'), covered))
+    }
     lease.update()
     if (decision === 'buyout') {
         fire(EVENT.leaseBuyout, lease, lease.getUniqueValue())
@@ -157,6 +174,8 @@ function disposeStockToLessor(lease: GlideRecord): string | null {
 /** Script action on x_daas_ham.lease.assets: recompute Refresh due dates of the lease's Assets. */
 export function refreshLeaseAssets(event: GlideRecord, current: GlideRecord): void {
     const leaseId = str(event, 'parm1')
+    // Never run with a blank lease: the query would match every Asset that has no lease.
+    if (!leaseId) return
     const lifecycles = modelLifecycles()
     runEventTableJob({
         eventName: EVENT.leaseAssets,

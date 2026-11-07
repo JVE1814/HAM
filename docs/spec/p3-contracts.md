@@ -17,7 +17,7 @@
 
 | Decision | Effect |
 |---|---|
-| Buy out | Every covered Asset becomes Provider-owned and leaves the schedule, in a background job (chunked, so large leases do not time out the UI action); when a buyout price is recorded, each Asset's cost becomes its share of it, fixed on the lease as *Buyout cost per asset* when the decision is applied |
+| Buy out | Every covered Asset becomes Provider-owned and leaves the schedule, in a background job (chunked, so large leases do not time out the UI action); when a buyout price is recorded, each Asset's cost becomes its share of it, fixed once on the lease (*Buyout cost per asset*, *Assets covered at buyout*) when the decision is applied. The daily review queues the transfer again for a bought-out lease that still has Assets |
 | Extend | The lease runs to the new end date (which must be later); a new decision comes due before it |
 | Return | Stock (available, spare pool) goes on a draft *return to lessor* disposal order. Deployed Assets (including ones shipped or awaiting first sighting) get a Refresh due date no later than the lease end, so automatic refresh replaces them; the swapped-back units are returned and evaluated as usual (lessor-owned units can only be returned to the lessor) |
 

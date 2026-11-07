@@ -12,7 +12,8 @@ export interface TableJob<T> {
     read(record: GlideRecord): T
     /**
      * Load what a whole batch needs in one go (e.g. its referenced records): called once per batch,
-     * after every row of it is read and before any of it is handled.
+     * after every row of it is read and before any of it is handled. It may complete the items in
+     * place (e.g. attach records loaded with one query for the whole batch).
      */
     prefetch?: (items: readonly T[]) => void
     handle(item: T, sysId: string): void

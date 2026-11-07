@@ -29,7 +29,6 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     const amortisationMonths = intProperty(PROPERTY.amortisationMonths, 60)
     const ledger = new CostLedger()
     const leases = new Map<string, LeaseTerms | null>()
-    const assets = new Map<string, AssetFields>()
     const result = runEventTableJob({
         eventName: EVENT.marginCompute,
         record: current,
@@ -44,10 +43,11 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
             start: str(interval, 'start_date'),
             end: str(interval, 'end_date') || undefined,
             assetId: str(interval, 'asset'),
+            asset: NO_ASSET,
         }),
-        prefetch: (intervals) => loadAssets(intervals.map((interval) => interval.assetId), assets),
+        prefetch: loadAssets,
         handle: (interval) => {
-            const asset = assets.get(interval.assetId) ?? NO_ASSET
+            const asset = interval.asset
             const costs = serviceIntervalCosts(interval, { ...asset, lease: leaseOf(asset.leaseId, leases) }, bounds, amortisationMonths)
             for (const cost of costs) ledger.add(interval.customerId, interval.siteId, cost.type, cost.amount)
         },
@@ -72,16 +72,16 @@ type AssetFields = Omit<AssetCostFacts, 'lease'> & { leaseId: string }
 /** A deleted Asset reads as a dot-walk through a broken reference did: empty strings and zeros. */
 const NO_ASSET: AssetFields = { legalOwner: '', purchaseCost: 0, purchaseDate: '', inServiceDate: '', supportAnnual: 0, leaseId: '' }
 
-/** Replace `into` with the cost fields of the batch's distinct Assets, read with one query. */
-function loadAssets(assetIds: readonly string[], into: Map<string, AssetFields>): void {
-    into.clear()
-    const ids = [...new Set(assetIds.filter(Boolean))]
+/** Give each interval of the batch its Asset's cost fields, read with one query (missing Assets keep NO_ASSET). */
+function loadAssets(intervals: ReadonlyArray<{ assetId: string; asset: AssetFields }>): void {
+    const ids = [...new Set(intervals.map((interval) => interval.assetId).filter(Boolean))]
     if (ids.length === 0) return
+    const found = new Map<string, AssetFields>()
     const asset = new GlideRecord('alm_hardware')
     asset.addEncodedQuery(`sys_idIN${ids.join(',')}`)
     asset.query()
     while (asset.next()) {
-        into.set(asset.getUniqueValue(), {
+        found.set(asset.getUniqueValue(), {
             legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner,
             purchaseCost: num(asset, 'cost'),
             purchaseDate: str(asset, 'purchase_date'),
@@ -90,6 +90,7 @@ function loadAssets(assetIds: readonly string[], into: Map<string, AssetFields>)
             leaseId: str(asset, 'x_daas_ham_lease'),
         })
     }
+    for (const interval of intervals) interval.asset = found.get(interval.assetId) ?? NO_ASSET
 }
 
 /** The Lease schedule's terms, read once per schedule; null without one or when it is not found. */
@@ -102,7 +103,8 @@ function leaseOf(leaseId: string, cache: Map<string, LeaseTerms | null>): LeaseT
         starts: str(lease, 'starts'),
         ends: str(lease, 'ends'),
         monthlyPayment: num(lease, 'monthly_payment'),
-        coveredAssets: count('alm_hardware', `x_daas_ham_lease=${leaseId}`),
+        // While a buyout transfer runs, keep splitting over the Assets covered when it was decided.
+        coveredAssets: Math.max(count('alm_hardware', `x_daas_ham_lease=${leaseId}`), num(lease, 'buyout_assets')),
     }
     cache.set(leaseId, terms)
     return terms
