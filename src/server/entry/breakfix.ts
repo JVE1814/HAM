@@ -49,7 +49,7 @@ export function uiRaiseReplacement(current: GlideRecord): void {
     order.setValue('install_mode', 'fsm_engineer')
     order.setValue('case', current.getUniqueValue())
     order.setValue('short_description', `Replace ${str(failed, 'asset_tag') || str(failed, 'serial_number')} (${str(current, 'number')})`)
-    order.insert()
+    if (!order.insert()) return void gs.addErrorMessage(`Replacement order not raised: ${refusal(order)}`)
 
     const line = new GlideRecord('x_daas_ham_order_line')
     line.initialize()
@@ -57,11 +57,24 @@ export function uiRaiseReplacement(current: GlideRecord): void {
     line.setValue('model', str(failed, 'model'))
     line.setValue('quantity', 1)
     line.setValue('replaces_asset', failed.getUniqueValue())
-    line.insert()
+    if (!line.insert()) {
+        // Without its line the Order replaces nothing: it is removed again, so the case can raise one afresh.
+        const kept = order.deleteRecord() ? '' : `; ${str(order, 'number')} is left without it, cancel it`
+        return void gs.addErrorMessage(`Replacement order not raised, its line was not saved: ${refusal(line)}${kept}`)
+    }
 
     current.setValue('x_daas_ham_replacement_order', order.getUniqueValue())
-    current.update()
+    // Unlinked, the case would offer Raise replacement again, so the Order stays a draft (it names the case).
+    if (!current.update()) {
+        const draft = `Replacement order ${str(order, 'number')} is a draft not linked to the case`
+        return void gs.addErrorMessage(`${draft}: ${refusal(current)}. Link it and submit it`)
+    }
     submitReplacement(order)
+}
+
+/** Why the platform refused to save `record`, for the message. */
+function refusal(record: GlideRecord): string {
+    return record.getLastErrorMessage() || 'the save was refused'
 }
 
 function submitReplacement(order: GlideRecord): void {
@@ -78,7 +91,8 @@ export function uiDefectiveReturnedToOem(current: GlideRecord): void {
         gs.addErrorMessage(verdict.reason)
         return
     }
-    asset.update()
+    // The RMA records the return only once the unit is retired.
+    if (!asset.update()) return void gs.addErrorMessage(`${str(asset, 'serial_number')} not retired: ${refusal(asset)}`)
     current.setValue('state', 'defective_returned')
     current.update()
 }

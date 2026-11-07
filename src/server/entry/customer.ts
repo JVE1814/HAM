@@ -7,7 +7,7 @@ import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
 import { ROLE } from '../domain/visibility'
 import { readStage } from '../platform/assets'
 import { currentSession } from '../platform/session'
-import { findById, str } from '../platform/records'
+import { exists, findById, str } from '../platform/records'
 import { installedAssetIds, raiseReturn } from '../platform/returns'
 import { returnLabels } from '../platform/shipments'
 import { completeAttestation } from './assurance'
@@ -140,7 +140,10 @@ export function reportFault(request: RESTAPIRequest, response: RESTAPIResponse):
     kase.setValue('short_description', `Faulty device ${str(asset, 'asset_tag') || str(asset, 'serial_number')} at ${asset.getDisplayValue('x_daas_ham_site')}`)
     kase.setValue('description', String(input.description ?? ''))
     kase.setValue('x_daas_ham_failed_asset', asset.getUniqueValue())
-    kase.insert()
+    if (!kase.insert()) {
+        gs.warn(`[x_daas_ham] No fault case for ${str(asset, 'serial_number')}: ${refusal(kase)}`)
+        return reply(response, 422, { error: 'Fault not reported: the platform refused it' })
+    }
     reply(response, 201, { case: str(kase, 'number') })
 }
 
@@ -151,7 +154,11 @@ export function confirmInstalled(request: RESTAPIRequest, response: RESTAPIRespo
     if (!order || !awaitsSelfInstallConfirmation({ stage: str(order, 'stage'), installMode: str(order, 'install_mode') })) {
         return reply(response, 409, { error: 'This order is not waiting for a self-install confirmation' })
     }
-    completeInstall(order)
+    // Refused units stay where they were, so the confirmation can be sent again.
+    const refused = completeInstall(order)
+    if (refused > 0) {
+        return reply(response, 422, { error: `${refused} device(s) not confirmed: the platform refused them` })
+    }
     reply(response, 200, { order: str(order, 'number') })
 }
 
@@ -163,13 +170,19 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
     if (!attestation || str(attestation, 'state') === '3') return reply(response, 404, { error: 'No open attestation' })
     const input = data(request)
     const answers = Array.isArray(input.items) ? (input.items as Array<{ id?: string; response?: string }>) : []
+    let refused = 0
     for (const answer of answers) {
         if (!['confirmed', 'missing', 'unknown'].includes(String(answer.response))) continue
         const item = findById('x_daas_ham_attestation_item', String(answer.id ?? ''))
         if (!item || str(item, 'attestation') !== attestation.getUniqueValue()) continue
         item.setValue('response', String(answer.response))
-        item.update()
+        if (item.update()) continue
+        refused++
+        const device = str(item, 'asset.serial_number')
+        gs.warn(`[x_daas_ham] ${str(attestation, 'number')}: answer for ${device} not saved: ${refusal(item)}`)
     }
+    // Submitted, the attestation would complete on the earlier answer, or none.
+    if (refused > 0) return reply(response, 422, { error: `${refused} answer(s) not saved: the platform refused them` })
     if (input.submit === true) {
         const open = new GlideRecord('x_daas_ham_attestation_item')
         open.addQuery('attestation', attestation.getUniqueValue())
@@ -177,7 +190,10 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
         open.setLimit(1)
         open.query()
         if (open.hasNext()) return reply(response, 409, { error: 'Answer every device before submitting' })
-        completeAttestation(attestation)
+        // Refused: it stays open, so the answers can be submitted again.
+        if (completeAttestation(attestation)) {
+            return reply(response, 422, { error: 'Attestation not submitted: the platform refused it' })
+        }
     }
     reply(response, 200, { attestation: str(attestation, 'number') })
 }
@@ -219,5 +235,14 @@ export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPI
     })
     // Refused: nothing was moved, so the request can be sent again.
     if (!returnId) return reply(response, 422, { error: 'Return not raised: the platform refused it' })
+    // A Return no device could be added to (each refused, logged, or already awaiting a return) is closed at once.
+    if (!exists('x_daas_ham_return_order_line', `return_order=${returnId}`)) {
+        return reply(response, 422, { error: 'No device could be added: each is already on a return or was refused' })
+    }
     reply(response, 201, { returnOrder: findById('x_daas_ham_return_order', returnId)?.getDisplayValue('number') ?? returnId })
+}
+
+/** Why the platform refused to save `record`, for the log. */
+function refusal(record: GlideRecord): string {
+    return record.getLastErrorMessage() || 'the save was refused'
 }

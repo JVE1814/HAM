@@ -35,5 +35,6 @@ export function uiConfirmInstalled(current: GlideRecord): void {
         return
     }
     current.update()
-    completeInstall(current)
+    const refused = completeInstall(current)
+    if (refused > 0) gs.addErrorMessage(`${refused} unit(s) not confirmed installed (see the system log): try again`)
 }

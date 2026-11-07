@@ -48,7 +48,11 @@ export function shipOrder(order: GlideRecord): void {
     if (plan.labelPackages !== null) {
         const label = labelOrder(order, plan.labelPackages)
         if (!label.ok) return void gs.addErrorMessage(`No shipping label: ${label.error}`)
-        order.update()
+        // The label is paid for and its Shipment saved, so the units still ship; only the Order lacks its tracking.
+        if (!order.update()) {
+            const tracking = str(order, 'tracking_number')
+            gs.addErrorMessage(`Tracking number ${tracking} not saved on the Order: ${refusal(order)}`)
+        }
     }
     const hotSpares = new Set(found.hotSpares)
     const asset = new GlideRecord('alm_hardware')
@@ -128,22 +132,33 @@ function openOnSiteWork(order: GlideRecord, work: OnSiteWork): void {
     if (!opened) return void gs.addErrorMessage('On-site work not opened (see the system log): open it by hand')
     order.setValue('change_request', opened.changeId)
     order.setValue('work_order', opened.workOrderId)
-    order.update()
+    // Unlinked, the next Ship opens the work again; the change and work order name the Order, to link them by hand.
+    if (!order.update()) gs.addErrorMessage(`On-site work opened but not linked to the Order: ${refusal(order)}`)
 }
 
-/** UI action "Confirm installed" and the FSM work-order completion rule. */
-export function completeInstall(order: GlideRecord): void {
+/** Why the platform refused to save `record`, for the message. */
+function refusal(record: GlideRecord): string {
+    return record.getLastErrorMessage() || 'the save was refused'
+}
+
+/**
+ * UI action "Confirm installed" and the FSM work-order completion rule. How many units the platform refused to move
+ * (logged): they and their line stay where they were, so confirming again retries only them.
+ */
+export function completeInstall(order: GlideRecord): number {
     const now = new GlideDateTime().getValue()
     const asset = orderAssets(order.getUniqueValue())
+    let refused = 0
     while (asset.next()) {
         const stage = readStage(asset)
         if (stage !== 'shipped' && stage !== 'spare_pool') continue
         asset.setValue('x_daas_ham_install_completed', now)
         asset.setValue('x_daas_ham_site', str(order, 'site'))
-        moveAndSave(asset, 'pending_in_service', `install ${str(order, 'number')}`)
+        if (!moveAndSave(asset, 'pending_in_service', `install ${str(order, 'number')}`)) refused++
     }
     retireReplacedAssets(order)
     recomputeOrder(order.getUniqueValue())
+    return refused
 }
 
 /** The Assets an Order replaced (break-fix, refresh) come out of service and go back on a Return order. */

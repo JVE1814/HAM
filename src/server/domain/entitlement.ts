@@ -176,7 +176,10 @@ export function approversFor(verdict: EntitlementVerdict | ''): Approver[] {
     }
 }
 
-/** Order line stages before the line has shipped: such a line's whole quantity counts as in-flight usage. */
+/**
+ * Order line stages before the line has shipped: such a line's whole quantity counts as in-flight usage, and it is
+ * what cancelling or rejecting its Order cancels.
+ */
 export const OPEN_LINE_STAGES: readonly LineStage[] = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship']
 
 /**

@@ -1,4 +1,4 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { followsLines, lineStageFor, orderStageFor, type LineStage } from '../domain/fulfilment'
 import type { Stage } from '../domain/lifecycle'
 import { readStage } from './assets'
@@ -29,7 +29,7 @@ export function recomputeLine(lineId: string): void {
     const next = lineStageFor({ current, quantity: num(line, 'quantity'), assetStages: lineAssetStages(lineId) })
     if (next !== current) {
         line.setValue('line_stage', next)
-        line.update()
+        if (!line.update()) return warnNotMoved(line, `${str(line, 'number')} not moved to ${next}`)
     }
     recomputeOrder(str(line, 'order'))
 }
@@ -48,5 +48,13 @@ export function recomputeOrder(orderId: string): void {
     order.setValue('stage', next)
     if (next === 'complete') order.setValue('state', 3)
     if (next === 'cancelled') order.setValue('state', 7)
-    order.update()
+    if (!order.update()) warnNotMoved(order, `${str(order, 'number')} not moved to ${next}`)
+}
+
+/**
+ * Stages are derived again only when an Asset next changes, so a refused save is logged: it can hold a line, and the
+ * Order with the actions offered at its stage (Ship, Confirm installed), where they are.
+ */
+function warnNotMoved(record: GlideRecord, what: string): void {
+    gs.warn(`[x_daas_ham] ${what}: ${record.getLastErrorMessage() || 'the save was refused'}`)
 }

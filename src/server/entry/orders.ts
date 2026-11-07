@@ -4,6 +4,7 @@ import { appendTo } from '../domain/collections'
 import {
     approversFor,
     assessOrder,
+    OPEN_LINE_STAGES,
     ownershipFindings,
     raiserRefusal,
     siteTemplateOffered,
@@ -59,7 +60,8 @@ interface DeviceRow {
 /**
  * Record producer post-insert script: create the lines and submit the Order. The producer does not apply the Order
  * create rule, so an Order its requester may not raise for that Customer is removed again. One that names records
- * that are not its Customer's stays a draft to correct, without the lines of a Site template not offered to it.
+ * that are not its Customer's stays a draft to correct, without the lines of a Site template not offered to it, and so
+ * does one missing a line the platform refused (it would be assessed and sourced short of what was asked for).
  * (`current` is typed unknown because the SDK passes its own GlideRecord type here.)
  */
 export function afterOrderProduced(producer: Record<string, unknown>, current: unknown): void {
@@ -69,14 +71,19 @@ export function afterOrderProduced(producer: Record<string, unknown>, current: u
     const refusal = raiserRefusal(parties.customerId, raiser)
     if (refusal) {
         gs.addErrorMessage(`Order not raised. ${refusal}.`)
-        order.deleteRecord()
+        // The producer has already saved it: one the platform keeps is named, to cancel.
+        if (!order.deleteRecord()) saveRefused(order, `${str(order, 'number')} not removed (${refusal}), cancel it`)
         return
     }
-    if (parties.siteTemplate && siteTemplateOffered(parties)) addLinesFromSiteTemplate(order.getUniqueValue(), parties.siteTemplate.id)
-    for (const row of parseRows(producer.devices)) {
-        if (row.model) addLine(order.getUniqueValue(), String(row.model), Math.max(1, Number(row.quantity) || 1), false)
+    let unsaved = 0
+    if (parties.siteTemplate && siteTemplateOffered(parties)) {
+        unsaved += addLinesFromSiteTemplate(order, parties.siteTemplate.id)
     }
-    submitAsRaised(order, parties, raiser)
+    for (const row of parseRows(producer.devices)) {
+        if (row.model && !addLine(order, String(row.model), Math.max(1, Number(row.quantity) || 1), false)) unsaved++
+    }
+    const missing = unsaved > 0 ? [`${unsaved} order line(s) not saved (see the system log): add them`] : []
+    submitAsRaised(order, parties, raiser, missing)
 }
 
 function parseRows(value: unknown): DeviceRow[] {
@@ -88,22 +95,37 @@ function parseRows(value: unknown): DeviceRow[] {
     }
 }
 
-function addLinesFromSiteTemplate(orderId: string, siteTemplateId: string): void {
+/** Add the Site template's non-optional items as lines; how many the platform refused (logged). */
+function addLinesFromSiteTemplate(order: GlideRecord, siteTemplateId: string): number {
     const item = new GlideRecord('x_daas_ham_site_template_item')
     item.addQuery('site_template', siteTemplateId)
     item.addQuery('optional', false)
     item.query()
-    while (item.next()) addLine(orderId, str(item, 'model'), num(item, 'quantity'), true)
+    let unsaved = 0
+    while (item.next()) {
+        if (!addLine(order, str(item, 'model'), num(item, 'quantity'), true)) unsaved++
+    }
+    return unsaved
 }
 
-function addLine(orderId: string, modelId: string, quantity: number, fromSiteTemplate: boolean): void {
+/** Add one line to the Order; false (logged) when the platform refuses it. */
+function addLine(order: GlideRecord, modelId: string, quantity: number, fromSiteTemplate: boolean): boolean {
     const line = new GlideRecord('x_daas_ham_order_line')
     line.initialize()
-    line.setValue('order', orderId)
+    line.setValue('order', order.getUniqueValue())
     line.setValue('model', modelId)
     line.setValue('quantity', quantity)
     line.setValue('from_site_template', fromSiteTemplate)
-    line.insert()
+    if (line.insert()) return true
+    saveRefused(line, `${str(order, 'number')}: no line for model ${modelId}`)
+    return false
+}
+
+/** Why the platform refused to save `record`, logged with what that leaves undone. */
+function saveRefused(record: GlideRecord, undone: string): string {
+    const reason = record.getLastErrorMessage() || 'the save was refused'
+    gs.warn(`[x_daas_ham] ${undone}: ${reason}`)
+    return reason
 }
 
 /** The signed-in user as the raiser of `order`: an Order raiser when the Order create rule lets them create it. */
@@ -141,11 +163,11 @@ export function submitOrder(order: GlideRecord): boolean {
 }
 
 /**
- * Submit the Order unless it cannot go ahead as raised (domain/entitlement `ownershipFindings`); then it stays a
- * draft, and the user is told why and the reasons are noted on it.
+ * Submit the Order unless it cannot go ahead as raised (domain/entitlement `ownershipFindings`, or the `unsaved`
+ * lines); then it stays a draft, and the user is told why and the reasons are noted on it.
  */
-function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Orderer): boolean {
-    const findings = ownershipFindings(parties, raiser)
+function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Orderer, unsaved: string[] = []): boolean {
+    const findings = [...ownershipFindings(parties, raiser), ...unsaved]
     if (findings.length === 0) return submitAccepted(order)
     gs.addErrorMessage(`Order not submitted. ${findings.join('. ')}.`)
     order.setValue('work_notes', `Not submitted:\n${findings.join('\n')}`)
@@ -167,8 +189,9 @@ function submitAccepted(order: GlideRecord): boolean {
     order.setValue('entitlement_findings', assessment.findings.join('\n'))
 
     if (assessment.approvers.length === 0) {
-        startSourcing(order)
-        return true
+        const refused = startSourcing(order)
+        if (refused) gs.addErrorMessage(`Order not submitted: ${refused}`)
+        return !refused
     }
     // Ask first: an Order the requests saved could not approve would wait for ever, so it stays a draft.
     const admins = customerAdminIds(str(order, 'customer'))
@@ -187,8 +210,12 @@ function submitAccepted(order: GlideRecord): boolean {
     }
     order.setValue('stage', 'awaiting_approval')
     order.setValue('approval', 'requested')
-    order.update()
-    return true
+    if (order.update()) return true
+    // The requests would wait on a draft, whose decisions roll up to nothing: they are taken back.
+    const reason = saveRefused(order, `${str(order, 'number')} not saved as awaiting approval, its requests cancelled`)
+    cancelPendingApprovals(order.getUniqueValue())
+    gs.addErrorMessage(`Order not submitted: ${reason}`)
+    return false
 }
 
 function requestedLines(orderId: string): RequestedLine[] {
@@ -223,12 +250,14 @@ function approverIds(order: GlideRecord, verdict: EntitlementVerdict, customerAd
     return [...ids]
 }
 
-function startSourcing(order: GlideRecord): void {
+/** Approve the Order and source it; why the platform refused the save ('' once saved), when nothing is sourced. */
+function startSourcing(order: GlideRecord): string {
     order.setValue('approval', 'approved')
     order.setValue('stage', 'sourcing')
     order.setValue('state', 2)
-    order.update()
+    if (!order.update()) return saveRefused(order, `${str(order, 'number')} not saved as approved, not sourced`)
     fire(EVENT.sourceOrder, order)
+    return ''
 }
 
 /** After-update rule on sysapproval_approver: roll the decisions up to the Order. */
@@ -238,19 +267,23 @@ export function onOrderApprovalDecision(current: GlideRecord): void {
     const decisions = groupDecisions(approvalsOf(order.getUniqueValue()), customerAdminIds(str(order, 'customer')))
     const outcome = rollupApprovals(approversFor(str(order, 'entitlement_verdict') as EntitlementVerdict), decisions)
     if (outcome === 'requested') return
-    if (outcome === 'approved') startSourcing(order)
-    else rejectOrder(order)
-    // Each cancellation runs this rule again; the Order is already saved out of awaiting approval, so that run stops.
-    cancelPendingApprovals(order.getUniqueValue())
+    const refused = outcome === 'approved' ? startSourcing(order) : rejectOrder(order)
+    // Each cancellation runs this rule again, which stops once the Order is saved out of awaiting approval. A refused
+    // save keeps it awaiting approval with its requests, so the next decision tries again.
+    if (!refused) cancelPendingApprovals(order.getUniqueValue())
 }
 
-/** A rejected Order cancels its lines, so they stop counting as usage. */
-function rejectOrder(order: GlideRecord): void {
-    cancelOpenLines(order.getUniqueValue())
+/**
+ * A rejected Order cancels its lines, so they stop counting as usage. The Order is saved first: one the platform
+ * refuses keeps its lines. Why it was refused ('' once saved).
+ */
+function rejectOrder(order: GlideRecord): string {
     order.setValue('approval', 'rejected')
     order.setValue('stage', 'rejected')
     order.setValue('state', 4)
-    order.update()
+    if (!order.update()) return saveRefused(order, `${str(order, 'number')} not saved as rejected`)
+    cancelOpenLines(order.getUniqueValue())
+    return ''
 }
 
 /** Script action on x_daas_ham.order.source: allocate stock, request transfers and purchases. */
@@ -329,8 +362,14 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
         purpose: sameModel ? 'replace' : 'new',
         coveredToday: !!replaced && sameModel && str(replaced, 'x_daas_ham_coverage_end') >= todayIso(),
     })
+    let rmaRefused = false
     if (route === 'oem_advance_replacement' && replaced) {
-        openOemRma({ defectiveAsset: replaced, orderLineId: line.getUniqueValue(), caseId: str(order, 'case') })
+        // Unrecorded, the line would wait for a replacement nobody asked the OEM for: logged and in its summary.
+        const rma = { defectiveAsset: replaced, orderLineId: line.getUniqueValue(), caseId: str(order, 'case') }
+        if (!openOemRma(rma)) {
+            rmaRefused = true
+            gs.warn(`[x_daas_ham] ${str(line, 'number')}: no OEM RMA saved for ${str(replaced, 'serial_number')}`)
+        }
     }
     const purchase = () =>
         requestPurchase({
@@ -347,9 +386,15 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
     }
     line.setValue('quantity_allocated', allocated + reserved - released)
     line.setValue('quantity_to_purchase', outcome.quantityToPurchase)
-    line.setValue('sourcing_summary', outcome.summary)
+    line.setValue('sourcing_summary', rmaRefused ? `${outcome.summary} (none saved: open it by hand)` : outcome.summary)
     line.setValue('line_stage', outcome.stage)
-    line.update()
+    if (!line.update()) {
+        // Unlisted, a purchase order's units are not allocated on receipt, and the next run buys the shortfall again.
+        const unlisted = [outcome.purchaseOrder ?? '', ...transfers].filter(Boolean)
+        const listThem = unlisted.length > 0 ? `; it does not list ${unlisted.join(', ')}, add them by hand` : ''
+        saveRefused(line, `${str(line, 'number')} not saved after sourcing${listThem}`)
+        return
+    }
     recomputeLine(line.getUniqueValue())
 }
 
@@ -369,53 +414,83 @@ function unreserve(asset: GlideRecord, source: Source): void {
     moveAndSave(asset, 'available', 'no transfer order')
 }
 
-/** Give an allocated Asset back to stock: hot spares stay in the Spare pool, the rest become free stock. */
-function releaseAsset(asset: GlideRecord): void {
-    closeOpenStagingTasks(asset.getUniqueValue())
+/**
+ * Give an allocated Asset back to stock: hot spares stay in the Spare pool, the rest become free stock. False when
+ * the platform refuses that or the closing of its Staging tasks (logged).
+ */
+function releaseAsset(asset: GlideRecord): boolean {
+    const closed = closeOpenStagingTasks(asset.getUniqueValue())
     asset.setValue('x_daas_ham_order_line', '')
     if (readStage(asset) === 'spare_pool') {
-        asset.update()
-        return
+        // Still linked to the line, the spare is never picked again.
+        if (asset.update()) return closed
+        saveRefused(asset, `order cancelled: ${str(asset, 'serial_number')} still linked to its line, unlink it`)
+        return false
     }
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('x_daas_ham_agreement', '')
-    moveAndSave(asset, 'available', 'order cancelled')
+    return moveAndSave(asset, 'available', 'order cancelled') && closed
 }
 
-function closeOpenStagingTasks(assetId: string): void {
+/** Skip the Asset's open Staging tasks; false when the platform refuses one (logged). */
+function closeOpenStagingTasks(assetId: string): boolean {
     const task = new GlideRecord('x_daas_ham_staging_task')
     task.addQuery('asset', assetId)
     task.addQuery('active', true)
     task.query()
+    let closed = true
     while (task.next()) {
         task.setValue('state', 7)
         task.setValue('work_notes', 'Order cancelled; staging skipped.')
-        task.update()
+        if (task.update()) continue
+        // Left open, it asks a technician to stage a unit that is back in stock.
+        saveRefused(task, `order cancelled: ${str(task, 'number')} left open, close it`)
+        closed = false
     }
+    return closed
 }
 
-/** Cancel every line that has not shipped, releasing its stock. Returns the purchase orders left to cancel. */
-function cancelOpenLines(orderId: string): string[] {
-    const purchases: string[] = []
+/** The Order's lines that have not shipped, queried. */
+function openLines(orderId: string): GlideRecord {
     const line = new GlideRecord('x_daas_ham_order_line')
     line.addQuery('order', orderId)
-    line.addQuery('line_stage', 'IN', CANCELLABLE_LINE_STAGES)
+    line.addQuery('line_stage', 'IN', OPEN_LINE_STAGES.join(','))
     line.query()
+    return line
+}
+
+/** The purchase orders of the Order's lines that have not shipped, to cancel in Procurement. */
+function openPurchaseOrders(orderId: string): string[] {
+    const line = openLines(orderId)
+    const purchases: string[] = []
     while (line.next()) {
-        const asset = new GlideRecord('alm_hardware')
-        asset.addQuery('x_daas_ham_order_line', line.getUniqueValue())
-        asset.query()
-        while (asset.next()) releaseAsset(asset)
         if (str(line, 'purchase_orders')) purchases.push(line.getDisplayValue('purchase_orders'))
-        line.setValue('line_stage', 'cancelled')
-        line.update()
     }
     return purchases
 }
 
-const CANCELLABLE_LINE_STAGES = 'new,awaiting_stock,sourced,staging,ready_to_ship'
+/** Cancel every line that has not shipped, releasing its stock; false when the platform refused any of it (logged). */
+function cancelOpenLines(orderId: string): boolean {
+    let done = true
+    const line = openLines(orderId)
+    while (line.next()) {
+        const asset = new GlideRecord('alm_hardware')
+        asset.addQuery('x_daas_ham_order_line', line.getUniqueValue())
+        asset.query()
+        while (asset.next()) done = releaseAsset(asset) && done
+        line.setValue('line_stage', 'cancelled')
+        if (line.update()) continue
+        // Left open, it is still given the units received on its purchase orders.
+        saveRefused(line, `order cancelled: ${str(line, 'number')} left open, cancel it`)
+        done = false
+    }
+    return done
+}
 
-/** UI action "Cancel order": only before anything has shipped; releases stock and staging work. */
+/**
+ * UI action "Cancel order": only before anything has shipped; releases stock and staging work. The Order is saved
+ * first, with the purchase orders to cancel: one the platform refuses keeps its lines, stock and approvals.
+ */
 export function cancelOrder(order: GlideRecord): void {
     const shipped = new GlideRecord('x_daas_ham_order_line')
     shipped.addQuery('order', order.getUniqueValue())
@@ -426,11 +501,17 @@ export function cancelOrder(order: GlideRecord): void {
         gs.addErrorMessage('Equipment has already shipped; return it with a return order instead of cancelling')
         return
     }
-    const purchases = cancelOpenLines(order.getUniqueValue())
+    const purchases = openPurchaseOrders(order.getUniqueValue())
     order.setValue('stage', 'cancelled')
     order.setValue('state', 7)
     if (purchases.length > 0) order.setValue('work_notes', `Cancel these purchase orders in Procurement: ${purchases.join(', ')}`)
-    order.update()
+    if (!order.update()) {
+        const reason = saveRefused(order, `${str(order, 'number')} not cancelled`)
+        return void gs.addErrorMessage(`Order not cancelled: ${reason}`)
+    }
+    if (!cancelOpenLines(order.getUniqueValue())) {
+        gs.addErrorMessage('Order cancelled; some lines, stock or staging tasks were left as they were (see the log)')
+    }
     // After the save, so the approval rule each cancellation runs finds the Order no longer awaiting approval.
     cancelPendingApprovals(order.getUniqueValue())
 }

@@ -15,10 +15,28 @@ export function customerAdminIds(customerId: string): string[] {
     )
 }
 
-/** Provider-side approvers: the account manager, or the asset managers when there is none. */
+/**
+ * Provider-side approvers: the account manager, or the asset managers when there is none. Only active users: a
+ * request to an inactive one saves but is never decided, so an inactive account manager counts as none.
+ */
 export function providerApproverIds(accountManagerId: string): string[] {
-    if (accountManagerId) return [accountManagerId]
+    if (accountManagerId && isActiveUser(accountManagerId)) return [accountManagerId]
     return pluck('sys_user_has_role', `role.name=${ROLE.assetManager}^user.active=true^state=active`, 'user', 20)
+}
+
+/**
+ * Whether the user is active, read past the before-query rules: a customer admin raising an Order may not be shown
+ * the Provider's users, which would make every account manager count as none.
+ */
+function isActiveUser(userId: string): boolean {
+    const user = new GlideRecord('sys_user')
+    // Only read, never saved, so the rules need not be turned back on.
+    user.setWorkflow(false)
+    user.addQuery('sys_id', userId)
+    user.addQuery('active', true)
+    user.setLimit(1)
+    user.query()
+    return user.hasNext()
 }
 
 /**
@@ -78,6 +96,9 @@ export function cancelPendingApprovals(taskId: string): void {
     approval.query()
     while (approval.next()) {
         approval.setValue('state', 'cancelled')
-        approval.update()
+        if (approval.update()) continue
+        // Left waiting, it still counts in the rollup if a draft task is submitted again (a rejection rejects it).
+        const reason = approval.getLastErrorMessage() || 'the save was refused'
+        gs.warn(`[x_daas_ham] Approval request ${approval.getUniqueValue()} left requested, cancel it: ${reason}`)
     }
 }
