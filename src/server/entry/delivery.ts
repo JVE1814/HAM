@@ -54,8 +54,12 @@ export function shipOrder(order: GlideRecord): void {
     asset.query()
     let shipped = 0
     while (asset.next()) {
+        // The label purchase takes time: an Asset moved on meanwhile is left alone.
+        const stage = readStage(asset)
+        const hotSpare = hotSpares.has(asset.getUniqueValue())
+        if (stage !== (hotSpare ? 'spare_pool' : 'staged')) continue
         placeAtSite(asset, siteId)
-        if (hotSpares.has(asset.getUniqueValue())) asset.update()
+        if (hotSpare) asset.update()
         else if (moveAndSave(asset, 'shipped', `ship ${str(order, 'number')}`)) shipped++
     }
     if (plan.onSiteWork) openOnSiteWork(order, plan.onSiteWork)
