@@ -1,6 +1,7 @@
 import { addDays } from './calendar'
 import type { NamedRecord } from './entitlement'
-import { DEPLOYED_STAGES, stagesQuery, type LegalOwner, type Stage } from './lifecycle'
+import type { LeaseEndAction } from './leases'
+import { DEPLOYED_STAGES, SERVING_STAGES, stagesQuery, type LegalOwner, type Stage } from './lifecycle'
 import type { VisibilityScope } from './visibility'
 
 /** Returns, depot evaluation, Fee events and break-fix shortfalls (P2.3–P2.4). */
@@ -55,19 +56,43 @@ export function sitePackageHoldersQuery(line: { siteId: string; agreementId: str
     return stagesQuery(DEPLOYED_STAGES, `x_daas_ham_site=${line.siteId}^x_daas_ham_agreement=${line.agreementId}`)
 }
 
+/** Installed at a Site: in service, temporary or awaiting first sighting (temporary ends, audits, attestations). */
+export const INSTALLED_STAGES: readonly Stage[] = ['in_service', 'temporary_deployment', 'pending_in_service']
+
+/**
+ * What a whole-Site recovery (agreement end, site decommission) takes back: every unit serving the Site, including
+ * those still shipped there, which the lifecycle lets go straight to pending return. Left off, a shipped unit would
+ * miss the agreement-end Return, raised only once, and hold the site package open for good (`sitePackageHoldersQuery`).
+ */
+export const SITE_RECOVERY_STAGES: readonly Stage[] = SERVING_STAGES
+
 export type EvaluationOutcome = 'refurbish' | 'oem_rma' | 'scrap' | 'return_to_owner'
 
-/** Where a returned Asset goes after depot evaluation. Customer-owned units never join provider stock. */
-export function evaluationTarget(outcome: EvaluationOutcome, legalOwner: LegalOwner): Stage {
-    switch (outcome) {
-        case 'refurbish':
-            return legalOwner === 'customer' ? 'pending_wipe' : 'available'
-        case 'oem_rma':
-            return 'pending_oem_rma'
-        case 'scrap':
-        case 'return_to_owner':
-            return 'pending_wipe'
-    }
+/** Who an evaluated Asset belongs to: its Legal owner and the end action of its lease ('' without one). */
+export interface EvaluatedOwnership {
+    legalOwner: LegalOwner
+    leaseEndAction: LeaseEndAction | ''
+}
+
+const OUTCOME_TARGET: Record<EvaluationOutcome, Stage> = {
+    refurbish: 'available',
+    oem_rma: 'pending_oem_rma',
+    scrap: 'pending_wipe',
+    return_to_owner: 'pending_wipe',
+}
+
+/**
+ * Where a returned Asset goes after depot evaluation. A unit its owner takes back never joins provider stock: one the
+ * Customer owns, or one the Lessor owns on a lease being returned to it (ADR 0011), goes to wiping instead of being
+ * available again, on its way to a return-to-customer or return-to-lessor disposal.
+ */
+export function evaluationTarget(outcome: EvaluationOutcome, ownership: EvaluatedOwnership): Stage {
+    const target = OUTCOME_TARGET[outcome]
+    return target === 'available' && ownerTakesBack(ownership) ? 'pending_wipe' : target
+}
+
+function ownerTakesBack({ legalOwner, leaseEndAction }: EvaluatedOwnership): boolean {
+    return legalOwner === 'customer' || (legalOwner === 'lessor' && leaseEndAction === 'return')
 }
 
 export type FeeType = 'lost' | 'damaged' | 'late_return'

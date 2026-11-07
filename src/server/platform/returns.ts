@@ -1,7 +1,7 @@
 import { GlideDateTime, GlideRecord } from '@servicenow/glide'
 import { appendTo } from '../domain/collections'
 import { isDeployed, stagesQuery } from '../domain/lifecycle'
-import { feeAmount, returnDueDate, type FeeType } from '../domain/returns'
+import { feeAmount, INSTALLED_STAGES, returnDueDate, SITE_RECOVERY_STAGES, type FeeType } from '../domain/returns'
 import { moveAndSave, readStage } from './assets'
 import { todayIso } from './clock'
 import { openChange, openWorkOrder } from './field-work'
@@ -91,9 +91,14 @@ export interface InstalledFilter {
     agreementId?: string
     siteId?: string
     orderId?: string
+    /** A whole-Site recovery: also the units still shipped there (domain/returns `SITE_RECOVERY_STAGES`). */
+    wholeSite?: boolean
 }
 
-/** Assets installed at a Site (in service, temporary or awaiting first sighting), by Agreement, Site or Order. */
+/**
+ * Assets installed at a Site (in service, temporary or awaiting first sighting, and shipped there for a whole-Site
+ * recovery), by Agreement, Site or Order.
+ */
 export function installedAssetIds(filter: InstalledFilter): string[] {
     const asset = queryInstalled(filter)
     const ids: string[] = []
@@ -118,7 +123,7 @@ function queryInstalled(filter: InstalledFilter): GlideRecord {
         .filter(Boolean)
         .join('^')
     const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(stagesQuery(['in_service', 'temporary_deployment', 'pending_in_service'], base))
+    asset.addEncodedQuery(stagesQuery(filter.wholeSite ? SITE_RECOVERY_STAGES : INSTALLED_STAGES, base))
     asset.query()
     return asset
 }

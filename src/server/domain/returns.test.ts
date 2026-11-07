@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { stagesQuery, type Stage } from './lifecycle'
+import type { LeaseEndAction } from './leases'
+import { checkTransition, DEPLOYED_STAGES, stagesQuery, type Stage } from './lifecycle'
 import {
     evaluationTarget,
     feeAmount,
+    INSTALLED_STAGES,
     overdueStep,
     returnDueDate,
     returnRequestFindings,
     shortfallRoute,
+    SITE_RECOVERY_STAGES,
     sitePackageHoldersQuery,
     type RequestedReturn,
     type ReturnRequester,
@@ -101,20 +104,53 @@ describe('sitePackageHoldersQuery', () => {
     })
 })
 
-describe('evaluationTarget', () => {
-    it('returns provider-owned units in good order to stock', () => {
-        expect(evaluationTarget('refurbish', 'provider')).toBe('available')
-        expect(evaluationTarget('refurbish', 'lessor')).toBe('available')
+describe('SITE_RECOVERY_STAGES', () => {
+    // Facts a unit at a Site under an Agreement has; pending return needs nothing more.
+    const atSite = { hasSite: true, hasAgreement: true, legalOwner: 'provider', wipeEvidenceComplete: false } as const
+
+    it('takes every unit that holds the site package open, but those already coming back', () => {
+        expect([...SITE_RECOVERY_STAGES, 'pending_return'].sort()).toEqual([...DEPLOYED_STAGES].sort())
     })
 
+    it('takes the units still shipped to the Site, which installed-only lists leave out', () => {
+        expect(SITE_RECOVERY_STAGES).toContain('shipped')
+        expect(INSTALLED_STAGES).not.toContain('shipped')
+        for (const stage of INSTALLED_STAGES) expect(SITE_RECOVERY_STAGES).toContain(stage)
+    })
+
+    it.each(SITE_RECOVERY_STAGES)('can move a unit %s to pending return', (stage) => {
+        expect(checkTransition(stage, 'pending_return', atSite)).toEqual({ allowed: true })
+    })
+})
+
+describe('evaluationTarget', () => {
+    const provider = { legalOwner: 'provider', leaseEndAction: '' } as const
+    const customer = { legalOwner: 'customer', leaseEndAction: '' } as const
+    const lessor = (leaseEndAction: LeaseEndAction | '') => ({ legalOwner: 'lessor', leaseEndAction }) as const
+
+    it('returns units in good order to stock', () => {
+        expect(evaluationTarget('refurbish', provider)).toBe('available')
+    })
+
+    it.each<LeaseEndAction | ''>(['', 'undecided', 'extend', 'buyout'])(
+        'returns a lessor-owned unit to stock while its lease is not being returned (%s)',
+        (endAction) => expect(evaluationTarget('refurbish', lessor(endAction))).toBe('available'),
+    )
+
     it('never refurbishes customer-owned units into provider stock', () => {
-        expect(evaluationTarget('refurbish', 'customer')).toBe('pending_wipe')
+        expect(evaluationTarget('refurbish', customer)).toBe('pending_wipe')
+    })
+
+    it('sends the units of a lease being returned to wiping for the lessor, not to stock', () => {
+        expect(evaluationTarget('refurbish', lessor('return'))).toBe('pending_wipe')
+        expect(evaluationTarget('scrap', lessor('return'))).toBe('pending_wipe')
     })
 
     it('sends defective units to the OEM and scrap or hand-backs to wiping', () => {
-        expect(evaluationTarget('oem_rma', 'provider')).toBe('pending_oem_rma')
-        expect(evaluationTarget('scrap', 'provider')).toBe('pending_wipe')
-        expect(evaluationTarget('return_to_owner', 'lessor')).toBe('pending_wipe')
+        expect(evaluationTarget('oem_rma', provider)).toBe('pending_oem_rma')
+        expect(evaluationTarget('oem_rma', lessor('return'))).toBe('pending_oem_rma')
+        expect(evaluationTarget('scrap', provider)).toBe('pending_wipe')
+        expect(evaluationTarget('return_to_owner', lessor(''))).toBe('pending_wipe')
     })
 })
 

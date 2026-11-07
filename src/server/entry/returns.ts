@@ -2,6 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import { toIsoDate } from '../domain/calendar'
+import type { LeaseEndAction } from '../domain/leases'
 import type { LegalOwner } from '../domain/lifecycle'
 import {
     evaluationTarget,
@@ -36,11 +37,10 @@ import {
 /** Returns, decommissions, depot evaluation and overdue chasing (P2.4). */
 
 /**
- * Record producer "Return or decommission equipment". A site decommission returns everything
- * installed at the Site; a device removal returns the chosen Assets. The producer does not apply the
- * Return create rule and its Customer and Site are only qualified in the browser, so a Return its
- * requester may not raise, or for a Site that is not its Customer's, is removed again
- * (domain/returns `returnRequestFindings`).
+ * Record producer "Return or decommission equipment". A site decommission returns everything installed or shipped at
+ * the Site (domain/returns `SITE_RECOVERY_STAGES`); a device removal returns the chosen Assets. The producer does not
+ * apply the Return create rule and its Customer and Site are only qualified in the browser, so a Return its requester
+ * may not raise, or for a Site that is not its Customer's, is removed again (domain/returns `returnRequestFindings`).
  */
 export function afterReturnProduced(producer: Record<string, unknown>, current: unknown): void {
     const order = current as GlideRecord
@@ -60,7 +60,7 @@ export function afterReturnProduced(producer: Record<string, unknown>, current: 
             const asset = id ? findById('alm_hardware', id) : null
             return !!asset && str(asset, 'x_daas_ham_site') === siteId
         })
-    const assetIds = decommission ? installedAssetIds({ siteId }) : chosen
+    const assetIds = decommission ? installedAssetIds({ siteId, wholeSite: true }) : chosen
     completeReturn(order, {
         trigger: str(order, 'trigger') as ReturnTrigger,
         customerId: str(order, 'customer'),
@@ -159,14 +159,20 @@ function endSitePackageIfEmpty(siteId: string, agreementId: string): void {
     }
 }
 
-/** After-update rule on return lines whose evaluation was set: route the Asset onward. */
+/**
+ * After-update rule on return lines whose evaluation was set: route the Asset onward. A unit its owner takes back, the
+ * Customer or the Lessor of a lease being returned, goes to wiping, not stock (domain/returns `evaluationTarget`).
+ */
 export function onReturnEvaluated(current: GlideRecord): void {
     const asset = findById('alm_hardware', str(current, 'asset'))
     if (!asset || readStage(asset) !== 'pending_evaluation') {
         gs.addErrorMessage('Evaluate the asset after it has been received at the depot')
         return
     }
-    const target = evaluationTarget(str(current, 'evaluation') as EvaluationOutcome, str(asset, 'x_daas_ham_legal_owner') as LegalOwner)
+    const target = evaluationTarget(str(current, 'evaluation') as EvaluationOutcome, {
+        legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner,
+        leaseEndAction: str(asset, 'x_daas_ham_lease.end_action') as LeaseEndAction | '',
+    })
     if (str(current, 'condition') === 'damaged') recordFee('damaged', asset, str(current, 'return_order'))
     if (target === 'available') {
         asset.setValue('company', stringProperty(PROPERTY.providerCompany))
@@ -237,8 +243,10 @@ export function raiseScheduledReturns(): void {
     agreement.query()
     while (agreement.next()) {
         const recover = `Agreement ${str(agreement, 'number')} ended ${str(agreement, 'ends')}: recover all equipment`
-        // One Return per Site, each a field de-install with its own change and work order there.
-        for (const [siteId, assetIds] of installedAssetIdsBySite({ agreementId: agreement.getUniqueValue() })) {
+        // One Return per Site, each a field de-install with its own change and work order there. Units still shipped
+        // there go too (domain/returns `SITE_RECOVERY_STAGES`): the job does not look at this Agreement again.
+        const bySite = installedAssetIdsBySite({ agreementId: agreement.getUniqueValue(), wholeSite: true })
+        for (const [siteId, assetIds] of bySite) {
             const site = findById('cmn_location', siteId)
             raiseReturn({
                 trigger: 'agreement_end',
