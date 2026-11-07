@@ -46,13 +46,21 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
 - **ASN rows** create in-transit Assets (Provider-owned, company = Provider). They are refused if the
   serial already exists, the PID does not map to a Model (which records a normalization exception),
   or a mandatory field is missing. A row whose Asset insert the platform refuses is marked error with
-  its reason.
+  its reason. The check that no Asset has the serial sees every Asset, past the importer's stockroom
+  rule (ADR 0005).
+- Each row's Asset is created under the serial's job lock (`receive_serial_<serial>`), which a first
+  scan without an ASN takes too, and the serial is checked again there. So a row and a scan of one
+  serial create one Asset. A row that finds the lock held through 5 tries, or cannot take it, is
+  marked error *serial <serial> not imported: ...; load this row again*. Loaded again, it imports, or
+  is refused as a serial that already exists.
 - **Receiving** (warehouse app) confirms only in-transit / on-order Assets as available in the chosen
   stockroom (for an inventory tech, one of theirs). It assigns the next Provider tag (unless the Asset
   has one). A unit whose ASN PO number is one of the *Purchase orders* of a line awaiting stock (same
   Model) is allocated to that line and comes off its *On order* count (reserved, then staging once its
   Staging task is created; without one, or when the move to staging is refused, it stays reserved and
-  the reply shows it reserved). An unknown serial with a PID is received without an ASN. Returned units
+  the reply shows it reserved). That holds while the line, read again under its lock, still awaits
+  stock and has room; otherwise the unit is received as free stock (available) and the reply shows it
+  unallocated. An unknown serial with a PID is received without an ASN. Returned units
   (pending return or missing) are received by the returns process (P2 after-sales spec); any other
   scanned Asset is refused as not awaiting receipt.
 - The chosen stockroom must be a central depot or a staging centre: a customer-site stockroom is
@@ -78,20 +86,29 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   *Not awaiting receipt* (a returned unit is then pending evaluation). The overdue job takes the same
   lock to declare a unit missing (P2 after-sales spec).
 - An unknown serial with a PID is created under a job lock on the serial (`receive_serial_<serial>`),
-  re-checked there, so two first scans create one Asset. A scan that finds the lock held is told to
+  re-checked there, so two first scans create one Asset. ASN rows take the same lock (above), so a
+  scan and an ASN row of one serial create one Asset too. A scan that finds the lock held is told to
   scan again (HTTP 503), and the rescan finds the Asset by serial.
 - A unit for a waiting line is saved, taken off its *On order* count (or its RMA marked received) and
   reserved under the line's job lock (`order_line_<sys_id>`, P1 ordering spec). So sourcing's count
   of the line (allocated, *On order*, open OEM RMAs) sees all of a receipt or none of it. A receipt
   that cannot take the lock after 10 tries saves nothing and answers HTTP 503 *Its order line is
-  being sourced or received: scan again*.
+  being sourced or received: scan again*. Under the line's lock the line is read again. The unit is
+  allocated only while the line is still awaiting stock and has fewer Assets than its quantity.
+  Otherwise it stays received as free stock (available), the line's *On order* count and any OEM RMA
+  are left as they are, and a warning *Received <serial> left in stock, not given to <line>: ...* is
+  logged.
 - **Put-away** records the stockroom an Asset now sits in (for an inventory tech, one of theirs):
   - available stock and returned units awaiting evaluation, wipe or disposal go into any stockroom;
   - a unit being staged (one received for a waiting PO line among them) goes only into a staging
     centre;
   - reserved, spare-pool and staged Assets, and anything not in stock, are refused.
 
-  A put-away the platform refuses to save answers HTTP 422 with its reason.
+  A put-away the platform refuses to save answers HTTP 422 with its reason. It is made under the
+  Asset's stock lock (`reserve_asset_<sys_id>`, P1 ordering spec), from a fresh read. So a unit a
+  sourcing run or the spare-pool top-up claims meanwhile is refused (HTTP 409), and a scan that finds
+  the lock held through 5 tries saves nothing and answers HTTP 503 *This unit is being reserved or
+  moved: scan again*.
 - **Pick** confirms an Asset is a staged Asset of the given Order.
 
 ## Staging
@@ -111,7 +128,8 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   hands over hot spares. Staged Assets, and hot spares linked to the Order (handed over where they
   are, with no package), become shipped with the Order's Site and location. Assets the lifecycle
   refuses are reported and the others ship. Ship counts the Order's Assets whoever presses it (an
-  inventory tech included).
+  inventory tech included). Ship on the Order form stops when the form's save is refused (the
+  platform says why), so a tracking number typed but not saved is never used.
 - For every mode except self-install, Ship opens a change and an FSM work order. A device replace
   uses a standard change; everything else uses a normal change.
 - If the tracking number, or the change and work order, cannot be saved on the Order, Ship still
@@ -127,12 +145,16 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   installed* (Customer contacts only on self-install Orders; asset managers and field techs on any
   Order being installed):
   - shipped Assets (hot spares included) become pending in service with the install time;
-  - Assets replaced by the Order's lines go to pending return.
+  - the Asset a line replaces goes to pending return once that line's own replacement is installed
+    (pending in service, in service or temporary).
 
   A unit the platform refuses to move stays where it was (logged), and so does its line: *Confirm
   installed* says how many, and the customer page's call (`POST /customer/orders/{id}/installed`)
-  answers HTTP 422, so the confirmation can be sent again. The replaced units still go to pending
-  return.
+  answers HTTP 422, so the confirmation can be sent again. An Asset whose replacement was refused
+  stays in service until confirming again installs the replacement; the other lines' replaced Assets
+  go to pending return at once. The refused unit's line stays shipped, so the Order stays installing
+  and *Confirm installed* stays offered for the retry. *Confirm installed* on the Order form stops,
+  like Ship, when the form's save is refused, so a Site typed but not saved is never used.
 
 ## In service and billing start
 
@@ -144,6 +166,12 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
 - At that moment:
   - the in-service date is set;
   - the Asset joins its Site's package line, or else the Agreement's line for its device class;
-  - a pending line becomes active with its start date;
+  - a pending line becomes active with its start date, only while it is still pending when read
+    again: a line another go-live started is joined with its start date kept; one ended meanwhile
+    leaves the Asset pending in service (logged), and its next sighting chooses among the open lines;
   - the lifecycle phase and refresh due date are computed.
+- Sightings of one Asset are applied one at a time under a job lock on it (`seen_asset_<sys_id>`),
+  from a fresh read: last_seen only moves forward and only a still-pending Asset goes live. An NMS
+  event that finds the lock held 10 times is not applied and is returned in `busy_identifiers`; the
+  detection job leaves that Asset to its next run.
 - Device events store state changes only. They are purged after `x_daas_ham.events.retention_days`.

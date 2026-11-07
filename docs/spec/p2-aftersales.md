@@ -32,8 +32,8 @@
   replacement Order completes (in service). A replacement served from a hot spare at the Site reaches
   *installing* at Ship (the spare is handed over as shipped), so its install can then be confirmed or
   its swap work order closed.
-- On install completion the failed unit goes on a **defective return**, collected by the swap work
-  order.
+- On install completion the failed unit goes on a **defective return** once its replacement is
+  installed, collected by the swap work order.
 - **Defective returned to OEM** on the RMA retires the unit as *returned to OEM*. This needs wipe
   evidence recorded since the unit was last received back at the depot (receipt clears earlier
   evidence). When the unit cannot be retired, the user is told why and the RMA is left as it was.
@@ -43,7 +43,7 @@
 | Trigger | Raised by |
 |---|---|
 | Site decommission / device removal | Record producer *Return or decommission network equipment*, or the customer page |
-| Refresh swap-back, defective return | Install completion of refresh / replacement Orders (collected by the same work order); a Return the platform refuses is logged, the replaced units stay in service, and completing the install again raises it |
+| Refresh swap-back, defective return | Install completion of refresh / replacement Orders, for each replaced unit whose own replacement is installed (collected by the same work order); a Return the platform refuses is logged, the replaced units stay in service, and completing the install again raises it |
 | Agreement end | Daily job, once per Agreement after its end date: one Return per Site for all equipment installed or still shipped there, each a field de-install with its own normal change and de-install work order |
 | Temporary end | Daily job, `x_daas_ham.returns.temporary_lead_days` before a temporary Order's end date |
 

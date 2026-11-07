@@ -47,8 +47,14 @@
   with the latest `datetime`.
   The Shipment's status, latest update and estimated delivery are updated and new tracking events
   added; the first *delivered* update puts a work note on the Order. Late or out-of-order updates
-  do not move a delivered, returned or voided shipment back; *unknown* never replaces a known status. Unknown tracking numbers are
-  acknowledged and ignored.
+  do not move a delivered, returned or voided shipment back; *unknown* never replaces a known status.
+  Unknown tracking numbers are acknowledged and ignored.
+  Each update is applied under the job lock `track_shipment_<Shipment sys_id>`, from the Shipment and
+  its events read again there. So overlapping deliveries of the same history store each event once
+  and note the delivery once, and an older status cannot replace a delivery. A delivery that finds
+  the lock held 5 times in a row saves nothing and is answered HTTP 503 *Another update of this
+  Shipment is being saved; send it again*, so an aggregator that retries failed deliveries (EasyPost
+  does) sends it again.
   If the platform refuses the Shipment or a tracking event, the refusal is logged and the reply is
   500, not 2xx. An aggregator that retries failed deliveries (EasyPost does) then sends the update
   again; the retry skips events already stored and does not repeat the delivered note.

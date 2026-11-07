@@ -122,12 +122,17 @@ demo data are illustrative, not vendor bulletins.
 `observed_at` is an ISO-8601 timestamp with a UTC offset (`Z`, `±hh:mm` or `±hhmm`), to the minute,
 second or fraction of a second; a time without an offset, another date format or a time that does not
 exist (2026-02-31, 24:00) is a rejected row. Responds `202` with accepted / unknown identifiers /
-rejected rows. Only state changes are stored.
+busy identifiers / rejected rows. `accepted` counts only the events applied: unknown and busy
+identifiers and rejected rows are not counted in it. `busy_identifiers` lists the events not applied
+because another request was applying a sighting to the same Asset (job lock
+`seen_asset_<Asset sys_id>`): send those again. That is safe, because a repeated *seen* is not stored
+twice and last_seen only moves forward. Only state changes are stored.
 
 **Imports**: load CSVs into *ASN import rows* (`x_daas_ham_asn_import`, including MAC address and
 OEM claim code), *Lifecycle import rows* (`x_daas_ham_eox_import`) and *OEM coverage import rows*
 (`x_daas_ham_coverage_import`, optionally with the contract's annual cost) with System Import Sets >
-Load Data; each row is processed on insert and its import state/comment shows the outcome.
+Load Data; each row is processed on insert and its import state/comment shows the outcome. An ASN
+row's check that no Asset has its serial sees every Asset, past the importer's stockroom rule.
 
 **Billing pull API** (role `x_daas_ham.finance` or `x_daas_ham.integration`):
 `GET /api/x_daas_ham/naas/billing_periods` and
@@ -203,8 +208,10 @@ What remains can only be confirmed on an instance or behind a vendor login:
   (otherwise use `setEndpoint`), that the GreenLake `find_device` filter URL is accepted, and that the
   Fortinet OAuth profiles (password grant, no client secret) obtain tokens for FortiCare and FortiZTP.
 - **Vendor-login-only contracts**: FortiCloud `products/register` and FortiZTP provisioning schemas
-  (FNDN), Cisco API quotas (API Console), and whether ShipEngine labels are tracked automatically or
-  need `/v1/tracking/start`.
+  (FNDN), Cisco API quotas (API Console), whether ShipEngine labels are tracked automatically or
+  need `/v1/tracking/start`, and whether ShipEngine retries a `track` webhook answered non-2xx, and
+  how often. The tracking webhook's 500 (refused save) and 503 (Shipment lock held) replies rely on
+  that retry; EasyPost's is documented (up to 6 times, with a 7 s response window).
 - **Job lock** (margin recomputes, ADR 0013): *Job lock* shows a unique database index on *Lock*; a
   second row with the same name is refused (`GlideRecord.insert()` returns no sys_id) without
   throwing, and the `x_daas_ham.margin.compute` event still ends as processed (a refused take tries
@@ -230,21 +237,31 @@ What remains can only be confirmed on an instance or behind a vendor login:
   receipt*. The overdue job takes the same lock to declare a unit missing: one that finds it held logs
   the same two errors and leaves the unit to the scan and its line to the next day's run. No
   `receive_asset_` row is left once the receipt or the declaration ends.
-- **Stock reservation lock** (Order sourcing, the spare-pool top-up and receiving's reservation for a
-  waiting line): reserving an Asset for an Order line, linking a hot spare at the customer site to
-  one, or moving free stock into a Spare pool takes the job lock `reserve_asset_<Asset sys_id>` in the
-  same *Job lock* table and re-reads the Asset under it, so two runs that pick the same Asset never
-  both claim it. The re-read also refuses a unit whose lease is being returned to its Lessor (end
-  action *Return to lessor*), so such a unit is never reserved, linked or pooled. The run that finds
-  the lock held leaves that Asset to the other (the unit counts in its line's or pool's shortfall) and
-  logs two *Unique Key violation* errors, or one when the other run lets go in between and the re-read
-  finds the Asset taken, or three when the other run lets go between the second try and the check
-  that follows and another run wins the third try; no `reserve_asset_` lock row is left once the run
-  ends. A lock that cannot be taken for another reason logs
-  *[x_daas_ham] Asset <id> not claimed: job lock ... could not be taken*, and a claim that outlasts its
-  lock and gives the Asset up logs *[x_daas_ham] Asset <id> not claimed: its lock was lost while
-  claiming it*. A receipt whose reservation finds the unit taken logs *[x_daas_ham] Received <serial>
-  not reserved for <line>: another run claimed it, or the save was refused*.
+- **Stock reservation lock** (Order sourcing, the spare-pool top-up, receiving's reservation for a
+  waiting line, put-away and a lease return's withdrawal): reserving an Asset for an Order line,
+  linking a hot spare at the customer site to one, or moving free stock into a Spare pool takes the
+  job lock `reserve_asset_<Asset sys_id>` in the same *Job lock* table and re-reads the Asset under
+  it, so two runs that pick the same Asset never both claim it. Put-away and the withdrawal of a
+  returned lease's stock take the same lock, each trying 5 times, so neither moves a unit a claim is
+  taking. The re-read also refuses a unit whose lease is being returned to its Lessor (end action
+  *Return to lessor*), so such a unit is never reserved, linked or pooled. A run that finds the lock
+  held leaves that Asset (the unit counts in its line's or pool's shortfall) and logs two *Unique Key
+  violation* errors, or one when the holder lets go in between and the re-read finds the Asset taken,
+  or three when the holder lets go between the second try and the check that follows and another run
+  wins the third try. The holder may also be a put-away or a withdrawal, which leaves the unit free
+  stock: the run still leaves it and counts it short, so a sourcing pass may buy for it. No
+  `reserve_asset_` lock row is left once the run ends. A lock that cannot be taken for another reason
+  logs *[x_daas_ham] Asset <id> not claimed: job lock ... could not be taken*, or *[x_daas_ham] Asset
+  <id> not put away: job lock ... could not be taken* for a put-away, or *[x_daas_ham] Asset <id> not
+  withdrawn for its lessor: ...* for a withdrawal. A withdrawal held off through its tries, or whose
+  lock cannot be taken, logs *[x_daas_ham] Lease return: <serial> not withdrawn: its stock lock could
+  not be taken*. A claim that outlasts its lock and gives the Asset up logs *[x_daas_ham] Asset <id>
+  not claimed: its lock was lost while claiming it*. A receipt whose reservation finds the unit taken
+  logs *[x_daas_ham] Received <serial> not reserved for <line>: another run claimed it, or the save
+  was refused*; that also covers a reservation that met a put-away or withdrawal holding the lock. A
+  receipt whose line, read again under its lock, no longer awaits stock or has all its units logs
+  *[x_daas_ham] Received <serial> left in stock, not given to <line>: ...* and leaves the unit free
+  stock.
 - **Fee event and service interval locks**: charging a Fee event takes the job lock
   `fee_<type>_<Asset sys_id>_<Return order sys_id>`, and opening or closing a Service interval takes
   `service_interval_<Asset sys_id>`. In *Job lock*, create a row named
@@ -258,30 +275,48 @@ What remains can only be confirmed on an instance or behind a vendor login:
   damaged evaluation saved: it logs *[x_daas_ham] <type> fee for <serial> not recorded: left to a run
   holding its lock ...* (warning) and records no fee. No `fee_` or `service_interval_` lock row is left
   after a normal charge, go-live or close.
+- **Sighting lock** (device events and in-service detection): an NMS event or the 15-minute detection
+  job applies a sighting under the job lock `seen_asset_<Asset sys_id>`. In *Job lock*, create a row
+  named `seen_asset_<sys_id of a pending-in-service Asset>`, then POST a *seen* event for it. The POST
+  answers `202` with its identifier in `busy_identifiers` and `accepted` 0, and each of the 10 refused
+  tries logs two *Unique Key violation* errors. The 15-minute detection job leaves that Asset pending
+  and logs nothing of its own for it: only the *Unique Key violation* errors of its refused tries
+  appear. Delete the row and the next event or run puts it in service. No `seen_asset_` row is left
+  afterwards.
 - **Sourcing locks** (Order sourcing and receiving): a sourcing pass holds the job lock
   `source_order_<Order sys_id>` for its whole run, and reads and saves each line under
   `order_line_<line sys_id>`, which a receipt for a waiting line takes too. A pass that finds the
   Order's lock held logs two *Unique Key violation* errors and *[x_daas_ham] <Order> sourced again in
-  60 s: another pass holds its lock* (info), and runs again a minute later. A request queued again 15
-  times logs *[x_daas_ham] <Order> not sourced again after 15 tries (...): check its lines* (warning)
-  and is dropped. A line lock is tried 10 times, each refused try logging two errors (up to 20). Held
-  through them all, sourcing leaves the line to the pass queued again (after picking stock, it logs
-  *[x_daas_ham] <line> left to the next sourcing pass (...)*, naming any transfer orders the line does
-  not list), and a receipt answers HTTP 503 *Its order line is being sourced or received: scan again*
-  and saves nothing. A received unit whose reservation fails queues `x_daas_ham.order.source` for its
-  Order: one *not reserved for <line>* warning is followed by a sourcing pass, not by a stalled line.
-  No `source_order_` or `order_line_` row is left once a run ends.
-- **Serial lock** (warehouse Receive without an ASN): the first scan of an unknown serial with its PID
-  creates the Asset under the job lock `receive_serial_<serial>`, checking there that no Asset has the
-  serial, so two first scans create one Asset. The other answers HTTP 503 *Another scan is receiving
+  60 s: another pass or a cancel holds its lock* (info), and runs again a minute later. A request
+  queued again 15 times logs *[x_daas_ham] <Order> not sourced again after 15 tries (...): check its
+  lines* (warning) and is dropped. A line lock is tried 10 times, each refused try logging two errors
+  (up to 20). Held through them all, sourcing leaves the line to the pass queued again (after picking
+  stock, it logs *[x_daas_ham] <line> left to the next sourcing pass (...)*, naming any transfer
+  orders the line does not list), and a receipt answers HTTP 503 *Its order line is being sourced or
+  received: scan again* and saves nothing. A received unit whose reservation fails queues
+  `x_daas_ham.order.source` for its Order: one *not reserved for <line>* warning is followed by a
+  sourcing pass, not by a stalled line. *Cancel order* takes `source_order_<Order sys_id>` too: with
+  a row of that name in *Job lock*, it says *Order not cancelled: sourcing is running on it. Try
+  again in a minute* and changes nothing. No `source_order_` or `order_line_` row is left once a run
+  or a cancel ends.
+- **Serial lock** (warehouse Receive without an ASN, and ASN import rows): the first scan of an
+  unknown serial with its PID, or an ASN row, creates the Asset under the job lock
+  `receive_serial_<serial>`, checking there that no Asset has the serial, so two first scans, or a
+  scan and an ASN row, create one Asset. The other scan answers HTTP 503 *Another scan is receiving
   this unit: scan again* and logs two *Unique Key violation* errors; its rescan finds the Asset by
-  serial. No `receive_serial_` row is left once the receipt ends.
-- **Return label and Ship locks**: *Create return label* holds the job lock
+  serial. An ASN row tries the lock 5 times: with a row `receive_serial_<serial>` created by hand in
+  *Job lock*, an ASN row loaded for that serial is marked error *serial <serial> not imported: a scan
+  or another row is receiving it; load this row again*, and ten *Unique Key violation* errors are
+  logged. No `receive_serial_` row is left once the receipt or the import ends.
+- **Return label, Ship and tracking locks**: *Create return label* holds the job lock
   `return_label_<Return order sys_id>` while it checks for an open label and buys one. A second press
   while one is being bought says *A return label is already being bought for this return* and buys
   nothing. *Ship* holds `ship_order_<Order sys_id>`: a second Ship says *Another Ship of this Order is
   running* and ships, buys and opens nothing. Each refused take logs two *Unique Key violation*
-  errors, and no lock row is left afterwards.
+  errors. The tracking webhook holds `track_shipment_<Shipment sys_id>` while it saves the status and
+  inserts new events. With a row of that name created by hand in *Job lock*, a delivery answers HTTP
+  503 *Another update of this Shipment is being saved; send it again* and logs two *Unique Key
+  violation* errors per try (up to 10). No lock row is left afterwards.
 - **Inventory tech access** (ADR 0005), also after upgrading an existing install: the ACLs that
   `security/acls*.now.ts` give `broadStaff` (agreements, subscription lines, catalog entries, site
   templates, fee events, attestations, leases, OEM coverage and cloud accounts, model data, device

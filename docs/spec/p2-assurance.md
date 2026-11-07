@@ -23,7 +23,7 @@
 
 - Daily, for each active Agreement with an attestation interval, each Site with installed Assets gets
   an attestation when:
-  - none is open; and
+  - none is open (a pending one counts); and
   - the last one was attested more than the interval ago (or never).
 - A Site has one attestation at a time, listing every Asset installed there, whichever Agreement it
   is under. A Site served by several attesting Agreements follows the shortest of their intervals, and
@@ -31,10 +31,13 @@
 - It is assigned to a Customer admin.
 - Customer admins answer each device (present / not present / don't know) on the customer page and
   submit once all are answered. *Not present* answers become *customer reports missing* exceptions.
-- An attestation the platform refuses is raised again on the next run; an Asset left off one is
-  logged. An answer the platform refuses answers HTTP 422 without submitting, and a refused submit
-  answers HTTP 422 and leaves the attestation open. Either can be sent again, which raises no
-  exception twice (exceptions open once per type and Asset).
+- An attestation is raised pending and opened only once every installed Asset is listed on it. One
+  the platform refuses is logged, and one whose item or opening it refuses is removed (logged): either
+  is raised again on the next run. One the platform will not remove stays pending, is logged to
+  cancel, and cannot be submitted, pending or once cancelled (HTTP 422). An answer the platform
+  refuses answers HTTP 422 without submitting, and a refused submit answers HTTP 422 and leaves the
+  attestation open. Either can be sent again, which raises no exception twice (exceptions open once
+  per type and Asset).
 
 ## Reconciliation (daily)
 
@@ -95,7 +98,8 @@ HTTP 422, so it can be sent again:
 - `POST /customer/returns` when the Return order is refused, or no device could be added to it (each
   is already on a return, or was refused);
 - `POST /customer/orders/{id}/installed` when a device is not moved to pending in service;
-- `POST /customer/attestations/{id}` when an answer or the submission is refused, without submitting.
+- `POST /customer/attestations/{id}` when an answer or the submission is refused, or the attestation
+  is still pending or was cancelled, without submitting.
 
 New equipment is ordered through the *Request network equipment* catalog item.
 
