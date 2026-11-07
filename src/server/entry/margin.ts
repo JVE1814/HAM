@@ -156,7 +156,7 @@ function leaseTermsOf(leaseId: string): LeaseTerms | null {
 
 /**
  * Add a batch's totals by costFactKey (as CostLedger.drain hands them over; this uses them up) to
- * the period's Cost facts, reading the ones they add to with one query.
+ * the period's Cost facts, reading the ones they add to with one query. A refused save throws (see checkSaved).
  */
 function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void {
     if (pending.size === 0) return
@@ -171,7 +171,7 @@ function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void
         const entry = pending.get(key)
         if (!entry) continue
         fact.setValue('amount', cents(num(fact, 'amount') + entry.amount))
-        fact.update()
+        checkSaved(fact.update(), fact, `${entry.type} Cost fact`)
         pending.delete(key)
     }
     for (const entry of pending.values()) {
@@ -182,8 +182,16 @@ function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void
         added.setValue('site', entry.siteId)
         added.setValue('cost_type', entry.type)
         added.setValue('amount', cents(entry.amount))
-        added.insert()
+        checkSaved(added.insert(), added, `${entry.type} Cost fact`)
     }
+}
+
+/**
+ * Throw when the platform refused a save of the pass, so that the pass stops and records why on the period
+ * (ADR 0013) instead of completing with that cost or Margin row left out.
+ */
+function checkSaved(sysId: string | null, record: GlideRecord, what: string): void {
+    if (!sysId) throw new Error(`${what} not saved: ${record.getLastErrorMessage() || 'the save was refused'}`)
 }
 
 /** Field work orders closed in the month, as Cost facts: their labour cost, or the standard visit cost. */
@@ -233,6 +241,6 @@ function writeMargin(periodId: string): void {
         margin.setValue('cost', row.cost)
         margin.setValue('margin', row.margin)
         margin.setValue('margin_pct', row.marginPct ?? '')
-        margin.insert()
+        checkSaved(margin.insert(), margin, 'Margin row')
     }
 }

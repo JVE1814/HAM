@@ -64,6 +64,7 @@ function depot(): GlideRecord | null {
  * Buy a label between the depot and the Site of `parent` (an Order shipping `to_site`, or a Return order
  * shipping back as a `return`) and record the shipment against it. `packages` is one box per Asset
  * (buyLabel refuses more than one label covers); the label carries the parent's number as its reference.
+ * A label bought whose Shipment the platform refuses is a failure that names the label, not a success.
  */
 function createShipment(direction: 'to_site' | 'return', parent: GlideRecord, packages: number): LabelResult {
     const carrierId = stringProperty(PROPERTY.shippingCarrierId)
@@ -103,8 +104,12 @@ function createShipment(direction: 'to_site' | 'return', parent: GlideRecord, pa
     shipment.setValue('cost', result.cost)
     shipment.setValue('currency', result.currency)
     shipment.setValue('status', 'label_created')
-    shipment.insert()
-    return result
+    if (shipment.insert()) return result
+    // The label is paid for, yet tracking, a later Ship and the open-label check cannot find it: name it to be voided.
+    const reason = shipment.getLastErrorMessage() || 'insert refused'
+    const label = `${result.carrier} ${result.trackingNumber}, label ${result.labelId}`
+    gs.warn(`[x_daas_ham] Label bought for ${str(parent, 'number')} but no Shipment saved (${label}): ${reason}`)
+    return { ok: false, error: `the label bought (${label}) was not recorded: ${reason}. Void it with the carrier` }
 }
 
 /** Buy the outbound label for an Order's staged Assets and put its tracking number on the Order (does not save). */
