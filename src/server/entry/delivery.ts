@@ -1,4 +1,5 @@
 import { GlideDateTime, GlideRecord, GlideSchedule, gs } from '@servicenow/glide'
+import { planShipment, type InstallMode, type OnSiteWork, type OrderType } from '../domain/delivery'
 import { isDeployed, stagesQuery } from '../domain/lifecycle'
 import { checkJobWindow } from '../domain/scheduling'
 import { moveAndSave, readStage } from '../platform/assets'
@@ -14,8 +15,6 @@ import { labelOrder, shippingEnabled } from './shipping'
 
 /** Shipping Orders to their Site, on-site work and install completion (P1.7). */
 
-const ROUTINE_ORDER_TYPES = ['device_replace']
-
 function orderAssets(orderId: string): GlideRecord {
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery('x_daas_ham_order_line.order', orderId)
@@ -29,22 +28,19 @@ function orderAssets(orderId: string): GlideRecord {
  */
 export function shipOrder(order: GlideRecord): void {
     const { staged, hotSpares } = countShippable(order.getUniqueValue())
-    if (staged + hotSpares === 0) {
-        gs.addErrorMessage('Nothing is staged for this order yet')
-        return
-    }
-    const needsCarrier = staged > 0 && !str(order, 'tracking_number') && str(order, 'install_mode') !== 'remote_hands'
-    if (needsCarrier && !shippingEnabled()) {
-        gs.addErrorMessage('Enter the carrier and tracking number before shipping')
-        return
-    }
-    if (needsCarrier) {
-        // The shipping aggregator replaces manual tracking numbers (P3.26): one package per staged Asset.
-        const label = labelOrder(order, staged)
-        if (!label.ok) {
-            gs.addErrorMessage(`No shipping label: ${label.error}`)
-            return
-        }
+    const plan = planShipment({
+        orderType: str(order, 'order_type') as OrderType,
+        installMode: str(order, 'install_mode') as InstallMode,
+        hasTrackingNumber: !!str(order, 'tracking_number'),
+        hasWorkOrder: !!str(order, 'work_order'),
+        staged,
+        hotSpares,
+        shippingEnabled: shippingEnabled(),
+    })
+    if (!plan.ok) return void gs.addErrorMessage(plan.error)
+    if (plan.labelPackages !== null) {
+        const label = labelOrder(order, plan.labelPackages)
+        if (!label.ok) return void gs.addErrorMessage(`No shipping label: ${label.error}`)
         order.update()
     }
     const siteId = str(order, 'site')
@@ -58,7 +54,7 @@ export function shipOrder(order: GlideRecord): void {
         if (stage === 'spare_pool') asset.update()
         else if (moveAndSave(asset, 'shipped', `ship ${str(order, 'number')}`)) shipped++
     }
-    if (str(order, 'install_mode') !== 'self_install' && !str(order, 'work_order')) openOnSiteWork(order)
+    if (plan.onSiteWork) openOnSiteWork(order, plan.onSiteWork)
     gs.addInfoMessage(`${shipped} asset(s) shipped to ${str(order, 'site.name')}`)
     recomputeOrder(order.getUniqueValue())
 }
@@ -71,20 +67,15 @@ function countShippable(orderId: string): { staged: number; hotSpares: number } 
     }
 }
 
-function openOnSiteWork(order: GlideRecord): void {
+function openOnSiteWork(order: GlideRecord, work: OnSiteWork): void {
     const context: WorkContext = {
         customerId: str(order, 'customer'),
         siteId: str(order, 'site'),
         description: `${str(order, 'number')}: ${str(order, 'order_type')} at ${str(order, 'site.name')}`,
         source: { field: 'x_daas_ham_order', id: order.getUniqueValue() },
     }
-    const changeId = openChange(context, ROUTINE_ORDER_TYPES.includes(str(order, 'order_type')) ? 'standard' : 'normal')
-    const workOrderId = openWorkOrder(
-        context,
-        ['device_replace', 'refresh'].includes(str(order, 'order_type')) ? 'swap' : 'install',
-        changeId,
-        ['subcontractor', 'remote_hands'].includes(str(order, 'install_mode')),
-    )
+    const changeId = openChange(context, work.changeType)
+    const workOrderId = openWorkOrder(context, work.purpose, changeId, work.subcontracted)
     order.setValue('change_request', changeId)
     order.setValue('work_order', workOrderId)
     order.update()
