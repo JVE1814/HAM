@@ -12,10 +12,12 @@
    - **regular expression** (case-insensitive; invalid patterns are skipped).
 
 - Hourly, discovered hardware models without a PID are mapped. Their Assets are re-pointed to the
-  canonical Model and the raw model records *normalized to*.
+  canonical Model, and only then does the raw model record *normalized to*: one Asset whose save is
+  refused leaves it unmarked, so the next run retries.
 - Unmapped pairs become counted **normalization exceptions**. Setting *resolved model* on one creates
   an exact rule, and an alias if the manufacturer was unknown (none for a blank or punctuation-only
-  one, which no alias could match).
+  one, which no alias could match). An exception whose alias or rule the platform refuses stays open
+  with an error message (clear its resolved model and set it again to retry).
 
 ## Lifecycle (`domain/model-lifecycle.ts`)
 

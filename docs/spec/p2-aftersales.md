@@ -6,7 +6,10 @@
   and the Asset's Customer.
 - **Raise replacement** (NOC, asset manager, CSM agent) creates a *device replace* Order: one line,
   same Model, *replaces asset* = the failed unit. The Order is submitted at once; one that Submit
-  refuses (ordering spec) stays a draft, linked to the case, to correct and submit.
+  refuses (ordering spec) stays a draft, linked to the case, to correct and submit. If the Order or
+  its line cannot be saved, nothing is raised (an Order without its line is removed again, or named
+  to cancel). If the case cannot be linked, the Order stays a draft that names the case, to link and
+  submit.
 - **Raise replacement** is offered while the case links no Order, or one that was rejected or
   cancelled: a new Order then takes its place on the case. A form opened before the link can still send
   it: a linked draft is then submitted again, and a linked Order awaiting approval, going ahead or
@@ -19,7 +22,9 @@
 - If no stock is left:
   - a failed unit with **OEM coverage today** gets an **OEM RMA** record (advance replacement, *to
     open*) instead of a purchase, when the line is for the failed unit's own Model (refresh lines
-    and replacements by a different Model are purchased);
+    and replacements by a different Model are purchased). If the RMA record cannot be saved, a
+    warning is logged and the line's sourcing summary says to open it by hand; the line waits for
+    stock;
   - the RMA is opened with the vendor manually;
   - the OEM's replacement unit is received with the RMA number in the PO field (ASN or warehouse
     app), allocated to the waiting line, and the RMA becomes *replacement received*.
@@ -31,14 +36,14 @@
   order.
 - **Defective returned to OEM** on the RMA retires the unit as *returned to OEM*. This needs wipe
   evidence recorded since the unit was last received back at the depot (receipt clears earlier
-  evidence).
+  evidence). When the unit cannot be retired, the user is told why and the RMA is left as it was.
 
 ## Returns (D60)
 
 | Trigger | Raised by |
 |---|---|
 | Site decommission / device removal | Record producer *Return or decommission network equipment*, or the customer page |
-| Refresh swap-back, defective return | Install completion of refresh / replacement Orders (collected by the same work order) |
+| Refresh swap-back, defective return | Install completion of refresh / replacement Orders (collected by the same work order); a Return the platform refuses is logged, the replaced units stay in service, and completing the install again raises it |
 | Agreement end | Daily job, once per Agreement after its end date: one Return per Site for all equipment installed or still shipped there, each a field de-install with its own normal change and de-install work order |
 | Temporary end | Daily job, `x_daas_ham.returns.temporary_lead_days` before a temporary Order's end date |
 
@@ -74,6 +79,11 @@
   - a unit received after the due date incurs a **late-return fee**;
   - a unit declared missing that turns up settles its line again: the open lost-asset fee is
     waived, the late-return fee applies, and the Return order reopens for evaluation.
+
+  A receipt the lifecycle or the platform refuses answers HTTP 422 with the reason and leaves the unit
+  pending return (or missing), with nothing settled, to scan again. If the unit is saved but its
+  return line is not (or its Return order is not reopened, or its site package not ended), this is
+  logged, to fix by hand.
 - **Evaluation** on the return line:
 
   | Choice | Result |
@@ -83,16 +93,23 @@
   | scrap, return to owner | pending wipe |
 
   A *damaged* condition incurs a damage fee. The Return order closes when every line is evaluated
-  or missing.
+  or missing. If the Asset's move is refused, the user is told and the line stays received, so the
+  evaluation can be chosen again.
 - **Overdue** (daily):
-  - the first day after the due date, the return is escalated once per Return order and the
-    Customer admins and account manager are emailed;
+  - the first day after the due date, the return is escalated once per Return order and, once the
+    escalation is saved, the Customer admins and account manager are emailed;
   - after `x_daas_ham.returns.grace_days`, the Asset is declared *missing* (its Rack position is
     freed) and a lost-asset fee is recorded. The active site package of its Site and Agreement ends
     that day once nothing else is left there, as on receipt. The missing unit keeps its Site and
     subscription line so that, found again and back in service, it bills on that line again while
-    the line is open.
-- Fees use the Agreement's lost / late / damage amounts. A zero amount records nothing.
+    the line is open;
+  - a unit whose move to missing is refused stays pending return with its line awaiting, and the
+    next run declares it again: the lost-asset fee and the site package's end follow only a saved
+    move. A line that cannot be saved as missing is logged and declared again on the next run,
+    without a second fee.
+- Fees use the Agreement's lost / late / damage amounts. A zero amount records nothing. Each fee type
+  is charged at most once per Asset and Return order (a waived fee aside), so a step retried after a
+  refused save never charges twice. A fee the platform refuses is logged.
 
 ## Refresh (D48)
 
@@ -104,6 +121,8 @@
 - Waves where some Asset has no successor stay **draft** with a work note for review. All others are
   submitted (within the agreement) and fulfilled like any Order; one that Submit refuses stays a draft
   with the reasons in its work notes.
+- An Order or line the platform refuses is logged; its Assets, on no open replacing line, are raised
+  again on the next run.
 - Shipping opens a **normal** change for the Customer's approval inside the maintenance window.
 
 ## Disposal (D61)
@@ -112,8 +131,10 @@
   - **Submit for approval** asks the provider-side approvers (asset managers), plus the order's
     Customer's admins when any Asset is customer-owned. That Customer must be set, and every
     customer-owned Asset must belong to it (its company): otherwise Submit says why, naming the
-    Assets that do not belong, and the order stays a draft.
-  - Rejection closes it.
+    Assets that do not belong, and the order stays a draft. Submit asks no one when the form save is
+    refused, and cancels its requests again if the order cannot be saved as awaiting approval.
+  - Rejection closes it. If the approved or rejected outcome cannot be saved, the order stays
+    awaiting approval with its requests (logged), and the next decision on them tries again.
   - Once the order leaves draft, what it retires is fixed: lines cannot be added, removed or pointed
     at another order, Asset or method, and the order's method and Customer cannot change (before
     rules on the line and the order). Complete disposal still records each line's status and
@@ -134,4 +155,7 @@
   A pending-wipe Asset is saved as pending disposal first, then retired. A line is done only when
   the retiring save is kept. A line whose Asset is not found or is outside the user's Stockrooms (ADR
   0005) is blocked like any other. Lines that are not retired are marked blocked with the reasons,
-  and the order stays approved until they are cleared.
+  and the order stays approved until they are cleared. It also stays open while any line cannot be
+  saved: one refused after its Asset was retired is logged as *done, its asset retired* and must be
+  set done by hand, since completing again would mark it blocked (its Asset is no longer awaiting
+  disposal).

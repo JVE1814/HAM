@@ -14,12 +14,13 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   Agreement.
 - Leaving the Provider needs wipe evidence. Evidence counts only if it was recorded since the Asset
   last came back from a Site or last entered staging: receipt at the depot clears it, and so does
-  every move into staging the app makes (staging loads a Customer's configuration). A stage set by
-  hand on the form does not clear it.
+  every save into staging, since staging loads a Customer's configuration. That covers the app's moves
+  and a stage set on the form by anyone, administrators included, or by a background process (the
+  before-update rule on `alm_hardware` clears it).
 - Leased Assets leave only to the Lessor, or to the OEM from pending OEM RMA (an OEM takeback from
   pending disposal is refused). Customer-owned Assets leave only back to the Customer.
 - Form edits that break the matrix are refused; administrators and background processes are not
-  checked.
+  checked (their moves into staging still clear the wipe evidence).
 
 ## Derived stages (`domain/fulfilment.ts`)
 
@@ -36,19 +37,24 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
 - An Order follows its slowest live line: preparing, delivering (ready to ship), installing,
   complete. It is cancelled when every line is. Draft, awaiting-approval, rejected, cancelled and
   complete Orders keep their stage: a complete Order stays complete when its Assets leave service.
+- A line or Order stage the platform refuses to save is logged: it is derived again only when one of
+  its Assets next changes, and until then the line or Order keeps its old stage, with the actions
+  that stage offers (Ship, Confirm installed).
 
 ## Inbound
 
 - **ASN rows** create in-transit Assets (Provider-owned, company = Provider). They are refused if the
   serial already exists, the PID does not map to a Model (which records a normalization exception),
-  or a mandatory field is missing.
+  or a mandatory field is missing. A row whose Asset insert the platform refuses is marked error with
+  its reason.
 - **Receiving** (warehouse app) confirms only in-transit / on-order Assets as available in the chosen
   stockroom (for an inventory tech, one of theirs). It assigns the next Provider tag (unless the Asset
   has one). A unit whose ASN PO number is one of the *Purchase orders* of a line awaiting stock (same
   Model) is allocated to that line and comes off its *On order* count (reserved, then staging once its
-  Staging task is created; without one it stays reserved). An unknown serial with a PID is received
-  without an ASN. Returned units (pending return or missing) are received by the returns process (P2
-  after-sales spec); any other scanned Asset is refused as not awaiting receipt.
+  Staging task is created; without one, or when the move to staging is refused, it stays reserved and
+  the reply shows it reserved). An unknown serial with a PID is received without an ASN. Returned units
+  (pending return or missing) are received by the returns process (P2 after-sales spec); any other
+  scanned Asset is refused as not awaiting receipt.
 - The chosen stockroom must be a central depot or a staging centre: a customer-site stockroom is
   refused (HTTP 400), for returned units too.
 - If the platform refuses to save the new or confirmed Asset, the call answers HTTP 422 and the unit is
@@ -56,6 +62,8 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   rescan. If only the reservation for the waiting line is refused, the unit stays received
   (available), a warning is logged and no Staging task opens. It still comes off the line's *On
   order* count, so the line can pick it as free stock the next time it is sourced.
+- If the line's *On order* count, or the OEM RMA a replacement unit arrives for (P2 after-sales spec),
+  cannot be saved, a warning is logged and the unit is still reserved for its line.
 - **Provider tags** come from one counter, advanced under a job lock so that no two Assets share a tag.
   A receipt that cannot take the lock after 5 tries is told to scan again (HTTP 503) and the unit is
   not received; one without an ASN stays on order, so the rescan finds it by serial.
@@ -64,6 +72,8 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   - a unit being staged (one received for a waiting PO line among them) goes only into a staging
     centre;
   - reserved, spare-pool and staged Assets, and anything not in stock, are refused.
+
+  A put-away the platform refuses to save answers HTTP 422 with its reason.
 - **Pick** confirms an Asset is a staged Asset of the given Order.
 
 ## Staging
@@ -86,6 +96,8 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   inventory tech included).
 - For every mode except self-install, Ship opens a change and an FSM work order. A device replace
   uses a standard change; everything else uses a normal change.
+- If the tracking number, or the change and work order, cannot be saved on the Order, Ship still
+  ships and says so; the Shipment, change and work order name the Order, to link them by hand.
 - A work order's planned start and end must lie inside the change window (once scheduled) and the
   Site's maintenance schedule (if any).
 - **Install completion** happens when the work order is closed complete or someone uses *Confirm
@@ -93,6 +105,11 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   Order being installed):
   - shipped Assets (hot spares included) become pending in service with the install time;
   - Assets replaced by the Order's lines go to pending return.
+
+  A unit the platform refuses to move stays where it was (logged), and so does its line: *Confirm
+  installed* says how many, and the customer page's call (`POST /customer/orders/{id}/installed`)
+  answers HTTP 422, so the confirmation can be sent again. The replaced units still go to pending
+  return.
 
 ## In service and billing start
 

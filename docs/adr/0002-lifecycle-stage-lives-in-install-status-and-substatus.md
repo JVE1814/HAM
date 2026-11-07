@@ -11,3 +11,5 @@ checks an allowed-moves matrix. A second state field would drift whenever out-of
 - The SDK refuses `ChoiceSet` on `alm_asset` from a scoped app, so our substatus values are shipped as
   plain `sys_choice` records via `Record()` (dependent on `install_status`).
 - Changes made outside the app are accepted but not validated; the app reads whatever stage results.
+  A change into staging still clears the wipe evidence, whoever makes it (the before-update rule on
+  `alm_hardware`).

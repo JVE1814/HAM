@@ -257,7 +257,13 @@ What remains can only be confirmed on an instance or behind a vendor login:
   Lessor-owned units of a returned lease that were evaluated as refurbish before this release may
   still sit in available stock: sourcing no longer claims them, but they are not withdrawn. List
   available Assets whose lease's end action is *Return to lessor*, move them to pending wipe and put
-  them on a *return to lessor* disposal order.
+  them on a *return to lessor* disposal order. The spare-pool top-up no longer counts spare-pool units
+  of a returned lease as reserved spares, so its first run after the upgrade may move free stock into
+  those Customers' pools (and buy for them when `x_daas_ham.spare_pool.auto_purchase` is true).
+  Withdraw a returned lease's spare-pool units the same way. Each fee type is now charged at most once
+  per Asset and Return order. Before this release, a damage fee could be charged twice when an
+  evaluation was chosen again after the lifecycle refused the move: list Fee events (not waived) that
+  share type, Asset and Return order, and waive the duplicates.
 - **Order create rule in jobs**: an Order is submitted only when its user passes the Order create rule
   (`GlideRecord.canCreate()`). The daily job *NaaS - raise refresh orders* relies on its *Run as* user
   (expected to be the system user) passing it; one without an Order raiser role leaves its refresh

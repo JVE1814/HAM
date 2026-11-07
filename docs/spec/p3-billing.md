@@ -22,9 +22,9 @@
 
 | Status | How it gets there | What can happen |
 |---|---|---|
-| Generating | A new period: the monthly job opens the previous month on day 1 unless it already has a period, or finance creates one by hand for a month that has ended (before the current month by UTC date). Either way, the insert starts its generation once. Or *Regenerate* | Lines are written in time-boxed chunks (event-driven); a subscription line or fee event that fails to bill is counted on the period (*Lines that failed to bill*) with the last error (*Last generation error*). A chunk that cannot run at all (e.g. a month saved past the month rule) stops generation: its error is recorded and the period is held as *Ready for review*. *Close period* refuses while a line failed to bill or an error is recorded, until a *Regenerate* bills every line |
-| Ready for review | Generation finished and totals are set, or generation stopped on an error (held for review) | *Regenerate* (rebuild from current data); *Close period* |
-| Closed (locked) | *Close period* (finance) | Lines of fees waived since generation are dropped (Close refuses if a waived fee cannot leave the period) and the totals redone, and the fees become *billed*. The period and its lines can no longer change or be deleted, and none of its lines can be moved to another period (nor a line moved into it). The CSV export is attached in the background shortly after closing; *Re-export CSV* attaches it again if it is missing |
+| Generating | A new period: the monthly job opens the previous month on day 1 unless it already has a period, or finance creates one by hand for a month that has ended (before the current month by UTC date). Either way, the insert starts its generation once. Or *Regenerate* | Lines are written in time-boxed chunks (event-driven); a subscription line or fee event that fails to bill is counted on the period (*Lines that failed to bill*) with the last error (*Last generation error*), and so is a fee whose link to the period is refused (a *Regenerate* links it). A chunk that cannot run at all (e.g. a month saved past the month rule), or whose failed-line count the period refuses, stops generation: its error is recorded and the period is held as *Ready for review*. If the period refuses that save, or the *ready* save at the end of generation, it stays *Generating* with nothing queued: the error is logged, *Close period* and *Regenerate* both refuse it, and an admin sets it to *Ready for review* once the cause is fixed. *Close period* refuses while a line failed to bill or an error is recorded, until a *Regenerate* bills every line |
+| Ready for review | Generation finished and totals are set, or generation stopped on an error (held for review) | *Regenerate* (rebuild from current data: the period is saved as *Generating* before its lines are deleted, so a refused save keeps it ready with its lines); *Close period* |
+| Closed (locked) | *Close period* (finance) | Lines of fees waived since generation are dropped (Close refuses if a waived fee cannot leave the period) and the totals redone; the period is saved closed before its fees become *billed*, so a refused save leaves them open. The period and its lines can no longer change or be deleted, and none of its lines can be moved to another period (nor a line moved into it). The CSV export is attached in the background shortly after closing; *Re-export CSV* attaches it again if it is missing |
 
 - A period's month is entered as YYYY-MM (e.g. 2026-10); a business rule refuses a period saved
   with any other month, or with a month that has not ended. The period's first and last day are set
@@ -35,7 +35,8 @@
 - A period can be created, or its month changed, only for a month that has ended: one before the
   current month by the instance's UTC date. The current or a later month is refused, since a new
   period is generated at once and would bill part of the month, and the monthly job would then skip
-  it. The monthly job only opens last month, so it is never refused.
+  it. The monthly job only opens last month, so the month rule never refuses it; any other refusal is
+  logged as an error and the month must be created by hand.
 
 ## Export
 
@@ -69,7 +70,8 @@ Closing a period (or **Recompute margin** on a closed one) rebuilds its **Cost f
   held the lock so long that it was taken as abandoned and cleared writes nothing more and starts the
   recompute over, so the period is recomputed from scratch. Service intervals that fail to cost are
   left out, counted on the period (*Service intervals that failed to cost*) with the last error (*Last
-  margin error*); both are cleared when a recompute starts.
+  margin error*); both are cleared when a recompute starts. If the period refuses that clearing, the
+  pass stops (logged) before it clears the period's Cost facts and Margin.
 - While a buyout transfer is still running, a lease's payment keeps being split over the Assets it
   covered when the buyout was decided.
 - Otherwise a lease's payment is split over the Assets it covers now: units the Lessor or the OEM has

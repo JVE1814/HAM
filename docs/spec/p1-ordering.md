@@ -16,9 +16,11 @@
   Customer's own or one offered to every Customer. **Submit** checks both rules every time, break-fix
   and refresh Orders included: otherwise the Order stays a draft, the user is told why and the reasons
   go in its work notes.
-- Through the record producer, an Order its requester may not raise is removed again. One that names
-  records not of its Customer stays a draft with its lines (except those of a Site template not offered
-  to the Customer), to correct and submit.
+- Through the record producer, an Order its requester may not raise is removed again (one the platform
+  keeps is logged, to cancel). One that names records not of its Customer stays a draft with its lines
+  (except those of a Site template not offered to the Customer), to correct and submit. So does one
+  missing a line the platform refused: the user is told, and its work notes say, how many order lines
+  were not saved, to add them and submit.
 
 ## Entitlement (`domain/entitlement.ts`)
 
@@ -48,12 +50,20 @@
   Order; it is approved once each required group has an approval. Remaining requests are cancelled.
   The Order's outcome is saved before they are, so cancelling them does not roll the approvals up
   again or start sourcing twice.
+- If that outcome cannot be saved, the Order stays awaiting approval with its remaining requests
+  (logged), and a later decision on them tries again; with none left it stays there until cancelled.
+  A pending request that cannot be cancelled is logged, to cancel by hand; left waiting, it would
+  still count if a draft is submitted again.
 - Provider-side approvers are the Agreement's account manager or, if it has none, the asset managers.
-  If the Customer has no Customer admins, the provider-side approvers stand in for them. If there is
-  no approver at all, the Order gets a work note and someone must add an approver manually.
-- A rejected Order cancels its lines, so they stop counting as usage. Usage also ignores draft and
-  cancelled Orders. Units a cancelled line had already shipped count as deployed again, since
-  cancelling closes the line.
+  They are active users only: an inactive account manager counts as none, so the asset managers
+  approve. If the Customer has no Customer admins, the provider-side approvers stand in for them.
+- If there is no approver, or the requests the platform saved could not approve it, the saved
+  requests are cancelled again and the Order stays a draft; the user is told why and it goes in its
+  work notes. An Order the platform will not save as approved (within agreement) or awaiting approval
+  also stays a draft, and the user is told why; requests already made are cancelled again.
+- A rejected Order cancels its lines, so they stop counting as usage. It is saved as rejected first,
+  so one the platform refuses keeps its lines. Usage also ignores draft and cancelled Orders. Units a
+  cancelled line had already shipped count as deployed again, since cancelling closes the line.
 
 ## Sourcing (`domain/sourcing.ts`)
 
@@ -103,23 +113,33 @@
 - Re-sourcing a line only covers `quantity − allocated − on order − open OEM RMAs`, where on order
   is units bought and not yet received.
 - Several source stockrooms give several transfer orders, all listed on the line.
+- If the line cannot be saved after sourcing, a warning names the purchase order and transfer orders
+  it does not list, to add by hand: otherwise units received on them are not allocated to it, and the
+  next run buys its shortfall again.
 - A failed staging takes the Asset off the line, which goes back to awaiting stock and is re-sourced.
   Only a line that has not shipped falls back.
 - **Cancel** is refused once anything has shipped, a hot spare handed over at Ship included (use a
   return order then). Otherwise it:
+  - saves the Order as cancelled first, listing every purchase order of its lines in its work notes
+    for cancelling in Procurement (if the platform refuses, the user is told and nothing is
+    released);
   - releases the stock: hot spares stay in the pool, other Assets return to free stock under the
     Provider company;
   - skips open staging tasks;
-  - lists every purchase order of its lines for cancelling in Procurement;
-  - cancels the Order's pending approvals once the Order is saved as cancelled.
+  - cancels the Order's pending approvals.
 
-  A cancelled, rejected or complete Order keeps its stage.
+  A line, unit or staging task the platform refuses to cancel or release is logged and the user is
+  told. A rejected Order's lines are cancelled the same way. A cancelled, rejected or complete Order
+  keeps its stage.
 
 ## Spare-pool top-up (daily)
 
 For each active Agreement with a spare-pool ratio, and each Model it has deployed:
-`shortfall = ceil(deployed × ratio) − reserved spares`. Free central stock is moved into the pool,
-each unit claimed under the same Asset lock as sourcing and only while it is still available on no Order
-line and not on a lease being returned: a unit sourcing took in the meantime, or whose save is refused,
-is not moved and stays in the shortfall. If `x_daas_ham.spare_pool.auto_purchase` is true, purchase
-orders are requested for the rest, net of top-up purchases still open for that Agreement and Model.
+`shortfall = ceil(deployed × ratio) − reserved spares`. Reserved spares are the Customer's spare-pool
+units, leaving out units on a lease being returned to its Lessor: sourcing can no longer claim them,
+so the top-up replaces them (`domain/sourcing.ts` `reservedSparesQuery`). Free central stock is moved
+into the pool, each unit claimed under the same Asset lock as sourcing and only while it is still
+available on no Order line and not on a lease being returned: a unit sourcing took in the meantime, or
+whose save is refused, is not moved and stays in the shortfall. If `x_daas_ham.spare_pool.auto_purchase`
+is true, purchase orders are requested for the rest, net of top-up purchases still open for that
+Agreement and Model.

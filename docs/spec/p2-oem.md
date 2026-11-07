@@ -38,12 +38,15 @@
     (`x_daas_ham.job.budget_seconds`) is spent, so a vendor with a backlog does not hold up the
     others and the budget is not left unused while one is behind. Each enabled vendor gets at least
     one batch per run, so a run can go past the budget by up to one batch per vendor. A vendor stops
-    for the run when nothing of it is stale, when a batch has errors, or after its one batch when it
-    is rate-limited (Fortinet).
+    for the run when nothing of it is stale, when a batch has errors or a refused save, or after its
+    one batch when it is rate-limited (Fortinet). A vendor whose saves keep being refused for some
+    Asset gets one batch per run until the cause is fixed, because that Asset stays the stalest.
   - Contracts are upserted per serial + contract number.
   - Each Asset gets its coverage end and service level (latest covering contract) and its annual
     support cost from the contracts of its serial, and is stamped as checked. Assets sharing a serial
-    all get that serial's coverage; its contracts point at the last of them.
+    all get that serial's coverage; its contracts point at the last of them. A serial whose coverage
+    record is refused is neither summarised onto its Assets nor stamped checked, so it is asked
+    again; so is an Asset whose own save is refused. Refusals are logged.
   - When a vendor call fails, only the serials it was asked about are left unchecked (the answered
     ones are stamped), and that vendor waits for the next run. When the vendor answers with an
     error of its own (FortiCloud status other than 0, an SN2INFO answer without `serial_numbers`),
@@ -59,6 +62,9 @@
 - **RMA status (hourly)**: open Cisco RMAs with an RMA number, at most 200 per run, least recently
   checked first. Every RMA asked is stamped *Last checked*, answered or not, so all of them take
   turns. *Last checked* is when the RMA was last asked, including when Cisco did not answer or the
-  call failed (failures are logged).
+  call failed (failures are logged). An RMA whose save is refused is logged (it keeps its place at
+  the front).
 - **CSV**: rows loaded into *OEM coverage import rows* (vendor, serial, contract, service level,
-  start, end) and *Lifecycle import rows* are processed on insert.
+  start, end) and *Lifecycle import rows* are processed on insert. A row whose coverage or Model
+  lifecycle the platform refuses is marked error with the reason, to load again once the cause is
+  fixed.

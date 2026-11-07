@@ -25,9 +25,9 @@
 - A return label voided with the carrier is closed with *Mark label voided* on its Shipment (asset
   managers, inventory techs and the NOC, while it is *Label created* or *Exception*). Nothing is sent
   to the aggregator. The Shipment becomes *Voided*, which is final, and the Return order gets a work
-  note. The customer page stops offering the label and a new return label can be created. Voided
-  Shipments, like delivered and returned ones, are left out of the workspace list *Shipments under
-  way*.
+  note (if the save is refused, the Shipment stays open and the Return order gets no note). The
+  customer page stops offering the label and a new return label can be created. Voided Shipments,
+  like delivered and returned ones, are left out of the workspace list *Shipments under way*.
 - Addresses need a name, street, city, postal code and country (U.S. and Canadian states as their
   two-letter codes), and the sender a phone number (ShipEngine requires `ship_from.phone`): the
   location's phone, else `x_daas_ham.shipping.sender_phone` for the depot or the first site
@@ -45,6 +45,9 @@
   added; the first *delivered* update puts a work note on the Order. Late or out-of-order updates
   do not move a delivered, returned or voided shipment back; *unknown* never replaces a known status. Unknown tracking numbers are
   acknowledged and ignored.
+  If the platform refuses the Shipment or a tracking event, the refusal is logged and the reply is
+  500, not 2xx. An aggregator that retries failed deliveries (EasyPost does) then sends the update
+  again; the retry skips events already stored and does not repeat the delivered note.
 
 | Aggregator status | Shipment status |
 |---|---|
@@ -91,7 +94,8 @@
   person (*OEM claims to do by hand* in the workspace). Licence and zero-touch steps start as
   *Waiting for the OEM claim step* when their staging task also has a claim step: they are not
   sent and use no attempts, also while the claim step is left for a person, and go to pending as
-  soon as the claim step is ticked done, by hand or by a run.
+  soon as the claim step is ticked done, by hand or by a run. A step whose save is refused is logged
+  and stays due, so it is sent again.
 - *Ship* and *Create return label* refuse more than 20 packages (one label's maximum): enter the
   carrier and tracking number by hand. A Return order gets one open return label at a time;
   delivered, returned and voided labels are not open, so to replace a label still *Label created* or

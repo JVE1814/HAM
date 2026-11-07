@@ -5,7 +5,10 @@
 - **Start blind count** on a stockroom lists everything in stock there as expected.
 - **Start site audit** on a Site lists its installed Assets and dispatches a site-audit work order
   under a standard change.
+- An Asset whose audit line the platform refuses is left out of the expected count (logged), and the
+  user is told how many.
 - Technicians scan in the warehouse app's **Audit** mode. Scans are blind: no unit details are shown.
+  A scan the platform refuses to record answers HTTP 422, to scan again.
 - An inventory tech sees, scans and closes only the blind counts of their Stockrooms; site audits are
   for field techs. Field techs and asset managers scan and close any open audit; other staff (NOC,
   account managers, finance) only read audits. An audit the user may not see answers *No open audit
@@ -28,6 +31,10 @@
 - It is assigned to a Customer admin.
 - Customer admins answer each device (present / not present / don't know) on the customer page and
   submit once all are answered. *Not present* answers become *customer reports missing* exceptions.
+- An attestation the platform refuses is raised again on the next run; an Asset left off one is
+  logged. An answer the platform refuses answers HTTP 422 without submitting, and a refused submit
+  answers HTTP 422 and leaves the attestation open. Either can be sent again, which raises no
+  exception twice (exceptions open once per type and Asset).
 
 ## Reconciliation (daily)
 
@@ -39,7 +46,8 @@ Each installed Asset is checked for:
 
 Exceptions open once per type and Asset (or CI), also when two runs raise the same one at once: the
 check and the insert are made under a lock on the type and subject. They resolve themselves when the
-condition clears.
+condition clears. One the platform refuses is logged (an audit or attestation, closed once, does not
+raise it again).
 Network-gear CIs discovered recently with no Asset raise *seen without asset*.
 
 ## Racks (D67)
@@ -68,6 +76,15 @@ portal menu. Visibility rules limit everything to the user's Customer (Site cont
 |---|---|
 | Everyone | see installed equipment by Site; report a faulty device (CSM case with the failed asset); see open orders and returns; confirm self-installed orders |
 | Customer admins | request returns of selected devices or a site decommission; answer attestations |
+
+The page calls the app's REST API under `/api/x_daas_ham/naas`. A call the platform refuses answers
+HTTP 422, so it can be sent again:
+
+- `POST /customer/faults` when the case is refused;
+- `POST /customer/returns` when the Return order is refused, or no device could be added to it (each
+  is already on a return, or was refused);
+- `POST /customer/orders/{id}/installed` when a device is not moved to pending in service;
+- `POST /customer/attestations/{id}` when an answer or the submission is refused, without submitting.
 
 New equipment is ordered through the *Request network equipment* catalog item.
 
