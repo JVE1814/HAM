@@ -30,16 +30,30 @@ export function attachToSubscription(asset: GlideRecord, inServiceAt: number): b
     })
     if (!lineId) return true
     if (lines.find((l) => l.id === lineId)?.status === 'pending') {
-        const line = findById('x_daas_ham_subscription_line', lineId)
-        line?.setValue('status', 'active')
-        line?.setValue('start_date', toIsoDate(inServiceAt))
-        if (!line?.update()) {
-            const reason = line ? refusal(line) : 'the line is gone'
-            gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} stays pending in service, line not started: ${reason}`)
+        const unstarted = startLine(lineId, inServiceAt)
+        if (unstarted) {
+            const serial = str(asset, 'serial_number')
+            gs.warn(`[x_daas_ham] ${serial} stays pending in service, line not started: ${unstarted}`)
             return false
         }
     }
     // The Service interval opens when the Asset actually enters service (entry/assets.ts onAssetServiceChange).
     asset.setValue('x_daas_ham_subscription_line', lineId)
     return true
+}
+
+/**
+ * Start the pending line from `inServiceAt`, read afresh: '' once it is active, else why not. Another go-live may have
+ * started it since the lines were read, and keeps its start date; one ended since (by hand) is not set active again,
+ * and the Asset stays pending, so its next sighting chooses among the open lines left.
+ */
+function startLine(lineId: string, inServiceAt: number): string {
+    const line = findById('x_daas_ham_subscription_line', lineId)
+    if (!line) return 'the line is gone'
+    const status = str(line, 'status')
+    if (status === 'active') return ''
+    if (status !== 'pending') return `the line is ${status || 'without a status'} now`
+    line.setValue('status', 'active')
+    line.setValue('start_date', toIsoDate(inServiceAt))
+    return line.update() ? '' : refusal(line)
 }
