@@ -11,7 +11,7 @@ import { todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
 import { refreshLifecycleDates } from '../platform/lifecycle-dates'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties'
-import { bool, count, findById, num, str } from '../platform/records'
+import { bool, count, exists, findById, num, str } from '../platform/records'
 
 /** Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
 
@@ -80,12 +80,7 @@ function serviceEnds(leaseId: string): string[] {
 }
 
 function openDecision(leaseId: string): boolean {
-    const decision = new GlideRecord('x_daas_ham_lease_decision')
-    decision.addQuery('lease', leaseId)
-    decision.addQuery('active', true)
-    decision.setLimit(1)
-    decision.query()
-    return decision.hasNext()
+    return exists('x_daas_ham_lease_decision', `lease=${leaseId}^active=true`)
 }
 
 function countAssets(leaseId: string, stages?: readonly Stage[]): number {
