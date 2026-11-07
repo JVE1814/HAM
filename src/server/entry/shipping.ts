@@ -6,6 +6,7 @@ import {
     applyTracking,
     buyLabel,
     newTrackingEvents,
+    MAX_LABEL_PACKAGES,
     packageCount,
     parseTrackingWebhook,
     tokenMatches,
@@ -70,6 +71,10 @@ interface ShipmentSpec {
 
 /** Buy a label between the depot and a Site and record the shipment. */
 function createShipment(spec: ShipmentSpec): LabelResult {
+    // One package per Asset: never buy a label that leaves boxes unlabelled.
+    if (spec.packages > MAX_LABEL_PACKAGES) {
+        return { ok: false, error: `${spec.packages} packages is more than one label covers (${MAX_LABEL_PACKAGES}); enter the carrier and tracking number by hand` }
+    }
     const carrierId = stringProperty(PROPERTY.shippingCarrierId)
     if (!carrierId) return { ok: false, error: 'set x_daas_ham.shipping.carrier_id to the ShipEngine carrier account (se-...) billed for labels' }
     const stockroom = depot()
@@ -132,6 +137,12 @@ export function labelOrder(order: GlideRecord, packages: number): LabelResult {
 export function uiCreateReturnLabel(current: GlideRecord): void {
     const packages = count('x_daas_ham_return_order_line', `return_order=${current.getUniqueValue()}^status=awaiting`)
     if (packages === 0) return void gs.addErrorMessage('Nothing on this return is still awaited')
+    // Each label is paid for: one open return label per Return order (void it with the carrier to replace it).
+    const open = new GlideRecord('x_daas_ham_shipment')
+    open.addEncodedQuery(`return_order=${current.getUniqueValue()}^direction=return^statusNOT INdelivered,returned`)
+    open.setLimit(1)
+    open.query()
+    if (open.next()) return void gs.addErrorMessage(`Return label ${str(open, 'tracking_number')} is still open; void it with the carrier before buying another`)
     const result = createShipment({
         direction: 'return',
         siteId: str(current, 'site'),

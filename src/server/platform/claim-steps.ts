@@ -1,7 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { dueStepsQuery, type ClaimAction, type ClaimOutcome, type ClaimStore, type ClaimTarget } from '../domain/oem/claims'
 import type { OemVendor } from '../domain/oem/types'
-import { findById, num, str } from './records'
+import { findById, num, pluck, str } from './records'
 
 /** Automated staging steps (x_daas_ham_staging_step) behind the claim run's ClaimStore port; caches OEM cloud accounts per run. */
 export function glideClaimStore(): ClaimStore {
@@ -20,8 +20,10 @@ function dueTargets(vendor: OemVendor, action: ClaimAction, limit: number, accou
     step.setLimit(limit)
     step.query()
     const targets: ClaimTarget[] = []
+    const tasks: string[] = []
     while (step.next()) {
         const customerId = str(step, 'staging_task.asset.company')
+        tasks.push(str(step, 'staging_task'))
         targets.push({
             stepId: step.getUniqueValue(),
             serial: str(step, 'staging_task.asset.serial_number'),
@@ -30,7 +32,11 @@ function dueTargets(vendor: OemVendor, action: ClaimAction, limit: number, accou
             account: cloudAccount(customerId, vendor, action, accounts),
         })
     }
-    return targets
+    if (action === 'oem_claim' || targets.length === 0) return targets
+    // Licensing and zero-touch need the device claimed first: steps whose task still has an open
+    // claim step wait (not attempted, not counted) until that step is done.
+    const waiting = new Set(pluck('x_daas_ham_staging_step', `staging_taskIN${[...new Set(tasks)].join(',')}^automation=oem_claim^done=false`, 'staging_task'))
+    return targets.filter((_, i) => !waiting.has(tasks[i]))
 }
 
 /** The Customer's OEM cloud account for `action`, looked up once per customer and action. */

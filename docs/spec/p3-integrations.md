@@ -74,4 +74,7 @@
   ago, per enabled vendor (`x_daas_ham.oem.claim.<vendor>.enabled`), within
   `x_daas_ham.oem.claim.max_calls` calls per vendor per run (Meraki allows 10 claims per 5 minutes).
 - A failure records the reason and counts an attempt; after 5 attempts the step is left for a
-  person (*OEM claims to do by hand* in the workspace).
+  person (*OEM claims to do by hand* in the workspace). Licence and zero-touch steps wait, without
+  using attempts, while their staging task still has an open claim step.
+- *Ship* and *Create return label* refuse more than 20 packages (one label's maximum): enter the
+  carrier and tracking number by hand. A Return order gets one open return label at a time.

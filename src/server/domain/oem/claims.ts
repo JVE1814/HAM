@@ -314,7 +314,11 @@ const MESSAGE_LENGTH = 255
 
 /** Where a run reads its due steps and records their outcomes (the Glide store is in platform/claim-steps.ts). */
 export interface ClaimStore {
-    /** Up to `limit` of `vendor`'s steps due for `action` (dueStepsQuery), fewest attempts first, then oldest; each carries the Customer's OEM cloud account for `action` ('' when none). */
+    /**
+     * Up to `limit` of `vendor`'s steps due for `action` (dueStepsQuery), fewest attempts first, then
+     * oldest; each carries the Customer's OEM cloud account for `action` ('' when none). Licence and
+     * zero-touch steps whose staging task still has an open claim step are not returned (they wait).
+     */
     due(vendor: OemVendor, action: ClaimAction, limit: number): ClaimTarget[]
     /** Record one attempted or refused step. ok: tick it (automation_status=done, done=true); otherwise automation_status=failed and one more attempt. outcome.message is at most 255 characters. */
     settle(outcome: ClaimOutcome): void
