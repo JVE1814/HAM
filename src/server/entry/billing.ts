@@ -17,7 +17,7 @@ import {
 import { appendTo } from '../domain/collections'
 import { memoized } from '../domain/memo'
 import { ROLE } from '../domain/visibility'
-import { runEventTableJob } from '../platform/chunked'
+import { RowFailure, runEventTableJob } from '../platform/chunked'
 import { msToGlide, nowMs, todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
 import { deleteWhere, exists, findById, num, pluck, str } from '../platform/records'
@@ -82,8 +82,6 @@ function generateChunk(period: GlideRecord, cursor: string, current: GlideRecord
         }),
         prepare: (lines: readonly LineRow[]) => withIntervals(lines, bounds),
         handle: (line, lineId) => {
-            // Counted as this line's failure, as if it had read its intervals itself.
-            if (line.intervalsError !== undefined) throw line.intervalsError
             for (const charge of subscriptionCharges(line.terms, bounds, { intervals: line.intervals, siteName })) {
                 insertLine(period, {
                     kind: 'subscription',
@@ -137,21 +135,18 @@ interface LineRow {
 }
 
 /** A Subscription line ready to bill: its row, and its Service intervals in the month. */
-type BillableLine = LineRow & { intervals: readonly ServiceInterval[]; intervalsError?: unknown }
+type BillableLine = LineRow & { intervals: readonly ServiceInterval[] }
 
 /**
  * The batch's lines with their Service intervals in the month (none for a line not billed from them), read with
- * one aggregate for the whole batch. If that read fails, only the lines billed from intervals carry its error,
- * so the others still bill.
+ * one aggregate for the whole batch. If that read fails, only the lines billed from intervals fail, so the others still bill.
  */
-function withIntervals(lines: readonly LineRow[], bounds: MonthBounds): BillableLine[] {
-    const perDevice = lines.filter((line) => billsFromIntervals(line.terms)).map((line) => line.lineId)
+function withIntervals(lines: readonly LineRow[], bounds: MonthBounds): Array<BillableLine | RowFailure> {
     try {
-        const byLine = intervalsByLine(perDevice, bounds)
+        const byLine = intervalsByLine(lines.filter((line) => billsFromIntervals(line.terms)).map((line) => line.lineId), bounds)
         return lines.map((line) => ({ ...line, intervals: byLine.get(line.lineId) ?? [] }))
     } catch (error) {
-        const unread = new Set(perDevice)
-        return lines.map((line) => ({ ...line, intervals: [], intervalsError: unread.has(line.lineId) ? error : undefined }))
+        return lines.map((line) => (billsFromIntervals(line.terms) ? new RowFailure(error) : { ...line, intervals: [] }))
     }
 }
 
@@ -249,14 +244,16 @@ function setTotals(period: GlideRecord): void {
  * still ready for review, so the closed-line guard lets the lines go.
  */
 function dropWaivedFeeLines(period: GlideRecord): void {
-    // In rounds of a bounded id list; an unlinked fee leaves the query, so each round finds the next.
+    // In pages of a bounded id list, in sys_id order, so the loop ends even if an unlink does not take.
+    let after = ''
     for (;;) {
-        const waived = pluck('x_daas_ham_fee_event', `billing_period=${period.getUniqueValue()}^status=waived`, 'sys_id', 500)
+        const waived = pluck('x_daas_ham_fee_event', `billing_period=${period.getUniqueValue()}^status=waived${after ? `^sys_id>${after}` : ''}^ORDERBYsys_id`, 'sys_id', 500)
         if (waived.length === 0) return
         // Lines first, by the fees' ids (a set-based delete is not relied on to follow a dot-walked
         // condition): if the delete fails, the fees still point at the period and a retry finds them.
         deleteWhere('x_daas_ham_billing_line', `billing_period=${period.getUniqueValue()}^kind=fee^fee_eventIN${waived.join(',')}`)
         unlinkFees(`sys_idIN${waived.join(',')}`)
+        after = waived[waived.length - 1]
     }
 }
 
@@ -425,7 +422,7 @@ export function guardBillingPeriodMonth(current: GlideRecord): void {
     current.setAbortAction(true)
 }
 
-/** Before update/delete rule on billing periods: a closed period is locked. */
+/** Before update/delete rule on billing periods: a closed period is locked (the margin computation saves its own status fields without this rule). */
 export function guardClosedBillingPeriod(current: GlideRecord, previous: GlideRecord): void {
     if (str(previous ?? current, 'status') !== 'closed') return
     gs.addErrorMessage('This billing period is closed and locked')

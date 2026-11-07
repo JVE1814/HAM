@@ -104,7 +104,6 @@ describe('leaseShare', () => {
     })
 })
 
-
 describe('costFactKey', () => {
     it('tells Cost facts apart by customer, site and type', () => {
         const keys = [costFactKey('acme', 'hq', 'lease'), costFactKey('acme', 'hq', 'purchase'), costFactKey('acme', '', 'lease'), costFactKey('globex', 'hq', 'lease')]
