@@ -17,8 +17,34 @@ const MILESTONES: ReadonlyArray<[keyof LifecycleDates, LifecyclePhase]> = [
     ['endOfSale', 'end_of_sale'],
 ]
 
-/** The latest milestone reached on `today`. */
-export function lifecyclePhaseOn(dates: LifecycleDates, today: string): LifecyclePhase {
+/** What an Asset contributes to its Lifecycle phase and Refresh due date. */
+export interface AssetLifecycleFacts {
+    /** The Asset's Agreement refresh basis as stored: 'cycle' | 'end_of_support' | 'earliest', or '' when the Asset has no Agreement (treated as 'earliest'). Any other value gives no basis date. */
+    refreshBasis: string
+    /** YYYY-MM-DD the Asset went into service; absent until it has. */
+    inServiceDate?: string
+    /** The Agreement's refresh cycle; 0 (or no Agreement) means no cycle date. */
+    refreshCycleMonths: number
+    /** The Asset's Lease schedule, when it is on one. */
+    lease?: { endAction: string; ends: string }
+}
+
+export interface AssetLifecycleStamp {
+    phase: LifecyclePhase
+    /** Refresh due date as YYYY-MM-DD, or '' when none can be determined. */
+    refreshDue: string
+}
+
+/**
+ * An Asset's Lifecycle phase (the latest milestone its Model has reached on `today`) and Refresh due
+ * date: the date its Agreement's refresh basis gives, brought forward to the lease end when the lease
+ * is being returned (ADR 0011).
+ */
+export function assetLifecycleStamp(asset: AssetLifecycleFacts, model: LifecycleDates, today: string): AssetLifecycleStamp {
+    return { phase: lifecyclePhaseOn(model, today), refreshDue: refreshDueDate(asset, model) }
+}
+
+function lifecyclePhaseOn(dates: LifecycleDates, today: string): LifecyclePhase {
     for (const [field, phase] of MILESTONES) {
         const date = dates[field]
         if (date && date <= today) return phase
@@ -26,35 +52,31 @@ export function lifecyclePhaseOn(dates: LifecycleDates, today: string): Lifecycl
     return 'available'
 }
 
-export type RefreshBasis = 'cycle' | 'end_of_support' | 'earliest'
-
-export interface RefreshInputs {
-    basis: RefreshBasis
-    inServiceDate?: string
-    refreshCycleMonths: number
-    endOfSupport?: string
-    /** The date the Asset must be off the network whatever the basis (its lease is being handed back). */
-    returnBy?: string
-}
-
-/** When an in-service Asset must be refreshed under its Agreement, or null if it cannot be determined. */
-export function refreshDueDate(inputs: RefreshInputs): string | null {
+function refreshDueDate(asset: AssetLifecycleFacts, model: LifecycleDates): string {
     // A lease hand-back applies even before the Asset is in service (shipped, awaiting first sighting).
-    if (!inputs.inServiceDate) return inputs.returnBy || null
-    return earliest([byBasis(inputs, inputs.inServiceDate), inputs.returnBy || undefined]) ?? null
+    const basisDate = asset.inServiceDate ? byBasis(asset, asset.inServiceDate, model.endOfSupport) : undefined
+    return earliest([basisDate, returnBy(asset.lease)]) ?? ''
 }
 
-function byBasis(inputs: RefreshInputs, inServiceDate: string): string | undefined {
-    const byCycle = inputs.refreshCycleMonths > 0 ? addMonths(inServiceDate, inputs.refreshCycleMonths) : undefined
-    const bySupport = inputs.endOfSupport || undefined
-    switch (inputs.basis) {
+function byBasis(asset: AssetLifecycleFacts, inServiceDate: string, endOfSupport: string | undefined): string | undefined {
+    const byCycle = asset.refreshCycleMonths > 0 ? addMonths(inServiceDate, asset.refreshCycleMonths) : undefined
+    const bySupport = endOfSupport || undefined
+    // An Asset without an Agreement has no basis stored, and refreshes on whichever comes first.
+    switch (asset.refreshBasis || 'earliest') {
         case 'cycle':
             return byCycle
         case 'end_of_support':
             return bySupport
         case 'earliest':
             return earliest([byCycle, bySupport])
+        default:
+            return undefined
     }
+}
+
+/** The date a leased Asset must be off the network: its lease end, once the decision is to return it. */
+function returnBy(lease: AssetLifecycleFacts['lease']): string | undefined {
+    return lease?.endAction === 'return' && lease.ends ? lease.ends.slice(0, 10) : undefined
 }
 
 export type LifecycleRow = { pid: string } & { [K in keyof LifecycleDates]?: string }

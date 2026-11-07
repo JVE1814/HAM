@@ -7,7 +7,7 @@ import { ROLE } from '../domain/visibility'
 import { findAssetByIdentifier, moveAndSave, readStage } from '../platform/assets'
 import { runTableJob } from '../platform/chunked'
 import { glideToMs, msToGlide, nowMs } from '../platform/clock'
-import { applyLifecycleDates } from '../platform/lifecycle-dates'
+import { applyLifecycleDates, modelLifecycles, type ModelLifecycles } from '../platform/lifecycle-dates'
 import { intProperty, PROPERTY } from '../platform/properties'
 import { str } from '../platform/records'
 import { attachToSubscription } from '../platform/subscriptions'
@@ -26,7 +26,7 @@ function recordSeen(asset: GlideRecord, at: number, source: string): void {
 }
 
 /** Put a pending Asset in service if it has been seen since its install. Saves the asset. */
-function goLiveIfSeen(asset: GlideRecord): void {
+function goLiveIfSeen(asset: GlideRecord, lifecycles: ModelLifecycles): void {
     const decision = decideInService({
         stage: readStage(asset),
         installCompletedAt: glideToMs(str(asset, 'x_daas_ham_install_completed')),
@@ -39,7 +39,7 @@ function goLiveIfSeen(asset: GlideRecord): void {
     }
     asset.setValue('x_daas_ham_in_service_date', msToGlide(decision.at))
     attachToSubscription(asset, decision.at)
-    applyLifecycleDates(asset)
+    applyLifecycleDates(asset, lifecycles)
     moveAndSave(asset, decision.stage, 'in-service detection')
 }
 
@@ -56,6 +56,7 @@ export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIRespo
         response.setBody({ error: parsed.error } as never)
         return
     }
+    const lifecycles = modelLifecycles()
     const unknown: string[] = []
     for (const event of parsed.events) {
         const asset = findAssetByIdentifier(event.identifier, { beyondVisibility: true })
@@ -63,7 +64,7 @@ export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIRespo
             unknown.push(event.identifier)
             continue
         }
-        applyEvent(asset, event)
+        applyEvent(asset, event, lifecycles)
     }
     response.setStatus(202)
     response.setBody({
@@ -73,12 +74,12 @@ export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIRespo
     } as never)
 }
 
-function applyEvent(asset: GlideRecord, event: DeviceEvent): void {
+function applyEvent(asset: GlideRecord, event: DeviceEvent, lifecycles: ModelLifecycles): void {
     const lastKind = lastEventKind(asset.getUniqueValue())
     if (event.event !== 'seen' || lastKind !== 'seen') storeEvent(asset.getUniqueValue(), event)
     if (event.event === 'down') return
     recordSeen(asset, event.observedAt, event.source)
-    goLiveIfSeen(asset)
+    goLiveIfSeen(asset, lifecycles)
 }
 
 function lastEventKind(assetId: string): string {
@@ -103,6 +104,7 @@ function storeEvent(assetId: string, event: DeviceEvent): void {
 
 /** Scheduled job: pick up Discovery / connector sightings of pending Assets and put them in service. */
 export function evaluatePendingInService(): void {
+    const lifecycles = modelLifecycles()
     runTableJob({
         job: 'in_service_detection',
         table: 'alm_hardware',
@@ -115,7 +117,7 @@ export function evaluatePendingInService(): void {
             if (discovered !== undefined) {
                 recordSeen(asset, discovered, str(asset, 'ci.discovery_source') === 'ServiceNow' ? 'discovery' : 'connector')
             }
-            goLiveIfSeen(asset)
+            goLiveIfSeen(asset, lifecycles)
         },
     })
 }

@@ -5,7 +5,7 @@ import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
 import { runEventTableJob, runTableJob } from '../platform/chunked'
 import { todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
-import { applyLifecycleDates, modelLifecycle } from '../platform/lifecycle-dates'
+import { applyLifecycleDates, modelLifecycles } from '../platform/lifecycle-dates'
 import {
     learnFromResolution,
     loadNormalizationData,
@@ -67,7 +67,7 @@ export function onModelLifecycleChanged(current: GlideRecord): void {
 /** Script action on x_daas_ham.model.lifecycle (parm1 = model, parm2 = cursor). */
 export function refreshModelAssets(event: GlideRecord, current: GlideRecord): void {
     const modelId = str(event, 'parm1')
-    const dates = modelLifecycle(modelId)
+    const lifecycles = modelLifecycles()
     runEventTableJob({
         eventName: EVENT.lifecycleChanged,
         record: current,
@@ -78,7 +78,7 @@ export function refreshModelAssets(event: GlideRecord, current: GlideRecord): vo
         read: (asset) => asset.getUniqueValue(),
         handle: (assetId) => {
             const asset = new GlideRecord('alm_hardware')
-            if (asset.get(assetId) && applyLifecycleDates(asset, dates)) asset.update()
+            if (asset.get(assetId) && applyLifecycleDates(asset, lifecycles)) asset.update()
         },
     })
 }
@@ -102,6 +102,7 @@ export function onAgreementTermsChanged(current: GlideRecord): void {
 /** Script action on x_daas_ham.agreement.terms (parm1 = agreement, parm2 = cursor). */
 export function refreshAgreementAssets(event: GlideRecord, current: GlideRecord): void {
     const agreementId = str(event, 'parm1')
+    const lifecycles = modelLifecycles()
     runEventTableJob({
         eventName: EVENT.agreementTermsChanged,
         record: current,
@@ -112,7 +113,7 @@ export function refreshAgreementAssets(event: GlideRecord, current: GlideRecord)
         read: (asset) => asset.getUniqueValue(),
         handle: (assetId) => {
             const asset = new GlideRecord('alm_hardware')
-            if (asset.get(assetId) && applyLifecycleDates(asset)) asset.update()
+            if (asset.get(assetId) && applyLifecycleDates(asset, lifecycles)) asset.update()
         },
     })
 }

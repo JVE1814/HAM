@@ -5,12 +5,11 @@ import { addDays } from '../domain/calendar'
 import { groupExpiringCoverage, leaseDecisionProblem, leaseMismatch, renewedEnd, withinLead, type LeaseEndAction } from '../domain/leases'
 import { stagesQuery, type Stage } from '../domain/lifecycle'
 import { leaseShare } from '../domain/margin'
-import type { LifecycleDates } from '../domain/model-lifecycle'
 import { providerApproverIds } from '../platform/approvals'
 import { runEventTableJob } from '../platform/chunked'
 import { todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
-import { applyLifecycleDates, modelLifecycle } from '../platform/lifecycle-dates'
+import { applyLifecycleDates, modelLifecycles } from '../platform/lifecycle-dates'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties'
 import { bool, count, findById, num, str } from '../platform/records'
 
@@ -167,16 +166,7 @@ function disposeStockToLessor(lease: GlideRecord): string | null {
 /** Script action on x_daas_ham.lease.assets: recompute Refresh due dates of the lease's Assets. */
 export function refreshLeaseAssets(event: GlideRecord, current: GlideRecord): void {
     const leaseId = str(event, 'parm1')
-    // One lifecycle read per model for this chunk: a lease usually covers many Assets of few models.
-    const lifecycles = new Map<string, LifecycleDates>()
-    const datesOf = (modelId: string): LifecycleDates => {
-        let dates = lifecycles.get(modelId)
-        if (!dates) {
-            dates = modelLifecycle(modelId)
-            lifecycles.set(modelId, dates)
-        }
-        return dates
-    }
+    const lifecycles = modelLifecycles()
     runEventTableJob({
         eventName: EVENT.leaseAssets,
         record: current,
@@ -187,7 +177,7 @@ export function refreshLeaseAssets(event: GlideRecord, current: GlideRecord): vo
         read: (asset) => asset.getUniqueValue(),
         handle: (assetId) => {
             const asset = new GlideRecord('alm_hardware')
-            if (asset.get(assetId) && applyLifecycleDates(asset, datesOf(str(asset, 'model')))) asset.update()
+            if (asset.get(assetId) && applyLifecycleDates(asset, lifecycles)) asset.update()
         },
     })
 }
