@@ -13,7 +13,13 @@ import {
 } from '../domain/disposal'
 import type { LegalOwner, Stage } from '../domain/lifecycle'
 import { ROLE } from '../domain/visibility'
-import { approvalsOf, cancelPendingApprovals, customerAdminIds, providerApproverIds, requestApproval } from '../platform/approvals'
+import {
+    approvalsOf,
+    cancelPendingApprovals,
+    customerAdminIds,
+    providerApproverIds,
+    requestApprovals,
+} from '../platform/approvals'
 import { moveAsset, readStage, transitionFacts } from '../platform/assets'
 import { findById, str } from '../platform/records'
 
@@ -59,17 +65,16 @@ export function uiSubmitDisposal(current: GlideRecord): void {
         gs.addErrorMessage(findings.join('. '))
         return
     }
+    const required = disposalApprovers(assets.map((asset) => asset.legalOwner))
+    const admins = customerAdminIds(str(current, 'customer'))
     const approvers = new Set<string>()
-    for (const group of disposalApprovers(assets.map((asset) => asset.legalOwner))) {
-        const ids = group === 'customer_admin' ? customerAdminIds(str(current, 'customer')) : providerApproverIds('')
-        for (const id of ids) approvers.add(id)
+    for (const group of required) {
+        for (const id of group === 'customer_admin' ? admins : providerApproverIds('')) approvers.add(id)
     }
-    // Ask first: an order with no request saved would wait with no one to decide it, so it stays a draft.
-    const refusals = [...approvers].map((id) => requestApproval(current, id))
-    if (!refusals.includes('')) {
-        const reason =
-            approvers.size === 0 ? 'no asset manager to approve it' : `no approval could be requested: ${refusals[0]}`
-        gs.addErrorMessage(`Not submitted: ${reason}`)
+    // Ask first: an order the requests saved could not approve would wait for ever, so it stays a draft.
+    const refusal = requestApprovals(current, [...approvers], required, admins, 'no asset manager to approve it')
+    if (refusal) {
+        gs.addErrorMessage(`Not submitted: ${refusal}`)
         return
     }
     current.setValue('stage', 'awaiting_approval')

@@ -1,5 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import type { ApprovalState } from '../domain/approvals'
+import { groupDecisions, rollupApprovals, type ApprovalState } from '../domain/approvals'
+import type { Approver } from '../domain/entitlement'
 import { ROLE } from '../domain/visibility'
 import { pluck, str } from './records'
 
@@ -21,10 +22,29 @@ export function providerApproverIds(accountManagerId: string): string[] {
 }
 
 /**
- * Ask `approverId` to decide `task`; why the platform refused the request (empty once saved), also logged. A task
- * with no request saved has no one to decide it, so the callers keep it out of awaiting approval.
+ * Ask `approverIds` to decide `task`; why it cannot wait for their decision ('' when it can): a refusal from the
+ * platform, else `noApprover`. It can wait only if the requests saved could approve it, one for each `required` group
+ * as the rollup groups them. Otherwise it could never be approved, so they are cancelled again and the callers keep it
+ * out of awaiting approval.
  */
-export function requestApproval(task: GlideRecord, approverId: string): string {
+export function requestApprovals(
+    task: GlideRecord,
+    approverIds: readonly string[],
+    required: readonly Approver[],
+    customerAdmins: readonly string[],
+    noApprover: string,
+): string {
+    const refusals = approverIds.map((approverId) => requestApproval(task, approverId))
+    const saved = approverIds.filter((_, i) => !refusals[i])
+    const allApproved = saved.map((approverId) => ({ approverId, state: 'approved' as const }))
+    if (rollupApprovals(required, groupDecisions(allApproved, customerAdmins)) === 'approved') return ''
+    if (saved.length > 0) cancelPendingApprovals(task.getUniqueValue())
+    const refused = refusals.find(Boolean)
+    return refused ? `an approval request was refused: ${refused}` : noApprover
+}
+
+/** Why the platform refused the request ('' once saved), also logged. */
+function requestApproval(task: GlideRecord, approverId: string): string {
     const approval = new GlideRecord('sysapproval_approver')
     approval.initialize()
     approval.setValue('sysapproval', task.getUniqueValue())

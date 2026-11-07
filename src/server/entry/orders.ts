@@ -22,7 +22,13 @@ import {
     type UnmovedStock,
 } from '../domain/sourcing'
 import { entitlementContext } from '../platform/agreements'
-import { approvalsOf, cancelPendingApprovals, customerAdminIds, providerApproverIds, requestApproval } from '../platform/approvals'
+import {
+    approvalsOf,
+    cancelPendingApprovals,
+    customerAdminIds,
+    providerApproverIds,
+    requestApprovals,
+} from '../platform/approvals'
 import { moveAndSave, readStage } from '../platform/assets'
 import { EVENT, fire } from '../platform/events'
 import { recomputeLine, recomputeOrder } from '../platform/fulfilment'
@@ -164,16 +170,18 @@ function submitAccepted(order: GlideRecord): boolean {
         startSourcing(order)
         return true
     }
-    // Ask first: an Order with no request saved would wait with no one to decide it, so it stays a draft.
-    const approvers = approverIds(order, assessment.verdict)
-    const refusals = approvers.map((approverId) => requestApproval(order, approverId))
-    if (!refusals.includes('')) {
-        const reason =
-            approvers.length === 0
-                ? 'No customer admin, account manager or asset manager to approve it'
-                : `No approval could be requested: ${refusals[0]}`
-        gs.addErrorMessage(`Order not submitted. ${reason}.`)
-        order.setValue('work_notes', `Not submitted: ${reason}`)
+    // Ask first: an Order the requests saved could not approve would wait for ever, so it stays a draft.
+    const admins = customerAdminIds(str(order, 'customer'))
+    const refusal = requestApprovals(
+        order,
+        approverIds(order, assessment.verdict, admins),
+        assessment.approvers,
+        admins,
+        'no account manager or asset manager to approve it',
+    )
+    if (refusal) {
+        gs.addErrorMessage(`Order not submitted: ${refusal}.`)
+        order.setValue('work_notes', `Not submitted: ${refusal}`)
         order.update()
         return false
     }
@@ -205,11 +213,11 @@ function requestedLines(orderId: string): RequestedLine[] {
  * Customer admins for the customer-admin group (provider approvers stand in when the Customer has
  * none); the account manager, or else the asset managers, for the account-manager group.
  */
-function approverIds(order: GlideRecord, verdict: EntitlementVerdict): string[] {
+function approverIds(order: GlideRecord, verdict: EntitlementVerdict, customerAdmins: readonly string[]): string[] {
     const provider = providerApproverIds(str(order, 'agreement.account_manager'))
     const ids = new Set<string>()
     for (const group of approversFor(verdict)) {
-        const admins = group === 'customer_admin' ? customerAdminIds(str(order, 'customer')) : []
+        const admins = group === 'customer_admin' ? customerAdmins : []
         for (const id of admins.length > 0 ? admins : provider) ids.add(id)
     }
     return [...ids]
