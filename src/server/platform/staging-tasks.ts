@@ -45,7 +45,7 @@ export function openStagingTask(asset: GlideRecord, orderLineId: string): string
     return taskId
 }
 
-/** Copies the template's steps onto the task; an automated step starts waiting when the task also gets its OEM prerequisite step (initialAutomationStatus). */
+/** Copies the template's steps onto the task, each automated one in its initialAutomationStatus. */
 function copyTemplateSteps(templateId: string, taskId: string): void {
     const item = new GlideRecord('x_daas_ham_staging_tmpl_item')
     item.addQuery('template', templateId)

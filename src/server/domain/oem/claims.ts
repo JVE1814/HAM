@@ -290,12 +290,7 @@ export const CLAIM_ROUTES: Partial<Record<OemVendor, Partial<Record<ClaimAction,
 /** Vendors with at least one automated step (Cisco has none). */
 export const CLAIM_VENDORS: readonly OemVendor[] = Object.keys(CLAIM_ROUTES) as OemVendor[]
 
-/**
- * The step a staging task must have done before an action's step on it is due: licensing and zero-touch
- * need the device claimed first. Such a step starts waiting (initialAutomationStatus) when its staging task
- * also has the prerequisite step: it is not due, so it is not loaded, not attempted and uses no attempts.
- * It goes to pending when that step is ticked done, by hand or by a run (rule br_staging_step_release).
- */
+/** Licensing and zero-touch need the device claimed first: on a staging task that also has a claim step, their step waits for it (initialAutomationStatus). */
 export const CLAIM_PREREQUISITE: Partial<Record<ClaimAction, ClaimAction>> = { oem_licence: 'oem_claim', oem_ztp: 'oem_claim' }
 
 /** The actions whose steps wait on an `action` step (CLAIM_PREREQUISITE). */
@@ -304,9 +299,11 @@ export function dependentActions(action: string): ClaimAction[] {
 }
 
 /**
- * The automation status a new `action` step starts in: waiting when its staging task also gets the
- * step's CLAIM_PREREQUISITE step, otherwise pending. `taskActions` are the automations of all the
- * task's steps ('' for a step done by hand).
+ * The automation status a new `action` step starts in when a template's steps are copied onto a staging
+ * task: waiting when the task also gets the step's CLAIM_PREREQUISITE step, otherwise pending.
+ * `taskActions` are the automations of all the task's steps ('' for a step done by hand).
+ * A waiting step is never due, so no run loads or attempts it and it uses no attempts; it goes to pending
+ * when its prerequisite step is ticked done, by hand or by a run.
  */
 export function initialAutomationStatus(action: string, taskActions: readonly string[]): 'pending' | 'waiting' {
     const prerequisite: string | undefined = CLAIM_PREREQUISITE[action as ClaimAction]
@@ -327,7 +324,7 @@ export interface ClaimStore {
     /**
      * Up to `limit` of `vendor`'s steps due for `action` (dueStepsQuery: pending, or failed and due a retry),
      * fewest attempts first, then oldest; each carries the Customer's OEM cloud account for `action`
-     * ('' when none). Steps still waiting for their CLAIM_PREREQUISITE step are not due.
+     * ('' when none).
      */
     due(vendor: OemVendor, action: ClaimAction, limit: number): ClaimTarget[]
     /**
@@ -372,7 +369,7 @@ function openStepsQuery(vendor: OemVendor, action: ClaimAction): string {
 
 /**
  * Encoded query on x_daas_ham_staging_step: open `action` steps (openStepsQuery) that are pending, or failed
- * over 30 minutes ago with fewer than 5 attempts (never waiting ones); those conditions are in every OR group (andEachClause).
+ * over 30 minutes ago with fewer than 5 attempts (so never waiting ones); those conditions are in every OR group (andEachClause).
  */
 export function dueStepsQuery(vendor: OemVendor, action: ClaimAction): string {
     return andEachClause(

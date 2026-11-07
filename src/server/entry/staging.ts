@@ -26,7 +26,7 @@ export function stampStagingStep(current: GlideRecord): void {
     }
 }
 
-/** After-update rule on automated staging steps ticked done: the same task's steps waiting on this one go to pending. */
+/** After-update rule on automated staging steps ticked done: release the steps waiting on this one (releaseStepsWaitingOn). */
 export function releaseWaitingSteps(current: GlideRecord): void {
     releaseStepsWaitingOn(str(current, 'staging_task'), str(current, 'automation'))
 }

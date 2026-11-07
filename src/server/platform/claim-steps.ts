@@ -1,10 +1,21 @@
 import { GlideRecord } from '@servicenow/glide'
 import { dependentActions, dueStepsQuery, type ClaimAction, type ClaimOutcome, type ClaimStore, type ClaimTarget } from '../domain/oem/claims'
 import type { OemVendor } from '../domain/oem/types'
-import { num, pluck, str } from './records'
+import { num, pluck, recordsById, str } from './records'
 import { memoized } from '../domain/memo'
 
 const STEP = 'x_daas_ham_staging_step'
+
+/** The fields of a step's Asset that a claim needs. */
+interface ClaimAsset {
+    customerId: string
+    serial: string
+    mac: string
+    claimCode: string
+}
+
+/** A staging task or Asset not found reads as empty, as a dot-walk through a broken reference did. */
+const NO_ASSET: ClaimAsset = { customerId: '', serial: '', mac: '', claimCode: '' }
 
 /** Automated staging steps (x_daas_ham_staging_step) behind the claim run's ClaimStore port; caches OEM cloud accounts per run. */
 export function glideClaimStore(): ClaimStore {
@@ -15,7 +26,7 @@ export function glideClaimStore(): ClaimStore {
     }
 }
 
-/** Up to `limit` due steps (dueStepsQuery), fewest attempts first, then oldest. */
+/** Up to `limit` due steps (dueStepsQuery), fewest attempts first, then oldest; their staging tasks and Assets are read with one query each. */
 function dueTargets(vendor: OemVendor, action: ClaimAction, limit: number, accounts: (key: string) => string): ClaimTarget[] {
     const step = new GlideRecord(STEP)
     step.addEncodedQuery(dueStepsQuery(vendor, action))
@@ -24,21 +35,26 @@ function dueTargets(vendor: OemVendor, action: ClaimAction, limit: number, accou
     step.orderBy('sys_id')
     step.setLimit(limit)
     step.query()
-    const targets: ClaimTarget[] = []
-    while (step.next()) {
-        const customerId = str(step, 'staging_task.asset.company')
-        targets.push({
-            stepId: step.getUniqueValue(),
-            serial: str(step, 'staging_task.asset.serial_number'),
-            mac: str(step, 'staging_task.asset.x_daas_ham_mac_address'),
-            claimCode: str(step, 'staging_task.asset.x_daas_ham_claim_code'),
-            account: accounts(`${customerId}|${vendor}|${action}`),
-        })
-    }
-    return targets
+    const steps: Array<{ stepId: string; taskId: string }> = []
+    while (step.next()) steps.push({ stepId: step.getUniqueValue(), taskId: str(step, 'staging_task') })
+    const assetOfTask = recordsById('x_daas_ham_staging_task', steps.map((s) => s.taskId), (task) => str(task, 'asset'))
+    const assets = recordsById(
+        'alm_hardware',
+        assetOfTask.values(),
+        (asset): ClaimAsset => ({
+            customerId: str(asset, 'company'),
+            serial: str(asset, 'serial_number'),
+            mac: str(asset, 'x_daas_ham_mac_address'),
+            claimCode: str(asset, 'x_daas_ham_claim_code'),
+        }),
+    )
+    return steps.map(({ stepId, taskId }) => {
+        const { customerId, serial, mac, claimCode } = assets.get(assetOfTask.get(taskId) ?? '') ?? NO_ASSET
+        return { stepId, serial, mac, claimCode, account: accounts(`${customerId}|${vendor}|${action}`) }
+    })
 }
 
-/** A step of `action` on staging task `taskId` was ticked done: the same task's open steps waiting on it are pending. */
+/** A step of `action` on staging task `taskId` was ticked done: release the task's open steps waiting on it (initialAutomationStatus). */
 export function releaseStepsWaitingOn(taskId: string, action: string): void {
     const dependents = dependentActions(action)
     if (!taskId || dependents.length === 0) return
@@ -47,11 +63,9 @@ export function releaseStepsWaitingOn(taskId: string, action: string): void {
     step.addQuery('automation', 'IN', dependents.join(','))
     step.addQuery('done', false)
     step.addQuery('automation_status', 'waiting')
-    step.query()
-    while (step.next()) {
-        step.setValue('automation_status', 'pending')
-        step.update()
-    }
+    // One set-based update: the staging step rules still run, and they react only to done changing.
+    step.setValue('automation_status', 'pending')
+    step.updateMultiple()
 }
 
 /** The Customer's OEM cloud account for `action`, looked up once per customer and action. */

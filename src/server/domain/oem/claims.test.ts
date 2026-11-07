@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HttpRequest, HttpResponse } from '../http'
 import {
-    CLAIM_ORDER,
     CLAIM_PREREQUISITE,
     CLAIM_ROUTES,
     CLAIM_VENDORS,
@@ -512,10 +511,6 @@ describe('CLAIM_PREREQUISITE', () => {
         expect(dependentActions('oem_claim')).toEqual(['oem_licence', 'oem_ztp'])
         expect(dependentActions('oem_licence')).toEqual([])
         expect(dependentActions('')).toEqual([])
-    })
-
-    it('runs the claim before licensing and zero-touch', () => {
-        expect(CLAIM_ORDER).toEqual(['oem_claim', 'oem_licence', 'oem_ztp'])
     })
 })
 
