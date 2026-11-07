@@ -20,7 +20,7 @@ import { ROLE } from '../domain/visibility'
 import { runEventTableJob } from '../platform/chunked'
 import { msToGlide, nowMs, todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
-import { deleteWhere, exists, findById, num, str } from '../platform/records'
+import { deleteWhere, exists, findById, num, pluck, str } from '../platform/records'
 import { queryInt, reply } from '../platform/rest-api'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
@@ -237,24 +237,24 @@ function setTotals(period: GlideRecord): void {
  * still ready for review, so the closed-line guard lets the lines go.
  */
 function dropWaivedFeeLines(period: GlideRecord): void {
-    const waived = unlinkFees(`billing_period=${period.getUniqueValue()}^status=waived`)
-    // By the fees' ids: a set-based delete is not relied on to follow a dot-walked condition.
-    if (waived.length > 0) deleteWhere('x_daas_ham_billing_line', `billing_period=${period.getUniqueValue()}^kind=fee^fee_eventIN${waived.join(',')}`)
+    const waived = pluck('x_daas_ham_fee_event', `billing_period=${period.getUniqueValue()}^status=waived`, 'sys_id')
+    if (waived.length === 0) return
+    // Lines first, by the fees' ids (a set-based delete is not relied on to follow a dot-walked
+    // condition): if the delete fails, the fees still point at the period and a retry finds them.
+    deleteWhere('x_daas_ham_billing_line', `billing_period=${period.getUniqueValue()}^kind=fee^fee_eventIN${waived.join(',')}`)
+    unlinkFees(`sys_idIN${waived.join(',')}`)
 }
 
-/** Unlink the Fee events matching an encoded query from their Billing period and return their ids (an open one is billed again by the next generation). */
-function unlinkFees(encodedQuery: string): string[] {
+/** Unlink the Fee events matching an encoded query from their Billing period (an open one is billed again by the next generation). */
+function unlinkFees(encodedQuery: string): void {
     // Per record: updateMultiple does not reliably clear a reference to empty.
     const fee = new GlideRecord('x_daas_ham_fee_event')
     fee.addEncodedQuery(encodedQuery)
     fee.query()
-    const unlinked: string[] = []
     while (fee.next()) {
-        unlinked.push(fee.getUniqueValue())
         fee.setValue('billing_period', '')
         fee.update()
     }
-    return unlinked
 }
 
 /** UI action "Regenerate" on a period ready for review: rebuild its lines from current data. */
