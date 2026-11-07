@@ -128,7 +128,8 @@ export interface EventTableJobResult extends ChunkedJobResult {
  * flush still flushes under its own pass's token, so whatever completes a pass tells its own records from
  * an older pass's by the token (see runsBefore). A fresh pass starting while a last chunk completes its
  * pass is caught by the caller asking `stillCurrent` before each completion write; one starting between
- * that question and the write is not, and the fresh pass's own completion replaces what that write did.
+ * that question and the write is not, and the fresh pass's own completion replaces what that write did
+ * (ADR 0013: no lock).
  */
 export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): EventTableJobResult {
     const supersede = spec.supersede
