@@ -19,7 +19,7 @@ import { memoized } from '../domain/memo'
 import { runEventTableJob } from '../platform/chunked'
 import { msToGlide, nowMs, todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
-import { exists, findById, num, str } from '../platform/records'
+import { exists, findById, num, pluck, str } from '../platform/records'
 import { queryInt, reply } from '../platform/rest-api'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
@@ -44,7 +44,16 @@ export function openMonthlyBillingPeriod(): void {
 export function generateBillingLines(event: GlideRecord, current: GlideRecord): void {
     const period = findById('x_daas_ham_billing_period', str(event, 'parm1'))
     if (!period || str(period, 'status') !== 'generating') return
-    const bounds = monthBounds(str(period, 'period'))
+    const month = str(period, 'period')
+    if (!isMonth(month)) {
+        // Saved past the month rule (an import without rules): stop for review with nothing billed, so
+        // Close refuses and Regenerate can run once the month is corrected.
+        addFailedLines(period, 1, `the month '${month}' is not YYYY-MM: correct it, then Regenerate`)
+        period.setValue('status', 'ready')
+        period.update()
+        return
+    }
+    const bounds = monthBounds(month)
     const siteName = memoized(siteNameOf)
     const result = runEventTableJob({
         eventName: EVENT.billingGenerate,
@@ -231,10 +240,15 @@ function setTotals(period: GlideRecord): void {
  * Only called while the period is still ready for review, so the closed-line guard lets the lines go.
  */
 function dropWaivedFeeLines(period: GlideRecord): void {
-    const lines = new GlideRecord('x_daas_ham_billing_line')
-    lines.addEncodedQuery(`billing_period=${period.getUniqueValue()}^kind=fee^fee_event.status=waived`)
-    lines.deleteMultiple()
-    unlinkFees(`billing_period=${period.getUniqueValue()}^status=waived`)
+    const waived = `billing_period=${period.getUniqueValue()}^status=waived`
+    const fees = pluck('x_daas_ham_fee_event', waived, 'sys_id')
+    if (fees.length > 0) {
+        // The fees are listed first: a set-based delete is not relied on to follow a dot-walked condition.
+        const lines = new GlideRecord('x_daas_ham_billing_line')
+        lines.addEncodedQuery(`billing_period=${period.getUniqueValue()}^kind=fee^fee_eventIN${fees.join(',')}`)
+        lines.deleteMultiple()
+        unlinkFees(waived)
+    }
     setTotals(period)
 }
 
