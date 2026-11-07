@@ -249,12 +249,15 @@ function setTotals(period: GlideRecord): void {
  * still ready for review, so the closed-line guard lets the lines go.
  */
 function dropWaivedFeeLines(period: GlideRecord): void {
-    const waived = pluck('x_daas_ham_fee_event', `billing_period=${period.getUniqueValue()}^status=waived`, 'sys_id')
-    if (waived.length === 0) return
-    // Lines first, by the fees' ids (a set-based delete is not relied on to follow a dot-walked
-    // condition): if the delete fails, the fees still point at the period and a retry finds them.
-    deleteWhere('x_daas_ham_billing_line', `billing_period=${period.getUniqueValue()}^kind=fee^fee_eventIN${waived.join(',')}`)
-    unlinkFees(`sys_idIN${waived.join(',')}`)
+    // In rounds of a bounded id list; an unlinked fee leaves the query, so each round finds the next.
+    for (;;) {
+        const waived = pluck('x_daas_ham_fee_event', `billing_period=${period.getUniqueValue()}^status=waived`, 'sys_id', 500)
+        if (waived.length === 0) return
+        // Lines first, by the fees' ids (a set-based delete is not relied on to follow a dot-walked
+        // condition): if the delete fails, the fees still point at the period and a retry finds them.
+        deleteWhere('x_daas_ham_billing_line', `billing_period=${period.getUniqueValue()}^kind=fee^fee_eventIN${waived.join(',')}`)
+        unlinkFees(`sys_idIN${waived.join(',')}`)
+    }
 }
 
 /** Unlink the Fee events matching an encoded query from their Billing period (an open one is billed again by the next generation). */
