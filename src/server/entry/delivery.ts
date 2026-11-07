@@ -1,11 +1,11 @@
 import { GlideDateTime, GlideRecord, GlideSchedule, gs } from '@servicenow/glide'
-import { isDeployed } from '../domain/lifecycle'
+import { isDeployed, stagesQuery } from '../domain/lifecycle'
 import { checkJobWindow } from '../domain/scheduling'
 import { moveAndSave, readStage } from '../platform/assets'
 import { glideToMs } from '../platform/clock'
 import { openChange, openWorkOrder, type WorkContext } from '../platform/field-work'
 import { recomputeOrder } from '../platform/fulfilment'
-import { findById, str } from '../platform/records'
+import { count, findById, str } from '../platform/records'
 import { returnReplacedAssets } from './returns'
 import { labelOrder, shippingEnabled } from './shipping'
 
@@ -64,14 +64,11 @@ export function shipOrder(order: GlideRecord): void {
 }
 
 function countShippable(orderId: string): { staged: number; hotSpares: number } {
-    const asset = orderAssets(orderId)
-    const counts = { staged: 0, hotSpares: 0 }
-    while (asset.next()) {
-        const stage = readStage(asset)
-        if (stage === 'staged') counts.staged++
-        else if (stage === 'spare_pool') counts.hotSpares++
+    const ofOrder = `x_daas_ham_order_line.order=${orderId}`
+    return {
+        staged: count('alm_hardware', stagesQuery(['staged'], ofOrder)),
+        hotSpares: count('alm_hardware', stagesQuery(['spare_pool'], ofOrder)),
     }
-    return counts
 }
 
 function openOnSiteWork(order: GlideRecord): void {

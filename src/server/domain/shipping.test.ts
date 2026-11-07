@@ -1,6 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import type { HttpRequest } from './http'
-import { addressProblem, buyLabel, countryCode, labelRequestBody, nextShipmentStatus, parseTrackingWebhook, tokenMatches, type Address, type LabelInput } from './shipping'
+import {
+    addressProblem,
+    applyTracking,
+    buyLabel,
+    countryCode,
+    labelRequestBody,
+    newTrackingEvents,
+    nextShipmentStatus,
+    packageCount,
+    parseTrackingWebhook,
+    tokenMatches,
+    trackingEventKey,
+    type Address,
+    type LabelInput,
+    type ShipmentStatus,
+    type TrackingEvent,
+    type TrackingUpdate,
+} from './shipping'
 
 const depot: Address = { name: 'NaaS Depot', company: 'Demo NaaS Provider', line1: '1 Depot Way', city: 'Utrecht', postalCode: '3511AA', country: 'nl' }
 const site: Address = { name: 'Acme HQ reception', phone: '+31 20 000', line1: '5 Main St', city: 'Amsterdam', postalCode: '1011AB', country: 'The Netherlands' }
@@ -14,6 +31,22 @@ describe('labelRequestBody', () => {
         expect(body.shipment.ship_to).toMatchObject({ name: 'Acme HQ reception', city_locality: 'Amsterdam', postal_code: '1011AB', country_code: 'NL' })
         expect(body.shipment.packages).toHaveLength(2)
         expect(body.shipment.packages[0]).toEqual({ weight: { value: 4.5, unit: 'kilogram' }, label_messages: { reference1: 'NORD0001234' } })
+    })
+
+    it('sends between 1 and 20 boxes', () => {
+        expect(JSON.parse(labelRequestBody({ ...input, packages: 0 })).shipment.packages).toHaveLength(1)
+        expect(JSON.parse(labelRequestBody({ ...input, packages: 35 })).shipment.packages).toHaveLength(20)
+    })
+})
+
+describe('packageCount', () => {
+    it('is a whole number from 1 to 20', () => {
+        expect(packageCount(3)).toBe(3)
+        expect(packageCount(2.7)).toBe(2)
+        expect(packageCount(0)).toBe(1)
+        expect(packageCount(-4)).toBe(1)
+        expect(packageCount(21)).toBe(20)
+        expect(packageCount(Number.NaN)).toBe(1)
     })
 })
 
@@ -116,6 +149,23 @@ describe('parseTrackingWebhook', () => {
         expect('events' in update && update.events.map((e) => e.location)).toEqual(['Utrecht, NL', 'Amsterdam'])
     })
 
+    it('gives the estimated delivery as a calendar date', () => {
+        const shipEngine = parseTrackingWebhook({ data: { tracking_number: '1Z999', status_code: 'IT', estimated_delivery_date: '2026-11-07T00:00:00Z' } })
+        expect(shipEngine).toMatchObject({ status: 'in_transit', estimatedDelivery: '2026-11-07', deliveredAt: undefined })
+        const easyPost = parseTrackingWebhook({ result: { tracking_code: 'EZ100', status: 'in_transit', est_delivery_date: '2026-11-07T18:00:00Z' } })
+        expect(easyPost).toMatchObject({ estimatedDelivery: '2026-11-07' })
+    })
+
+    it('reads unrecognised carrier statuses as unknown', () => {
+        const update = parseTrackingWebhook({ data: { tracking_number: '1Z999', status_code: 'ZZ', events: [{ occurred_at: '2026-11-06T08:00:00Z', status_code: 'QQ' }] } })
+        expect(update).toMatchObject({ status: 'unknown', events: [{ status: 'unknown', location: '' }] })
+    })
+
+    it('treats statuses outside the table as unknown, even inherited property names', () => {
+        expect(parseTrackingWebhook({ result: { tracking_code: 'X', status: 'constructor' } })).toMatchObject({ status: 'unknown' })
+        expect(parseTrackingWebhook({ data: { tracking_number: 'X', status_code: 'ZZ' } })).toMatchObject({ status: 'unknown' })
+    })
+
     it('rejects payloads without a tracking number', () => {
         expect(parseTrackingWebhook({ data: {} })).toEqual({ error: 'not a tracking update (no tracking number)' })
         expect(parseTrackingWebhook('nonsense')).toHaveProperty('error')
@@ -137,6 +187,63 @@ describe('nextShipmentStatus', () => {
 
     it('lets a return to sender override a delivery', () => {
         expect(nextShipmentStatus('delivered', 'returned')).toBe('returned')
+    })
+})
+
+function trackingUpdate(status: ShipmentStatus, description = 'Carrier says so'): TrackingUpdate {
+    return { trackingNumber: '1Z999', status, description, events: [] }
+}
+
+describe('applyTracking', () => {
+    it('takes the carrier status and its description', () => {
+        expect(applyTracking('label_created', trackingUpdate('in_transit', 'Departed hub'))).toEqual({ status: 'in_transit', detail: 'Departed hub', deliveredNow: false })
+    })
+
+    it('marks the first delivery only', () => {
+        expect(applyTracking('in_transit', trackingUpdate('delivered', 'Delivered'))).toEqual({ status: 'delivered', detail: 'Delivered', deliveredNow: true })
+        expect(applyTracking('delivered', trackingUpdate('delivered', 'Delivered'))).toEqual({ status: 'delivered', detail: 'Delivered', deliveredNow: false })
+    })
+
+    it('keeps the status and its detail on a late or unknown update', () => {
+        const late = applyTracking('delivered', trackingUpdate('in_transit', 'Departed hub'))
+        expect(late).toEqual({ status: 'delivered', deliveredNow: false })
+        expect(late).not.toHaveProperty('detail')
+        const unknown = applyTracking('in_transit', trackingUpdate('unknown', 'Status not available'))
+        expect(unknown).toEqual({ status: 'in_transit', deliveredNow: false })
+        expect(unknown).not.toHaveProperty('detail')
+    })
+
+    it('cuts the detail to 255 characters', () => {
+        expect(applyTracking('in_transit', trackingUpdate('exception', 'x'.repeat(300))).detail).toHaveLength(255)
+    })
+})
+
+describe('trackingEventKey', () => {
+    it('is the time and the stored description', () => {
+        expect(trackingEventKey({ occurredAt: '2026-11-06T14:02:00Z', description: 'Delivered' })).toBe('2026-11-06T14:02:00Z|Delivered')
+        expect(trackingEventKey({ occurredAt: 't', description: 'y'.repeat(300) })).toBe(`t|${'y'.repeat(255)}`)
+    })
+})
+
+describe('newTrackingEvents', () => {
+    const departed: TrackingEvent = { occurredAt: '2026-11-06T08:00:00Z', status: 'in_transit', description: 'Departed hub', location: 'Utrecht, NL' }
+    const delivered: TrackingEvent = { occurredAt: '2026-11-07T10:00:00Z', status: 'delivered', description: 'Delivered', location: 'Amsterdam, NL' }
+
+    it('skips events already stored', () => {
+        expect(newTrackingEvents(new Set([trackingEventKey(departed)]), [departed, delivered])).toEqual([delivered])
+        expect(newTrackingEvents(new Set([trackingEventKey(departed), trackingEventKey(delivered)]), [departed, delivered])).toEqual([])
+    })
+
+    it('keeps one of each event within a batch', () => {
+        expect(newTrackingEvents(new Set(), [departed, delivered, { ...departed }])).toEqual([departed, delivered])
+    })
+
+    it('cuts description and location to the stored lengths', () => {
+        const long: TrackingEvent = { ...departed, description: 'd'.repeat(300), location: 'l'.repeat(150) }
+        const [event] = newTrackingEvents(new Set(), [long])
+        expect(event.description).toBe('d'.repeat(255))
+        expect(event.location).toBe('l'.repeat(120))
+        expect(newTrackingEvents(new Set([trackingEventKey(long)]), [{ ...long, description: `${'d'.repeat(255)}more` }])).toEqual([])
     })
 })
 

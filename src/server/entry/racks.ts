@@ -7,12 +7,22 @@ import { visibilityFilter } from '../domain/visibility'
 import { readStage } from '../platform/assets'
 import { currentSession } from '../platform/session'
 import { num, str } from '../platform/records'
-import { queryParam } from '../platform/rest-api'
+import { queryParam, reply } from '../platform/rest-api'
 
 /** Rack placement and the rack elevation view (P2.8, D67). */
 
 function heightOf(asset: GlideRecord): number {
     return Math.max(1, num(asset, 'model.rack_units'))
+}
+
+function placementOf(asset: GlideRecord): Placement {
+    return {
+        assetId: str(asset, 'asset_tag') || str(asset, 'serial_number'),
+        ruStart: num(asset, 'x_daas_ham_ru_start'),
+        height: heightOf(asset),
+        face: (str(asset, 'x_daas_ham_rack_face') || 'front') as RackFace,
+        powerW: num(asset, 'model.x_daas_ham_typical_power_w'),
+    }
 }
 
 function placementsIn(rackId: string, exceptAssetId: string): Placement[] {
@@ -22,15 +32,7 @@ function placementsIn(rackId: string, exceptAssetId: string): Placement[] {
     asset.addNotNullQuery('x_daas_ham_ru_start')
     asset.query()
     const placements: Placement[] = []
-    while (asset.next()) {
-        placements.push({
-            assetId: str(asset, 'asset_tag') || str(asset, 'serial_number'),
-            ruStart: num(asset, 'x_daas_ham_ru_start'),
-            height: heightOf(asset),
-            face: (str(asset, 'x_daas_ham_rack_face') || 'front') as RackFace,
-            powerW: num(asset, 'model.x_daas_ham_typical_power_w'),
-        })
-    }
+    while (asset.next()) placements.push(placementOf(asset))
     return placements
 }
 
@@ -38,15 +40,12 @@ function placementsIn(rackId: string, exceptAssetId: string): Placement[] {
 export function guardRackPlacement(current: GlideRecord, previous: GlideRecord): void {
     const rackId = str(current, 'x_daas_ham_rack')
     if (!rackId || !str(current, 'x_daas_ham_ru_start')) return
-    const addsPower = !previous || str(previous, 'x_daas_ham_rack') !== rackId || str(previous, 'model') !== str(current, 'model')
+    // The draw this device already had in this rack; undefined when it is new to the rack.
+    const previousPowerW =
+        previous && str(previous, 'x_daas_ham_rack') === rackId && str(previous, 'x_daas_ham_ru_start') ? num(previous, 'model.x_daas_ham_typical_power_w') : undefined
     const rack = { units: num(current, 'x_daas_ham_rack.rack_units') || 42, powerCapacityW: num(current, 'x_daas_ham_rack.x_daas_ham_power_capacity_w') }
-    const problem = placementProblem(rack, placementsIn(rackId, current.getUniqueValue()), {
-        assetId: current.getUniqueValue(),
-        ruStart: num(current, 'x_daas_ham_ru_start'),
-        height: heightOf(current),
-        face: (str(current, 'x_daas_ham_rack_face') || 'front') as RackFace,
-        powerW: num(current, 'model.x_daas_ham_typical_power_w'),
-    }, addsPower)
+    const candidate = { ...placementOf(current), assetId: current.getUniqueValue() }
+    const problem = placementProblem(rack, placementsIn(rackId, current.getUniqueValue()), candidate, previousPowerW)
     if (problem) {
         gs.addErrorMessage(problem)
         current.setAbortAction(true)
@@ -55,8 +54,7 @@ export function guardRackPlacement(current: GlideRecord, previous: GlideRecord):
 
 function forbidden(response: RESTAPIResponse): boolean {
     if (currentSession().scope !== 'unscoped') return false
-    response.setStatus(403)
-    response.setBody({ error: 'Requires a NaaS role' } as never)
+    reply(response, 403, { error: 'Requires a NaaS role' })
     return true
 }
 
@@ -73,8 +71,7 @@ export function listRacks(request: RESTAPIRequest, response: RESTAPIResponse): v
     while (rack.next()) {
         racks.push({ id: rack.getUniqueValue(), name: str(rack, 'name'), units: num(rack, 'rack_units') || 42, room: rack.getDisplayValue('location') })
     }
-    response.setStatus(200)
-    response.setBody({ racks } as never)
+    reply(response, 200, { racks })
 }
 
 /** GET /racks/{id}: the rack and the devices placed in it (visibility rules apply to devices). */
@@ -82,8 +79,7 @@ export function getRack(request: RESTAPIRequest, response: RESTAPIResponse): voi
     if (forbidden(response)) return
     const rack = new GlideRecord('cmdb_ci_rack')
     if (!rack.get(String(request.pathParams.id ?? ''))) {
-        response.setStatus(404)
-        response.setBody({ error: 'No such rack' } as never)
+        reply(response, 404, { error: 'No such rack' })
         return
     }
     const asset = new GlideRecord('alm_hardware')
@@ -91,27 +87,28 @@ export function getRack(request: RESTAPIRequest, response: RESTAPIResponse): voi
     asset.addNotNullQuery('x_daas_ham_ru_start')
     asset.query()
     const devices: object[] = []
+    const placements: Placement[] = []
     while (asset.next()) {
+        const placement = placementOf(asset)
+        placements.push(placement)
         devices.push({
             id: asset.getUniqueValue(),
             tag: str(asset, 'asset_tag'),
             serial: str(asset, 'serial_number'),
             model: asset.getDisplayValue('model'),
-            ruStart: num(asset, 'x_daas_ham_ru_start'),
-            height: heightOf(asset),
-            face: str(asset, 'x_daas_ham_rack_face') || 'front',
+            ruStart: placement.ruStart,
+            height: placement.height,
+            face: placement.face,
             stage: readStage(asset) ?? 'unknown',
             customer: asset.getDisplayValue('company'),
             lifecyclePhase: str(asset, 'x_daas_ham_lifecycle_phase'),
             coverageEnd: str(asset, 'x_daas_ham_coverage_end'),
             refreshDue: str(asset, 'x_daas_ham_refresh_due'),
-            powerW: num(asset, 'model.x_daas_ham_typical_power_w'),
         })
     }
-    // The budget counts every placed device, including ones the viewer may not see.
-    const power = powerBudget(num(rack, 'x_daas_ham_power_capacity_w'), placementsIn(rack.getUniqueValue(), ''))
-    response.setStatus(200)
-    response.setBody({ rack: { id: rack.getUniqueValue(), name: str(rack, 'name'), units: num(rack, 'rack_units') || 42, power }, devices } as never)
+    // The budget counts the devices listed above, so the same visibility rules apply to it.
+    const power = powerBudget(num(rack, 'x_daas_ham_power_capacity_w'), placements)
+    reply(response, 200, { rack: { id: rack.getUniqueValue(), name: str(rack, 'name'), units: num(rack, 'rack_units') || 42, power }, devices })
 }
 
 /** GET /sites: customer Sites the user may see (customers only their own, site contacts only theirs). */
@@ -127,6 +124,5 @@ export function listSites(request: RESTAPIRequest, response: RESTAPIResponse): v
     site.query()
     const sites: Array<{ id: string; name: string; customer: string }> = []
     while (site.next()) sites.push({ id: site.getUniqueValue(), name: str(site, 'name'), customer: site.getDisplayValue('company') })
-    response.setStatus(200)
-    response.setBody({ sites } as never)
+    reply(response, 200, { sites })
 }

@@ -1,5 +1,6 @@
+import type { HttpPort } from '../http'
 import { asArray, chunks, field, isoDate, parseJson, text } from '../json'
-import type { CoverageFact, Fetched, HttpPort, LifecycleFact, OemVendor, RmaFact } from './types'
+import type { CoverageFact, Fetched, LifecycleFact, OemVendor, RmaFact } from './types'
 
 /*
  * Vendor adapters (ADR 0008). Response shapes follow the vendors' public API documentation; mappers

@@ -22,10 +22,11 @@ export interface RackSpec {
 
 /**
  * Why `candidate` cannot go where it is placed, or null if it fits: space on its face, and power for
- * the whole rack when the change adds draw (a device new to the rack, or a different Model). A move
- * within the rack adds none, so it is allowed even in a rack already over its budget.
+ * the whole rack. `previousPowerW` is the draw the device had in this rack before the change
+ * (undefined when it is new to the rack). An over-budget rack refuses a new device or a change that
+ * raises its draw, but allows a move or a swap to a Model that draws no more.
  */
-export function placementProblem(rack: RackSpec, placements: readonly Placement[], candidate: Placement, addsPower = true): string | null {
+export function placementProblem(rack: RackSpec, placements: readonly Placement[], candidate: Placement, previousPowerW?: number): string | null {
     const top = candidate.ruStart + Math.max(1, candidate.height) - 1
     if (candidate.ruStart < 1 || top > rack.units) {
         return `Rack units ${candidate.ruStart}-${top} do not fit in a ${rack.units}U rack`
@@ -39,10 +40,16 @@ export function placementProblem(rack: RackSpec, placements: readonly Placement[
         }
     }
     const budget = powerBudget(rack.powerCapacityW, [...others, candidate])
-    if (addsPower && budget.remainingW !== null && budget.remainingW < 0) {
+    // The other devices draw the same before and after, so only the candidate's own draw can raise it.
+    const raisesDraw = previousPowerW === undefined || drawW(candidate) > Math.max(0, previousPowerW)
+    if (raisesDraw && budget.remainingW !== null && budget.remainingW < 0) {
         return `The rack's power budget would be exceeded: ${budget.usedW} W of ${budget.capacityW} W`
     }
     return null
+}
+
+function drawW(placement: Placement): number {
+    return Math.max(0, placement.powerW ?? 0)
 }
 
 export interface PowerBudget {
@@ -56,7 +63,7 @@ export interface PowerBudget {
 
 /** Typical power drawn by the placed devices against the rack's capacity. */
 export function powerBudget(capacityW: number, placements: readonly Placement[]): PowerBudget {
-    const usedW = placements.reduce((sum, p) => sum + Math.max(0, p.powerW ?? 0), 0)
+    const usedW = placements.reduce((sum, p) => sum + drawW(p), 0)
     if (capacityW <= 0) return { capacityW: 0, usedW, remainingW: null, utilisation: null }
     return { capacityW, usedW, remainingW: capacityW - usedW, utilisation: Math.round((usedW / capacityW) * 100) }
 }

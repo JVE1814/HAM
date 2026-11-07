@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { rackElevation } from '../../server/domain/rack'
-import { rackApi, type PowerBudget, type Rack, type RackDevice, type Site } from './api'
+import { rackElevation, type PowerBudget } from '../../server/domain/rack'
+import { rackApi, type Rack, type RackDevice, type Site } from './api'
 
 type ColourBy = 'stage' | 'customer' | 'risk'
 

@@ -5,13 +5,14 @@ import { addDays } from '../domain/calendar'
 import { groupExpiringCoverage, leaseDecisionProblem, leaseMismatch, renewedEnd, withinLead, type LeaseEndAction } from '../domain/leases'
 import { stagesQuery, type Stage } from '../domain/lifecycle'
 import { leaseShare } from '../domain/margin'
+import type { LifecycleDates } from '../domain/model-lifecycle'
 import { providerApproverIds } from '../platform/approvals'
 import { runEventTableJob } from '../platform/chunked'
 import { todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
-import { applyLifecycleDates } from '../platform/lifecycle-dates'
+import { applyLifecycleDates, modelLifecycle } from '../platform/lifecycle-dates'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties'
-import { bool, findById, num, str } from '../platform/records'
+import { bool, count, findById, num, str } from '../platform/records'
 
 /** Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
 
@@ -73,11 +74,8 @@ function openDecision(leaseId: string): boolean {
 }
 
 function countAssets(leaseId: string, stages?: readonly Stage[]): number {
-    const ga = new GlideAggregate('alm_hardware')
-    ga.addEncodedQuery(stages ? stagesQuery(stages, `x_daas_ham_lease=${leaseId}`) : `x_daas_ham_lease=${leaseId}`)
-    ga.addAggregate('COUNT', '')
-    ga.query()
-    return ga.next() ? Number(ga.getAggregate('COUNT', '')) : 0
+    const ofLease = `x_daas_ham_lease=${leaseId}`
+    return count('alm_hardware', stages ? stagesQuery(stages, ofLease) : ofLease)
 }
 
 function raiseDecision(lease: GlideRecord, mismatch: boolean): void {
@@ -169,6 +167,16 @@ function disposeStockToLessor(lease: GlideRecord): string | null {
 /** Script action on x_daas_ham.lease.assets: recompute Refresh due dates of the lease's Assets. */
 export function refreshLeaseAssets(event: GlideRecord, current: GlideRecord): void {
     const leaseId = str(event, 'parm1')
+    // One lifecycle read per model for this chunk: a lease usually covers many Assets of few models.
+    const lifecycles = new Map<string, LifecycleDates>()
+    const datesOf = (modelId: string): LifecycleDates => {
+        let dates = lifecycles.get(modelId)
+        if (!dates) {
+            dates = modelLifecycle(modelId)
+            lifecycles.set(modelId, dates)
+        }
+        return dates
+    }
     runEventTableJob({
         eventName: EVENT.leaseAssets,
         record: current,
@@ -179,7 +187,7 @@ export function refreshLeaseAssets(event: GlideRecord, current: GlideRecord): vo
         read: (asset) => asset.getUniqueValue(),
         handle: (assetId) => {
             const asset = new GlideRecord('alm_hardware')
-            if (asset.get(assetId) && applyLifecycleDates(asset)) asset.update()
+            if (asset.get(assetId) && applyLifecycleDates(asset, datesOf(str(asset, 'model')))) asset.update()
         },
     })
 }

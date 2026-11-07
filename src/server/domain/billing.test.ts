@@ -82,6 +82,33 @@ describe('subscriptionCharges', () => {
             { siteId: 'store', units: 15, amount: 22.5 },
         ])
     })
+
+    it('counts an interval shared by several assets once per asset', () => {
+        const line = { lineType: 'device_class', monthlyRate: 45, siteId: '' } as const
+        const grouped = subscriptionCharges(
+            line,
+            [
+                { siteId: 'hq', start: '2026-11-21', count: 3 },
+                { siteId: 'store', start: '2026-06-01', end: '2026-11-15', count: 1 },
+            ],
+            nov,
+        )
+        expect(grouped).toEqual([
+            { siteId: 'hq', units: 30, amount: 45 },
+            { siteId: 'store', units: 15, amount: 22.5 },
+        ])
+        const perAsset = subscriptionCharges(
+            line,
+            [
+                { siteId: 'hq', start: '2026-11-21' },
+                { siteId: 'hq', start: '2026-11-21' },
+                { siteId: 'hq', start: '2026-11-21' },
+                { siteId: 'store', start: '2026-06-01', end: '2026-11-15' },
+            ],
+            nov,
+        )
+        expect(grouped).toEqual(perAsset)
+    })
 })
 
 describe('toCsv', () => {

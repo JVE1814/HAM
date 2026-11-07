@@ -3,11 +3,11 @@
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
 import { activeDays, monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing'
 import type { LegalOwner } from '../domain/lifecycle'
-import { CostLedger, intervalCosts, leaseRunsIn, leaseShare, marginKey, marginRows, type CostType } from '../domain/margin'
+import { cents, CostLedger, intervalCosts, leaseRunsIn, leaseShare, marginKey, marginRows, type CostType } from '../domain/margin'
 import { runEventTableJob } from '../platform/chunked'
 import { EVENT, fire } from '../platform/events'
 import { intProperty, PROPERTY } from '../platform/properties'
-import { findById, num, str } from '../platform/records'
+import { count, findById, num, str } from '../platform/records'
 
 /** Cost facts and Margin per Customer and Site, computed when a Billing period closes (P3.28). */
 
@@ -86,11 +86,7 @@ function shareOf(leaseId: string, bounds: MonthBounds, cache: Map<string, number
         cache.set(leaseId, 0)
         return 0
     }
-    const covered = new GlideAggregate('alm_hardware')
-    covered.addEncodedQuery(`x_daas_ham_lease=${leaseId}`)
-    covered.addAggregate('COUNT', '')
-    covered.query()
-    const share = leaseShare(num(lease, 'monthly_payment'), covered.next() ? Number(covered.getAggregate('COUNT', '')) : 0)
+    const share = leaseShare(num(lease, 'monthly_payment'), count('alm_hardware', `x_daas_ham_lease=${leaseId}`))
     cache.set(leaseId, share)
     return share
 }
@@ -106,7 +102,7 @@ function writeCostFacts(periodId: string, entries: ReadonlyArray<{ customerId: s
         fact.setLimit(1)
         fact.query()
         if (fact.next()) {
-            fact.setValue('amount', Math.round((num(fact, 'amount') + entry.amount) * 100) / 100)
+            fact.setValue('amount', cents(num(fact, 'amount') + entry.amount))
             fact.update()
             continue
         }
@@ -115,7 +111,7 @@ function writeCostFacts(periodId: string, entries: ReadonlyArray<{ customerId: s
         fact.setValue('customer', entry.customerId)
         fact.setValue('site', entry.siteId)
         fact.setValue('cost_type', entry.type)
-        fact.setValue('amount', Math.round(entry.amount * 100) / 100)
+        fact.setValue('amount', cents(entry.amount))
         fact.insert()
     }
 }

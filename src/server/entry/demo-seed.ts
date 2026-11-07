@@ -234,19 +234,6 @@ export function loadDemoData(): void {
         covered.setValue('x_daas_ham_coverage_level', 'SNTC 8X5XNBD')
         covered.update()
     }
-    // Billing history of the in-service switches (normally opened by in-service detection)
-    const billed = new GlideRecord('alm_hardware')
-    billed.addQuery('serial_number', 'STARTSWITH', 'DEMOLIVE')
-    billed.query()
-    while (billed.next()) {
-        ensure('x_daas_ham_service_interval', { asset: billed.getUniqueValue() }, {
-            subscription_line: acmeHqPackage,
-            customer: acme,
-            site: acmeHq,
-            start_date: '2026-02-01',
-        })
-    }
-
     // A lease ending before the Acme agreement it serves: the daily review flags it and raises a decision
     const lessor = ensure('core_company', { name: 'Demo Capital Leasing' }, { vendor: true })
     const lease = ensure('x_daas_ham_lease_schedule', { schedule_number: 'DEMO-LS-001' }, {
@@ -259,10 +246,17 @@ export function loadDemoData(): void {
         decision_lead_days: 120,
         state: 'active',
     })
+    // Billing history of the in-service switches (normally opened by in-service detection), and their lease
     const leased = new GlideRecord('alm_hardware')
     leased.addQuery('serial_number', 'STARTSWITH', 'DEMOLIVE')
     leased.query()
     while (leased.next()) {
+        ensure('x_daas_ham_service_interval', { asset: leased.getUniqueValue() }, {
+            subscription_line: acmeHqPackage,
+            customer: acme,
+            site: acmeHq,
+            start_date: '2026-02-01',
+        })
         leased.setValue('x_daas_ham_lease', lease)
         leased.update()
     }

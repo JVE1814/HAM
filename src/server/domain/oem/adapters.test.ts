@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { OEM_ADAPTERS, type OemContext } from './adapters'
-import type { HttpRequest, HttpResponse } from './types'
+import type { HttpRequest, HttpResponse } from '../http'
 
 function fakeHttp(routes: Record<string, (params: Record<string, string>) => unknown>) {
     const calls: HttpRequest[] = []

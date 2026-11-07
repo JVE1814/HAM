@@ -2,7 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideAggregate, GlideDateTime, GlideRecord, GlideSysAttachment, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { monthBounds, previousMonth, subscriptionCharges, toCsv, type MonthBounds, type ServiceInterval, type SubscriptionLineTerms } from '../domain/billing'
+import { monthBounds, overlapsMonth, previousMonth, subscriptionCharges, toCsv, type MonthBounds, type ServiceInterval, type SubscriptionLineTerms } from '../domain/billing'
 import { ROLE } from '../domain/visibility'
 import { runEventTableJob } from '../platform/chunked'
 import { todayIso } from '../platform/clock'
@@ -37,13 +37,14 @@ export function generateBillingLines(event: GlideRecord, current: GlideRecord): 
     const period = findById('x_daas_ham_billing_period', str(event, 'parm1'))
     if (!period || str(period, 'status') !== 'generating') return
     const bounds = boundsOf(period)
+    const siteNames = new Map<string, string>()
     const result = runEventTableJob({
         eventName: EVENT.billingGenerate,
         record: current,
         parm1: period.getUniqueValue(),
         cursor: str(event, 'parm2'),
         table: 'x_daas_ham_subscription_line',
-        query: `status!=pending^start_date<=${bounds.last}^end_dateISEMPTY^ORend_date>=${bounds.first}`,
+        query: `status!=pending^${overlapsMonth(bounds)}`,
         read: (line) => ({
             terms: {
                 lineType: str(line, 'line_type') as SubscriptionLineTerms['lineType'],
@@ -60,14 +61,14 @@ export function generateBillingLines(event: GlideRecord, current: GlideRecord): 
         handle: (line, lineId) => {
             const intervals = line.terms.lineType === 'device_class' ? intervalsOf(lineId, bounds) : []
             for (const charge of subscriptionCharges(line.terms, intervals, bounds)) {
-                const site = charge.siteId ? findById('cmn_location', charge.siteId) : null
+                const name = siteName(charge.siteId, siteNames)
                 insertLine(period, {
                     kind: 'subscription',
                     customer: line.customerId,
                     agreement: line.agreementId,
                     subscription_line: lineId,
                     site: charge.siteId,
-                    description: site ? `${line.description} - ${str(site, 'name')}` : line.description,
+                    description: name ? `${line.description} - ${name}` : line.description,
                     units: charge.units,
                     monthly_rate: line.terms.monthlyRate,
                     amount: charge.amount,
@@ -79,13 +80,34 @@ export function generateBillingLines(event: GlideRecord, current: GlideRecord): 
     if (result.done) finishGeneration(period)
 }
 
+/** A Site's name, read once per Site and chunk ('' without a Site). */
+function siteName(siteId: string, cache: Map<string, string>): string {
+    let name = cache.get(siteId)
+    if (name === undefined) {
+        const site = findById('cmn_location', siteId)
+        name = site ? str(site, 'name') : ''
+        cache.set(siteId, name)
+    }
+    return name
+}
+
+/** The line's Service intervals in the month, one row per Site and dates with the number of Assets sharing them. */
 function intervalsOf(lineId: string, bounds: MonthBounds): ServiceInterval[] {
-    const interval = new GlideRecord('x_daas_ham_service_interval')
-    interval.addEncodedQuery(`subscription_line=${lineId}^start_date<=${bounds.last}^end_dateISEMPTY^ORend_date>=${bounds.first}`)
-    interval.query()
+    const ga = new GlideAggregate('x_daas_ham_service_interval')
+    ga.addEncodedQuery(`subscription_line=${lineId}^${overlapsMonth(bounds)}`)
+    ga.addAggregate('COUNT', '')
+    ga.groupBy('site')
+    ga.groupBy('start_date')
+    ga.groupBy('end_date')
+    ga.query()
     const intervals: ServiceInterval[] = []
-    while (interval.next()) {
-        intervals.push({ siteId: str(interval, 'site'), start: str(interval, 'start_date'), end: str(interval, 'end_date') || undefined })
+    while (ga.next()) {
+        intervals.push({
+            siteId: String(ga.getValue('site') ?? ''),
+            start: String(ga.getValue('start_date') ?? ''),
+            end: String(ga.getValue('end_date') ?? '') || undefined,
+            count: Number(ga.getAggregate('COUNT', '')),
+        })
     }
     return intervals
 }
@@ -156,9 +178,12 @@ function dropWaivedFeeLines(period: GlideRecord): void {
 /** UI action "Regenerate" on a period ready for review: rebuild its lines from current data. */
 export function uiRegenerateBillingPeriod(current: GlideRecord): void {
     if (str(current, 'status') !== 'ready') return void gs.addErrorMessage('Only a period ready for review can be regenerated')
+    // Without business rules: the period is ready, not closed, so the closed-line guard has nothing to stop.
     const lines = new GlideRecord('x_daas_ham_billing_line')
     lines.addQuery('billing_period', current.getUniqueValue())
+    lines.setWorkflow(false)
     lines.deleteMultiple()
+    // Per record: updateMultiple does not reliably clear a reference to empty.
     const fee = new GlideRecord('x_daas_ham_fee_event')
     fee.addQuery('billing_period', current.getUniqueValue())
     fee.query()
@@ -183,14 +208,11 @@ export function uiCloseBillingPeriod(current: GlideRecord): void {
     while (line.next()) rows.push(csvRow(current, line))
     new GlideSysAttachment().write(current, `billing-${str(current, 'period')}.csv`, 'text/csv', toCsv(rows))
 
-    const fee = new GlideRecord('x_daas_ham_fee_event')
-    fee.addQuery('billing_period', current.getUniqueValue())
-    fee.addQuery('status', 'open')
-    fee.query()
-    while (fee.next()) {
-        fee.setValue('status', 'billed')
-        fee.update()
-    }
+    const fees = new GlideRecord('x_daas_ham_fee_event')
+    fees.addQuery('billing_period', current.getUniqueValue())
+    fees.addQuery('status', 'open')
+    fees.setValue('status', 'billed')
+    fees.updateMultiple()
     current.setValue('status', 'closed')
     current.setValue('closed_at', new GlideDateTime().getValue())
     current.setValue('closed_by', gs.getUserID())

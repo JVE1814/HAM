@@ -76,7 +76,7 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
         })
     }
 
-    const returns: Array<{ id: string; number: string; site: string; trigger: string; dueDate: string; labelUrl: string; trackingNumber: string }> = []
+    const returns: Array<{ id: string; number: string; site: string; trigger: string; dueDate: string }> = []
     const ret = new GlideRecord('x_daas_ham_return_order')
     ret.addQuery('active', true)
     ret.setLimit(200)
@@ -88,12 +88,10 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
             site: ret.getDisplayValue('site'),
             trigger: ret.getDisplayValue('trigger'),
             dueDate: str(ret, 'due_date'),
-            labelUrl: '',
-            trackingNumber: '',
         })
     }
     const labels = returnLabels(returns.map((r) => r.id))
-    for (const entry of returns) Object.assign(entry, labels.get(entry.id) ?? {})
+    const labelledReturns = returns.map((r) => ({ ...r, ...(labels.get(r.id) ?? { labelUrl: '', trackingNumber: '' }) }))
 
     const attestations: object[] = []
     const attestation = new GlideRecord('x_daas_ham_attestation')
@@ -122,7 +120,7 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
         isCustomerAdmin: isCustomerAdmin(),
         assets,
         orders,
-        returns,
+        returns: labelledReturns,
         attestations,
     })
 }

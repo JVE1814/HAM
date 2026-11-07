@@ -78,6 +78,15 @@ describe('Mist claim', () => {
 })
 
 describe('GreenLake', () => {
+    it('fails every device of a refused GreenLake batch with the API error', () => {
+        const { http } = fake([{ status: 403, body: JSON.stringify({ message: 'Forbidden' }) }])
+        const result = CLAIM_ROUTES.aruba!.oem_claim!.run([target('A', { account: '' }), target('B', { account: '' })], http, 5)
+        expect(result.outcomes).toEqual([
+            { stepId: 'A', ok: false, message: 'HTTP 403: Forbidden' },
+            { stepId: 'B', ok: false, message: 'HTTP 403: Forbidden' },
+        ])
+    })
+
     it('adds network devices with serial and MAC', () => {
         const { http, calls } = fake([{ status: 202, body: '' }])
         const result = CLAIM_ROUTES.aruba!.oem_claim!.run([target('A', { account: '' })], http, 5)
@@ -123,7 +132,19 @@ describe('Fortinet', () => {
         const result = CLAIM_ROUTES.fortinet!.oem_ztp!.run([target('A', { account: 'FMG-1' })], http, 5)
         expect(calls[0]).toMatchObject({ fn: 'provision_device', params: { serial: 'Q2XX-A' } })
         expect(JSON.parse(calls[0].body ?? '')).toMatchObject({ provisionStatus: 'provisioned', fortiManagerOid: 'FMG-1' })
-        expect(result.outcomes[0].ok).toBe(true)
+        expect(result.outcomes[0]).toEqual({ stepId: 'A', ok: true, message: 'provisioned to FortiManager FMG-1' })
+    })
+
+    it('makes one FortiZTP call per device within the budget, and needs the FortiManager', () => {
+        const { http, calls } = fake([{ status: 200, body: '{}' }])
+        const result = CLAIM_ROUTES.fortinet!.oem_ztp!.run([target('A', { account: '' }), target('B'), target('C'), target('D')], http, 2)
+        expect(calls).toHaveLength(2)
+        expect(result.outcomes.map((o) => [o.stepId, o.ok])).toEqual([
+            ['A', false],
+            ['B', true],
+            ['C', true],
+        ])
+        expect(result.outcomes[0].message).toBe('no cloud account configured for this customer')
     })
 })
 
@@ -139,5 +160,15 @@ describe('Check Point Zero Touch', () => {
 describe('CLAIM_ROUTES', () => {
     it('has nothing for Cisco (PnP has no public API)', () => {
         expect(CLAIM_ROUTES.cisco).toBeUndefined()
+    })
+
+    it('says how many devices one call carries, to size each run', () => {
+        expect(CLAIM_ROUTES.meraki!.oem_claim!.perCall).toBe(50)
+        expect(CLAIM_ROUTES.mist!.oem_claim!.perCall).toBe(100)
+        expect(CLAIM_ROUTES.aruba!.oem_claim!.perCall).toBe(25)
+        expect(CLAIM_ROUTES.aruba!.oem_licence!.perCall).toBe(0.5)
+        expect(CLAIM_ROUTES.fortinet!.oem_claim!.perCall).toBe(10)
+        expect(CLAIM_ROUTES.fortinet!.oem_ztp!.perCall).toBe(1)
+        expect(CLAIM_ROUTES.checkpoint!.oem_ztp!.perCall).toBe(1)
     })
 })

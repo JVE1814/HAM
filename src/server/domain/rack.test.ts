@@ -36,14 +36,33 @@ describe('placementProblem with a power budget', () => {
         )
     })
 
-    it('lets devices move within a rack that is already over budget', () => {
-        const overloaded = { units: 42, powerCapacityW: 500 }
-        expect(placementProblem(overloaded, placed, { assetId: 'sw1', ruStart: 20, height: 1, face: 'front', powerW: 350 }, false)).toBeNull()
-        expect(placementProblem(overloaded, placed, { assetId: 'sw1', ruStart: 20, height: 1, face: 'front', powerW: 350 })).toMatch(/power budget/)
+    it('does not count a device twice when it is re-placed (its old placement is excluded)', () => {
+        const full = { units: 42, powerCapacityW: 600 }
+        expect(placementProblem(full, placed, { assetId: 'sw1', ruStart: 20, height: 1, face: 'front', powerW: 350 })).toBeNull()
+    })
+})
+
+describe('placementProblem in a rack already over its power budget', () => {
+    const overloaded = { units: 42, powerCapacityW: 500 }
+
+    it('lets a device move within the rack', () => {
+        expect(placementProblem(overloaded, placed, { assetId: 'sw1', ruStart: 20, height: 1, face: 'front', powerW: 350 }, 350)).toBeNull()
     })
 
-    it('does not count a device twice when it moves within the rack', () => {
-        expect(placementProblem(budgeted, placed, { assetId: 'sw1', ruStart: 20, height: 1, face: 'front', powerW: 350 })).toBeNull()
+    it('allows a swap to a lower-power Model', () => {
+        expect(placementProblem(overloaded, placed, { assetId: 'sw1', ruStart: 40, height: 1, face: 'front', powerW: 300 }, 350)).toBeNull()
+    })
+
+    it('refuses a swap to a higher-power Model', () => {
+        expect(placementProblem(overloaded, placed, { assetId: 'sw1', ruStart: 40, height: 1, face: 'front', powerW: 400 }, 350)).toBe(
+            "The rack's power budget would be exceeded: 650 W of 500 W",
+        )
+    })
+
+    it('refuses a device new to the rack', () => {
+        expect(placementProblem(overloaded, placed, { assetId: 'new', ruStart: 10, height: 1, face: 'rear', powerW: 10 })).toBe(
+            "The rack's power budget would be exceeded: 610 W of 500 W",
+        )
     })
 })
 

@@ -4,8 +4,6 @@ import type { LifecycleDates } from '../model-lifecycle'
 
 export type OemVendor = 'cisco' | 'meraki' | 'fortinet' | 'mist' | 'aruba' | 'checkpoint'
 
-export type { HttpPort, HttpRequest, HttpResponse } from '../http'
-
 export interface LifecycleFact {
     pid: string
     dates: LifecycleDates

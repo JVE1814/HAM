@@ -1,7 +1,8 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord } from '@servicenow/glide'
-import { CLAIM_ROUTES, MAX_CLAIM_ATTEMPTS, type ClaimAction, type ClaimOutcome, type ClaimTarget } from '../domain/oem/claims'
+import { andEachClause } from '../domain/encoded-query'
+import { CLAIM_ROUTES, MAX_CLAIM_ATTEMPTS, type ClaimAction, type ClaimOutcome, type ClaimRoute, type ClaimTarget } from '../domain/oem/claims'
 import type { OemVendor } from '../domain/oem/types'
 import { restMessagePort } from '../platform/rest-port'
 import { boolProperty, intProperty, PROPERTY } from '../platform/properties'
@@ -17,13 +18,13 @@ const BATCH = 200
  */
 export function runOemClaims(): void {
     const maxCalls = intProperty(PROPERTY.claimMaxCalls, 8)
-    for (const [vendor, routes] of Object.entries(CLAIM_ROUTES) as Array<[OemVendor, NonNullable<(typeof CLAIM_ROUTES)[OemVendor]>]>) {
+    for (const [vendor, routes] of Object.entries(CLAIM_ROUTES)) {
         if (!boolProperty(`x_daas_ham.oem.claim.${vendor}.enabled`, false)) continue
         let budget = maxCalls
         const accounts = new Map<string, string>()
-        for (const [action, route] of Object.entries(routes) as Array<[ClaimAction, NonNullable<(typeof routes)[ClaimAction]>]>) {
+        for (const [action, route] of Object.entries(routes)) {
             if (budget <= 0) break
-            const targets = pendingTargets(vendor, action, accounts)
+            const targets = pendingTargets(vendor as OemVendor, action as ClaimAction, route, budget, accounts)
             if (targets.length === 0) continue
             const run = route.run(targets, restMessagePort(route.message), budget)
             budget -= run.calls
@@ -32,16 +33,20 @@ export function runOemClaims(): void {
     }
 }
 
-function pendingTargets(vendor: OemVendor, action: ClaimAction, accounts: Map<string, string>): ClaimTarget[] {
+/** The vendor's open steps for `action`, as many as `budget` calls of `route` can carry (at most BATCH). */
+function pendingTargets(vendor: OemVendor, action: ClaimAction, route: ClaimRoute, budget: number, accounts: Map<string, string>): ClaimTarget[] {
     const base = `automation=${action}^done=false^staging_task.active=true^staging_task.asset.model.x_daas_ham_oem_source=${vendor}`
     const step = new GlideRecord('x_daas_ham_staging_step')
     // Pending steps, plus failed ones last tried over 30 minutes ago that have attempts left.
     step.addEncodedQuery(
-        `${base}^automation_status=pending^NQ${base}^automation_status=failed^attempts<${MAX_CLAIM_ATTEMPTS}^sys_updated_on<javascript:gs.minutesAgoStart(30)`,
+        andEachClause(
+            `automation_status=pending^NQautomation_status=failed^attempts<${MAX_CLAIM_ATTEMPTS}^sys_updated_on<javascript:gs.minutesAgoStart(30)`,
+            base,
+        ),
     )
     step.orderBy('attempts')
     step.orderBy('sys_created_on')
-    step.setLimit(BATCH)
+    step.setLimit(Math.min(BATCH, Math.max(1, Math.ceil(budget * route.perCall))))
     step.query()
     const targets: ClaimTarget[] = []
     while (step.next()) {

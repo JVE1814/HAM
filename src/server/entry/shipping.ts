@@ -1,10 +1,23 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
-import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { buyLabel, nextShipmentStatus, parseTrackingWebhook, tokenMatches, type Address, type LabelResult, type ShipmentStatus } from '../domain/shipping'
+import {
+    applyTracking,
+    buyLabel,
+    newTrackingEvents,
+    packageCount,
+    parseTrackingWebhook,
+    tokenMatches,
+    trackingEventKey,
+    type Address,
+    type LabelResult,
+    type ShipmentStatus,
+    type TrackingEvent,
+} from '../domain/shipping'
+import { msToGlide, nowMs } from '../platform/clock'
 import { boolProperty, intProperty, PROPERTY, stringProperty } from '../platform/properties'
-import { findById, str } from '../platform/records'
+import { count, findById, str } from '../platform/records'
 import { restMessagePort } from '../platform/rest-port'
 import { queryParam, reply } from '../platform/rest-api'
 
@@ -19,9 +32,7 @@ function aggregator() {
 }
 
 /** A cmn_location as a carrier address, addressed to `name`. */
-function addressOf(locationId: string, name: string, company: string): Address | null {
-    const location = findById('cmn_location', locationId)
-    if (!location) return null
+function addressOf(location: GlideRecord, name: string, company: string): Address {
     return {
         name: name || str(location, 'name'),
         company,
@@ -34,9 +45,9 @@ function addressOf(locationId: string, name: string, company: string): Address |
     }
 }
 
-function siteContactName(siteId: string): string {
-    const site = findById('cmn_location', siteId)
-    const first = site ? str(site, 'x_daas_ham_site_contacts').split(',')[0] : ''
+/** The name of a Site's first contact, or '' when it has none. */
+function siteContactName(site: GlideRecord): string {
+    const first = str(site, 'x_daas_ham_site_contacts').split(',')[0]
     const contact = first ? findById('customer_contact', first) : null
     return contact ? str(contact, 'name') : ''
 }
@@ -56,22 +67,25 @@ interface ShipmentSpec {
 }
 
 /** Buy a label between the depot and a Site and record the shipment. */
-function createShipment(spec: ShipmentSpec): { result: LabelResult; shipmentId?: string } {
+function createShipment(spec: ShipmentSpec): LabelResult {
     const stockroom = depot()
-    if (!stockroom) return { result: { ok: false, error: 'set x_daas_ham.staging.default_stockroom to the depot that ships' } }
-    const depotAddress = addressOf(str(stockroom, 'location'), str(stockroom, 'name'), stringProperty(PROPERTY.shippingSenderName))
-    const siteAddress = addressOf(spec.siteId, siteContactName(spec.siteId), spec.parent.getDisplayValue('customer'))
-    if (!depotAddress || !siteAddress) return { result: { ok: false, error: 'the depot or the Site has no location' } }
+    if (!stockroom) return { ok: false, error: 'set x_daas_ham.staging.default_stockroom to the depot that ships' }
+    const depotLocation = findById('cmn_location', str(stockroom, 'location'))
+    const site = findById('cmn_location', spec.siteId)
+    if (!depotLocation || !site) return { ok: false, error: 'the depot or the Site has no location' }
+    const depotAddress = addressOf(depotLocation, str(stockroom, 'name'), stringProperty(PROPERTY.shippingSenderName))
+    const siteAddress = addressOf(site, siteContactName(site), spec.parent.getDisplayValue('customer'))
     const serviceCode = stringProperty(PROPERTY.shippingServiceCode)
+    const packages = packageCount(spec.packages)
     const result = buyLabel(aggregator(), {
         serviceCode,
         from: spec.direction === 'to_site' ? depotAddress : siteAddress,
         to: spec.direction === 'to_site' ? siteAddress : depotAddress,
-        packages: Math.min(Math.max(spec.packages, 1), 20),
+        packages,
         weightKg: intProperty(PROPERTY.shippingPackageKg, 5),
         reference: spec.reference,
     })
-    if (!result.ok) return { result }
+    if (!result.ok) return result
     const shipment = new GlideRecord('x_daas_ham_shipment')
     shipment.initialize()
     shipment.setValue('direction', spec.direction)
@@ -81,19 +95,20 @@ function createShipment(spec: ShipmentSpec): { result: LabelResult; shipmentId?:
     shipment.setValue('stockroom', stockroom.getUniqueValue())
     shipment.setValue('carrier', result.carrier)
     shipment.setValue('service_code', serviceCode)
-    shipment.setValue('packages', Math.min(Math.max(spec.packages, 1), 20))
+    shipment.setValue('packages', packages)
     shipment.setValue('tracking_number', result.trackingNumber)
     shipment.setValue('label_id', result.labelId)
     shipment.setValue('label_url', result.labelUrl)
     shipment.setValue('cost', result.cost)
     shipment.setValue('currency', result.currency)
     shipment.setValue('status', 'label_created')
-    return { result, shipmentId: shipment.insert() ?? undefined }
+    shipment.insert()
+    return result
 }
 
 /** Buy the outbound label for an Order's staged Assets and put its tracking number on the Order (does not save). */
 export function labelOrder(order: GlideRecord, packages: number): LabelResult {
-    const { result } = createShipment({
+    const result = createShipment({
         direction: 'to_site',
         siteId: str(order, 'site'),
         parent: order,
@@ -110,13 +125,9 @@ export function labelOrder(order: GlideRecord, packages: number): LabelResult {
 
 /** UI action "Create return label" on a ship-back Return order: the Site contact prints it. */
 export function uiCreateReturnLabel(current: GlideRecord): void {
-    const lines = new GlideRecord('x_daas_ham_return_order_line')
-    lines.addQuery('return_order', current.getUniqueValue())
-    lines.addQuery('status', 'awaiting')
-    lines.query()
-    const packages = lines.getRowCount()
+    const packages = count('x_daas_ham_return_order_line', `return_order=${current.getUniqueValue()}^status=awaiting`)
     if (packages === 0) return void gs.addErrorMessage('Nothing on this return is still awaited')
-    const { result } = createShipment({
+    const result = createShipment({
         direction: 'return',
         siteId: str(current, 'site'),
         parent: current,
@@ -139,16 +150,18 @@ export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIRes
     const shipment = new GlideRecord('x_daas_ham_shipment')
     if (!shipment.get('tracking_number', update.trackingNumber)) return reply(response, 200, { matched: false })
 
-    const previous = str(shipment, 'status') as ShipmentStatus
-    const status = nextShipmentStatus(previous, update.status)
+    const { status, detail, deliveredNow } = applyTracking(str(shipment, 'status') as ShipmentStatus, update)
     shipment.setValue('status', status)
-    if (status === update.status) shipment.setValue('status_detail', update.description.slice(0, 255))
-    if (update.estimatedDelivery) shipment.setValue('estimated_delivery', update.estimatedDelivery.slice(0, 10))
-    if (status === 'delivered' && previous !== 'delivered') shipment.setValue('delivered_at', glideDateTime(update.deliveredAt))
+    if (detail !== undefined) shipment.setValue('status_detail', detail)
+    if (update.estimatedDelivery) shipment.setValue('estimated_delivery', update.estimatedDelivery)
+    if (deliveredNow) {
+        const deliveredMs = Date.parse(update.deliveredAt ?? '')
+        shipment.setValue('delivered_at', msToGlide(Number.isFinite(deliveredMs) ? deliveredMs : nowMs()))
+    }
     shipment.update()
     recordEvents(shipment.getUniqueValue(), update.events)
 
-    if (status === 'delivered' && previous !== 'delivered') {
+    if (deliveredNow) {
         const order = findById('x_daas_ham_order', str(shipment, 'order'))
         if (order) {
             order.setValue('work_notes', `Delivered to ${order.getDisplayValue('site')} (${str(shipment, 'carrier')} ${update.trackingNumber}).`)
@@ -158,32 +171,21 @@ export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIRes
     reply(response, 200, { matched: true, status })
 }
 
-/** A carrier timestamp as a Glide date-time (UTC), or now when it is missing or unreadable. */
-function glideDateTime(iso: string | undefined): string {
-    const ms = iso ? Date.parse(iso) : NaN
-    const value = new GlideDateTime()
-    if (Number.isFinite(ms)) value.setNumericValue(ms)
-    return value.getValue()
-}
-
 /** Add the tracking events not recorded yet (the aggregator resends the whole history). */
-function recordEvents(shipmentId: string, events: ReadonlyArray<{ occurredAt: string; status: string; description: string; location: string }>): void {
+function recordEvents(shipmentId: string, events: readonly TrackingEvent[]): void {
     const known = new Set<string>()
     const existing = new GlideRecord('x_daas_ham_shipment_event')
     existing.addQuery('shipment', shipmentId)
     existing.query()
-    while (existing.next()) known.add(`${str(existing, 'occurred_at')}|${str(existing, 'description')}`)
-    for (const event of events) {
-        const key = `${event.occurredAt}|${event.description.slice(0, 255)}`
-        if (known.has(key)) continue
-        known.add(key)
+    while (existing.next()) known.add(trackingEventKey({ occurredAt: str(existing, 'occurred_at'), description: str(existing, 'description') }))
+    for (const event of newTrackingEvents(known, events)) {
         const record = new GlideRecord('x_daas_ham_shipment_event')
         record.initialize()
         record.setValue('shipment', shipmentId)
         record.setValue('occurred_at', event.occurredAt)
         record.setValue('status', event.status)
-        record.setValue('description', event.description.slice(0, 255))
-        record.setValue('location', event.location.slice(0, 120))
+        record.setValue('description', event.description)
+        record.setValue('location', event.location)
         record.insert()
     }
 }

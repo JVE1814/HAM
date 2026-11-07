@@ -1,5 +1,5 @@
-import type { HttpPort } from './http'
-import { asArray, field, parseJson, text } from './json'
+import { errorText, isSuccess, type HttpPort } from './http'
+import { asArray, field, isoDate, parseJson, text } from './json'
 
 /**
  * Shipping aggregator (P3.26, D73): one adapter buys labels and reads tracking webhooks. Requests
@@ -75,8 +75,14 @@ function toAggregatorAddress(address: Address): Record<string, string> {
     }
 }
 
+/** How many boxes a label covers: a whole number from 1 to 20. */
+export function packageCount(n: number): number {
+    if (Number.isNaN(n)) return 1
+    return Math.min(20, Math.max(1, Math.floor(n)))
+}
+
 export function labelRequestBody(input: LabelInput): string {
-    const count = Math.max(1, Math.floor(input.packages))
+    const count = packageCount(input.packages)
     const weight = Math.max(0.1, input.weightKg)
     return JSON.stringify({
         shipment: {
@@ -96,11 +102,8 @@ export function buyLabel(http: HttpPort, input: LabelInput): LabelResult {
         if (problem) return { ok: false, error: `${side} address ${problem}` }
     }
     const response = http({ fn: 'create_label', params: {}, body: labelRequestBody(input) })
+    if (!isSuccess(response.status)) return { ok: false, error: errorText(response.status, response.body) }
     const json = parseJson(response.body)
-    if (response.status < 200 || response.status >= 300) {
-        const message = text(field(asArray(field(json, 'errors'))[0], 'message'))
-        return { ok: false, error: `HTTP ${response.status}${message ? `: ${message}` : ''}` }
-    }
     const trackingNumber = text(field(json, 'tracking_number'))
     if (!trackingNumber) return { ok: false, error: 'the aggregator returned no tracking number' }
     return {
@@ -154,41 +157,64 @@ export interface TrackingUpdate {
     events: TrackingEvent[]
 }
 
-/** A tracking webhook in ShipEngine (`data.status_code`) or EasyPost (`result.status`) shape. */
+/** A status from the aggregator's table; anything else (including inherited names like "constructor") is unknown. */
+function lookupStatus(table: Record<string, ShipmentStatus>, key: string): ShipmentStatus {
+    return Object.prototype.hasOwnProperty.call(table, key) ? table[key] : 'unknown'
+}
+
+function shipEngineStatus(code: unknown): ShipmentStatus {
+    return lookupStatus(SHIPENGINE_STATUS, text(code).toUpperCase())
+}
+
+function easyPostStatus(status: unknown): ShipmentStatus {
+    return lookupStatus(EASYPOST_STATUS, text(status).toLowerCase())
+}
+
+/** "City, Country" from whichever parts the carrier sent. */
+function placeName(...parts: string[]): string {
+    return parts.filter(Boolean).join(', ')
+}
+
+/**
+ * A tracking webhook in ShipEngine (`data.status_code`) or EasyPost (`result.status`) shape. The
+ * estimated delivery is a YYYY-MM-DD date; `deliveredAt` is the carrier's own timestamp.
+ */
 export function parseTrackingWebhook(body: unknown): TrackingUpdate | { error: string } {
     const shipEngine = field(body, 'data')
-    if (text(field(shipEngine, 'tracking_number'))) {
-        const status = SHIPENGINE_STATUS[text(field(shipEngine, 'status_code')).toUpperCase()] ?? 'unknown'
+    const shipEngineNumber = text(field(shipEngine, 'tracking_number'))
+    if (shipEngineNumber) {
+        const status = shipEngineStatus(field(shipEngine, 'status_code'))
         return {
-            trackingNumber: text(field(shipEngine, 'tracking_number')),
+            trackingNumber: shipEngineNumber,
             status,
             description: text(field(shipEngine, 'status_description')) || text(field(shipEngine, 'carrier_status_description')),
-            estimatedDelivery: text(field(shipEngine, 'estimated_delivery_date')) || undefined,
+            estimatedDelivery: isoDate(field(shipEngine, 'estimated_delivery_date')),
             deliveredAt: status === 'delivered' ? text(field(shipEngine, 'actual_delivery_date')) || undefined : undefined,
             events: asArray(field(shipEngine, 'events')).map((event) => ({
                 occurredAt: text(field(event, 'occurred_at')),
-                status: SHIPENGINE_STATUS[text(field(event, 'status_code')).toUpperCase()] ?? 'unknown',
+                status: shipEngineStatus(field(event, 'status_code')),
                 description: text(field(event, 'description')),
-                location: [text(field(event, 'city_locality')), text(field(event, 'country_code'))].filter(Boolean).join(', '),
+                location: placeName(text(field(event, 'city_locality')), text(field(event, 'country_code'))),
             })),
         }
     }
     const easyPost = field(body, 'result')
-    if (text(field(easyPost, 'tracking_code'))) {
-        const status = EASYPOST_STATUS[text(field(easyPost, 'status')).toLowerCase()] ?? 'unknown'
+    const easyPostNumber = text(field(easyPost, 'tracking_code'))
+    if (easyPostNumber) {
+        const status = easyPostStatus(field(easyPost, 'status'))
         const details = asArray(field(easyPost, 'tracking_details'))
         const last = details[details.length - 1]
         return {
-            trackingNumber: text(field(easyPost, 'tracking_code')),
+            trackingNumber: easyPostNumber,
             status,
             description: text(field(last, 'message')) || text(field(easyPost, 'status_detail')),
-            estimatedDelivery: text(field(easyPost, 'est_delivery_date')) || undefined,
+            estimatedDelivery: isoDate(field(easyPost, 'est_delivery_date')),
             deliveredAt: status === 'delivered' ? text(field(last, 'datetime')) || undefined : undefined,
             events: details.map((detail) => ({
                 occurredAt: text(field(detail, 'datetime')),
-                status: EASYPOST_STATUS[text(field(detail, 'status')).toLowerCase()] ?? 'unknown',
+                status: easyPostStatus(field(detail, 'status')),
                 description: text(field(detail, 'message')),
-                location: [text(field(detail, 'tracking_location', 'city')), text(field(detail, 'tracking_location', 'country'))].filter(Boolean).join(', '),
+                location: placeName(text(field(detail, 'tracking_location', 'city')), text(field(detail, 'tracking_location', 'country'))),
             })),
         }
     }
@@ -206,6 +232,37 @@ export function nextShipmentStatus(current: ShipmentStatus, incoming: ShipmentSt
     if (incoming === 'unknown') return current
     if (FINAL.has(current)) return incoming === 'returned' ? 'returned' : current
     return incoming
+}
+
+/**
+ * What a tracking update does to a shipment: its next status, the status detail to store (only when
+ * the shipment took the update's status, at most 255 characters) and whether it was delivered just now.
+ */
+export function applyTracking(previous: ShipmentStatus, update: TrackingUpdate): { status: ShipmentStatus; detail?: string; deliveredNow: boolean } {
+    const status = nextShipmentStatus(previous, update.status)
+    const deliveredNow = status === 'delivered' && previous !== 'delivered'
+    return status === update.status ? { status, detail: update.description.slice(0, 255), deliveredNow } : { status, deliveredNow }
+}
+
+/** The identity of a stored tracking event: when it happened and what the carrier said (as stored, 255 characters). */
+export function trackingEventKey(event: { occurredAt: string; description: string }): string {
+    return `${event.occurredAt}|${event.description.slice(0, 255)}`
+}
+
+/**
+ * The events of a tracking update not stored yet (the aggregator resends the whole history), once
+ * each, cut to the stored lengths (description 255, location 120 characters).
+ */
+export function newTrackingEvents(known: ReadonlySet<string>, events: readonly TrackingEvent[]): TrackingEvent[] {
+    const seen = new Set<string>()
+    const fresh: TrackingEvent[] = []
+    for (const event of events) {
+        const key = trackingEventKey(event)
+        if (known.has(key) || seen.has(key)) continue
+        seen.add(key)
+        fresh.push({ occurredAt: event.occurredAt, status: event.status, description: event.description.slice(0, 255), location: event.location.slice(0, 120) })
+    }
+    return fresh
 }
 
 /** Constant-time comparison of a webhook token with the configured secret (never matches an empty secret). */

@@ -42,11 +42,13 @@ export function prorate(monthlyRate: number, units: number, daysInMonth: number)
     return Math.round((monthlyRate * units * 100) / daysInMonth) / 100
 }
 
-/** The days one Asset delivered a Subscription line at a Site (end inclusive; none while still in service). */
+/** The days one Asset (or `count` Assets) delivered a Subscription line at a Site (end inclusive; none while still in service). */
 export interface ServiceInterval {
     siteId: string
     start: string
     end?: string
+    /** Assets that share this Site and these dates (default 1). */
+    count?: number
 }
 
 export interface SubscriptionLineTerms {
@@ -75,7 +77,7 @@ export function subscriptionCharges(line: SubscriptionLineTerms, intervals: read
     }
     const unitsBySite = new Map<string, number>()
     for (const interval of intervals) {
-        const units = activeDays(bounds, interval.start, interval.end)
+        const units = activeDays(bounds, interval.start, interval.end) * (interval.count ?? 1)
         if (units > 0) unitsBySite.set(interval.siteId, (unitsBySite.get(interval.siteId) ?? 0) + units)
     }
     return [...unitsBySite].map(([siteId, units]) => ({ siteId, units, amount: prorate(line.monthlyRate, units, bounds.days) }))

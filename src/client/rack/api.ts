@@ -1,16 +1,11 @@
+import type { PowerBudget } from '../../server/domain/rack'
+
 /** Calls to the NaaS rack endpoints (/api/x_daas_ham/naas). */
 
 export interface Site {
     id: string
     name: string
     customer: string
-}
-
-export interface PowerBudget {
-    capacityW: number
-    usedW: number
-    remainingW: number | null
-    utilisation: number | null
 }
 
 export interface Rack {
@@ -34,7 +29,6 @@ export interface RackDevice {
     lifecyclePhase: string
     coverageEnd: string
     refreshDue: string
-    powerW: number
 }
 
 async function get<T>(path: string): Promise<T> {
