@@ -20,7 +20,6 @@ export const PROPERTY = {
     amortisationMonths: 'x_daas_ham.margin.amortisation_months',
     visitCost: 'x_daas_ham.margin.visit_cost',
     shippingEnabled: 'x_daas_ham.shipping.enabled',
-    shippingApiKey: 'x_daas_ham.shipping.api_key',
     shippingWebhookToken: 'x_daas_ham.shipping.webhook_token',
     shippingServiceCode: 'x_daas_ham.shipping.service_code',
     shippingPackageKg: 'x_daas_ham.shipping.package_kg',

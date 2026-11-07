@@ -3,7 +3,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { CLAIM_ROUTES, MAX_CLAIM_ATTEMPTS, type ClaimAction, type ClaimOutcome, type ClaimTarget } from '../domain/oem/claims'
 import type { OemVendor } from '../domain/oem/types'
-import { oemMessagePort } from '../platform/oem-http'
+import { restMessagePort } from '../platform/rest-port'
 import { boolProperty, intProperty, PROPERTY } from '../platform/properties'
 import { findById, num, str } from '../platform/records'
 
@@ -25,7 +25,7 @@ export function runOemClaims(): void {
             if (budget <= 0) break
             const targets = pendingTargets(vendor, action, accounts)
             if (targets.length === 0) continue
-            const run = route.run(targets, oemMessagePort(route.message), budget)
+            const run = route.run(targets, restMessagePort(route.message), budget)
             budget -= run.calls
             for (const outcome of run.outcomes) settle(outcome)
         }

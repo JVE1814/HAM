@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { groupExpiringCoverage, leaseDecisionProblem, leaseMismatch, renewedEnd, withinLead } from './leases'
+import { groupExpiringCoverage, leaseDecisionProblem, leaseMismatch, leaseReturnBy, renewedEnd, withinLead } from './leases'
+
+describe('leaseReturnBy', () => {
+    it('is the lease end only once the lease is being returned', () => {
+        expect(leaseReturnBy('return', '2027-01-31')).toBe('2027-01-31')
+        expect(leaseReturnBy('extend', '2027-01-31')).toBeUndefined()
+        expect(leaseReturnBy('return', '')).toBeUndefined()
+    })
+})
 
 describe('withinLead', () => {
     it('is due from lead days before the end date onwards', () => {

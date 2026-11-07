@@ -16,6 +16,14 @@ export function monthBounds(month: string): MonthBounds {
     return { month, first, last: addDays(next, -1), days: daysBetween(first, next) }
 }
 
+/**
+ * An encoded query for records whose date range (end blank = still open) overlaps the month.
+ * The ^OR binds to the end-date clause only: start <= last AND (end empty OR end >= first).
+ */
+export function overlapsMonth(bounds: MonthBounds, startField = 'start_date', endField = 'end_date'): string {
+    return `${startField}<=${bounds.last}^${endField}ISEMPTY^OR${endField}>=${bounds.first}`
+}
+
 /** The calendar month before the one `today` falls in. */
 export function previousMonth(today: string): string {
     return addMonths(`${today.slice(0, 7)}-01`, -1).slice(0, 7)

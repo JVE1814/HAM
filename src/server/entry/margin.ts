@@ -1,10 +1,10 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
-import { activeDays, monthBounds, type MonthBounds } from '../domain/billing'
+import { activeDays, monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing'
 import type { LegalOwner } from '../domain/lifecycle'
 import { CostLedger, intervalCosts, leaseRunsIn, leaseShare, marginKey, marginRows, type CostType } from '../domain/margin'
-import { isCurrentRun, runEventTableJob, startRun } from '../platform/chunked'
+import { runEventTableJob } from '../platform/chunked'
 import { EVENT, fire } from '../platform/events'
 import { intProperty, PROPERTY } from '../platform/properties'
 import { findById, num, str } from '../platform/records'
@@ -18,22 +18,13 @@ export function uiRecomputeMargin(current: GlideRecord): void {
 }
 
 /**
- * Script action on x_daas_ham.margin.compute: Asset costs over the month's service intervals, then
- * labour and margin. parm1 is the period, plus `|token` on continuation events; a fresh trigger
- * starts a new run that supersedes one still in progress.
+ * Script action on x_daas_ham.margin.compute (parm1 = period): Asset costs over the month's service
+ * intervals, then labour and margin. A fresh trigger supersedes a pass still in progress.
  */
 export function computeMargin(event: GlideRecord, current: GlideRecord): void {
-    const [periodId, carriedToken] = str(event, 'parm1').split('|')
+    const periodId = str(event, 'parm1')
     const period = findById('x_daas_ham_billing_period', periodId)
     if (!period) return
-    const job = `margin_${periodId}`
-    let token = carriedToken ?? ''
-    if (!token) {
-        token = startRun(job)
-        clearPeriod(periodId)
-    } else if (!isCurrentRun(job, token)) {
-        return
-    }
     const bounds = monthBounds(str(period, 'period'))
     const amortisationMonths = intProperty(PROPERTY.amortisationMonths, 60)
     const ledger = new CostLedger()
@@ -41,10 +32,11 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     const result = runEventTableJob({
         eventName: EVENT.marginCompute,
         record: current,
-        parm1: `${periodId}|${token}`,
+        parm1: periodId,
         cursor: str(event, 'parm2'),
+        supersede: { job: `margin_${periodId}`, onStart: () => clearPeriod(periodId) },
         table: 'x_daas_ham_service_interval',
-        query: `start_date<=${bounds.last}^end_dateISEMPTY^ORend_date>=${bounds.first}`,
+        query: overlapsMonth(bounds),
         read: (interval) => ({
             customerId: str(interval, 'customer'),
             siteId: str(interval, 'site'),
@@ -70,9 +62,9 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
             })
             for (const cost of costs) ledger.add(interval.customerId, interval.siteId, cost.type, cost.amount)
         },
-        flush: () => writeCostFacts(period.getUniqueValue(), ledger.drain()),
+        flush: () => writeCostFacts(periodId, ledger.drain()),
     })
-    if (!result.done || !isCurrentRun(job, token)) return
+    if (!result.done) return
     addFieldLabour(periodId, bounds)
     writeMargin(periodId)
 }

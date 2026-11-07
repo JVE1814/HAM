@@ -54,7 +54,7 @@ export function marginKey(customerId: string, siteId: string): string {
     return `${customerId}|${siteId}`
 }
 
-export function splitMarginKey(key: string): { customerId: string; siteId: string } {
+function splitMarginKey(key: string): { customerId: string; siteId: string } {
     const [customerId, siteId = ''] = key.split('|')
     return { customerId, siteId }
 }
@@ -90,7 +90,10 @@ export interface MarginRow {
     marginPct: number | null
 }
 
-const cents = (value: number) => Math.round(value * 100) / 100
+/** Rounded to the cent. */
+export function cents(value: number): number {
+    return Math.round(value * 100) / 100
+}
 
 /** Margin for every Customer/Site that had revenue or cost. */
 export function marginRows(revenue: ReadonlyMap<string, number>, cost: ReadonlyMap<string, number>): MarginRow[] {

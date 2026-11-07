@@ -1,6 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { lifecyclePhaseOn, refreshDueDate, type LifecycleDates, type RefreshBasis } from '../domain/model-lifecycle'
 import { toIsoDate } from '../domain/calendar'
+import { leaseReturnBy } from '../domain/leases'
 import { glideToMs, todayIso } from './clock'
 import { num, str } from './records'
 
@@ -27,7 +28,8 @@ export function applyLifecycleDates(asset: GlideRecord, dates: LifecycleDates = 
             inServiceDate: inService === undefined ? undefined : toIsoDate(inService),
             refreshCycleMonths: num(asset, 'x_daas_ham_agreement.refresh_cycle_months'),
             endOfSupport: dates.endOfSupport,
-            returnBy: str(asset, 'x_daas_ham_lease.end_action') === 'return' ? str(asset, 'x_daas_ham_lease.ends') : undefined,
+            // Only leased Assets pay for the dot-walk to their lease.
+            returnBy: str(asset, 'x_daas_ham_lease') ? leaseReturnBy(str(asset, 'x_daas_ham_lease.end_action'), str(asset, 'x_daas_ham_lease.ends')) : undefined,
         }) ?? ''
     const changed = str(asset, 'x_daas_ham_lifecycle_phase') !== phase || str(asset, 'x_daas_ham_refresh_due') !== due
     asset.setValue('x_daas_ham_lifecycle_phase', phase)

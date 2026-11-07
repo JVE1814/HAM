@@ -1177,6 +1177,10 @@ declare global {
                         table: 'sys_script'
                         id: 'ba981185458d47608f9c4087e585b04d'
                     }
+                    br_asset_left_service: {
+                        table: 'sys_script'
+                        id: '8b1d91d72df14c14bdae2ff48d59b9bf'
+                    }
                     br_asset_stage_to_order_line: {
                         table: 'sys_script'
                         id: 'f712caf500154d8ea81c399fe85d3247'

@@ -1,4 +1,4 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideAggregate, GlideRecord } from '@servicenow/glide'
 
 /** Small Glide helpers shared by repositories and gateways. Keep this module free of business rules. */
 
@@ -17,6 +17,15 @@ export function pluck(table: string, encodedQuery: string, field: string, limit 
     const values: string[] = []
     while (gr.next()) values.push(String(gr.getValue(field) ?? ''))
     return values
+}
+
+/** How many records match an encoded query (one aggregate query). */
+export function count(table: string, encodedQuery: string): number {
+    const ga = new GlideAggregate(table)
+    ga.addEncodedQuery(encodedQuery)
+    ga.addAggregate('COUNT', '')
+    ga.query()
+    return ga.next() ? Number(ga.getAggregate('COUNT', '')) : 0
 }
 
 export function str(gr: GlideRecord, field: string): string {

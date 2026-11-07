@@ -1,3 +1,5 @@
+import { andEachClause } from './encoded-query'
+
 /**
  * Asset lifecycle stages and the moves allowed between them.
  *
@@ -194,11 +196,18 @@ export const DEPLOYED_STAGES: readonly Stage[] = [...AT_OR_TOWARDS_SITE]
  * ^NQ starts a new top-level OR group). `via` dot-walks to the asset from another table (`asset.`).
  */
 export function stagesQuery(stages: readonly Stage[], base = '', via = ''): string {
-    return stages
+    const clauses = stages
         .map((stage) => {
             const { installStatus, substatus } = STAGE_FIELDS[stage]
-            const clause = `${via}install_status=${installStatus}^${via}${substatus ? `substatus=${substatus}` : 'substatusISEMPTY'}`
-            return base ? `${base}^${clause}` : clause
+            return `${via}install_status=${installStatus}^${via}${substatus ? `substatus=${substatus}` : 'substatusISEMPTY'}`
         })
         .join('^NQ')
+    return base ? andEachClause(clauses, base) : clauses
+}
+
+/** Stages in which an Asset delivers its Subscription line and is billed (D52). */
+const BILLABLE: ReadonlySet<Stage> = new Set(['in_service', 'temporary_deployment'])
+
+export function isBillable(stage: Stage | null): boolean {
+    return stage !== null && BILLABLE.has(stage)
 }

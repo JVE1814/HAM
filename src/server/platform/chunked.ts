@@ -37,11 +37,8 @@ export function runTableJob<T>(spec: TableJob<T>): ChunkedJobResult {
     )
 }
 
-/**
- * Start a new run of an event-driven `job`, superseding any run still in progress; returns the run's
- * token, which the run carries in its events and checks with `isCurrentRun` before each chunk.
- */
-export function startRun(job: string): string {
+/** Start a new run of `job`, superseding any run still in progress; returns the run's token. */
+function startRun(job: string): string {
     const record = loadCursorRecord(job)
     const token = String(nowMs())
     record.setValue('cursor', token)
@@ -51,7 +48,7 @@ export function startRun(job: string): string {
     return token
 }
 
-export function isCurrentRun(job: string, token: string): boolean {
+function isCurrentRun(job: string, token: string): boolean {
     return String(loadCursorRecord(job).getValue('cursor') ?? '') === token
 }
 
@@ -64,29 +61,55 @@ function loadCursorRecord(job: string): GlideRecord {
     return gr
 }
 
+export interface EventTableJob<T> extends Omit<TableJob<T>, 'job'> {
+    eventName: string
+    record: GlideRecord
+    parm1: string
+    /** The event's parm2 as received ('' on the first event of a pass). */
+    cursor: string
+    /** Write out anything accumulated in memory before the next chunk can start. */
+    flush?: () => void
+    /**
+     * Make each fresh pass supersede one still running under `job`: `onStart` runs once at the start
+     * of a pass, and chunks of a superseded pass stop without flushing or queueing more events.
+     */
+    supersede?: { job: string; onStart(): void }
+}
+
 /**
  * The same runner driven by an event instead of a schedule: the cursor travels in the event's parm2
- * and the event is queued again (with the new cursor) until the pass is complete.
+ * (with the pass token when `supersede` is set) and the event is queued again until the pass is
+ * complete. A superseded chunk reports `done: false`.
  */
-export function runEventTableJob<T>(
-    spec: Omit<TableJob<T>, 'job'> & {
-        eventName: string
-        record: GlideRecord
-        parm1: string
-        cursor: string
-        /** Write out anything accumulated in memory before the next chunk can start. */
-        flush?: () => void
-    },
-): ChunkedJobResult {
-    return runChunked<{ id: string; item: T }>(
+export function runEventTableJob<T>(spec: EventTableJob<T>): ChunkedJobResult {
+    const run = spec.supersede
+    let token = ''
+    let cursor = spec.cursor
+    if (run) {
+        const separator = spec.cursor.indexOf(':')
+        token = separator < 0 ? '' : spec.cursor.slice(0, separator)
+        cursor = separator < 0 ? '' : spec.cursor.slice(separator + 1)
+        if (!token) {
+            token = startRun(run.job)
+            run.onStart()
+        } else if (!isCurrentRun(run.job, token)) {
+            return { processed: 0, failed: 0, done: false, cursor, lastError: 'superseded' }
+        }
+    }
+    let superseded = false
+    const result = runChunked<{ id: string; item: T }>(
         {
-            loadCursor: () => spec.cursor,
+            loadCursor: () => cursor,
             fetchBatch: (after, size) => fetchBatch(spec, after, size),
             keyOf: (record) => record.id,
             handle: (record) => spec.handle(record.item, record.id),
-            saveCursor: (cursor, _processed, done) => {
+            saveCursor: (next, _processed, done) => {
+                if (run && !isCurrentRun(run.job, token)) {
+                    superseded = true
+                    return
+                }
                 spec.flush?.()
-                if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, cursor)
+                if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, run ? `${token}:${next}` : next)
             },
             now: nowMs,
         },
@@ -95,6 +118,7 @@ export function runEventTableJob<T>(
             budgetMs: intProperty(PROPERTY.jobBudgetSeconds, 120) * 1000,
         },
     )
+    return superseded ? { ...result, done: false, lastError: 'superseded' } : result
 }
 
 function fetchBatch<T>(spec: Pick<TableJob<T>, 'table' | 'query' | 'read'>, after: string, size: number) {

@@ -15,7 +15,7 @@ export function shippingEnabled(): boolean {
 }
 
 function aggregator() {
-    return restMessagePort('NaaS Shipping aggregator', [{ variable: 'api_key', property: PROPERTY.shippingApiKey }])
+    return restMessagePort('NaaS Shipping aggregator')
 }
 
 /** A cmn_location as a carrier address, addressed to `name`. */

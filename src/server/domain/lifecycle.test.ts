@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkTransition, fieldsOf, isDeployed, stageOf, stagesQuery, type TransitionFacts } from './lifecycle'
+import { checkTransition, fieldsOf, isBillable, isDeployed, stageOf, stagesQuery, type Stage, type TransitionFacts } from './lifecycle'
 
 const deployable: TransitionFacts = {
     hasSite: true,
@@ -110,7 +110,7 @@ describe('isDeployed', () => {
 describe('stagesQuery', () => {
     it('builds one OR-ed clause per stage, each carrying the base query', () => {
         expect(stagesQuery(['in_service', 'shipped'], 'x_daas_ham_agreement=a1')).toBe(
-            'x_daas_ham_agreement=a1^install_status=1^substatusISEMPTY^NQx_daas_ham_agreement=a1^install_status=9^substatus=shipped_to_site',
+            'install_status=1^substatusISEMPTY^x_daas_ham_agreement=a1^NQinstall_status=9^substatus=shipped_to_site^x_daas_ham_agreement=a1',
         )
     })
 
@@ -120,7 +120,12 @@ describe('stagesQuery', () => {
 
     it('dot-walks to the asset from a related table', () => {
         expect(stagesQuery(['in_service', 'available'], 'covered=true', 'asset.')).toBe(
-            'covered=true^asset.install_status=1^asset.substatusISEMPTY^NQcovered=true^asset.install_status=6^asset.substatus=available',
+            'asset.install_status=1^asset.substatusISEMPTY^covered=true^NQasset.install_status=6^asset.substatus=available^covered=true',
         )
+    })
+
+    it('marks in-service and temporary assets as billable', () => {
+        expect(['in_service', 'temporary_deployment', 'pending_return', 'shipped'].map((s) => isBillable(s as Stage))).toEqual([true, true, false, false])
+        expect(isBillable(null)).toBe(false)
     })
 })

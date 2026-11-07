@@ -1,8 +1,10 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { checkTransition, stageOf } from '../domain/lifecycle'
+import { checkTransition, isBillable, stageOf } from '../domain/lifecycle'
 import { readStage, transitionFacts } from '../platform/assets'
+import { todayIso } from '../platform/clock'
 import { recomputeLine } from '../platform/fulfilment'
 import { str } from '../platform/records'
+import { closeServiceIntervals } from '../platform/service-intervals'
 import { ROLE } from '../domain/visibility'
 
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
@@ -32,4 +34,13 @@ export function enforceLifecycle(current: GlideRecord, previous: GlideRecord): v
 export function onAllocatedAssetStageChange(current: GlideRecord): void {
     const lineId = str(current, 'x_daas_ham_order_line')
     if (lineId) recomputeLine(lineId)
+}
+
+/**
+ * After-update rule on alm_hardware stage changes: billing stops the day an Asset leaves service
+ * (goes on a Return order, is declared missing, or is moved by hand), whatever moved it (D52).
+ */
+export function onAssetLeftService(current: GlideRecord, previous: GlideRecord): void {
+    const before = stageOf({ installStatus: str(previous, 'install_status'), substatus: str(previous, 'substatus') })
+    if (isBillable(before) && !isBillable(readStage(current))) closeServiceIntervals(current.getUniqueValue(), todayIso())
 }

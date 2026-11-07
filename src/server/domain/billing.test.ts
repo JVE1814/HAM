@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activeDays, monthBounds, previousMonth, prorate, subscriptionCharges, toCsv } from './billing'
+import { activeDays, monthBounds, overlapsMonth, previousMonth, prorate, subscriptionCharges, toCsv } from './billing'
 
 const nov = monthBounds('2026-11')
 const feb = monthBounds('2028-02')
@@ -9,6 +9,12 @@ describe('monthBounds', () => {
         expect(nov).toEqual({ month: '2026-11', first: '2026-11-01', last: '2026-11-30', days: 30 })
         expect(feb.days).toBe(29)
         expect(monthBounds('2026-12').last).toBe('2026-12-31')
+    })
+})
+
+describe('overlapsMonth', () => {
+    it('selects ranges starting by the month end and not ended before it began', () => {
+        expect(overlapsMonth(nov)).toBe('start_date<=2026-11-30^end_dateISEMPTY^ORend_date>=2026-11-01')
     })
 })
 

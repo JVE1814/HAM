@@ -4,6 +4,11 @@ import { addDays, addMonths } from './calendar'
 
 export type LeaseEndAction = 'undecided' | 'buyout' | 'extend' | 'return'
 
+/** The date the Assets of a lease must be off the network: its end, once the decision is to return it. */
+export function leaseReturnBy(endAction: string, leaseEnd: string): string | undefined {
+    return endAction === 'return' && leaseEnd ? leaseEnd.slice(0, 10) : undefined
+}
+
 /** True once `today` is within `leadDays` of `endDate` (or past it). */
 export function withinLead(endDate: string, today: string, leadDays: number): boolean {
     return !!endDate && today >= addDays(endDate, -Math.max(0, leadDays))

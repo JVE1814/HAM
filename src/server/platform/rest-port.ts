@@ -7,14 +7,20 @@ import type { HttpPort } from '../domain/http'
 /** The typings expose RESTMessageV2's Rhino constructor; at runtime it takes (message, function). */
 const RestMessage = RESTMessageV2 as unknown as new (message: string, fn: string) => RESTMessageV2
 
-/** A secret substituted into the message at call time from a password2 property. */
-export interface SecretVariable {
-    variable: string
-    property: string
+/**
+ * Secrets substituted into each REST message's headers at call time, from password2 properties.
+ * Messages not listed authenticate with an OAuth 2.0 profile attached on the instance.
+ */
+const SECRETS: Record<string, Array<{ variable: string; property: string }>> = {
+    'NaaS Meraki Dashboard': [{ variable: 'api_key', property: 'x_daas_ham.meraki.api_key' }],
+    'NaaS HPE Mist': [{ variable: 'api_token', property: 'x_daas_ham.mist.api_token' }],
+    'NaaS Check Point Zero Touch': [{ variable: 'api_key', property: 'x_daas_ham.checkpoint.api_key' }],
+    'NaaS Shipping aggregator': [{ variable: 'api_key', property: 'x_daas_ham.shipping.api_key' }],
 }
 
-/** Calls functions of the REST message `message`; failures come back as status 0. */
-export function restMessagePort(message: string, secrets: readonly SecretVariable[] = []): HttpPort {
+/** Calls functions of the REST message `message` (with its secrets); failures come back as status 0. */
+export function restMessagePort(message: string): HttpPort {
+    const secrets = SECRETS[message] ?? []
     return (request) => {
         try {
             const rest = new RestMessage(message, request.fn)
