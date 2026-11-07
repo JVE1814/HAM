@@ -10,7 +10,7 @@ import { cancelOrder, submitOrder } from './orders'
 
 /*
  * Server-side UI action handlers. Each saves the form before it acts so values typed before clicking
- * (tracking number, carrier, ...) are not lost.
+ * (tracking number, carrier, ...) are not lost; Ship, which uses them, stops when that save is refused.
  */
 
 export function uiSubmitOrder(current: GlideRecord): void {
@@ -24,7 +24,9 @@ export function uiCancelOrder(current: GlideRecord): void {
 }
 
 export function uiShipOrder(current: GlideRecord): void {
-    current.update()
+    // A refused form save (the platform says why) ships nothing: Ship reads the Order afresh, so a tracking number
+    // typed but not saved would go unused.
+    if (!current.update()) return
     shipOrder(current)
 }
 
