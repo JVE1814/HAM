@@ -6,7 +6,7 @@ import { placementProblem, powerBudget, type Placement, type RackFace } from '..
 import { visibilityFilter } from '../domain/visibility'
 import { readStage } from '../platform/assets'
 import { currentSession } from '../platform/session'
-import { num, recordsById, str } from '../platform/records'
+import { exists, findById, num, recordsById, str } from '../platform/records'
 import { queryParam, reply } from '../platform/rest-api'
 
 /** Rack placement and the rack elevation view (P2.8, D67). */
@@ -90,10 +90,33 @@ function forbidden(response: RESTAPIResponse): boolean {
     return true
 }
 
+/** The fields of a Location that carry the Customer and the Site for the visibility rules. */
+const LOCATION_FIELDS = { customer: 'company', site: 'sys_id' }
+
+/**
+ * Whether the user may see any of `locationIds` (a Site, or a Room in it): staff see every Site, customer admins
+ * their Customer's and site contacts their own. Locations have no before-query rule, so the rack endpoints check
+ * this before reading a rack. The ids go into an encoded query, so they must be sys_ids read from records, never
+ * values taken from the request.
+ */
+function seesLocation(locationIds: readonly string[]): boolean {
+    const session = currentSession()
+    const filter = visibilityFilter(session.scope, LOCATION_FIELDS, session)
+    if (!filter) return true
+    const ids = locationIds.filter(Boolean)
+    return ids.length > 0 && exists('cmn_location', `sys_idIN${ids.join(',')}^${filter}`)
+}
+
 /** GET /racks?site={sys_id}: racks in the Site's rooms. */
 export function listRacks(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (forbidden(response)) return
-    const siteId = queryParam(request, 'site')
+    // The Site is read first so the visibility check and the rack query below use the same sys_id.
+    const site = findById('cmn_location', queryParam(request, 'site'))
+    if (!site || !seesLocation([site.getUniqueValue()])) {
+        reply(response, 404, { error: 'No such site' })
+        return
+    }
+    const siteId = site.getUniqueValue()
     const rack = new GlideRecord('cmdb_ci_rack')
     const atSite = rack.addQuery('location', siteId)
     atSite.addOrCondition('location.parent', siteId)
@@ -110,7 +133,8 @@ export function listRacks(request: RESTAPIRequest, response: RESTAPIResponse): v
 export function getRack(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (forbidden(response)) return
     const rack = new GlideRecord('cmdb_ci_rack')
-    if (!rack.get(String(request.pathParams.id ?? ''))) {
+    // A rack stands in a Room of the Site (or at the Site itself), as GET /racks lists it.
+    if (!rack.get(String(request.pathParams.id ?? '')) || !seesLocation([str(rack, 'location'), str(rack, 'location.parent')])) {
         reply(response, 404, { error: 'No such rack' })
         return
     }
@@ -157,7 +181,7 @@ export function listSites(request: RESTAPIRequest, response: RESTAPIResponse): v
     const session = currentSession()
     const site = new GlideRecord('cmn_location')
     site.addQuery('x_daas_ham_is_site', true)
-    const filter = visibilityFilter(session.scope, { customer: 'company', site: 'sys_id' }, session)
+    const filter = visibilityFilter(session.scope, LOCATION_FIELDS, session)
     if (filter) site.addEncodedQuery(filter)
     site.orderBy('name')
     site.setLimit(1000)

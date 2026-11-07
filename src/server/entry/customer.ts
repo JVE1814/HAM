@@ -2,12 +2,13 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
+import { awaitsSelfInstallConfirmation } from '../domain/install-confirmation'
 import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
 import { ROLE } from '../domain/visibility'
 import { readStage } from '../platform/assets'
 import { currentSession } from '../platform/session'
 import { findById, str } from '../platform/records'
-import { raiseReturn } from '../platform/returns'
+import { installedAssetIds, raiseReturn } from '../platform/returns'
 import { returnLabels } from '../platform/shipments'
 import { completeAttestation } from './assurance'
 import { completeInstall } from './delivery'
@@ -73,7 +74,7 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
             stage: str(order, 'stage'),
             stageLabel: order.getDisplayValue('stage'),
             installMode: str(order, 'install_mode'),
-            canConfirmInstall: str(order, 'stage') === 'installing' && str(order, 'install_mode') === 'self_install',
+            canConfirmInstall: awaitsSelfInstallConfirmation({ stage: str(order, 'stage'), installMode: str(order, 'install_mode') }),
         })
     }
 
@@ -147,7 +148,7 @@ export function reportFault(request: RESTAPIRequest, response: RESTAPIResponse):
 export function confirmInstalled(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const order = findById('x_daas_ham_order', String(request.pathParams.id ?? ''))
-    if (!order || str(order, 'stage') !== 'installing' || str(order, 'install_mode') !== 'self_install') {
+    if (!order || !awaitsSelfInstallConfirmation({ stage: str(order, 'stage'), installMode: str(order, 'install_mode') })) {
         return reply(response, 409, { error: 'This order is not waiting for a self-install confirmation' })
     }
     completeInstall(order)
@@ -181,22 +182,32 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
     reply(response, 200, { attestation: str(attestation, 'number') })
 }
 
+/**
+ * The Assets a return request covers (visibility rules apply): for a decommission everything installed at the Site,
+ * as the record producer does, whatever the request lists; otherwise the listed devices that are at the Site.
+ */
+function returnedAssetIds(siteId: string, decommission: boolean, listed: unknown): string[] {
+    if (decommission) return installedAssetIds({ siteId })
+    return (Array.isArray(listed) ? (listed as unknown[]) : []).map(String).filter((id) => {
+        const asset = findById('alm_hardware', id)
+        return !!asset && str(asset, 'x_daas_ham_site') === siteId
+    })
+}
+
 /** POST /customer/returns { site, assets: [ids], decommission, method }: request equipment to be taken back. */
 export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     if (!isCustomerAdmin()) return reply(response, 403, { error: 'Only customer admins can request returns' })
     const input = data(request)
     const site = findById('cmn_location', String(input.site ?? ''))
-    const assetIds = (Array.isArray(input.assets) ? (input.assets as unknown[]) : [])
-        .map(String)
-        .filter((id) => {
-            const asset = findById('alm_hardware', id) // visibility rules apply
-            return !!asset && str(asset, 'x_daas_ham_site') === site?.getUniqueValue()
-        })
-    if (!site || assetIds.length === 0) return reply(response, 400, { error: 'Choose a site and at least one of its devices' })
+    const decommission = input.decommission === true
+    const assetIds = site ? returnedAssetIds(site.getUniqueValue(), decommission, input.assets) : []
+    if (!site || assetIds.length === 0) {
+        return reply(response, 400, { error: decommission ? 'Choose a site with installed devices' : 'Choose a site and at least one of its devices' })
+    }
     const firstAsset = findById('alm_hardware', assetIds[0])
     const returnId = raiseReturn({
-        trigger: input.decommission === true ? 'site_decommission' : 'device_removal',
+        trigger: decommission ? 'site_decommission' : 'device_removal',
         customerId: str(firstAsset ?? site, 'company'),
         siteId: site.getUniqueValue(),
         agreementId: firstAsset ? str(firstAsset, 'x_daas_ham_agreement') : '',

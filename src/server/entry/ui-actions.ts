@@ -1,4 +1,7 @@
-import type { GlideRecord } from '@servicenow/glide'
+import { gs, type GlideRecord } from '@servicenow/glide'
+import { mayConfirmInstall } from '../domain/install-confirmation'
+import { str } from '../platform/records'
+import { currentSession } from '../platform/session'
 import { completeInstall, shipOrder } from './delivery'
 import { cancelOrder, submitOrder } from './orders'
 
@@ -6,7 +9,7 @@ import { cancelOrder, submitOrder } from './orders'
 // response) because the SDK's generated wrapper passes them by name.
 
 /*
- * Server-side UI action handlers. Each saves the form first so values typed before clicking
+ * Server-side UI action handlers. Each saves the form before it acts so values typed before clicking
  * (tracking number, carrier, ...) are not lost.
  */
 
@@ -25,7 +28,12 @@ export function uiShipOrder(current: GlideRecord): void {
     shipOrder(current)
 }
 
+/** "Confirm installed" is also offered to Customer contacts, who may only confirm a self-install (as on the customer page). */
 export function uiConfirmInstalled(current: GlideRecord): void {
+    if (!mayConfirmInstall(currentSession().scope, { stage: str(current, 'stage'), installMode: str(current, 'install_mode') })) {
+        gs.addErrorMessage('Only a self-install can be confirmed here; other installs complete when their work order is closed')
+        return
+    }
     current.update()
     completeInstall(current)
 }
