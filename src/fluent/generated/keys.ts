@@ -2339,6 +2339,10 @@ declare global {
                         table: 'sys_module'
                         id: '66a9e5e6194444a49fe62905319c8113'
                     }
+                    src_server_domain_collections_ts: {
+                        table: 'sys_module'
+                        id: '281ba57e802649c2a3b8b6b86eb70e26'
+                    }
                     src_server_domain_coverage_ts: {
                         table: 'sys_module'
                         id: '02bd27b0af66429589216a33a7904d12'
@@ -2659,6 +2663,10 @@ declare global {
                     src_server_platform_session_ts: {
                         table: 'sys_module'
                         id: 'ff6163d33d6e493890b5e2c135ad7997'
+                    }
+                    src_server_platform_shipments_ts: {
+                        table: 'sys_module'
+                        id: '058c226bc486401194ca3a43c67c9037'
                     }
                     'src_server_platform_staging-tasks_ts': {
                         table: 'sys_module'

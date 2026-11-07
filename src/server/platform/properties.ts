@@ -34,8 +34,9 @@ export function intProperty(name: string, fallback: number): number {
     return Number.isFinite(value) ? value : fallback
 }
 
+/** A string property, trimmed; `fallback` when it is unset, empty or only whitespace. */
 export function stringProperty(name: string, fallback = ''): string {
-    return gs.getProperty(name, fallback) || fallback
+    return (gs.getProperty(name, fallback) || '').trim() || fallback
 }
 
 export function boolProperty(name: string, fallback: boolean): boolean {

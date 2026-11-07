@@ -42,6 +42,13 @@ export function addAnyOf(gr: GlideRecord, field: string, values: readonly string
     for (const value of separate) condition.addOrCondition(field, value)
 }
 
+/** Delete every record matching an encoded query, with one set-based delete (business rules run). */
+export function deleteWhere(table: string, encodedQuery: string): void {
+    const gr = new GlideRecord(table)
+    gr.addEncodedQuery(encodedQuery)
+    gr.deleteMultiple()
+}
+
 /** Whether any record matches an encoded query (stops at the first). */
 export function exists(table: string, encodedQuery: string): boolean {
     const gr = new GlideRecord(table)
