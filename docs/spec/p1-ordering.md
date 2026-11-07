@@ -144,7 +144,7 @@
   Only a line that has not shipped falls back. A receipt whose unit could not be reserved for its
   waiting line also sources the Order again (P1 fulfilment spec).
 - **Cancel** is refused once anything has shipped, a hot spare handed over at Ship included (use a
-  return order then). It runs under the Order's sourcing lock (`source_order_<sys_id>`), taking turns
+  return order then), and does nothing when the form's save is refused (the platform says why). It runs under the Order's sourcing lock (`source_order_<sys_id>`), taking turns
   with sourcing passes: pressed while a pass holds it, it changes nothing and says *Order not
   cancelled: sourcing is running on it. Try again in a minute*. Otherwise it:
   - saves the Order as cancelled first, listing every purchase order of its lines in its work notes
