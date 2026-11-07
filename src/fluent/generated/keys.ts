@@ -2383,6 +2383,10 @@ declare global {
                         table: 'sys_module'
                         id: '1117c5ce1de44237a43fe486ffaef0e7'
                     }
+                    src_server_domain_memo_ts: {
+                        table: 'sys_module'
+                        id: '99a48153ebd94b9f9c543356cd334da5'
+                    }
                     'src_server_domain_model-lifecycle_ts': {
                         table: 'sys_module'
                         id: '1ab1430e2cc24d0db5823748a547d90e'

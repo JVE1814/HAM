@@ -19,6 +19,15 @@ export function pluck(table: string, encodedQuery: string, field: string, limit 
     return values
 }
 
+/** Whether any record matches an encoded query (stops at the first). */
+export function exists(table: string, encodedQuery: string): boolean {
+    const gr = new GlideRecord(table)
+    gr.addEncodedQuery(encodedQuery)
+    gr.setLimit(1)
+    gr.query()
+    return gr.hasNext()
+}
+
 /** How many records match an encoded query (one aggregate query). */
 export function count(table: string, encodedQuery: string): number {
     const ga = new GlideAggregate(table)

@@ -65,17 +65,14 @@ export interface CoverageDates {
 export interface CoverageWrite extends CoverageDates {
     /** The end date changed: a renewed contract can expire again, so its expiry warning is to be sent afresh. */
     resetExpiryNotified: boolean
-    /** What the Provider pays per year, when the source gives it (CSV import); absent keeps the stored cost. */
-    annualCost?: number
 }
 
 /** Combine a stored coverage contract (empty when new) with a fresh answer from the OEM API or a CSV import. */
-export function mergeCoverage(stored: CoverageDates, incoming: CoverageDates & { annualCost?: number }): CoverageWrite {
+export function mergeCoverage(stored: CoverageDates, incoming: CoverageDates): CoverageWrite {
     return {
         // A response without a start date (SN2INFO v2) keeps the one stored earlier.
         startDate: incoming.startDate ?? stored.startDate,
         endDate: incoming.endDate,
         resetExpiryNotified: (stored.endDate ?? '') !== (incoming.endDate ?? ''),
-        annualCost: incoming.annualCost,
     }
 }

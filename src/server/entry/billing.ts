@@ -7,7 +7,7 @@ import { ROLE } from '../domain/visibility'
 import { runEventTableJob } from '../platform/chunked'
 import { msToGlide, nowMs, todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
-import { findById, num, str } from '../platform/records'
+import { exists, findById, num, str } from '../platform/records'
 import { queryInt, reply } from '../platform/rest-api'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
@@ -279,11 +279,7 @@ function exportQuery(period: GlideRecord, fileName: string): string {
 }
 
 function hasAttachment(period: GlideRecord, fileName: string): boolean {
-    const attachment = new GlideRecord('sys_attachment')
-    attachment.addEncodedQuery(exportQuery(period, fileName))
-    attachment.setLimit(1)
-    attachment.query()
-    return attachment.hasNext()
+    return exists('sys_attachment', exportQuery(period, fileName))
 }
 
 function linesOf(periodId: string, offset = 0, limit = 0): GlideRecord {
@@ -300,15 +296,12 @@ function linesOf(periodId: string, offset = 0, limit = 0): GlideRecord {
 type ReferenceDisplay = (line: GlideRecord, field: 'customer' | 'agreement' | 'subscription_line' | 'site') => string
 
 function referenceDisplay(): ReferenceDisplay {
+    // Keyed by the referenced record; the first line seen for it supplies the display value.
     const cache = new Map<string, string>()
     return (line, field) => {
         const key = `${field}|${str(line, field)}`
-        let value = cache.get(key)
-        if (value === undefined) {
-            value = line.getDisplayValue(field)
-            cache.set(key, value)
-        }
-        return value
+        if (!cache.has(key)) cache.set(key, line.getDisplayValue(field))
+        return cache.get(key) ?? ''
     }
 }
 

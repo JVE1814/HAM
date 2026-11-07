@@ -44,7 +44,8 @@ export function serviceIntervalCosts(
     bounds: MonthBounds,
     amortisationMonths: number,
 ): Array<Pick<CostEntry, 'type' | 'amount'>> {
-    const share = activeDays(bounds, interval.start, interval.end) / bounds.days
+    // A malformed period (no days) carries no cost rather than NaN.
+    const share = bounds.days > 0 ? activeDays(bounds, interval.start, interval.end) / bounds.days : 0
     const costs: Array<Pick<CostEntry, 'type' | 'amount'>> = []
     const owner = asset.legalOwner || 'provider'
     if (owner === 'provider' && asset.purchaseCost > 0 && amortisationMonths > 0 && !writtenOff(asset, bounds, amortisationMonths)) {

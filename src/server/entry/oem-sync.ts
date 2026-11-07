@@ -139,7 +139,7 @@ function upsertCoverage(assetId: string, vendor: OemVendor, fact: CoverageFact, 
     if (!exists) coverage.initialize()
     const merged = mergeCoverage(
         { startDate: str(coverage, 'start_date') || undefined, endDate: str(coverage, 'end_date') || undefined },
-        { startDate: fact.startDate, endDate: fact.endDate, annualCost },
+        { startDate: fact.startDate, endDate: fact.endDate },
     )
     coverage.setValue('asset', assetId)
     coverage.setValue('serial_number', serial)
@@ -151,7 +151,8 @@ function upsertCoverage(assetId: string, vendor: OemVendor, fact: CoverageFact, 
     coverage.setValue('end_date', merged.endDate ?? '')
     if (merged.resetExpiryNotified) coverage.setValue('expiry_notified', false)
     coverage.setValue('source', source)
-    if (merged.annualCost !== undefined) coverage.setValue('annual_cost', merged.annualCost)
+    // The annual cost comes only from the CSV import; an API answer keeps the stored one.
+    if (annualCost !== undefined) coverage.setValue('annual_cost', annualCost)
     coverage.setValue('last_checked', msToGlide(nowMs()))
     if (exists) coverage.update()
     else coverage.insert()

@@ -8,6 +8,7 @@ import { runEventTableJob } from '../platform/chunked'
 import { EVENT, fire } from '../platform/events'
 import { intProperty, PROPERTY } from '../platform/properties'
 import { count, findById, num, str } from '../platform/records'
+import { memoized } from '../domain/memo'
 
 /** Cost facts and Margin per Customer and Site, computed when a Billing period closes (P3.28). */
 
@@ -28,7 +29,7 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     const bounds = monthBounds(str(period, 'period'))
     const amortisationMonths = intProperty(PROPERTY.amortisationMonths, 60)
     const ledger = new CostLedger()
-    const leases = new Map<string, LeaseTerms | null>()
+    const leases = memoized(leaseTermsOf)
     const result = runEventTableJob({
         eventName: EVENT.marginCompute,
         record: current,
@@ -47,7 +48,7 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
         prepare: withAssets,
         handle: (interval) => {
             const asset = interval.asset
-            const costs = serviceIntervalCosts(interval, { ...asset, lease: leaseOf(asset.leaseId, leases) }, bounds, amortisationMonths)
+            const costs = serviceIntervalCosts(interval, { ...asset, lease: (asset.leaseId ? leases(asset.leaseId) : null) }, bounds, amortisationMonths)
             for (const cost of costs) ledger.add(interval.customerId, interval.siteId, cost.type, cost.amount)
         },
         flush: () => writeCostFacts(periodId, ledger.drain()),
@@ -104,20 +105,16 @@ function withAssets(intervals: readonly IntervalRow[]): Array<IntervalRow & { as
 }
 
 /** The Lease schedule's terms, read once per schedule; null without one or when it is not found. */
-function leaseOf(leaseId: string, cache: Map<string, LeaseTerms | null>): LeaseTerms | null {
-    if (!leaseId) return null
-    const cached = cache.get(leaseId)
-    if (cached !== undefined) return cached
+/** A Lease schedule's terms for Margin; null when it is not found. */
+function leaseTermsOf(leaseId: string): LeaseTerms | null {
     const lease = findById('x_daas_ham_lease_schedule', leaseId)
-    const terms = lease && {
+    return lease && {
         starts: str(lease, 'starts'),
         ends: str(lease, 'ends'),
         monthlyPayment: num(lease, 'monthly_payment'),
         // While a buyout transfer runs, keep splitting over the Assets covered when it was decided.
         coveredAssets: Math.max(count('alm_hardware', `x_daas_ham_lease=${leaseId}`), num(lease, 'buyout_assets')),
     }
-    cache.set(leaseId, terms)
-    return terms
 }
 
 function costFactKey(customerId: string, siteId: string, type: string): string {
@@ -133,8 +130,10 @@ function writeCostFacts(periodId: string, entries: readonly CostEntry[]): void {
         const amount = (pending.get(key)?.amount ?? 0) + entry.amount
         pending.set(key, { ...entry, amount })
     }
+    // Only the facts of the customers being written are read, not the whole period's.
+    const customers = [...new Set(entries.map((e) => e.customerId))]
     const fact = new GlideRecord('x_daas_ham_cost_fact')
-    fact.addQuery('billing_period', periodId)
+    fact.addEncodedQuery(`billing_period=${periodId}^customerIN${customers.join(',')}`)
     fact.query()
     while (fact.next()) {
         const key = costFactKey(str(fact, 'customer'), str(fact, 'site'), str(fact, 'cost_type'))

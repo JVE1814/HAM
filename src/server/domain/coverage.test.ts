@@ -75,7 +75,6 @@ describe('mergeCoverage', () => {
             startDate: '2024-01-01',
             endDate: '2027-06-30',
             resetExpiryNotified: false,
-            annualCost: undefined,
         })
     })
 
@@ -84,7 +83,6 @@ describe('mergeCoverage', () => {
             startDate: '2025-01-01',
             endDate: undefined,
             resetExpiryNotified: true,
-            annualCost: undefined,
         })
     })
 
@@ -94,9 +92,4 @@ describe('mergeCoverage', () => {
         expect(mergeCoverage({}, {}).resetExpiryNotified).toBe(false)
     })
 
-    it('takes the annual cost only when the source gives one', () => {
-        expect(mergeCoverage({}, { annualCost: 120 }).annualCost).toBe(120)
-        expect(mergeCoverage({}, { annualCost: 0 }).annualCost).toBe(0)
-        expect(mergeCoverage({}, {}).annualCost).toBeUndefined()
-    })
 })

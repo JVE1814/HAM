@@ -240,6 +240,7 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
     line.setValue('quantity_to_purchase', onOrder + (purchaseOrder ? toPurchase : 0))
     if (unsourced) {
         const why = stagingStockroom ? 'Procurement did not create it' : `set ${PROPERTY.stagingStockroom}`
+        gs.warn(`[x_daas_ham] ${str(line, 'number')}: no purchase order (${why})`)
         line.setValue('sourcing_summary', `${plan.summary} (no purchase order: ${why})`)
     } else if (route !== 'oem_advance_replacement') {
         line.setValue('sourcing_summary', plan.summary)
