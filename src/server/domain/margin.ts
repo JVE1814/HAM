@@ -34,9 +34,10 @@ export interface AssetCostFacts {
 
 /**
  * The costs one Asset carried over one Service interval, prorated by the interval's days in the month.
- * Provider-owned Assets carry their purchase write-off until it is complete; leased ones their share of
- * the lease payment while the lease runs; customer-owned ones neither. Any Asset carries the OEM support
- * the Provider pays for it.
+ * Provider-owned Assets carry their purchase write-off from its start (no earlier than the purchase,
+ * e.g. a lease buyout) until it is complete; leased ones their share of the lease payment while the
+ * lease runs; customer-owned ones neither. Any Asset carries the OEM support the Provider pays for it.
+ * Costs follow the Asset as it is now: a month recomputed after a buyout is costed as provider-owned.
  */
 export function serviceIntervalCosts(
     interval: { start: string; end?: string },
@@ -45,11 +46,14 @@ export function serviceIntervalCosts(
     amortisationMonths: number,
 ): Array<Pick<CostEntry, 'type' | 'amount'>> {
     // A malformed period (no days) carries no cost rather than NaN.
-    const share = bounds.days > 0 ? activeDays(bounds, interval.start, interval.end) / bounds.days : 0
+    const shareFrom = (from: string) => (bounds.days > 0 ? activeDays(bounds, from, interval.end) / bounds.days : 0)
+    const share = shareFrom(interval.start)
     const costs: Array<Pick<CostEntry, 'type' | 'amount'>> = []
     const owner = asset.legalOwner || 'provider'
-    if (owner === 'provider' && asset.purchaseCost > 0 && amortisationMonths > 0 && !writtenOff(asset, bounds, amortisationMonths)) {
-        costs.push({ type: 'purchase', amount: (asset.purchaseCost / amortisationMonths) * share })
+    const writeOffFrom = writeOffStart(asset)
+    if (owner === 'provider' && asset.purchaseCost > 0 && amortisationMonths > 0 && !writtenOff(writeOffFrom, bounds, amortisationMonths)) {
+        const from = writeOffFrom > interval.start ? writeOffFrom : interval.start
+        costs.push({ type: 'purchase', amount: (asset.purchaseCost / amortisationMonths) * shareFrom(from) })
     }
     if (owner === 'lessor' && asset.lease && leaseRunsIn(asset.lease, bounds)) {
         const monthly = leaseShare(asset.lease.monthlyPayment, asset.lease.coveredAssets)
@@ -59,9 +63,13 @@ export function serviceIntervalCosts(
     return costs
 }
 
-/** Whether the write-off (from the purchase date, else first in service) ended by the month; an unknown start = still running. */
-function writtenOff(asset: AssetCostFacts, bounds: MonthBounds, amortisationMonths: number): boolean {
-    const start = asset.purchaseDate || asset.inServiceDate.slice(0, 10)
+/** The day the write-off starts: the purchase date, else the day first in service ('' when unknown). */
+function writeOffStart(asset: AssetCostFacts): string {
+    return asset.purchaseDate.slice(0, 10) || asset.inServiceDate.slice(0, 10)
+}
+
+/** Whether the write-off from `start` ended by the month; an unknown start = still running. */
+function writtenOff(start: string, bounds: MonthBounds, amortisationMonths: number): boolean {
     return !!start && addMonths(start, amortisationMonths) <= bounds.first
 }
 

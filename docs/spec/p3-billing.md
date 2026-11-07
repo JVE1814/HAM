@@ -44,7 +44,7 @@ Closing a period (or **Recompute margin** on a closed one) rebuilds its **Cost f
 
 | Cost type | Source | Attributed by |
 |---|---|---|
-| Purchase | The Asset's cost, written off over `x_daas_ham.margin.amortisation_months` from its purchase date (else its in-service date), then no more (Provider-owned only; a buyout sets the cost to the Asset's share of the buyout price) | Service-interval days in the month |
+| Purchase | The Asset's cost, written off over `x_daas_ham.margin.amortisation_months` from its purchase date (else its in-service date), then no more (Provider-owned only; a buyout sets the cost to the Asset's share of the buyout price and the purchase date to the buyout day) | Service-interval days in the month from the write-off start |
 | Lease | The lease's monthly payment split evenly over the Assets it covers, in months the lease runs (lessor-owned) | Service-interval days |
 | OEM support | Annual cost of the coverage contracts covering the Asset today (`annual_cost`, from the coverage CSV or entered on the contract) ÷ 12 | Service-interval days |
 | Field labour | NaaS work orders closed in the month: their *NaaS field labour cost*, else `x_daas_ham.margin.visit_cost` | The work order's company and location |

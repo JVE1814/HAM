@@ -1,7 +1,7 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
-import { monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing'
+import { isMonth, monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing'
 import type { LegalOwner } from '../domain/lifecycle'
 import { cents, CostLedger, marginRows, serviceIntervalCosts, type Amount, type AssetCostFacts, type CostEntry, type LeaseTerms } from '../domain/margin'
 import { runEventTableJob } from '../platform/chunked'
@@ -26,8 +26,9 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     const periodId = str(event, 'parm1')
     const period = findById('x_daas_ham_billing_period', periodId)
     if (!period) return
-    const bounds = monthBounds(str(period, 'period'))
-    if (!(bounds.days > 0)) return void gs.error(`[x_daas_ham] Margin not computed: billing period ${periodId} has a malformed month '${str(period, 'period')}'`)
+    const month = str(period, 'period')
+    if (!isMonth(month)) return void gs.error(`[x_daas_ham] Margin not computed: billing period ${periodId} has a malformed month '${month}'`)
+    const bounds = monthBounds(month)
     const amortisationMonths = intProperty(PROPERTY.amortisationMonths, 60)
     const ledger = new CostLedger()
     const leases = memoized(leaseTermsOf)
@@ -61,11 +62,13 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
 }
 
 function clearPeriod(periodId: string): void {
-    for (const table of ['x_daas_ham_cost_fact', 'x_daas_ham_margin']) {
-        const gr = new GlideRecord(table)
-        gr.addQuery('billing_period', periodId)
-        gr.deleteMultiple()
-    }
+    for (const table of ['x_daas_ham_cost_fact', 'x_daas_ham_margin']) deleteWhere(table, `billing_period=${periodId}`)
+}
+
+function deleteWhere(table: string, encodedQuery: string): void {
+    const gr = new GlideRecord(table)
+    gr.addEncodedQuery(encodedQuery)
+    gr.deleteMultiple()
 }
 
 /** A Service interval as stored, with its Asset's sys_id. */
@@ -155,8 +158,13 @@ function writeCostFacts(periodId: string, entries: readonly CostEntry[]): void {
     }
 }
 
-/** Field work orders closed in the month: their labour cost, or the standard visit cost. */
+/**
+ * Field work orders closed in the month: their labour cost, or the standard visit cost. Replaces the
+ * period's labour facts, as writeMargin replaces its Margin rows, so a superseded pass finishing late
+ * leaves nothing a fresh pass does not overwrite.
+ */
 function addFieldLabour(periodId: string, bounds: MonthBounds): void {
+    deleteWhere('x_daas_ham_cost_fact', `billing_period=${periodId}^cost_type=field_labour`)
     const visitCost = intProperty(PROPERTY.visitCost, 250)
     const ledger = new CostLedger()
     const workOrder = new GlideRecord('wm_order')
@@ -188,6 +196,7 @@ function sumsBy(table: string, periodId: string): Amount[] {
 }
 
 function writeMargin(periodId: string): void {
+    deleteWhere('x_daas_ham_margin', `billing_period=${periodId}`)
     for (const row of marginRows(sumsBy('x_daas_ham_billing_line', periodId), sumsBy('x_daas_ham_cost_fact', periodId))) {
         const margin = new GlideRecord('x_daas_ham_margin')
         margin.initialize()

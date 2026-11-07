@@ -31,6 +31,12 @@ describe('serviceIntervalCosts', () => {
         expect(costs({ ...provider, purchaseDate: '2021-11-02', inServiceDate: '2021-11-01 09:30:00' })).toEqual([{ type: 'purchase', amount: 100 }])
     })
 
+    it('starts the write-off no earlier than the purchase, e.g. a lease buyout', () => {
+        expect(costs({ ...provider, purchaseDate: '2026-11-16' })).toEqual([{ type: 'purchase', amount: 50 }])
+        expect(costs({ ...provider, purchaseDate: '2026-12-01' })).toEqual([{ type: 'purchase', amount: 0 }])
+        expect(costs({ ...provider, purchaseDate: '2026-11-16' }, { start: '2026-11-21', end: '2026-11-25' })).toEqual([{ type: 'purchase', amount: 100 * (5 / 30) }])
+    })
+
     it('keeps the write-off running when neither date is known', () => {
         expect(costs({ ...provider, purchaseDate: '', inServiceDate: '' })).toEqual([{ type: 'purchase', amount: 100 }])
     })
