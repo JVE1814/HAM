@@ -1,46 +1,44 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { runChunked, type ChunkedJobResult } from '../domain/chunked-job'
+import { runChunked, type ChunkedJobPorts, type ChunkedJobResult } from '../domain/chunked-job'
 import { andEachClause } from '../domain/encoded-query'
 import { msToGlide, nowMs } from './clock'
 import { intProperty, PROPERTY } from './properties'
 
-/** Run the chunked-job runner over a table, persisting the cursor in x_daas_ham_job_cursor (ADR 0007). */
-export interface TableJob<T> {
+/**
+ * Run the chunked-job runner over a table, persisting the cursor in x_daas_ham_job_cursor (ADR 0007).
+ * Each record is read into a row `R`; the item handled is `T`, the row itself unless `prepare` is set.
+ */
+interface TableJobFields<T, R> {
     job: string
     table: string
     query: string
-    read(record: GlideRecord): T
-    /**
-     * Load what a whole batch needs in one go (e.g. its referenced records): called once per batch,
-     * after every row of it is read and before any of it is handled. It may complete the items in
-     * place (e.g. attach records loaded with one query for the whole batch).
-     */
-    prefetch?: (items: readonly T[]) => void
+    read(record: GlideRecord): R
     handle(item: T, sysId: string): void
 }
 
-export function runTableJob<T>(spec: TableJob<T>): ChunkedJobResult {
+/**
+ * Turn a batch's rows into the items handled, one per row and in the same order, loading what the
+ * whole batch needs in one go (e.g. its referenced records with one query): called once per batch,
+ * after every row of it is read and before any of it is handled. Required whenever the items handled
+ * are not the rows read.
+ */
+type Prepare<T, R> = [R] extends [T] ? { prepare?: (rows: readonly R[]) => T[] } : { prepare: (rows: readonly R[]) => T[] }
+
+export type TableJob<T, R = T> = TableJobFields<T, R> & Prepare<T, R>
+
+// The row type comes first so that, without `prepare`, the item type defaults to it.
+export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
     const cursorRecord = loadCursorRecord(spec.job)
-    return runChunked<{ id: string; item: T }>(
-        {
-            loadCursor: () => String(cursorRecord.getValue('cursor') ?? ''),
-            fetchBatch: (after, size) => fetchBatch(spec, after, size),
-            keyOf: (record) => record.id,
-            handle: (record) => spec.handle(record.item, record.id),
-            saveCursor: (cursor, processed, done) => {
-                cursorRecord.setValue('cursor', cursor)
-                cursorRecord.setValue('last_run', msToGlide(nowMs()))
-                cursorRecord.setValue('processed_total', processed)
-                cursorRecord.setValue('last_status', done ? 'complete' : 'paused (time budget)')
-                cursorRecord.update()
-            },
-            now: nowMs,
+    return runOverTable(spec, {
+        loadCursor: () => String(cursorRecord.getValue('cursor') ?? ''),
+        saveCursor: (cursor, processed, done) => {
+            cursorRecord.setValue('cursor', cursor)
+            cursorRecord.setValue('last_run', msToGlide(nowMs()))
+            cursorRecord.setValue('processed_total', processed)
+            cursorRecord.setValue('last_status', done ? 'complete' : 'paused (time budget)')
+            cursorRecord.update()
         },
-        {
-            batchSize: intProperty(PROPERTY.jobBatchSize, 500),
-            budgetMs: intProperty(PROPERTY.jobBudgetSeconds, 120) * 1000,
-        },
-    )
+    })
 }
 
 /** Start a new run of `job`, superseding any run still in progress; returns the run's token. */
@@ -67,7 +65,9 @@ function loadCursorRecord(job: string): GlideRecord {
     return gr
 }
 
-export interface EventTableJob<T> extends Omit<TableJob<T>, 'job'> {
+export type EventTableJob<T, R = T> = Omit<TableJobFields<T, R>, 'job'> & Prepare<T, R> & EventJobFields
+
+interface EventJobFields {
     eventName: string
     record: GlideRecord
     parm1: string
@@ -87,7 +87,7 @@ export interface EventTableJob<T> extends Omit<TableJob<T>, 'job'> {
  * (with the pass token when `supersede` is set) and the event is queued again until the pass is
  * complete. A superseded chunk reports `done: false`.
  */
-export function runEventTableJob<T>(spec: EventTableJob<T>): ChunkedJobResult {
+export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): ChunkedJobResult {
     const run = spec.supersede
     let token = ''
     let cursor = spec.cursor
@@ -103,20 +103,31 @@ export function runEventTableJob<T>(spec: EventTableJob<T>): ChunkedJobResult {
         }
     }
     let superseded = false
-    const result = runChunked<{ id: string; item: T }>(
+    const result = runOverTable(spec, {
+        loadCursor: () => cursor,
+        saveCursor: (next, _processed, done) => {
+            if (run && !isCurrentRun(run.job, token)) {
+                superseded = true
+                return
+            }
+            spec.flush?.()
+            if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, run ? `${token}:${next}` : next)
+        },
+    })
+    return superseded ? { ...result, done: false, lastError: 'superseded' } : result
+}
+
+type TableSource<T, R> = Pick<TableJobFields<T, R>, 'table' | 'query' | 'read' | 'handle'> & { prepare?: (rows: readonly R[]) => T[] }
+
+/** The runner over a table's records in sys_id order, with the batch size and time budget from properties. */
+function runOverTable<T, R>(spec: TableSource<T, R>, cursor: Pick<ChunkedJobPorts<unknown>, 'loadCursor' | 'saveCursor'>): ChunkedJobResult {
+    return runChunked<{ id: string; item: T }>(
         {
-            loadCursor: () => cursor,
+            loadCursor: cursor.loadCursor,
+            saveCursor: cursor.saveCursor,
             fetchBatch: (after, size) => fetchBatch(spec, after, size),
             keyOf: (record) => record.id,
             handle: (record) => spec.handle(record.item, record.id),
-            saveCursor: (next, _processed, done) => {
-                if (run && !isCurrentRun(run.job, token)) {
-                    superseded = true
-                    return
-                }
-                spec.flush?.()
-                if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, run ? `${token}:${next}` : next)
-            },
             now: nowMs,
         },
         {
@@ -124,17 +135,21 @@ export function runEventTableJob<T>(spec: EventTableJob<T>): ChunkedJobResult {
             budgetMs: intProperty(PROPERTY.jobBudgetSeconds, 120) * 1000,
         },
     )
-    return superseded ? { ...result, done: false, lastError: 'superseded' } : result
 }
 
-function fetchBatch<T>(spec: Pick<TableJob<T>, 'table' | 'query' | 'read' | 'prefetch'>, after: string, size: number) {
+function fetchBatch<T, R>(spec: TableSource<T, R>, after: string, size: number): Array<{ id: string; item: T }> {
     const gr = new GlideRecord(spec.table)
     gr.addEncodedQuery(after ? andEachClause(spec.query, `sys_id>${after}`) : spec.query)
     gr.orderBy('sys_id')
     gr.setLimit(size)
     gr.query()
-    const batch: Array<{ id: string; item: T }> = []
-    while (gr.next()) batch.push({ id: gr.getUniqueValue(), item: spec.read(gr) })
-    spec.prefetch?.(batch.map((record) => record.item))
-    return batch
+    const ids: string[] = []
+    const rows: R[] = []
+    while (gr.next()) {
+        ids.push(gr.getUniqueValue())
+        rows.push(spec.read(gr))
+    }
+    // Without `prepare` the rows are the items (T defaults to R).
+    const items = spec.prepare ? spec.prepare(rows) : (rows as unknown[] as T[])
+    return ids.map((id, index) => ({ id, item: items[index] }))
 }

@@ -43,9 +43,9 @@ export function serviceIntervalCosts(
     asset: AssetCostFacts,
     bounds: MonthBounds,
     amortisationMonths: number,
-): Array<{ type: CostType; amount: number }> {
-    const share = bounds.days > 0 ? activeDays(bounds, interval.start, interval.end) / bounds.days : 0
-    const costs: Array<{ type: CostType; amount: number }> = []
+): Array<Pick<CostEntry, 'type' | 'amount'>> {
+    const share = activeDays(bounds, interval.start, interval.end) / bounds.days
+    const costs: Array<Pick<CostEntry, 'type' | 'amount'>> = []
     const owner = asset.legalOwner || 'provider'
     if (owner === 'provider' && asset.purchaseCost > 0 && amortisationMonths > 0 && !writtenOff(asset, bounds, amortisationMonths)) {
         costs.push({ type: 'purchase', amount: (asset.purchaseCost / amortisationMonths) * share })
@@ -97,7 +97,7 @@ export class CostLedger {
     }
 
     /** The totals so far, emptying the ledger. */
-    drain(): Array<{ customerId: string; siteId: string; type: CostType; amount: number }> {
+    drain(): CostEntry[] {
         const entries = [...this.totals].map(([key, amount]) => {
             const [customerId, siteId, type] = key.split('|')
             return { customerId, siteId, type: type as CostType, amount }
@@ -112,6 +112,11 @@ export interface Amount {
     customerId: string
     siteId: string
     amount: number
+}
+
+/** An amount of one cost type for a Customer and Site, as a Cost fact holds it. */
+export interface CostEntry extends Amount {
+    type: CostType
 }
 
 export interface MarginRow {

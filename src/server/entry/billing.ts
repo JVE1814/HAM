@@ -1,13 +1,13 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
-import { GlideAggregate, GlideDateTime, GlideRecord, GlideSysAttachment, gs } from '@servicenow/glide'
+import { GlideAggregate, GlideRecord, GlideSysAttachment, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { monthBounds, overlapsMonth, previousMonth, subscriptionCharges, toCsv, type MonthBounds, type ServiceInterval } from '../domain/billing'
 import { ROLE } from '../domain/visibility'
 import { runEventTableJob } from '../platform/chunked'
-import { todayIso } from '../platform/clock'
+import { msToGlide, nowMs, todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
-import { count, findById, num, str } from '../platform/records'
+import { findById, num, str } from '../platform/records'
 import { queryInt, reply } from '../platform/rest-api'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
@@ -149,7 +149,7 @@ function finishGeneration(period: GlideRecord): void {
         fee.update()
     }
     setTotals(period)
-    period.setValue('generated_at', new GlideDateTime().getValue())
+    period.setValue('generated_at', msToGlide(nowMs()))
     period.setValue('status', 'ready')
     period.update()
 }
@@ -221,7 +221,7 @@ export function uiCloseBillingPeriod(current: GlideRecord): void {
     fees.setValue('status', 'billed')
     fees.updateMultiple()
     current.setValue('status', 'closed')
-    current.setValue('closed_at', new GlideDateTime().getValue())
+    current.setValue('closed_at', msToGlide(nowMs()))
     current.setValue('closed_by', gs.getUserID())
     current.update()
     fire(EVENT.billingExport, current, current.getUniqueValue())
@@ -251,8 +251,9 @@ export function exportBillingPeriod(event: GlideRecord): void {
     if (hasAttachment(period, fileName)) return
     try {
         const rows: Array<Array<string | number>> = [CSV_HEADER]
+        const display = referenceDisplay()
         const line = linesOf(period.getUniqueValue())
-        while (line.next()) rows.push(csvRow(period, line))
+        while (line.next()) rows.push(csvRow(period, line, display))
         new GlideSysAttachment().write(period, fileName, 'text/csv', toCsv(rows))
         keepOldestExport(period, fileName)
     } catch (error) {
@@ -266,11 +267,7 @@ function keepOldestExport(period: GlideRecord, fileName: string): void {
     copy.addEncodedQuery(`${exportQuery(period, fileName)}^ORDERBYsys_created_on^ORDERBYsys_id`)
     copy.query()
     const attachments = new GlideSysAttachment()
-    let first = true
-    while (copy.next()) {
-        if (!first) attachments.deleteAttachment(copy.getUniqueValue())
-        first = false
-    }
+    if (copy.next()) while (copy.next()) attachments.deleteAttachment(copy.getUniqueValue())
 }
 
 function exportFileName(period: GlideRecord): string {
@@ -282,7 +279,11 @@ function exportQuery(period: GlideRecord, fileName: string): string {
 }
 
 function hasAttachment(period: GlideRecord, fileName: string): boolean {
-    return count('sys_attachment', exportQuery(period, fileName)) > 0
+    const attachment = new GlideRecord('sys_attachment')
+    attachment.addEncodedQuery(exportQuery(period, fileName))
+    attachment.setLimit(1)
+    attachment.query()
+    return attachment.hasNext()
 }
 
 function linesOf(periodId: string, offset = 0, limit = 0): GlideRecord {
@@ -295,14 +296,30 @@ function linesOf(periodId: string, offset = 0, limit = 0): GlideRecord {
     return line
 }
 
-function csvRow(period: GlideRecord, line: GlideRecord): Array<string | number> {
+/** A line's reference display value, looked up once per referenced record. */
+type ReferenceDisplay = (line: GlideRecord, field: 'customer' | 'agreement' | 'subscription_line' | 'site') => string
+
+function referenceDisplay(): ReferenceDisplay {
+    const cache = new Map<string, string>()
+    return (line, field) => {
+        const key = `${field}|${str(line, field)}`
+        let value = cache.get(key)
+        if (value === undefined) {
+            value = line.getDisplayValue(field)
+            cache.set(key, value)
+        }
+        return value
+    }
+}
+
+function csvRow(period: GlideRecord, line: GlideRecord, display: ReferenceDisplay): Array<string | number> {
     return [
         str(period, 'period'),
         str(line, 'kind'),
-        line.getDisplayValue('customer'),
-        line.getDisplayValue('agreement'),
-        line.getDisplayValue('subscription_line'),
-        line.getDisplayValue('site'),
+        display(line, 'customer'),
+        display(line, 'agreement'),
+        display(line, 'subscription_line'),
+        display(line, 'site'),
         str(line, 'description'),
         num(line, 'units'),
         num(line, 'monthly_rate'),
@@ -356,6 +373,7 @@ export function getBillingLines(request: RESTAPIRequest, response: RESTAPIRespon
     if (!period) return reply(response, 404, { error: 'Unknown billing period' })
     const offset = queryInt(request, 'offset', 0)
     const limit = Math.min(Math.max(queryInt(request, 'limit', 1000), 1), 5000)
+    const display = referenceDisplay()
     const line = linesOf(period.getUniqueValue(), offset, limit)
     const lines: object[] = []
     while (line.next()) {
@@ -363,11 +381,11 @@ export function getBillingLines(request: RESTAPIRequest, response: RESTAPIRespon
             id: line.getUniqueValue(),
             kind: str(line, 'kind'),
             customerId: str(line, 'customer'),
-            customer: line.getDisplayValue('customer'),
-            agreement: line.getDisplayValue('agreement'),
+            customer: display(line, 'customer'),
+            agreement: display(line, 'agreement'),
             subscriptionLine: str(line, 'subscription_line'),
             siteId: str(line, 'site'),
-            site: line.getDisplayValue('site'),
+            site: display(line, 'site'),
             feeEvent: str(line, 'fee_event'),
             description: str(line, 'description'),
             units: num(line, 'units'),

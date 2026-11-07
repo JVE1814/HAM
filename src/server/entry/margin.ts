@@ -3,7 +3,7 @@
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
 import { monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing'
 import type { LegalOwner } from '../domain/lifecycle'
-import { cents, CostLedger, marginRows, serviceIntervalCosts, type Amount, type AssetCostFacts, type CostType, type LeaseTerms } from '../domain/margin'
+import { cents, CostLedger, marginRows, serviceIntervalCosts, type Amount, type AssetCostFacts, type CostEntry, type LeaseTerms } from '../domain/margin'
 import { runEventTableJob } from '../platform/chunked'
 import { EVENT, fire } from '../platform/events'
 import { intProperty, PROPERTY } from '../platform/properties'
@@ -43,9 +43,8 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
             start: str(interval, 'start_date'),
             end: str(interval, 'end_date') || undefined,
             assetId: str(interval, 'asset'),
-            asset: NO_ASSET,
         }),
-        prefetch: loadAssets,
+        prepare: withAssets,
         handle: (interval) => {
             const asset = interval.asset
             const costs = serviceIntervalCosts(interval, { ...asset, lease: leaseOf(asset.leaseId, leases) }, bounds, amortisationMonths)
@@ -67,31 +66,41 @@ function clearPeriod(periodId: string): void {
     }
 }
 
+/** A Service interval as stored, with its Asset's sys_id. */
+interface IntervalRow {
+    customerId: string
+    siteId: string
+    start: string
+    end?: string
+    assetId: string
+}
+
 /** An Asset's cost fields as stored, with its Lease schedule's sys_id. */
 type AssetFields = Omit<AssetCostFacts, 'lease'> & { leaseId: string }
 
 /** A deleted Asset reads as a dot-walk through a broken reference did: empty strings and zeros. */
 const NO_ASSET: AssetFields = { legalOwner: '', purchaseCost: 0, purchaseDate: '', inServiceDate: '', supportAnnual: 0, leaseId: '' }
 
-/** Give each interval of the batch its Asset's cost fields, read with one query (missing Assets keep NO_ASSET). */
-function loadAssets(intervals: ReadonlyArray<{ assetId: string; asset: AssetFields }>): void {
+/** The batch's intervals with their Assets' cost fields, read with one query. */
+function withAssets(intervals: readonly IntervalRow[]): Array<IntervalRow & { asset: AssetFields }> {
     const ids = [...new Set(intervals.map((interval) => interval.assetId).filter(Boolean))]
-    if (ids.length === 0) return
     const found = new Map<string, AssetFields>()
-    const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(`sys_idIN${ids.join(',')}`)
-    asset.query()
-    while (asset.next()) {
-        found.set(asset.getUniqueValue(), {
-            legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner,
-            purchaseCost: num(asset, 'cost'),
-            purchaseDate: str(asset, 'purchase_date'),
-            inServiceDate: str(asset, 'x_daas_ham_in_service_date'),
-            supportAnnual: num(asset, 'x_daas_ham_support_cost'),
-            leaseId: str(asset, 'x_daas_ham_lease'),
-        })
+    if (ids.length > 0) {
+        const asset = new GlideRecord('alm_hardware')
+        asset.addEncodedQuery(`sys_idIN${ids.join(',')}`)
+        asset.query()
+        while (asset.next()) {
+            found.set(asset.getUniqueValue(), {
+                legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner,
+                purchaseCost: num(asset, 'cost'),
+                purchaseDate: str(asset, 'purchase_date'),
+                inServiceDate: str(asset, 'x_daas_ham_in_service_date'),
+                supportAnnual: num(asset, 'x_daas_ham_support_cost'),
+                leaseId: str(asset, 'x_daas_ham_lease'),
+            })
+        }
     }
-    for (const interval of intervals) interval.asset = found.get(interval.assetId) ?? NO_ASSET
+    return intervals.map((interval) => ({ ...interval, asset: found.get(interval.assetId) ?? NO_ASSET }))
 }
 
 /** The Lease schedule's terms, read once per schedule; null without one or when it is not found. */
@@ -111,28 +120,39 @@ function leaseOf(leaseId: string, cache: Map<string, LeaseTerms | null>): LeaseT
     return terms
 }
 
-/** Add amounts to the period's Cost facts (one per Customer, Site and type). */
-function writeCostFacts(periodId: string, entries: ReadonlyArray<{ customerId: string; siteId: string; type: CostType; amount: number }>): void {
+function costFactKey(customerId: string, siteId: string, type: string): string {
+    return `${customerId}|${siteId}|${type}`
+}
+
+/** Add amounts to the period's Cost facts (one per Customer, Site and type), reading the period's facts once. */
+function writeCostFacts(periodId: string, entries: readonly CostEntry[]): void {
+    if (entries.length === 0) return
+    const pending = new Map<string, CostEntry>()
     for (const entry of entries) {
-        const fact = new GlideRecord('x_daas_ham_cost_fact')
-        fact.addQuery('billing_period', periodId)
-        fact.addQuery('customer', entry.customerId)
-        fact.addQuery('site', entry.siteId)
-        fact.addQuery('cost_type', entry.type)
-        fact.setLimit(1)
-        fact.query()
-        if (fact.next()) {
-            fact.setValue('amount', cents(num(fact, 'amount') + entry.amount))
-            fact.update()
-            continue
-        }
-        fact.initialize()
-        fact.setValue('billing_period', periodId)
-        fact.setValue('customer', entry.customerId)
-        fact.setValue('site', entry.siteId)
-        fact.setValue('cost_type', entry.type)
-        fact.setValue('amount', cents(entry.amount))
-        fact.insert()
+        const key = costFactKey(entry.customerId, entry.siteId, entry.type)
+        const amount = (pending.get(key)?.amount ?? 0) + entry.amount
+        pending.set(key, { ...entry, amount })
+    }
+    const fact = new GlideRecord('x_daas_ham_cost_fact')
+    fact.addQuery('billing_period', periodId)
+    fact.query()
+    while (fact.next()) {
+        const key = costFactKey(str(fact, 'customer'), str(fact, 'site'), str(fact, 'cost_type'))
+        const entry = pending.get(key)
+        if (!entry) continue
+        fact.setValue('amount', cents(num(fact, 'amount') + entry.amount))
+        fact.update()
+        pending.delete(key)
+    }
+    for (const entry of pending.values()) {
+        const added = new GlideRecord('x_daas_ham_cost_fact')
+        added.initialize()
+        added.setValue('billing_period', periodId)
+        added.setValue('customer', entry.customerId)
+        added.setValue('site', entry.siteId)
+        added.setValue('cost_type', entry.type)
+        added.setValue('amount', cents(entry.amount))
+        added.insert()
     }
 }
 
