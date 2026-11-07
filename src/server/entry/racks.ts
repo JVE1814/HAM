@@ -63,7 +63,12 @@ function slotsIn(rackId: string, exceptAssetId: string): Slot[] {
     return slots
 }
 
-/** Before rule on alm_hardware: a rack position must be free, inside the rack and within its power budget. */
+/**
+ * Before rule on alm_hardware: a rack position must be free, inside the rack and within its power budget. It checks
+ * against the placements saved so far and takes no lock: one taken here is released before the platform writes the
+ * record, so two saves into the same units at the same moment could still both pass. Placements are entered by hand,
+ * one Asset per save, and no app logic places one, so that is accepted.
+ */
 export function guardRackPlacement(current: GlideRecord, previous: GlideRecord): void {
     const rackId = str(current, 'x_daas_ham_rack')
     if (!rackId || !str(current, 'x_daas_ham_ru_start')) return

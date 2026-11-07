@@ -7,12 +7,14 @@ import type { StockroomType } from '../domain/sourcing'
 import { ROLE } from '../domain/visibility'
 import { awaitsReceipt, putAwayProblem, RECEIVING_STOCKROOM_TYPES, receivingProblem } from '../domain/warehouse'
 import { findAssetByIdentifier, moveAndSave, moveAsset, newAsset, readStage } from '../platform/assets'
+import { withLock, type HeldLock } from '../platform/locks'
 import { loadNormalizationData, resolveModel } from '../platform/normalization'
 import { PROPERTY, stringProperty } from '../platform/properties'
 import { lineAwaitingRma } from '../platform/oem-rma'
 import { purchaseOrderId } from '../platform/procurement'
 import { findById, num, refusal, str } from '../platform/records'
 import { openStagingTask } from '../platform/staging-tasks'
+import { reserveAsset } from '../platform/stock'
 import { nextProviderTag } from '../platform/tags'
 import { receiveReturnedAsset } from './returns'
 import { reply } from '../platform/rest-api'
@@ -79,6 +81,11 @@ export function lookupAsset(request: RESTAPIRequest, response: RESTAPIResponse):
 /**
  * POST /receive { code, stockroom, pid?, manufacturer? }: confirm an in-transit asset (ASN) or create
  * one received without an ASN; tag it and allocate it to an Order line waiting for this purchase.
+ *
+ * Two scans of one unit (two devices, or a rescan while the first is still running) would both find it awaiting
+ * receipt, each take a Provider tag and allocate it. So the receipt is made under a lock on the Asset, from a fresh
+ * read; a scan that finds the lock held saves nothing and is told to scan again, and the rescan finds it received.
+ * Taking the lock throws only when an insert is refused with no lock row (platform/locks); that error escapes.
  */
 export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
@@ -100,9 +107,21 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
         if ('error' in created) return reply(response, 422, created)
         asset = created.asset
     }
+    const assetId = asset.getUniqueValue()
+    // Not the stock lock (platform/stock) the allocation's reservation takes: a second take of a lock is refused.
+    const taken = withLock(`receive_asset_${assetId}`, (lock) => {
+        receiveHolding(lock, response, assetId, input.stockroom)
+    })
+    if (!taken) reply(response, 503, { error: 'Another scan is receiving this unit: scan again' })
+}
+
+/** The receipt, made holding the Asset's `lock`: the stage is read again here, so only one scan receives the unit. */
+function receiveHolding(lock: HeldLock, response: RESTAPIResponse, assetId: string, stockroomId: string): void {
+    const asset = arrivingAsset(assetId)
+    if (!asset) return reply(response, 404, { error: 'No asset with that serial or tag' })
     // A unit coming back from a Site is received ('') or refused, staying pending return (or missing) for a rescan, and
     // its unsaved move is not shown. Any other unit (null) is received as stock below.
-    const returnRefusal = receiveReturnedAsset(asset, input.stockroom)
+    const returnRefusal = receiveReturnedAsset(asset, stockroomId)
     if (returnRefusal) return reply(response, 422, { error: `Not received: ${returnRefusal}` })
     if (returnRefusal === '') return reply(response, 200, summarise(asset))
     const stage = readStage(asset)
@@ -112,11 +131,23 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
     const tag = str(asset, 'asset_tag') || nextProviderTag()
     if (!tag) return reply(response, 503, { error: 'Other receipts are taking Provider tags: scan again' })
     asset.setValue('asset_tag', tag)
-    asset.setValue('stockroom', input.stockroom)
+    asset.setValue('stockroom', stockroomId)
+    // A holder that outlasted the lock (ADR 0013) may overlap the next scan's receipt: it saves only while it holds it.
+    if (!lock.held()) return reply(response, 503, { error: 'Another scan is receiving this unit: scan again' })
     // A refused save leaves the unit in transit or on order for a rescan, and allocates nothing.
     if (!asset.update()) return reply(response, 422, { error: `Not received: ${refusal(asset)}` })
-    allocateToWaitingLine(asset)
-    reply(response, 200, summarise(asset))
+    reply(response, 200, summarise(allocateToWaitingLine(asset)))
+}
+
+/** The Asset read again by sys_id, past the stockroom rule as the scan's lookup was (see `receiveAsset`). */
+function arrivingAsset(assetId: string): GlideRecord | null {
+    const asset = new GlideRecord('alm_hardware')
+    asset.setWorkflow(false)
+    asset.addQuery('sys_id', assetId)
+    asset.query()
+    // Rules back on, so the receipt's saves run the lifecycle, billing and asset-CI rules.
+    asset.setWorkflow(true)
+    return asset.next() ? asset : null
 }
 
 function createReceivedAsset(input: Record<string, string>): { asset: GlideRecord } | { error: string } {
@@ -132,15 +163,15 @@ function createReceivedAsset(input: Record<string, string>): { asset: GlideRecor
 
 /**
  * A received purchase (or OEM advance replacement, announced with its RMA number in the PO field)
- * goes straight to the Order line waiting for it.
+ * goes straight to the Order line waiting for it. Returns the Asset as it now stands, for the reply.
  */
-function allocateToWaitingLine(asset: GlideRecord): void {
+function allocateToWaitingLine(asset: GlideRecord): GlideRecord {
     const poNumber = str(asset, 'po_number')
-    if (!poNumber) return
+    if (!poNumber) return asset
     const line = new GlideRecord('x_daas_ham_order_line')
     const viaRma = lineAwaitingRma(poNumber, str(asset, 'model'))
     if (viaRma) {
-        if (!line.get(viaRma.lineId)) return
+        if (!line.get(viaRma.lineId)) return asset
         const rma = findById('x_daas_ham_oem_rma', viaRma.rmaId)
         rma?.setValue('state', 'replacement_received')
         rma?.setValue('replacement_serial', str(asset, 'serial_number'))
@@ -151,32 +182,36 @@ function allocateToWaitingLine(asset: GlideRecord): void {
     } else {
         // A line lists every purchase order it raised, so units of an earlier one still find it.
         const poId = purchaseOrderId(poNumber)
-        if (!poId) return
+        if (!poId) return asset
         line.addQuery('purchase_orders', 'CONTAINS', poId)
         line.addQuery('model', str(asset, 'model'))
         line.addQuery('line_stage', 'awaiting_stock')
         line.setLimit(1)
         line.query()
-        if (!line.next()) return
+        if (!line.next()) return asset
         // Arrived, so no longer on order: re-sourcing covers quantity - allocated - on order and must not wait for it.
         // A refused count is logged to correct by hand; the unit still goes to the line, which would otherwise wait.
         line.setValue('quantity_to_purchase', Math.max(0, num(line, 'quantity_to_purchase') - 1))
         if (!line.update()) gs.warn(`[x_daas_ham] ${str(line, 'number')} keeps a unit on order: ${refusal(line)}`)
     }
-    if (!moveAsset(asset, 'reserved').allowed) return
-    asset.setValue('x_daas_ham_order_line', line.getUniqueValue())
-    asset.setValue('company', str(line, 'order.customer'))
-    asset.setValue('x_daas_ham_agreement', str(line, 'order.agreement'))
-    if (!asset.update()) {
+    // Received, the unit is free stock a sourcing run may pick too, so it is reserved the way sourcing claims stock:
+    // under the Asset's stock lock, from a fresh read (platform/stock). Only one of them gets it.
+    const reserved = reserveAsset(asset.getUniqueValue(), {
+        orderLineId: line.getUniqueValue(),
+        customerId: str(line, 'order.customer'),
+        agreementId: str(line, 'order.agreement'),
+    })
+    if (!reserved) {
         // The receipt is saved; the reservation is not, so no Staging task opens and the reply shows the unit as saved.
-        gs.warn(`[x_daas_ham] Received ${str(asset, 'serial_number')} not reserved for its Order line: ${refusal(asset)}`)
-        asset.get(asset.getUniqueValue())
-        return
+        const why = 'another run claimed it, or the save was refused'
+        gs.warn(`[x_daas_ham] Received ${str(asset, 'serial_number')} not reserved for ${str(line, 'number')}: ${why}`)
+        return asset
     }
     // Without its Staging task the Asset stays reserved for the line, not staging with no task to finish. A refused
-    // move (moveAndSave warns) leaves it reserved too, so it is read again for the reply, as above.
-    if (!openStagingTask(asset, line.getUniqueValue())) return
-    if (!moveAndSave(asset, 'staging', 'receiving')) asset.get(asset.getUniqueValue())
+    // move (moveAndSave warns) leaves it reserved too, so it is read again for the reply.
+    if (!openStagingTask(reserved, line.getUniqueValue())) return reserved
+    if (!moveAndSave(reserved, 'staging', 'receiving')) reserved.get(reserved.getUniqueValue())
+    return reserved
 }
 
 /** POST /putaway { code, stockroom }: record the stockroom an in-stock asset now sits in, when it is free to move there. */
