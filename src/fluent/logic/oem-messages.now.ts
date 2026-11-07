@@ -7,7 +7,10 @@ import { RestMessage } from '@servicenow/sdk/core'
  *   via id.cisco.com; FortiCloud IAM API user with client_id "assetmanagement").
  * - Meraki and Mist: API key / token in the password2 properties x_daas_ham.meraki.api_key and
  *   x_daas_ham.mist.api_token (substituted into the header at call time).
- * Function names are the ones domain/oem/adapters.ts calls.
+ * - Meraki and Mist API hosts: ${meraki_host} / ${mist_host} in each function endpoint, from the string
+ *   properties x_daas_ham.meraki.api_host and x_daas_ham.mist.api_host (regional clouds); the message
+ *   endpoint is the documented default.
+ * Function names are the ones domain/oem/adapters.ts and domain/oem/claims.ts call.
  */
 
 RestMessage({
@@ -49,9 +52,10 @@ RestMessage({
         {
             name: 'inventory_by_model',
             httpMethod: 'GET',
-            endpoint: 'https://api.meraki.com/api/v1/organizations/${org_id}/inventory/devices?models[]=${model}',
+            endpoint: 'https://${meraki_host}/api/v1/organizations/${org_id}/inventory/devices?models[]=${model}',
             headers: [{ $id: Now.ID['rm_meraki_auth'], name: 'Authorization', value: 'Bearer ${api_key}' }],
             variables: [
+                { $id: Now.ID['rm_meraki_host'], name: 'meraki_host' },
                 { $id: Now.ID['rm_meraki_org'], name: 'org_id' },
                 { $id: Now.ID['rm_meraki_model'], name: 'model' },
                 { $id: Now.ID['rm_meraki_key'], name: 'api_key' },
@@ -60,12 +64,13 @@ RestMessage({
         {
             name: 'claim_inventory',
             httpMethod: 'POST',
-            endpoint: 'https://api.meraki.com/api/v1/organizations/${org_id}/inventory/claim',
+            endpoint: 'https://${meraki_host}/api/v1/organizations/${org_id}/inventory/claim',
             headers: [
                 { $id: Now.ID['rm_meraki_claim_auth'], name: 'Authorization', value: 'Bearer ${api_key}' },
                 { $id: Now.ID['rm_meraki_claim_ct'], name: 'Content-Type', value: 'application/json' },
             ],
             variables: [
+                { $id: Now.ID['rm_meraki_claim_host'], name: 'meraki_host' },
                 { $id: Now.ID['rm_meraki_claim_org'], name: 'org_id' },
                 { $id: Now.ID['rm_meraki_claim_key'], name: 'api_key' },
             ],
@@ -109,9 +114,10 @@ RestMessage({
         {
             name: 'jsi_by_model',
             httpMethod: 'GET',
-            endpoint: 'https://api.mist.com/api/v1/orgs/${org_id}/jsi/inventory?model=${model}',
+            endpoint: 'https://${mist_host}/api/v1/orgs/${org_id}/jsi/inventory?model=${model}',
             headers: [{ $id: Now.ID['rm_mist_auth_model'], name: 'Authorization', value: 'Token ${api_token}' }],
             variables: [
+                { $id: Now.ID['rm_mist_host_m'], name: 'mist_host' },
                 { $id: Now.ID['rm_mist_org_m'], name: 'org_id' },
                 { $id: Now.ID['rm_mist_model'], name: 'model' },
                 { $id: Now.ID['rm_mist_token_m'], name: 'api_token' },
@@ -120,9 +126,10 @@ RestMessage({
         {
             name: 'jsi_by_serial',
             httpMethod: 'GET',
-            endpoint: 'https://api.mist.com/api/v1/orgs/${org_id}/jsi/inventory?serial=${serial}',
+            endpoint: 'https://${mist_host}/api/v1/orgs/${org_id}/jsi/inventory?serial=${serial}',
             headers: [{ $id: Now.ID['rm_mist_auth_serial'], name: 'Authorization', value: 'Token ${api_token}' }],
             variables: [
+                { $id: Now.ID['rm_mist_host_s'], name: 'mist_host' },
                 { $id: Now.ID['rm_mist_org_s'], name: 'org_id' },
                 { $id: Now.ID['rm_mist_serial'], name: 'serial' },
                 { $id: Now.ID['rm_mist_token_s'], name: 'api_token' },
@@ -131,12 +138,13 @@ RestMessage({
         {
             name: 'claim_inventory',
             httpMethod: 'POST',
-            endpoint: 'https://api.mist.com/api/v1/orgs/${org_id}/inventory',
+            endpoint: 'https://${mist_host}/api/v1/orgs/${org_id}/inventory',
             headers: [
                 { $id: Now.ID['rm_mist_claim_auth'], name: 'Authorization', value: 'Token ${api_token}' },
                 { $id: Now.ID['rm_mist_claim_ct'], name: 'Content-Type', value: 'application/json' },
             ],
             variables: [
+                { $id: Now.ID['rm_mist_host_claim'], name: 'mist_host' },
                 { $id: Now.ID['rm_mist_claim_org'], name: 'org_id' },
                 { $id: Now.ID['rm_mist_claim_token'], name: 'api_token' },
             ],
@@ -146,8 +154,13 @@ RestMessage({
 
 /*
  * Claim and provisioning (P3.27). GreenLake and FortiZTP authenticate with an OAuth 2.0 profile
- * attached on the instance; Check Point Zero Touch takes the key in x_daas_ham.checkpoint.api_key.
- * The Check Point endpoint is the one to confirm against the tenant's Zero Touch API documentation.
+ * attached on the instance:
+ * - GreenLake: Client Credentials grant, token URL
+ *   https://global.api.greenlake.hpe.com/authorization/v2/oauth2/<workspaceId>/token; the API client's
+ *   user needs Devices and Subscription edit permission.
+ * Check Point Zero Touch logs in per run with the password2 properties x_daas_ham.checkpoint.api_client_id
+ * and x_daas_ham.checkpoint.api_key (substituted into the login body) and sends the returned sid as
+ * X-chkp-sid until it logs out.
  */
 
 RestMessage({
@@ -172,6 +185,8 @@ RestMessage({
             name: 'assign_subscription',
             httpMethod: 'PATCH',
             endpoint: 'https://global.api.greenlake.hpe.com/devices/v1/devices?id=${device_id}',
+            // patchDevicesV1 accepts only merge-patch JSON; this overrides the message's Content-Type.
+            headers: [{ $id: Now.ID['rm_greenlake_patch_ct'], name: 'Content-Type', value: 'application/merge-patch+json' }],
             variables: [{ $id: Now.ID['rm_greenlake_device'], name: 'device_id' }],
         },
     ],
@@ -200,19 +215,36 @@ RestMessage({
 RestMessage({
     $id: Now.ID['rm_checkpoint_zt'],
     name: 'NaaS Check Point Zero Touch',
-    endpoint: 'https://zerotouch.checkpoint.com/api/v1',
-    description: 'Check Point Zero Touch: assign Quantum Spark gateways to a customer template.',
+    endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2',
+    description: 'Check Point Zero Touch web API v2: log in, claim Small Office (Quantum Spark) gateways with a customer template, log out.',
     headers: [
         { $id: Now.ID['rm_checkpoint_accept'], name: 'Accept', value: 'application/json' },
         { $id: Now.ID['rm_checkpoint_ct'], name: 'Content-Type', value: 'application/json' },
     ],
     functions: [
         {
-            name: 'assign_gateway',
+            name: 'login',
             httpMethod: 'POST',
-            endpoint: 'https://zerotouch.checkpoint.com/api/v1/gateways',
-            headers: [{ $id: Now.ID['rm_checkpoint_key_header'], name: 'X-API-Key', value: '${api_key}' }],
-            variables: [{ $id: Now.ID['rm_checkpoint_key'], name: 'api_key' }],
+            endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/login',
+            content: '{"api-client-id":"${api_client_id}","api-key":"${api_key}"}',
+            variables: [
+                { $id: Now.ID['rm_checkpoint_login_client_id'], name: 'api_client_id' },
+                { $id: Now.ID['rm_checkpoint_login_key'], name: 'api_key' },
+            ],
+        },
+        {
+            name: 'claim_gateway',
+            httpMethod: 'POST',
+            endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/claim-gateway',
+            headers: [{ $id: Now.ID['rm_checkpoint_claim_sid_header'], name: 'X-chkp-sid', value: '${sid}' }],
+            variables: [{ $id: Now.ID['rm_checkpoint_claim_sid'], name: 'sid' }],
+        },
+        {
+            name: 'logout',
+            httpMethod: 'POST',
+            endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/logout',
+            headers: [{ $id: Now.ID['rm_checkpoint_logout_sid_header'], name: 'X-chkp-sid', value: '${sid}' }],
+            variables: [{ $id: Now.ID['rm_checkpoint_logout_sid'], name: 'sid' }],
         },
     ],
 })

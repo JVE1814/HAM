@@ -153,7 +153,7 @@ export const x_daas_ham_cloud_account = Table({
                 mist: { label: 'HPE Mist (org id)', sequence: 1 },
                 aruba: { label: 'HPE GreenLake (subscription id)', sequence: 2 },
                 fortinet: { label: 'FortiZTP (FortiManager OID)', sequence: 3 },
-                checkpoint: { label: 'Check Point Zero Touch (template)', sequence: 4 },
+                checkpoint: { label: 'Check Point Zero Touch (User Center account id/template id)', sequence: 4 },
             },
             mandatory: true,
             dropdown: 'dropdown_without_none',

@@ -149,6 +149,26 @@ Property({
 })
 
 Property({
+    $id: Now.ID['prop_meraki_host'],
+    name: 'x_daas_ham.meraki.api_host',
+    type: 'string',
+    value: 'api.meraki.com',
+    description:
+        'Meraki Dashboard API host: api.meraki.com in most of the world; api.meraki.ca (Canada), api.meraki.cn (China), api.meraki.in (India), api.gov-meraki.com (US FedRAMP).',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_mist_host'],
+    name: 'x_daas_ham.mist.api_host',
+    type: 'string',
+    value: 'api.mist.com',
+    description:
+        'HPE Mist API host of the cloud the orgs are on: the portal host with "manage" replaced by "api" (e.g. api.mist.com Global 01, api.gc1.mist.com Global 02, api.eu.mist.com EMEA 01, api.ac5.mist.com APAC 01). All orgs in x_daas_ham.mist.org_ids must be on this cloud.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
     $id: Now.ID['prop_meraki_key'],
     name: 'x_daas_ham.meraki.api_key',
     type: 'password2',
@@ -162,7 +182,7 @@ Property({
     name: 'x_daas_ham.mist.api_token',
     type: 'password2',
     value: '',
-    description: 'HPE Mist API token.',
+    description: 'HPE Mist org API token (Mist removes a token unused for 90 days).',
     roles: { read: [admin], write: [admin] },
 })
 

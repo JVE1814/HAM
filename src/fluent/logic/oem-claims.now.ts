@@ -66,7 +66,16 @@ Property({
     name: 'x_daas_ham.oem.claim.checkpoint.enabled',
     type: 'boolean',
     value: false,
-    description: 'Assign Check Point gateways to their Zero Touch template during staging.',
+    description: 'Claim Check Point gateways in Zero Touch with their customer template during staging.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_checkpoint_client_id'],
+    name: 'x_daas_ham.checkpoint.api_client_id',
+    type: 'password2',
+    value: '',
+    description: 'Check Point Zero Touch API Client ID.',
     roles: { read: [admin], write: [admin] },
 })
 
@@ -75,6 +84,6 @@ Property({
     name: 'x_daas_ham.checkpoint.api_key',
     type: 'password2',
     value: '',
-    description: 'Check Point Zero Touch API key.',
+    description: 'Check Point Zero Touch API Key (expires after 1-180 days; regenerate in Zero Touch portal > Manage API Key).',
     roles: { read: [admin], write: [admin] },
 })

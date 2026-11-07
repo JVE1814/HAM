@@ -17,7 +17,7 @@ export interface ClaimTarget {
     serial: string
     mac: string
     claimCode: string
-    /** The Customer's cloud account the device goes to (org, subscription, FortiManager, template); '' where the call needs none. */
+    /** The Customer's cloud account the device goes to (org, subscription, FortiManager, Zero Touch "<account id>/<template id>"); '' where the call needs none. */
     account: string
 }
 
@@ -50,12 +50,14 @@ interface ClaimRoute {
 const MERAKI_CLAIM_BATCH = 50
 /** Claim codes per Mist claim call. */
 const MIST_CLAIM_BATCH = 100
-/** Devices per GreenLake add call. */
-const GREENLAKE_ADD_BATCH = 25
+/** Devices per GreenLake add call (at most five, counting network, compute and storage devices together). */
+const GREENLAKE_ADD_BATCH = 5
 /** GreenLake subscription assignment: find the device, then PATCH it. */
 const GREENLAKE_SUBSCRIBE_CALLS = 2
 /** Registration units per FortiCloud register call. */
 const FORTICLOUD_REGISTER_BATCH = 10
+/** Check Point Zero Touch: the login and logout calls around a session's claim-gateway calls. */
+const ZERO_TOUCH_SESSION_CALLS = 2
 
 /** Group targets by account, then cut each group into chunks of `size`. */
 function batches(targets: readonly ClaimTarget[], size: number): ClaimTarget[][] {
@@ -121,16 +123,26 @@ const merakiClaim: ClaimAdapter = (targets, http, maxCalls) => {
             outcomes.push(...fail(batch, errorText(response.status, response.body)))
             continue
         }
-        const claimed = new Set(asArray(field(parseJson(response.body), 'serials')).map((s) => text(s).toUpperCase()))
+        // Only a missing serials field is unknown (counted as done); an explicit [] means nothing was claimed.
+        const returned = field(parseJson(response.body), 'serials')
+        const claimed = new Set(asArray(returned).map((s) => text(s).toUpperCase()))
         for (const t of batch) {
-            const done = claimed.size === 0 || claimed.has(t.serial.toUpperCase())
+            const done = !Array.isArray(returned) || claimed.has(t.serial.toUpperCase())
             outcomes.push({ stepId: t.stepId, ok: done, message: done ? `claimed into Meraki org ${t.account}` : 'not in the claimed serials' })
         }
     }
     return { outcomes, calls }
 }
 
-/** HPE Mist: POST /orgs/{org}/inventory [claim codes]; already-claimed (duplicated) codes count as done. */
+/** A Mist claim code without separators, upper case (inventory `magic` values carry no dashes). */
+function claimCodeKey(code: unknown): string {
+    return text(code).replace(/[^A-Z0-9]/gi, '').toUpperCase()
+}
+
+/**
+ * HPE Mist: POST /orgs/{org}/inventory [claim codes]; already-claimed (duplicated) codes count as done.
+ * A 400 carries the same per-code result (added, duplicated, error, reason) when no code was valid.
+ */
 const mistClaim: ClaimAdapter = (targets, http, maxCalls) => {
     const { usable, outcomes } = unusable(targets, 'claimCode')
     let calls = 0
@@ -138,38 +150,46 @@ const mistClaim: ClaimAdapter = (targets, http, maxCalls) => {
         if (calls >= maxCalls) break
         calls++
         const response = http({ fn: 'claim_inventory', params: { org_id: batch[0].account }, body: JSON.stringify(batch.map((t) => t.claimCode)) })
-        if (!isSuccess(response.status)) {
+        const json = parseJson(response.body)
+        const hasResult = ['added', 'duplicated', 'error'].some((k) => Array.isArray(field(json, k)))
+        if (!isSuccess(response.status) && !(response.status === 400 && hasResult)) {
             outcomes.push(...fail(batch, errorText(response.status, response.body)))
             continue
         }
-        const json = parseJson(response.body)
-        const accepted = new Set([...asArray(field(json, 'added')), ...asArray(field(json, 'duplicated'))].map((c) => text(c).toUpperCase()))
-        const errors = asArray(field(json, 'error')).map((c) => text(c).toUpperCase())
+        const accepted = new Set([...asArray(field(json, 'added')), ...asArray(field(json, 'duplicated'))].map(claimCodeKey))
+        const errors = asArray(field(json, 'error')).map(claimCodeKey)
         const reasons = asArray(field(json, 'reason')).map(text)
         for (const t of batch) {
-            const code = t.claimCode.toUpperCase()
+            const code = claimCodeKey(t.claimCode)
+            const index = errors.indexOf(code)
+            // reason[] is not documented as parallel to error[]: pair them only when the lengths agree.
+            const reason = index < 0 ? '' : reasons.length === errors.length ? reasons[index] : reasons.join('; ')
             if (accepted.has(code)) outcomes.push({ stepId: t.stepId, ok: true, message: `claimed into Mist org ${t.account}` })
-            else outcomes.push({ stepId: t.stepId, ok: false, message: reasons[errors.indexOf(code)] || 'claim code not accepted' })
+            else outcomes.push({ stepId: t.stepId, ok: false, message: reason || 'claim code not accepted' })
         }
     }
     return { outcomes, calls }
 }
 
-/** HPE GreenLake: POST /devices/v1/devices { network: [{ serialNumber, macAddress }] } into the Provider's workspace (202). */
+/** HPE GreenLake: POST /devices/v1/devices { network: [{ serialNumber, macAddress }], compute: [], storage: [] } into the Provider's workspace (202), five devices per call. */
 const greenLakeAdd: ClaimAdapter = (targets, http, maxCalls) => {
     const { usable, outcomes } = unusable(targets, 'mac', false)
     let calls = 0
     for (const batch of batches(usable, GREENLAKE_ADD_BATCH)) {
         if (calls >= maxCalls) break
         calls++
-        const body = JSON.stringify({ network: batch.map((t) => ({ serialNumber: t.serial, macAddress: t.mac })) })
+        const body = JSON.stringify({ network: batch.map((t) => ({ serialNumber: t.serial, macAddress: t.mac })), compute: [], storage: [] })
         const response = http({ fn: 'add_devices', params: {}, body })
         outcomes.push(...batch.map((t) => outcome(t, response, 'added to the GreenLake workspace')))
     }
     return { outcomes, calls }
 }
 
-/** HPE GreenLake: find the device by serial, then PATCH its subscription (GREENLAKE_SUBSCRIBE_CALLS = these two calls). */
+/**
+ * HPE GreenLake: find the device by serial, then PATCH its subscription (GREENLAKE_SUBSCRIBE_CALLS = these two calls).
+ * The PATCH is asynchronous (202), so a device found already carrying the subscription id is done without a PATCH:
+ * a re-run confirms the assignment.
+ */
 const greenLakeSubscribe: ClaimAdapter = (targets, http, maxCalls) => {
     const { usable, outcomes } = unusable(targets, 'serial')
     let calls = 0
@@ -177,9 +197,14 @@ const greenLakeSubscribe: ClaimAdapter = (targets, http, maxCalls) => {
         if (calls + GREENLAKE_SUBSCRIBE_CALLS > maxCalls) break
         calls++
         const found = http({ fn: 'find_device', params: { serial: t.serial } })
-        const deviceId = isSuccess(found.status) ? text(field(asArray(field(parseJson(found.body), 'items'))[0], 'id')) : ''
+        const device = isSuccess(found.status) ? asArray(field(parseJson(found.body), 'items'))[0] : undefined
+        const deviceId = text(field(device, 'id'))
         if (!deviceId) {
             outcomes.push({ stepId: t.stepId, ok: false, message: isSuccess(found.status) ? 'device not in the GreenLake workspace yet' : errorText(found.status, found.body) })
+            continue
+        }
+        if (asArray(field(device, 'subscription')).some((s) => text(field(s, 'id')).toLowerCase() === t.account.toLowerCase())) {
+            outcomes.push({ stepId: t.stepId, ok: true, message: `subscription ${t.account} assigned` })
             continue
         }
         calls++
@@ -219,11 +244,41 @@ const fortiZtp = perDevice(
     (t) => `provisioned to FortiManager ${t.account}`,
 )
 
-/** Check Point Zero Touch: assign a gateway to its customer template. */
-const checkPointZeroTouch = perDevice(
-    (t) => ({ fn: 'assign_gateway', params: {}, body: JSON.stringify({ serialNumber: t.serial, template: t.account }) }),
-    (t) => `assigned to Zero Touch template ${t.account}`,
-)
+/** A Zero Touch cloud account "<User Center account id>/<template id>" as numbers; undefined when it is not. */
+function zeroTouchAccount(account: string): { accountId: number; templateId: number } | undefined {
+    const parts = account.split('/').map((p) => p.trim())
+    return parts.length === 2 && parts.every((p) => /^\d+$/.test(p)) ? { accountId: Number(parts[0]), templateId: Number(parts[1]) } : undefined
+}
+
+/**
+ * Check Point Zero Touch web API v2, one session per run: login (API client id and key) returns a sid sent
+ * as X-chkp-sid; then claim-gateway { object-name: serial, account-id, template-id, mac } per gateway; then
+ * logout. Login and logout count against the budget, so a run needs at least three calls.
+ */
+const checkPointZeroTouch: ClaimAdapter = (targets, http, maxCalls) => {
+    const { usable, outcomes } = unusable(targets, 'mac')
+    const claims: Array<{ target: ClaimTarget; accountId: number; templateId: number }> = []
+    for (const t of usable) {
+        const account = zeroTouchAccount(t.account)
+        if (account) claims.push({ target: t, ...account })
+        else outcomes.push({ stepId: t.stepId, ok: false, message: 'cloud account must be "<User Center account id>/<template id>"' })
+    }
+    const reachable = claims.slice(0, Math.max(0, maxCalls - ZERO_TOUCH_SESSION_CALLS))
+    if (reachable.length === 0) return { outcomes, calls: 0 }
+    const login = http({ fn: 'login', params: {} })
+    const sid = isSuccess(login.status) ? text(field(parseJson(login.body), 'sid')) : ''
+    if (!sid) {
+        const reason = isSuccess(login.status) ? 'no session id returned' : errorText(login.status, login.body)
+        outcomes.push(...fail(reachable.map((c) => c.target), `Zero Touch login failed: ${reason}`))
+        return { outcomes, calls: 1 }
+    }
+    for (const { target, accountId, templateId } of reachable) {
+        const body = JSON.stringify({ 'object-name': target.serial, 'account-id': accountId, 'template-id': templateId, mac: target.mac })
+        outcomes.push(outcome(target, http({ fn: 'claim_gateway', params: { sid }, body }), `claimed with Zero Touch template ${templateId}`))
+    }
+    http({ fn: 'logout', params: { sid } })
+    return { outcomes, calls: reachable.length + ZERO_TOUCH_SESSION_CALLS }
+}
 
 /** Which vendor can do which step, through which REST message. Cisco PnP has no public API. */
 export const CLAIM_ROUTES: Partial<Record<OemVendor, Partial<Record<ClaimAction, ClaimRoute>>>> = {

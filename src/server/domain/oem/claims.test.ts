@@ -22,19 +22,33 @@ const target = (stepId: string, overrides: Partial<ClaimTarget> = {}): ClaimTarg
     ...overrides,
 })
 
+const many = (prefix: string, count: number, accounts = 1): ClaimTarget[] =>
+    Array.from({ length: count }, (_, i) => target(`${prefix}${i}`, { account: `acct${i % accounts}` }))
+
 describe('Meraki claim', () => {
     const run = CLAIM_ROUTES.meraki!.oem_claim!.run
 
     it('claims serials per org and ticks the ones returned', () => {
-        const { http, calls } = fake([{ status: 200, body: JSON.stringify({ serials: ['Q2XX-A'] }) }])
+        // claimIntoOrganizationInventory 200: { orders, serials (the serials claimed), licenses }
+        const { http, calls } = fake([{ status: 200, body: JSON.stringify({ orders: [], serials: ['q2xx-a'], licenses: [] }) }])
         const result = run([target('A'), target('B')], http, 10)
         expect(calls).toHaveLength(1)
         expect(calls[0]).toMatchObject({ fn: 'claim_inventory', params: { org_id: 'org1' } })
         expect(JSON.parse(calls[0].body ?? '')).toEqual({ serials: ['Q2XX-A', 'Q2XX-B'] })
-        expect(result.outcomes.map((o) => [o.stepId, o.ok])).toEqual([
-            ['A', true],
-            ['B', false],
+        expect(result.outcomes).toEqual([
+            { stepId: 'A', ok: true, message: 'claimed into Meraki org org1' },
+            { stepId: 'B', ok: false, message: 'not in the claimed serials' },
         ])
+    })
+
+    it('reads an explicit empty serials list as nothing claimed', () => {
+        const { http } = fake([{ status: 200, body: JSON.stringify({ orders: [], serials: [], licenses: [] }) }])
+        expect(run([target('A')], http, 10).outcomes).toEqual([{ stepId: 'A', ok: false, message: 'not in the claimed serials' }])
+    })
+
+    it('counts the batch as claimed only when the response has no serials field', () => {
+        const { http } = fake([{ status: 200, body: '' }])
+        expect(run([target('A'), target('B')], http, 10).outcomes.map((o) => o.ok)).toEqual([true, true])
     })
 
     it('stops at the call budget and leaves the rest for the next run', () => {
@@ -57,16 +71,50 @@ describe('Meraki claim', () => {
 describe('Mist claim', () => {
     const run = CLAIM_ROUTES.mist!.oem_claim!.run
 
+    /** A response_inventory body (addOrgInventory, 200 and 400). */
+    const inventory = (result: { added?: string[]; duplicated?: string[]; error?: string[]; reason?: string[] }) =>
+        JSON.stringify({ added: [], duplicated: [], error: [], reason: [], inventory_added: [], inventory_duplicated: [], ...result })
+
     it('counts added and duplicated codes as done and reports the reason for errors', () => {
         const { http, calls } = fake([
-            { status: 200, body: JSON.stringify({ added: ['CODEA'], duplicated: ['CODEB'], error: ['CODEC'], reason: ['invalid claim code'] }) },
+            { status: 200, body: inventory({ added: ['CODEA'], duplicated: ['CODEB'], error: ['CODEC'], reason: ['invalid claim code'] }) },
         ])
         const result = run([target('A'), target('B'), target('C')], http, 5)
+        expect(calls[0]).toMatchObject({ fn: 'claim_inventory', params: { org_id: 'org1' } })
         expect(JSON.parse(calls[0].body ?? '')).toEqual(['CODEA', 'CODEB', 'CODEC'])
         expect(result.outcomes.map((o) => [o.stepId, o.ok, o.message])).toEqual([
             ['A', true, 'claimed into Mist org org1'],
             ['B', true, 'claimed into Mist org org1'],
             ['C', false, 'invalid claim code'],
+        ])
+    })
+
+    it('reads the per-code result of a 400 (no code valid) instead of failing the batch', () => {
+        const { http } = fake([{ status: 400, body: inventory({ duplicated: ['CODEA'], error: ['CODEB'], reason: ['claim code already used'] }) }])
+        expect(run([target('A'), target('B')], http, 5).outcomes).toEqual([
+            { stepId: 'A', ok: true, message: 'claimed into Mist org org1' },
+            { stepId: 'B', ok: false, message: 'claim code already used' },
+        ])
+    })
+
+    it('fails the batch on an error without a per-code result', () => {
+        const { http } = fake([{ status: 400, body: JSON.stringify({ detail: 'invalid org' }) }])
+        expect(run([target('A'), target('B')], http, 5).outcomes.map((o) => o.message)).toEqual(['HTTP 400: invalid org', 'HTTP 400: invalid org'])
+    })
+
+    it('joins the reasons when they are not one per rejected code', () => {
+        const { http } = fake([{ status: 400, body: inventory({ error: ['CODEA', 'CODEB', 'CODEC'], reason: ['invalid claim code', 'claim code already used'] }) }])
+        const result = run([target('A'), target('B'), target('C')], http, 5)
+        expect(result.outcomes.map((o) => o.message)).toEqual(Array(3).fill('invalid claim code; claim code already used'))
+    })
+
+    it('matches claim codes without separators and case', () => {
+        const { http, calls } = fake([{ status: 200, body: inventory({ added: ['6JG8EPTFV2A9Z2N'], error: ['DVH4VSNMSZPDXBR'], reason: ['invalid claim code'] }) }])
+        const result = run([target('A', { claimCode: '6jg8e-ptfv2-a9z2n' }), target('B', { claimCode: 'DVH4V-SNMSZ-PDXBR' })], http, 5)
+        expect(JSON.parse(calls[0].body ?? '')).toEqual(['6jg8e-ptfv2-a9z2n', 'DVH4V-SNMSZ-PDXBR'])
+        expect(result.outcomes.map((o) => [o.stepId, o.ok, o.message])).toEqual([
+            ['A', true, 'claimed into Mist org org1'],
+            ['B', false, 'invalid claim code'],
         ])
     })
 
@@ -87,23 +135,56 @@ describe('GreenLake', () => {
         ])
     })
 
-    it('adds network devices with serial and MAC', () => {
-        const { http, calls } = fake([{ status: 202, body: '' }])
+    /** postDevicesV1 202: progress at the Location URL; body { code, status, transactionId }. */
+    const accepted = { status: 202, body: JSON.stringify({ code: 202, status: 'Accepted', transactionId: 'tx-1' }) }
+    const SUB = '6b1a3b8e-0c1d-4c3e-9f7a-2d5e8b9c0a11'
+    /** getDevicesV1 200: { items: [{ id, serialNumber, partNumber, type, subscription: [{ id, key, tier }] }], count, offset, total }. */
+    const devices = (subscription: Array<{ id: string; key: string; tier?: string }> = []) => ({
+        status: 200,
+        body: JSON.stringify({
+            items: [{ id: 'f3c1b2a0-1111-4222-8333-444455556666', serialNumber: 'Q2XX-A', partNumber: 'R4W02A', type: 'devices/device', subscription }],
+            count: 1,
+            offset: 0,
+            total: 1,
+        }),
+    })
+
+    it('adds network devices with serial and MAC, with the required compute and storage lists empty', () => {
+        const { http, calls } = fake([accepted])
         const result = CLAIM_ROUTES.aruba!.oem_claim!.run([target('A', { account: '' })], http, 5)
-        expect(JSON.parse(calls[0].body ?? '')).toEqual({ network: [{ serialNumber: 'Q2XX-A', macAddress: '00:11:22:33:44:55' }] })
-        expect(result.outcomes[0].ok).toBe(true)
+        expect(calls[0]).toMatchObject({ fn: 'add_devices', params: {} })
+        expect(JSON.parse(calls[0].body ?? '')).toEqual({ network: [{ serialNumber: 'Q2XX-A', macAddress: '00:11:22:33:44:55' }], compute: [], storage: [] })
+        expect(result.outcomes[0]).toEqual({ stepId: 'A', ok: true, message: 'added to the GreenLake workspace' })
+    })
+
+    it('adds at most five devices per call', () => {
+        const { http, calls } = fake([accepted])
+        const result = CLAIM_ROUTES.aruba!.oem_claim!.run(many('A', 6), http, 5)
+        expect(calls.map((c) => JSON.parse(c.body ?? '').network.length)).toEqual([5, 1])
+        expect(result.calls).toBe(2)
     })
 
     it('assigns the subscription after finding the device, two calls each', () => {
-        const { http, calls } = fake([
-            { status: 200, body: JSON.stringify({ items: [{ id: 'dev-1' }] }) },
-            { status: 202, body: '' },
-        ])
-        const result = CLAIM_ROUTES.aruba!.oem_licence!.run([target('A', { account: 'sub-9' }), target('B', { account: 'sub-9' })], http, 3)
+        const { http, calls } = fake([devices(), accepted])
+        const result = CLAIM_ROUTES.aruba!.oem_licence!.run([target('A', { account: SUB }), target('B', { account: SUB })], http, 3)
         expect(calls.map((c) => c.fn)).toEqual(['find_device', 'assign_subscription'])
-        expect(calls[1]).toMatchObject({ params: { device_id: 'dev-1' } })
-        expect(JSON.parse(calls[1].body ?? '')).toEqual({ subscription: [{ id: 'sub-9' }] })
-        expect(result).toEqual({ outcomes: [{ stepId: 'A', ok: true, message: 'subscription sub-9 assigned' }], calls: 2 })
+        expect(calls[0]).toMatchObject({ params: { serial: 'Q2XX-A' } })
+        expect(calls[1]).toMatchObject({ params: { device_id: 'f3c1b2a0-1111-4222-8333-444455556666' } })
+        expect(JSON.parse(calls[1].body ?? '')).toEqual({ subscription: [{ id: SUB }] })
+        expect(result).toEqual({ outcomes: [{ stepId: 'A', ok: true, message: `subscription ${SUB} assigned` }], calls: 2 })
+    })
+
+    it('ticks a device that already carries the subscription id without a PATCH', () => {
+        const { http, calls } = fake([devices([{ id: SUB.toUpperCase(), key: 'SIEIAASTEST018ID', tier: 'FOUNDATION_AP' }])])
+        const result = CLAIM_ROUTES.aruba!.oem_licence!.run([target('A', { account: SUB })], http, 5)
+        expect(calls.map((c) => c.fn)).toEqual(['find_device'])
+        expect(result).toEqual({ outcomes: [{ stepId: 'A', ok: true, message: `subscription ${SUB} assigned` }], calls: 1 })
+    })
+
+    it('still assigns when the device only carries another subscription (the key is not the id)', () => {
+        const { http, calls } = fake([devices([{ id: 'aaaaaaaa-0000-4000-8000-000000000000', key: SUB }]), accepted])
+        CLAIM_ROUTES.aruba!.oem_licence!.run([target('A', { account: SUB })], http, 5)
+        expect(calls.map((c) => c.fn)).toEqual(['find_device', 'assign_subscription'])
     })
 
     it('waits while the device is not in the workspace yet', () => {
@@ -149,11 +230,78 @@ describe('Fortinet', () => {
 })
 
 describe('Check Point Zero Touch', () => {
-    it('assigns the gateway to the customer template', () => {
-        const { http, calls } = fake([{ status: 500, body: JSON.stringify({ message: 'Unknown template' }) }])
-        const result = CLAIM_ROUTES.checkpoint!.oem_ztp!.run([target('A', { account: 'branch-tpl' })], http, 5)
-        expect(JSON.parse(calls[0].body ?? '')).toEqual({ serialNumber: 'Q2XX-A', template: 'branch-tpl' })
-        expect(result.outcomes[0]).toEqual({ stepId: 'A', ok: false, message: 'HTTP 500: Unknown template' })
+    const run = CLAIM_ROUTES.checkpoint!.oem_ztp!.run
+    /** web_api/v2 login 200: { sid, user, url, last-login-was-at }. */
+    const loggedIn = { status: 200, body: JSON.stringify({ sid: 'aB3+x/9=', user: 'api-user', url: 'https://zerotouch.checkpoint.com', 'last-login-was-at': '2026-11-07T08:00:00' }) }
+    /** claim-gateway 200: an array with the gateway configuration and status. */
+    const claimed = {
+        status: 200,
+        body: JSON.stringify([{ 'gateway-configuration': { 'template-name': 'Branch' }, 'gateway-status': { 'status-value': 'set', 'display-status': 'Ready to deploy' } }]),
+    }
+    const loggedOut = { status: 200, body: JSON.stringify({ code: '17999', message: 'Logout succeeded' }) }
+    const reply = (claim: HttpResponse) => (request: HttpRequest): HttpResponse => (request.fn === 'login' ? loggedIn : request.fn === 'logout' ? loggedOut : claim)
+
+    it('logs in, claims each gateway with the account and template ids, then logs out', () => {
+        const { http, calls } = fake([reply(claimed)])
+        const result = run([target('A', { account: '1234567/42' }), target('B', { account: ' 1234567 / 43 ' })], http, 5)
+        expect(calls.map((c) => c.fn)).toEqual(['login', 'claim_gateway', 'claim_gateway', 'logout'])
+        expect(calls[0]).toEqual({ fn: 'login', params: {} })
+        expect(calls[1]).toMatchObject({ params: { sid: 'aB3+x/9=' } })
+        expect(JSON.parse(calls[1].body ?? '')).toEqual({ 'object-name': 'Q2XX-A', 'account-id': 1234567, 'template-id': 42, mac: '00:11:22:33:44:55' })
+        expect(JSON.parse(calls[2].body ?? '')).toMatchObject({ 'account-id': 1234567, 'template-id': 43 })
+        expect(calls[3]).toEqual({ fn: 'logout', params: { sid: 'aB3+x/9=' } })
+        expect(result).toEqual({
+            outcomes: [
+                { stepId: 'A', ok: true, message: 'claimed with Zero Touch template 42' },
+                { stepId: 'B', ok: true, message: 'claimed with Zero Touch template 43' },
+            ],
+            calls: 4,
+        })
+    })
+
+    it('reports a refused claim with the API message', () => {
+        const { http } = fake([reply({ status: 400, body: JSON.stringify({ message: 'Template does not exist', messages: [], code: '400' }) })])
+        expect(run([target('A', { account: '1234567/42' })], http, 5).outcomes).toEqual([{ stepId: 'A', ok: false, message: 'HTTP 400: Template does not exist' }])
+    })
+
+    it('counts login and logout against the budget and needs three calls', () => {
+        const { http, calls } = fake([reply(claimed)])
+        expect(run(many('Z', 5).map((t) => ({ ...t, account: '1/2' })), http, 4)).toMatchObject({ calls: 4 })
+        expect(calls.map((c) => c.fn)).toEqual(['login', 'claim_gateway', 'claim_gateway', 'logout'])
+        const idle = fake([reply(claimed)])
+        expect(run([target('A', { account: '1/2' })], idle.http, 2)).toEqual({ outcomes: [], calls: 0 })
+        expect(idle.calls).toHaveLength(0)
+    })
+
+    it('fails the gateways it would claim when the login fails, and does not log out', () => {
+        const { http, calls } = fake([{ status: 401, body: JSON.stringify({ message: 'Invalid api-key', messages: [], code: '401' }) }])
+        const result = run([target('A', { account: '1/2' }), target('B', { account: '1/2' })], http, 3)
+        expect(calls.map((c) => c.fn)).toEqual(['login'])
+        expect(result).toEqual({ outcomes: [{ stepId: 'A', ok: false, message: 'Zero Touch login failed: HTTP 401: Invalid api-key' }], calls: 1 })
+    })
+
+    it('fails the gateways when the login succeeds without a session id', () => {
+        const { http, calls } = fake([{ status: 200, body: JSON.stringify({ message: 'ok' }) }])
+        const result = run([target('A', { account: '1/2' })], http, 3)
+        expect(calls.map((c) => c.fn)).toEqual(['login'])
+        expect(result).toEqual({ outcomes: [{ stepId: 'A', ok: false, message: 'Zero Touch login failed: no session id returned' }], calls: 1 })
+    })
+
+    it('needs room for login, one claim and logout (three calls)', () => {
+        const { http, calls } = fake([succeed])
+        expect(run([target('A', { account: '1/2' }), target('B', { account: '1/2' })], http, 3).calls).toBe(3)
+        expect(calls.map((c) => c.fn)).toEqual(['login', 'claim_gateway', 'logout'])
+    })
+
+    it('refuses an account that is not "<account id>/<template id>" and a missing MAC without logging in', () => {
+        const { http, calls } = fake([reply(claimed)])
+        const result = run([target('A', { account: 'branch-tpl' }), target('B', { account: '1/2', mac: '' }), target('C', { account: '' })], http, 5)
+        expect(calls).toHaveLength(0)
+        expect(result.outcomes).toEqual([
+            { stepId: 'B', ok: false, message: 'missing mac' },
+            { stepId: 'C', ok: false, message: 'no cloud account configured for this customer' },
+            { stepId: 'A', ok: false, message: 'cloud account must be "<User Center account id>/<template id>"' },
+        ])
     })
 })
 
@@ -186,12 +334,13 @@ function fakeTransport(responses: Array<HttpResponse | ((request: HttpRequest) =
     return { transport, messages, calls }
 }
 
-/** Answers every vendor function with success (GreenLake finds the device, FortiCloud status 0). */
+/** Answers every vendor function with success (GreenLake finds the device, Zero Touch logs in, FortiCloud status 0). */
 const succeed = (request: HttpRequest): HttpResponse =>
-    request.fn === 'find_device' ? { status: 200, body: JSON.stringify({ items: [{ id: 'dev-1' }] }) } : { status: 200, body: JSON.stringify({ status: 0 }) }
-
-const many = (prefix: string, count: number, accounts = 1): ClaimTarget[] =>
-    Array.from({ length: count }, (_, i) => target(`${prefix}${i}`, { account: `acct${i % accounts}` }))
+    request.fn === 'find_device'
+        ? { status: 200, body: JSON.stringify({ items: [{ id: 'dev-1' }] }) }
+        : request.fn === 'login'
+          ? { status: 200, body: JSON.stringify({ sid: 'sid-1' }) }
+          : { status: 200, body: JSON.stringify({ status: 0 }) }
 
 describe('runVendorClaims', () => {
     it('loads the steps of the vendor it runs, sized for Mist and Check Point too', () => {
@@ -223,7 +372,7 @@ describe('runVendorClaims', () => {
         const { transport, messages, calls } = fakeTransport([succeed])
         expect(runVendorClaims('aruba', store, transport, 8)).toBe(7)
         expect(loads).toEqual([
-            ['oem_claim', 200],
+            ['oem_claim', 40],
             ['oem_licence', 4],
         ])
         expect(messages).toEqual(['NaaS HPE GreenLake', 'NaaS HPE GreenLake'])
@@ -247,7 +396,7 @@ describe('runVendorClaims', () => {
         const { transport, messages } = fakeTransport([succeed])
         expect(runVendorClaims('aruba', store, transport, 8)).toBe(0)
         expect(loads).toEqual([
-            ['oem_claim', 200],
+            ['oem_claim', 40],
             ['oem_licence', 4],
         ])
         expect(messages).toEqual([])
@@ -268,7 +417,9 @@ describe('runVendorClaims', () => {
     it('never makes more calls than maxCalls', () => {
         for (const vendor of CLAIM_VENDORS) {
             for (let maxCalls = 0; maxCalls <= 12; maxCalls++) {
-                const { store } = fakeStore({ oem_claim: many('C', 300, 7), oem_licence: many('L', 300, 7), oem_ztp: many('Z', 300, 7) })
+                // Zero Touch accounts are "<account id>/<template id>", so the Check Point session path runs too.
+                const zeroTouch = many('Z', 300).map((t, i) => ({ ...t, account: `${(i % 7) + 1}/1` }))
+                const { store } = fakeStore({ oem_claim: many('C', 300, 7), oem_licence: many('L', 300, 7), oem_ztp: zeroTouch })
                 const { transport, calls } = fakeTransport([succeed])
                 const made = runVendorClaims(vendor, store, transport, maxCalls)
                 expect(calls.length, `${vendor} with ${maxCalls} calls`).toBeLessThanOrEqual(maxCalls)
