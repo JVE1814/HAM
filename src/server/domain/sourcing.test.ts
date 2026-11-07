@@ -4,10 +4,12 @@ import {
     freeStockOf,
     isClaimable,
     isFree,
+    orderLineLockName,
     pickForSparePool,
     planSourcing,
     reservedSparesQuery,
     shortfallOutcome,
+    sourcingLockName,
     sparePoolShortfall,
     stockQueries,
     type PurchaseResult,
@@ -134,12 +136,12 @@ describe('stockQueries', () => {
 })
 
 describe('shortfallOutcome', () => {
-    const line = { planSummary: '1 from central stock, 2 to purchase', missing: 2, onOrder: 3 }
+    const line = { planSummary: '1 from central stock, 2 to purchase', missing: 2 }
     const purchase = (result: PurchaseResult = { ok: true, poId: 'po1' }) => vi.fn(() => result)
 
     it('sources a line with nothing left to buy as planned, buying nothing', () => {
         const buy = purchase()
-        expect(shortfallOutcome('none', { ...line, missing: 0 }, buy)).toEqual({ stage: 'sourced', summary: line.planSummary, quantityToPurchase: 3 })
+        expect(shortfallOutcome('none', { ...line, missing: 0 }, buy)).toEqual({ stage: 'sourced', summary: line.planSummary, purchased: 0 })
         expect(buy).not.toHaveBeenCalled()
     })
 
@@ -148,14 +150,14 @@ describe('shortfallOutcome', () => {
         expect(shortfallOutcome('oem_advance_replacement', { ...line, missing: 1 }, buy)).toEqual({
             stage: 'sourced',
             summary: '1 from central stock, 2 to purchase (OEM advance replacement under RMA)',
-            quantityToPurchase: 3,
+            purchased: 0,
         })
         expect(buy).not.toHaveBeenCalled()
     })
 
-    it('buys once, links the purchase order and counts its units on top of those already on order', () => {
+    it('buys once, links the purchase order and counts its units as just put on order', () => {
         const buy = purchase()
-        expect(shortfallOutcome('purchase', line, buy)).toEqual({ stage: 'sourced', summary: line.planSummary, purchaseOrder: 'po1', quantityToPurchase: 5 })
+        expect(shortfallOutcome('purchase', line, buy)).toEqual({ stage: 'sourced', summary: line.planSummary, purchaseOrder: 'po1', purchased: 2 })
         expect(buy).toHaveBeenCalledOnce()
     })
 
@@ -164,7 +166,7 @@ describe('shortfallOutcome', () => {
             expect(shortfallOutcome('purchase', line, purchase({ ok: false, reason }))).toEqual({
                 stage: 'awaiting_stock',
                 summary: `1 from central stock, 2 to purchase (no purchase order: ${reason})`,
-                quantityToPurchase: 3,
+                purchased: 0,
             })
         }
     })
@@ -177,15 +179,25 @@ describe('shortfallOutcome', () => {
         expect(shortfallOutcome('none', { ...line, missing: 0, unmoved }, purchase())).toEqual({
             stage: 'awaiting_stock',
             summary: '1 from central stock, 2 to purchase (no transfer order for 2 from North: not created; no transfer order for 1 from South: lines missing)',
-            quantityToPurchase: 3,
+            purchased: 0,
         })
     })
 
     it('still buys the real shortfall when picked stock could not be moved', () => {
         const buy = purchase()
         const outcome = shortfallOutcome('purchase', { ...line, unmoved: [{ units: 1, from: 'Depot North', reason: 'Inventory did not create it' }] }, buy)
-        expect(outcome).toMatchObject({ stage: 'awaiting_stock', purchaseOrder: 'po1', quantityToPurchase: 5 })
+        expect(outcome).toMatchObject({ stage: 'awaiting_stock', purchaseOrder: 'po1', purchased: 2 })
         expect(buy).toHaveBeenCalledOnce()
+    })
+})
+
+describe('sourcingLockName and orderLineLockName', () => {
+    const sysId = (c: string) => c.repeat(32)
+
+    it('lock each Order and each line on its own, within the job lock name length', () => {
+        const names = [sysId('a'), sysId('b')].flatMap((id) => [sourcingLockName(id), orderLineLockName(id)])
+        expect(new Set(names).size).toBe(names.length)
+        for (const name of names) expect(name.length).toBeLessThanOrEqual(100)
     })
 })
 

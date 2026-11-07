@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import { groupDecisions, rollupApprovals } from '../domain/approvals'
 import { appendTo } from '../domain/collections'
 import {
@@ -14,10 +14,12 @@ import {
     type OrderParties,
     type RequestedLine,
 } from '../domain/entitlement'
-import { shortfallRoute } from '../domain/returns'
+import { shortfallRoute, type ShortfallRoute } from '../domain/returns'
 import {
+    orderLineLockName,
     planSourcing,
     shortfallOutcome,
+    sourcingLockName,
     type Source,
     type SourcingRequest,
     type UnmovedStock,
@@ -34,6 +36,7 @@ import { moveAndSave, readStage } from '../platform/assets'
 import { EVENT, fire } from '../platform/events'
 import { recomputeLine, recomputeOrder } from '../platform/fulfilment'
 import { todayIso } from '../platform/clock'
+import { withLock, type HeldLock } from '../platform/locks'
 import { openOemRma, openRmaCount } from '../platform/oem-rma'
 import { requestPurchase } from '../platform/procurement'
 import { PROPERTY, stagingStockroom, stringProperty } from '../platform/properties'
@@ -286,23 +289,122 @@ function rejectOrder(order: GlideRecord): string {
     return ''
 }
 
-/** Script action on x_daas_ham.order.source: allocate stock, request transfers and purchases. */
-export function sourceOrder(event: GlideRecord, current: GlideRecord): void {
-    const line = new GlideRecord('x_daas_ham_order_line')
-    line.addQuery('order', current.getUniqueValue())
-    line.addQuery('line_stage', 'IN', 'new,awaiting_stock')
-    line.query()
-    while (line.next()) sourceLine(current, line)
-    recomputeOrder(current.getUniqueValue())
+/** How many times a request to source an Order is queued again, a minute apart, while it cannot run (`sourceOrder`). */
+const SOURCING_TRIES = 15
+
+const SOURCING_RETRY_SECONDS = 60
+
+/**
+ * Tries at taking an Order line's lock before giving up: a holder keeps it for a receipt (the Asset, the line and the
+ * reservation saved) or for sourcing's read of the line or its purchase and save, so a few more than a counter's.
+ */
+const LINE_LOCK_ATTEMPTS = 10
+
+/** How sourcing left a line: done (sourced, or a refused save logged), or for a pass queued again to finish. */
+type LineSourcing = 'done' | 'line busy' | 'lock lost'
+
+const AGAIN_BECAUSE: Record<Exclude<LineSourcing, 'done'>, string> = {
+    'line busy': "a line's lock stayed held",
+    'lock lost': "the Order's sourcing lock was lost",
 }
 
-function sourceLine(order: GlideRecord, line: GlideRecord): void {
-    const quantity = num(line, 'quantity')
-    const allocated = countAllocated(line.getUniqueValue())
-    // Units bought and not yet received: receiving one takes it off (warehouse allocateToWaitingLine).
-    const onOrder = num(line, 'quantity_to_purchase')
-    const shortfall = quantity - allocated - onOrder - openRmaCount(line.getUniqueValue())
-    if (shortfall <= 0) return
+/**
+ * Script action on x_daas_ham.order.source (parm2: how many times this request was queued again): allocate stock,
+ * request transfers and purchases.
+ *
+ * Two passes over one Order (two staging tasks failed seconds apart, or one failed while the first pass runs) would
+ * count the same shortfall, and one would buy what the other claimed. So a pass holds a lock on the Order. One that
+ * finds it held runs again a minute later rather than leave its work to the holder, which may have counted before the
+ * change that queued it; so does a pass that left a line whose lock stayed held, or that lost the Order's lock. A
+ * request is queued again SOURCING_TRIES times at most, past the lock's ten-minute abandonment, then dropped with a
+ * warning: a lock still held by then was taken after the request was queued, by a pass that counted its change. Taking
+ * the lock throws only when an insert is refused with no lock row (platform/locks): that error escapes.
+ */
+export function sourceOrder(event: GlideRecord, current: GlideRecord): void {
+    const orderId = current.getUniqueValue()
+    // Set inside the Order's lock.
+    let again = null as Exclude<LineSourcing, 'done'> | null
+    const taken = withLock(sourcingLockName(orderId), (lock) => {
+        const line = new GlideRecord('x_daas_ham_order_line')
+        line.addQuery('order', orderId)
+        line.addQuery('line_stage', 'IN', 'new,awaiting_stock')
+        line.query()
+        while (again !== 'lock lost' && line.next()) {
+            const sourced = sourceLine(lock, current, line)
+            if (sourced !== 'done') again = sourced
+        }
+    })
+    if (!taken || again) {
+        const why = again ? AGAIN_BECAUSE[again] : 'another pass holds its lock'
+        sourceAgain(current, Number(str(event, 'parm2')) || 0, why)
+    }
+    if (taken) recomputeOrder(orderId)
+}
+
+/** Queue the request to source `order` again a minute later, unless it was already queued again `tries` times. */
+function sourceAgain(order: GlideRecord, tries: number, why: string): void {
+    const number = str(order, 'number')
+    if (tries >= SOURCING_TRIES) {
+        return void gs.warn(`[x_daas_ham] ${number} not sourced again after ${tries} tries (${why}): check its lines`)
+    }
+    gs.info(`[x_daas_ham] ${number} sourced again in ${SOURCING_RETRY_SECONDS} s: ${why}`)
+    const when = new GlideDateTime()
+    when.addSeconds(SOURCING_RETRY_SECONDS)
+    gs.eventQueueScheduled(EVENT.sourceOrder, order, '', String(tries + 1), when)
+}
+
+/**
+ * Run `work` holding the Order line's lock (domain/sourcing `orderLineLockName`) and return true, or false when other
+ * holders kept it through every try. Taking the lock throws only when an insert is refused with no lock row
+ * (platform/locks): that try is made again, and only when every try throws does the error escape, as does one from
+ * `work`.
+ */
+export function withOrderLineLock(lineId: string, work: (lock: HeldLock) => void): boolean {
+    let held = false
+    let takeError: unknown = null
+    for (let attempt = 0; attempt < LINE_LOCK_ATTEMPTS; attempt++) {
+        let started = false
+        try {
+            const taken = withLock(orderLineLockName(lineId), (lock) => {
+                started = true
+                work(lock)
+            })
+            if (taken) return true
+            held = true
+        } catch (error) {
+            if (started) throw error
+            takeError = error
+        }
+    }
+    if (!held && takeError) throw takeError
+    return false
+}
+
+/** What sourcing found and did for a line before routing its shortfall: what `settleHolding` buys and saves. */
+interface Sourced {
+    lineId: string
+    modelId: string
+    route: ShortfallRoute
+    /** The Asset a break-fix line replaces, which an OEM advance replacement is asked for. */
+    replaced: GlideRecord | null
+    toPurchase: number
+    planSummary: string
+    unmoved: UnmovedStock[]
+    transfers: string[]
+}
+
+/** Source one line holding the Order's `orderLock`; see `LineSourcing`. */
+function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord): LineSourcing {
+    // A pass that outlasted the Order's lock (ADR 0013) may overlap the one that took it over: it sources nothing more.
+    if (!orderLock.held()) return leftUnsaved(line, 'lock lost', [])
+    const lineId = line.getUniqueValue()
+    // Read under the line's lock, where a receipt takes its unit off order and allocates it: seen whole or not at all.
+    let shortfall = null as number | null
+    const read = withOrderLineLock(lineId, () => {
+        shortfall = lineShortfall(lineId)
+    })
+    if (!read) return 'line busy'
+    if (shortfall === null || shortfall <= 0) return 'done'
 
     const modelId = str(line, 'model')
     const customerId = str(order, 'customer')
@@ -312,7 +414,7 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
     const plan = planSourcing(request, stockCandidates(request, shortfall * 5 + 50))
 
     const stagingId = stagingStockroom()
-    const reservation = { orderLineId: line.getUniqueValue(), customerId, agreementId: str(order, 'agreement') }
+    const reservation = { orderLineId: lineId, customerId, agreementId: str(order, 'agreement') }
     const toStage: GlideRecord[] = []
     const toTransfer = new Map<string, Array<{ asset: GlideRecord; source: Source }>>()
     let reserved = 0
@@ -332,7 +434,6 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
     // Stock outside the staging centre is only staged once its transfer order exists; without one it goes back.
     const transfers: string[] = []
     const unmoved: UnmovedStock[] = []
-    let released = 0
     for (const [from, picked] of toTransfer) {
         const transfer = requestTransfer({ fromStockroomId: from, toStockroomId: stagingId, assets: picked.map(({ asset }) => ({ assetId: asset.getUniqueValue(), modelId })) })
         if (transfer.ok) {
@@ -342,14 +443,10 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
         }
         unmoved.push({ units: picked.length, from: picked[0].asset.getDisplayValue('stockroom'), reason: transfer.reason })
         for (const { asset, source } of picked) unreserve(asset, source)
-        released += picked.length
     }
     // An Asset whose Staging task could not be opened stays reserved for the line rather than staging with no task to finish.
     for (const asset of toStage) {
-        if (openStagingTask(asset, line.getUniqueValue())) moveAndSave(asset, 'staging', 'sourcing')
-    }
-    if (transfers.length > 0) {
-        line.setValue('transfer_orders', [str(line, 'transfer_orders'), ...transfers].filter(Boolean).join(','))
+        if (openStagingTask(asset, lineId)) moveAndSave(asset, 'staging', 'sourcing')
     }
     // Unmoved stock is not bought (see shortfallOutcome).
     const toPurchase = shortfall - reserved
@@ -362,40 +459,89 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
         purpose: sameModel ? 'replace' : 'new',
         coveredToday: !!replaced && sameModel && str(replaced, 'x_daas_ham_coverage_end') >= todayIso(),
     })
+    const planSummary = plan.summary
+    const sourced: Sourced = { lineId, modelId, route, replaced, toPurchase, planSummary, unmoved, transfers }
+    // Set inside the line's lock.
+    let settled = 'line busy' as Exclude<LineSourcing, 'done'> | 'saved' | 'unsaved'
+    withOrderLineLock(lineId, (lineLock) => {
+        settled = settleHolding(orderLock, lineLock, order, sourced)
+    })
+    if (settled === 'saved') recomputeLine(lineId)
+    if (settled === 'saved' || settled === 'unsaved') return 'done'
+    return leftUnsaved(line, settled, transfers)
+}
+
+/** Units the line still needs, read afresh: not allocated, on order (bought, not received) or under an open OEM RMA. */
+function lineShortfall(lineId: string): number | null {
+    const line = findById('x_daas_ham_order_line', lineId)
+    if (!line) return null
+    return num(line, 'quantity') - countAllocated(lineId) - num(line, 'quantity_to_purchase') - openRmaCount(lineId)
+}
+
+/**
+ * Route the line's shortfall and save the line, holding its `lineLock` and the Order's: from a fresh read, adding what
+ * is bought to the on-order count and purchase orders as they now stand, since receipts take units off order meanwhile.
+ * 'unsaved' when the line is gone or its save is refused (logged).
+ */
+function settleHolding(
+    orderLock: HeldLock,
+    lineLock: HeldLock,
+    order: GlideRecord,
+    sourced: Sourced,
+): 'saved' | 'unsaved' | 'lock lost' {
+    // Buying is what two overlapping passes must not both do.
+    if (!orderLock.held()) return 'lock lost'
+    const line = findById('x_daas_ham_order_line', sourced.lineId)
+    if (!line) return 'unsaved'
+    const number = str(line, 'number')
     let rmaRefused = false
-    if (route === 'oem_advance_replacement' && replaced) {
+    if (sourced.route === 'oem_advance_replacement' && sourced.replaced) {
         // Unrecorded, the line would wait for a replacement nobody asked the OEM for: logged and in its summary.
-        const rma = { defectiveAsset: replaced, orderLineId: line.getUniqueValue(), caseId: str(order, 'case') }
+        const rma = { defectiveAsset: sourced.replaced, orderLineId: sourced.lineId, caseId: str(order, 'case') }
         if (!openOemRma(rma)) {
             rmaRefused = true
-            gs.warn(`[x_daas_ham] ${str(line, 'number')}: no OEM RMA saved for ${str(replaced, 'serial_number')}`)
+            gs.warn(`[x_daas_ham] ${number}: no OEM RMA saved for ${str(sourced.replaced, 'serial_number')}`)
         }
     }
+    const { toPurchase, planSummary, unmoved, transfers } = sourced
     const purchase = () =>
         requestPurchase({
-            modelId,
+            modelId: sourced.modelId,
             quantity: toPurchase,
-            description: `${str(order, 'number')} ${str(line, 'number')}: ${toPurchase} x ${str(line, 'model.display_name')}`,
+            description: `${str(order, 'number')} ${number}: ${toPurchase} x ${str(line, 'model.display_name')}`,
         })
-    const outcome = shortfallOutcome(route, { planSummary: plan.summary, missing: toPurchase, onOrder, unmoved }, purchase)
+    const outcome = shortfallOutcome(sourced.route, { planSummary, missing: toPurchase, unmoved }, purchase)
+    if (transfers.length > 0) {
+        line.setValue('transfer_orders', [str(line, 'transfer_orders'), ...transfers].filter(Boolean).join(','))
+    }
     if (outcome.purchaseOrder) {
         // Every purchase order stays listed, so units of an earlier one are still allocated to the line on receipt.
         const listed = [str(line, 'purchase_orders'), outcome.purchaseOrder].filter(Boolean)
         line.setValue('purchase_order', outcome.purchaseOrder)
         line.setValue('purchase_orders', listed.join(','))
     }
-    line.setValue('quantity_allocated', allocated + reserved - released)
-    line.setValue('quantity_to_purchase', outcome.quantityToPurchase)
+    // Counted again: a receipt may have allocated a unit to the line since this pass read it.
+    line.setValue('quantity_allocated', countAllocated(sourced.lineId))
+    line.setValue('quantity_to_purchase', num(line, 'quantity_to_purchase') + outcome.purchased)
     line.setValue('sourcing_summary', rmaRefused ? `${outcome.summary} (none saved: open it by hand)` : outcome.summary)
     line.setValue('line_stage', outcome.stage)
     if (!line.update()) {
         // Unlisted, a purchase order's units are not allocated on receipt, and the next run buys the shortfall again.
         const unlisted = [outcome.purchaseOrder ?? '', ...transfers].filter(Boolean)
         const listThem = unlisted.length > 0 ? `; it does not list ${unlisted.join(', ')}, add them by hand` : ''
-        saveRefused(line, `${str(line, 'number')} not saved after sourcing${listThem}`)
-        return
+        saveRefused(line, `${number} not saved after sourcing${listThem}`)
+        return 'unsaved'
     }
-    recomputeLine(line.getUniqueValue())
+    // A holder that outlasted the line's lock (ADR 0013) may have saved beside a receipt that took it over.
+    if (!lineLock.held()) gs.warn(`[x_daas_ham] ${number} saved after its lock was lost: check its On order count`)
+    return 'saved'
+}
+
+/** Log a line left to the pass queued again, naming the transfer orders it does not list. */
+function leftUnsaved(line: GlideRecord, why: keyof typeof AGAIN_BECAUSE, transfers: readonly string[]): LineSourcing {
+    const listThem = transfers.length > 0 ? `; it does not list ${transfers.join(', ')}, add them by hand` : ''
+    gs.warn(`[x_daas_ham] ${str(line, 'number')} left to the next sourcing pass (${AGAIN_BECAUSE[why]})${listThem}`)
+    return why
 }
 
 function countAllocated(lineId: string): number {
@@ -516,7 +662,7 @@ export function cancelOrder(order: GlideRecord): void {
     cancelPendingApprovals(order.getUniqueValue())
 }
 
-/** Re-source a line that lost an allocated Asset (failed staging). */
+/** Source the Order again for a line that lost an allocated Asset (failed staging) or a unit received for it. */
 export function resourceOrder(orderId: string): void {
     const order = findById('x_daas_ham_order', orderId)
     if (order) fire(EVENT.sourceOrder, order)

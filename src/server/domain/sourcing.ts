@@ -171,21 +171,24 @@ export interface ShortfallOutcome {
     summary: string
     /** The purchase order just created for the line, if any. */
     purchaseOrder?: string
-    /** Units on purchase orders for the line: those already on order plus any just purchased. */
-    quantityToPurchase: number
+    /**
+     * Units just put on order for the line (0 without a new purchase order). They are added to its on-order count as it
+     * stands when the line is saved, not as sourcing read it: receipts take units off it meanwhile.
+     */
+    purchased: number
 }
 
 /**
  * Where sourcing leaves an Order line once its shortfall is routed: sourced, unless the shortfall was
  * to be purchased and `purchase` (called only then) brings no purchase order, or picked stock could not
  * be moved to the staging centre (`unmoved`), when the line waits for stock and its summary says why; an
- * OEM advance replacement is noted in the summary. `missing` is the shortfall routed and `onOrder` the
- * units on the line's purchase orders not yet received. Unmoved stock is not part of `missing`: it is still
- * there, so it is not bought, and the line picks it again when it is next sourced.
+ * OEM advance replacement is noted in the summary. `missing` is the shortfall routed. Unmoved stock is
+ * not part of `missing`: it is still there, so it is not bought, and the line picks it again when it is
+ * next sourced.
  */
 export function shortfallOutcome(
     route: ShortfallRoute,
-    line: { planSummary: string; missing: number; onOrder: number; unmoved?: readonly UnmovedStock[] },
+    line: { planSummary: string; missing: number; unmoved?: readonly UnmovedStock[] },
     purchase: () => PurchaseResult,
 ): ShortfallOutcome {
     const outcome = routedOutcome(route, line, purchase)
@@ -194,13 +197,27 @@ export function shortfallOutcome(
     return { ...outcome, stage: 'awaiting_stock', summary: `${outcome.summary} (${notes.join('; ')})` }
 }
 
-function routedOutcome(route: ShortfallRoute, line: { planSummary: string; missing: number; onOrder: number }, purchase: () => PurchaseResult): ShortfallOutcome {
-    const sourced = { stage: 'sourced', summary: line.planSummary, quantityToPurchase: line.onOrder } as const
+function routedOutcome(route: ShortfallRoute, line: { planSummary: string; missing: number }, purchase: () => PurchaseResult): ShortfallOutcome {
+    const sourced = { stage: 'sourced', summary: line.planSummary, purchased: 0 } as const
     if (route === 'none') return sourced
     if (route === 'oem_advance_replacement') return { ...sourced, summary: `${line.planSummary} (OEM advance replacement under RMA)` }
-    const purchased = purchase()
-    if (!purchased.ok) return { ...sourced, stage: 'awaiting_stock', summary: `${line.planSummary} (no purchase order: ${purchased.reason})` }
-    return { ...sourced, purchaseOrder: purchased.poId, quantityToPurchase: line.onOrder + line.missing }
+    const bought = purchase()
+    if (!bought.ok) return { ...sourced, stage: 'awaiting_stock', summary: `${line.planSummary} (no purchase order: ${bought.reason})` }
+    return { ...sourced, purchaseOrder: bought.poId, purchased: line.missing }
+}
+
+/** The job lock (ADR 0013) an Order's sourcing passes take turns under, so two never count the same shortfall. */
+export function sourcingLockName(orderId: string): string {
+    return `source_order_${orderId}`
+}
+
+/**
+ * The job lock (ADR 0013) an Order line's need is read and changed under: sourcing reads its units and on-order count
+ * there and saves what it bought, and a receipt takes its unit off order and allocates it. So neither change is lost,
+ * and sourcing's count never sees half a receipt.
+ */
+export function orderLineLockName(lineId: string): string {
+    return `order_line_${lineId}`
 }
 
 /**
