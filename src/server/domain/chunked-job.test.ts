@@ -144,10 +144,15 @@ describe('writeChunkUnderLock', () => {
         expect(steps.at(-1)).toBe(step)
     })
 
-    it.each<Write>(['flush', 'complete'])('throws on when the %s throws while the lock is still held', (step) => {
+    // A refused save in a chunk throws (entry/margin.ts): its pass must then neither go on nor complete.
+    it.each<[Write, boolean, string[]]>([
+        ['flush', false, ['flush']],
+        ['flush', true, ['flush']],
+        ['complete', true, ['flush', 'complete']],
+    ])('writes nothing more when the %s throws still holding the lock (last chunk: %s)', (step, last, written) => {
         const { ports, steps } = lockedChunk({ throwsIn: step })
-        expect(() => writeChunkUnderLock(ports, true)).toThrow(`${step} failed`)
-        expect(steps).not.toContain('queueNext')
+        expect(() => writeChunkUnderLock(ports, last)).toThrow(`${step} failed`)
+        expect(steps).toEqual(written)
     })
 
     it('neither queues the next chunk nor throws after a flush that threw having lost the lock', () => {
