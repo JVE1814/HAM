@@ -1,12 +1,11 @@
-import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
+import { GlideAggregate, gs } from '@servicenow/glide'
 import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
 import { pickForSparePool, sparePoolShortfall } from '../domain/sourcing'
-import { moveAsset } from '../platform/assets'
 import { runTableJob } from '../platform/chunked'
 import { openPurchaseQuantity, requestPurchase } from '../platform/procurement'
 import { boolProperty, PROPERTY, stagingStockroom } from '../platform/properties'
 import { num, str } from '../platform/records'
-import { stockCandidates } from '../platform/stock'
+import { moveToSparePool, stockCandidates } from '../platform/stock'
 
 /** Daily job: keep every Customer's Spare pool at its Agreement's spare-pool ratio (P1.4). */
 export function topUpSparePools(): void {
@@ -46,16 +45,11 @@ function topUpAgreement(agreementId: string, customerId: string, ratio: number, 
         const shortfall = sparePoolShortfall({ deployed: deployedCount, reserved: reserved.get(modelId) ?? 0, ratio })
         if (shortfall === 0) continue
         const picked = pickForSparePool(stockCandidates(modelId, shortfall * 5 + 50), modelId, shortfall)
-        for (const assetId of picked) {
-            const asset = new GlideRecord('alm_hardware')
-            if (!asset.get(assetId) || !moveAsset(asset, 'spare_pool').allowed) continue
-            asset.setValue('company', customerId)
-            asset.setValue('x_daas_ham_agreement', agreementId)
-            asset.update()
-        }
+        // A unit sourcing claimed in the meantime (or whose save was refused) is not moved and stays in the shortfall.
+        const moved = picked.filter((assetId) => moveToSparePool(assetId, customerId, agreementId)).length
         if (!autoPurchase) continue
         const prefix = `Spare-pool top-up ${agreementId}:`
-        const missing = shortfall - picked.length - openPurchaseQuantity(prefix, modelId)
+        const missing = shortfall - moved - openPurchaseQuantity(prefix, modelId)
         if (missing > 0) requestPurchase({ modelId, quantity: missing, description: `${prefix} ${missing} unit(s)` })
     }
 }

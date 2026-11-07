@@ -97,6 +97,8 @@
 ## Spare-pool top-up (daily)
 
 For each active Agreement with a spare-pool ratio, and each Model it has deployed:
-`shortfall = ceil(deployed × ratio) − reserved spares`. Free central stock is moved into the pool. If
-`x_daas_ham.spare_pool.auto_purchase` is true, purchase orders are requested for
+`shortfall = ceil(deployed × ratio) − reserved spares`. Free central stock is moved into the pool,
+each unit claimed under the same Asset lock as sourcing and only while it is still available on no Order
+line: a unit sourcing took in the meantime, or whose save is refused, is not moved and stays in the
+shortfall. If `x_daas_ham.spare_pool.auto_purchase` is true, purchase orders are requested for
 the rest, net of top-up purchases still open for that Agreement and Model.

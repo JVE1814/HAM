@@ -46,7 +46,7 @@ export interface Reservation {
  * free or the save is refused (see `claim`).
  */
 export function reserveAsset(assetId: string, reservation: Reservation): GlideRecord | null {
-    return claim(assetId, 'reserved', reservation)
+    return claim(assetId, { from: ['available', 'spare_pool'], to: 'reserved', values: lineValues(reservation) })
 }
 
 /**
@@ -54,21 +54,45 @@ export function reserveAsset(assetId: string, reservation: Reservation): GlideRe
  * in the pool and is installed from where it is. Null when it is no longer free or the save is refused (see `claim`).
  */
 export function linkHotSpare(assetId: string, reservation: Reservation): GlideRecord | null {
-    return claim(assetId, 'spare_pool', reservation)
+    return claim(assetId, { from: ['available', 'spare_pool'], to: 'spare_pool', values: lineValues(reservation) })
 }
 
 /**
- * Put an in-stock Asset on an Order line in stage `to`. Two sourcing runs may pick the same Asset, so the claim is made
- * under a lock on that Asset and checks a fresh read: still available or in a spare pool, and on no Order line. A run
- * that finds the lock held (or cannot take it, when the holder lets go mid-take) leaves the Asset to the other one.
+ * Move free stock into a Customer's Spare pool (the daily top-up), or null when it is no longer free stock on no Order
+ * line or the save is refused (see `claim`).
  */
-function claim(assetId: string, to: Stage, reservation: Reservation): GlideRecord | null {
+export function moveToSparePool(assetId: string, customerId: string, agreementId: string): GlideRecord | null {
+    const values = { company: customerId, x_daas_ham_agreement: agreementId, x_daas_ham_order_line: '' }
+    return claim(assetId, { from: ['available'], to: 'spare_pool', values })
+}
+
+function lineValues(reservation: Reservation): Record<string, string> {
+    return {
+        x_daas_ham_order_line: reservation.orderLineId,
+        company: reservation.customerId,
+        x_daas_ham_agreement: reservation.agreementId,
+    }
+}
+
+/** A claim: the stages the Asset may be in, the stage it moves to, and the values it takes. */
+interface Claim {
+    from: readonly Stage[]
+    to: Stage
+    values: Readonly<Record<string, string>>
+}
+
+/**
+ * Make `wanted` on an in-stock Asset. Sourcing runs and the spare-pool top-up may pick the same Asset, so the claim is
+ * made under a lock on that Asset and checks a fresh read: still in one of the `from` stages, and on no Order line. A
+ * run that finds the lock held (or cannot take it, when the holder lets go mid-take) leaves the Asset to the other one.
+ */
+function claim(assetId: string, wanted: Claim): GlideRecord | null {
     let claimed: GlideRecord | null = null
     let started = false
     try {
         withLock(`reserve_asset_${assetId}`, (lock) => {
             started = true
-            claimed = claimHolding(lock, assetId, to, reservation)
+            claimed = claimHolding(lock, assetId, wanted)
         })
     } catch (error) {
         // An error from the claim itself is the claim's to report; one from taking the lock only means not now.
@@ -81,25 +105,27 @@ function claim(assetId: string, to: Stage, reservation: Reservation): GlideRecor
 /**
  * The claim, made holding `lock`. A holder that outlasts the lock (ADR 0013) may overlap the next one, so it saves only
  * while it still holds the lock, and one that lost it during the save keeps the claim only if a fresh read still shows
- * the Asset on this line.
+ * the Asset in the stage and with the values claimed.
  */
-function claimHolding(lock: HeldLock, assetId: string, to: Stage, reservation: Reservation): GlideRecord | null {
+function claimHolding(lock: HeldLock, assetId: string, wanted: Claim): GlideRecord | null {
     const asset = new GlideRecord('alm_hardware')
-    if (!asset.get(assetId) || !isUnclaimed(asset) || !moveAsset(asset, to).allowed) return null
-    asset.setValue('x_daas_ham_order_line', reservation.orderLineId)
-    asset.setValue('company', reservation.customerId)
-    asset.setValue('x_daas_ham_agreement', reservation.agreementId)
+    if (!asset.get(assetId) || !isFree(asset, wanted.from) || !moveAsset(asset, wanted.to).allowed) return null
+    for (const [field, value] of Object.entries(wanted.values)) asset.setValue(field, value)
     if (!lock.held()) return lockLost(assetId)
     if (!asset.update()) return null
     if (lock.held()) return asset
     const fresh = new GlideRecord('alm_hardware')
-    return fresh.get(assetId) && str(fresh, 'x_daas_ham_order_line') === reservation.orderLineId ? fresh : lockLost(assetId)
+    return fresh.get(assetId) && shows(fresh, wanted) ? fresh : lockLost(assetId)
 }
 
-/** Still free stock or spare-pool stock, and on no Order line. */
-function isUnclaimed(asset: GlideRecord): boolean {
+/** In one of the `from` stages, and on no Order line. */
+function isFree(asset: GlideRecord, from: readonly Stage[]): boolean {
     const stage = readStage(asset)
-    return (stage === 'available' || stage === 'spare_pool') && !str(asset, 'x_daas_ham_order_line')
+    return stage !== null && from.includes(stage) && !str(asset, 'x_daas_ham_order_line')
+}
+
+function shows(asset: GlideRecord, wanted: Claim): boolean {
+    return readStage(asset) === wanted.to && Object.entries(wanted.values).every(([field, value]) => str(asset, field) === value)
 }
 
 function lockLost(assetId: string): null {
