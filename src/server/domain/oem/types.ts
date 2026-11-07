@@ -29,4 +29,6 @@ export interface Fetched<T> {
     errors: string[]
     /** Keys (serials) whose call failed, so nothing is known about them; the others were answered. */
     failed?: string[]
+    /** Keys the vendor answered with an error of its own (e.g. not in the account): retry them only after the refresh interval. */
+    rejected?: string[]
 }

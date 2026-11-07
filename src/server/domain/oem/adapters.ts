@@ -1,6 +1,7 @@
 import type { HttpPort } from '../http'
 import { asArray, chunks, field, isoDate, parseJson, text } from '../json'
 import type { CoverageFact, Fetched, LifecycleFact, OemVendor, RmaFact } from './types'
+import { fortiCloudError } from './forticloud'
 
 /*
  * Vendor adapters (ADR 0008). Response shapes follow the vendors' public API documentation; mappers
@@ -72,9 +73,21 @@ const ciscoCoverage: Capability<CoverageFact> = (serials, context) => {
     const facts: CoverageFact[] = []
     const errors: string[] = []
     const failed: string[] = []
+    const rejected: string[] = []
     for (const batch of chunks(serials, 50)) {
         const json = call(context, 'coverage_by_serial', { serials: batch.join(',') }, errors)
-        if (json === undefined) failed.push(...batch)
+        // A failed call says nothing about the batch (asked again next run). An answer without
+        // serial_numbers is Cisco's own error (e.g. EXCEEDED_OUTPUT): asked again only after the
+        // refresh interval, so a batch that always errors does not hold the queue.
+        if (json === undefined) {
+            failed.push(...batch)
+            continue
+        }
+        if (!Array.isArray(field(json, 'serial_numbers'))) {
+            errors.push(`coverage_by_serial: no serial_numbers in the response`)
+            rejected.push(...batch)
+            continue
+        }
         for (const record of asArray(field(json, 'serial_numbers'))) {
             const serial = text(field(record, 'sr_no'))
             if (!serial) continue
@@ -83,7 +96,8 @@ const ciscoCoverage: Capability<CoverageFact> = (serials, context) => {
                 covered: text(field(record, 'is_covered')).toUpperCase() === 'YES',
                 contractNumber: text(field(record, 'service_contract_number')),
                 serviceLevel: text(field(record, 'service_line_descr')),
-                startDate: undefined, // the SN2INFO v2 summary has no coverage start date
+                // The SN2INFO v2 summary has no start date; v1.0 responses carry coverage_start_date.
+                startDate: isoDate(field(record, 'coverage_start_date')),
                 // Contract end (v2 summary), then the v1.0 name, then the warranty end.
                 endDate:
                     isoDate(field(record, 'covered_product_line_end_date')) ??
@@ -92,7 +106,7 @@ const ciscoCoverage: Capability<CoverageFact> = (serials, context) => {
             })
         }
     }
-    return { facts, errors, failed }
+    return { facts, errors, failed, rejected }
 }
 
 const ciscoRmaStatus: Capability<RmaFact> = (rmaNumbers, context) => {
@@ -151,18 +165,20 @@ const fortinetCoverage: Capability<CoverageFact> = (serials, context) => {
     const facts: CoverageFact[] = []
     const errors: string[] = []
     const failed: string[] = []
+    const rejected: string[] = []
     for (const serial of serials) {
         const json = call(context, 'products_list', { serial }, errors)
         if (json === undefined) {
             failed.push(serial)
             continue
         }
-        // FortiCloud reports API errors in an HTTP 200 envelope: status 0 means success. Leave the
-        // serial unanswered (stale) rather than stamping it checked with no coverage.
-        if (Number(field(json, 'status') ?? 0) !== 0) {
-            const detail = text(field(json, 'message')) || text(field(json, 'error')) || `status ${text(field(json, 'status'))}`
-            errors.push(`products_list ${serial}: ${detail}`)
-            failed.push(serial)
+        // An API error in FortiCloud's HTTP 200 envelope (e.g. a unit not in the account) is an
+        // answer: the serial keeps its coverage and is asked again only after the refresh interval,
+        // so permanent rejections do not hold the rate-limited queue.
+        const error = fortiCloudError(json)
+        if (error) {
+            errors.push(`products_list ${serial}: ${error}`)
+            rejected.push(serial)
             continue
         }
         for (const asset of asArray(field(json, 'assets'))) {
@@ -185,22 +201,27 @@ const fortinetCoverage: Capability<CoverageFact> = (serials, context) => {
             })
         }
     }
-    return { facts, errors, failed }
+    return { facts, errors, failed, rejected }
 }
 
 // --- HPE Mist (JSI inventory) ----------------------------------------------------------------
 
-/** The first org's matching JSI items; `answered` is false when no org gave an answer (every call failed). */
+/**
+ * The first org's matching JSI items. `answered` is true when items were found, or every org answered
+ * that it has none; if any org's call failed and nothing was found, the device may be in that org.
+ */
 function mistLookup(context: OemContext, fn: 'jsi_by_model' | 'jsi_by_serial', params: Record<string, string>, errors: string[]): { items: unknown[]; answered: boolean } {
-    let answered = false
+    let anyFailed = false
     for (const orgId of context.orgIds) {
         const json = call(context, fn, { org_id: orgId, ...params }, errors)
-        if (json === undefined) continue
-        answered = true
+        if (json === undefined) {
+            anyFailed = true
+            continue
+        }
         const items = asArray(json)
-        if (items.length > 0) return { items, answered }
+        if (items.length > 0) return { items, answered: true }
     }
-    return { items: [], answered }
+    return { items: [], answered: !anyFailed }
 }
 
 function mistItems(context: OemContext, fn: 'jsi_by_model' | 'jsi_by_serial', params: Record<string, string>, errors: string[]): unknown[] {

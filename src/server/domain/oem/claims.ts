@@ -2,6 +2,7 @@ import { andEachClause } from '../encoded-query'
 import { errorText, isSuccess, type HttpPort, type HttpRequest, type HttpResponse } from '../http'
 import { asArray, chunks, field, parseJson, text } from '../json'
 import type { OemVendor } from './types'
+import { fortiCloudError } from './forticloud'
 
 /**
  * OEM claim and provisioning (P3.27, D70): staging checklist steps that the manufacturer's cloud can
@@ -225,11 +226,9 @@ const fortiRegister: ClaimAdapter = (targets, http, maxCalls) => {
         const body = JSON.stringify({ registrationUnits: batch.map((t) => ({ serialNumber: t.serial, description: 'NaaS staging', isGovernment: false })) })
         const response = http({ fn: 'register_products', params: {}, body })
         const json = parseJson(response.body)
-        if (isSuccess(response.status) && Number(field(json, 'status') ?? 0) === 0) {
-            outcomes.push(...batch.map((t) => ({ stepId: t.stepId, ok: true, message: 'registered in FortiCloud' })))
-        } else {
-            outcomes.push(...fail(batch, text(field(json, 'message')) || errorText(response.status, response.body)))
-        }
+        const error = isSuccess(response.status) ? fortiCloudError(json) : errorText(response.status, response.body)
+        if (error === null) outcomes.push(...batch.map((t) => ({ stepId: t.stepId, ok: true, message: 'registered in FortiCloud' })))
+        else outcomes.push(...fail(batch, error))
     }
     return { outcomes, calls }
 }

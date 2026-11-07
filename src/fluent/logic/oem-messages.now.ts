@@ -243,6 +243,7 @@ RestMessage({
             name: 'logout',
             httpMethod: 'POST',
             endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/logout',
+            content: '{}',
             headers: [{ $id: Now.ID['rm_checkpoint_logout_sid_header'], name: 'X-chkp-sid', value: '${sid}' }],
             variables: [{ $id: Now.ID['rm_checkpoint_logout_sid'], name: 'sid' }],
         },

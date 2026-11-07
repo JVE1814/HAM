@@ -196,13 +196,18 @@ describe('Fortinet', () => {
             { serial: 'FGT60F000002', covered: true, contractNumber: 'FC-ONLY', serviceLevel: '24x7 FortiCare', startDate: '2025-01-01', endDate: '2027-01-01' },
         ])
         expect(result.errors).toEqual(['products_list FGT60F000003: Unit not found in this account', 'products_list BAD: Invalid serial number'])
-        // Only the serials whose call failed stay unchecked; the answered one is stamped.
-        expect(result.failed).toEqual(['FGT60F000003', 'BAD'])
+        // API errors in the envelope are answers: those serials are rejected (asked again after the
+        // refresh interval), not failed, so permanent rejections do not block the queue.
+        expect(result.failed).toEqual([])
+        expect(result.rejected).toEqual(['FGT60F000003', 'BAD'])
     })
 
     it('reports an HTTP failure for that serial only', () => {
-        const { http } = fakeHttp({ products_list: (params) => (params.serial === 'DOWN' ? { status: 503, body: '' } : fortiEnvelope({ status: 0, assets: [] })) })
-        expect(OEM_ADAPTERS.fortinet.coverage!.run(['OK1', 'DOWN'], { http, orgIds: [] }).failed).toEqual(['DOWN'])
+        // fakeHttp answers HTTP 500 when the handler returns undefined.
+        const { http } = fakeHttp({ products_list: (params) => (params.serial === 'DOWN' ? undefined : fortiEnvelope({ status: 0, assets: [] })) })
+        const result = OEM_ADAPTERS.fortinet.coverage!.run(['OK1', 'DOWN'], { http, orgIds: [] })
+        expect(result.failed).toEqual(['DOWN'])
+        expect(result.rejected).toEqual([])
     })
 })
 
@@ -215,11 +220,28 @@ describe('coverage failures', () => {
         expect(result.failed).toEqual(serials.slice(0, 50))
     })
 
-    it('Mist marks a serial failed only when no org answered', () => {
+    it('Mist marks a serial failed when an org failed and no org had the device', () => {
         const http = (request: { params: Record<string, string> }) =>
-            request.params.org_id === 'down' ? { status: 502, body: '' } : { status: 200, body: '[]' }
+            request.params.org_id === 'down'
+                ? { status: 502, body: '' }
+                : request.params.org_id === 'has'
+                  ? { status: 200, body: JSON.stringify([{ serial: 'A1', warranty_end: '2028-01-01' }]) }
+                  : { status: 200, body: '[]' }
         expect(OEM_ADAPTERS.mist.coverage!.run(['A1'], { http, orgIds: ['down'] }).failed).toEqual(['A1'])
-        expect(OEM_ADAPTERS.mist.coverage!.run(['A1'], { http, orgIds: ['down', 'up'] }).failed).toEqual([])
+        // The device may be in the org that failed: not known yet.
+        expect(OEM_ADAPTERS.mist.coverage!.run(['A1'], { http, orgIds: ['down', 'up'] }).failed).toEqual(['A1'])
+        // Every org answered that it has none: answered (no coverage).
+        expect(OEM_ADAPTERS.mist.coverage!.run(['A1'], { http, orgIds: ['up'] }).failed).toEqual([])
+        // Found in a later org despite an earlier failure: answered.
+        expect(OEM_ADAPTERS.mist.coverage!.run(['A1'], { http, orgIds: ['down', 'has'] })).toMatchObject({ failed: [], facts: [{ serial: 'A1', endDate: '2028-01-01' }] })
+    })
+
+    it('Cisco treats an answer without serial_numbers as rejected (asked again after the refresh interval)', () => {
+        const http = () => ({ status: 200, body: JSON.stringify({ ErrorResponse: { APIError: { ErrorCode: 'EXCEEDED_OUTPUT' } } }) })
+        const result = OEM_ADAPTERS.cisco.coverage!.run(['S1', 'S2'], { http, orgIds: [] })
+        expect(result.failed).toEqual([])
+        expect(result.rejected).toEqual(['S1', 'S2'])
+        expect(result.errors).toEqual(['coverage_by_serial: no serial_numbers in the response'])
     })
 })
 

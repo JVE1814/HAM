@@ -38,7 +38,13 @@
   - Each Asset gets its coverage end and service level (latest covering contract) and is stamped as
     checked. Records sharing a serial are all updated.
   - When a vendor call fails, only the serials it was asked about are left unchecked (the answered
-    ones are stamped), and that vendor waits for the next run.
+    ones are stamped), and that vendor waits for the next run. When the vendor answers with an
+    error of its own (FortiCloud status other than 0, an SN2INFO answer without `serial_numbers`),
+    the serials keep their coverage and are asked again only after the refresh interval, so
+    permanent rejections do not hold the queue.
+  - A vendor's own newer lifecycle answer replaces the dates it stored before; dates from CSV or
+    another source are only filled in where missing. A response without a coverage start date keeps
+    the stored one.
   - Fortinet: one batch of at most 90 serials per run. FortiCloud allows 100 calls per minute and
     1000 per hour, and `products/list` takes one serial per call. Every 4 hours that is about 540
     serials a day, so a fleet above roughly 3,800 FortiGates is not fully refreshed within the

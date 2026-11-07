@@ -57,15 +57,20 @@ function upsertLifecycle(modelId: string, incoming: LifecycleDates, vendor: OemV
         lifecycle.initialize()
         lifecycle.setValue('model', modelId)
     }
-    const merged = mergeLifecycle(
-        {
-            endOfSale: str(lifecycle, 'end_of_sale') || undefined,
-            endOfSupport: str(lifecycle, 'end_of_support') || undefined,
-            endOfExtendedSupport: str(lifecycle, 'end_of_extended_support') || undefined,
-            endOfLife: str(lifecycle, 'end_of_life') || undefined,
-        },
-        incoming,
-    )
+    // The vendor's own latest answer replaces what it wrote before (so a remapped field does not
+    // linger); dates from another source (CSV, another vendor) are only filled in where missing.
+    const sameSource = exists && str(lifecycle, 'source') === vendor
+    const merged = sameSource
+        ? incoming
+        : mergeLifecycle(
+              {
+                  endOfSale: str(lifecycle, 'end_of_sale') || undefined,
+                  endOfSupport: str(lifecycle, 'end_of_support') || undefined,
+                  endOfExtendedSupport: str(lifecycle, 'end_of_extended_support') || undefined,
+                  endOfLife: str(lifecycle, 'end_of_life') || undefined,
+              },
+              incoming,
+          )
     lifecycle.setValue('end_of_sale', merged.endOfSale ?? '')
     lifecycle.setValue('end_of_support', merged.endOfSupport ?? '')
     lifecycle.setValue('end_of_extended_support', merged.endOfExtendedSupport ?? '')
@@ -107,9 +112,15 @@ export function syncOemCoverage(): void {
             // back every unanswered serial of a batch with errors.
             const failed = result.errors.length > 0
             const failedSerials = result.failed ? new Set(result.failed.map(normalizeSerial)) : undefined
+            const rejectedSerials = new Set((result.rejected ?? []).map(normalizeSerial))
             for (const [serial, assetIds] of assets) {
                 const facts = factsBySerial.get(serial) ?? []
                 if (failedSerials ? failedSerials.has(serial) : failed && facts.length === 0) continue
+                if (rejectedSerials.has(serial)) {
+                    // Answered with an error: keep the coverage, ask again after the refresh interval.
+                    for (const assetId of assetIds) stampCoverageChecked(assetId)
+                    continue
+                }
                 for (const assetId of assetIds) {
                     for (const fact of facts) upsertCoverage(assetId, vendor, fact, 'api')
                     refreshAssetCoverage(assetId)
@@ -152,7 +163,8 @@ function upsertCoverage(assetId: string, vendor: OemVendor, fact: CoverageFact, 
     coverage.setValue('contract_number', fact.contractNumber)
     coverage.setValue('service_level', fact.serviceLevel)
     coverage.setValue('covered', fact.covered)
-    coverage.setValue('start_date', fact.startDate ?? '')
+    // A response without a start date (SN2INFO v2) keeps the one stored earlier.
+    if (fact.startDate !== undefined || !exists) coverage.setValue('start_date', fact.startDate ?? '')
     // A renewed contract (new end date) can expire again: warn about it afresh.
     if (str(coverage, 'end_date') !== (fact.endDate ?? '')) coverage.setValue('expiry_notified', false)
     coverage.setValue('end_date', fact.endDate ?? '')
@@ -161,22 +173,31 @@ function upsertCoverage(assetId: string, vendor: OemVendor, fact: CoverageFact, 
     coverage.setValue('last_checked', msToGlide(nowMs()))
     if (exists) coverage.update()
     else coverage.insert()
-    if (source === 'api' && fact.contractNumber) retireUnnumberedRows(vendor, normalizeSerial(fact.serial))
+    if (source === 'api' && vendor === 'fortinet' && fact.contractNumber) retireUnnumberedFortinetRows(normalizeSerial(fact.serial))
 }
 
 /**
- * Earlier syncs stored some API contracts without a number (FortiCloud's lives on contracts[], read
- * since the contract fix). Once the numbered contract arrives, the unnumbered row stops covering, so
- * it neither keeps the Asset covered nor raises expiry warnings for a contract that was renewed.
+ * Earlier Fortinet syncs stored contracts without a number (FortiCloud's lives on contracts[], read
+ * since the contract fix). Once the numbered contract arrives, an unnumbered row not refreshed in the
+ * last day stops covering, so it neither keeps the Asset covered nor raises expiry warnings; rows
+ * written by this sync run are left alone.
  */
-function retireUnnumberedRows(vendor: OemVendor, serial: string): void {
+function retireUnnumberedFortinetRows(serial: string): void {
     const stale = new GlideRecord('x_daas_ham_oem_coverage')
-    stale.addEncodedQuery(`serial_number=${serial}^vendor=${vendor}^source=api^contract_numberISEMPTY^covered=true`)
+    stale.addEncodedQuery(`serial_number=${serial}^vendor=fortinet^source=api^contract_numberISEMPTY^covered=true^last_checked<javascript:gs.daysAgoStart(1)`)
     stale.query()
     while (stale.next()) {
         stale.setValue('covered', false)
         stale.update()
     }
+}
+
+/** Stamp an asset's coverage as checked without changing it (the vendor answered with an error). */
+function stampCoverageChecked(assetId: string): void {
+    const asset = new GlideRecord('alm_hardware')
+    if (!asset.get(assetId)) return
+    asset.setValue('x_daas_ham_coverage_checked', msToGlide(nowMs()))
+    asset.update()
 }
 
 /** Re-summarise an asset's coverage contracts onto the asset and stamp it checked. */
