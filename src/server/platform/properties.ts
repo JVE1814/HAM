@@ -42,3 +42,8 @@ export function stringProperty(name: string, fallback = ''): string {
 export function boolProperty(name: string, fallback: boolean): boolean {
     return gs.getProperty(name, String(fallback)) === 'true'
 }
+
+/** The staging centre's stockroom: where purchased units ship to, Assets are staged and shipments leave from ('' while none is set). */
+export function stagingStockroom(): string {
+    return stringProperty(PROPERTY.stagingStockroom)
+}

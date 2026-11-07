@@ -1,11 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { PurchaseResult } from '../domain/sourcing'
-import { PROPERTY, stringProperty } from './properties'
-
-/** The staging centre's stockroom: where purchased units ship to and Assets are staged ('' while none is set). */
-export function stagingStockroom(): string {
-    return stringProperty(PROPERTY.stagingStockroom)
-}
+import { PROPERTY, stagingStockroom } from './properties'
 
 /**
  * Purchase orders through the Procurement plugin (proc_po / proc_po_item), shipped to the staging

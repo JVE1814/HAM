@@ -137,11 +137,7 @@ function staleAssets(vendor: OemVendor, staleBefore: string, limit: number): Map
     return assets
 }
 
-/**
- * Write the answers onto the coverage of the answered Assets' serials (`answered`: Asset sys_id to normalised
- * serial), give each answered Asset its serial's coverage, and stamp it and each `stamped` Asset (the vendor
- * answered with an error: its coverage is kept) checked.
- */
+/** Write the answers onto the answered serials' coverage (writeCoverage) and summarise it onto the Assets (refreshAssetCoverage), with one check time; shared by the API sync and the CSV import. */
 function applyCoverage(vendor: OemVendor, source: 'api' | 'csv', answered: ReadonlyMap<string, string>, answers: readonly CoverageAnswer[], stamped: readonly string[]): void {
     const checkedAt = msToGlide(nowMs())
     const serials = [...new Set(answered.values())]

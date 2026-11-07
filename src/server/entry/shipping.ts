@@ -17,7 +17,7 @@ import {
     type TrackingEvent,
 } from '../domain/shipping'
 import { msToGlide, nowMs } from '../platform/clock'
-import { boolProperty, intProperty, PROPERTY, stringProperty } from '../platform/properties'
+import { boolProperty, intProperty, PROPERTY, stagingStockroom, stringProperty } from '../platform/properties'
 import { count, findById, str } from '../platform/records'
 import { restMessagePort } from '../platform/rest-port'
 import { queryParam, reply } from '../platform/rest-api'
@@ -55,7 +55,7 @@ function siteContact(site: GlideRecord): { name: string; phone: string } {
 }
 
 function depot(): GlideRecord | null {
-    return findById('alm_stockroom', stringProperty(PROPERTY.stagingStockroom))
+    return findById('alm_stockroom', stagingStockroom())
 }
 
 /**
