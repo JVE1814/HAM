@@ -21,10 +21,19 @@ export function isSuccess(status: number): boolean {
     return status >= 200 && status < 300
 }
 
-/** "HTTP 400: <first error>" from the common error shapes (errors[] of strings or objects, message, detail). */
+/**
+ * "HTTP 400: <first error>" from the common error shapes: errors[] of strings or objects, message,
+ * detail, and the OAuth-style {error, error_description} used by FortiCloud and FortiZTP.
+ */
 export function errorText(status: number, body: string): string {
     const json = parseJson(body)
     const first = asArray(field(json, 'errors'))[0]
-    const detail = text(first) || text(field(first, 'message')) || text(field(json, 'message')) || text(field(json, 'detail'))
+    const detail =
+        text(first) ||
+        text(field(first, 'message')) ||
+        text(field(json, 'message')) ||
+        text(field(json, 'detail')) ||
+        text(field(json, 'error_description')) ||
+        text(field(json, 'error'))
     return `HTTP ${status}${detail ? `: ${detail}` : ''}`
 }

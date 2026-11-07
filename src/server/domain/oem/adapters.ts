@@ -29,10 +29,25 @@ function call(context: OemContext, fn: string, params: Record<string, string>, e
 
 // --- Cisco Support APIs (EoX v5, SN2INFO v2, Service Order Return) ---------------------------
 
+/** EoX v5 takes up to 20 PIDs per call, and the comma-joined productID is limited to 250 characters. */
+function eoxBatches(pids: readonly string[]): string[][] {
+    const out: string[][] = []
+    let batch: string[] = []
+    for (const pid of pids) {
+        if (batch.length === 20 || (batch.length > 0 && [...batch, pid].join(',').length > 250)) {
+            out.push(batch)
+            batch = []
+        }
+        batch.push(pid)
+    }
+    if (batch.length > 0) out.push(batch)
+    return out
+}
+
 const ciscoLifecycle: Capability<LifecycleFact> = (pids, context) => {
     const facts: LifecycleFact[] = []
     const errors: string[] = []
-    for (const batch of chunks(pids, 20)) {
+    for (const batch of eoxBatches(pids)) {
         const json = call(context, 'eox_by_pid', { pids: batch.join(',') }, errors)
         for (const record of asArray(field(json, 'EOXRecord'))) {
             if (field(record, 'EOXError')) continue // product without an EoX bulletin
@@ -56,8 +71,10 @@ const ciscoLifecycle: Capability<LifecycleFact> = (pids, context) => {
 const ciscoCoverage: Capability<CoverageFact> = (serials, context) => {
     const facts: CoverageFact[] = []
     const errors: string[] = []
+    const failed: string[] = []
     for (const batch of chunks(serials, 50)) {
         const json = call(context, 'coverage_by_serial', { serials: batch.join(',') }, errors)
+        if (json === undefined) failed.push(...batch)
         for (const record of asArray(field(json, 'serial_numbers'))) {
             const serial = text(field(record, 'sr_no'))
             if (!serial) continue
@@ -66,12 +83,16 @@ const ciscoCoverage: Capability<CoverageFact> = (serials, context) => {
                 covered: text(field(record, 'is_covered')).toUpperCase() === 'YES',
                 contractNumber: text(field(record, 'service_contract_number')),
                 serviceLevel: text(field(record, 'service_line_descr')),
-                startDate: isoDate(field(record, 'coverage_start_date')),
-                endDate: isoDate(field(record, 'coverage_end_date')) ?? isoDate(field(record, 'warranty_end_date')),
+                startDate: undefined, // the SN2INFO v2 summary has no coverage start date
+                // Contract end (v2 summary), then the v1.0 name, then the warranty end.
+                endDate:
+                    isoDate(field(record, 'covered_product_line_end_date')) ??
+                    isoDate(field(record, 'coverage_end_date')) ??
+                    isoDate(field(record, 'warranty_end_date')),
             })
         }
     }
-    return { facts, errors }
+    return { facts, errors, failed }
 }
 
 const ciscoRmaStatus: Capability<RmaFact> = (rmaNumbers, context) => {
@@ -119,11 +140,31 @@ const merakiLifecycle: Capability<LifecycleFact> = (pids, context) => {
 
 // --- Fortinet Asset Management API v3 --------------------------------------------------------
 
+/** The asset's contract that has a term ending on the given date, else its first contract. */
+function fortinetContract(asset: unknown, end: string | undefined): unknown {
+    const contracts = asArray(field(asset, 'contracts'))
+    const matching = contracts.find((c) => end !== undefined && asArray(field(c, 'terms')).some((t) => isoDate(field(t, 'endDate')) === end))
+    return matching ?? contracts[0]
+}
+
 const fortinetCoverage: Capability<CoverageFact> = (serials, context) => {
     const facts: CoverageFact[] = []
     const errors: string[] = []
+    const failed: string[] = []
     for (const serial of serials) {
         const json = call(context, 'products_list', { serial }, errors)
+        if (json === undefined) {
+            failed.push(serial)
+            continue
+        }
+        // FortiCloud reports API errors in an HTTP 200 envelope: status 0 means success. Leave the
+        // serial unanswered (stale) rather than stamping it checked with no coverage.
+        if (Number(field(json, 'status') ?? 0) !== 0) {
+            const detail = text(field(json, 'message')) || text(field(json, 'error')) || `status ${text(field(json, 'status'))}`
+            errors.push(`products_list ${serial}: ${detail}`)
+            failed.push(serial)
+            continue
+        }
         for (const asset of asArray(field(json, 'assets'))) {
             const entitlements = asArray(field(asset, 'entitlements'))
                 .map((e) => ({
@@ -137,35 +178,45 @@ const fortinetCoverage: Capability<CoverageFact> = (serials, context) => {
             facts.push({
                 serial: text(field(asset, 'serialNumber')) || serial,
                 covered: !!latest,
-                contractNumber: text(field(asset, 'contractNumber')),
+                contractNumber: text(field(fortinetContract(asset, latest?.end), 'contractNumber')),
                 serviceLevel: latest?.level ?? '',
                 startDate: latest?.start,
                 endDate: latest?.end,
             })
         }
     }
-    return { facts, errors }
+    return { facts, errors, failed }
 }
 
 // --- HPE Mist (JSI inventory) ----------------------------------------------------------------
 
-function mistItems(context: OemContext, fn: 'jsi_by_model' | 'jsi_by_serial', params: Record<string, string>, errors: string[]): unknown[] {
+/** The first org's matching JSI items; `answered` is false when no org gave an answer (every call failed). */
+function mistLookup(context: OemContext, fn: 'jsi_by_model' | 'jsi_by_serial', params: Record<string, string>, errors: string[]): { items: unknown[]; answered: boolean } {
+    let answered = false
     for (const orgId of context.orgIds) {
-        const items = asArray(call(context, fn, { org_id: orgId, ...params }, errors))
-        if (items.length > 0) return items
+        const json = call(context, fn, { org_id: orgId, ...params }, errors)
+        if (json === undefined) continue
+        answered = true
+        const items = asArray(json)
+        if (items.length > 0) return { items, answered }
     }
-    return []
+    return { items: [], answered }
+}
+
+function mistItems(context: OemContext, fn: 'jsi_by_model' | 'jsi_by_serial', params: Record<string, string>, errors: string[]): unknown[] {
+    return mistLookup(context, fn, params, errors).items
 }
 
 const mistLifecycle: Capability<LifecycleFact> = (pids, context) => {
     const facts: LifecycleFact[] = []
     const errors: string[] = []
     for (const pid of pids) {
-        const item = mistItems(context, 'jsi_by_model', { model: pid }, errors).find((i) => field(i, 'eos_time') || field(i, 'eol_time'))
+        // JSI: end_of_sale_time is end of sale, eos_time is end of support (epoch seconds).
+        const item = mistItems(context, 'jsi_by_model', { model: pid }, errors).find((i) => field(i, 'end_of_sale_time') || field(i, 'eos_time'))
         if (!item) continue
         facts.push({
             pid,
-            dates: { endOfSale: isoDate(field(item, 'eos_time')), endOfLife: isoDate(field(item, 'eol_time')) },
+            dates: { endOfSale: isoDate(field(item, 'end_of_sale_time')), endOfSupport: isoDate(field(item, 'eos_time')) },
             reference: 'mist:jsi',
         })
     }
@@ -175,20 +226,24 @@ const mistLifecycle: Capability<LifecycleFact> = (pids, context) => {
 const mistCoverage: Capability<CoverageFact> = (serials, context) => {
     const facts: CoverageFact[] = []
     const errors: string[] = []
+    const failed: string[] = []
     for (const serial of serials) {
-        const item = mistItems(context, 'jsi_by_serial', { serial }, errors)[0]
+        const { items, answered } = mistLookup(context, 'jsi_by_serial', { serial }, errors)
+        if (!answered && context.orgIds.length > 0) failed.push(serial)
+        const item = items[0]
         if (!item) continue
-        const end = isoDate(field(item, 'warranty_end_time')) ?? isoDate(field(item, 'contract_end_time'))
+        // JSI dates are YYYY-MM-DD strings; has_support means an active support contract.
+        const end = isoDate(field(item, 'warranty_end')) ?? isoDate(field(item, 'contract_end_date'))
         facts.push({
             serial,
-            covered: !!end,
+            covered: field(item, 'has_support') === true || !!end,
             contractNumber: text(field(item, 'contract_id')),
             serviceLevel: text(field(item, 'warranty_type')) || text(field(item, 'contract_type')),
-            startDate: isoDate(field(item, 'warranty_start_time')) ?? isoDate(field(item, 'contract_start_time')),
+            startDate: isoDate(field(item, 'warranty_start')) ?? isoDate(field(item, 'contract_start_date')),
             endDate: end,
         })
     }
-    return { facts, errors }
+    return { facts, errors, failed }
 }
 
 interface Route<T> {

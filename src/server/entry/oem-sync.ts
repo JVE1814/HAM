@@ -16,6 +16,15 @@ import { bool, num, str } from '../platform/records'
 
 const VENDORS: readonly OemVendor[] = ['cisco', 'meraki', 'fortinet', 'mist', 'aruba', 'checkpoint']
 
+/** Assets per coverage batch. */
+const COVERAGE_BATCH = 200
+
+/**
+ * FortiCloud allows 100 calls per minute and 1000 per hour, and products/list takes one serial per
+ * call: one batch of at most 90 serials per run (every 4 hours).
+ */
+const FORTINET_SERIALS_PER_RUN = 90
+
 function report(job: string, errors: readonly string[]): void {
     for (const error of errors.slice(0, 20)) gs.warn(`[x_daas_ham] ${job}: ${error}`)
 }
@@ -70,7 +79,8 @@ function upsertLifecycle(modelId: string, incoming: LifecycleDates, vendor: OemV
 
 /**
  * Every 4 hours: OEM coverage of assets not checked for x_daas_ham.oem.coverage_refresh_days, oldest
- * first, until the time budget is spent. Checked assets drop out of the query, so no cursor is needed.
+ * first, until the time budget is spent (FortiCloud: one rate-limited batch). Checked assets drop out
+ * of the query, so no cursor is needed.
  */
 export function syncOemCoverage(): void {
     const started = nowMs()
@@ -80,9 +90,10 @@ export function syncOemCoverage(): void {
     for (const vendor of VENDORS) {
         const route = OEM_ADAPTERS[vendor].coverage
         if (!route || !oemEnabled(route.via)) continue
+        const rateLimited = route.via === 'fortinet'
         for (;;) {
             if (nowMs() - started > budgetMs) return
-            const assets = staleAssets(vendor, staleBefore.getValue(), 200)
+            const assets = staleAssets(vendor, staleBefore.getValue(), rateLimited ? FORTINET_SERIALS_PER_RUN : COVERAGE_BATCH)
             if (assets.size === 0) break
             const result = route.run([...assets.keys()], oemContext(route.via))
             report(`coverage ${vendor}`, result.errors)
@@ -91,18 +102,20 @@ export function syncOemCoverage(): void {
                 const key = normalizeSerial(fact.serial)
                 factsBySerial.set(key, [...(factsBySerial.get(key) ?? []), fact])
             }
-            // A failed call says nothing about its serials: leave them stale for the next run and
-            // move on, rather than stamping them checked or asking again straight away.
+            // A failed call says nothing about its serials: leave them stale for the next run, and
+            // stamp the ones that were answered. Adapters that do not say which serials failed hold
+            // back every unanswered serial of a batch with errors.
             const failed = result.errors.length > 0
+            const failedSerials = result.failed ? new Set(result.failed.map(normalizeSerial)) : undefined
             for (const [serial, assetIds] of assets) {
                 const facts = factsBySerial.get(serial) ?? []
-                if (failed && facts.length === 0) continue
+                if (failedSerials ? failedSerials.has(serial) : failed && facts.length === 0) continue
                 for (const assetId of assetIds) {
                     for (const fact of facts) upsertCoverage(assetId, vendor, fact, 'api')
                     refreshAssetCoverage(assetId)
                 }
             }
-            if (failed) break
+            if (failed || rateLimited) break
         }
     }
 }
@@ -148,6 +161,22 @@ function upsertCoverage(assetId: string, vendor: OemVendor, fact: CoverageFact, 
     coverage.setValue('last_checked', msToGlide(nowMs()))
     if (exists) coverage.update()
     else coverage.insert()
+    if (source === 'api' && fact.contractNumber) retireUnnumberedRows(vendor, normalizeSerial(fact.serial))
+}
+
+/**
+ * Earlier syncs stored some API contracts without a number (FortiCloud's lives on contracts[], read
+ * since the contract fix). Once the numbered contract arrives, the unnumbered row stops covering, so
+ * it neither keeps the Asset covered nor raises expiry warnings for a contract that was renewed.
+ */
+function retireUnnumberedRows(vendor: OemVendor, serial: string): void {
+    const stale = new GlideRecord('x_daas_ham_oem_coverage')
+    stale.addEncodedQuery(`serial_number=${serial}^vendor=${vendor}^source=api^contract_numberISEMPTY^covered=true`)
+    stale.query()
+    while (stale.next()) {
+        stale.setValue('covered', false)
+        stale.update()
+    }
 }
 
 /** Re-summarise an asset's coverage contracts onto the asset and stamp it checked. */

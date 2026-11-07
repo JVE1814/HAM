@@ -27,4 +27,6 @@ export interface RmaFact {
 export interface Fetched<T> {
     facts: T[]
     errors: string[]
+    /** Keys (serials) whose call failed, so nothing is known about them; the others were answered. */
+    failed?: string[]
 }
