@@ -68,6 +68,8 @@ export const x_daas_ham_job_lock = Table({
     name: 'x_daas_ham_job_lock',
     label: 'Job lock',
     display: 'name',
+    // Locks are taken and released all the time; their deletes are not worth keeping in Deleted Records.
+    attributes: { no_audit_delete: true },
     schema: {
         name: StringColumn({ label: 'Lock', maxLength: 100, mandatory: true }),
     },

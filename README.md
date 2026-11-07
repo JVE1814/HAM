@@ -198,8 +198,12 @@ What remains can only be confirmed on an instance or behind a vendor login:
 - **Vendor-login-only contracts**: FortiCloud `products/register` and FortiZTP provisioning schemas
   (FNDN), Cisco API quotas (API Console), and whether ShipEngine labels are tracked automatically or
   need `/v1/tracking/start`.
-- **Job lock**: that inserting a second `x_daas_ham_job_lock` row with the same name is refused by the
-  unique index (`GlideRecord.insert()` returns no sys_id), which margin recomputes rely on (ADR 0013).
+- **Job lock** (margin recomputes, ADR 0013): *Job lock* shows a unique database index on *Lock*; a
+  second row with the same name is refused (`GlideRecord.insert()` returns no sys_id) without throwing,
+  and the `x_daas_ham.margin.compute` event still ends as processed (one *Unique Key violation* error in
+  the system log per contention is expected); a lock row created over 10 minutes ago is cleared by the
+  next recompute and a fresh one is not; a chunk that finds the lock held runs again about a minute
+  later; and no lock row is left once a recompute completes.
 - **Scale**: before-query rule performance and the chunked jobs at your data volumes (indexes are
   declared on the scoped columns).
 - **Currency**: amounts are written in each line's currency (default EUR); confirm the session

@@ -29,11 +29,8 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     try {
         computeMarginChunk(period, str(event, 'parm2'), current)
     } catch (error) {
-        // A chunk that throws queues no next one: the pass stops, and the period must not read as complete.
-        const message = error instanceof Error ? error.message : String(error)
-        gs.error(`[x_daas_ham] Margin of ${str(period, 'period')} stopped: ${message}`)
-        const fresh = findById('x_daas_ham_billing_period', periodId)
-        if (fresh) saveMarginStatus(fresh, num(fresh, 'margin_failed'), `stopped: ${message}`)
+        // The pass stops (the runner records it on the period through `stopped` while the pass is current).
+        gs.error(`[x_daas_ham] Margin of ${str(period, 'period')} stopped: ${error instanceof Error ? error.message : String(error)}`)
     }
 }
 
@@ -58,6 +55,11 @@ function computeMarginChunk(period: GlideRecord, cursor: string, current: GlideR
             complete: () => {
                 addFieldLabour(periodId, bounds)
                 writeMargin(periodId)
+            },
+            // A chunk that throws queues no next one: the pass stops, and the period must not read as complete.
+            stopped: (error) => {
+                const fresh = findById('x_daas_ham_billing_period', periodId)
+                if (fresh) saveMarginStatus(fresh, num(fresh, 'margin_failed'), `stopped: ${error}`)
             },
         },
         table: 'x_daas_ham_service_interval',
