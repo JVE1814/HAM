@@ -26812,6 +26812,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '8389bf8ff8cc41f9bf2be9b4698d7d16'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'margin_failed'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '839478d4518b4e0e9eb6404d0a61e8d4'
                         key: {
@@ -42576,6 +42584,15 @@ declare global {
                             element: 'NULL'
                             relationship: 'NULL'
                             parent: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'ddba580ef25740e5baa81a482beab7a2'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'margin_failed'
+                            language: 'en'
                         }
                     },
                     {

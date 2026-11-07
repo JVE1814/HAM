@@ -41,7 +41,7 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
             job: `margin_${periodId}`,
             onStart: () => {
                 clearPeriod(periodId)
-                noteMarginError(periodId, '')
+                saveMarginFailures(period, 0, '')
             },
         },
         table: 'x_daas_ham_service_interval',
@@ -61,11 +61,11 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
         },
         flush: (run) => writeCostFacts(periodId, run, ledger.drain()),
     })
+    if (result.superseded) return
     if (result.failed > 0) {
-        const error = `${result.failed} service interval(s) failed: ${result.lastError}`
-        gs.error(`[x_daas_ham] Margin of ${str(period, 'period')}: ${error}`)
+        gs.error(`[x_daas_ham] Margin of ${str(period, 'period')}: ${result.failed} service interval(s) failed: ${result.lastError}`)
         // Margin is still written without them, so the period says it is incomplete.
-        noteMarginError(periodId, error)
+        saveMarginFailures(period, num(period, 'margin_failed') + result.failed, result.lastError)
     }
     if (!result.done) return
     // Drop older passes' Cost facts (a superseded pass may have flushed a last batch after this one
@@ -76,21 +76,22 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
 }
 
 /**
- * Empty the period's Cost facts and Margin as a pass starts: the dashboard reads Cost facts whatever
- * their run, so the period must not show an earlier pass's facts alongside this one's.
+ * Record on the Billing period how many Service intervals the current margin computation failed to cost
+ * and the last error (0 and '' to clear them), saving only a change. The period is closed and locked;
+ * these fields are about Margin, not the bill, so the lock's rule is not run.
  */
-/**
- * Record (or clear, with '') the latest margin computation's error on its Billing period. The period
- * is closed and locked; this field is about Margin, not the bill, so the lock's rule is not run.
- */
-function noteMarginError(periodId: string, error: string): void {
-    const period = findById('x_daas_ham_billing_period', periodId)
-    if (!period) return
+function saveMarginFailures(period: GlideRecord, failed: number, error: string): void {
+    if (num(period, 'margin_failed') === failed && str(period, 'margin_error') === error.slice(0, 255)) return
+    period.setValue('margin_failed', failed)
     period.setValue('margin_error', error.slice(0, 255))
     period.setWorkflow(false)
     period.update()
 }
 
+/**
+ * Empty the period's Cost facts and Margin as a pass starts: the dashboard reads Cost facts whatever
+ * their run, so the period must not show an earlier pass's facts alongside this one's.
+ */
 function clearPeriod(periodId: string): void {
     for (const table of ['x_daas_ham_cost_fact', 'x_daas_ham_margin']) deleteWhere(table, `billing_period=${periodId}`)
 }

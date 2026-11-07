@@ -101,6 +101,8 @@ interface EventJobFields {
 export interface EventTableJobResult extends ChunkedJobResult {
     /** The pass's token: a new one for each pass when `supersede` is set, else ''. */
     run: string
+    /** A fresh pass superseded this chunk's: it completes nothing (`done` is false), and what it counted no longer matters. */
+    superseded: boolean
 }
 
 /**
@@ -110,7 +112,8 @@ export interface EventTableJobResult extends ChunkedJobResult {
  * checked as a chunk starts, before it flushes and, for the last chunk, after it flushes, so a pass
  * superseded meanwhile is not completed. A chunk superseded during its flush still flushes under its
  * own pass's token: whatever completes a pass tells what it wrote from what an older pass did by the
- * token (see runsBefore).
+ * token (see runsBefore). A fresh pass starting while a last chunk completes its pass is not seen: the
+ * fresh pass's own completion replaces what that one wrote.
  */
 export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): EventTableJobResult {
     const supersede = spec.supersede
@@ -142,8 +145,7 @@ export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): EventTabl
             else if (supersede && !isCurrentRun(supersede.job, token)) superseded = true
         },
     })
-    const out = { ...result, run: token }
-    return superseded ? { ...out, done: false, lastError: 'superseded' } : out
+    return { ...result, done: result.done && !superseded, run: token, superseded }
 }
 
 type TableSource<T, R> = Pick<TableJobFields<T, R>, 'table' | 'query' | 'read' | 'handle'> & { prepare?: (rows: readonly R[]) => T[] }

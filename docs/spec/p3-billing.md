@@ -56,8 +56,8 @@ Closing a period (or **Recompute margin** on a closed one) rebuilds its **Cost f
   reflects today's data. A recompute started while another is running supersedes it: each Cost fact
   records the recompute that wrote it (*Computation run*), and a recompute that completes drops the
   Cost facts of earlier ones, adds field labour and rebuilds Margin from its own. Service intervals
-  that fail to cost are left out and the period's *Last margin error* says how many and why; it is
-  cleared when a recompute starts.
+  that fail to cost are left out, counted on the period (*Service intervals that failed to cost*) with
+  the last error (*Last margin error*); both are cleared when a recompute starts.
 - While a buyout transfer is still running, a lease's payment keeps being split over the Assets it
   covered when the buyout was decided.
 - **Revenue** is the period's billing lines (subscriptions per Site, fees at Customer level).
