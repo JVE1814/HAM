@@ -78,16 +78,6 @@ export function planSourcing(request: SourcingRequest, stock: readonly StockCand
 /** What came of requesting a purchase: the purchase order created, or why there is none. */
 export type PurchaseResult = { ok: true; poId: string } | { ok: false; reason: string }
 
-/** How sourcing buys the units of an Order line it could not take from stock. */
-export interface ShortfallPurchasing {
-    /** The staging stockroom purchased units ship to; '' while none is set. */
-    stagingStockroomId: string
-    /** Request a purchase order for the units, shipped to the stockroom given. */
-    purchase(shipToStockroomId: string): PurchaseResult
-    /** Why there is no purchase order while no staging stockroom is set (asked once for each purchase not requested). */
-    noStagingStockroom(): string
-}
-
 /** Where sourcing leaves an Order line. */
 export interface ShortfallOutcome {
     stage: Extract<LineStage, 'sourced' | 'awaiting_stock'>
@@ -99,25 +89,18 @@ export interface ShortfallOutcome {
 }
 
 /**
- * Where sourcing leaves an Order line once its shortfall is routed. A shortfall to be purchased is
- * bought only while a staging stockroom is set to ship the units to. The line is sourced unless no
- * purchase order comes of it, when it waits for stock and its summary says why; an OEM advance
- * replacement is noted in the summary. `missing` is the shortfall routed and `onOrder` the units
- * already on the line's purchase order.
+ * Where sourcing leaves an Order line once its shortfall is routed: sourced, unless the shortfall was
+ * to be purchased and `purchase` (called only then) brings no purchase order, when the line waits for
+ * stock and its summary says why; an OEM advance replacement is noted in the summary. `missing` is the
+ * shortfall routed and `onOrder` the units already on the line's purchase order.
  */
-export function shortfallOutcome(
-    route: ShortfallRoute,
-    line: { planSummary: string; missing: number; onOrder: number },
-    purchasing: ShortfallPurchasing,
-): ShortfallOutcome {
+export function shortfallOutcome(route: ShortfallRoute, line: { planSummary: string; missing: number; onOrder: number }, purchase: () => PurchaseResult): ShortfallOutcome {
     const sourced = { stage: 'sourced', summary: line.planSummary, quantityToPurchase: line.onOrder } as const
     if (route === 'none') return sourced
     if (route === 'oem_advance_replacement') return { ...sourced, summary: `${line.planSummary} (OEM advance replacement under RMA)` }
-    const purchase: PurchaseResult = purchasing.stagingStockroomId
-        ? purchasing.purchase(purchasing.stagingStockroomId)
-        : { ok: false, reason: purchasing.noStagingStockroom() }
-    if (!purchase.ok) return { ...sourced, stage: 'awaiting_stock', summary: `${line.planSummary} (no purchase order: ${purchase.reason})` }
-    return { ...sourced, purchaseOrder: purchase.poId, quantityToPurchase: line.onOrder + line.missing }
+    const purchased = purchase()
+    if (!purchased.ok) return { ...sourced, stage: 'awaiting_stock', summary: `${line.planSummary} (no purchase order: ${purchased.reason})` }
+    return { ...sourced, purchaseOrder: purchased.poId, quantityToPurchase: line.onOrder + line.missing }
 }
 
 /** Spares a Customer still needs to reach `ratio` × deployed Assets. */

@@ -3,7 +3,7 @@ import { groupDecisions, rollupApprovals } from '../domain/approvals'
 import { appendTo } from '../domain/collections'
 import { approversFor, assessOrder, type EntitlementVerdict, type RequestedLine } from '../domain/entitlement'
 import { shortfallRoute } from '../domain/returns'
-import { planSourcing, shortfallOutcome, type ShortfallPurchasing } from '../domain/sourcing'
+import { planSourcing, shortfallOutcome } from '../domain/sourcing'
 import { entitlementContext } from '../platform/agreements'
 import { approvalsOf, cancelPendingApprovals, customerAdminIds, providerApproverIds, requestApproval } from '../platform/approvals'
 import { moveAndSave, moveAsset, readStage } from '../platform/assets'
@@ -222,7 +222,14 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
     if (route === 'oem_advance_replacement' && replaced) {
         openOemRma({ defectiveAsset: replaced, orderLineId: line.getUniqueValue(), caseId: str(order, 'case') })
     }
-    const outcome = shortfallOutcome(route, { planSummary: plan.summary, missing: toPurchase, onOrder }, linePurchasing(order, line, toPurchase, stagingStockroom))
+    const purchase = () =>
+        requestPurchase({
+            modelId,
+            quantity: toPurchase,
+            shipToStockroomId: stagingStockroom,
+            description: `${str(order, 'number')} ${str(line, 'number')}: ${toPurchase} x ${str(line, 'model.display_name')}`,
+        })
+    const outcome = shortfallOutcome(route, { planSummary: plan.summary, missing: toPurchase, onOrder }, purchase)
     if (outcome.purchaseOrder) line.setValue('purchase_order', outcome.purchaseOrder)
     line.setValue('quantity_allocated', allocated + reserved)
     line.setValue('quantity_to_purchase', outcome.quantityToPurchase)
@@ -230,23 +237,6 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
     line.setValue('line_stage', outcome.stage)
     line.update()
     recomputeLine(line.getUniqueValue())
-}
-
-/**
- * Buying `quantity` units of a line's Model: a Procurement purchase order described by Order and line
- * number, or, with no staging stockroom set, a warning and a reason naming the property to set.
- */
-function linePurchasing(order: GlideRecord, line: GlideRecord, quantity: number, stagingStockroomId: string): ShortfallPurchasing {
-    const description = () => `${str(order, 'number')} ${str(line, 'number')}: ${quantity} x ${str(line, 'model.display_name')}`
-    return {
-        stagingStockroomId,
-        purchase: (shipToStockroomId) => requestPurchase({ modelId: str(line, 'model'), quantity, shipToStockroomId, description: description() }),
-        noStagingStockroom: () => {
-            const reason = `set ${PROPERTY.stagingStockroom}`
-            gs.warn(`[x_daas_ham] No purchase order (${reason}): ${description()}`)
-            return reason
-        },
-    }
 }
 
 function countAllocated(lineId: string): number {

@@ -1,4 +1,4 @@
-import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
+import { GlideAggregate, GlideRecord } from '@servicenow/glide'
 import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
 import { pickForSparePool, sparePoolShortfall } from '../domain/sourcing'
 import { moveAsset } from '../platform/assets'
@@ -33,6 +33,7 @@ function countByModel(query: string): Map<string, number> {
 function topUpAgreement(agreementId: string, customerId: string, ratio: number): void {
     const deployed = countByModel(stagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}`))
     const reserved = countByModel(stagesQuery(['spare_pool'], `company=${customerId}`))
+    const stagingStockroom = stringProperty(PROPERTY.stagingStockroom)
     for (const [modelId, deployedCount] of deployed) {
         const shortfall = sparePoolShortfall({ deployed: deployedCount, reserved: reserved.get(modelId) ?? 0, ratio })
         if (shortfall === 0) continue
@@ -47,13 +48,6 @@ function topUpAgreement(agreementId: string, customerId: string, ratio: number):
         if (!boolProperty(PROPERTY.autoPurchaseSpares, false)) continue
         const prefix = `Spare-pool top-up ${agreementId}:`
         const missing = shortfall - picked.length - openPurchaseQuantity(prefix, modelId)
-        if (missing <= 0) continue
-        const stagingStockroom = stringProperty(PROPERTY.stagingStockroom)
-        // Purchased spares ship to the staging centre: without one set, nothing is bought.
-        if (!stagingStockroom) {
-            gs.warn(`[x_daas_ham] No purchase order (set ${PROPERTY.stagingStockroom}): ${prefix} ${missing} unit(s)`)
-            continue
-        }
-        requestPurchase({ modelId, quantity: missing, shipToStockroomId: stagingStockroom, description: `${prefix} ${missing} unit(s)` })
+        if (missing > 0) requestPurchase({ modelId, quantity: missing, shipToStockroomId: stagingStockroom, description: `${prefix} ${missing} unit(s)` })
     }
 }

@@ -46,56 +46,38 @@ describe('planSourcing', () => {
 
 describe('shortfallOutcome', () => {
     const line = { planSummary: '1 from central stock, 2 to purchase', missing: 2, onOrder: 3 }
-    const purchasing = (stagingStockroomId: string, result: PurchaseResult = { ok: true, poId: 'po1' }) => ({
-        stagingStockroomId,
-        purchase: vi.fn((_shipToStockroomId: string) => result),
-        noStagingStockroom: vi.fn(() => 'set x_daas_ham.staging.default_stockroom'),
+    const purchase = (result: PurchaseResult = { ok: true, poId: 'po1' }) => vi.fn(() => result)
+
+    it('sources a line with nothing left to buy as planned, buying nothing', () => {
+        const buy = purchase()
+        expect(shortfallOutcome('none', { ...line, missing: 0 }, buy)).toEqual({ stage: 'sourced', summary: line.planSummary, quantityToPurchase: 3 })
+        expect(buy).not.toHaveBeenCalled()
     })
 
-    it('sources a line with nothing left to buy as planned, even while no staging stockroom is set', () => {
-        const procurement = purchasing('')
-        expect(shortfallOutcome('none', { ...line, missing: 0 }, procurement)).toEqual({ stage: 'sourced', summary: line.planSummary, quantityToPurchase: 3 })
-        expect(procurement.purchase).not.toHaveBeenCalled()
-        expect(procurement.noStagingStockroom).not.toHaveBeenCalled()
-    })
-
-    it('notes an OEM advance replacement without buying anything, even while no staging stockroom is set', () => {
-        const procurement = purchasing('')
-        expect(shortfallOutcome('oem_advance_replacement', { ...line, missing: 1 }, procurement)).toEqual({
+    it('notes an OEM advance replacement without buying anything', () => {
+        const buy = purchase()
+        expect(shortfallOutcome('oem_advance_replacement', { ...line, missing: 1 }, buy)).toEqual({
             stage: 'sourced',
             summary: '1 from central stock, 2 to purchase (OEM advance replacement under RMA)',
             quantityToPurchase: 3,
         })
-        expect(procurement.purchase).not.toHaveBeenCalled()
-        expect(procurement.noStagingStockroom).not.toHaveBeenCalled()
+        expect(buy).not.toHaveBeenCalled()
     })
 
-    it('buys for the staging stockroom, links the purchase order and counts its units on top of those already on order', () => {
-        const procurement = purchasing('lab')
-        expect(shortfallOutcome('purchase', line, procurement)).toEqual({ stage: 'sourced', summary: line.planSummary, purchaseOrder: 'po1', quantityToPurchase: 5 })
-        expect(procurement.purchase).toHaveBeenCalledExactlyOnceWith('lab')
-        expect(procurement.noStagingStockroom).not.toHaveBeenCalled()
+    it('buys once, links the purchase order and counts its units on top of those already on order', () => {
+        const buy = purchase()
+        expect(shortfallOutcome('purchase', line, buy)).toEqual({ stage: 'sourced', summary: line.planSummary, purchaseOrder: 'po1', quantityToPurchase: 5 })
+        expect(buy).toHaveBeenCalledOnce()
     })
 
-    it('leaves the line waiting for stock, saying why, when Procurement creates no purchase order', () => {
-        const procurement = purchasing('lab', { ok: false, reason: 'Procurement did not create it' })
-        expect(shortfallOutcome('purchase', line, procurement)).toEqual({
-            stage: 'awaiting_stock',
-            summary: '1 from central stock, 2 to purchase (no purchase order: Procurement did not create it)',
-            quantityToPurchase: 3,
-        })
-        expect(procurement.noStagingStockroom).not.toHaveBeenCalled()
-    })
-
-    it('requests no purchase while no staging stockroom is set and leaves the line waiting for stock, saying why', () => {
-        const procurement = purchasing('')
-        expect(shortfallOutcome('purchase', line, procurement)).toEqual({
-            stage: 'awaiting_stock',
-            summary: '1 from central stock, 2 to purchase (no purchase order: set x_daas_ham.staging.default_stockroom)',
-            quantityToPurchase: 3,
-        })
-        expect(procurement.purchase).not.toHaveBeenCalled()
-        expect(procurement.noStagingStockroom).toHaveBeenCalledOnce()
+    it('leaves the line waiting for stock, saying why, when no purchase order comes of it', () => {
+        for (const reason of ['Procurement did not create it', 'set x_daas_ham.staging.default_stockroom']) {
+            expect(shortfallOutcome('purchase', line, purchase({ ok: false, reason }))).toEqual({
+                stage: 'awaiting_stock',
+                summary: `1 from central stock, 2 to purchase (no purchase order: ${reason})`,
+                quantityToPurchase: 3,
+            })
+        }
     })
 })
 
