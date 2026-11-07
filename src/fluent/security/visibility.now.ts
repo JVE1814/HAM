@@ -114,6 +114,16 @@ BusinessRule({
 })
 
 BusinessRule({
+    $id: Now.ID['br_scope_shipment'],
+    name: 'NaaS - scope shipments',
+    table: 'x_daas_ham_shipment',
+    when: 'before',
+    action: ['query'],
+    order: 50,
+    script: scopeCustomerSiteRecords,
+})
+
+BusinessRule({
     $id: Now.ID['br_scope_attestation'],
     name: 'NaaS - scope attestations',
     table: 'x_daas_ham_attestation',

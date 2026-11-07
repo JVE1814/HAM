@@ -50,7 +50,7 @@ export const order_form = Form({
             content: [
                 {
                     layout: 'one-column',
-                    elements: [{ type: 'formatter', formatterRef: 'Activities_Filtered' }, { type: 'list', listType: '12M', listRef: 'x_daas_ham_order_line.order' }],
+                    elements: [{ type: 'formatter', formatterRef: 'Activities_Filtered' }, { type: 'list', listType: '12M', listRef: 'x_daas_ham_order_line.order' }, { type: 'list', listType: '12M', listRef: 'x_daas_ham_shipment.order' }],
                 },
             ],
         },
@@ -580,7 +580,7 @@ export const return_order_form = Form({
             content: [
                 {
                     layout: 'one-column',
-                    elements: [{ type: 'formatter', formatterRef: 'Activities_Filtered' }, { type: 'list', listType: '12M', listRef: 'x_daas_ham_return_order_line.return_order' }, { type: 'list', listType: '12M', listRef: 'x_daas_ham_fee_event.return_order' }],
+                    elements: [{ type: 'formatter', formatterRef: 'Activities_Filtered' }, { type: 'list', listType: '12M', listRef: 'x_daas_ham_return_order_line.return_order' }, { type: 'list', listType: '12M', listRef: 'x_daas_ham_fee_event.return_order' }, { type: 'list', listType: '12M', listRef: 'x_daas_ham_shipment.return_order' }],
                 },
             ],
         },

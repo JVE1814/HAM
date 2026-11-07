@@ -36,7 +36,7 @@ export interface Overview {
     isCustomerAdmin: boolean
     assets: CustomerAsset[]
     orders: CustomerOrder[]
-    returns: Array<{ number: string; site: string; trigger: string; dueDate: string }>
+    returns: Array<{ number: string; site: string; trigger: string; dueDate: string; labelUrl: string; trackingNumber: string }>
     attestations: Array<{ id: string; number: string; site: string; items: AttestationItem[] }>
 }
 

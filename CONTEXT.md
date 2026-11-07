@@ -161,6 +161,10 @@ _Avoid_: imaging, provisioning, prep
 **Staging source**:
 Whether an Asset is staged in-house or pre-staged by the distributor (which then only needs verification).
 
+**Shipment**:
+A carrier consignment bought through the shipping aggregator, to a Site or back to the depot, with its tracking.
+_Avoid_: parcel, delivery (the act)
+
 **Install mode**:
 How an Asset gets installed: FSM engineer, Customer self-install, subcontractor or data-centre remote hands.
 _Avoid_: delivery method

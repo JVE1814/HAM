@@ -86,7 +86,15 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
     ret.setLimit(200)
     ret.query()
     while (ret.next()) {
-        returns.push({ number: str(ret, 'number'), site: ret.getDisplayValue('site'), trigger: ret.getDisplayValue('trigger'), dueDate: str(ret, 'due_date') })
+        const label = returnLabel(ret.getUniqueValue())
+        returns.push({
+            number: str(ret, 'number'),
+            site: ret.getDisplayValue('site'),
+            trigger: ret.getDisplayValue('trigger'),
+            dueDate: str(ret, 'due_date'),
+            labelUrl: label ? str(label, 'label_url') : '',
+            trackingNumber: label ? str(label, 'tracking_number') : '',
+        })
     }
 
     const attestations: object[] = []
@@ -119,6 +127,17 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
         returns,
         attestations,
     })
+}
+
+/** The latest prepaid return label of a Return order, if one was bought. */
+function returnLabel(returnOrderId: string): GlideRecord | null {
+    const shipment = new GlideRecord('x_daas_ham_shipment')
+    shipment.addQuery('return_order', returnOrderId)
+    shipment.addQuery('direction', 'return')
+    shipment.orderByDesc('sys_created_on')
+    shipment.setLimit(1)
+    shipment.query()
+    return shipment.next() ? shipment : null
 }
 
 /** POST /customer/faults { asset, description }: report a faulty device as a CSM case. */

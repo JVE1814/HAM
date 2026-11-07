@@ -174,6 +174,15 @@ function Orders({ overview, run }: { overview: Overview; run: Runner }) {
                     {overview.returns.map((ret) => (
                         <li key={ret.number}>
                             <strong>{ret.number}</strong> {ret.trigger} · {ret.site} · due back by {ret.dueDate}
+                            {ret.labelUrl && (
+                                <>
+                                    {' · '}
+                                    <a href={ret.labelUrl} target="_blank" rel="noreferrer">
+                                        Print return label
+                                    </a>{' '}
+                                    ({ret.trackingNumber})
+                                </>
+                            )}
                         </li>
                     ))}
                     {overview.returns.length === 0 && <li>No open returns</li>}

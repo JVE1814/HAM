@@ -581,6 +581,46 @@ declare global {
                         table: 'sys_security_acl'
                         id: 'b3c27e35a5e248b487fd407324985b01'
                     }
+                    acl_shipment_create: {
+                        table: 'sys_security_acl'
+                        id: '976ce657498e4d13a67d31edb20907c0'
+                    }
+                    acl_shipment_delete: {
+                        table: 'sys_security_acl'
+                        id: '69e344b1ddb14730b78617c63bc3bfcc'
+                    }
+                    acl_shipment_event_create: {
+                        table: 'sys_security_acl'
+                        id: 'dd67d784147441f39c5d441351b439de'
+                    }
+                    acl_shipment_event_delete: {
+                        table: 'sys_security_acl'
+                        id: 'e93d9c4df439423f96f12762bc273bb8'
+                    }
+                    acl_shipment_event_read: {
+                        table: 'sys_security_acl'
+                        id: 'f1644f8a75344f9db88b6fe2190ad2de'
+                    }
+                    acl_shipment_event_read_customer: {
+                        table: 'sys_security_acl'
+                        id: 'd2e07326f7644c6d979eaeb1e1551ab5'
+                    }
+                    acl_shipment_event_write: {
+                        table: 'sys_security_acl'
+                        id: '6c8b0f7538374737afd42bb0141d7186'
+                    }
+                    acl_shipment_read: {
+                        table: 'sys_security_acl'
+                        id: '18bb700d973b4ac0a9f0ce84667fd21b'
+                    }
+                    acl_shipment_read_customer: {
+                        table: 'sys_security_acl'
+                        id: '92bf86d598ec4557a0407145bf57dff7'
+                    }
+                    acl_shipment_write: {
+                        table: 'sys_security_acl'
+                        id: 'eb7d7a5d520c43eaa550acc7409a7205'
+                    }
                     acl_site_template_create: {
                         table: 'sys_security_acl'
                         id: '387872bdcc1649ca89aa4846b86ac795'
@@ -1096,6 +1136,10 @@ declare global {
                     br_scope_return_order: {
                         table: 'sys_script'
                         id: 'ee95caad7e384f23a8b43c1c96fd56c3'
+                    }
+                    br_scope_shipment: {
+                        table: 'sys_script'
+                        id: '311ca8914edd4b6f84c36fe1cc3a835f'
                     }
                     br_scope_staging_task: {
                         table: 'sys_script'
@@ -1629,6 +1673,30 @@ declare global {
                         table: 'sys_properties'
                         id: 'c3ad8001ceec439daf765116301b82d4'
                     }
+                    prop_shipping_api_key: {
+                        table: 'sys_properties'
+                        id: 'a87c6a7508a54236a9c09dc42ec21881'
+                    }
+                    prop_shipping_enabled: {
+                        table: 'sys_properties'
+                        id: '308a3d6b10b54a16b3b76b6025a6b606'
+                    }
+                    prop_shipping_package_kg: {
+                        table: 'sys_properties'
+                        id: 'e67e858efea44e57974b46c90a9cb01b'
+                    }
+                    prop_shipping_sender_name: {
+                        table: 'sys_properties'
+                        id: '8a04662e324c47eeb70dd346d285314f'
+                    }
+                    prop_shipping_service_code: {
+                        table: 'sys_properties'
+                        id: '231e944df8ca47ba84e069a249aac9c0'
+                    }
+                    prop_shipping_webhook_token: {
+                        table: 'sys_properties'
+                        id: '4be6ba7d00c04b85a5c5c81e47d0328d'
+                    }
                     prop_spare_auto_purchase: {
                         table: 'sys_properties'
                         id: '988248bc7e6f4246aa57616152699889'
@@ -1716,6 +1784,10 @@ declare global {
                     rest_naas_receive: {
                         table: 'sys_ws_operation'
                         id: 'ba16ac8f45074fa38ddec4e7cba3daa3'
+                    }
+                    rest_naas_shipping_tracking: {
+                        table: 'sys_ws_operation'
+                        id: '6cbc930287c3459aa0d89b5201a0e6e3'
                     }
                     rest_naas_sites: {
                         table: 'sys_ws_operation'
@@ -1825,6 +1897,26 @@ declare global {
                         table: 'sys_rest_message_fn_parameters'
                         id: 'f629968f0795434b9a025b64e8b5a6c8'
                     }
+                    rm_shipping: {
+                        table: 'sys_rest_message'
+                        id: 'edc7cea79b4c492c8600270b006f7a5a'
+                    }
+                    rm_shipping_accept: {
+                        table: 'sys_rest_message_headers'
+                        id: 'e7189044ae5043eb9effab90518dbf9f'
+                    }
+                    rm_shipping_ct: {
+                        table: 'sys_rest_message_headers'
+                        id: '1eeb3256b9274f35bf0ce0748fe885ae'
+                    }
+                    rm_shipping_key: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: '006086b8e62d4ea091af87c9cd2f1032'
+                    }
+                    rm_shipping_key_header: {
+                        table: 'sys_rest_message_fn_headers'
+                        id: '7c915c2105df408ca7db24d00cc5aac2'
+                    }
                     rp_request_network_equipment: {
                         table: 'sc_cat_item_producer'
                         id: '5d455ea958a8443a8913cf053541396f'
@@ -1917,9 +2009,17 @@ declare global {
                         table: 'sys_module'
                         id: 'a9525a96b50a4fcaab6c97c42738645b'
                     }
+                    src_server_domain_http_ts: {
+                        table: 'sys_module'
+                        id: '186e28c8e54443c5b97c9d4c276e1751'
+                    }
                     'src_server_domain_in-service_ts': {
                         table: 'sys_module'
                         id: '8564a8a9d7d14e39b995ef679e5a0c70'
+                    }
+                    src_server_domain_json_ts: {
+                        table: 'sys_module'
+                        id: 'dd36dd93290c419983953ef50a0f60db'
                     }
                     src_server_domain_leases_ts: {
                         table: 'sys_module'
@@ -1948,6 +2048,7 @@ declare global {
                     src_server_domain_oem_json_ts: {
                         table: 'sys_module'
                         id: 'f19ec875c0b445ccb4062a3fa36da90b'
+                        deleted: true
                     }
                     src_server_domain_oem_types_ts: {
                         table: 'sys_module'
@@ -1980,6 +2081,10 @@ declare global {
                     src_server_domain_scheduling_ts: {
                         table: 'sys_module'
                         id: '70901aff85264a03b64caaaaf627143d'
+                    }
+                    src_server_domain_shipping_ts: {
+                        table: 'sys_module'
+                        id: '9eb74e4a9af34c82be439f7e6c9a91e5'
                     }
                     src_server_domain_sourcing_ts: {
                         table: 'sys_module'
@@ -2069,6 +2174,10 @@ declare global {
                         table: 'sys_module'
                         id: '60bb6ebe41f642159b5f2698e8be9d33'
                     }
+                    src_server_entry_shipping_ts: {
+                        table: 'sys_module'
+                        id: '921e7511d77a482294b5a20def94642e'
+                    }
                     'src_server_entry_spare-pool_ts': {
                         table: 'sys_module'
                         id: 'e4a09635dab141b8a31ac273e98cfe97'
@@ -2153,6 +2262,10 @@ declare global {
                         table: 'sys_module'
                         id: 'b7ff627b508a49f582d8a13d6b24276e'
                     }
+                    'src_server_platform_rest-port_ts': {
+                        table: 'sys_module'
+                        id: '008ae84b1ad241d6af3a6d706d26061c'
+                    }
                     src_server_platform_returns_ts: {
                         table: 'sys_module'
                         id: 'd236066f0a2640a4ae36f40a2e385776'
@@ -2236,6 +2349,10 @@ declare global {
                     ua_order_submit: {
                         table: 'sys_ui_action'
                         id: 'bf6325cd4aeb4308843702357c40b64c'
+                    }
+                    ua_return_label: {
+                        table: 'sys_ui_action'
+                        id: '37c361c4fc834b498d6ecacbcf8b06c2'
                     }
                     ua_rma_defective_returned: {
                         table: 'sys_ui_action'
@@ -2740,6 +2857,22 @@ declare global {
                     ws_service_intervals_aud: {
                         table: 'sys_ux_applicability_m2m_list'
                         id: 'b805d7e6b75a4ce686f39658ade3f6e1'
+                    }
+                    ws_shipments_exception: {
+                        table: 'sys_ux_list'
+                        id: '8baf3008eacd484b9a68287b06278f7a'
+                    }
+                    ws_shipments_exception_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '4bb322a833544a5abdf7863e65265d83'
+                    }
+                    ws_shipments_open: {
+                        table: 'sys_ux_list'
+                        id: '1388ea70afc1476f8d0fb4f7e0db8fb5'
+                    }
+                    ws_shipments_open_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '575169caae8047a98113b5d1569bd9f9'
                     }
                     ws_site_templates: {
                         table: 'sys_ux_list'
@@ -3449,6 +3582,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '0236476b43e340bb80eb0119a8e5bb16'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'shipment'
+                        }
+                    },
+                    {
                         table: 'sys_db_object'
                         id: '024bdcbcdcd14b6084c677ebee8df502'
                         key: {
@@ -3476,6 +3617,19 @@ declare global {
                                 }
                             }
                             element: 'customer'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '02575838d2d24391a5eefa6ae4229843'
+                        key: {
+                            sys_security_acl: '18bb700d973b4ac0a9f0ce84667fd21b'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -3725,6 +3879,48 @@ declare global {
                         key: {
                             logical_table_name: 'x_daas_ham_order'
                             col_name_string: 'site'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '03fb6af4b6a3411e9d542321b35ae2f9'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'stockroom'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '03fd0a1ad2c5402faa4d6b6c45746dbf'
+                        key: {
+                            sys_ui_form: {
+                                id: '0b5f0a4ee91a46eb86be51af4e625a67'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
                         }
                     },
                     {
@@ -4507,6 +4703,15 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
+                        id: '08427036b8cd4d998541475ed970febe'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'label_id'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
                         id: '08427e6e1b1a40d488369694ba0e9216'
                         key: {
                             name: 'x_daas_ham_agreement'
@@ -4836,6 +5041,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '0a73692cfb0b49f29c53830ecc0cc58a'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'label_url'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '0a9688764bff4faa90d101a2a1c35744'
                         key: {
@@ -4899,6 +5113,20 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: '0b5f0a4ee91a46eb86be51af4e625a67'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '0b76892eeee84def8cf7f8a15b52524d'
                         key: {
@@ -4907,6 +5135,14 @@ declare global {
                             value: 'failed'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_index'
+                        id: '0b76c333eb7f4b01bd3f0b62d7205577'
+                        key: {
+                            logical_table_name: 'x_daas_ham_shipment'
+                            col_name_string: 'order'
                         }
                     },
                     {
@@ -5138,6 +5374,17 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '0cc98396d41645f39fedcd9977569975'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'status'
+                            value: 'exception'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -5703,6 +5950,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice_set'
+                        id: '10680bf7d7674e628a45ee6158cc610f'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'status'
+                        }
+                    },
+                    {
                         table: 'sys_ui_action_role'
                         id: '107eca402c1446a9ae4b97a0ef3eb823'
                         key: {
@@ -5849,6 +6104,15 @@ declare global {
                         id: '1192dd07fce34582aa3954e4752bcd82'
                         key: {
                             name: 'x_daas_ham_audit_line'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '11bf71fe497740cd8e2ea3b346691a41'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'cost'
+                            language: 'en'
                         }
                     },
                     {
@@ -6111,6 +6375,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '12b5456337084f25bf5e3e11a765629a'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'status'
+                            value: 'returned'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '12b89ae7c43e4b129b8786939c6e9234'
                         key: {
@@ -6246,6 +6521,19 @@ declare global {
                                 }
                             }
                             sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '1322bb290f594fd5ab1c76a3530313e5'
+                        key: {
+                            sys_security_acl: '69e344b1ddb14730b78617c63bc3bfcc'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
+                                }
+                            }
                         }
                     },
                     {
@@ -6691,6 +6979,14 @@ declare global {
                             value: 'aruba'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '161e167fc2904c7f9fc5e73f4f91b58e'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'site'
                         }
                     },
                     {
@@ -7627,6 +7923,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '1d5983e66ee446d6ac36462b06b2d16f'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'status'
+                            value: 'label_created'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '1d766027cdeb4dcfa6fef2bdca2ed929'
                         key: {
@@ -7794,6 +8101,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_db_object'
+                        id: '1e39922dfa824de899b0232388e75243'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '1e448cc0f50944bd8ed880ae632fb6d5'
                         key: {
@@ -7925,6 +8239,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_job_cursor'
                             element: 'last_run'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '1ef689a1473346688aeb06af8af42cc6'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'status_detail'
+                            position: '10'
                         }
                     },
                     {
@@ -9077,6 +9413,15 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
+                        id: '25c8c286005548f1bb730a1155f73d63'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'direction'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
                         id: '25cfbaa749704bb9b07930ce62dcacc3'
                         key: {
                             name: 'x_daas_ham_staging_task'
@@ -9992,6 +10337,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '2bcc02d8463644648464c30acdaf5c9a'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'return_order'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '2bd148141ad249558e196231ada9067f'
                         key: {
@@ -10138,6 +10505,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice_set'
+                        id: '2c3179cc7896422ba88e4fadae7a5d21'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'direction'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '2c5a39a35df84f5ea2d3abceb1d352d5'
                         key: {
@@ -10157,6 +10532,21 @@ declare global {
                             }
                             element: 'assigned_to'
                             position: '9'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '2c6d8b25060d438c825bba66406bd3fa'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            caption: 'Tracking'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -11182,6 +11572,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '338dc2808fe640b9b426ade3394b0579'
+                        key: {
+                            sys_security_acl: 'e93d9c4df439423f96f12762bc273bb8'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '3398098bd50744e4b5dc8a647b5269be'
                         key: {
@@ -11372,6 +11775,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_return_order'
                             element: 'tracking_number'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '347cf545a4254d25abeb17ae837cb62c'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'NULL'
                         }
                     },
                     {
@@ -11688,6 +12099,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '35cf72da60e7440bb58745bb75342508'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'direction'
+                            value: 'return'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '361ccd9562ba46478c597c8ab85f5984'
                         key: {
@@ -11723,6 +12145,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_agreement_quantity'
                             element: 'agreement'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '3697c88d3c164d709d29aad8f8809ae3'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'order'
                             language: 'en'
                         }
                     },
@@ -11878,6 +12309,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '37a0c38df00248cfb902c355ba310107'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'direction'
+                            value: 'to_site'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '37a77b2b5c3b48df9c6589955e199eb5'
                         key: {
@@ -11940,6 +12382,19 @@ declare global {
                                 id: 'd33813ebacca4b79aad41517026036d8'
                                 key: {
                                     name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: '381090ea582648f6a389211fb32d755d'
+                        key: {
+                            sys_ui_action: '37c361c4fc834b498d6ecacbcf8b06c2'
+                            sys_user_role: {
+                                id: 'c5156577be814d2aa8bf557ddec8bf0e'
+                                key: {
+                                    name: 'x_daas_ham.noc'
                                 }
                             }
                         }
@@ -12305,6 +12760,19 @@ declare global {
                                 id: '50893530c7b94924ba2610453d4ebd3e'
                                 key: {
                                     name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '3a5222bd494b4ce2a5ab5f1599ad1925'
+                        key: {
+                            sys_security_acl: 'd2e07326f7644c6d979eaeb1e1551ab5'
+                            sys_user_role: {
+                                id: '104c293b21934f30966cd88c879e4008'
+                                key: {
+                                    name: 'x_daas_ham.site_contact'
                                 }
                             }
                         }
@@ -13251,6 +13719,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '4191453c5b874bc980066eb3db811194'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'delivered_at'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '41ad875d3e6f4b6eb34daa6fd5924125'
                         key: {
@@ -13359,6 +13836,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_return_order_line'
                             element: 'evaluation'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '4272d958ca0c41959bc9b4ab5f159a19'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'status'
+                            language: 'en'
                         }
                     },
                     {
@@ -13517,6 +14003,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '435dca991004437899fbdc934b14f470'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'cost'
+                        }
+                    },
+                    {
                         table: 'sys_ui_form_section'
                         id: '43653b7daf2f4b6f8de5162460e1c2d4'
                         key: {
@@ -13587,6 +14081,28 @@ declare global {
                         key: {
                             document_key: 'e01c2b8e22e64c2996dc7829a076ce0c'
                             variable: '52ed1e5b5360220002c6435723dc3421'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '4430226dfd8942d692188082eed874bc'
+                        key: {
+                            sys_ui_section: {
+                                id: 'b04b943231ef424a8bf94e5479a32316'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Label'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '7'
                         }
                     },
                     {
@@ -13890,6 +14406,28 @@ declare global {
                     },
                     {
                         table: 'sys_ui_element'
+                        id: '4659455c5c834c009fefb2a757060839'
+                        key: {
+                            sys_ui_section: {
+                                id: '8743c49afdfa4a1982578a5b2c0ba0a3'
+                                key: {
+                                    name: 'x_daas_ham_return_order'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_return_order.x_daas_ham_shipment.return_order'
+                            position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
                         id: '4665908a88544cd3b237dc88632b0caa'
                         key: {
                             sys_ui_section: {
@@ -14078,6 +14616,14 @@ declare global {
                             }
                             element: 'observed_at'
                             position: '6'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '46d0b2dd7e90434098537519f37cb810'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'return_order'
                         }
                     },
                     {
@@ -14446,6 +14992,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_eox_import'
                             element: 'pid'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '491ebd3e3ca149de80e5471493d62345'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'packages'
+                            language: 'en'
                         }
                     },
                     {
@@ -14924,6 +15479,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '4cd1d63379bf446eb6f096286ece3ea6'
+                        key: {
+                            sys_ui_section: {
+                                id: 'b04b943231ef424a8bf94e5479a32316'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Label'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'label_id'
+                            position: '3'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '4ce489ced41b49ef81873e041eec94f0'
                         key: {
@@ -15216,6 +15793,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '4ee38e8dd61742a08e73b1e4a8dde501'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'order'
+                            position: '4'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: '4f0232523a324866aefa827d93b34681'
                         key: {
@@ -15267,6 +15866,14 @@ declare global {
                                 }
                             }
                             element: 'quantity_allocated'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '4f1083a73e0342afbc2686526cd06546'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'occurred_at'
                         }
                     },
                     {
@@ -15353,6 +15960,15 @@ declare global {
                             }
                             element: '.split'
                             position: '5'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '4fab88288de94176af812f8c75a245b6'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'shipment'
+                            language: 'en'
                         }
                     },
                     {
@@ -15490,6 +16106,19 @@ declare global {
                             value: 'return_to_customer'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '50c8ab3fa72a4a45a7d5dd0d4582bb3f'
+                        key: {
+                            sys_security_acl: 'eb7d7a5d520c43eaa550acc7409a7205'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -16171,6 +16800,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: '551cab4eb7a24d078ad110c9b6202186'
+                        key: {
+                            sys_ui_form: {
+                                id: '0b5f0a4ee91a46eb86be51af4e625a67'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '2c6d8b25060d438c825bba66406bd3fa'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Tracking'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '5548d7a4f060441f8d2585da0c1f2b4d'
                         key: {
@@ -16347,6 +17009,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_db_object'
+                        id: '5639fd110ddc4098a9aeb43f4e2b3a20'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '56653240efe84c42ad702145c1b2256b'
                         key: {
@@ -16436,6 +17105,14 @@ declare global {
                         id: '5734eff961e8465e952033df5e98b216'
                         key: {
                             name: 'x_daas_ham_lease_schedule'
+                        }
+                    },
+                    {
+                        table: 'sys_index'
+                        id: '576e1471c9294995adf833751d3e7b0d'
+                        key: {
+                            logical_table_name: 'x_daas_ham_shipment'
+                            col_name_string: 'return_order'
                         }
                     },
                     {
@@ -16559,6 +17236,19 @@ declare global {
                         key: {
                             document_key: 'de1af667ade94dd5944687a7a0a28591'
                             variable: 'e6e3c7535320220002c6435723dc3496'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '588ca257db944c9d8d3ecd1c7b3441bb'
+                        key: {
+                            sys_security_acl: 'f1644f8a75344f9db88b6fe2190ad2de'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -17505,6 +18195,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '5e2726abfc7b4367be769f62a62fc96b'
+                        key: {
+                            sys_ui_section: {
+                                id: 'b04b943231ef424a8bf94e5479a32316'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Label'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'currency'
+                            position: '6'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '5e3b53201c0d440f8f20a0193b3a7e21'
                         key: {
@@ -17798,6 +18510,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '5f78631775dc4fd292aa1897a844162b'
+                        key: {
+                            sys_security_acl: 'f1644f8a75344f9db88b6fe2190ad2de'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '5f8d0232e42e46089bea44c2d0dd086f'
                         key: {
@@ -17806,6 +18531,15 @@ declare global {
                             value: 'fee'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '5fa6ec3eb62f4b00b8ae687e19128c0d'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'site'
+                            language: 'en'
                         }
                     },
                     {
@@ -18084,6 +18818,15 @@ declare global {
                             }
                             element: 'name'
                             position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '618256a826e44aadb33cc9d8a5f609de'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'status'
+                            language: 'en'
                         }
                     },
                     {
@@ -18557,6 +19300,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_number'
+                        id: '64b8ae78b49d46c699e7a8c07ef1cb30'
+                        key: {
+                            category: 'x_daas_ham_shipment'
+                            prefix: 'NSHP'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '64f4775a67594e77951c04b66c369305'
                         key: {
@@ -18570,6 +19321,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_catalog_entry'
                             element: 'site_template'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '6506265f9f4247e2898c4eaa8e80cf1c'
+                        key: {
+                            sys_ui_section: {
+                                id: '2c6d8b25060d438c825bba66406bd3fa'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Tracking'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_shipment.x_daas_ham_shipment_event.shipment'
+                            position: '0'
                         }
                     },
                     {
@@ -18663,6 +19436,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_billing_line'
                             element: 'amount'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '6536c48a4c7842ce88658709bed5d841'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'status_detail'
                         }
                     },
                     {
@@ -18853,6 +19634,28 @@ declare global {
                             name: 'x_daas_ham_oem_rma'
                             element: 'advance_replacement'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '66afccd50edf419fb141882c88858efa'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'label_url'
+                            position: '15'
                         }
                     },
                     {
@@ -19846,6 +20649,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '6c0a966a29a84183a3d14d9ed503daf0'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'label_url'
+                        }
+                    },
+                    {
                         table: 'sys_element_mapping'
                         id: '6c180d50aaa544688baddf228c8864f1'
                         key: {
@@ -19865,6 +20676,28 @@ declare global {
                                     name: 'x_daas_ham.admin'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '6c44ed85633a47e095d55b99fd7966d1'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'site'
+                            position: '6'
                         }
                     },
                     {
@@ -20292,6 +21125,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '6e8d64cb62bb4250a5aaf7d7d89b92c3'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'NULL'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '6e8f9b4ce3114958b95f4141249f496c'
+                        key: {
+                            sys_security_acl: '6c8b0f7538374737afd42bb0141d7186'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_action_role'
                         id: '6ea7b5d87dc740549ef378afb6181f8e'
                         key: {
@@ -20419,6 +21274,23 @@ declare global {
                     },
                     {
                         table: 'sys_dictionary'
+                        id: '6f704fc37ed342e9a85085c7ad2600c3'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'packages'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '6f713ef27da64dad8744783973b48a8f'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'currency'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
                         id: '6f7dd80edd40498c97170008be9477ed'
                         key: {
                             name: 'x_daas_ham_model_lifecycle'
@@ -20464,6 +21336,19 @@ declare global {
                         key: {
                             name: 'x_daas_ham_recon_exception'
                             element: 'detected_at'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '6fb6e2f97b304aef9d9109191b2b83c2'
+                        key: {
+                            sys_security_acl: '92bf86d598ec4557a0407145bf57dff7'
+                            sys_user_role: {
+                                id: 'fd154cb7b91e4ef5aa4da43a7344134d'
+                                key: {
+                                    name: 'x_daas_ham.customer_admin'
+                                }
+                            }
                         }
                     },
                     {
@@ -20625,6 +21510,14 @@ declare global {
                             value: 'purchase'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '7062e0aae8164bc68ed3f559f446a329'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'tracking_number'
                         }
                     },
                     {
@@ -20849,6 +21742,19 @@ declare global {
                                 id: 'd33813ebacca4b79aad41517026036d8'
                                 key: {
                                     name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '71f112f788f64a4c8dd51a5a3d345f91'
+                        key: {
+                            sys_security_acl: '976ce657498e4d13a67d31edb20907c0'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
                                 }
                             }
                         }
@@ -21101,6 +22007,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '7347dbf69fef4da4a5ab7500131b2a1a'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'status'
+                            value: 'in_transit'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '73509e1cdcb14395bcb35f33490cc9b1'
                         key: {
@@ -21325,6 +22242,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '74b1bfe892e8451aa76f9d22dc003b5f'
+                        key: {
+                            sys_security_acl: '976ce657498e4d13a67d31edb20907c0'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: '74b24d3a028446d1b5a6efbef66218db'
                         key: {
@@ -21427,6 +22357,14 @@ declare global {
                                 }
                             }
                             element: 'model'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '74dbfce439b84007998563f6df859f5d'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'stockroom'
                         }
                     },
                     {
@@ -21866,6 +22804,28 @@ declare global {
                     },
                     {
                         table: 'sys_ui_element'
+                        id: '76d92fe032c74b0a8cbcce3c428a654d'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'tracking_number'
+                            position: '14'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
                         id: '76df280da1f84ae28c0d5fd31b2de01b'
                         key: {
                             sys_ui_section: {
@@ -21955,6 +22915,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice_set'
+                        id: '77975d4d9f2441ceb61c95a77da48bf3'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'status'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '779a6dcee5014b4994eef5f982829b84'
                         key: {
@@ -22031,6 +22999,17 @@ declare global {
                         id: '781a7099bd834e0f8f8240911b0f75e3'
                         key: {
                             name: 'x_daas_ham_oem_coverage'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '78498e00961a4dd090b2fac5220e0ec7'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'status'
+                            value: 'label_created'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -22360,6 +23339,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '79f2e308ffd64ad1ad2ee0bcf68648b8'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'delivered_at'
+                            position: '12'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '79f31c860f60419eafa27324211f93c9'
                         key: {
@@ -22425,6 +23426,15 @@ declare global {
                                     name: 'x_daas_ham.finance'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '7aa39d4b30e445f7baa9cc6e964f8075'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'service_code'
+                            language: 'en'
                         }
                     },
                     {
@@ -22744,6 +23754,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '7d7b5224371c4b6fa78047a5035b3f9c'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'customer'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '7d7e5bec46164684b818cf5985c82d5b'
                         key: {
@@ -22976,6 +23995,15 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '7f17be1835b94dc484eafeceaf932f0c'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'location'
+                            language: 'en'
                         }
                     },
                     {
@@ -23338,6 +24366,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '81ae6c51e87b4ecf967fc3aa36a77427'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'service_code'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '81b4a36621914d8d8d543b2a23d0d4ec'
                         key: {
@@ -23575,6 +24611,19 @@ declare global {
                             }
                             element: '.end_split'
                             position: '7'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '82a9a76f2d30484597ff062f0b2f56b6'
+                        key: {
+                            sys_security_acl: '18bb700d973b4ac0a9f0ce84667fd21b'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
                         }
                     },
                     {
@@ -24613,10 +25662,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '887693145e874169bfaa3dba9ead65c8'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'status'
+                            value: 'in_transit'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sn_glider_source_artifact'
                         id: '888663c7a08f49ebbf66191a4afa2175'
                         key: {
                             name: 'x_daas_ham_warehouse.do - BYOUI Files'
+                        }
+                    },
+                    {
+                        table: 'sys_index'
+                        id: '889c5bfd36cd4bc98d820e4c42938c41'
+                        key: {
+                            logical_table_name: 'x_daas_ham_shipment_event'
+                            col_name_string: 'shipment'
                         }
                     },
                     {
@@ -24658,6 +25726,19 @@ declare global {
                             name: 'x_daas_ham_lease_schedule'
                             element: 'decision_lead_days'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '8915785324dc4a99965526857ef32b9b'
+                        key: {
+                            sys_security_acl: '18bb700d973b4ac0a9f0ce84667fd21b'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
                         }
                     },
                     {
@@ -24815,6 +25896,17 @@ declare global {
                     },
                     {
                         table: 'sys_choice'
+                        id: '8a1aedc72ddc445499b3cb9cf9b62fbe'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'status'
+                            value: 'delivered'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
                         id: '8a254bc872354e7c9e176ec9ac2b4a88'
                         key: {
                             name: 'x_daas_ham_disposal_order'
@@ -24953,6 +26045,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '8acd150fb01a4a96a41e174e0a0ca5cb'
+                        key: {
+                            sys_security_acl: 'f1644f8a75344f9db88b6fe2190ad2de'
+                            sys_user_role: {
+                                id: 'b1a9a9832f01483a9c4e6fc55ca84188'
+                                key: {
+                                    name: 'x_daas_ham.field_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '8ad767315e764ea390856506b4ca6985'
                         key: {
@@ -25016,6 +26121,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '8bb8a682495d45758a2c6654e1e36378'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'location'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '8bb93560781e47fabe2b123494e1511d'
                         key: {
@@ -25024,6 +26137,19 @@ declare global {
                                 id: '50893530c7b94924ba2610453d4ebd3e'
                                 key: {
                                     name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '8bbc80b49e624a00806ca0ad5e48d963'
+                        key: {
+                            sys_security_acl: '92bf86d598ec4557a0407145bf57dff7'
+                            sys_user_role: {
+                                id: '104c293b21934f30966cd88c879e4008'
+                                key: {
+                                    name: 'x_daas_ham.site_contact'
                                 }
                             }
                         }
@@ -25074,6 +26200,13 @@ declare global {
                             name: 'x_daas_ham_subscription_line'
                             element: 'currency'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'ua_table_licensing_config'
+                        id: '8c1347e3a5be4cbf8522c35e810f8941'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
                         }
                     },
                     {
@@ -25336,6 +26469,17 @@ declare global {
                         key: {
                             document_key: '6e9345afffda46bc9e62437cefc52277'
                             variable: 'b27b2b29ff6033008d3f5d9ad53bf164'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '8e7f0c57850f456a91395adb66811e5a'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'status'
+                            value: 'exception'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -25711,6 +26855,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '903f24a9d6ad44b2a3876172b0f5d1bb'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'status'
+                            value: 'unknown'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '904ccb47069b4c6fb9dcec8356caaa70'
                         key: {
@@ -25865,6 +27020,14 @@ declare global {
                         key: {
                             document_key: '1fb51464a3164cdebad8571a0d6f8631'
                             variable: 'dd54cf535320220002c6435723dc34fd'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '911f4f7031c84a4ba6e881cc81dc2cec'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'delivered_at'
                         }
                     },
                     {
@@ -26115,6 +27278,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_index'
+                        id: '925d43dd1b1847f1b48494cc54577e47'
+                        key: {
+                            logical_table_name: 'x_daas_ham_shipment'
+                            col_name_string: 'tracking_number'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '9261a27d988f4a9083b9ee3e33f5e7ce'
                         key: {
@@ -26305,6 +27476,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_return_order'
                             element: 'trigger'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '934aa5507b7744438bc996b6f8bb3771'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'direction'
+                            position: '2'
                         }
                     },
                     {
@@ -26547,6 +27740,28 @@ declare global {
                             name: 'x_daas_ham_order'
                             element: 'site'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '94cd4c382d5c4a0887d54d731d321268'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'carrier'
+                            position: '13'
                         }
                     },
                     {
@@ -26845,6 +28060,14 @@ declare global {
                                 }
                             }
                             sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '95d75f3419de4cea8d58df0f3aa277f0'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'NULL'
                         }
                     },
                     {
@@ -27666,6 +28889,19 @@ declare global {
                     },
                     {
                         table: 'sys_security_acl_role'
+                        id: '9ae16ea76fa2401ba7cc9c243e7c8237'
+                        key: {
+                            sys_security_acl: '18bb700d973b4ac0a9f0ce84667fd21b'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
                         id: '9ae2d5a42ac64b92b164ae798da73ba6'
                         key: {
                             sys_security_acl: 'd2723438df534bafbaa5cc127e2f2a38'
@@ -27694,6 +28930,14 @@ declare global {
                             value: 'standard'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '9b1b7f1090ab4daf93af256f0fc83ee8'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'direction'
                         }
                     },
                     {
@@ -27874,6 +29118,28 @@ declare global {
                             }
                             element: 'vendor'
                             position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '9c45300081a24f2faf4d9b556ef0882c'
+                        key: {
+                            sys_ui_section: {
+                                id: 'b04b943231ef424a8bf94e5479a32316'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Label'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'cost'
+                            position: '5'
                         }
                     },
                     {
@@ -28486,6 +29752,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '9f653a53dae84be0afaab52c1adb014f'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'status_detail'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: '9fa3e2093f944087b812e65cb4aed4ef'
                         key: {
@@ -28574,6 +29849,19 @@ declare global {
                             }
                             element: '.end_split'
                             position: '8'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'a02b8cd49d9d4d25900354edc980a5ec'
+                        key: {
+                            sys_security_acl: 'eb7d7a5d520c43eaa550acc7409a7205'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
                         }
                     },
                     {
@@ -29145,6 +30433,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'a32f04ef2149422f91c4ce1dc1d15c5e'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'stockroom'
+                            position: '7'
+                        }
+                    },
+                    {
                         table: 'sys_ui_section'
                         id: 'a33b84058a7f402b9db9058053a88b57'
                         key: {
@@ -29165,6 +30475,15 @@ declare global {
                         key: {
                             logical_table_name: 'x_daas_ham_oem_coverage'
                             col_name_string: 'end_date'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'a34d1048151b4d7a92f04466b9e17b3e'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'carrier'
+                            language: 'en'
                         }
                     },
                     {
@@ -29295,6 +30614,19 @@ declare global {
                         key: {
                             dashboard: '2201d220760d41669225280628c65eb8'
                             dashboard_tab: '111ed9a3503b465f898c4489af04d60e'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: 'a3dfaacf18ab481187da7e9240d13c54'
+                        key: {
+                            sys_ui_action: '37c361c4fc834b498d6ecacbcf8b06c2'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -29560,6 +30892,28 @@ declare global {
                             name: 'x_daas_ham_order_line'
                             element: 'quantity_allocated'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'a4fff1498c0f4f9ba187d2d3c8c478e9'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'customer'
+                            position: '3'
                         }
                     },
                     {
@@ -30362,6 +31716,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: 'aaa46ffa051b4829a860d38b430db1f9'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'status'
+                            value: 'returned'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: 'aaa835d577fa440b8f3b9add0b369ddd'
                         key: {
@@ -30389,6 +31754,28 @@ declare global {
                             value: 'fsm_deinstall'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'aaef0eb72e914541a7a3c5a325d518e6'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '8'
                         }
                     },
                     {
@@ -30631,6 +32018,50 @@ declare global {
                         key: {
                             sc_cat_item: '5d455ea958a8443a8913cf053541396f'
                             variable_set: '1db668e49f964e40bd59263b5c40a25b'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'acdda3c3b7fa46b29938856e5ea62dd6'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'status'
+                            value: 'out_for_delivery'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: 'ad1f71abd7c94037a4aa12576ae7d0cb'
+                        key: {
+                            sys_ui_form: {
+                                id: '0b5f0a4ee91a46eb86be51af4e625a67'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'b04b943231ef424a8bf94e5479a32316'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Label'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
                         }
                     },
                     {
@@ -31003,6 +32434,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: 'b04b943231ef424a8bf94e5479a32316'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            caption: 'Label'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: 'b056ea562bed4684a2b685596e719f4d'
                         key: {
@@ -31219,6 +32665,14 @@ declare global {
                         key: {
                             logical_table_name: 'x_daas_ham_cost_fact'
                             col_name_string: 'customer'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'b164c9bc8e674e148a56a45cf9c669b1'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'status'
                         }
                     },
                     {
@@ -31471,6 +32925,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_rest_message_fn'
+                        id: 'b333efe9d57543cf9d9ae0a6f28bd67a'
+                        key: {
+                            rest_message: 'edc7cea79b4c492c8600270b006f7a5a'
+                            function_name: 'create_label'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: 'b344b32b552b4b8db05acc01e8511a5d'
                         key: {
@@ -31625,6 +33087,14 @@ declare global {
                                     name: 'x_daas_ham.field_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'b420d2bd99154f9ab9f0c82856abc776'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'carrier'
                         }
                     },
                     {
@@ -32271,6 +33741,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'b7fe3ebb7fd7485983f0923d927f0f98'
+                        key: {
+                            sys_security_acl: 'f1644f8a75344f9db88b6fe2190ad2de'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'b809170cdca3433c9dcb1ad9547c9e9d'
                         key: {
@@ -32757,6 +34240,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            caption: 'Shipment'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: 'bb49d975aaab48ee9444cfcb7f029f07'
                         key: {
@@ -32818,6 +34316,28 @@ declare global {
                             value: 'temporary'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'bc0997066bf84df8859fdd31ef0713d8'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -33150,6 +34670,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'ua_table_licensing_config'
+                        id: 'be8afdbba2e74fdbbeae21ebb93b502c'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list'
                         id: 'be8d3fff171d40048e7672070240815f'
                         key: {
@@ -33243,6 +34770,19 @@ declare global {
                                 id: 'c5156577be814d2aa8bf557ddec8bf0e'
                                 key: {
                                     name: 'x_daas_ham.noc'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'bf5da7e0a3f94870a97f2d5e8693c0a2'
+                        key: {
+                            sys_security_acl: 'f1644f8a75344f9db88b6fe2190ad2de'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
                                 }
                             }
                         }
@@ -33452,6 +34992,14 @@ declare global {
                             name: 'x_daas_ham_order_line'
                             element: 'quantity'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'c15c3688af18458fb687e6ea61318a5e'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'description'
                         }
                     },
                     {
@@ -33675,6 +35223,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: 'c2797fe1d3f14665af277def9bed7662'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'label_id'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'c2864cd6ce344c6da7981e96fcfcf018'
                         key: {
@@ -33724,6 +35280,15 @@ declare global {
                             value: 'staging'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'c32c7872da424a47ba398ad3d9d416af'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'NULL'
+                            language: 'en'
                         }
                     },
                     {
@@ -33896,6 +35461,14 @@ declare global {
                                     sys_domain: 'global'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'c3fca804bce14ae2bbd57e4762d20501'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'order'
                         }
                     },
                     {
@@ -34836,6 +36409,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'c850511d0af74fc5a8ad633fd59b291d'
+                        key: {
+                            sys_ui_section: {
+                                id: '26f338a8a5d741948f5ec74a2f971600'
+                                key: {
+                                    name: 'x_daas_ham_order'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_order.x_daas_ham_shipment.order'
+                            position: '2'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: 'c85d4ee133714588af391d76e50f77f5'
                         key: {
@@ -34897,6 +36492,32 @@ declare global {
                             value: 'installed'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: 'c8e2b70827644823b2bbdd767e881cfa'
+                        key: {
+                            sys_ui_action: '37c361c4fc834b498d6ecacbcf8b06c2'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'c8e423de9ad34bbc91a2aacf7e6230ed'
+                        key: {
+                            sys_security_acl: '18bb700d973b4ac0a9f0ce84667fd21b'
+                            sys_user_role: {
+                                id: 'c5156577be814d2aa8bf557ddec8bf0e'
+                                key: {
+                                    name: 'x_daas_ham.noc'
+                                }
+                            }
                         }
                     },
                     {
@@ -35436,6 +37057,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'cbe2c4d1c6e946049778f647baf9164e'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'status'
+                            position: '9'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: 'cc0878601bb249f4899e1b8fbf175b98'
                         key: {
@@ -35871,6 +37514,15 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'cde9977cce8a49e68d1bdf5eb9c16a21'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'return_order'
+                            language: 'en'
                         }
                     },
                     {
@@ -36659,6 +38311,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'd36db821f96e4d6faaff7cb6d2bbe676'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'description'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'd370a32eaf7b4ee4b154b8e1ec22be76'
                         key: {
@@ -36723,6 +38384,14 @@ declare global {
                                 }
                             }
                             element: 'asset'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'd3a9d436800a46389a0593437a48e2dd'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'estimated_delivery'
                         }
                     },
                     {
@@ -36800,6 +38469,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'd4614b165c0745dba3d68411438744b9'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'number'
+                            position: '1'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'd47fbd83a1764154bfb6e8fef4cb1315'
                         key: {
@@ -36840,6 +38531,14 @@ declare global {
                             name: 'x_daas_ham_order_line'
                             element: 'quantity_to_purchase'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'd4f50c933f114355be2c1b5006c9b675'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'customer'
                         }
                     },
                     {
@@ -37493,6 +39192,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'd969d6407889462c946fdecb5b1e6fa0'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '16'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'd96cb9fc3eef4b67b4f7b0f68568d053'
                         key: {
@@ -37584,6 +39305,15 @@ declare global {
                         key: {
                             document_key: '1ef7351b55b746438b82ac14b2a2a0c6'
                             variable: '9024a37f671003007ba405225685efe5'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'd9d474cf0f4249c9a20fc0844779a4a7'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'tracking_number'
+                            language: 'en'
                         }
                     },
                     {
@@ -38089,6 +39819,17 @@ declare global {
                         key: {
                             logical_table_name: 'x_daas_ham_oem_rma'
                             col_name_string: 'rma_number'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'dd8cab96b7564f289483398433880869'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'status'
+                            value: 'unknown'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -38748,6 +40489,15 @@ declare global {
                                     name: 'x_daas_ham.admin'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'e2072b4ee93d4b6b9a4c78ed0046e790'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'occurred_at'
+                            language: 'en'
                         }
                     },
                     {
@@ -39744,6 +41494,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: 'e97ef1073c24414d944fb546651f0574'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'currency'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: 'e985d43ab9ed4746a3f44b3eec7d389b'
                         key: {
@@ -39953,6 +41711,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: 'eb3b266a71ea46419316d40eee8a1089'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'status'
+                            value: 'out_for_delivery'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'eb5b445052ba42a3bb9fea8208f5b89d'
+                        key: {
+                            sys_ui_section: {
+                                id: 'b04b943231ef424a8bf94e5479a32316'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Label'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'eb62b99d3b67464abf296cd9233d26b4'
                         key: {
@@ -40139,6 +41930,28 @@ declare global {
                             }
                             element: 'model'
                             position: '2'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'ec5706ef93224c3290b666969a2ab747'
+                        key: {
+                            sys_ui_section: {
+                                id: 'b04b943231ef424a8bf94e5479a32316'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Label'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'service_code'
+                            position: '1'
                         }
                     },
                     {
@@ -40601,6 +42414,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'ef02fd9f589e434ca742f21dea51ed1e'
+                        key: {
+                            sys_ui_section: {
+                                id: 'bb44ff2d0f6e4a06b5b88b64a15db437'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Shipment'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'estimated_delivery'
+                            position: '11'
+                        }
+                    },
+                    {
                         table: 'sys_element_mapping'
                         id: 'ef1201b7771641b2911a70e4ee5fbdf5'
                         key: {
@@ -40666,6 +42501,19 @@ declare global {
                                 id: '4e548db0cdee42dfb31bc76a4de6214d'
                                 key: {
                                     name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'efaf685794dd435795d113b1bdfda83e'
+                        key: {
+                            sys_security_acl: 'd2e07326f7644c6d979eaeb1e1551ab5'
+                            sys_user_role: {
+                                id: 'fd154cb7b91e4ef5aa4da43a7344134d'
+                                key: {
+                                    name: 'x_daas_ham.customer_admin'
                                 }
                             }
                         }
@@ -41020,6 +42868,32 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'f2ed4dcf159442478f03302303283c7a'
+                        key: {
+                            sys_security_acl: 'dd67d784147441f39c5d441351b439de'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'f3015ab4bfc4405fa4d6d5f707e3ea9d'
+                        key: {
+                            sys_security_acl: 'f1644f8a75344f9db88b6fe2190ad2de'
+                            sys_user_role: {
+                                id: 'c5156577be814d2aa8bf557ddec8bf0e'
+                                key: {
+                                    name: 'x_daas_ham.noc'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: 'f30ce999538d4c9bac071e83acbb2c75'
                         key: {
@@ -41125,6 +42999,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'f38ca17096f6427ea379d7f1d4221a4d'
+                        key: {
+                            sys_ui_section: {
+                                id: 'b04b943231ef424a8bf94e5479a32316'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Label'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'packages'
+                            position: '2'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'f3a77059e72d47a4a5e2f352c500c3ff'
                         key: {
@@ -41190,6 +43086,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_norm_exception'
                             element: 'source_table'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'f3f4c03b2943472ea0a721d153669f97'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'estimated_delivery'
                             language: 'en'
                         }
                     },
@@ -41610,6 +43515,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'f7c88976006f43ec924bde64a06ab3fa'
+                        key: {
+                            sys_security_acl: '18bb700d973b4ac0a9f0ce84667fd21b'
+                            sys_user_role: {
+                                id: 'b1a9a9832f01483a9c4e6fc55ca84188'
+                                key: {
+                                    name: 'x_daas_ham.field_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_number'
                         id: 'f7cbd105951b42a0840cfd255ba3f208'
                         key: {
@@ -41698,6 +43616,17 @@ declare global {
                         key: {
                             document_key: '734616e614cc4a5db34a82caaef1e9d5'
                             variable: '9024a37f671003007ba405225685efe5'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'f8ac779f38e8427a8fba9795ed61577d'
+                        key: {
+                            name: 'x_daas_ham_shipment_event'
+                            element: 'status'
+                            value: 'delivered'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -42180,6 +44109,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'fbe4a4e4516744d798bb5aeed01d71fd'
+                        key: {
+                            sys_ui_section: {
+                                id: 'b04b943231ef424a8bf94e5479a32316'
+                                key: {
+                                    name: 'x_daas_ham_shipment'
+                                    caption: 'Label'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '4'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'fbf0548e729448c4a318c97aef96648a'
                         key: {
@@ -42282,6 +44233,14 @@ declare global {
                             name: 'x_daas_ham_disposal_line'
                             element: 'disposal_order'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'fc8103ab1b974129bf7bbcfeeba938d4'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'status'
                         }
                     },
                     {

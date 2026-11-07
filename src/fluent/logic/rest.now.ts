@@ -6,6 +6,7 @@ import { scanAudit } from '../../server/entry/assurance'
 import { getRack, listRacks, listSites } from '../../server/entry/racks'
 import { answerAttestation, confirmInstalled, customerOverview, reportFault, requestCustomerReturn } from '../../server/entry/customer'
 import { getBillingLines, listBillingPeriods } from '../../server/entry/billing'
+import { postTrackingUpdate } from '../../server/entry/shipping'
 
 /* Scripted REST API: /api/x_daas_ham/naas/... */
 
@@ -172,6 +173,16 @@ RestApi({
             shortDescription: 'One page of a billing period\'s lines (?offset=0&limit=1000); final once the period is closed.',
             authentication: true,
             script: getBillingLines,
+        },
+        {
+            $id: Now.ID['rest_naas_shipping_tracking'],
+            name: 'shipping_tracking',
+            method: 'POST',
+            path: '/shipping/tracking',
+            shortDescription: 'Tracking webhook from the shipping aggregator (ShipEngine or EasyPost shape); authenticated by ?token=.',
+            authentication: false,
+            authorization: false,
+            script: postTrackingUpdate,
         },
     ],
 })

@@ -7,6 +7,7 @@ import { openChange, openWorkOrder, type WorkContext } from '../platform/field-w
 import { recomputeOrder } from '../platform/fulfilment'
 import { findById, str } from '../platform/records'
 import { returnReplacedAssets } from './returns'
+import { labelOrder, shippingEnabled } from './shipping'
 
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
@@ -22,11 +23,21 @@ function orderAssets(orderId: string): GlideRecord {
     return asset
 }
 
-/** UI action "Ship": send every staged Asset to the Site and open the on-site work. */
+/** UI action "Ship": send every staged Asset to the Site (buying the label when the aggregator is on) and open the on-site work. */
 export function shipOrder(order: GlideRecord): void {
-    if (!str(order, 'tracking_number') && str(order, 'install_mode') !== 'remote_hands') {
+    const needsCarrier = !str(order, 'tracking_number') && str(order, 'install_mode') !== 'remote_hands'
+    if (needsCarrier && !shippingEnabled()) {
         gs.addErrorMessage('Enter the carrier and tracking number before shipping')
         return
+    }
+    if (needsCarrier) {
+        // The shipping aggregator replaces manual tracking numbers (P3.26).
+        const label = labelOrder(order, countStaged(order.getUniqueValue()))
+        if (!label.ok) {
+            gs.addErrorMessage(`No shipping label: ${label.error}`)
+            return
+        }
+        order.update()
     }
     const siteId = str(order, 'site')
     const asset = orderAssets(order.getUniqueValue())
@@ -51,6 +62,13 @@ export function shipOrder(order: GlideRecord): void {
     if (str(order, 'install_mode') !== 'self_install' && !str(order, 'work_order')) openOnSiteWork(order)
     gs.addInfoMessage(`${shipped} asset(s) shipped to ${str(order, 'site.name')}`)
     recomputeOrder(order.getUniqueValue())
+}
+
+function countStaged(orderId: string): number {
+    const asset = orderAssets(orderId)
+    let staged = 0
+    while (asset.next()) if (readStage(asset) === 'staged') staged++
+    return staged
 }
 
 function openOnSiteWork(order: GlideRecord): void {
