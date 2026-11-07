@@ -4,6 +4,7 @@ import { postDeviceEvents } from '../../server/entry/in-service'
 import { listStockrooms, lookupAsset, pickAsset, putAwayAsset, receiveAsset } from '../../server/entry/warehouse'
 import { scanAudit } from '../../server/entry/assurance'
 import { getRack, listRacks, listSites } from '../../server/entry/racks'
+import { answerAttestation, confirmInstalled, customerOverview, reportFault, requestCustomerReturn } from '../../server/entry/customer'
 
 /* Scripted REST API: /api/x_daas_ham/naas/... */
 
@@ -107,6 +108,51 @@ RestApi({
             shortDescription: 'A rack and the devices placed in it.',
             authentication: true,
             script: getRack,
+        },
+        {
+            $id: Now.ID['rest_naas_customer_overview'],
+            name: 'customer_overview',
+            method: 'GET',
+            path: '/customer/overview',
+            shortDescription: "The signed-in customer contact's equipment, orders, returns and attestations.",
+            authentication: true,
+            script: customerOverview,
+        },
+        {
+            $id: Now.ID['rest_naas_customer_fault'],
+            name: 'customer_fault',
+            method: 'POST',
+            path: '/customer/faults',
+            shortDescription: 'Report a faulty device (creates a CSM case).',
+            authentication: true,
+            script: reportFault,
+        },
+        {
+            $id: Now.ID['rest_naas_customer_installed'],
+            name: 'customer_installed',
+            method: 'POST',
+            path: '/customer/orders/{id}/installed',
+            shortDescription: 'Confirm a self-installed order is installed.',
+            authentication: true,
+            script: confirmInstalled,
+        },
+        {
+            $id: Now.ID['rest_naas_customer_attestation'],
+            name: 'customer_attestation',
+            method: 'POST',
+            path: '/customer/attestations/{id}',
+            shortDescription: 'Answer (and optionally submit) an attestation.',
+            authentication: true,
+            script: answerAttestation,
+        },
+        {
+            $id: Now.ID['rest_naas_customer_returns'],
+            name: 'customer_returns',
+            method: 'POST',
+            path: '/customer/returns',
+            shortDescription: 'Request selected devices or a whole site to be taken back.',
+            authentication: true,
+            script: requestCustomerReturn,
         },
     ],
 })

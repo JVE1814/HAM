@@ -2,6 +2,7 @@ import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
 import {
     accountManager,
+    finance,
     admin,
     assetManager,
     customerAdmin,
@@ -754,4 +755,465 @@ Acl({
     table: 'x_daas_ham_eox_import',
     operation: 'write',
     roles: [assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_oem_coverage_read'],
+    type: 'record',
+    table: 'x_daas_ham_oem_coverage',
+    operation: 'read',
+    roles: providerStaff,
+})
+
+Acl({
+    $id: Now.ID['acl_oem_coverage_create'],
+    type: 'record',
+    table: 'x_daas_ham_oem_coverage',
+    operation: 'create',
+    roles: [assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_oem_coverage_write'],
+    type: 'record',
+    table: 'x_daas_ham_oem_coverage',
+    operation: 'write',
+    roles: [assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_oem_coverage_delete'],
+    type: 'record',
+    table: 'x_daas_ham_oem_coverage',
+    operation: 'delete',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_oem_rma_read'],
+    type: 'record',
+    table: 'x_daas_ham_oem_rma',
+    operation: 'read',
+    roles: providerStaff,
+})
+
+Acl({
+    $id: Now.ID['acl_oem_rma_create'],
+    type: 'record',
+    table: 'x_daas_ham_oem_rma',
+    operation: 'create',
+    roles: [assetManager, inventoryTech, noc],
+})
+
+Acl({
+    $id: Now.ID['acl_oem_rma_write'],
+    type: 'record',
+    table: 'x_daas_ham_oem_rma',
+    operation: 'write',
+    roles: [assetManager, inventoryTech, noc],
+})
+
+Acl({
+    $id: Now.ID['acl_oem_rma_delete'],
+    type: 'record',
+    table: 'x_daas_ham_oem_rma',
+    operation: 'delete',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_coverage_import_read'],
+    type: 'record',
+    table: 'x_daas_ham_coverage_import',
+    operation: 'read',
+    roles: providerStaff,
+})
+
+Acl({
+    $id: Now.ID['acl_coverage_import_create'],
+    type: 'record',
+    table: 'x_daas_ham_coverage_import',
+    operation: 'create',
+    roles: [assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_coverage_import_write'],
+    type: 'record',
+    table: 'x_daas_ham_coverage_import',
+    operation: 'write',
+    roles: [assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_coverage_import_delete'],
+    type: 'record',
+    table: 'x_daas_ham_coverage_import',
+    operation: 'delete',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_disposal_order_read'],
+    type: 'record',
+    table: 'x_daas_ham_disposal_order',
+    operation: 'read',
+    roles: providerStaff,
+})
+
+Acl({
+    $id: Now.ID['acl_disposal_order_create'],
+    type: 'record',
+    table: 'x_daas_ham_disposal_order',
+    operation: 'create',
+    roles: [assetManager, inventoryTech],
+})
+
+Acl({
+    $id: Now.ID['acl_disposal_order_write'],
+    type: 'record',
+    table: 'x_daas_ham_disposal_order',
+    operation: 'write',
+    roles: [assetManager, inventoryTech],
+})
+
+Acl({
+    $id: Now.ID['acl_disposal_order_delete'],
+    type: 'record',
+    table: 'x_daas_ham_disposal_order',
+    operation: 'delete',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_disposal_line_read'],
+    type: 'record',
+    table: 'x_daas_ham_disposal_line',
+    operation: 'read',
+    roles: providerStaff,
+})
+
+Acl({
+    $id: Now.ID['acl_disposal_line_create'],
+    type: 'record',
+    table: 'x_daas_ham_disposal_line',
+    operation: 'create',
+    roles: [assetManager, inventoryTech],
+})
+
+Acl({
+    $id: Now.ID['acl_disposal_line_write'],
+    type: 'record',
+    table: 'x_daas_ham_disposal_line',
+    operation: 'write',
+    roles: [assetManager, inventoryTech],
+})
+
+Acl({
+    $id: Now.ID['acl_disposal_line_delete'],
+    type: 'record',
+    table: 'x_daas_ham_disposal_line',
+    operation: 'delete',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_audit_read'],
+    type: 'record',
+    table: 'x_daas_ham_audit',
+    operation: 'read',
+    roles: providerStaff,
+})
+
+Acl({
+    $id: Now.ID['acl_audit_create'],
+    type: 'record',
+    table: 'x_daas_ham_audit',
+    operation: 'create',
+    roles: [assetManager, inventoryTech, fieldTech],
+})
+
+Acl({
+    $id: Now.ID['acl_audit_write'],
+    type: 'record',
+    table: 'x_daas_ham_audit',
+    operation: 'write',
+    roles: [assetManager, inventoryTech, fieldTech],
+})
+
+Acl({
+    $id: Now.ID['acl_audit_delete'],
+    type: 'record',
+    table: 'x_daas_ham_audit',
+    operation: 'delete',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_audit_line_read'],
+    type: 'record',
+    table: 'x_daas_ham_audit_line',
+    operation: 'read',
+    roles: providerStaff,
+})
+
+Acl({
+    $id: Now.ID['acl_audit_line_create'],
+    type: 'record',
+    table: 'x_daas_ham_audit_line',
+    operation: 'create',
+    roles: [assetManager, inventoryTech, fieldTech],
+})
+
+Acl({
+    $id: Now.ID['acl_audit_line_write'],
+    type: 'record',
+    table: 'x_daas_ham_audit_line',
+    operation: 'write',
+    roles: [assetManager, inventoryTech, fieldTech],
+})
+
+Acl({
+    $id: Now.ID['acl_audit_line_delete'],
+    type: 'record',
+    table: 'x_daas_ham_audit_line',
+    operation: 'delete',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_recon_exception_read'],
+    type: 'record',
+    table: 'x_daas_ham_recon_exception',
+    operation: 'read',
+    roles: providerStaff,
+})
+
+Acl({
+    $id: Now.ID['acl_recon_exception_create'],
+    type: 'record',
+    table: 'x_daas_ham_recon_exception',
+    operation: 'create',
+    roles: [assetManager, noc],
+})
+
+Acl({
+    $id: Now.ID['acl_recon_exception_write'],
+    type: 'record',
+    table: 'x_daas_ham_recon_exception',
+    operation: 'write',
+    roles: [assetManager, noc],
+})
+
+Acl({
+    $id: Now.ID['acl_recon_exception_delete'],
+    type: 'record',
+    table: 'x_daas_ham_recon_exception',
+    operation: 'delete',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_return_order_read'],
+    type: 'record',
+    table: 'x_daas_ham_return_order',
+    operation: 'read',
+    roles: providerStaff,
+})
+
+Acl({
+    $id: Now.ID['acl_return_order_read_customer'],
+    type: 'record',
+    table: 'x_daas_ham_return_order',
+    operation: 'read',
+    roles: customerRoles,
+    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID();",
+})
+
+Acl({
+    $id: Now.ID['acl_attestation_read'],
+    type: 'record',
+    table: 'x_daas_ham_attestation',
+    operation: 'read',
+    roles: providerStaff,
+})
+
+Acl({
+    $id: Now.ID['acl_attestation_read_customer'],
+    type: 'record',
+    table: 'x_daas_ham_attestation',
+    operation: 'read',
+    roles: customerRoles,
+    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID();",
+})
+
+Acl({
+    $id: Now.ID['acl_fee_event_read'],
+    type: 'record',
+    table: 'x_daas_ham_fee_event',
+    operation: 'read',
+    roles: providerStaff,
+})
+
+Acl({
+    $id: Now.ID['acl_fee_event_read_customer'],
+    type: 'record',
+    table: 'x_daas_ham_fee_event',
+    operation: 'read',
+    roles: customerRoles,
+    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID();",
+})
+
+Acl({
+    $id: Now.ID['acl_return_order_create'],
+    type: 'record',
+    table: 'x_daas_ham_return_order',
+    operation: 'create',
+    roles: [assetManager, accountManager, noc, customerAdmin, 'sn_customerservice_agent'],
+})
+
+Acl({
+    $id: Now.ID['acl_return_order_write'],
+    type: 'record',
+    table: 'x_daas_ham_return_order',
+    operation: 'write',
+    roles: [assetManager, accountManager, noc, inventoryTech, fieldTech],
+})
+
+Acl({
+    $id: Now.ID['acl_return_order_delete'],
+    type: 'record',
+    table: 'x_daas_ham_return_order',
+    operation: 'delete',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_return_order_line_read'],
+    type: 'record',
+    table: 'x_daas_ham_return_order_line',
+    operation: 'read',
+    roles: providerStaff,
+})
+
+Acl({
+    $id: Now.ID['acl_return_order_line_read_customer'],
+    type: 'record',
+    table: 'x_daas_ham_return_order_line',
+    operation: 'read',
+    roles: customerRoles,
+    script: "answer = current.return_order.customer.toString() == gs.getUser().getCompanyID();",
+})
+
+Acl({
+    $id: Now.ID['acl_return_order_line_create'],
+    type: 'record',
+    table: 'x_daas_ham_return_order_line',
+    operation: 'create',
+    roles: [assetManager, inventoryTech, noc],
+})
+
+Acl({
+    $id: Now.ID['acl_return_order_line_write'],
+    type: 'record',
+    table: 'x_daas_ham_return_order_line',
+    operation: 'write',
+    roles: [assetManager, inventoryTech],
+})
+
+Acl({
+    $id: Now.ID['acl_return_order_line_delete'],
+    type: 'record',
+    table: 'x_daas_ham_return_order_line',
+    operation: 'delete',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_attestation_create'],
+    type: 'record',
+    table: 'x_daas_ham_attestation',
+    operation: 'create',
+    roles: [assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_attestation_write'],
+    type: 'record',
+    table: 'x_daas_ham_attestation',
+    operation: 'write',
+    roles: [assetManager, accountManager],
+})
+
+Acl({
+    $id: Now.ID['acl_attestation_delete'],
+    type: 'record',
+    table: 'x_daas_ham_attestation',
+    operation: 'delete',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_attestation_item_read'],
+    type: 'record',
+    table: 'x_daas_ham_attestation_item',
+    operation: 'read',
+    roles: providerStaff,
+})
+
+Acl({
+    $id: Now.ID['acl_attestation_item_read_customer'],
+    type: 'record',
+    table: 'x_daas_ham_attestation_item',
+    operation: 'read',
+    roles: customerRoles,
+    script: "answer = current.attestation.customer.toString() == gs.getUser().getCompanyID();",
+})
+
+Acl({
+    $id: Now.ID['acl_attestation_item_create'],
+    type: 'record',
+    table: 'x_daas_ham_attestation_item',
+    operation: 'create',
+    roles: [assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_attestation_item_write'],
+    type: 'record',
+    table: 'x_daas_ham_attestation_item',
+    operation: 'write',
+    roles: [assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_attestation_item_delete'],
+    type: 'record',
+    table: 'x_daas_ham_attestation_item',
+    operation: 'delete',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_fee_event_create'],
+    type: 'record',
+    table: 'x_daas_ham_fee_event',
+    operation: 'create',
+    roles: [finance, assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_fee_event_write'],
+    type: 'record',
+    table: 'x_daas_ham_fee_event',
+    operation: 'write',
+    roles: [finance, assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_fee_event_delete'],
+    type: 'record',
+    table: 'x_daas_ham_fee_event',
+    operation: 'delete',
+    roles: [admin],
 })

@@ -40,3 +40,7 @@ export function scopeOrderLines(current: GlideRecord): void {
 export function scopeCustomerRecords(current: GlideRecord): void {
     restrict(current, { customer: 'customer' })
 }
+
+export function scopeCustomerSiteRecords(current: GlideRecord): void {
+    restrict(current, { customer: 'customer', site: 'site' })
+}

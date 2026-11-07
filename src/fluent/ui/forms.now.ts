@@ -32,7 +32,7 @@ export const order_form = Form({
                 {
                     layout: 'two-column',
                     leftElements: [{ field: 'carrier', type: 'table_field' }, { field: 'tracking_number', type: 'table_field' }],
-                    rightElements: [{ field: 'change_request', type: 'table_field' }, { field: 'work_order', type: 'table_field' }],
+                    rightElements: [{ field: 'change_request', type: 'table_field' }, { field: 'work_order', type: 'table_field' }, { field: 'case', type: 'table_field' }, { field: 'return_raised', type: 'table_field' }],
                 },
             ],
         },
@@ -497,3 +497,303 @@ List({ table: 'x_daas_ham_stockroom_member', view: default_view, columns: ['user
 List({ table: 'x_daas_ham_device_event', view: default_view, columns: ['observed_at', 'asset', 'identifier', 'event', 'source'] })
 
 List({ table: 'x_daas_ham_job_cursor', view: default_view, columns: ['job', 'cursor', 'last_run', 'last_status', 'processed_total'] })
+
+export const oem_coverage_form = Form({
+    table: 'x_daas_ham_oem_coverage',
+    view: default_view,
+    sections: [
+        {
+            caption: 'Coverage',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'serial_number', type: 'table_field' }, { field: 'asset', type: 'table_field' }, { field: 'vendor', type: 'table_field' }, { field: 'contract_number', type: 'table_field' }, { field: 'service_level', type: 'table_field' }],
+                    rightElements: [{ field: 'covered', type: 'table_field' }, { field: 'start_date', type: 'table_field' }, { field: 'end_date', type: 'table_field' }, { field: 'source', type: 'table_field' }, { field: 'last_checked', type: 'table_field' }],
+                },
+            ],
+        },
+    ],
+})
+
+export const oem_rma_form = Form({
+    table: 'x_daas_ham_oem_rma',
+    view: default_view,
+    sections: [
+        {
+            caption: 'RMA',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'rma_number', type: 'table_field' }, { field: 'vendor', type: 'table_field' }, { field: 'state', type: 'table_field' }, { field: 'status', type: 'table_field' }, { field: 'advance_replacement', type: 'table_field' }],
+                    rightElements: [{ field: 'defective_asset', type: 'table_field' }, { field: 'order_line', type: 'table_field' }, { field: 'case', type: 'table_field' }, { field: 'replacement_serial', type: 'table_field' }, { field: 'ship_back_due', type: 'table_field' }, { field: 'last_synced', type: 'table_field' }],
+                },
+            ],
+        },
+    ],
+})
+
+export const return_order_form = Form({
+    table: 'x_daas_ham_return_order',
+    view: default_view,
+    sections: [
+        {
+            caption: 'Return',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'number', type: 'table_field' }, { field: 'trigger', type: 'table_field' }, { field: 'customer', type: 'table_field' }, { field: 'site', type: 'table_field' }, { field: 'agreement', type: 'table_field' }, { field: 'source_order', type: 'table_field' }],
+                    rightElements: [{ field: 'state', type: 'table_field' }, { field: 'method', type: 'table_field' }, { field: 'due_date', type: 'table_field' }, { field: 'escalated', type: 'table_field' }],
+                },
+            ],
+        },
+        {
+            caption: 'Collection',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'carrier', type: 'table_field' }, { field: 'tracking_number', type: 'table_field' }],
+                    rightElements: [{ field: 'work_order', type: 'table_field' }, { field: 'change_request', type: 'table_field' }],
+                },
+            ],
+        },
+        {
+            caption: 'Notes',
+            content: [
+                {
+                    layout: 'one-column',
+                    elements: [{ field: 'short_description', type: 'table_field' }, { field: 'work_notes', type: 'table_field' }],
+                },
+            ],
+        },
+        {
+            caption: 'Related',
+            content: [
+                {
+                    layout: 'one-column',
+                    elements: [{ type: 'formatter', formatterRef: 'Activities_Filtered' }, { type: 'list', listType: '12M', listRef: 'x_daas_ham_return_order_line.return_order' }, { type: 'list', listType: '12M', listRef: 'x_daas_ham_fee_event.return_order' }],
+                },
+            ],
+        },
+    ],
+})
+
+export const return_order_line_form = Form({
+    table: 'x_daas_ham_return_order_line',
+    view: default_view,
+    sections: [
+        {
+            caption: 'Line',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'return_order', type: 'table_field' }, { field: 'asset', type: 'table_field' }, { field: 'status', type: 'table_field' }, { field: 'received_at', type: 'table_field' }],
+                    rightElements: [{ field: 'condition', type: 'table_field' }, { field: 'evaluation', type: 'table_field' }],
+                },
+            ],
+        },
+    ],
+})
+
+export const fee_event_form = Form({
+    table: 'x_daas_ham_fee_event',
+    view: default_view,
+    sections: [
+        {
+            caption: 'Fee',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'fee_type', type: 'table_field' }, { field: 'customer', type: 'table_field' }, { field: 'agreement', type: 'table_field' }, { field: 'asset', type: 'table_field' }, { field: 'return_order', type: 'table_field' }],
+                    rightElements: [{ field: 'amount', type: 'table_field' }, { field: 'currency', type: 'table_field' }, { field: 'occurred_on', type: 'table_field' }, { field: 'status', type: 'table_field' }],
+                },
+            ],
+        },
+    ],
+})
+
+export const disposal_order_form = Form({
+    table: 'x_daas_ham_disposal_order',
+    view: default_view,
+    sections: [
+        {
+            caption: 'Disposal',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'number', type: 'table_field' }, { field: 'method', type: 'table_field' }, { field: 'disposal_vendor', type: 'table_field' }, { field: 'customer', type: 'table_field' }, { field: 'certificate_number', type: 'table_field' }],
+                    rightElements: [{ field: 'stage', type: 'table_field' }, { field: 'state', type: 'table_field' }, { field: 'approval', type: 'table_field' }],
+                },
+            ],
+        },
+        {
+            caption: 'Notes',
+            content: [
+                {
+                    layout: 'one-column',
+                    elements: [{ field: 'short_description', type: 'table_field' }, { field: 'work_notes', type: 'table_field' }],
+                },
+            ],
+        },
+        {
+            caption: 'Related',
+            content: [
+                {
+                    layout: 'one-column',
+                    elements: [{ type: 'formatter', formatterRef: 'Activities_Filtered' }, { type: 'list', listType: '12M', listRef: 'x_daas_ham_disposal_line.disposal_order' }],
+                },
+            ],
+        },
+    ],
+})
+
+export const disposal_line_form = Form({
+    table: 'x_daas_ham_disposal_line',
+    view: default_view,
+    sections: [
+        {
+            caption: 'Line',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'disposal_order', type: 'table_field' }, { field: 'asset', type: 'table_field' }, { field: 'method', type: 'table_field' }],
+                    rightElements: [{ field: 'sale_amount', type: 'table_field' }, { field: 'credit_amount', type: 'table_field' }, { field: 'status', type: 'table_field' }, { field: 'blockers', type: 'table_field' }],
+                },
+            ],
+        },
+    ],
+})
+
+export const audit_form = Form({
+    table: 'x_daas_ham_audit',
+    view: default_view,
+    sections: [
+        {
+            caption: 'Audit',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'number', type: 'table_field' }, { field: 'audit_type', type: 'table_field' }, { field: 'stockroom', type: 'table_field' }, { field: 'site', type: 'table_field' }, { field: 'customer', type: 'table_field' }, { field: 'work_order', type: 'table_field' }],
+                    rightElements: [{ field: 'state', type: 'table_field' }, { field: 'expected_count', type: 'table_field' }, { field: 'matched_count', type: 'table_field' }, { field: 'missing_count', type: 'table_field' }, { field: 'unexpected_count', type: 'table_field' }],
+                },
+            ],
+        },
+        {
+            caption: 'Notes',
+            content: [
+                {
+                    layout: 'one-column',
+                    elements: [{ field: 'short_description', type: 'table_field' }, { field: 'work_notes', type: 'table_field' }],
+                },
+            ],
+        },
+        {
+            caption: 'Related',
+            content: [
+                {
+                    layout: 'one-column',
+                    elements: [{ type: 'formatter', formatterRef: 'Activities_Filtered' }, { type: 'list', listType: '12M', listRef: 'x_daas_ham_audit_line.audit' }],
+                },
+            ],
+        },
+    ],
+})
+
+export const audit_line_form = Form({
+    table: 'x_daas_ham_audit_line',
+    view: default_view,
+    sections: [
+        {
+            caption: 'Line',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'audit', type: 'table_field' }, { field: 'asset', type: 'table_field' }, { field: 'scanned_code', type: 'table_field' }],
+                    rightElements: [{ field: 'result', type: 'table_field' }, { field: 'scanned_at', type: 'table_field' }],
+                },
+            ],
+        },
+    ],
+})
+
+export const attestation_form = Form({
+    table: 'x_daas_ham_attestation',
+    view: default_view,
+    sections: [
+        {
+            caption: 'Attestation',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'number', type: 'table_field' }, { field: 'customer', type: 'table_field' }, { field: 'site', type: 'table_field' }, { field: 'agreement', type: 'table_field' }],
+                    rightElements: [{ field: 'state', type: 'table_field' }, { field: 'assigned_to', type: 'table_field' }, { field: 'attested_by', type: 'table_field' }, { field: 'attested_at', type: 'table_field' }],
+                },
+            ],
+        },
+        {
+            caption: 'Related',
+            content: [
+                {
+                    layout: 'one-column',
+                    elements: [{ type: 'list', listType: '12M', listRef: 'x_daas_ham_attestation_item.attestation' }],
+                },
+            ],
+        },
+    ],
+})
+
+export const attestation_item_form = Form({
+    table: 'x_daas_ham_attestation_item',
+    view: default_view,
+    sections: [
+        {
+            caption: 'Item',
+            content: [
+                {
+                    layout: 'one-column',
+                    elements: [{ field: 'attestation', type: 'table_field' }, { field: 'asset', type: 'table_field' }, { field: 'response', type: 'table_field' }],
+                },
+            ],
+        },
+    ],
+})
+
+export const recon_exception_form = Form({
+    table: 'x_daas_ham_recon_exception',
+    view: default_view,
+    sections: [
+        {
+            caption: 'Exception',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'exception_type', type: 'table_field' }, { field: 'asset', type: 'table_field' }, { field: 'ci', type: 'table_field' }, { field: 'customer', type: 'table_field' }],
+                    rightElements: [{ field: 'status', type: 'table_field' }, { field: 'detected_at', type: 'table_field' }, { field: 'detail', type: 'table_field' }],
+                },
+            ],
+        },
+    ],
+})
+
+List({ table: 'x_daas_ham_oem_coverage', view: default_view, columns: ['serial_number', 'asset', 'vendor', 'service_level', 'end_date', 'covered', 'source'] })
+
+List({ table: 'x_daas_ham_oem_rma', view: default_view, columns: ['rma_number', 'vendor', 'state', 'status', 'defective_asset', 'replacement_serial', 'ship_back_due'] })
+
+List({ table: 'x_daas_ham_return_order', view: default_view, columns: ['number', 'trigger', 'customer', 'site', 'method', 'due_date', 'state', 'escalated'] })
+
+List({ table: 'x_daas_ham_return_order_line', view: default_view, columns: ['return_order', 'asset', 'status', 'received_at', 'condition', 'evaluation'] })
+
+List({ table: 'x_daas_ham_fee_event', view: default_view, columns: ['occurred_on', 'fee_type', 'customer', 'asset', 'amount', 'currency', 'status'] })
+
+List({ table: 'x_daas_ham_disposal_order', view: default_view, columns: ['number', 'method', 'disposal_vendor', 'customer', 'stage', 'approval'] })
+
+List({ table: 'x_daas_ham_disposal_line', view: default_view, columns: ['disposal_order', 'asset', 'method', 'status', 'sale_amount', 'credit_amount', 'blockers'] })
+
+List({ table: 'x_daas_ham_audit', view: default_view, columns: ['number', 'audit_type', 'stockroom', 'site', 'state', 'expected_count', 'matched_count', 'missing_count', 'unexpected_count'] })
+
+List({ table: 'x_daas_ham_audit_line', view: default_view, columns: ['audit', 'asset', 'scanned_code', 'result', 'scanned_at'] })
+
+List({ table: 'x_daas_ham_attestation', view: default_view, columns: ['number', 'customer', 'site', 'state', 'assigned_to', 'attested_at'] })
+
+List({ table: 'x_daas_ham_attestation_item', view: default_view, columns: ['attestation', 'asset', 'response'] })
+
+List({ table: 'x_daas_ham_recon_exception', view: default_view, columns: ['detected_at', 'exception_type', 'asset', 'ci', 'customer', 'status', 'detail'] })

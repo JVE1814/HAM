@@ -3,6 +3,7 @@ import { BusinessRule } from '@servicenow/sdk/core'
 import {
     scopeAssets,
     scopeCustomerRecords,
+    scopeCustomerSiteRecords,
     scopeOrderLines,
     scopeOrders,
     scopeStagingTasks,
@@ -96,6 +97,36 @@ BusinessRule({
     $id: Now.ID['br_scope_catalog_entry'],
     name: 'NaaS - scope catalog entries',
     table: 'x_daas_ham_catalog_entry',
+    when: 'before',
+    action: ['query'],
+    order: 50,
+    script: scopeCustomerRecords,
+})
+
+BusinessRule({
+    $id: Now.ID['br_scope_return_order'],
+    name: 'NaaS - scope return orders',
+    table: 'x_daas_ham_return_order',
+    when: 'before',
+    action: ['query'],
+    order: 50,
+    script: scopeCustomerSiteRecords,
+})
+
+BusinessRule({
+    $id: Now.ID['br_scope_attestation'],
+    name: 'NaaS - scope attestations',
+    table: 'x_daas_ham_attestation',
+    when: 'before',
+    action: ['query'],
+    order: 50,
+    script: scopeCustomerSiteRecords,
+})
+
+BusinessRule({
+    $id: Now.ID['br_scope_fee_event'],
+    name: 'NaaS - scope fee events',
+    table: 'x_daas_ham_fee_event',
     when: 'before',
     action: ['query'],
     order: 50,

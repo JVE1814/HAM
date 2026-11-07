@@ -2,6 +2,7 @@ import '@servicenow/sdk/global'
 import { ApplicationMenu, Record } from '@servicenow/sdk/core'
 import { accountManager, assetManager, fieldTech, finance, inventoryTech, noc } from '../security/roles.now'
 import { requestNetworkEquipment } from './order-producer.now'
+import { requestReturn } from './return-producer.now'
 
 /* Navigator menu "NaaS Asset Management". */
 
@@ -459,5 +460,215 @@ Record({
         roles: ['x_daas_ham.admin'],
         active: true,
         order: 930,
+    },
+})
+
+Record({
+    $id: Now.ID['module_racks'],
+    table: 'sys_app_module',
+    data: {
+        title: 'Rack elevations',
+        application: naasMenu,
+        link_type: 'DIRECT',
+        query: 'x_daas_ham_racks.do',
+        roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
+        active: true,
+        order: 130,
+    },
+})
+
+Record({
+    $id: Now.ID['module_customer_page'],
+    table: 'sys_app_module',
+    data: {
+        title: 'Customer self-service (preview)',
+        application: naasMenu,
+        link_type: 'DIRECT',
+        query: 'x_daas_ham_customer.do',
+        roles: ['x_daas_ham.asset_manager'],
+        active: true,
+        order: 140,
+    },
+})
+
+Record({
+    $id: Now.ID['module_request_return'],
+    table: 'sys_app_module',
+    data: {
+        title: 'Return or decommission equipment',
+        application: naasMenu,
+        link_type: 'DIRECT',
+        query: `com.glideapp.servicecatalog_cat_item_view.do?v=1&sysparm_id=${requestReturn.$id}`,
+        roles: ['x_daas_ham.asset_manager', 'x_daas_ham.account_manager', 'x_daas_ham.noc', 'sn_customerservice_agent'],
+        active: true,
+        order: 150,
+    },
+})
+
+Record({
+    $id: Now.ID['module_sep_aftersales'],
+    table: 'sys_app_module',
+    data: {
+        title: 'After-sales',
+        application: naasMenu,
+        link_type: 'SEPARATOR',
+        roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
+        active: true,
+        order: 350,
+    },
+})
+
+Record({
+    $id: Now.ID['module_returns_open'],
+    table: 'sys_app_module',
+    data: {
+        title: 'Open returns',
+        application: naasMenu,
+        link_type: 'FILTER',
+        name: 'x_daas_ham_return_order',
+        filter: 'active=true',
+        roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
+        active: true,
+        order: 355,
+    },
+})
+
+Record({
+    $id: Now.ID['module_return_lines'],
+    table: 'sys_app_module',
+    data: {
+        title: 'Return lines',
+        application: naasMenu,
+        link_type: 'LIST',
+        name: 'x_daas_ham_return_order_line',
+        roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
+        active: true,
+        order: 357,
+    },
+})
+
+Record({
+    $id: Now.ID['module_oem_rmas'],
+    table: 'sys_app_module',
+    data: {
+        title: 'OEM RMAs',
+        application: naasMenu,
+        link_type: 'LIST',
+        name: 'x_daas_ham_oem_rma',
+        roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
+        active: true,
+        order: 360,
+    },
+})
+
+Record({
+    $id: Now.ID['module_oem_coverage'],
+    table: 'sys_app_module',
+    data: {
+        title: 'OEM coverage',
+        application: naasMenu,
+        link_type: 'LIST',
+        name: 'x_daas_ham_oem_coverage',
+        roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
+        active: true,
+        order: 365,
+    },
+})
+
+Record({
+    $id: Now.ID['module_disposals'],
+    table: 'sys_app_module',
+    data: {
+        title: 'Disposal orders',
+        application: naasMenu,
+        link_type: 'LIST',
+        name: 'x_daas_ham_disposal_order',
+        roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
+        active: true,
+        order: 370,
+    },
+})
+
+Record({
+    $id: Now.ID['module_fee_events'],
+    table: 'sys_app_module',
+    data: {
+        title: 'Fee events',
+        application: naasMenu,
+        link_type: 'LIST',
+        name: 'x_daas_ham_fee_event',
+        roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
+        active: true,
+        order: 375,
+    },
+})
+
+Record({
+    $id: Now.ID['module_sep_assurance'],
+    table: 'sys_app_module',
+    data: {
+        title: 'Assurance',
+        application: naasMenu,
+        link_type: 'SEPARATOR',
+        roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
+        active: true,
+        order: 380,
+    },
+})
+
+Record({
+    $id: Now.ID['module_audits'],
+    table: 'sys_app_module',
+    data: {
+        title: 'Audits',
+        application: naasMenu,
+        link_type: 'LIST',
+        name: 'x_daas_ham_audit',
+        roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
+        active: true,
+        order: 382,
+    },
+})
+
+Record({
+    $id: Now.ID['module_attestations'],
+    table: 'sys_app_module',
+    data: {
+        title: 'Attestations',
+        application: naasMenu,
+        link_type: 'LIST',
+        name: 'x_daas_ham_attestation',
+        roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
+        active: true,
+        order: 384,
+    },
+})
+
+Record({
+    $id: Now.ID['module_exceptions'],
+    table: 'sys_app_module',
+    data: {
+        title: 'Reconciliation exceptions',
+        application: naasMenu,
+        link_type: 'FILTER',
+        name: 'x_daas_ham_recon_exception',
+        filter: 'status=open',
+        roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
+        active: true,
+        order: 386,
+    },
+})
+
+Record({
+    $id: Now.ID['module_coverage_import'],
+    table: 'sys_app_module',
+    data: {
+        title: 'OEM coverage import rows',
+        application: naasMenu,
+        link_type: 'LIST',
+        name: 'x_daas_ham_coverage_import',
+        roles: ['x_daas_ham.asset_manager'],
+        active: true,
+        order: 625,
     },
 })
