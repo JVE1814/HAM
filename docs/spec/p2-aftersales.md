@@ -7,6 +7,10 @@
 - **Raise replacement** (NOC, asset manager, CSM agent) creates a *device replace* Order: one line,
   same Model, *replaces asset* = the failed unit. The Order is submitted at once; one that Submit
   refuses (ordering spec) stays a draft, linked to the case, to correct and submit.
+- **Raise replacement** is offered only while the case links no Order. A form opened before the link
+  can still send it: a linked draft is then submitted again, a linked Order awaiting approval, going
+  ahead or complete is kept, and only one that was rejected or cancelled is replaced by a new Order
+  (`domain/breakfix.ts`).
 - Replacement lines skip the entitlement checks: a like-for-like swap is not a new catalog choice and
   adds no usage.
 - Sourcing follows the replacement priority: hot spare at the Site → Spare pool → central stock.
@@ -33,6 +37,11 @@
 | Agreement end | Daily job, once per Agreement after its end date (all installed equipment) |
 | Temporary end | Daily job, `x_daas_ham.returns.temporary_lead_days` before a temporary Order's end date |
 
+- Through the record producer, a return is raised only when the Return create rule lets its requester
+  in (asset managers, account managers, NOC, the service desk and Customer admins): a Customer admin
+  requests only for their own Customer, the others for any Customer, and site contacts never. The Site
+  must be one of the Customer's Sites. Otherwise the request is removed again and the requester is
+  told why (`domain/returns.ts` `returnRequestFindings`). The Site choices follow the chosen Customer.
 - Installed Assets on a return become *pending return*. The due date is the Agreement's return
   allowance.
 - An Asset already awaiting another return is not added again; completing an install twice raises
@@ -43,7 +52,8 @@
 - Devices chosen for a device removal must be at the chosen Site; others are ignored.
 - Field de-install opens a normal change and a de-install work order. Ship-back relies on the Site
   contact.
-- **Receipt** at the depot (warehouse app, Receive), for units pending return (or missing):
+- **Receipt** at the depot (warehouse app, Receive), for units pending return (or missing), only into a
+  central depot or a staging centre, never a customer-site stockroom:
   - the unit goes to *pending evaluation* and leaves its Site, Rack position and subscription line;
   - a site package with no Assets left ends that day (all its units count, not only those the
     receiving tech can see);

@@ -18,4 +18,7 @@ the Site, queries with business rules off.
 
 For Customer contacts, a rule on a table with no Customer field (or no Site field, for Site contacts)
 matches nothing. Site contacts therefore get no Stockrooms, Agreements, subscription lines, catalog
-entries or Fee events, and no Customer contact gets transfer orders or Staging tasks.
+entries or Fee events, and no Customer contact gets transfer orders or Staging tasks. The backing
+customer read ACLs check the Customer and, for a site contact who is not also a customer admin, that
+the record's Site lists them as a contact: a dot-walk from a visible record and the tables with no rule
+(return lines, attestation items, shipment events) rely on the ACL alone.

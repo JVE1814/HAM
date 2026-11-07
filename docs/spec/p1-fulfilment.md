@@ -34,6 +34,12 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   Staging task is created; without one it stays reserved). An unknown serial with a PID is received
   without an ASN. Returned units (pending return or missing) are received by the returns process (P2
   after-sales spec); any other scanned Asset is refused as not awaiting receipt.
+- The chosen stockroom must be a central depot or a staging centre: a customer-site stockroom is
+  refused (HTTP 400), for returned units too.
+- If the platform refuses to save the new or confirmed Asset, the call answers HTTP 422 and the unit is
+  not received: it stays in transit or on order (one without an ASN may not be created at all), for a
+  rescan. If only the reservation for the waiting line is refused, the unit stays received
+  (available), a warning is logged and no Staging task opens.
 - **Provider tags** come from one counter, advanced under a job lock so that no two Assets share a tag.
   A receipt that cannot take the lock after 5 tries is told to scan again (HTTP 503) and the unit is
   not received; one without an ASN stays on order, so the rescan finds it by serial.
@@ -48,6 +54,9 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
 
 - The checklist is the most specific active template matching the Asset's Customer > manufacturer >
   device class and staging source. Distributor-staged Assets get verification templates.
+- A Staging task is kept only with every step of its template. If the platform refuses a step, the task
+  and its steps are removed (a task that cannot be deleted is named in a warning, to cancel) and the
+  Asset stays reserved for its line.
 - Steps stamp who and when. A task can be closed complete only when all mandatory steps are done,
   unless its result is *failed*. A failed Asset goes to pending evaluation and leaves the line.
 

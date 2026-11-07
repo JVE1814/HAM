@@ -37,7 +37,9 @@ Each installed Asset is checked for:
 - **site mismatch** with its CI's location: the CI's location, or the location two levels up
   (room → building → site), must be the Asset's Site.
 
-Exceptions open once per type and Asset, and resolve themselves when the condition clears.
+Exceptions open once per type and Asset (or CI), also when two runs raise the same one at once: the
+check and the insert are made under a lock on the type and subject. They resolve themselves when the
+condition clears.
 Network-gear CIs discovered recently with no Asset raise *seen without asset*.
 
 ## Racks (D67)

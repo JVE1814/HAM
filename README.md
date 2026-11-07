@@ -119,7 +119,10 @@ demo data are illustrative, not vendor bulletins.
 ```
 
 `identifier` is a serial number, provider tag or customer tag; `event` is `seen`, `down` or `up`.
-Responds `202` with accepted / unknown identifiers / rejected rows. Only state changes are stored.
+`observed_at` is an ISO-8601 timestamp with a UTC offset (`Z`, `±hh:mm` or `±hhmm`), to the minute,
+second or fraction of a second; a time without an offset, another date format or a time that does not
+exist (2026-02-31, 24:00) is a rejected row. Responds `202` with accepted / unknown identifiers /
+rejected rows. Only state changes are stored.
 
 **Imports**: load CSVs into *ASN import rows* (`x_daas_ham_asn_import`, including MAC address and
 OEM claim code), *Lifecycle import rows* (`x_daas_ham_eox_import`) and *OEM coverage import rows*
@@ -214,12 +217,15 @@ What remains can only be confirmed on an instance or behind a vendor login:
   finds the lock held 5 times in a row answers HTTP 503 *Other receipts are taking Provider tags: scan
   again* and leaves the unit unreceived; each refused try logs two *Unique Key violation* errors (up to
   10 for one 503), and so does a try that meets the lock being released.
-- **Stock reservation lock** (Order sourcing): reserving an Asset for an Order line takes the job lock
-  `reserve_asset_<Asset sys_id>` in the same *Job lock* table and re-reads the Asset under it, so two
-  sourcing runs that pick the same Asset never both reserve it. The run that finds the lock held leaves
-  that Asset to the other (the unit counts in its line's shortfall) and logs two *Unique Key violation*
-  errors, or one when the other run lets go in between and the re-read finds the Asset taken; no
-  `reserve_asset_` lock row is left once sourcing ends.
+- **Stock reservation lock** (Order sourcing): reserving an Asset for an Order line, or linking a hot
+  spare at the customer site to one, takes the job lock `reserve_asset_<Asset sys_id>` in the same *Job
+  lock* table and re-reads the Asset under it, so two sourcing runs that pick the same Asset never both
+  claim it. The run that finds the lock held leaves that Asset to the other (the unit counts in its line's
+  shortfall) and logs two *Unique Key violation* errors, or one when the other run lets go in between and
+  the re-read finds the Asset taken; no `reserve_asset_` lock row is left once sourcing ends. A lock that
+  cannot be taken for another reason logs *[x_daas_ham] Asset <id> not claimed: job lock ... could not be
+  taken*, and a claim that outlasts its lock and gives the Asset up logs *[x_daas_ham] Asset <id> not
+  claimed: its lock was lost while claiming it*.
 - **Inventory tech access** (ADR 0005), also after upgrading an existing install: the ACLs that
   `security/acls*.now.ts` give `broadStaff` (agreements, subscription lines, catalog entries, site
   templates, fee events, attestations, leases, OEM coverage and cloud accounts, model data, device

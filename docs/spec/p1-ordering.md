@@ -60,9 +60,14 @@
   determinism.
 - Reserved Assets take the Customer as `company` and the Agreement (ADR 0006); in-house stock at the
   staging centre moves to *staging* at once, with a Staging task.
-- Two sourcing runs never reserve the same Asset: each claim is made under a lock on that Asset and
-  re-checks that it is still free stock or spare-pool stock on no Order line. A run that finds it locked
-  or taken leaves it, and that unit counts in the line's shortfall.
+- Stock already on an Order line is not picked: a hot spare linked to a line stays in the Spare pool but
+  is taken.
+- Two sourcing runs never claim the same Asset, whether reserving it or linking a hot spare: each claim
+  is made under a lock on that Asset and re-checks that it is still free stock or spare-pool stock on no
+  Order line. A run that finds it locked or taken leaves it, and that unit counts in the line's shortfall.
+- A claim that outlasts its lock (cleared as abandoned, ADR 0013) saves only while it still holds the
+  lock. One that lost the lock during its save keeps the Asset only if a fresh read still shows it on the
+  line. Otherwise it gives the Asset up with a warning, and the unit counts in the shortfall.
 - Stock outside the staging centre is reserved and gets a transfer order to it, and only then its
   Staging task and the move to *staging*. If Inventory does not create the transfer order or all its
   lines, what was created is removed (or named in the summary for cancelling) and the stock is put back:
@@ -70,8 +75,8 @@
   stock, its sourcing summary says why, and it picks the stock again when next sourced.
 - If the Staging task cannot be created, the Asset stays reserved for the line (a warning is logged) and
   is not moved to *staging*.
-- Hot spares at the site stay in the Spare pool, linked to the line, and are installed from where
-  they are.
+- Hot spares at the site stay in the Spare pool, linked to the line (claimed the same way, under the
+  Asset lock), and are installed from where they are.
 - Shortfalls become one requested purchase order per line (ship to the staging centre); received units
   of that PO are allocated to the line on receipt.
 - Without a staging stockroom (`x_daas_ham.staging.default_stockroom`) no purchase order is requested, and a
