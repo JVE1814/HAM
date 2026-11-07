@@ -206,7 +206,10 @@ function routedOutcome(route: ShortfallRoute, line: { planSummary: string; missi
     return { ...sourced, purchaseOrder: bought.poId, purchased: line.missing }
 }
 
-/** The job lock (ADR 0013) an Order's sourcing passes take turns under, so two never count the same shortfall. */
+/**
+ * The job lock (ADR 0013) an Order's sourcing passes take turns under, so two never count the same shortfall, and that
+ * Cancel order holds, so a pass never reserves or buys for lines being cancelled.
+ */
 export function sourcingLockName(orderId: string): string {
     return `source_order_${orderId}`
 }

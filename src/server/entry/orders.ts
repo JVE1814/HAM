@@ -14,6 +14,7 @@ import {
     type OrderParties,
     type RequestedLine,
 } from '../domain/entitlement'
+import type { LineStage } from '../domain/fulfilment'
 import { shortfallRoute, type ShortfallRoute } from '../domain/returns'
 import {
     orderLineLockName,
@@ -36,7 +37,7 @@ import { moveAndSave, readStage } from '../platform/assets'
 import { EVENT, fire } from '../platform/events'
 import { recomputeLine, recomputeOrder } from '../platform/fulfilment'
 import { todayIso } from '../platform/clock'
-import { withLock, type HeldLock } from '../platform/locks'
+import { withLock, withLockTries, type HeldLock } from '../platform/locks'
 import { openOemRma, openRmaCount } from '../platform/oem-rma'
 import { requestPurchase } from '../platform/procurement'
 import { PROPERTY, stagingStockroom, stringProperty } from '../platform/properties'
@@ -313,12 +314,13 @@ const AGAIN_BECAUSE: Record<Exclude<LineSourcing, 'done'>, string> = {
  * request transfers and purchases.
  *
  * Two passes over one Order (two staging tasks failed seconds apart, or one failed while the first pass runs) would
- * count the same shortfall, and one would buy what the other claimed. So a pass holds a lock on the Order. One that
- * finds it held runs again a minute later rather than leave its work to the holder, which may have counted before the
- * change that queued it; so does a pass that left a line whose lock stayed held, or that lost the Order's lock. A
- * request is queued again SOURCING_TRIES times at most, past the lock's ten-minute abandonment, then dropped with a
- * warning: a lock still held by then was taken after the request was queued, by a pass that counted its change. Taking
- * the lock throws only when an insert is refused with no lock row (platform/locks): that error escapes.
+ * count the same shortfall, and one would buy what the other claimed. So a pass holds a lock on the Order, which Cancel
+ * order holds too (`cancelOrder`). One that finds it held runs again a minute later rather than leave its work to the
+ * holder, which may have counted before the change that queued it; so does a pass that left a line whose lock stayed
+ * held, or that lost the Order's lock. A request is queued again SOURCING_TRIES times at most, past the lock's
+ * ten-minute abandonment, then dropped with a warning: a lock still held by then was taken after the request was
+ * queued, by a pass that counted its change. Taking the lock throws only when an insert is refused with no lock row
+ * (platform/locks): that error escapes.
  */
 export function sourceOrder(event: GlideRecord, current: GlideRecord): void {
     const orderId = current.getUniqueValue()
@@ -335,7 +337,7 @@ export function sourceOrder(event: GlideRecord, current: GlideRecord): void {
         }
     })
     if (!taken || again) {
-        const why = again ? AGAIN_BECAUSE[again] : 'another pass holds its lock'
+        const why = again ? AGAIN_BECAUSE[again] : 'another pass or a cancel holds its lock'
         sourceAgain(current, Number(str(event, 'parm2')) || 0, why)
     }
     if (taken) recomputeOrder(orderId)
@@ -356,28 +358,14 @@ function sourceAgain(order: GlideRecord, tries: number, why: string): void {
 /**
  * Run `work` holding the Order line's lock (domain/sourcing `orderLineLockName`) and return true, or false when other
  * holders kept it through every try. Taking the lock throws only when an insert is refused with no lock row
- * (platform/locks): that try is made again, and only when every try throws does the error escape, as does one from
- * `work`.
+ * (platform/locks `withLockTries` tries again, and that error escapes only when every try threw), as does an error
+ * from `work`.
  */
 export function withOrderLineLock(lineId: string, work: (lock: HeldLock) => void): boolean {
-    let held = false
-    let takeError: unknown = null
-    for (let attempt = 0; attempt < LINE_LOCK_ATTEMPTS; attempt++) {
-        let started = false
-        try {
-            const taken = withLock(orderLineLockName(lineId), (lock) => {
-                started = true
-                work(lock)
-            })
-            if (taken) return true
-            held = true
-        } catch (error) {
-            if (started) throw error
-            takeError = error
-        }
-    }
-    if (!held && takeError) throw takeError
-    return false
+    // What `work` did counts once it ran, so whatever it returns never gives the try up (platform/locks).
+    return withLockTries(orderLineLockName(lineId), LINE_LOCK_ATTEMPTS, (lock) => {
+        work(lock)
+    })
 }
 
 /** What sourcing found and did for a line before routing its shortfall: what `settleHolding` buys and saves. */
@@ -462,37 +450,57 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
     const planSummary = plan.summary
     const sourced: Sourced = { lineId, modelId, route, replaced, toPurchase, planSummary, unmoved, transfers }
     // Set inside the line's lock.
-    let settled = 'line busy' as Exclude<LineSourcing, 'done'> | 'saved' | 'unsaved'
+    let settled = 'line busy' as Exclude<LineSourcing, 'done'> | 'saved' | 'unsaved' | 'closed'
     withOrderLineLock(lineId, (lineLock) => {
         settled = settleHolding(orderLock, lineLock, order, sourced)
     })
     if (settled === 'saved') recomputeLine(lineId)
-    if (settled === 'saved' || settled === 'unsaved') return 'done'
+    if (settled === 'closed') leftClosed(line, transfers)
+    if (settled === 'saved' || settled === 'unsaved' || settled === 'closed') return 'done'
     return leftUnsaved(line, settled, transfers)
 }
 
-/** Units the line still needs, read afresh: not allocated, on order (bought, not received) or under an open OEM RMA. */
+/**
+ * Units the line still needs, read afresh: not allocated, on order (bought, not received) or under an open OEM RMA.
+ * Null for a line gone or no longer open, so nothing is reserved for it.
+ */
 function lineShortfall(lineId: string): number | null {
-    const line = findById('x_daas_ham_order_line', lineId)
+    const line = openLine(lineId)
     if (!line) return null
     return num(line, 'quantity') - countAllocated(lineId) - num(line, 'quantity_to_purchase') - openRmaCount(lineId)
+}
+
+/** Order stages in which nothing is sourced, even for a line a refused save left open. */
+const ENDED_ORDER_STAGES: readonly string[] = ['cancelled', 'rejected']
+
+/**
+ * The line read afresh while it and its Order are still open (not shipped, cancelled or rejected), else null. Cancel
+ * order takes turns with sourcing under the Order's lock, but a rejected Order's lines are cancelled without that lock,
+ * a cancel may overlap a pass that outlasted it (ADR 0013), and a line whose cancel was refused stays open on its
+ * cancelled Order; so sourcing checks the line here before it reserves, buys or saves. The Order is saved as cancelled
+ * or rejected before its lines, so it is checked too.
+ */
+function openLine(lineId: string): GlideRecord | null {
+    const line = findById('x_daas_ham_order_line', lineId)
+    if (!line || ENDED_ORDER_STAGES.includes(str(line, 'order.stage'))) return null
+    return OPEN_LINE_STAGES.includes(str(line, 'line_stage') as LineStage) ? line : null
 }
 
 /**
  * Route the line's shortfall and save the line, holding its `lineLock` and the Order's: from a fresh read, adding what
  * is bought to the on-order count and purchase orders as they now stand, since receipts take units off order meanwhile.
- * 'unsaved' when the line is gone or its save is refused (logged).
+ * 'closed' when the line is gone or no longer open (`openLine`), 'unsaved' when its save is refused (logged).
  */
 function settleHolding(
     orderLock: HeldLock,
     lineLock: HeldLock,
     order: GlideRecord,
     sourced: Sourced,
-): 'saved' | 'unsaved' | 'lock lost' {
+): 'saved' | 'unsaved' | 'closed' | 'lock lost' {
     // Buying is what two overlapping passes must not both do.
     if (!orderLock.held()) return 'lock lost'
-    const line = findById('x_daas_ham_order_line', sourced.lineId)
-    if (!line) return 'unsaved'
+    const line = openLine(sourced.lineId)
+    if (!line) return 'closed'
     const number = str(line, 'number')
     let rmaRefused = false
     if (sourced.route === 'oem_advance_replacement' && sourced.replaced) {
@@ -535,6 +543,17 @@ function settleHolding(
     // A holder that outlasted the line's lock (ADR 0013) may have saved beside a receipt that took it over.
     if (!lineLock.held()) gs.warn(`[x_daas_ham] ${number} saved after its lock was lost: check its On order count`)
     return 'saved'
+}
+
+/**
+ * Log a line gone or closed while this pass picked stock for it (see `openLine`): nothing is bought or saved for it,
+ * and what the pass reserved and requested meanwhile is named, to undo by hand.
+ */
+function leftClosed(line: GlideRecord, transfers: readonly string[]): void {
+    const units = countAllocated(line.getUniqueValue())
+    const release = units > 0 ? `; release the ${units} unit(s) still on it` : ''
+    const cancel = transfers.length > 0 ? `; cancel ${transfers.join(', ')}` : ''
+    gs.warn(`[x_daas_ham] ${str(line, 'number')} closed while it was sourced: nothing bought for it${release}${cancel}`)
 }
 
 /** Log a line left to the pass queued again, naming the transfer orders it does not list. */
@@ -636,8 +655,19 @@ function cancelOpenLines(orderId: string): boolean {
 /**
  * UI action "Cancel order": only before anything has shipped; releases stock and staging work. The Order is saved
  * first, with the purchase orders to cancel: one the platform refuses keeps its lines, stock and approvals.
+ *
+ * A sourcing pass running meanwhile would reserve stock for, or buy for, lines just cancelled, and its purchase orders
+ * would not be listed to cancel. So the cancel holds the Order's sourcing lock (`sourceOrder`) and the two take turns;
+ * a cancel that finds it held changes nothing and tells the user to try again. Taking the lock throws only when an
+ * insert is refused with no lock row (platform/locks): that error escapes.
  */
 export function cancelOrder(order: GlideRecord): void {
+    const taken = withLock(sourcingLockName(order.getUniqueValue()), (lock) => cancelHolding(lock, order))
+    if (!taken) gs.addErrorMessage('Order not cancelled: sourcing is running on it. Try again in a minute')
+}
+
+/** The cancel, holding the Order's sourcing `lock`. */
+function cancelHolding(lock: HeldLock, order: GlideRecord): void {
     const shipped = new GlideRecord('x_daas_ham_order_line')
     shipped.addQuery('order', order.getUniqueValue())
     shipped.addQuery('line_stage', 'IN', 'shipped,installed,in_service')
@@ -657,6 +687,12 @@ export function cancelOrder(order: GlideRecord): void {
     }
     if (!cancelOpenLines(order.getUniqueValue())) {
         gs.addErrorMessage('Order cancelled; some lines, stock or staging tasks were left as they were (see the log)')
+    }
+    // A cancel that outlasted the lock (ADR 0013) may have overlapped a pass that took it over; that pass skips the
+    // lines it reads after the Order was saved cancelled (`openLine`), not those it reached first.
+    if (!lock.held()) {
+        const check = 'check its lines for stock reserved or bought meanwhile'
+        gs.warn(`[x_daas_ham] ${str(order, 'number')} cancelled after its sourcing lock was lost: ${check}`)
     }
     // After the save, so the approval rule each cancellation runs finds the Order no longer awaiting approval.
     cancelPendingApprovals(order.getUniqueValue())
