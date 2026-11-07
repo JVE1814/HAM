@@ -303,7 +303,7 @@ export const CLAIM_PREREQUISITE: Partial<Record<ClaimAction, ClaimAction>> = { o
 const MAX_STEPS_PER_LOAD = 200
 
 /** Attempts after which a failing step is left for a person. */
-const MAX_CLAIM_ATTEMPTS = 5
+export const MAX_CLAIM_ATTEMPTS = 5
 
 /** Length of a staging step's automation_message. */
 const MESSAGE_LENGTH = 255
@@ -362,6 +362,11 @@ export function dueStepsQuery(vendor: OemVendor, action: ClaimAction): string {
         `automation_status=pending^NQautomation_status=failed^attempts<${MAX_CLAIM_ATTEMPTS}^sys_updated_on<javascript:gs.minutesAgoStart(30)`,
         openStepsQuery(vendor, action),
     )
+}
+
+/** Encoded query: open `action` steps of `vendor` that used up their attempts (left for a person). */
+export function exhaustedStepsQuery(vendor: OemVendor, action: ClaimAction): string {
+    return `${openStepsQuery(vendor, action)}^automation_status=failed^attempts>=${MAX_CLAIM_ATTEMPTS}`
 }
 
 /** The candidates whose staging task is not waiting on a prerequisite step, at most `limit`, in order. */
