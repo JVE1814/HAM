@@ -52,15 +52,18 @@
   requests only for their own Customer, the others for any Customer, and site contacts never. The Site
   must be one of the Customer's Sites. Otherwise the request is removed again and the requester is
   told why (`domain/returns.ts` `returnRequestFindings`). The Site choices follow the chosen Customer.
+- From the customer page, only a Customer admin limited to their own Customer requests returns
+  (`domain/visibility.ts` `actsAsCustomerAdmin`); provider staff and platform admins get HTTP 403
+  there and use the record producer.
 - Installed and shipped Assets on a return become *pending return*. The due date is the Agreement's
   return allowance.
 - An Asset already awaiting another return is not added again; completing an install twice raises
   one return. A return with nothing to bring back closes at once (a temporary Order still being
   installed waits until its equipment is installed or its end date passes).
 - A site decommission returns everything installed at the Site (in service, temporary, pending in
-  service), whatever devices the request lists. From the record producer it also returns units still
-  shipped to the Site (`domain/returns.ts` `SITE_RECOVERY_STAGES`), so none is left holding the site
-  package open; a decommission from the customer page leaves them.
+  service), whatever devices the request lists. From the record producer and the customer page it
+  also returns units still shipped to the Site (`domain/returns.ts` `SITE_RECOVERY_STAGES`), so none
+  is left holding the site package open.
 - Devices chosen for a device removal must be at the chosen Site; others are ignored.
 - Field de-install opens a normal change and a de-install work order. Ship-back relies on the Site
   contact.
@@ -106,10 +109,23 @@
   - a unit whose move to missing is refused stays pending return with its line awaiting, and the
     next run declares it again: the lost-asset fee and the site package's end follow only a saved
     move. A line that cannot be saved as missing is logged and declared again on the next run,
-    without a second fee.
+    without a second fee;
+  - the declaration takes the unit's receive lock (`receive_asset_<sys_id>`), the same one a depot
+    scan takes (P1 fulfilment spec), and works from a fresh read. It goes ahead only while the line
+    still awaits the unit and the unit is still at or on its way to the Site, pending return or
+    already missing. A run that finds a scan receiving the unit leaves the line awaiting for the next
+    day's run, so a unit scanned in that day is never also declared missing or charged a lost-asset
+    fee;
+  - a line whose unit is neither at nor on its way to the Site nor missing (for example received at
+    the depot while its line could not be saved) is not declared missing. It is logged on each run,
+    to settle by hand.
 - Fees use the Agreement's lost / late / damage amounts. A zero amount records nothing. Each fee type
   is charged at most once per Asset and Return order (a waived fee aside), so a step retried after a
-  refused save never charges twice. A fee the platform refuses is logged.
+  refused save never charges twice. Two steps charging the same fee at once (two users saving one
+  return line's evaluation) check for and record it under a job lock on the fee (ADR 0013), so it is
+  charged once. One that finds the lock held 5 times leaves the fee to the other and logs a warning if
+  it is still not recorded. Two scans of one unit, and overlapping overdue runs, already take turns
+  under the unit's receive lock. A fee the platform refuses is logged.
 
 ## Refresh (D48)
 

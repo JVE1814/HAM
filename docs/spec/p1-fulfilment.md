@@ -59,14 +59,32 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   refused (HTTP 400), for returned units too.
 - If the platform refuses to save the new or confirmed Asset, the call answers HTTP 422 and the unit is
   not received: it stays in transit or on order (one without an ASN may not be created at all), for a
-  rescan. If only the reservation for the waiting line is refused, the unit stays received
-  (available), a warning is logged and no Staging task opens. It still comes off the line's *On
-  order* count, so the line can pick it as free stock the next time it is sourced.
+  rescan. The reservation for the waiting line is a stock claim under the Asset's lock, as in
+  sourcing (P1 ordering spec), so a sourcing run or the spare-pool top-up that claimed the received
+  unit first keeps it, and the reply shows the unit as that run left it. If the reservation's save is
+  refused, the unit stays received (available). Either way a warning is logged, no Staging task opens
+  and the unit still comes off the line's *On order* count (or its RMA is marked received). The line
+  is then a unit short, so the receipt queues the Order's sourcing again: a sourcing run may have
+  picked the unit as free stock between the receipt's save and its reservation. The new pass sources
+  the missing unit as usual, the received one among the free stock if it is still free.
 - If the line's *On order* count, or the OEM RMA a replacement unit arrives for (P2 after-sales spec),
   cannot be saved, a warning is logged and the unit is still reserved for its line.
 - **Provider tags** come from one counter, advanced under a job lock so that no two Assets share a tag.
   A receipt that cannot take the lock after 5 tries is told to scan again (HTTP 503) and the unit is
   not received; one without an ASN stays on order, so the rescan finds it by serial.
+- Receipts of one unit are made under a job lock on the Asset (`receive_asset_<sys_id>`), from a
+  fresh read. A scan of a unit another scan is still receiving saves nothing and answers HTTP 503
+  *Another scan is receiving this unit: scan again*. The rescan finds it received and answers HTTP 409
+  *Not awaiting receipt* (a returned unit is then pending evaluation). The overdue job takes the same
+  lock to declare a unit missing (P2 after-sales spec).
+- An unknown serial with a PID is created under a job lock on the serial (`receive_serial_<serial>`),
+  re-checked there, so two first scans create one Asset. A scan that finds the lock held is told to
+  scan again (HTTP 503), and the rescan finds the Asset by serial.
+- A unit for a waiting line is saved, taken off its *On order* count (or its RMA marked received) and
+  reserved under the line's job lock (`order_line_<sys_id>`, P1 ordering spec). So sourcing's count
+  of the line (allocated, *On order*, open OEM RMAs) sees all of a receipt or none of it. A receipt
+  that cannot take the lock after 10 tries saves nothing and answers HTTP 503 *Its order line is
+  being sourced or received: scan again*.
 - **Put-away** records the stockroom an Asset now sits in (for an inventory tech, one of theirs):
   - available stock and returned units awaiting evaluation, wipe or disposal go into any stockroom;
   - a unit being staged (one received for a waiting PO line among them) goes only into a staging
@@ -98,6 +116,11 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   uses a standard change; everything else uses a normal change.
 - If the tracking number, or the change and work order, cannot be saved on the Order, Ship still
   ships and says so; the Shipment, change and work order name the Order, to link them by hand.
+- Ship runs one at a time per Order, under a job lock on it (`ship_order_<sys_id>`), and reads the
+  Order's tracking number and work order afresh. A Ship pressed while another of the same Order is
+  running ships, buys and opens nothing and says another Ship is running. A Ship after it finds the
+  units shipped and the work opened, so it buys no second label and opens no second change and work
+  order.
 - A work order's planned start and end must lie inside the change window (once scheduled) and the
   Site's maintenance schedule (if any).
 - **Install completion** happens when the work order is closed complete or someone uses *Confirm

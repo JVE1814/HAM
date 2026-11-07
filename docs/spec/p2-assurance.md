@@ -59,6 +59,12 @@ Network-gear CIs discovered recently with no Asset raise *seen without asset*.
   take the typical power (the Models' *typical power (W)*) of all devices in it, both faces, over
   the capacity, when the change adds draw (a device new to the rack, or a different Model). Moves
   within the rack are always allowed. The elevation page shows used against available power.
+- The checks read the placements already saved. Two saves into the same units of one rack at the
+  same moment can both pass: the check is a before rule, and a lock taken there ends before the
+  record is written. Placements are entered by hand, one Asset per save, so this is accepted.
+- The checks count every device placed in the rack, including ones the saving user cannot see (an
+  inventory tech sees only their Stockrooms' Assets). The elevation page and its power figure still
+  show only what the viewer may see.
 - The **rack elevation** page (`x_daas_ham_racks.do`) shows the front and rear of the racks in a
   Site's rooms. Colours are by stage, customer, or risk:
   - *high*: past end of support, or no current coverage;
@@ -70,7 +76,12 @@ Network-gear CIs discovered recently with no Asset raise *seen without asset*.
 ## Customer self-service (D49)
 
 The page `x_daas_ham_customer.do` is for Customer admins and Site contacts; link it from the CSM
-portal menu. Visibility rules limit everything to the user's Customer (Site contacts: their Sites).
+portal menu. Asset managers can open it as a preview (navigator *Customer self-service (preview)*):
+they see every Customer and take only the *Everyone* actions. Returns and attestations are for
+Customer admins limited to their own Customer (`domain/visibility.ts` `actsAsCustomerAdmin`); staff
+raise returns through the *Return or decommission network equipment* record producer, and the API
+refuses anyone else with HTTP 403. Visibility rules limit everything to the user's Customer (Site
+contacts: their Sites).
 
 | Who | Can |
 |---|---|

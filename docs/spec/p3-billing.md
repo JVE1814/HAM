@@ -9,6 +9,15 @@
   billed. An Asset back in service on or before the day its interval on the same line closed gets
   that interval reopened, so no day is billed twice. The rule also runs when the stage change clears
   the Asset's Subscription line, so the interval still closes.
+- The rule opens or reopens the interval under a job lock on the Asset (`service_interval_<sys_id>`,
+  ADR 0013), so two saves that put it in service at once (a Seen signal and the detection job) open
+  one interval. The opening and the closing for one Asset take turns under that lock, and each reads
+  its stage afresh. An Asset taken out of service before its go-live's rule ran gets its interval
+  opened and closed that day. One put back in service before its close ran keeps its interval open.
+  A save that cannot take the lock after 5 tries leaves the interval to the holder, and logs an error
+  if the interval is then not open (or still open for an Asset out of service), to fix by hand if the
+  save holding the lock does not. An interval the platform refuses to open or close is logged as a
+  warning, for finance to fix by hand.
 - A **site package** line is billed from its start date to its end date (it ends on the day its last
   Asset at the Site is received back or declared missing, while no other Asset under its Agreement is
   on its way to, at or pending return from that Site).

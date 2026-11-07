@@ -12,7 +12,8 @@
   each, at most 20), service `x_daas_ham.shipping.service_code`. Nothing is bought when nothing is
   staged; hot spares already at the Site are handed over without a package. The carrier and tracking
   number land on the Order; a **Shipment** records the label, cost and status. A remote-hands install
-  still needs no carrier.
+  still needs no carrier. Ship runs one at a time per Order (P1 fulfilment spec), so two presses buy
+  one label.
 - The number of a label an earlier Ship bought does not count as entered by hand: a later Ship, for
   Assets staged since, buys them a label of their own, or asks for a tracking number while the
   aggregator is off. With a tracking number entered by hand, no label is bought.
@@ -22,6 +23,9 @@
   *Label created* or *Exception*, it says to void it with the carrier and use *Mark label voided*.
   While it is *In transit* or *Out for delivery*, it says the return is already under way and names
   its tracking number, since *Mark label voided* is not offered then.
+- Two presses of *Create return label* at once buy one label. The check and the purchase are made
+  under a job lock on the Return order (`return_label_<sys_id>`), and a press that finds a label being
+  bought is told so and buys nothing.
 - A return label voided with the carrier is closed with *Mark label voided* on its Shipment (asset
   managers, inventory techs and the NOC, while it is *Label created* or *Exception*). Nothing is sent
   to the aggregator. The Shipment becomes *Voided*, which is final, and the Return order gets a work

@@ -221,19 +221,67 @@ What remains can only be confirmed on an instance or behind a vendor login:
   again* and leaves the unit unreceived; each refused try logs two *Unique Key violation* errors (up to
   10 for one 503). A try that meets the lock being released logs the same two, then tries a third
   insert, which normally takes it.
-- **Stock reservation lock** (Order sourcing and the spare-pool top-up): reserving an Asset for an Order
-  line, linking a hot spare at the customer site to one, or moving free stock into a Spare pool takes the
-  job lock `reserve_asset_<Asset sys_id>` in the same *Job lock* table and re-reads the Asset under it, so
-  two runs that pick the same Asset never both claim it. The re-read also refuses a unit whose lease is
-  being returned to its Lessor (end action *Return to lessor*), so such a unit is never reserved, linked
-  or pooled. The run that finds the lock held leaves that Asset to the other (the unit counts in its
-  line's or pool's shortfall) and logs two *Unique Key violation* errors, or one when the other run lets
-  go in between and the re-read finds the Asset taken, or three when the other run lets go between the
-  second try and the check that follows and another run wins the third try; no `reserve_asset_` lock
-  row is left once the run ends. A lock that cannot be taken for another reason logs
+- **Receipt lock** (warehouse Receive and the overdue job): a receipt holds the job lock
+  `receive_asset_<Asset sys_id>` and re-reads the Asset under it. When one unit is scanned on two
+  devices at once, one receives it. The other answers HTTP 503 *Another scan is receiving this unit:
+  scan again* and logs two *Unique Key violation* errors, or three when the holder lets go between the
+  second try and the check that follows and another scan wins the third try. A scan that meets the
+  holder letting go between its first and second try logs one and answers HTTP 409 *Not awaiting
+  receipt*. The overdue job takes the same lock to declare a unit missing: one that finds it held logs
+  the same two errors and leaves the unit to the scan and its line to the next day's run. No
+  `receive_asset_` row is left once the receipt or the declaration ends.
+- **Stock reservation lock** (Order sourcing, the spare-pool top-up and receiving's reservation for a
+  waiting line): reserving an Asset for an Order line, linking a hot spare at the customer site to
+  one, or moving free stock into a Spare pool takes the job lock `reserve_asset_<Asset sys_id>` in the
+  same *Job lock* table and re-reads the Asset under it, so two runs that pick the same Asset never
+  both claim it. The re-read also refuses a unit whose lease is being returned to its Lessor (end
+  action *Return to lessor*), so such a unit is never reserved, linked or pooled. The run that finds
+  the lock held leaves that Asset to the other (the unit counts in its line's or pool's shortfall) and
+  logs two *Unique Key violation* errors, or one when the other run lets go in between and the re-read
+  finds the Asset taken, or three when the other run lets go between the second try and the check
+  that follows and another run wins the third try; no `reserve_asset_` lock row is left once the run
+  ends. A lock that cannot be taken for another reason logs
   *[x_daas_ham] Asset <id> not claimed: job lock ... could not be taken*, and a claim that outlasts its
   lock and gives the Asset up logs *[x_daas_ham] Asset <id> not claimed: its lock was lost while
-  claiming it*.
+  claiming it*. A receipt whose reservation finds the unit taken logs *[x_daas_ham] Received <serial>
+  not reserved for <line>: another run claimed it, or the save was refused*.
+- **Fee event and service interval locks**: charging a Fee event takes the job lock
+  `fee_<type>_<Asset sys_id>_<Return order sys_id>`, and opening or closing a Service interval takes
+  `service_interval_<Asset sys_id>`. In *Job lock*, create a row named
+  `service_interval_<sys_id of a pending-in-service Asset>` by hand, then move that Asset into service:
+  no Service interval opens, and the system log shows ten *Unique Key violation* errors and
+  *[x_daas_ham] <serial> in service from <date>, no interval open: left to another save holding its
+  lock ...* (error). Delete the row and the next go-live opens it. With the row in place, moving an
+  Asset with an open interval out of service leaves it open and logs *[x_daas_ham] <serial> left
+  service on <date>, its Service interval still open: ...* (error). A row named
+  `fee_<type>_<Asset sys_id>_<Return order sys_id>` does the same to a line declared missing or a
+  damaged evaluation saved: it logs *[x_daas_ham] <type> fee for <serial> not recorded: left to a run
+  holding its lock ...* (warning) and records no fee. No `fee_` or `service_interval_` lock row is left
+  after a normal charge, go-live or close.
+- **Sourcing locks** (Order sourcing and receiving): a sourcing pass holds the job lock
+  `source_order_<Order sys_id>` for its whole run, and reads and saves each line under
+  `order_line_<line sys_id>`, which a receipt for a waiting line takes too. A pass that finds the
+  Order's lock held logs two *Unique Key violation* errors and *[x_daas_ham] <Order> sourced again in
+  60 s: another pass holds its lock* (info), and runs again a minute later. A request queued again 15
+  times logs *[x_daas_ham] <Order> not sourced again after 15 tries (...): check its lines* (warning)
+  and is dropped. A line lock is tried 10 times, each refused try logging two errors (up to 20). Held
+  through them all, sourcing leaves the line to the pass queued again (after picking stock, it logs
+  *[x_daas_ham] <line> left to the next sourcing pass (...)*, naming any transfer orders the line does
+  not list), and a receipt answers HTTP 503 *Its order line is being sourced or received: scan again*
+  and saves nothing. A received unit whose reservation fails queues `x_daas_ham.order.source` for its
+  Order: one *not reserved for <line>* warning is followed by a sourcing pass, not by a stalled line.
+  No `source_order_` or `order_line_` row is left once a run ends.
+- **Serial lock** (warehouse Receive without an ASN): the first scan of an unknown serial with its PID
+  creates the Asset under the job lock `receive_serial_<serial>`, checking there that no Asset has the
+  serial, so two first scans create one Asset. The other answers HTTP 503 *Another scan is receiving
+  this unit: scan again* and logs two *Unique Key violation* errors; its rescan finds the Asset by
+  serial. No `receive_serial_` row is left once the receipt ends.
+- **Return label and Ship locks**: *Create return label* holds the job lock
+  `return_label_<Return order sys_id>` while it checks for an open label and buys one. A second press
+  while one is being bought says *A return label is already being bought for this return* and buys
+  nothing. *Ship* holds `ship_order_<Order sys_id>`: a second Ship says *Another Ship of this Order is
+  running* and ships, buys and opens nothing. Each refused take logs two *Unique Key violation*
+  errors, and no lock row is left afterwards.
 - **Inventory tech access** (ADR 0005), also after upgrading an existing install: the ACLs that
   `security/acls*.now.ts` give `broadStaff` (agreements, subscription lines, catalog entries, site
   templates, fee events, attestations, leases, OEM coverage and cloud accounts, model data, device

@@ -86,10 +86,11 @@
   is taken.
 - Stock of a lease being returned to its Lessor (end action *Return to lessor*) is never picked or
   claimed, wherever it sits.
-- Two sourcing runs never claim the same Asset, whether reserving it or linking a hot spare: each claim
-  is made under a lock on that Asset and re-checks that it is still free stock or spare-pool stock on no
-  Order line and not on a lease being returned. A run that finds it locked or taken leaves it, and that
-  unit counts in the line's shortfall.
+- Two sourcing runs, or a run and a receipt reserving its unit for the waiting line, never claim the
+  same Asset, whether reserving it or linking a hot spare: each claim is made under a lock on that
+  Asset and re-checks that it is still free stock or spare-pool stock on no Order line and not on a
+  lease being returned. A run that finds it locked or taken leaves it, and that unit counts in the
+  line's shortfall.
 - A claim that outlasts its lock (cleared as abandoned, ADR 0013) saves only while it still holds the
   lock. One that lost the lock during its save keeps the Asset only if a fresh read still shows it on the
   line. Otherwise it gives the Asset up with a warning, and the unit counts in the shortfall.
@@ -111,13 +112,26 @@
   again, or named for cancelling), is treated the same way: the line waits for stock and its sourcing summary
   says why. The spare-pool top-up then buys nothing and logs a warning.
 - Re-sourcing a line only covers `quantity − allocated − on order − open OEM RMAs`, where on order
-  is units bought and not yet received.
+  is units bought and not yet received. These figures are read together under the line's lock
+  (below), so a receipt for the line is counted whole or not at all.
+- An Order's sourcing passes take turns under a job lock on the Order (`source_order_<sys_id>`, ADR
+  0013), so two passes never count the same shortfall. A pass that finds it held runs again about a
+  minute later, up to 15 times, then is dropped with a warning.
+- A line's need is counted under a job lock on the line (`order_line_<sys_id>`), which a receipt for
+  the line takes too, and the line is saved under it again after buying. The stock pick runs outside
+  that lock, each claim under its Asset's lock. At the save the allocated units are counted again,
+  what the pass bought is added to the *On order* count as it then stands, and its transfer and
+  purchase orders are added to the line's lists as they then stand.
+- A line whose lock stays held through 10 tries, or a pass that lost the Order's lock (ADR 0013), is
+  left to the pass queued again. A warning names any transfer orders the line does not list, to add
+  by hand.
 - Several source stockrooms give several transfer orders, all listed on the line.
 - If the line cannot be saved after sourcing, a warning names the purchase order and transfer orders
   it does not list, to add by hand: otherwise units received on them are not allocated to it, and the
   next run buys its shortfall again.
 - A failed staging takes the Asset off the line, which goes back to awaiting stock and is re-sourced.
-  Only a line that has not shipped falls back.
+  Only a line that has not shipped falls back. A receipt whose unit could not be reserved for its
+  waiting line also sources the Order again (P1 fulfilment spec).
 - **Cancel** is refused once anything has shipped, a hot spare handed over at Ship included (use a
   return order then). Otherwise it:
   - saves the Order as cancelled first, listing every purchase order of its lines in its work notes

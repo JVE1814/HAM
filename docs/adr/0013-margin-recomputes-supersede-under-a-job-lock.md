@@ -32,4 +32,8 @@ for the current pass; a stop that cannot be recorded on the period is logged. A 
 current pass, is only logged. A take whose second insert is refused, and whose holder lets go before
 the check, tries the insert once more. Only an insert refused while no lock row exists throws, instead
 of retrying forever.
+
+Order sourcing takes a lock of the same kind on each Order but does not supersede: a pass that finds
+it held is queued again about a minute later, at most 15 times, because a purchase already requested
+cannot be cleared the way a recompute clears its period.
 Whether the instance behaves as expected is on the first-install checklist.
