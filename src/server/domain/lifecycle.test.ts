@@ -65,6 +65,17 @@ describe('checkTransition', () => {
         expect(checkTransition('pending_disposal', 'returned_to_lessor', leased)).toEqual({ allowed: true })
     })
 
+    it('sends a leased asset to the OEM only under an OEM RMA', () => {
+        const leased: TransitionFacts = { ...deployable, legalOwner: 'lessor', wipeEvidenceComplete: true }
+        expect(checkTransition('pending_disposal', 'returned_to_oem', leased)).toEqual({
+            allowed: false,
+            reason: 'A lessor-owned asset goes to the OEM only under an OEM RMA',
+        })
+        expect(checkTransition('pending_oem_rma', 'returned_to_oem', leased)).toEqual({ allowed: true })
+        const owned: TransitionFacts = { ...leased, legalOwner: 'provider' }
+        expect(checkTransition('pending_disposal', 'returned_to_oem', owned)).toEqual({ allowed: true })
+    })
+
     it('only returns customer-owned assets to the customer', () => {
         const customerOwned: TransitionFacts = { ...deployable, legalOwner: 'customer', wipeEvidenceComplete: true }
         expect(checkTransition('pending_disposal', 'disposed', customerOwned).allowed).toBe(false)

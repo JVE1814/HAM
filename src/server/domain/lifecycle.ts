@@ -169,11 +169,12 @@ export function checkTransition(from: Stage | null, to: Stage, facts: Transition
             return { allowed: false, reason: `An asset must belong to an agreement before it can be ${to}` }
         }
     }
-    if (RETIRED.has(to)) return checkRetirement(to, facts)
+    if (RETIRED.has(to)) return checkRetirement(from, to, facts)
     return { allowed: true }
 }
 
-function checkRetirement(to: Stage, facts: TransitionFacts): TransitionVerdict {
+/** The legal owner decides how an Asset may leave; a Lessor's reaches the OEM only on an OEM RMA, not as a takeback. */
+function checkRetirement(from: Stage, to: Stage, facts: TransitionFacts): TransitionVerdict {
     const exitFor: Record<Exclude<LegalOwner, ''>, readonly Stage[]> = {
         provider: ['disposed', 'sold', 'returned_to_oem'],
         customer: ['returned_to_customer'],
@@ -182,6 +183,9 @@ function checkRetirement(to: Stage, facts: TransitionFacts): TransitionVerdict {
     const owner = facts.legalOwner || 'provider'
     if (!exitFor[owner].includes(to)) {
         return { allowed: false, reason: `A ${owner}-owned asset cannot leave as ${to}` }
+    }
+    if (owner === 'lessor' && to === 'returned_to_oem' && from !== 'pending_oem_rma') {
+        return { allowed: false, reason: 'A lessor-owned asset goes to the OEM only under an OEM RMA' }
     }
     if (!facts.wipeEvidenceComplete) {
         return { allowed: false, reason: 'Record wipe evidence before the asset leaves the provider' }

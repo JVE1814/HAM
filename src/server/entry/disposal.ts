@@ -2,13 +2,25 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import { groupDecisions, rollupApprovals } from '../domain/approvals'
-import { disposalApprovers, disposalLineBlockers, disposalStage, type DisposalMethod } from '../domain/disposal'
-import type { LegalOwner } from '../domain/lifecycle'
+import {
+    disposalApprovers,
+    disposalCustomerFindings,
+    disposalLineBlockers,
+    disposalScopeRefusal,
+    disposalStage,
+    type DisposalAsset,
+    type DisposalMethod,
+} from '../domain/disposal'
+import type { LegalOwner, Stage } from '../domain/lifecycle'
+import { ROLE } from '../domain/visibility'
 import { approvalsOf, cancelPendingApprovals, customerAdminIds, providerApproverIds, requestApproval } from '../platform/approvals'
 import { moveAsset, readStage, transitionFacts } from '../platform/assets'
 import { findById, str } from '../platform/records'
 
 /** Disposal orders: approve, then retire each wiped Asset by its method (P2.5, D61). */
+
+/** Line fields that say what is retired and how; the rest (status, blockers, amounts) stays writable after submit. */
+const LINE_SCOPE = ['disposal_order', 'asset', 'method']
 
 function lines(orderId: string): GlideRecord {
     const line = new GlideRecord('x_daas_ham_disposal_line')
@@ -17,27 +29,38 @@ function lines(orderId: string): GlideRecord {
     return line
 }
 
-function ownersOf(orderId: string): LegalOwner[] {
-    const owners: LegalOwner[] = []
+function assetsOf(orderId: string): DisposalAsset[] {
+    const assets: DisposalAsset[] = []
     const line = lines(orderId)
-    while (line.next()) owners.push(str(line, 'asset.x_daas_ham_legal_owner') as LegalOwner)
-    return owners
+    while (line.next()) {
+        assets.push({
+            legalOwner: str(line, 'asset.x_daas_ham_legal_owner') as LegalOwner,
+            customerId: str(line, 'asset.company'),
+            label: str(line, 'asset.serial_number') || line.getDisplayValue('asset'),
+        })
+    }
+    return assets
+}
+
+function ownersOf(orderId: string): LegalOwner[] {
+    return assetsOf(orderId).map((asset) => asset.legalOwner)
 }
 
 /** UI action "Submit for approval" on a draft disposal order. */
 export function uiSubmitDisposal(current: GlideRecord): void {
     current.update()
-    const owners = ownersOf(current.getUniqueValue())
-    if (owners.length === 0) {
+    const assets = assetsOf(current.getUniqueValue())
+    if (assets.length === 0) {
         gs.addErrorMessage('Add the assets to dispose of first')
         return
     }
-    if (owners.includes('customer') && !str(current, 'customer')) {
-        gs.addErrorMessage('Set the customer whose assets are being returned')
+    const findings = disposalCustomerFindings(str(current, 'customer'), assets)
+    if (findings.length > 0) {
+        gs.addErrorMessage(findings.join('. '))
         return
     }
     const approvers = new Set<string>()
-    for (const group of disposalApprovers(owners)) {
+    for (const group of disposalApprovers(assets.map((asset) => asset.legalOwner))) {
         const ids = group === 'customer_admin' ? customerAdminIds(str(current, 'customer')) : providerApproverIds('')
         for (const id of ids) approvers.add(id)
     }
@@ -54,36 +77,26 @@ export function onDisposalApprovalDecision(current: GlideRecord): void {
     const decisions = groupDecisions(approvalsOf(order.getUniqueValue()), customerAdminIds(str(order, 'customer')))
     const outcome = rollupApprovals(disposalApprovers(ownersOf(order.getUniqueValue())), decisions)
     if (outcome === 'requested') return
-    cancelPendingApprovals(order.getUniqueValue())
     order.setValue('approval', outcome)
     order.setValue('stage', outcome === 'approved' ? 'approved' : 'rejected')
     if (outcome === 'rejected') order.setValue('state', 4)
     order.update()
+    // After the save, so the approval rule each cancellation runs finds the order no longer awaiting approval.
+    cancelPendingApprovals(order.getUniqueValue())
 }
 
 /** UI action "Complete disposal": retire every ready line; report what blocks the rest. */
 export function uiCompleteDisposal(current: GlideRecord): void {
-    current.update()
+    // A refused form save (a method or Customer changed after submit) leaves the refused values on `current`.
+    if (!current.update()) return
     let blocked = 0
     const line = lines(current.getUniqueValue())
     while (line.next()) {
         if (str(line, 'status') === 'done') continue
-        const asset = findById('alm_hardware', str(line, 'asset'))
-        if (!asset) continue
-        const method = (str(line, 'method') || str(current, 'method')) as DisposalMethod
-        const facts = transitionFacts(asset)
-        const blockers = disposalLineBlockers({ legalOwner: facts.legalOwner, method, wipeComplete: facts.wipeEvidenceComplete, stage: readStage(asset) })
-        if (blockers.length === 0 && readStage(asset) === 'pending_wipe') moveAsset(asset, 'pending_disposal')
-        const verdict = blockers.length === 0 ? moveAsset(asset, disposalStage(method)) : { allowed: false as const, reason: blockers.join('; ') }
-        if (verdict.allowed) {
-            asset.update()
-            line.setValue('status', 'done')
-            line.setValue('blockers', '')
-        } else {
-            blocked++
-            line.setValue('status', 'blocked')
-            line.setValue('blockers', verdict.reason)
-        }
+        const refusal = retire(line, current)
+        if (refusal) blocked++
+        line.setValue('status', refusal ? 'blocked' : 'done')
+        line.setValue('blockers', refusal)
         line.update()
     }
     if (blocked > 0) {
@@ -93,4 +106,65 @@ export function uiCompleteDisposal(current: GlideRecord): void {
     current.setValue('stage', 'completed')
     current.setValue('state', 3)
     current.update()
+}
+
+/**
+ * Retire a line's Asset by its method; why it was not (empty when it was). An Asset the user cannot read (outside
+ * their Stockrooms, ADR 0005) blocks its line rather than being skipped. The lifecycle rule checks each saved move,
+ * so a pending-wipe Asset is saved as pending disposal first, and the line is done only once the retiring save holds.
+ */
+function retire(line: GlideRecord, order: GlideRecord): string {
+    const asset = findById('alm_hardware', str(line, 'asset'))
+    if (!asset) return 'asset not found, or not in your stockrooms'
+    const method = (str(line, 'method') || str(order, 'method')) as DisposalMethod
+    const facts = transitionFacts(asset)
+    const stage = readStage(asset)
+    const blockers = disposalLineBlockers({
+        legalOwner: facts.legalOwner,
+        method,
+        wipeComplete: facts.wipeEvidenceComplete,
+        stage,
+        customerId: str(asset, 'company'),
+        orderCustomerId: str(order, 'customer'),
+    })
+    if (blockers.length > 0) return blockers.join('; ')
+    if (stage === 'pending_wipe') {
+        const refusal = moveAndKeep(asset, 'pending_disposal')
+        if (refusal) return refusal
+    }
+    return moveAndKeep(asset, disposalStage(method))
+}
+
+/** Move the Asset and save it; why that was refused (empty once saved). */
+function moveAndKeep(asset: GlideRecord, to: Stage): string {
+    const verdict = moveAsset(asset, to)
+    if (!verdict.allowed) return verdict.reason
+    return asset.update() ? '' : asset.getLastErrorMessage() || `the asset could not be saved as ${to}`
+}
+
+/**
+ * Before insert/update/delete rule on disposal lines: once the order leaves draft no line is added, removed or
+ * pointed at another order, Asset or method, so what is retired is what was approved. Removing a line retires
+ * nothing, so administrators (the only role the ACLs let delete) still may: otherwise a line whose Asset can never
+ * be retired keeps its order approved for good, and deleting an order could not take its lines with it.
+ */
+export function guardDisposalLine(current: GlideRecord, previous: GlideRecord): void {
+    const operation = current.operation()
+    if (operation === 'update' && LINE_SCOPE.every((field) => str(current, field) === str(previous, field))) return
+    if (operation === 'delete' && gs.hasRole(ROLE.admin)) return
+    const stages = [str(current, 'disposal_order.stage')]
+    if (operation === 'update') stages.push(str(previous, 'disposal_order.stage'))
+    refuseOnceSubmitted(current, stages)
+}
+
+/** Before-update rule on disposal orders whose method or Customer changes: both are fixed at submit, like the lines. */
+export function guardDisposalOrder(current: GlideRecord, previous: GlideRecord): void {
+    refuseOnceSubmitted(current, [str(previous, 'stage')])
+}
+
+function refuseOnceSubmitted(current: GlideRecord, orderStages: string[]): void {
+    const refusal = disposalScopeRefusal(orderStages)
+    if (!refusal) return
+    gs.addErrorMessage(refusal)
+    current.setAbortAction(true)
 }

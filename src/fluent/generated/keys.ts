@@ -1301,6 +1301,14 @@ declare global {
                         table: 'sys_script'
                         id: '4130c64898904cb48dc19b3da973e124'
                     }
+                    br_disposal_line_frozen: {
+                        table: 'sys_script'
+                        id: 'f44bbc369196467790d27d69868ed19f'
+                    }
+                    br_disposal_order_frozen: {
+                        table: 'sys_script'
+                        id: '95bb161ba7c7446190dc9fde9c30bee3'
+                    }
                     br_eox_row: {
                         table: 'sys_script'
                         id: '4411888922fd4cf2b2aedb7b9e439df9'
