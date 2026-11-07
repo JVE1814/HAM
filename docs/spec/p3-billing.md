@@ -9,8 +9,9 @@
   billed. An Asset back in service on or before the day its interval on the same line closed gets
   that interval reopened, so no day is billed twice. The rule also runs when the stage change clears
   the Asset's Subscription line, so the interval still closes.
-- A **site package** line is billed from its start date to its end date (it ends when its last
-  Asset is received back).
+- A **site package** line is billed from its start date to its end date (it ends on the day its last
+  Asset at the Site is received back or declared missing, while no other Asset under its Agreement is
+  on its way to, at or pending return from that Site).
 - A **per-device** line is billed per device-day: `monthly rate × device-days ÷ days in month`, one
   billing line per Site.
 - Open **Fee events** up to the month end (lost, damaged, late return) are added once, each as its
@@ -21,11 +22,18 @@
 
 | Status | How it gets there | What can happen |
 |---|---|---|
-| Generating | Monthly job on day 1 (previous month), or *Regenerate* | Lines are written in time-boxed chunks (event-driven); a subscription line or fee event that fails to bill is counted on the period (*Lines that failed to bill*) with the last error (*Last generation error*). A chunk that cannot run at all (e.g. a month saved past the month rule) stops generation: its error is recorded and the period is held as *Ready for review*. *Close period* refuses while a line failed to bill or an error is recorded, until a *Regenerate* bills every line |
+| Generating | A new period: the monthly job opens the previous month on day 1 unless it already has a period, or finance creates one by hand. Either way, the insert starts its generation once. Or *Regenerate* | Lines are written in time-boxed chunks (event-driven); a subscription line or fee event that fails to bill is counted on the period (*Lines that failed to bill*) with the last error (*Last generation error*). A chunk that cannot run at all (e.g. a month saved past the month rule) stops generation: its error is recorded and the period is held as *Ready for review*. *Close period* refuses while a line failed to bill or an error is recorded, until a *Regenerate* bills every line |
 | Ready for review | Generation finished and totals are set, or generation stopped on an error (held for review) | *Regenerate* (rebuild from current data); *Close period* |
-| Closed (locked) | *Close period* (finance) | Lines of fees waived since generation are dropped (Close refuses if a waived fee cannot leave the period) and the totals redone, and the fees become *billed*. The period and its lines can no longer change or be deleted. The CSV export is attached in the background shortly after closing; *Re-export CSV* attaches it again if it is missing |
+| Closed (locked) | *Close period* (finance) | Lines of fees waived since generation are dropped (Close refuses if a waived fee cannot leave the period) and the totals redone, and the fees become *billed*. The period and its lines can no longer change or be deleted, and none of its lines can be moved to another period (nor a line moved into it). The CSV export is attached in the background shortly after closing; *Re-export CSV* attaches it again if it is missing |
 
-- A period's month is entered as YYYY-MM (e.g. 2026-11); a business rule refuses a period saved with any other month. A period saved past the rule (e.g. by an import without business rules) bills nothing: its generation stops with the error recorded, and *Close period* refuses until the month is corrected and *Regenerate* run.
+- A period's month is entered as YYYY-MM (e.g. 2026-11); a business rule refuses a period saved
+  with any other month. The period's first and last day are set from its month whenever the month is
+  saved.
+- A period whose month is changed past the rule bills nothing: its generation stops with the error
+  recorded, and *Close period* refuses until the month is corrected and *Regenerate* run. A period
+  inserted without business rules does not start generating: delete it and create it again.
+- A period created before its month ends is generated from that day's data; *Regenerate* it once the
+  month has ended, before closing.
 
 ## Export
 
@@ -46,8 +54,8 @@ Closing a period (or **Recompute margin** on a closed one) rebuilds its **Cost f
 
 | Cost type | Source | Attributed by |
 |---|---|---|
-| Purchase | The Asset's cost, written off over `x_daas_ham.margin.amortisation_months` from its purchase date (else its in-service date), then no more (Provider-owned only; a buyout sets the cost to the Asset's share of the buyout price and the purchase date to the buyout day) | Service-interval days in the month from the write-off start |
-| Lease | The lease's monthly payment split evenly over the Assets it covers, in months the lease runs (lessor-owned) | Service-interval days |
+| Purchase | The Asset's cost, written off over `x_daas_ham.margin.amortisation_months` from its purchase date (else its in-service date) through the day before the same date that many months later, then no more. A write-off that starts mid-month ends mid-month, and its last month carries what its first month left of a monthly write-off, so an Asset in service throughout is costed exactly its cost (Provider-owned only; a buyout sets the cost to the Asset's share of the buyout price and the purchase date to the buyout day) | Service-interval days in the month from the write-off start through its last day |
+| Lease | The lease's monthly payment split evenly over the Assets it covers (retired units, which the Lessor or the OEM holds, are not covered), in months the lease runs (lessor-owned) | Service-interval days |
 | OEM support | Annual cost of the coverage contracts covering the Asset today (`annual_cost`, from the coverage CSV or entered on the contract) ÷ 12 | Service-interval days |
 | Field labour | NaaS work orders closed in the month: their *NaaS field labour cost*, else `x_daas_ham.margin.visit_cost` | The work order's company and location |
 
@@ -62,6 +70,9 @@ Closing a period (or **Recompute margin** on a closed one) rebuilds its **Cost f
   margin error*); both are cleared when a recompute starts.
 - While a buyout transfer is still running, a lease's payment keeps being split over the Assets it
   covered when the buyout was decided.
+- Otherwise a lease's payment is split over the Assets it covers now: units the Lessor or the OEM has
+  taken back (retired) no longer count, so a period recomputed after all of a lease's units have gone
+  back carries no lease cost for it (ADR 0010).
 - **Revenue** is the period's billing lines (subscriptions per Site, fees at Customer level).
 - **Margin** = revenue − cost; margin % = margin ÷ revenue (blank without revenue).
 - The workspace dashboard's **Margin** tab shows last month's revenue, cost and margin, margin by

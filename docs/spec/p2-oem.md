@@ -34,6 +34,12 @@
 - **Coverage (every 4 h, time-boxed)**:
   - Covers Assets not retired and not checked for `x_daas_ham.oem.coverage_refresh_days`, oldest
     first.
+  - The enabled vendors take turns, one batch each, until the time budget
+    (`x_daas_ham.job.budget_seconds`) is spent, so a vendor with a backlog does not hold up the
+    others and the budget is not left unused while one is behind. Each enabled vendor gets at least
+    one batch per run, so a run can go past the budget by up to one batch per vendor. A vendor stops
+    for the run when nothing of it is stale, when a batch has errors, or after its one batch when it
+    is rate-limited (Fortinet).
   - Contracts are upserted per serial + contract number.
   - Each Asset gets its coverage end and service level (latest covering contract) and its annual
     support cost from the contracts of its serial, and is stamped as checked. Assets sharing a serial
@@ -50,6 +56,9 @@
     1000 per hour, and `products/list` takes one serial per call. Every 4 hours that is about 540
     serials a day, so a fleet above roughly 3,800 FortiGates is not fully refreshed within the
     default 7 days: raise `x_daas_ham.oem.coverage_refresh_days`, or use the CSV import for the rest.
-- **RMA status (hourly)**: open Cisco RMAs with an RMA number.
+- **RMA status (hourly)**: open Cisco RMAs with an RMA number, at most 200 per run, least recently
+  synced first. Every RMA asked is stamped *Last synced*, answered or not, so all of them take turns.
+  *Last synced* is when the RMA was last asked, including when Cisco did not answer or the call
+  failed (failures are logged).
 - **CSV**: rows loaded into *OEM coverage import rows* (vendor, serial, contract, service level,
   start, end) and *Lifecycle import rows* are processed on insert.

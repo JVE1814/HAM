@@ -13,8 +13,10 @@ every Customer and are not narrowed. Tables inventory techs may not read at all 
 commercial and configuration tables) are closed by the read ACLs' role lists, not by a match-nothing
 filter: a before-query rule also applies to the server logic the user's actions set off. Receiving a
 returned Asset, for example, reads and can end its Subscription line and record a late-return Fee
-event. Server logic that must count past the user's rules, such as the units of a site package still at
-the Site, queries with business rules off.
+event. Server logic that must count past the user's rules queries with business rules off: the units
+of a site package still at the Site, the Assets of an Order line when its stage is derived, and the
+Assets Ship sends. Logic that saves what such a query read turns the rules back on before any save
+(`setWorkflow(true)`), so the stage-change and billing rules still run.
 
 For Customer contacts, a rule on a table with no Customer field (or no Site field, for Site contacts)
 matches nothing. Site contacts therefore get no Stockrooms, Agreements, subscription lines, catalog

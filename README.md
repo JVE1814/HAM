@@ -13,7 +13,7 @@ routers and firewalls it installs at customer sites and bills as a service.
 | Area | Phase 1 (this release) |
 |---|---|
 | Ordering | "Request network equipment" record producer → Order + lines (site templates and single devices); entitlement check against the customer catalog and contracted quantities; approvals by customer admins / account manager |
-| Sourcing | Hot spare at the site (replacements) → customer spare pool → central stock (transfer to staging) → purchase order; daily spare-pool top-up |
+| Sourcing | Hot spare at the Order's site (replacements) → customer spare pool → central stock (transfer to staging) → purchase order; daily spare-pool top-up |
 | Inbound | ASN import (in-transit assets), warehouse scanning app (receive, provider tags + labels, put-away, pick) |
 | Staging | Staging tasks with per-customer / vendor / device-class checklists; distributor-staged units get a verification checklist |
 | Delivery | Ship → change request + FSM work order (inside change and site maintenance windows); self-install confirmation |
@@ -35,7 +35,7 @@ routers and firewalls it installs at customer sites and bills as a service.
 
 | Area | Phase 3 |
 |---|---|
-| Leases | Lease schedules make their assets lessor-owned; mismatch alerts when a lease ends before the service; end-of-lease decisions (buy out, extend, return) ([spec](docs/spec/p3-contracts.md)) |
+| Leases | Lease schedules make their assets lessor-owned; mismatch alerts when a lease ends before the service; end-of-lease decisions (buy out, extend, return; one buy out or return per lease, returned stock withdrawn to pending wipe) ([spec](docs/spec/p3-contracts.md)) |
 | Renewals | Agreement renewal warnings and *Renew agreement*; OEM coverage expiry warnings per customer |
 | Billing | Service intervals per asset; monthly billing periods prorated by day (site packages) and device-day (per-device lines) plus fees; review, regenerate, close and lock; CSV attachment and pull API ([spec](docs/spec/p3-billing.md)) |
 | Margin | Cost facts (purchase write-off, lease, OEM support, field labour) and margin per customer and site on period close; dashboard tab |
@@ -80,7 +80,7 @@ Then configure (System Properties, `x_daas_ham.*`):
 | `x_daas_ham.provider_company` | sys_id of the provider's own `core_company` (company of unassigned stock) |
 | `x_daas_ham.staging.default_stockroom` | sys_id of the staging-centre stockroom |
 | `x_daas_ham.tag.prefix` / `.digits` | provider tag format (default `NAAS-0000001`) |
-| `x_daas_ham.job.batch_size` / `.budget_seconds` | chunked-job tuning (defaults 500 / 120 s; a batch size below 1 counts as 1, and a budget of 0 or less handles one record per run) |
+| `x_daas_ham.job.batch_size` / `.budget_seconds` | chunked-job tuning (defaults 500 / 120 s; a batch size below 1 counts as 1, and a budget of 0 or less handles one record per run); the OEM coverage sync shares the budget among the enabled vendors one batch at a time and gives each at least one batch per run |
 | `x_daas_ham.events.max_batch` / `.retention_days` | NMS event API limits (500 / 90 days) |
 | `x_daas_ham.spare_pool.auto_purchase` | `true` to raise POs for spare-pool shortfalls |
 | `x_daas_ham.oem.<vendor>.enabled`, `x_daas_ham.meraki.*`, `x_daas_ham.mist.*` | OEM API access, see [OEM spec](docs/spec/p2-oem.md) |
@@ -139,7 +139,8 @@ API, billed to `x_daas_ham.shipping.carrier_id`). Register the tracking webhook 
 `https://<instance>/api/x_daas_ham/naas/shipping/tracking` with the custom header
 `X-NaaS-Webhook-Token: <x_daas_ham.shipping.webhook_token>` (ShipEngine `headers`, EasyPost
 `custom_headers`; `?token=` also works where the URL keeps it). ShipEngine and EasyPost tracker
-payloads are accepted.
+payloads are accepted. Labels are not voided through the aggregator: void a return label with the
+carrier, then use *Mark label voided* on its Shipment so a new one can be created.
 
 **OEM clouds**: REST messages *NaaS Meraki Dashboard*, *NaaS HPE Mist*, *NaaS HPE GreenLake*,
 *NaaS FortiCare*, *NaaS FortiZTP* and *NaaS Check Point Zero Touch*. Attach OAuth 2.0 profiles to
@@ -204,19 +205,21 @@ What remains can only be confirmed on an instance or behind a vendor login:
   (FNDN), Cisco API quotas (API Console), and whether ShipEngine labels are tracked automatically or
   need `/v1/tracking/start`.
 - **Job lock** (margin recomputes, ADR 0013): *Job lock* shows a unique database index on *Lock*; a
-  second row with the same name is refused (`GlideRecord.insert()` returns no sys_id) without throwing,
-  and the `x_daas_ham.margin.compute` event still ends as processed (a refused take tries the insert
-  twice, before and after clearing abandoned locks, so two *Unique Key violation* errors in the system
-  log per refused take are expected); a lock row created over 10 minutes ago is cleared by the next
-  recompute and a fresh one is not; a chunk that finds the lock held runs again about a minute later; a
-  recompute whose lock was cleared while it was writing logs a *job lock lost while writing* warning and
-  starts a fresh pass, which recomputes the period from scratch; and no lock row is left once a
-  recompute completes.
+  second row with the same name is refused (`GlideRecord.insert()` returns no sys_id) without
+  throwing, and the `x_daas_ham.margin.compute` event still ends as processed (a refused take tries
+  the insert twice, before and after clearing abandoned locks, so two *Unique Key violation* errors in
+  the system log per refused take are expected, three when the holder lets go between the second try
+  and the check that follows and another take wins the third try; a third try that is accepted takes
+  the lock); a lock row created over 10 minutes ago is cleared by the next recompute and a fresh one
+  is not; a chunk that finds the lock held runs again about a minute later; a recompute whose lock was
+  cleared while it was writing logs a *job lock lost while writing* warning and starts a fresh pass,
+  which recomputes the period from scratch; and no lock row is left once a recompute completes.
 - **Provider tag counter** (warehouse Receive): the counter is advanced under the job lock
   `provider_tag_sequence`, so two units received at the same moment get different tags. A receipt that
   finds the lock held 5 times in a row answers HTTP 503 *Other receipts are taking Provider tags: scan
   again* and leaves the unit unreceived; each refused try logs two *Unique Key violation* errors (up to
-  10 for one 503), and so does a try that meets the lock being released.
+  10 for one 503). A try that meets the lock being released logs the same two, then tries a third
+  insert, which normally takes it.
 - **Stock reservation lock** (Order sourcing and the spare-pool top-up): reserving an Asset for an Order
   line, linking a hot spare at the customer site to one, or moving free stock into a Spare pool takes the
   job lock `reserve_asset_<Asset sys_id>` in the same *Job lock* table and re-reads the Asset under it, so
@@ -235,6 +238,15 @@ What remains can only be confirmed on an instance or behind a vendor login:
   other stockrooms' blind counts and site audits are not listed, and in the warehouse app receiving one
   returned unit of a multi-unit site package keeps its subscription line active, receiving the last one
   ends it, and a late one records the late-return fee.
+- **Returns and site packages**: when an Agreement with equipment at two Sites ends, the daily job
+  raises one Return order per Site, each with a normal change and a de-install work order located at
+  that Site. A site package whose last outstanding unit is declared missing ends that day. With every
+  unit of a one-site package swapped (a break-fix swap of a one-device package, for example),
+  receiving the old units before the new ones are seen leaves the package active, and returning or
+  declaring missing the never-seen new units then ends it. After an upgrade, site packages kept active
+  by a unit declared missing before this release are not ended retroactively: list active
+  site-package lines whose Site has no Asset under the Agreement shipped, pending in service, in
+  service, temporary or pending return, and end them by hand.
 - **Order create rule in jobs**: an Order is submitted only when its user passes the Order create rule
   (`GlideRecord.canCreate()`). The daily job *NaaS - raise refresh orders* relies on its *Run as* user
   (expected to be the system user) passing it; one without an Order raiser role leaves its refresh

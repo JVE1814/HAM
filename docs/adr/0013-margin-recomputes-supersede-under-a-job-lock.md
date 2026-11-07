@@ -27,5 +27,7 @@ it is held (a heartbeat) would not close the gap: it can only be renewed between
 write that overruns, and no write can be tied to the lock in a transaction.
 
 A chunk that throws while it still holds the lock records why on the period, under the lock and only
-for the current pass. An insert refused while no lock row exists throws instead of retrying forever.
+for the current pass. A take whose second insert is refused, and whose holder lets go before the
+check, tries the insert once more. Only an insert refused while no lock row exists throws, instead of
+retrying forever.
 Whether the instance behaves as expected is on the first-install checklist.

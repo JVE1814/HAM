@@ -13,7 +13,9 @@
   complete is kept (`domain/breakfix.ts`).
 - Replacement lines skip the entitlement checks: a like-for-like swap is not a new catalog choice and
   adds no usage.
-- Sourcing follows the replacement priority: hot spare at the Site → Spare pool → central stock.
+- Sourcing follows the replacement priority: hot spare at the Site (in a customer-site stockroom
+  located at the Site or one of its Rooms; one at another Site is not used) → Spare pool → central
+  stock.
 - If no stock is left:
   - a failed unit with **OEM coverage today** gets an **OEM RMA** record (advance replacement, *to
     open*) instead of a purchase, when the line is for the failed unit's own Model (refresh lines
@@ -22,11 +24,14 @@
   - the OEM's replacement unit is received with the RMA number in the PO field (ASN or warehouse
     app), allocated to the waiting line, and the RMA becomes *replacement received*.
 - SLAs on the case: next business day 24 h, same day 8 h, 24x7x4 4 h (wall clock). They stop when the
-  replacement Order completes (in service).
+  replacement Order completes (in service). A replacement served from a hot spare at the Site reaches
+  *installing* at Ship (the spare is handed over as shipped), so its install can then be confirmed or
+  its swap work order closed.
 - On install completion the failed unit goes on a **defective return**, collected by the swap work
   order.
 - **Defective returned to OEM** on the RMA retires the unit as *returned to OEM*. This needs wipe
-  evidence.
+  evidence recorded since the unit was last received back at the depot (receipt clears earlier
+  evidence).
 
 ## Returns (D60)
 
@@ -34,7 +39,7 @@
 |---|---|
 | Site decommission / device removal | Record producer *Return or decommission network equipment*, or the customer page |
 | Refresh swap-back, defective return | Install completion of refresh / replacement Orders (collected by the same work order) |
-| Agreement end | Daily job, once per Agreement after its end date (all installed equipment) |
+| Agreement end | Daily job, once per Agreement after its end date: one Return per Site for all installed equipment there, each a field de-install with its own normal change and de-install work order |
 | Temporary end | Daily job, `x_daas_ham.returns.temporary_lead_days` before a temporary Order's end date |
 
 - Through the record producer, a return is raised only when the Return create rule lets its requester
@@ -55,8 +60,15 @@
 - **Receipt** at the depot (warehouse app, Receive), for units pending return (or missing), only into a
   central depot or a staging centre, never a customer-site stockroom:
   - the unit goes to *pending evaluation* and leaves its Site, Rack position and subscription line;
-  - a site package with no Assets left ends that day (all its units count, not only those the
-    receiving tech can see);
+    its wipe evidence is cleared (a wipe recorded before it went out does not cover what it picked
+    up at the Site), so it must be wiped again before it leaves the Provider;
+  - the active site package of the Site and Agreement the unit leaves ends that day once nothing is
+    left there under that Agreement (shipped, pending in service, in service, temporary or pending
+    return). Units received or declared missing no longer count. A swap's new units count before
+    monitoring first sees them, so a swap-back that reaches the depot first leaves the package open,
+    and a new unit that leaves before it was seen still ends it. All units count, not only those the
+    receiving tech can see. A pending package waiting for its rollout is not ended
+    (`domain/returns.ts` `sitePackageHoldersQuery`);
   - a unit received after the due date incurs a **late-return fee**;
   - a unit declared missing that turns up settles its line again: the open lost-asset fee is
     waived, the late-return fee applies, and the Return order reopens for evaluation.
@@ -74,7 +86,10 @@
   - the first day after the due date, the return is escalated once per Return order and the
     Customer admins and account manager are emailed;
   - after `x_daas_ham.returns.grace_days`, the Asset is declared *missing* (its Rack position is
-    freed) and a lost-asset fee is recorded.
+    freed) and a lost-asset fee is recorded. The active site package of its Site and Agreement ends
+    that day once nothing else is left there, as on receipt. The missing unit keeps its Site and
+    subscription line so that, found again and back in service, it bills on that line again while
+    the line is open.
 - Fees use the Agreement's lost / late / damage amounts. A zero amount records nothing.
 
 ## Refresh (D48)
@@ -92,11 +107,21 @@
 ## Disposal (D61)
 
 - A **Disposal order** has a method, lines and optional per-line method overrides.
-  - **Submit for approval** asks the provider-side approvers (asset managers), plus Customer admins
-    when any Asset is customer-owned.
+  - **Submit for approval** asks the provider-side approvers (asset managers), plus the order's
+    Customer's admins when any Asset is customer-owned. That Customer must be set, and every
+    customer-owned Asset must belong to it (its company): otherwise Submit says why, naming the
+    Assets that do not belong, and the order stays a draft.
   - Rejection closes it.
-- **Complete disposal** retires each line whose Asset is pending wipe or disposal, has wipe evidence,
-  and uses a method allowed for its legal owner:
+  - Once the order leaves draft, what it retires is fixed: lines cannot be added, removed or pointed
+    at another order, Asset or method, and the order's method and Customer cannot change (before
+    rules on the line and the order). Complete disposal still records each line's status and
+    blockers. An administrator may still remove a line from a submitted order (removing retires
+    nothing), so an order whose line can never be retired can still be completed, and deleting an
+    order takes its lines with it.
+- **Complete disposal** retires each line whose Asset is pending wipe or disposal, has wipe evidence
+  recorded since it was last received back at the depot (receipt clears earlier evidence), uses a
+  method allowed for its legal owner and, when customer-owned, belongs to the order's Customer (an
+  order with no Customer returns no customer-owned Asset):
 
   | Legal owner | Allowed methods |
   |---|---|
@@ -104,5 +129,7 @@
   | Customer | return to customer |
   | Lessor | return to lessor |
 
-  Other lines are marked blocked with the reasons, and the order stays approved until they are
-  cleared.
+  A pending-wipe Asset is saved as pending disposal first, then retired. A line is done only when
+  the retiring save is kept. A line whose Asset is not found or is outside the user's Stockrooms (ADR
+  0005) is blocked like any other. Lines that are not retired are marked blocked with the reasons,
+  and the order stays approved until they are cleared.

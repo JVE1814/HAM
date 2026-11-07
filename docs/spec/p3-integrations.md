@@ -6,15 +6,22 @@
   ShipEngine's one-call label API (`POST /v1/labels`) with the key in `x_daas_ham.shipping.api_key`,
   billed to the carrier account `x_daas_ham.shipping.carrier_id` (no label is bought while it is
   empty).
-- **Outbound**: *Ship* on an Order without a tracking number buys the label instead of asking for
-  one: from the depot (`x_daas_ham.staging.default_stockroom`'s location) to the Site, addressed to
-  the first site contact, one package per staged Asset (`x_daas_ham.shipping.package_kg` each,
-  at most 20), service `x_daas_ham.shipping.service_code`. Nothing is bought when nothing is
-  staged; hot spares already at the Site are not shipped. The carrier and tracking number land on
-  the Order; a **Shipment** records the label, cost and status. A remote-hands install still needs
-  no carrier.
+- **Outbound**: *Ship* on an Order without a tracking number entered by hand buys the label instead
+  of asking for one: from the depot (`x_daas_ham.staging.default_stockroom`'s location) to the Site,
+  addressed to the first site contact, one package per staged Asset (`x_daas_ham.shipping.package_kg`
+  each, at most 20), service `x_daas_ham.shipping.service_code`. Nothing is bought when nothing is
+  staged; hot spares already at the Site are handed over without a package. The carrier and tracking
+  number land on the Order; a **Shipment** records the label, cost and status. A remote-hands install
+  still needs no carrier.
+- The number of a label an earlier Ship bought does not count as entered by hand: a later Ship, for
+  Assets staged since, buys them a label of their own, or asks for a tracking number while the
+  aggregator is off. With a tracking number entered by hand, no label is bought.
 - **Returns**: *Create return label* on a ship-back Return order buys a label from the Site to the
   depot for the awaited Assets. The customer page shows it as *Print return label*.
+- A return label voided with the carrier is closed with *Mark label voided* on its Shipment (asset
+  managers, inventory techs and the NOC, while it is *Label created* or *Exception*). Nothing is sent
+  to the aggregator. The Shipment becomes *Voided*, which is final, and the Return order gets a work
+  note. The customer page stops offering the label and a new return label can be created.
 - Addresses need a name, street, city, postal code and country (U.S. and Canadian states as their
   two-letter codes), and the sender a phone number (ShipEngine requires `ship_from.phone`): the
   location's phone, else `x_daas_ham.shipping.sender_phone` for the depot or the first site
@@ -30,7 +37,7 @@
   with the latest `datetime`.
   The Shipment's status, latest update and estimated delivery are updated and new tracking events
   added; the first *delivered* update puts a work note on the Order. Late or out-of-order updates
-  do not move a delivered (or returned) shipment back; *unknown* never replaces a known status. Unknown tracking numbers are
+  do not move a delivered, returned or voided shipment back; *unknown* never replaces a known status. Unknown tracking numbers are
   acknowledged and ignored.
 
 | Aggregator status | Shipment status |
@@ -41,6 +48,7 @@
 | DE, SP / delivered | Delivered |
 | EX / failure, error, cancelled | Exception |
 | return_to_sender | Returned to sender |
+| — (set by *Mark label voided*, never by tracking) | Voided |
 
 ## OEM claims (D70)
 
@@ -79,4 +87,6 @@
   sent and use no attempts, also while the claim step is left for a person, and go to pending as
   soon as the claim step is ticked done, by hand or by a run.
 - *Ship* and *Create return label* refuse more than 20 packages (one label's maximum): enter the
-  carrier and tracking number by hand. A Return order gets one open return label at a time.
+  carrier and tracking number by hand. A Return order gets one open return label at a time;
+  delivered, returned and voided labels are not open, so to replace a label, void it with the
+  carrier and mark it voided.

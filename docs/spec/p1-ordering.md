@@ -27,7 +27,8 @@
   count.
 - **Usage** = Assets of the Agreement at or on their way to a Site (shipped, pending in service, in
   service, temporary deployment, pending return) + quantities on other open, not-yet-shipped Order
-  lines of the Agreement.
+  lines of the Agreement. A line that has shipped never counts as open again, also when one of its
+  Assets is later returned.
 - A Contracted quantity caps either one Model (model-specific) or a Device class. Classes without a
   quantity are uncapped.
 - Verdict: **over quota** if any cap would be exceeded, else **off catalog** if anything is not
@@ -43,6 +44,8 @@
 
 - Approvals are `sysapproval_approver` records; a rule rolls them up: any rejection rejects the
   Order; it is approved once each required group has an approval. Remaining requests are cancelled.
+  The Order's outcome is saved before they are, so cancelling them does not roll the approvals up
+  again or start sourcing twice.
 - Provider-side approvers are the Agreement's account manager or, if it has none, the asset managers.
   If the Customer has no Customer admins, the provider-side approvers stand in for them. If there is
   no approver at all, the Order gets a work note and someone must add an approver manually.
@@ -54,10 +57,16 @@
 | Purpose | Priority |
 |---|---|
 | New install | Customer Spare pool → free central stock → purchase |
-| Replacement (device replace) | hot spare in a customer-site stockroom of that Customer → Spare pool → free central stock → purchase |
+| Replacement (device replace) | hot spare in a customer-site stockroom of that Customer at the Order's Site (the stockroom's location is the Site or one of its Rooms) → Spare pool → free central stock → purchase |
 
-- Another Customer's spares are never used. Picks are ordered by stockroom, then asset, for
-  determinism.
+- A hot spare at another of the Customer's Sites is not used; a customer-site stockroom needs its
+  location set.
+- Another Customer's spares are never used. Stock is looked up one source at a time (site hot
+  spares, the Customer's Spare pool, free stock), filtered to the Customer in the query and read by
+  stockroom then sys_id, so other Customers' spares never crowd out usable stock and the picks are the
+  same on every run.
+- Free central stock is available stock outside customer-site stockrooms; a stockroom with no type,
+  or an Asset in none, counts as a central depot.
 - Reserved Assets take the Customer as `company` and the Agreement (ADR 0006); in-house stock at the
   staging centre moves to *staging* at once, with a Staging task.
 - Stock already on an Order line is not picked: a hot spare linked to a line stays in the Spare pool but
@@ -76,23 +85,28 @@
 - If the Staging task cannot be created, the Asset stays reserved for the line (a warning is logged) and
   is not moved to *staging*.
 - Hot spares at the site stay in the Spare pool, linked to the line (claimed the same way, under the
-  Asset lock), and are installed from where they are.
-- Shortfalls become one requested purchase order per line (ship to the staging centre); received units
-  of that PO are allocated to the line on receipt.
+  Asset lock), until Ship hands them over where they are (shipped, with no package).
+- Each sourcing run with a shortfall requests one purchase order for the line (ship to the staging
+  centre). The line lists every one (*Purchase orders*; *Latest purchase order* is the newest). A
+  unit received on any of them is allocated to the line and comes off its *On order* count.
 - Without a staging stockroom (`x_daas_ham.staging.default_stockroom`) no purchase order is requested, and a
   line whose purchase order Procurement does not create, or creates without its line item (that PO is removed
   again, or named for cancelling), is treated the same way: the line waits for stock and its sourcing summary
   says why. The spare-pool top-up then buys nothing and logs a warning.
-- Re-sourcing a line only covers `quantity − allocated − on order`.
+- Re-sourcing a line only covers `quantity − allocated − on order − open OEM RMAs`, where on order
+  is units bought and not yet received.
 - Several source stockrooms give several transfer orders, all listed on the line.
 - A failed staging takes the Asset off the line, which goes back to awaiting stock and is re-sourced.
-- **Cancel** is refused once anything has shipped (use a return order then). Otherwise it:
+  Only a line that has not shipped falls back.
+- **Cancel** is refused once anything has shipped, a hot spare handed over at Ship included (use a
+  return order then). Otherwise it:
   - releases the stock: hot spares stay in the pool, other Assets return to free stock under the
     Provider company;
   - skips open staging tasks;
-  - lists any purchase orders for cancelling in Procurement.
+  - lists every purchase order of its lines for cancelling in Procurement;
+  - cancels the Order's pending approvals once the Order is saved as cancelled.
 
-  A cancelled or rejected Order keeps its stage.
+  A cancelled, rejected or complete Order keeps its stage.
 
 ## Spare-pool top-up (daily)
 

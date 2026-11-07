@@ -194,6 +194,10 @@ The recurring time at a Site during which on-site changes may be carried out.
 An Order of type device replace raised from a case about a failed Asset, served from a hot spare, the Spare pool, stock, an OEM advance replacement or a purchase.
 _Avoid_: RMA (that is the OEM's), break-fix ticket, swap
 
+**Hot spare**:
+Spare-pool stock kept in one of the Customer's customer-site stockrooms at a Site (or one of its Rooms), installed from there for a replacement at that Site.
+_Avoid_: on-site spare
+
 **OEM RMA**:
 A return authorisation the Provider opens with the manufacturer for a defective Asset.
 
@@ -212,7 +216,7 @@ _Avoid_: reclamation, RMA
 Retiring Assets for good by resale, OEM takeback, recycling, or return to the Customer or Lessor.
 
 **Wipe evidence**:
-Proof that an Asset's configuration, keys and credentials were erased before it left the Provider's control.
+Proof that an Asset's configuration, keys and credentials were erased before it left the Provider's control. Evidence counts only if recorded since the Asset last came back from a Site.
 
 **Temporary deployment**:
 An Order of type temporary: equipment installed for a fixed period (event, pop-up site, trial) whose Return order is raised automatically before the end date.
