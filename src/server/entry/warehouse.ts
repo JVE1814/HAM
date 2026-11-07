@@ -3,7 +3,9 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { normalizeSerial } from '../domain/asn'
+import type { StockroomType } from '../domain/sourcing'
 import { ROLE } from '../domain/visibility'
+import { awaitsReceipt, putAwayProblem } from '../domain/warehouse'
 import { findAssetByIdentifier, moveAndSave, moveAsset, newAsset, readStage } from '../platform/assets'
 import { loadNormalizationData, resolveModel } from '../platform/normalization'
 import { PROPERTY, stringProperty } from '../platform/properties'
@@ -50,11 +52,9 @@ function allowed(response: RESTAPIResponse): boolean {
     return false
 }
 
-/** A stockroom the user may see (the stockroom visibility rule applies to this lookup). */
-function visibleStockroom(stockroomId: string | undefined): boolean {
-    if (!stockroomId) return false
-    const stockroom = new GlideRecord('alm_stockroom')
-    return stockroom.get(stockroomId)
+/** The stockroom, if the user may see it (the stockroom visibility rule applies to this lookup). */
+function visibleStockroom(stockroomId: string | undefined): GlideRecord | null {
+    return findById('alm_stockroom', stockroomId ?? '')
 }
 
 function body(request: RESTAPIRequest): Record<string, string> {
@@ -81,6 +81,8 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
 
     if (!visibleStockroom(input.stockroom)) return reply(response, 400, { error: 'Choose one of your stockrooms' })
 
+    // Arriving units (bought or returned) sit in none of the user's stockrooms yet, so the lookup goes past the stockroom
+    // rule; only those stages are received below, never stock held elsewhere.
     let asset = findAssetByIdentifier(input.code, { beyondVisibility: true })
     if (!asset) {
         if (!input.pid) return reply(response, 404, { error: 'Unknown serial: scan the PID too to receive without an ASN' })
@@ -89,10 +91,14 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
         asset = created.asset
     }
     if (receiveReturnedAsset(asset, input.stockroom)) return reply(response, 200, summarise(asset))
-    const verdict = moveAsset(asset, 'available')
-    if (!verdict.allowed) return reply(response, 409, { error: `Already received (${readStage(asset)})` })
+    const stage = readStage(asset)
+    if (!awaitsReceipt(stage) || !moveAsset(asset, 'available').allowed) {
+        return reply(response, 409, { error: `Not awaiting receipt (${stage ?? 'unknown stage'})` })
+    }
+    const tag = str(asset, 'asset_tag') || nextProviderTag()
+    if (!tag) return reply(response, 503, { error: 'Other receipts are taking Provider tags: scan again' })
+    asset.setValue('asset_tag', tag)
     asset.setValue('stockroom', input.stockroom)
-    if (!str(asset, 'asset_tag')) asset.setValue('asset_tag', nextProviderTag())
     asset.update()
     allocateToWaitingLine(asset)
     reply(response, 200, summarise(asset))
@@ -141,14 +147,16 @@ function allocateToWaitingLine(asset: GlideRecord): void {
     moveAndSave(asset, 'staging', 'receiving')
 }
 
-/** POST /putaway { code, stockroom }: record where an in-stock asset now sits. */
+/** POST /putaway { code, stockroom }: record the stockroom an in-stock asset now sits in, when it is free to move there. */
 export function putAwayAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const input = body(request)
-    if (!visibleStockroom(input.stockroom)) return reply(response, 400, { error: 'Choose one of your stockrooms' })
+    const stockroom = visibleStockroom(input.stockroom)
+    if (!stockroom) return reply(response, 400, { error: 'Choose one of your stockrooms' })
     const asset = findAssetByIdentifier(input.code ?? '')
     if (!asset) return reply(response, 404, { error: 'No asset with that serial or tag' })
-    if (str(asset, 'install_status') !== '6') return reply(response, 409, { error: 'Only in-stock assets can be put away' })
+    const problem = putAwayProblem(readStage(asset), (str(stockroom, 'x_daas_ham_stockroom_type') || 'central_depot') as StockroomType)
+    if (problem) return reply(response, 409, { error: problem })
     asset.setValue('stockroom', input.stockroom)
     asset.update()
     reply(response, 200, summarise(asset))
