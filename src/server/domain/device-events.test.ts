@@ -33,8 +33,56 @@ describe('parseDeviceEvents', () => {
         expect(result.rejected).toEqual([
             { index: 0, reason: 'identifier is required' },
             { index: 1, reason: 'event must be one of seen, down, up' },
-            { index: 2, reason: 'observed_at must be an ISO-8601 timestamp' },
+            { index: 2, reason: 'observed_at must be an ISO-8601 timestamp with a UTC offset, such as 2026-11-06T10:00:00Z' },
         ])
+    })
+
+    it('reads ISO-8601 timestamps to the minute, second or fraction, with Z or a UTC offset', () => {
+        const at = (observed_at: string) => {
+            const result = parseDeviceEvents({ events: [{ identifier: 'A', event: 'seen', observed_at }] }, 10, NOW)
+            if ('error' in result) throw new Error(result.error)
+            return result.events[0]?.observedAt
+        }
+        expect(at('2026-11-06T10:00Z')).toBe(Date.parse('2026-11-06T10:00:00Z'))
+        expect(at('2026-11-06T10:00:00.25Z')).toBe(Date.parse('2026-11-06T10:00:00.250Z'))
+        expect(at('2026-11-06T10:00:00.123456789Z')).toBe(Date.parse('2026-11-06T10:00:00.123Z'))
+        expect(at('2026-11-06T11:30:00+01:30')).toBe(Date.parse('2026-11-06T10:00:00Z'))
+        expect(at('2026-11-06T05:00:00-0500')).toBe(Date.parse('2026-11-06T10:00:00Z'))
+        expect(at('2026-11-06T00:30:00+01:00')).toBe(Date.parse('2026-11-05T23:30:00Z'))
+        expect(at('2024-02-29T10:00:00Z')).toBe(Date.parse('2024-02-29T10:00:00Z'))
+    })
+
+    it('rejects timestamps Date.parse would take that are not ISO-8601 with an offset, and impossible dates or times', () => {
+        const values = [
+            '11/06/2026 10:00',
+            '2026/11/06 10:00:00',
+            'Fri, 06 Nov 2026 10:00:00 GMT',
+            'November 6, 2026 10:00 UTC',
+            '2026-11-06',
+            '2026-11-06T10:00:00',
+            '2026-11-06 10:00:00Z',
+            '2026-02-31T10:00:00Z',
+            '2025-02-29T10:00:00Z',
+            '2026-13-01T10:00:00Z',
+            '2026-11-00T10:00:00Z',
+            '2026-11-06T24:00:00Z',
+            '2026-11-06T10:60:00Z',
+            '2026-11-06T10:00:60Z',
+            '2026-11-06T10:00:00+24:00',
+            '2026-11-06T10:00:00+01:60',
+            ' 2026-11-06T10:00:00Z',
+        ]
+        const result = parseDeviceEvents({ events: values.map((observed_at) => ({ identifier: 'A', event: 'seen', observed_at })) }, 100, NOW)
+        if ('error' in result) throw new Error(result.error)
+        expect(result.events).toEqual([])
+        expect(result.rejected.map((r) => r.index)).toEqual(values.map((_, index) => index))
+        expect(new Set(result.rejected.map((r) => r.reason))).toEqual(new Set(['observed_at must be an ISO-8601 timestamp with a UTC offset, such as 2026-11-06T10:00:00Z']))
+    })
+
+    it('rejects an observed_at that is not a string', () => {
+        const result = parseDeviceEvents({ events: [{ identifier: 'A', event: 'seen', observed_at: Date.parse('2026-11-06T10:00:00Z') }] }, 10, NOW)
+        if ('error' in result) throw new Error(result.error)
+        expect(result.rejected).toEqual([{ index: 0, reason: 'observed_at must be an ISO-8601 timestamp with a UTC offset, such as 2026-11-06T10:00:00Z' }])
     })
 
     it('refuses a body without an events array or a batch that is too large', () => {

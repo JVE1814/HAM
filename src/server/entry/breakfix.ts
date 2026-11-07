@@ -1,6 +1,7 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
+import { replacementStep } from '../domain/breakfix'
 import { moveAsset, readStage } from '../platform/assets'
 import { findById, str } from '../platform/records'
 import { submitOrder } from './orders'
@@ -18,9 +19,18 @@ export function onCaseFailedAsset(current: GlideRecord): void {
 /**
  * UI action "Raise replacement" on a case: an Order replacing the failed Asset like-for-like. One that cannot be
  * submitted as raised stays a draft, still linked to the case so a second one is not raised, for the user to correct.
+ * The action is offered only while the case links no Order, but a form opened before the first one was raised can
+ * still send it: then a linked draft is submitted again and a linked Order going ahead is kept (domain/breakfix).
  */
 export function uiRaiseReplacement(current: GlideRecord): void {
     current.update()
+    const linked = findById('x_daas_ham_order', str(current, 'x_daas_ham_replacement_order'))
+    const step = replacementStep(linked ? str(linked, 'stage') : null)
+    if (linked && step === 'submit_draft') return submitReplacement(linked)
+    if (linked && step === 'keep') {
+        gs.addInfoMessage(`Replacement order ${str(linked, 'number')} is already raised (${linked.getDisplayValue('stage')})`)
+        return
+    }
     const failed = findById('alm_hardware', str(current, 'x_daas_ham_failed_asset'))
     if (!failed) {
         gs.addErrorMessage('Set the failed asset on the case first')
@@ -51,6 +61,10 @@ export function uiRaiseReplacement(current: GlideRecord): void {
 
     current.setValue('x_daas_ham_replacement_order', order.getUniqueValue())
     current.update()
+    submitReplacement(order)
+}
+
+function submitReplacement(order: GlideRecord): void {
     if (submitOrder(order)) gs.addInfoMessage(`Replacement order ${str(order, 'number')} raised`)
     else gs.addInfoMessage(`Replacement order ${str(order, 'number')} is left as a draft: correct it and submit it`)
 }

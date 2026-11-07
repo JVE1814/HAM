@@ -2427,6 +2427,10 @@ declare global {
                         table: 'sys_module'
                         id: '7ceb99170ccd4aa4bd5247a5ab054e7c'
                     }
+                    src_server_domain_breakfix_ts: {
+                        table: 'sys_module'
+                        id: '37aec855232b4eb298d7057ec3c14d72'
+                    }
                     src_server_domain_calendar_ts: {
                         table: 'sys_module'
                         id: '7461777040a24dc0a39e08bc4a774cc4'
