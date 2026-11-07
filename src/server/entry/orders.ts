@@ -164,15 +164,22 @@ function submitAccepted(order: GlideRecord): boolean {
         startSourcing(order)
         return true
     }
+    // Ask first: an Order with no request saved would wait with no one to decide it, so it stays a draft.
+    const approvers = approverIds(order, assessment.verdict)
+    const refusals = approvers.map((approverId) => requestApproval(order, approverId))
+    if (!refusals.includes('')) {
+        const reason =
+            approvers.length === 0
+                ? 'No customer admin, account manager or asset manager to approve it'
+                : `No approval could be requested: ${refusals[0]}`
+        gs.addErrorMessage(`Order not submitted. ${reason}.`)
+        order.setValue('work_notes', `Not submitted: ${reason}`)
+        order.update()
+        return false
+    }
     order.setValue('stage', 'awaiting_approval')
     order.setValue('approval', 'requested')
     order.update()
-    const approvers = approverIds(order, assessment.verdict)
-    if (approvers.length === 0) {
-        order.setValue('work_notes', 'No customer admin, account manager or asset manager to approve; add an approver manually.')
-        order.update()
-    }
-    for (const approverId of approvers) requestApproval(order, approverId)
     return true
 }
 

@@ -1,4 +1,4 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import type { ApprovalState } from '../domain/approvals'
 import { ROLE } from '../domain/visibility'
 import { pluck, str } from './records'
@@ -20,7 +20,11 @@ export function providerApproverIds(accountManagerId: string): string[] {
     return pluck('sys_user_has_role', `role.name=${ROLE.assetManager}^user.active=true^state=active`, 'user', 20)
 }
 
-export function requestApproval(task: GlideRecord, approverId: string): void {
+/**
+ * Ask `approverId` to decide `task`; why the platform refused the request (empty once saved), also logged. A task
+ * with no request saved has no one to decide it, so the callers keep it out of awaiting approval.
+ */
+export function requestApproval(task: GlideRecord, approverId: string): string {
     const approval = new GlideRecord('sysapproval_approver')
     approval.initialize()
     approval.setValue('sysapproval', task.getUniqueValue())
@@ -28,7 +32,10 @@ export function requestApproval(task: GlideRecord, approverId: string): void {
     approval.setValue('document_id', task.getUniqueValue())
     approval.setValue('approver', approverId)
     approval.setValue('state', 'requested')
-    approval.insert()
+    if (approval.insert()) return ''
+    const reason = approval.getLastErrorMessage() || 'insert refused'
+    gs.warn(`[x_daas_ham] No approval request for ${str(task, 'number')} to ${approverId}: ${reason}`)
+    return reason
 }
 
 export function approvalsOf(taskId: string): Array<{ approverId: string; state: ApprovalState }> {

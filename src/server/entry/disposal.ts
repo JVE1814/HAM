@@ -64,7 +64,14 @@ export function uiSubmitDisposal(current: GlideRecord): void {
         const ids = group === 'customer_admin' ? customerAdminIds(str(current, 'customer')) : providerApproverIds('')
         for (const id of ids) approvers.add(id)
     }
-    for (const id of approvers) requestApproval(current, id)
+    // Ask first: an order with no request saved would wait with no one to decide it, so it stays a draft.
+    const refusals = [...approvers].map((id) => requestApproval(current, id))
+    if (!refusals.includes('')) {
+        const reason =
+            approvers.size === 0 ? 'no asset manager to approve it' : `no approval could be requested: ${refusals[0]}`
+        gs.addErrorMessage(`Not submitted: ${reason}`)
+        return
+    }
     current.setValue('stage', 'awaiting_approval')
     current.setValue('approval', 'requested')
     current.update()

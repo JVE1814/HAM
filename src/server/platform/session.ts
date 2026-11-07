@@ -18,6 +18,7 @@ export function currentSession(): SessionScope {
         userId,
         customerId: gs.getUser().getCompanyID(),
         stockroomIds: () => pluck('x_daas_ham_stockroom_member', `user=${userId}`, 'stockroom'),
+        // Contacts are a comma-separated list of 32-character sys_ids: a whole sys_id matches only its own entry.
         siteIds: () => pluck('cmn_location', `x_daas_ham_site_contactsLIKE${userId}`, 'sys_id'),
     }
 }
