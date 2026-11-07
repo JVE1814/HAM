@@ -22,8 +22,19 @@ routers and firewalls it installs at customer sites and bills as a service.
 | Visibility | Customer admins see only their customer, site contacts their sites, inventory techs their stockrooms |
 | UI | NaaS Asset Workspace (`/now/naas-assets/home`) with dashboard; navigator menu; warehouse page (`x_daas_ham_warehouse.do`) |
 
-Phases 2 and 3 (break-fix, refresh, returns, disposal, audits, OEM APIs, rack view, portal, leases,
-billing export, carriers, margin) follow the plan.
+| Area | Phase 2 |
+|---|---|
+| OEM data | EoX and coverage from Cisco, Meraki, Fortinet and HPE Mist APIs; CSV for Aruba and Check Point; Cisco RMA status ([spec](docs/spec/p2-oem.md)) |
+| Break-fix | Case → *Raise replacement* (hot spare, spare pool, stock, OEM advance replacement or purchase); replacement SLAs on the case |
+| Returns | Decommission / removal requests, swap-backs, agreement-end and temporary-end returns; depot receipt and evaluation; overdue escalation, missing and fees |
+| Refresh | Automatic refresh orders per agreement and site with successor-model choice |
+| Disposal | Approved disposal orders retiring wiped assets by method and legal owner |
+| Assurance | Blind counts, site audits, customer attestation, monitoring reconciliation exceptions |
+| Racks | Placement guard and rack elevation page (`x_daas_ham_racks.do`) |
+| Customer self-service | `x_daas_ham_customer.do`: equipment, faults, returns, install confirmation, attestation |
+
+See [`docs/spec`](docs/spec) for the behaviour of each module. Phase 3 (leases, billing export,
+carriers, provisioning APIs, margin) follows the plan.
 
 ## Required plugins
 
@@ -63,6 +74,11 @@ Then configure (System Properties, `x_daas_ham.*`):
 | `x_daas_ham.job.batch_size` / `.budget_seconds` | chunked-job tuning (defaults 500 / 120 s) |
 | `x_daas_ham.events.max_batch` / `.retention_days` | NMS event API limits (500 / 90 days) |
 | `x_daas_ham.spare_pool.auto_purchase` | `true` to raise POs for spare-pool shortfalls |
+| `x_daas_ham.oem.<vendor>.enabled`, `x_daas_ham.meraki.*`, `x_daas_ham.mist.*` | OEM API access, see [OEM spec](docs/spec/p2-oem.md) |
+| `x_daas_ham.oem.coverage_refresh_days` | days between coverage checks per asset (7) |
+| `x_daas_ham.returns.grace_days` / `.temporary_lead_days` | missing after due + grace (14); temporary returns raised ahead (7) |
+| `x_daas_ham.refresh.horizon_days` | refresh orders for assets due within (90) days |
+| `x_daas_ham.reconciliation.unseen_days` | installed but unseen threshold (7) |
 
 Assign roles (`x_daas_ham.asset_manager`, `.inventory_tech`, `.field_tech`, `.noc`, `.account_manager`,
 `.finance`, `.admin`; customers: `.customer_admin`, `.site_contact`) and add inventory techs to
@@ -101,7 +117,7 @@ import state/comment shows the outcome.
 | `npm run lint` | ESLint |
 | `npm test` | Vitest unit tests for the domain core and client helpers |
 | `npm run build` | `now-sdk build` (Fluent type check, client bundle, app package) |
-| `npx now-sdk cicd testsuite run ...` | ATF suite **NaaS - P1** on an instance |
+| `npx now-sdk cicd testsuite run ...` | ATF suites **NaaS - P1** and **NaaS - P2** on an instance |
 
 Layout:
 

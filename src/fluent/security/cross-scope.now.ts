@@ -398,3 +398,39 @@ CrossScopePrivilege({
     targetScope: 'sn_customerservice',
     targetType: 'sys_db_object',
 })
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_sn_customerservice_case_create'],
+    operation: 'create',
+    status: 'allowed',
+    targetName: 'sn_customerservice_case',
+    targetScope: 'sn_customerservice',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_cmdb_ci_netgear_read'],
+    operation: 'read',
+    status: 'allowed',
+    targetName: 'cmdb_ci_netgear',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_sys_user_has_role_read'],
+    operation: 'read',
+    status: 'allowed',
+    targetName: 'sys_user_has_role',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_sys_user_role_read'],
+    operation: 'read',
+    status: 'allowed',
+    targetName: 'sys_user_role',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})

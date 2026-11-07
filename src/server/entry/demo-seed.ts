@@ -1,5 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { newAsset } from '../platform/assets'
+import { str } from '../platform/records'
 import type { Stage } from '../domain/lifecycle'
 
 /**
@@ -56,11 +57,20 @@ export function loadDemoData(): void {
     const acmeSpares = stockroom('Acme HQ hot spares', 'customer_site', { x_daas_ham_customer: acme, location: acmeMdf })
     gs.setProperty('x_daas_ham.staging.default_stockroom', stagingCentre)
 
+    const sourceOf = new Map([[cisco, 'cisco'], [hpe, 'aruba'], [fortinet, 'fortinet'], [checkpoint, 'checkpoint']])
     const model = (pid: string, name: string, manufacturer: string, deviceClass: string, track = true, power = 0) =>
         ensure(
             'cmdb_hardware_product_model',
             { x_daas_ham_oem_pid: pid },
-            { name, model_number: pid, manufacturer, x_daas_ham_device_class: deviceClass, x_daas_ham_track_as_asset: track, x_daas_ham_typical_power_w: power },
+            {
+                name,
+                model_number: pid,
+                manufacturer,
+                x_daas_ham_device_class: deviceClass,
+                x_daas_ham_track_as_asset: track,
+                x_daas_ham_typical_power_w: power,
+                x_daas_ham_oem_source: pid.endsWith('-HW') ? 'meraki' : (sourceOf.get(manufacturer) ?? ''),
+            },
         )
     const c9300 = model('C9300-48P-E', 'Catalyst 9300 48-port PoE+', cisco, 'switch', true, 715)
     model('C9300-NM-8X', 'Catalyst 9300 8x10G network module', cisco, 'module')
@@ -205,6 +215,24 @@ export function loadDemoData(): void {
         live.setValue('x_daas_ham_ru_start', ru)
         ru -= 2
         live.update()
+    }
+    // OEM coverage for the in-service demo switches (normally from the Cisco API or CSV import)
+    const covered = new GlideRecord('alm_hardware')
+    covered.addQuery('serial_number', 'STARTSWITH', 'DEMOLIVE')
+    covered.query()
+    while (covered.next()) {
+        ensure('x_daas_ham_oem_coverage', { serial_number: str(covered, 'serial_number'), contract_number: 'DEMO-SNTC-1' }, {
+            asset: covered.getUniqueValue(),
+            vendor: 'cisco',
+            service_level: 'SNTC 8X5XNBD',
+            covered: true,
+            start_date: '2026-02-01',
+            end_date: '2029-01-31',
+            source: 'manual',
+        })
+        covered.setValue('x_daas_ham_coverage_end', '2029-01-31')
+        covered.setValue('x_daas_ham_coverage_level', 'SNTC 8X5XNBD')
+        covered.update()
     }
     gs.info('[x_daas_ham] demo data loaded')
 }
