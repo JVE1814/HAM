@@ -1,7 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { initialAutomationStatus } from '../domain/oem/claims'
 import { selectStagingTemplate, type StagingTemplateView } from '../domain/staging'
-import { bool, num, str } from './records'
+import { bool, deleteWhere, num, str } from './records'
 
 /** Creating Staging tasks with their checklist steps. */
 
@@ -24,7 +24,10 @@ function templates(): StagingTemplateView[] {
     return list
 }
 
-/** Open the Asset's Staging task with its template's steps; null (and a warning) when the platform refuses the task. */
+/**
+ * Open the Asset's Staging task with its template's steps; null (and a warning) when the platform refuses the task or
+ * one of its steps. Closure checks only the steps the task has, so a task missing a mandatory step is not kept.
+ */
 export function openStagingTask(asset: GlideRecord, orderLineId: string): string | null {
     const source = (str(asset, 'x_daas_ham_staging_source') || 'in_house') as StagingTemplateView['source']
     const templateId = selectStagingTemplate(templates(), {
@@ -46,12 +49,22 @@ export function openStagingTask(asset: GlideRecord, orderLineId: string): string
         gs.warn(`[x_daas_ham] No Staging task for ${str(asset, 'serial_number')}: ${task.getLastErrorMessage() || 'insert refused'}`)
         return null
     }
-    if (templateId) copyTemplateSteps(templateId, taskId)
-    return taskId
+    const stepRefused = templateId ? copyTemplateSteps(templateId, taskId) : null
+    if (stepRefused === null) return taskId
+    deleteWhere('x_daas_ham_staging_step', `staging_task=${taskId}`)
+    const removed = task.deleteRecord()
+    gs.warn(
+        `[x_daas_ham] No Staging task for ${str(asset, 'serial_number')}: ${stepRefused}` +
+            (removed ? '' : `; ${str(task, 'number')} keeps an incomplete checklist, cancel it`),
+    )
+    return null
 }
 
-/** Copies the template's steps onto the task, each automated one in its initialAutomationStatus. */
-function copyTemplateSteps(templateId: string, taskId: string): void {
+/**
+ * Copies the template's steps onto the task, each automated one in its initialAutomationStatus. Stops at the first
+ * step the platform refuses and says why; null when every step was saved.
+ */
+function copyTemplateSteps(templateId: string, taskId: string): string | null {
     const item = new GlideRecord('x_daas_ham_staging_tmpl_item')
     item.addQuery('template', templateId)
     item.orderBy('order')
@@ -70,8 +83,9 @@ function copyTemplateSteps(templateId: string, taskId: string): void {
             step.setValue('automation', automation)
             step.setValue('automation_status', initialAutomationStatus(automation, taskActions))
         }
-        step.insert()
+        if (!step.insert()) return `step "${label}" not saved: ${step.getLastErrorMessage() || 'insert refused'}`
     }
+    return null
 }
 
 export function stagingSteps(taskId: string): Array<{ mandatory: boolean; done: boolean }> {

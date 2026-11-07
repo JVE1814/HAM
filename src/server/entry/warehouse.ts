@@ -5,7 +5,7 @@ import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_in
 import { normalizeSerial } from '../domain/asn'
 import type { StockroomType } from '../domain/sourcing'
 import { ROLE } from '../domain/visibility'
-import { awaitsReceipt, putAwayProblem } from '../domain/warehouse'
+import { awaitsReceipt, putAwayProblem, RECEIVING_STOCKROOM_TYPES, receivingProblem } from '../domain/warehouse'
 import { findAssetByIdentifier, moveAndSave, moveAsset, newAsset, readStage } from '../platform/assets'
 import { loadNormalizationData, resolveModel } from '../platform/normalization'
 import { PROPERTY, stringProperty } from '../platform/properties'
@@ -57,6 +57,16 @@ function visibleStockroom(stockroomId: string | undefined): GlideRecord | null {
     return findById('alm_stockroom', stockroomId ?? '')
 }
 
+/** The stockroom's type; a stockroom saved without one counts as a central depot, the field's default. */
+function stockroomType(stockroom: GlideRecord): StockroomType {
+    return (str(stockroom, 'x_daas_ham_stockroom_type') || 'central_depot') as StockroomType
+}
+
+/** Why the platform refused to save `record`, for the reply. */
+function refusal(record: GlideRecord): string {
+    return record.getLastErrorMessage() || 'the platform refused the save'
+}
+
 function body(request: RESTAPIRequest): Record<string, string> {
     const data = request.body.data as Record<string, unknown> | null
     return Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [k, String(v ?? '').trim()]))
@@ -79,7 +89,11 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
     const input = body(request)
     if (!input.code || !input.stockroom) return reply(response, 400, { error: 'code and stockroom are required' })
 
-    if (!visibleStockroom(input.stockroom)) return reply(response, 400, { error: 'Choose one of your stockrooms' })
+    const stockroom = visibleStockroom(input.stockroom)
+    if (!stockroom) return reply(response, 400, { error: 'Choose one of your stockrooms' })
+    // A visible stockroom may be a customer site (field techs see them all); units arrive only at the Provider's own.
+    const wrongStockroom = receivingProblem(stockroomType(stockroom))
+    if (wrongStockroom) return reply(response, 400, { error: wrongStockroom })
 
     // Arriving units (bought or returned) sit in none of the user's stockrooms yet, so the lookup goes past the stockroom
     // rule; only those stages are received below, never stock held elsewhere.
@@ -99,7 +113,8 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
     if (!tag) return reply(response, 503, { error: 'Other receipts are taking Provider tags: scan again' })
     asset.setValue('asset_tag', tag)
     asset.setValue('stockroom', input.stockroom)
-    asset.update()
+    // A refused save leaves the unit in transit or on order for a rescan, and allocates nothing.
+    if (!asset.update()) return reply(response, 422, { error: `Not received: ${refusal(asset)}` })
     allocateToWaitingLine(asset)
     reply(response, 200, summarise(asset))
 }
@@ -111,7 +126,7 @@ function createReceivedAsset(input: Record<string, string>): { asset: GlideRecor
     asset.setValue('serial_number', normalizeSerial(input.code))
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('x_daas_ham_legal_owner', 'provider')
-    asset.insert()
+    if (!asset.insert()) return { error: `Not received: ${refusal(asset)}` }
     return { asset }
 }
 
@@ -142,7 +157,12 @@ function allocateToWaitingLine(asset: GlideRecord): void {
     asset.setValue('x_daas_ham_order_line', line.getUniqueValue())
     asset.setValue('company', str(line, 'order.customer'))
     asset.setValue('x_daas_ham_agreement', str(line, 'order.agreement'))
-    asset.update()
+    if (!asset.update()) {
+        // The receipt is saved; the reservation is not, so no Staging task opens and the reply shows the unit as saved.
+        gs.warn(`[x_daas_ham] Received ${str(asset, 'serial_number')} not reserved for its Order line: ${refusal(asset)}`)
+        asset.get(asset.getUniqueValue())
+        return
+    }
     // Without its Staging task the Asset stays reserved for the line, not staging with no task to finish.
     if (openStagingTask(asset, line.getUniqueValue())) moveAndSave(asset, 'staging', 'receiving')
 }
@@ -155,7 +175,7 @@ export function putAwayAsset(request: RESTAPIRequest, response: RESTAPIResponse)
     if (!stockroom) return reply(response, 400, { error: 'Choose one of your stockrooms' })
     const asset = findAssetByIdentifier(input.code ?? '')
     if (!asset) return reply(response, 404, { error: 'No asset with that serial or tag' })
-    const problem = putAwayProblem(readStage(asset), (str(stockroom, 'x_daas_ham_stockroom_type') || 'central_depot') as StockroomType)
+    const problem = putAwayProblem(readStage(asset), stockroomType(stockroom))
     if (problem) return reply(response, 409, { error: problem })
     asset.setValue('stockroom', input.stockroom)
     asset.update()
@@ -180,7 +200,7 @@ export function pickAsset(request: RESTAPIRequest, response: RESTAPIResponse): v
 export function listStockrooms(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const stockroom = new GlideRecord('alm_stockroom')
-    stockroom.addQuery('x_daas_ham_stockroom_type', 'IN', 'central_depot,staging_centre')
+    stockroom.addQuery('x_daas_ham_stockroom_type', 'IN', RECEIVING_STOCKROOM_TYPES.join(','))
     stockroom.orderBy('name')
     stockroom.setLimit(500)
     stockroom.query()

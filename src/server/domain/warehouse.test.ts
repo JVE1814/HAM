@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ALL_STAGES, type Stage } from './lifecycle'
 import type { StockroomType } from './sourcing'
-import { awaitsReceipt, putAwayProblem } from './warehouse'
+import { awaitsReceipt, putAwayProblem, RECEIVING_STOCKROOM_TYPES, receivingProblem } from './warehouse'
 
 describe('awaitsReceipt', () => {
     it('accepts units bought but not yet in stock', () => {
@@ -13,6 +13,22 @@ describe('awaitsReceipt', () => {
         const others = ALL_STAGES.filter((stage) => stage !== 'in_transit' && stage !== 'on_order')
         expect(others.filter(awaitsReceipt)).toEqual([])
         expect(awaitsReceipt(null)).toBe(false)
+    })
+})
+
+describe('receivingProblem', () => {
+    it('receives arriving units into central depots and staging centres', () => {
+        expect(receivingProblem('central_depot')).toBeNull()
+        expect(receivingProblem('staging_centre')).toBeNull()
+    })
+
+    it("refuses a customer-site stockroom, which holds that Customer's own stock, saying where units go", () => {
+        expect(receivingProblem('customer_site')).toBe('Receive into a central depot or a staging centre')
+    })
+
+    it('lists exactly the types it receives into, for the stockroom picker', () => {
+        const TYPES: readonly StockroomType[] = ['central_depot', 'staging_centre', 'customer_site']
+        expect(TYPES.filter((type) => receivingProblem(type) === null)).toEqual([...RECEIVING_STOCKROOM_TYPES])
     })
 })
 
