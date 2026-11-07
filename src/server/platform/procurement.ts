@@ -1,12 +1,14 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { PurchaseResult } from '../domain/sourcing'
 import { PROPERTY, stagingStockroom } from './properties'
+import { str } from './records'
 
 /**
  * Purchase orders through the Procurement plugin (proc_po / proc_po_item), shipped to the staging
  * stockroom. Created in the "requested" status for a buyer to complete; field names follow the base
  * Procurement data model. Ship to is mandatory on a purchase order, so none is requested while no
- * staging stockroom is set; then, or when the PO is not inserted, a warning is logged and the result says why.
+ * staging stockroom is set; then, or when the PO or its line item is not inserted, a warning is logged and the
+ * result says why. A PO without its line item is removed (or, if it cannot be, named in the reason for cancelling).
  */
 export function requestPurchase(input: { modelId: string; quantity: number; description: string }): PurchaseResult {
     const shipTo = stagingStockroom()
@@ -25,8 +27,9 @@ export function requestPurchase(input: { modelId: string; quantity: number; desc
     item.setValue('model', input.modelId)
     item.setValue('ordered_quantity', input.quantity)
     item.setValue('status', 'requested')
-    item.insert()
-    return { ok: true, poId }
+    if (item.insert()) return { ok: true, poId }
+    const removed = po.deleteRecord()
+    return noPurchase(input.description, removed ? 'Procurement did not create its line item' : `Procurement created ${str(po, 'number')} without its line item; cancel it`)
 }
 
 /** Statuses after which a PO, or a single line item, no longer counts as open. */

@@ -1,6 +1,10 @@
+import type { VisibilityScope } from './visibility'
+
 /**
  * Entitlement: is an Order within the Customer's Agreement?
  *
+ * - Only an Order raiser raises an Order, a customer admin only for their own Customer, and it must name its
+ *   Customer's own Agreement and Site, and a Site template offered to it (`ownershipFindings`).
  * - Every Model must be a Catalog entry, or come from a catalogued Site template.
  * - Usage (deployed + in-flight) plus the request must not exceed a Contracted quantity.
  *   A model-specific quantity caps that model; a device-class quantity caps the class.
@@ -98,6 +102,64 @@ export function assessOrder(request: OrderRequest, context: EntitlementContext):
     const verdict: EntitlementVerdict =
         overQuota.length > 0 ? 'over_quota' : offCatalog.length > 0 ? 'off_catalog' : 'within_agreement'
     return { verdict, approvers: approversFor(verdict), findings }
+}
+
+/**
+ * A record an Order names, with the Customer it belongs to: '' for none (a Site template offered to every
+ * Customer), null when it cannot be read.
+ */
+export interface NamedRecord {
+    id: string
+    customerId: string | null
+}
+
+/** The Customer an Order is for and the records it names; a record the Order does not name is left out. */
+export interface OrderParties {
+    customerId: string
+    agreement?: NamedRecord
+    site?: NamedRecord & { isSite: boolean }
+    siteTemplate?: NamedRecord
+}
+
+/** The person raising an Order: whether they are an Order raiser at all, how far they see (ADR 0005) and their own Customer. */
+export interface Orderer {
+    mayRaise: boolean
+    scope: VisibilityScope
+    customerId: string
+}
+
+/**
+ * Why this person may not raise an Order for the Customer, or null when they may. Only Order raisers raise Orders, and
+ * site contacts never do; provider staff and the service desk raise them for any Customer, a customer admin only for
+ * their own.
+ */
+export function raiserRefusal(customerId: string, orderer: Orderer): string | null {
+    if (!orderer.mayRaise || orderer.scope === 'own_sites') return 'You may not raise orders'
+    if (orderer.scope === 'own_customer' && customerId !== orderer.customerId) return 'You can only order for your own customer'
+    return null
+}
+
+/** Whether the Order names no Site template, or one offered to its Customer or to every Customer. */
+export function siteTemplateOffered(order: OrderParties): boolean {
+    const offeredTo = order.siteTemplate?.customerId
+    return !order.siteTemplate || offeredTo === '' || offeredTo === order.customerId
+}
+
+/**
+ * Why an Order cannot go ahead as raised; empty when it can. The person must be allowed to raise it for its Customer
+ * (`raiserRefusal`), its Agreement and Site must be the Customer's own, and its Site template one offered to it.
+ */
+export function ownershipFindings(order: OrderParties, orderer: Orderer): string[] {
+    const refusal = raiserRefusal(order.customerId, orderer)
+    if (refusal) return [refusal]
+    if (!order.customerId) return ['Choose the customer']
+    const findings: string[] = []
+    if (!order.agreement) findings.push("Choose one of the customer's agreements")
+    else if (order.agreement.customerId !== order.customerId) findings.push("The agreement is not one of the customer's agreements")
+    if (!order.site) findings.push("Choose one of the customer's sites")
+    else if (!order.site.isSite || order.site.customerId !== order.customerId) findings.push("The site is not one of the customer's sites")
+    if (!siteTemplateOffered(order)) findings.push('The site template is not offered to the customer')
+    return findings
 }
 
 /** Who must approve an Order with this verdict. */

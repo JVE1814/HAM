@@ -78,6 +78,17 @@ export function planSourcing(request: SourcingRequest, stock: readonly StockCand
 /** What came of requesting a purchase: the purchase order created, or why there is none. */
 export type PurchaseResult = { ok: true; poId: string } | { ok: false; reason: string }
 
+/** What came of requesting a transfer order to the staging centre: the one created, or why there is none. */
+export type TransferResult = { ok: true; transferId: string } | { ok: false; reason: string }
+
+/** Picked stock left where it was, and no longer reserved, because no transfer order to the staging centre came of it. */
+export interface UnmovedStock {
+    units: number
+    /** The Stockroom it stays in. */
+    from: string
+    reason: string
+}
+
 /** Where sourcing leaves an Order line. */
 export interface ShortfallOutcome {
     stage: Extract<LineStage, 'sourced' | 'awaiting_stock'>
@@ -90,11 +101,24 @@ export interface ShortfallOutcome {
 
 /**
  * Where sourcing leaves an Order line once its shortfall is routed: sourced, unless the shortfall was
- * to be purchased and `purchase` (called only then) brings no purchase order, when the line waits for
- * stock and its summary says why; an OEM advance replacement is noted in the summary. `missing` is the
- * shortfall routed and `onOrder` the units already on the line's purchase order.
+ * to be purchased and `purchase` (called only then) brings no purchase order, or picked stock could not
+ * be moved to the staging centre (`unmoved`), when the line waits for stock and its summary says why; an
+ * OEM advance replacement is noted in the summary. `missing` is the shortfall routed and `onOrder` the
+ * units already on the line's purchase order. Unmoved stock is not part of `missing`: it is still there,
+ * so it is not bought, and the line picks it again when it is next sourced.
  */
-export function shortfallOutcome(route: ShortfallRoute, line: { planSummary: string; missing: number; onOrder: number }, purchase: () => PurchaseResult): ShortfallOutcome {
+export function shortfallOutcome(
+    route: ShortfallRoute,
+    line: { planSummary: string; missing: number; onOrder: number; unmoved?: readonly UnmovedStock[] },
+    purchase: () => PurchaseResult,
+): ShortfallOutcome {
+    const outcome = routedOutcome(route, line, purchase)
+    if (!line.unmoved?.length) return outcome
+    const notes = line.unmoved.map((stock) => `no transfer order for ${stock.units} from ${stock.from}: ${stock.reason}`)
+    return { ...outcome, stage: 'awaiting_stock', summary: `${outcome.summary} (${notes.join('; ')})` }
+}
+
+function routedOutcome(route: ShortfallRoute, line: { planSummary: string; missing: number; onOrder: number }, purchase: () => PurchaseResult): ShortfallOutcome {
     const sourced = { stage: 'sourced', summary: line.planSummary, quantityToPurchase: line.onOrder } as const
     if (route === 'none') return sourced
     if (route === 'oem_advance_replacement') return { ...sourced, summary: `${line.planSummary} (OEM advance replacement under RMA)` }

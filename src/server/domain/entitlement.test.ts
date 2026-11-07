@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assessOrder, type EntitlementContext } from './entitlement'
+import { assessOrder, ownershipFindings, raiserRefusal, siteTemplateOffered, type EntitlementContext, type Orderer, type OrderParties } from './entitlement'
 
 const context: EntitlementContext = {
     catalog: [
@@ -86,5 +86,104 @@ describe('replacement lines', () => {
             { ...context, usage: [{ deviceClass: 'switch', modelId: 'c9300', count: 10 }] },
         )
         expect(result).toEqual({ verdict: 'within_agreement', approvers: [], findings: [] })
+    })
+})
+
+describe('ownershipFindings', () => {
+    const order: OrderParties = {
+        customerId: 'acme',
+        agreement: { id: 'acme-agreement', customerId: 'acme' },
+        site: { id: 'acme-hq', customerId: 'acme', isSite: true },
+        siteTemplate: { id: 'acme-branch', customerId: 'acme' },
+    }
+    const staff: Orderer = { mayRaise: true, scope: 'everything', customerId: 'provider' }
+    const acmeAdmin: Orderer = { mayRaise: true, scope: 'own_customer', customerId: 'acme' }
+
+    it("accepts an order naming the customer's own agreement, site and site template", () => {
+        expect(ownershipFindings(order, staff)).toEqual([])
+        expect(ownershipFindings(order, acmeAdmin)).toEqual([])
+        expect(ownershipFindings({ ...order, siteTemplate: undefined }, acmeAdmin)).toEqual([])
+    })
+
+    it('accepts a site template offered to every customer', () => {
+        expect(ownershipFindings({ ...order, siteTemplate: { id: 'small-branch', customerId: '' } }, staff)).toEqual([])
+    })
+
+    it("refuses another customer's agreement, site or site template, even from provider staff", () => {
+        const globex: OrderParties = {
+            customerId: 'acme',
+            agreement: { id: 'globex-agreement', customerId: 'globex' },
+            site: { id: 'globex-dc', customerId: 'globex', isSite: true },
+            siteTemplate: { id: 'globex-campus', customerId: 'globex' },
+        }
+        expect(ownershipFindings(globex, staff)).toEqual([
+            "The agreement is not one of the customer's agreements",
+            "The site is not one of the customer's sites",
+            'The site template is not offered to the customer',
+        ])
+    })
+
+    it('refuses records it cannot read, and a location that is not a site', () => {
+        const unread: OrderParties = {
+            customerId: 'acme',
+            agreement: { id: 'hidden', customerId: null },
+            site: { id: 'acme-mdf', customerId: 'acme', isSite: false },
+            siteTemplate: { id: 'gone', customerId: null },
+        }
+        expect(ownershipFindings(unread, staff)).toEqual([
+            "The agreement is not one of the customer's agreements",
+            "The site is not one of the customer's sites",
+            'The site template is not offered to the customer',
+        ])
+    })
+
+    it('asks for the customer, agreement and site when the order names none', () => {
+        expect(ownershipFindings({ customerId: '' }, staff)).toEqual(['Choose the customer'])
+        expect(ownershipFindings({ customerId: 'acme' }, staff)).toEqual(["Choose one of the customer's agreements", "Choose one of the customer's sites"])
+    })
+
+    it('lets a customer admin order only for their own customer', () => {
+        const globexOrder: OrderParties = {
+            customerId: 'globex',
+            agreement: { id: 'globex-agreement', customerId: 'globex' },
+            site: { id: 'globex-dc', customerId: 'globex', isSite: true },
+        }
+        expect(ownershipFindings(globexOrder, acmeAdmin)).toEqual(['You can only order for your own customer'])
+        expect(ownershipFindings({ customerId: '' }, acmeAdmin)).toEqual(['You can only order for your own customer'])
+        expect(ownershipFindings(order, { ...acmeAdmin, customerId: '' })).toEqual(['You can only order for your own customer'])
+        expect(ownershipFindings(globexOrder, staff)).toEqual([])
+    })
+
+    it('lets the service desk, who see no slice of their own, order for any customer', () => {
+        expect(ownershipFindings(order, { mayRaise: true, scope: 'unscoped', customerId: '' })).toEqual([])
+    })
+
+    it('refuses anyone who is not an order raiser, however much they see', () => {
+        for (const scope of ['everything', 'assigned_stockrooms', 'own_customer', 'unscoped'] as const) {
+            expect(ownershipFindings(order, { mayRaise: false, scope, customerId: 'acme' })).toEqual(['You may not raise orders'])
+        }
+    })
+
+    it('refuses site contacts, even with a role that raises orders', () => {
+        expect(ownershipFindings(order, { mayRaise: true, scope: 'own_sites', customerId: 'acme' })).toEqual(['You may not raise orders'])
+    })
+})
+
+describe('raiserRefusal', () => {
+    it('is about who raises the order for which customer, not the records it names', () => {
+        expect(raiserRefusal('acme', { mayRaise: true, scope: 'own_customer', customerId: 'acme' })).toBeNull()
+        expect(raiserRefusal('globex', { mayRaise: true, scope: 'everything', customerId: 'provider' })).toBeNull()
+        expect(raiserRefusal('globex', { mayRaise: true, scope: 'own_customer', customerId: 'acme' })).toBe('You can only order for your own customer')
+        expect(raiserRefusal('acme', { mayRaise: false, scope: 'everything', customerId: 'provider' })).toBe('You may not raise orders')
+    })
+})
+
+describe('siteTemplateOffered', () => {
+    it("holds for no site template, one offered to every customer and the customer's own, not for another's or one it cannot read", () => {
+        expect(siteTemplateOffered({ customerId: 'acme' })).toBe(true)
+        expect(siteTemplateOffered({ customerId: 'acme', siteTemplate: { id: 'small-branch', customerId: '' } })).toBe(true)
+        expect(siteTemplateOffered({ customerId: 'acme', siteTemplate: { id: 'acme-branch', customerId: 'acme' } })).toBe(true)
+        expect(siteTemplateOffered({ customerId: 'acme', siteTemplate: { id: 'globex-campus', customerId: 'globex' } })).toBe(false)
+        expect(siteTemplateOffered({ customerId: 'acme', siteTemplate: { id: 'gone', customerId: null } })).toBe(false)
     })
 })

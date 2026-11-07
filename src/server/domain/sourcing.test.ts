@@ -79,6 +79,25 @@ describe('shortfallOutcome', () => {
             })
         }
     })
+
+    it('leaves the line waiting for stock, saying why, when picked stock could not be moved to staging', () => {
+        const unmoved = [
+            { units: 2, from: 'North', reason: 'not created' },
+            { units: 1, from: 'South', reason: 'lines missing' },
+        ]
+        expect(shortfallOutcome('none', { ...line, missing: 0, unmoved }, purchase())).toEqual({
+            stage: 'awaiting_stock',
+            summary: '1 from central stock, 2 to purchase (no transfer order for 2 from North: not created; no transfer order for 1 from South: lines missing)',
+            quantityToPurchase: 3,
+        })
+    })
+
+    it('still buys the real shortfall when picked stock could not be moved', () => {
+        const buy = purchase()
+        const outcome = shortfallOutcome('purchase', { ...line, unmoved: [{ units: 1, from: 'Depot North', reason: 'Inventory did not create it' }] }, buy)
+        expect(outcome).toMatchObject({ stage: 'awaiting_stock', purchaseOrder: 'po1', quantityToPurchase: 5 })
+        expect(buy).toHaveBeenCalledOnce()
+    })
 })
 
 describe('sparePoolShortfall', () => {

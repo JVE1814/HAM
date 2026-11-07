@@ -1,9 +1,20 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { groupDecisions, rollupApprovals } from '../domain/approvals'
 import { appendTo } from '../domain/collections'
-import { approversFor, assessOrder, type EntitlementVerdict, type RequestedLine } from '../domain/entitlement'
+import {
+    approversFor,
+    assessOrder,
+    ownershipFindings,
+    raiserRefusal,
+    siteTemplateOffered,
+    type EntitlementVerdict,
+    type NamedRecord,
+    type Orderer,
+    type OrderParties,
+    type RequestedLine,
+} from '../domain/entitlement'
 import { shortfallRoute } from '../domain/returns'
-import { planSourcing, shortfallOutcome } from '../domain/sourcing'
+import { planSourcing, shortfallOutcome, type Source, type UnmovedStock } from '../domain/sourcing'
 import { entitlementContext } from '../platform/agreements'
 import { approvalsOf, cancelPendingApprovals, customerAdminIds, providerApproverIds, requestApproval } from '../platform/approvals'
 import { moveAndSave, moveAsset, readStage } from '../platform/assets'
@@ -14,6 +25,7 @@ import { openOemRma, openRmaCount } from '../platform/oem-rma'
 import { requestPurchase } from '../platform/procurement'
 import { PROPERTY, stagingStockroom, stringProperty } from '../platform/properties'
 import { bool, count, findById, num, str } from '../platform/records'
+import { currentSession } from '../platform/session'
 import { openStagingTask } from '../platform/staging-tasks'
 import { reserveAsset, stockCandidates } from '../platform/stock'
 import { requestTransfer } from '../platform/transfers'
@@ -33,17 +45,26 @@ interface DeviceRow {
 }
 
 /**
- * Record producer post-insert script: create the lines and submit the Order.
+ * Record producer post-insert script: create the lines and submit the Order. The producer does not apply the Order
+ * create rule, so an Order its requester may not raise for that Customer is removed again. One that names records
+ * that are not its Customer's stays a draft to correct, without the lines of a Site template not offered to it.
  * (`current` is typed unknown because the SDK passes its own GlideRecord type here.)
  */
 export function afterOrderProduced(producer: Record<string, unknown>, current: unknown): void {
     const order = current as GlideRecord
-    const siteTemplateId = str(order, 'site_template')
-    if (siteTemplateId) addLinesFromSiteTemplate(order.getUniqueValue(), siteTemplateId)
+    const parties = orderParties(order)
+    const raiser = orderingUser(order)
+    const refusal = raiserRefusal(parties.customerId, raiser)
+    if (refusal) {
+        gs.addErrorMessage(`Order not raised. ${refusal}.`)
+        order.deleteRecord()
+        return
+    }
+    if (parties.siteTemplate && siteTemplateOffered(parties)) addLinesFromSiteTemplate(order.getUniqueValue(), parties.siteTemplate.id)
     for (const row of parseRows(producer.devices)) {
         if (row.model) addLine(order.getUniqueValue(), String(row.model), Math.max(1, Number(row.quantity) || 1), false)
     }
-    submitOrder(order)
+    submitAsRaised(order, parties, raiser)
 }
 
 function parseRows(value: unknown): DeviceRow[] {
@@ -73,12 +94,58 @@ function addLine(orderId: string, modelId: string, quantity: number, fromSiteTem
     line.insert()
 }
 
-/** UI action "Submit" on a draft Order, and the end of the record producer. */
-export function submitOrder(order: GlideRecord): void {
+/** The signed-in user as the raiser of `order`: an Order raiser when the Order create rule lets them create it. */
+function orderingUser(order: GlideRecord): Orderer {
+    const { scope, customerId } = currentSession()
+    return { mayRaise: order.canCreate(), scope, customerId }
+}
+
+/**
+ * The records the Order names and whose they are, read as the signed-in user: the visibility rules (ADR 0005) hide
+ * another Customer's Agreement from a customer contact, so it reads as belonging to no one they may order for.
+ */
+function orderParties(order: GlideRecord): OrderParties {
+    const named = (field: string, table: string, customerField: string): NamedRecord | undefined => {
+        const id = str(order, field)
+        if (!id) return undefined
+        const record = findById(table, id)
+        return { id, customerId: record ? str(record, customerField) : null }
+    }
+    const site = named('site', 'cmn_location', 'company')
+    return {
+        customerId: str(order, 'customer'),
+        agreement: named('agreement', 'x_daas_ham_agreement', 'customer'),
+        site: site && { ...site, isSite: bool(order, 'site.x_daas_ham_is_site') },
+        siteTemplate: named('site_template', 'x_daas_ham_site_template', 'customer'),
+    }
+}
+
+/**
+ * UI action "Submit" on a draft Order, and the end of break-fix and refresh Orders. Returns whether the Order went
+ * ahead (to approval or sourcing); otherwise it stays a draft.
+ */
+export function submitOrder(order: GlideRecord): boolean {
+    return submitAsRaised(order, orderParties(order), orderingUser(order))
+}
+
+/**
+ * Submit the Order unless it cannot go ahead as raised (domain/entitlement `ownershipFindings`); then it stays a
+ * draft, and the user is told why and the reasons are noted on it.
+ */
+function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Orderer): boolean {
+    const findings = ownershipFindings(parties, raiser)
+    if (findings.length === 0) return submitAccepted(order)
+    gs.addErrorMessage(`Order not submitted. ${findings.join('. ')}.`)
+    order.setValue('work_notes', `Not submitted:\n${findings.join('\n')}`)
+    order.update()
+    return false
+}
+
+function submitAccepted(order: GlideRecord): boolean {
     const lines = requestedLines(order.getUniqueValue())
     if (lines.length === 0) {
         gs.addErrorMessage('Add at least one order line before submitting')
-        return
+        return false
     }
     const assessment = assessOrder(
         { siteTemplateId: str(order, 'site_template') || undefined, lines },
@@ -89,7 +156,7 @@ export function submitOrder(order: GlideRecord): void {
 
     if (assessment.approvers.length === 0) {
         startSourcing(order)
-        return
+        return true
     }
     order.setValue('stage', 'awaiting_approval')
     order.setValue('approval', 'requested')
@@ -100,6 +167,7 @@ export function submitOrder(order: GlideRecord): void {
         order.update()
     }
     for (const approverId of approvers) requestApproval(order, approverId)
+    return true
 }
 
 function requestedLines(orderId: string): RequestedLine[] {
@@ -187,10 +255,11 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
     )
 
     const stagingId = stagingStockroom()
-    const toTransfer = new Map<string, Array<{ assetId: string; modelId: string }>>()
+    const reservation = { orderLineId: line.getUniqueValue(), customerId, agreementId: str(order, 'agreement') }
+    const toStage: GlideRecord[] = []
+    const toTransfer = new Map<string, Array<{ asset: GlideRecord; source: Source }>>()
     let reserved = 0
     for (const pick of plan.picks) {
-        const reservation = { orderLineId: line.getUniqueValue(), customerId, agreementId: str(order, 'agreement') }
         if (pick.source === 'customer_site_stock') {
             if (linkHotSpare(pick.assetId, reservation)) reserved++
             continue
@@ -199,16 +268,32 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
         if (!asset) continue
         reserved++
         const from = str(asset, 'stockroom')
-        if (stagingId && from && from !== stagingId) appendTo(toTransfer, from, { assetId: pick.assetId, modelId })
+        if (stagingId && from && from !== stagingId) appendTo(toTransfer, from, { asset, source: pick.source })
+        else toStage.push(asset)
+    }
+    // Stock outside the staging centre is only staged once its transfer order exists; without one it goes back.
+    const transfers: string[] = []
+    const unmoved: UnmovedStock[] = []
+    let released = 0
+    for (const [from, picked] of toTransfer) {
+        const transfer = requestTransfer({ fromStockroomId: from, toStockroomId: stagingId, assets: picked.map(({ asset }) => ({ assetId: asset.getUniqueValue(), modelId })) })
+        if (transfer.ok) {
+            transfers.push(transfer.transferId)
+            toStage.push(...picked.map(({ asset }) => asset))
+            continue
+        }
+        unmoved.push({ units: picked.length, from: picked[0].asset.getDisplayValue('stockroom'), reason: transfer.reason })
+        for (const { asset, source } of picked) unreserve(asset, source)
+        released += picked.length
+    }
+    for (const asset of toStage) {
         openStagingTask(asset, line.getUniqueValue())
         moveAndSave(asset, 'staging', 'sourcing')
     }
-    const transfers = [...toTransfer].map(([from, assets]) =>
-        requestTransfer({ fromStockroomId: from, toStockroomId: stagingId, assets }),
-    )
     if (transfers.length > 0) {
         line.setValue('transfer_orders', [str(line, 'transfer_orders'), ...transfers].filter(Boolean).join(','))
     }
+    // Unmoved stock is not bought (see shortfallOutcome).
     const toPurchase = shortfall - reserved
     // Only a break-fix line for the same Model can be served by the OEM's advance replacement; a
     // refresh line also names the Asset it replaces, but that Asset is healthy.
@@ -228,9 +313,9 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
             quantity: toPurchase,
             description: `${str(order, 'number')} ${str(line, 'number')}: ${toPurchase} x ${str(line, 'model.display_name')}`,
         })
-    const outcome = shortfallOutcome(route, { planSummary: plan.summary, missing: toPurchase, onOrder }, purchase)
+    const outcome = shortfallOutcome(route, { planSummary: plan.summary, missing: toPurchase, onOrder, unmoved }, purchase)
     if (outcome.purchaseOrder) line.setValue('purchase_order', outcome.purchaseOrder)
-    line.setValue('quantity_allocated', allocated + reserved)
+    line.setValue('quantity_allocated', allocated + reserved - released)
     line.setValue('quantity_to_purchase', outcome.quantityToPurchase)
     line.setValue('sourcing_summary', outcome.summary)
     line.setValue('line_stage', outcome.stage)
@@ -254,6 +339,18 @@ function linkHotSpare(assetId: string, reservation: { orderLineId: string; custo
     asset.setValue('x_daas_ham_agreement', reservation.agreementId)
     asset.update()
     return true
+}
+
+/** Put back stock reserved for a line but never moved to staging: Spare-pool stock to the pool, the rest to free stock. */
+function unreserve(asset: GlideRecord, source: Source): void {
+    asset.setValue('x_daas_ham_order_line', '')
+    if (source === 'spare_pool') {
+        moveAndSave(asset, 'spare_pool', 'no transfer order')
+        return
+    }
+    asset.setValue('company', stringProperty(PROPERTY.providerCompany))
+    asset.setValue('x_daas_ham_agreement', '')
+    moveAndSave(asset, 'available', 'no transfer order')
 }
 
 /** Give an allocated Asset back to stock: hot spares stay in the Spare pool, the rest become free stock. */
