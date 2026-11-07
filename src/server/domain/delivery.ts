@@ -1,4 +1,10 @@
-/** Shipping an Order to its Site: when "Ship" is refused, what label it buys and what on-site work it opens (P1.7). */
+import type { Stage } from './lifecycle'
+import { INSTALLED_STAGES } from './returns'
+
+/**
+ * Shipping an Order to its Site: when "Ship" is refused, what label it buys and what on-site work it opens, and when
+ * install completion takes a replaced Asset out of service (P1.7).
+ */
 
 export type OrderType = 'site_rollout' | 'device_add' | 'device_replace' | 'temporary' | 'refresh'
 export type InstallMode = 'fsm_engineer' | 'self_install' | 'subcontractor' | 'remote_hands'
@@ -66,4 +72,20 @@ function onSiteWork({ orderType, installMode }: ShipFacts): OnSiteWork {
         purpose: orderType === 'device_replace' || orderType === 'refresh' ? 'swap' : 'install',
         subcontracted: installMode === 'subcontractor' || installMode === 'remote_hands',
     }
+}
+
+/** A line that replaces an Asset (break-fix, refresh): its quantity and the stages of the units allocated to it. */
+export interface ReplacementLine {
+    quantity: number
+    assetStages: ReadonlyArray<Stage | null>
+}
+
+/**
+ * Whether a replacing line's own units are installed (pending in service or further), so the Asset it replaces may
+ * come out of service. Decided per line: a replacement the platform refused to move is still shipped, and the unit it
+ * replaces keeps serving the Site until confirming again installs it. A line with no quantity replaces nothing.
+ */
+export function replacementInstalled(line: ReplacementLine): boolean {
+    const installed = line.assetStages.filter((stage) => stage !== null && INSTALLED_STAGES.includes(stage)).length
+    return line.quantity > 0 && installed >= line.quantity
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { planShipment, type InstallMode, type OrderType, type ShipFacts } from './delivery'
+import { planShipment, replacementInstalled, type InstallMode, type OrderType, type ShipFacts } from './delivery'
 
 const order: ShipFacts = {
     orderType: 'site_rollout',
@@ -154,5 +154,34 @@ describe('planShipment', () => {
             labelPackages: 2,
             onSiteWork: { changeType: 'normal', purpose: 'install', subcontracted: false },
         })
+    })
+})
+
+describe('replacementInstalled', () => {
+    it('lets the replaced Asset go once its own replacement is installed, now or by an earlier completion', () => {
+        expect(replacementInstalled({ quantity: 1, assetStages: ['pending_in_service'] })).toBe(true)
+        expect(replacementInstalled({ quantity: 1, assetStages: ['in_service'] })).toBe(true)
+        expect(replacementInstalled({ quantity: 1, assetStages: ['temporary_deployment'] })).toBe(true)
+    })
+
+    it('keeps the replaced Asset in service while its replacement is refused or not yet delivered', () => {
+        expect(replacementInstalled({ quantity: 1, assetStages: ['shipped'] })).toBe(false)
+        expect(replacementInstalled({ quantity: 1, assetStages: ['spare_pool'] })).toBe(false)
+        expect(replacementInstalled({ quantity: 1, assetStages: ['staged'] })).toBe(false)
+        expect(replacementInstalled({ quantity: 1, assetStages: [] })).toBe(false)
+    })
+
+    it('does not count a replacement unit that left the line, such as a dead-on-arrival swap-back', () => {
+        expect(replacementInstalled({ quantity: 1, assetStages: ['pending_return', 'shipped'] })).toBe(false)
+        expect(replacementInstalled({ quantity: 1, assetStages: ['pending_return', 'pending_in_service'] })).toBe(true)
+    })
+
+    it('waits for every unit of a line replacing with more than one', () => {
+        expect(replacementInstalled({ quantity: 2, assetStages: ['pending_in_service', 'shipped'] })).toBe(false)
+        expect(replacementInstalled({ quantity: 2, assetStages: ['pending_in_service', 'in_service'] })).toBe(true)
+    })
+
+    it('replaces nothing from a line with no quantity', () => {
+        expect(replacementInstalled({ quantity: 0, assetStages: [] })).toBe(false)
     })
 })

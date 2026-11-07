@@ -1,13 +1,13 @@
 import { GlideDateTime, GlideRecord, GlideSchedule, gs } from '@servicenow/glide'
-import { planShipment, type InstallMode, type OnSiteWork, type OrderType } from '../domain/delivery'
+import { planShipment, replacementInstalled, type InstallMode, type OnSiteWork, type OrderType } from '../domain/delivery'
 import { isDeployed, stagesQuery } from '../domain/lifecycle'
 import { checkJobWindow } from '../domain/scheduling'
 import { moveAndSave, moveAsset, readStage } from '../platform/assets'
 import { glideToMs } from '../platform/clock'
 import { openFieldWork, type WorkContext } from '../platform/field-work'
-import { recomputeOrder } from '../platform/fulfilment'
+import { lineAssetStages, recomputeOrder } from '../platform/fulfilment'
 import { withLock, type HeldLock } from '../platform/locks'
-import { findById, refusal, str } from '../platform/records'
+import { findById, num, refusal, str } from '../platform/records'
 import { returnReplacedAssets } from './returns'
 import { labelOrder, shippingEnabled } from './shipping'
 
@@ -156,7 +156,8 @@ function openOnSiteWork(order: GlideRecord, work: OnSiteWork): void {
 
 /**
  * UI action "Confirm installed" and the FSM work-order completion rule. How many units the platform refused to move
- * (logged): they and their line stay where they were, so confirming again retries only them.
+ * (logged): they and their line stay where they were, and so does the Asset their line replaces, so confirming again
+ * retries only them and then retires it.
  */
 export function completeInstall(order: GlideRecord): number {
     const now = new GlideDateTime().getValue()
@@ -174,7 +175,11 @@ export function completeInstall(order: GlideRecord): number {
     return refused
 }
 
-/** The Assets an Order replaced (break-fix, refresh) come out of service and go back on a Return order. */
+/**
+ * The Assets an Order replaced (break-fix, refresh) come out of service and go back on a Return order, each once its
+ * own line's replacement is installed: retired beside a replacement still shipped, the Site would lose the device.
+ * The line's units are read past the user's before-query rules, as when its stage is derived (ADR 0005).
+ */
 function retireReplacedAssets(order: GlideRecord): void {
     const line = new GlideRecord('x_daas_ham_order_line')
     line.addQuery('order', order.getUniqueValue())
@@ -182,6 +187,8 @@ function retireReplacedAssets(order: GlideRecord): void {
     line.query()
     const replaced: string[] = []
     while (line.next()) {
+        const replacement = { quantity: num(line, 'quantity'), assetStages: lineAssetStages(line.getUniqueValue()) }
+        if (!replacementInstalled(replacement)) continue
         const asset = findById('alm_hardware', str(line, 'replaces_asset'))
         const stage = asset ? readStage(asset) : null
         // Already pending return: an earlier completion (UI action, then work order close) raised it.

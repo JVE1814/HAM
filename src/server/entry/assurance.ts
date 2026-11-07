@@ -231,6 +231,14 @@ function lastAttestedOn(siteId: string): string | undefined {
     return last.next() ? glideToIsoDate(str(last, 'attested_at')) : undefined
 }
 
+/** The task states an attestation takes: pending while its Assets are listed, open to answer, closed once attested. */
+const ATTESTATION_STATE = { pending: -5, open: 1, closed: 3 } as const
+
+/**
+ * Raise the Site's attestation, pending until every installed Asset is listed on it: submitted without one, it would
+ * confirm the Site without that Asset. One whose item (or opening) the platform refuses is removed with its items, so
+ * none is open and the next run raises it whole; one the platform keeps stays pending, never closed, to cancel.
+ */
 function openAttestation(agreement: GlideRecord, siteId: string): void {
     const customerId = str(agreement, 'customer')
     const attestation = new GlideRecord('x_daas_ham_attestation')
@@ -240,26 +248,40 @@ function openAttestation(agreement: GlideRecord, siteId: string): void {
     attestation.setValue('agreement', agreement.getUniqueValue())
     attestation.setValue('assigned_to', customerAdminIds(customerId)[0] ?? '')
     attestation.setValue('short_description', 'Confirm the equipment installed at your site')
-    attestation.setValue('state', 1)
+    attestation.setValue('state', ATTESTATION_STATE.pending)
     const attestationId = attestation.insert()
     // Refused: none is open at the Site, so the next run raises it again.
     if (!attestationId) return void gs.warn(`[x_daas_ham] No attestation for site ${siteId}: ${refusal(attestation)}`)
-    const number = str(attestation, 'number')
-    for (const assetId of installedAssetIds({ siteId })) {
+    let why = listAttested(attestationId, installedAssetIds({ siteId }))
+    if (!why) {
+        attestation.setValue('state', ATTESTATION_STATE.open)
+        if (attestation.update()) return
+        why = `not opened: ${refusal(attestation)}`
+    }
+    const kept = attestation.deleteRecord() ? '' : `; ${str(attestation, 'number')} stays pending, cancel it`
+    gs.warn(`[x_daas_ham] No attestation for site ${siteId}: ${why}${kept}`)
+}
+
+/** List each Asset on the attestation; why the platform refused the first one it left off ('' when all are listed). */
+function listAttested(attestationId: string, assetIds: readonly string[]): string {
+    for (const assetId of assetIds) {
         const item = new GlideRecord('x_daas_ham_attestation_item')
         item.initialize()
         item.setValue('attestation', attestationId)
         item.setValue('asset', assetId)
-        // The Customer cannot confirm an Asset left off: logged, so its absence is not taken for a confirmation.
-        if (!item.insert()) gs.warn(`[x_daas_ham] Asset ${assetId} left off ${number}: ${refusal(item)}`)
+        if (!item.insert()) return `asset ${assetId} not listed: ${refusal(item)}`
     }
+    return ''
 }
 
 /**
- * Close an attestation answered by the customer; assets reported missing become exceptions. Why the platform refused
- * to close it ('' once closed): it stays open to submit again, which raises no exception twice (openException).
+ * Close an attestation answered by the customer; assets reported missing become exceptions. Why it was not closed
+ * ('' once closed): one still pending may not list every installed Asset (openAttestation), and one the platform
+ * refuses to close stays open to submit again, which raises no exception twice (openException).
  */
 export function completeAttestation(attestation: GlideRecord): string {
+    const number = str(attestation, 'number')
+    if (num(attestation, 'state') === ATTESTATION_STATE.pending) return notClosed(number, 'it may not list every asset')
     const item = new GlideRecord('x_daas_ham_attestation_item')
     item.addQuery('attestation', attestation.getUniqueValue())
     item.addQuery('response', 'missing')
@@ -268,15 +290,17 @@ export function completeAttestation(attestation: GlideRecord): string {
         openException('attested_missing', {
             assetId: str(item, 'asset'),
             customerId: str(attestation, 'customer'),
-            detail: `Reported not present in ${str(attestation, 'number')}`,
+            detail: `Reported not present in ${number}`,
         })
     }
     attestation.setValue('attested_by', gs.getUserID())
     attestation.setValue('attested_at', new GlideDateTime().getValue())
-    attestation.setValue('state', 3)
-    if (attestation.update()) return ''
-    const reason = refusal(attestation)
-    gs.warn(`[x_daas_ham] Attestation ${str(attestation, 'number')} not closed: ${reason}`)
+    attestation.setValue('state', ATTESTATION_STATE.closed)
+    return attestation.update() ? '' : notClosed(number, refusal(attestation))
+}
+
+function notClosed(number: string, reason: string): string {
+    gs.warn(`[x_daas_ham] Attestation ${number} not closed: ${reason}`)
     return reason
 }
 
