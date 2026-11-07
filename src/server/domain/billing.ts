@@ -51,36 +51,66 @@ export interface ServiceInterval {
     count?: number
 }
 
+/** What a Subscription line is billed by, as stored on it. */
 export interface SubscriptionLineTerms {
-    lineType: 'site_package' | 'device_class'
+    /** As stored. 'site_package' bills its own dates, 'device_class' its Service intervals; any other value bills nothing. */
+    lineType: string
     monthlyRate: number
+    /** The package's Site ('' on a per-device line). */
     siteId: string
+    /** The Subscription line's own description. */
+    description: string
     start?: string
     end?: string
 }
 
+/** What one Subscription line bills at one Site for the month: the content of its Billing line. */
 export interface Charge {
     siteId: string
+    /** '<line description> - <Site name>', or just the line description when the Site has no name. */
+    description: string
     /** Days for a site package; device-days for a per-device line. */
     units: number
     amount: number
 }
 
+/** What a charge is drafted from beyond the line itself, read only when the line's type needs it. */
+export interface ChargeSources {
+    /** The line's Service intervals overlapping the month. Called at most once, and only for a 'device_class' line. */
+    intervals(): readonly ServiceInterval[]
+    /** A Site's name; '' for '' or an unknown Site. */
+    siteName(siteId: string): string
+}
+
 /**
- * What a Subscription line costs for a month: a site package by its own active days, a per-device
- * line by the device-days its Assets were in service, per Site.
+ * The charges (one per Site) a Subscription line produces for the month: a site package by its own
+ * active days, a per-device line by the device-days its Assets were in service, per Site.
  */
-export function subscriptionCharges(line: SubscriptionLineTerms, intervals: readonly ServiceInterval[], bounds: MonthBounds): Charge[] {
+export function subscriptionCharges(line: SubscriptionLineTerms, bounds: MonthBounds, sources: ChargeSources): Charge[] {
+    return [...unitsBySite(line, bounds, sources)].map(([siteId, units]) => {
+        const name = sources.siteName(siteId)
+        return {
+            siteId,
+            description: name ? `${line.description} - ${name}` : line.description,
+            units,
+            amount: prorate(line.monthlyRate, units, bounds.days),
+        }
+    })
+}
+
+/** The units the line bills per Site, in order of first appearance; Sites with none are left out. */
+function unitsBySite(line: SubscriptionLineTerms, bounds: MonthBounds, sources: ChargeSources): Map<string, number> {
+    const bySite = new Map<string, number>()
     if (line.lineType === 'site_package') {
         const units = line.start ? activeDays(bounds, line.start, line.end) : 0
-        return units > 0 ? [{ siteId: line.siteId, units, amount: prorate(line.monthlyRate, units, bounds.days) }] : []
+        if (units > 0) bySite.set(line.siteId, units)
+    } else if (line.lineType === 'device_class') {
+        for (const interval of sources.intervals()) {
+            const units = activeDays(bounds, interval.start, interval.end) * (interval.count ?? 1)
+            if (units > 0) bySite.set(interval.siteId, (bySite.get(interval.siteId) ?? 0) + units)
+        }
     }
-    const unitsBySite = new Map<string, number>()
-    for (const interval of intervals) {
-        const units = activeDays(bounds, interval.start, interval.end) * (interval.count ?? 1)
-        if (units > 0) unitsBySite.set(interval.siteId, (unitsBySite.get(interval.siteId) ?? 0) + units)
-    }
-    return [...unitsBySite].map(([siteId, units]) => ({ siteId, units, amount: prorate(line.monthlyRate, units, bounds.days) }))
+    return bySite
 }
 
 /** RFC 4180 CSV: fields with commas, quotes or line breaks are quoted, quotes doubled. */

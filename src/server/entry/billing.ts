@@ -2,7 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideAggregate, GlideDateTime, GlideRecord, GlideSysAttachment, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { monthBounds, overlapsMonth, previousMonth, subscriptionCharges, toCsv, type MonthBounds, type ServiceInterval, type SubscriptionLineTerms } from '../domain/billing'
+import { monthBounds, overlapsMonth, previousMonth, subscriptionCharges, toCsv, type MonthBounds, type ServiceInterval } from '../domain/billing'
 import { ROLE } from '../domain/visibility'
 import { runEventTableJob } from '../platform/chunked'
 import { todayIso } from '../platform/clock'
@@ -47,28 +47,27 @@ export function generateBillingLines(event: GlideRecord, current: GlideRecord): 
         query: `status!=pending^${overlapsMonth(bounds)}`,
         read: (line) => ({
             terms: {
-                lineType: str(line, 'line_type') as SubscriptionLineTerms['lineType'],
+                lineType: str(line, 'line_type'),
                 monthlyRate: num(line, 'monthly_rate'),
                 siteId: str(line, 'site'),
+                description: str(line, 'description'),
                 start: str(line, 'start_date') || undefined,
                 end: str(line, 'end_date') || undefined,
             },
             customerId: str(line, 'customer'),
             agreementId: str(line, 'agreement'),
-            description: str(line, 'description'),
             currency: str(line, 'currency') || 'EUR',
         }),
         handle: (line, lineId) => {
-            const intervals = line.terms.lineType === 'device_class' ? intervalsOf(lineId, bounds) : []
-            for (const charge of subscriptionCharges(line.terms, intervals, bounds)) {
-                const name = siteName(charge.siteId, siteNames)
+            const sources = { intervals: () => intervalsOf(lineId, bounds), siteName: (siteId: string) => siteName(siteId, siteNames) }
+            for (const charge of subscriptionCharges(line.terms, bounds, sources)) {
                 insertLine(period, {
                     kind: 'subscription',
                     customer: line.customerId,
                     agreement: line.agreementId,
                     subscription_line: lineId,
                     site: charge.siteId,
-                    description: name ? `${line.description} - ${name}` : line.description,
+                    description: charge.description,
                     units: charge.units,
                     monthly_rate: line.terms.monthlyRate,
                     amount: charge.amount,

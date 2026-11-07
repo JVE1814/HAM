@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activeDays, monthBounds, overlapsMonth, previousMonth, prorate, subscriptionCharges, toCsv } from './billing'
+import { activeDays, monthBounds, overlapsMonth, previousMonth, prorate, subscriptionCharges, toCsv, type ChargeSources, type ServiceInterval } from './billing'
 
 const nov = monthBounds('2026-11')
 const feb = monthBounds('2028-02')
@@ -52,62 +52,120 @@ describe('prorate', () => {
     })
 })
 
+const SITE_NAMES: { [siteId: string]: string } = { hq: 'Head office', store: 'Store 12' }
+
+/** Sources with these Service intervals and the Site names above, counting the intervals reads. */
+function sources(intervals: readonly ServiceInterval[] = []): ChargeSources & { intervalReads: number; siteReads: number } {
+    return {
+        intervalReads: 0,
+        siteReads: 0,
+        intervals() {
+            this.intervalReads++
+            return intervals
+        },
+        siteName(siteId) {
+            this.siteReads++
+            return SITE_NAMES[siteId] ?? ''
+        },
+    }
+}
+
 describe('subscriptionCharges', () => {
+    const sitePackage = { lineType: 'site_package', monthlyRate: 4500, siteId: 'hq', description: 'Site package' }
+    const perDevice = { lineType: 'device_class', monthlyRate: 45, siteId: '', description: 'Laptop' }
+
     it('charges a site package for the days it was active', () => {
-        expect(
-            subscriptionCharges({ lineType: 'site_package', monthlyRate: 4500, siteId: 'hq', start: '2026-11-16' }, [], nov),
-        ).toEqual([{ siteId: 'hq', units: 15, amount: 2250 }])
-        expect(subscriptionCharges({ lineType: 'site_package', monthlyRate: 4500, siteId: 'hq', start: '2026-12-01' }, [], nov)).toEqual([])
+        expect(subscriptionCharges({ ...sitePackage, start: '2026-11-16' }, nov, sources())).toEqual([
+            { siteId: 'hq', description: 'Site package - Head office', units: 15, amount: 2250 },
+        ])
+        expect(subscriptionCharges({ ...sitePackage, start: '2026-12-01' }, nov, sources())).toEqual([])
+        expect(subscriptionCharges({ ...sitePackage }, nov, sources())).toEqual([])
     })
 
     it('ends a site package on its end date', () => {
-        expect(
-            subscriptionCharges({ lineType: 'site_package', monthlyRate: 3000, siteId: 'hq', start: '2026-01-01', end: '2026-11-10' }, [], nov),
-        ).toEqual([{ siteId: 'hq', units: 10, amount: 1000 }])
+        expect(subscriptionCharges({ ...sitePackage, monthlyRate: 3000, start: '2026-01-01', end: '2026-11-10' }, nov, sources())).toEqual([
+            { siteId: 'hq', description: 'Site package - Head office', units: 10, amount: 1000 },
+        ])
+    })
+
+    it('never reads Service intervals for a site package', () => {
+        const read = sources([{ siteId: 'store', start: '2026-11-01' }])
+        subscriptionCharges({ ...sitePackage, start: '2026-11-16' }, nov, read)
+        subscriptionCharges({ ...sitePackage, start: '2026-12-01' }, nov, read)
+        expect(read.intervalReads).toBe(0)
     })
 
     it('charges a per-device line by device-days, per site', () => {
+        const read = sources([
+            { siteId: 'hq', start: '2026-02-01' },
+            { siteId: 'hq', start: '2026-11-21' },
+            { siteId: 'store', start: '2026-06-01', end: '2026-11-15' },
+            { siteId: 'store', start: '2026-01-01', end: '2026-10-31' },
+        ])
+        expect(subscriptionCharges(perDevice, nov, read)).toEqual([
+            { siteId: 'hq', description: 'Laptop - Head office', units: 40, amount: 60 },
+            { siteId: 'store', description: 'Laptop - Store 12', units: 15, amount: 22.5 },
+        ])
+        expect(read.intervalReads).toBe(1)
+    })
+
+    it('lists Sites in order of first appearance and leaves out Sites without device-days', () => {
         const charges = subscriptionCharges(
-            { lineType: 'device_class', monthlyRate: 45, siteId: '' },
-            [
-                { siteId: 'hq', start: '2026-02-01' },
-                { siteId: 'hq', start: '2026-11-21' },
-                { siteId: 'store', start: '2026-06-01', end: '2026-11-15' },
-                { siteId: 'store', start: '2026-01-01', end: '2026-10-31' },
-            ],
+            perDevice,
             nov,
+            sources([
+                { siteId: 'store', start: '2026-11-21' },
+                { siteId: 'warehouse', start: '2026-01-01', end: '2026-10-31' },
+                { siteId: 'hq', start: '2026-11-30' },
+                { siteId: 'store', start: '2026-11-30' },
+            ]),
         )
-        expect(charges).toEqual([
-            { siteId: 'hq', units: 40, amount: 60 },
-            { siteId: 'store', units: 15, amount: 22.5 },
+        expect(charges.map((charge) => [charge.siteId, charge.units])).toEqual([
+            ['store', 11],
+            ['hq', 1],
         ])
     })
 
     it('counts an interval shared by several assets once per asset', () => {
-        const line = { lineType: 'device_class', monthlyRate: 45, siteId: '' } as const
         const grouped = subscriptionCharges(
-            line,
-            [
+            perDevice,
+            nov,
+            sources([
                 { siteId: 'hq', start: '2026-11-21', count: 3 },
                 { siteId: 'store', start: '2026-06-01', end: '2026-11-15', count: 1 },
-            ],
-            nov,
+            ]),
         )
         expect(grouped).toEqual([
-            { siteId: 'hq', units: 30, amount: 45 },
-            { siteId: 'store', units: 15, amount: 22.5 },
+            { siteId: 'hq', description: 'Laptop - Head office', units: 30, amount: 45 },
+            { siteId: 'store', description: 'Laptop - Store 12', units: 15, amount: 22.5 },
         ])
         const perAsset = subscriptionCharges(
-            line,
-            [
+            perDevice,
+            nov,
+            sources([
                 { siteId: 'hq', start: '2026-11-21' },
                 { siteId: 'hq', start: '2026-11-21' },
                 { siteId: 'hq', start: '2026-11-21' },
                 { siteId: 'store', start: '2026-06-01', end: '2026-11-15' },
-            ],
-            nov,
+            ]),
         )
         expect(grouped).toEqual(perAsset)
+    })
+
+    it('describes a charge by the line alone when its Site has no name', () => {
+        expect(subscriptionCharges({ ...sitePackage, siteId: '', start: '2026-11-16' }, nov, sources())).toEqual([
+            { siteId: '', description: 'Site package', units: 15, amount: 2250 },
+        ])
+        expect(subscriptionCharges(perDevice, nov, sources([{ siteId: 'unknown', start: '2026-11-21' }]))).toEqual([
+            { siteId: 'unknown', description: 'Laptop', units: 10, amount: 15 },
+        ])
+    })
+
+    it('bills nothing for an unknown line type, reading neither source', () => {
+        const read = sources([{ siteId: 'hq', start: '2026-11-01' }])
+        expect(subscriptionCharges({ ...perDevice, lineType: 'per_seat', siteId: 'hq', start: '2026-11-01' }, nov, read)).toEqual([])
+        expect(read.intervalReads).toBe(0)
+        expect(read.siteReads).toBe(0)
     })
 })
 
