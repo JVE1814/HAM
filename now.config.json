@@ -4,5 +4,6 @@
     "name": "NaaS Hardware Asset Management",
     "tsconfigPath": "./src/server/tsconfig.json",
     "packageSourceCodeOnInstance": true,
+    "legacyChoices": false,
     "description": "Hardware asset management for a Network-as-a-Service provider: agreements, site orders, sourcing, staging, install, in-service billing, break-fix, refresh, returns, disposal."
 }

@@ -5,7 +5,23 @@ import { Record } from '@servicenow/sdk/core'
  * Substatus values this app adds to alm_asset.substatus (ADR 0002). The SDK refuses ChoiceSet on
  * global tables from a scoped app, so each value ships as a sys_choice record. Keep in sync with
  * ADDED_SUBSTATUSES in src/server/domain/lifecycle.ts (enforced by substatus-choices.test.ts).
+ *
+ * All sys_choice records for one field share the update name sys_choice_alm_asset_substatus, so
+ * without a parent only the last one survives the build. The sys_choice_set parent below groups
+ * them into one choice-set update. Keep "legacyChoices": false in now.config.json: the v4
+ * (sys_choice_v2) format deletes and re-inserts only these values, while the legacy v3 format
+ * would delete every alm_asset.substatus choice, out-of-box ones included. Needs Brazil,
+ * Australia Patch 4+ or Zurich Patch 11+.
  */
+
+Record({
+    $id: Now.ID['substatus_choice_set'],
+    table: 'sys_choice_set',
+    data: {
+        name: 'alm_asset',
+        element: 'substatus',
+    },
+})
 
 Record({
     $id: Now.ID['substatus_reserved_spare_pool'],

@@ -223,20 +223,29 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
     if (route === 'oem_advance_replacement' && replaced) {
         openOemRma({ defectiveAsset: replaced, orderLineId: line.getUniqueValue(), caseId: str(order, 'case') })
         line.setValue('sourcing_summary', `${plan.summary} (OEM advance replacement under RMA)`)
-    } else if (route === 'purchase') {
-        line.setValue(
-            'purchase_order',
-            requestPurchase({
-                modelId,
-                quantity: toPurchase,
-                shipToStockroomId: stagingStockroom,
-                description: `${str(order, 'number')} ${str(line, 'number')}: ${toPurchase} x ${str(line, 'model.display_name')}`,
-            }),
-        )
     }
+    // No PO without a ship-to stockroom (requestPurchase returns ''): the shortfall stays unsourced.
+    const purchaseOrder =
+        route === 'purchase'
+            ? requestPurchase({
+                  modelId,
+                  quantity: toPurchase,
+                  shipToStockroomId: stagingStockroom,
+                  description: `${str(order, 'number')} ${str(line, 'number')}: ${toPurchase} x ${str(line, 'model.display_name')}`,
+              })
+            : ''
+    if (purchaseOrder) line.setValue('purchase_order', purchaseOrder)
+    const purchased = purchaseOrder ? toPurchase : 0
     line.setValue('quantity_allocated', allocated + reserved)
-    line.setValue('quantity_to_purchase', onOrder + (route === 'purchase' ? toPurchase : 0))
+    line.setValue('quantity_to_purchase', onOrder + purchased)
     if (route !== 'oem_advance_replacement') line.setValue('sourcing_summary', plan.summary)
+    if (route === 'purchase' && !purchaseOrder) {
+        line.setValue('sourcing_summary', `${plan.summary} (no purchase order: set x_daas_ham.staging.default_stockroom)`)
+        line.setValue('line_stage', 'awaiting_stock')
+        line.update()
+        recomputeLine(line.getUniqueValue())
+        return
+    }
     line.setValue('line_stage', 'sourced')
     line.update()
     recomputeLine(line.getUniqueValue())
