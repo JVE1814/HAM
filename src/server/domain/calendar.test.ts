@@ -23,4 +23,16 @@ describe('calendar', () => {
         expect(isIsoDate('06/11/2026')).toBe(false)
         expect(toIsoDate(Date.UTC(2026, 10, 6, 23, 59))).toBe('2026-11-06')
     })
+
+    it('refuses calendar dates that do not exist instead of rolling them into the next month', () => {
+        expect(isIsoDate('2024-02-29')).toBe(true)
+        expect(isIsoDate('2026-12-31')).toBe(true)
+        expect(isIsoDate('2026-02-29')).toBe(false)
+        expect(isIsoDate('2026-02-31')).toBe(false)
+        expect(isIsoDate('2026-04-31')).toBe(false)
+        expect(isIsoDate('2026-02-32')).toBe(false)
+        expect(isIsoDate('2026-13-01')).toBe(false)
+        expect(isIsoDate('2026-00-10')).toBe(false)
+        expect(isIsoDate('2026-01-00')).toBe(false)
+    })
 })

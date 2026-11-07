@@ -2,8 +2,11 @@
 
 const DAY_MS = 86_400_000
 
+/** A real calendar date written as YYYY-MM-DD: impossible days such as 2026-02-31 are refused, not rolled over into the next month. */
 export function isIsoDate(value: string): boolean {
-    return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+    const epoch = toEpoch(value)
+    return !Number.isNaN(epoch) && toIsoDate(epoch) === value
 }
 
 function toEpoch(date: string): number {
