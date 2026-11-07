@@ -1,7 +1,7 @@
 import { GlideDateTime, gs, type GlideRecord } from '@servicenow/glide'
 import { stagingOutcome } from '../domain/staging'
 import { moveAndSave } from '../platform/assets'
-import { releaseParkedSteps } from '../platform/claim-steps'
+import { releaseStepsWaitingOn } from '../platform/claim-steps'
 import { recomputeLine } from '../platform/fulfilment'
 import { findById, str } from '../platform/records'
 import { stagingSteps } from '../platform/staging-tasks'
@@ -26,9 +26,9 @@ export function stampStagingStep(current: GlideRecord): void {
     }
 }
 
-/** After-update rule on automated staging steps ticked done: the steps parked behind this one are due again. */
+/** After-update rule on automated staging steps ticked done: the same task's steps waiting on this one go to pending. */
 export function releaseWaitingSteps(current: GlideRecord): void {
-    releaseParkedSteps(str(current, 'staging_task'), str(current, 'automation'))
+    releaseStepsWaitingOn(str(current, 'staging_task'), str(current, 'automation'))
 }
 
 /** Before-update rule on staging tasks being closed: every mandatory step must be done unless it failed. */

@@ -76,6 +76,7 @@ export const x_daas_ham_staging_step = Table({
                 pending: { label: 'Pending', sequence: 0 },
                 done: { label: 'Done', sequence: 1 },
                 failed: { label: 'Failed (do it by hand)', sequence: 2 },
+                waiting: { label: 'Waiting for the OEM claim step', sequence: 3 },
             },
             readOnly: true,
         }),

@@ -1,4 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
+import { initialAutomationStatus } from '../domain/oem/claims'
 import { selectStagingTemplate, type StagingTemplateView } from '../domain/staging'
 import { bool, num, str } from './records'
 
@@ -44,21 +45,25 @@ export function openStagingTask(asset: GlideRecord, orderLineId: string): string
     return taskId
 }
 
+/** Copies the template's steps onto the task; an automated step starts waiting when the task also gets its OEM prerequisite step (initialAutomationStatus). */
 function copyTemplateSteps(templateId: string, taskId: string): void {
     const item = new GlideRecord('x_daas_ham_staging_tmpl_item')
     item.addQuery('template', templateId)
     item.orderBy('order')
     item.query()
-    while (item.next()) {
+    const items: Array<{ label: string; order: number; mandatory: boolean; automation: string }> = []
+    while (item.next()) items.push({ label: str(item, 'label'), order: num(item, 'order'), mandatory: bool(item, 'mandatory'), automation: str(item, 'automation') })
+    const taskActions = items.map((i) => i.automation)
+    for (const { label, order, mandatory, automation } of items) {
         const step = new GlideRecord('x_daas_ham_staging_step')
         step.initialize()
         step.setValue('staging_task', taskId)
-        step.setValue('label', str(item, 'label'))
-        step.setValue('order', num(item, 'order'))
-        step.setValue('mandatory', bool(item, 'mandatory'))
-        if (str(item, 'automation')) {
-            step.setValue('automation', str(item, 'automation'))
-            step.setValue('automation_status', 'pending')
+        step.setValue('label', label)
+        step.setValue('order', order)
+        step.setValue('mandatory', mandatory)
+        if (automation) {
+            step.setValue('automation', automation)
+            step.setValue('automation_status', initialAutomationStatus(automation, taskActions))
         }
         step.insert()
     }

@@ -12,7 +12,10 @@ import { fortiCloudError } from './forticloud'
  * runVendorClaims runs one vendor's adapters within its call budget against a ClaimStore.
  */
 
-export type ClaimAction = 'oem_claim' | 'oem_licence' | 'oem_ztp'
+/** The automated checklist actions, in the order a vendor's actions run: a device is claimed before it is licensed or provisioned. */
+export const CLAIM_ORDER = ['oem_claim', 'oem_licence', 'oem_ztp'] as const
+
+export type ClaimAction = (typeof CLAIM_ORDER)[number]
 
 export interface ClaimTarget {
     stepId: string
@@ -287,23 +290,34 @@ export const CLAIM_ROUTES: Partial<Record<OemVendor, Partial<Record<ClaimAction,
 /** Vendors with at least one automated step (Cisco has none). */
 export const CLAIM_VENDORS: readonly OemVendor[] = Object.keys(CLAIM_ROUTES) as OemVendor[]
 
-/** The order a vendor's actions run in: a device is claimed before it is licensed or provisioned. */
-const CLAIM_ORDER = ['oem_claim', 'oem_licence', 'oem_ztp'] as const satisfies readonly ClaimAction[]
-/** Compile-time check that CLAIM_ORDER lists every ClaimAction (a new action fails to compile here). */
-const everyActionOrdered: [Exclude<ClaimAction, (typeof CLAIM_ORDER)[number]>] extends [never] ? true : never = true
-void everyActionOrdered
-
 /**
  * The step a staging task must have done before an action's step on it is due: licensing and zero-touch
- * need the device claimed first. Until then the step waits (not loaded, not attempted, not counted).
+ * need the device claimed first. Such a step starts waiting (initialAutomationStatus) when its staging task
+ * also has the prerequisite step: it is not due, so it is not loaded, not attempted and uses no attempts.
+ * It goes to pending when that step is ticked done, by hand or by a run (rule br_staging_step_release).
  */
 export const CLAIM_PREREQUISITE: Partial<Record<ClaimAction, ClaimAction>> = { oem_licence: 'oem_claim', oem_ztp: 'oem_claim' }
+
+/** The actions whose steps wait on an `action` step (CLAIM_PREREQUISITE). */
+export function dependentActions(action: string): ClaimAction[] {
+    return CLAIM_ORDER.filter((dependent) => CLAIM_PREREQUISITE[dependent] === action)
+}
+
+/**
+ * The automation status a new `action` step starts in: waiting when its staging task also gets the
+ * step's CLAIM_PREREQUISITE step, otherwise pending. `taskActions` are the automations of all the
+ * task's steps ('' for a step done by hand).
+ */
+export function initialAutomationStatus(action: string, taskActions: readonly string[]): 'pending' | 'waiting' {
+    const prerequisite: string | undefined = CLAIM_PREREQUISITE[action as ClaimAction]
+    return prerequisite && taskActions.includes(prerequisite) ? 'waiting' : 'pending'
+}
 
 /** Steps loaded per action and run at most. */
 const MAX_STEPS_PER_LOAD = 200
 
 /** Attempts after which a failing step is left for a person. */
-export const MAX_CLAIM_ATTEMPTS = 5
+const MAX_CLAIM_ATTEMPTS = 5
 
 /** Length of a staging step's automation_message. */
 const MESSAGE_LENGTH = 255
@@ -311,13 +325,16 @@ const MESSAGE_LENGTH = 255
 /** Where a run reads its due steps and records their outcomes (the Glide store is in platform/claim-steps.ts). */
 export interface ClaimStore {
     /**
-     * Up to `limit` of `vendor`'s steps due for `action` (dueStepsQuery), fewest attempts first, then
-     * oldest; each carries the Customer's OEM cloud account for `action` ('' when none). Steps whose
-     * staging task still has an open CLAIM_PREREQUISITE step are not returned and do not use up `limit`.
+     * Up to `limit` of `vendor`'s steps due for `action` (dueStepsQuery: pending, or failed and due a retry),
+     * fewest attempts first, then oldest; each carries the Customer's OEM cloud account for `action`
+     * ('' when none). Steps still waiting for their CLAIM_PREREQUISITE step are not due.
      */
     due(vendor: OemVendor, action: ClaimAction, limit: number): ClaimTarget[]
-    /** Record one attempted or refused step. ok: tick it (automation_status=done, done=true); otherwise automation_status=failed and one more attempt. outcome.message is at most 255 characters. */
-    settle(outcome: ClaimOutcome): void
+    /**
+     * Record the outcomes of one action's run (each step at most once). ok: tick the step (automation_status=done,
+     * done=true); otherwise automation_status=failed and one more attempt. Messages are at most 255 characters.
+     */
+    settle(outcomes: readonly ClaimOutcome[]): void
 }
 
 /** Steps `remaining` calls of `route` can carry: at least one, at most MAX_STEPS_PER_LOAD. */
@@ -328,8 +345,8 @@ function stepsFor(route: ClaimRoute, remaining: number): number {
 /**
  * One vendor's 5-minute run. Its actions run in the fixed order oem_claim, oem_licence, oem_ztp and share maxCalls.
  * An action is loaded only while calls remain, with limit = min(200, max(1, ceil(remaining x perCall))).
- * Every outcome the adapter returns (attempted or refused) is settled exactly once; loaded steps the
- * budget did not reach are not settled and wait for the next run. Returns the calls made (<= maxCalls).
+ * The outcomes the adapter returns (attempted or refused steps) are settled together, once per action; loaded
+ * steps the budget did not reach are not settled and wait for the next run. Returns the calls made (<= maxCalls).
  */
 export function runVendorClaims(vendor: OemVendor, store: ClaimStore, transport: (message: string) => HttpPort, maxCalls: number): number {
     const routes = CLAIM_ROUTES[vendor] ?? {}
@@ -343,44 +360,23 @@ export function runVendorClaims(vendor: OemVendor, store: ClaimStore, transport:
         if (targets.length === 0) continue
         const run = route.run(targets, transport(route.message), remaining)
         calls += run.calls
-        for (const outcome of run.outcomes) store.settle({ ...outcome, message: outcome.message.slice(0, MESSAGE_LENGTH) })
+        store.settle(run.outcomes.map((outcome) => ({ ...outcome, message: outcome.message.slice(0, MESSAGE_LENGTH) })))
     }
     return calls
 }
 
 /** Encoded query on x_daas_ham_staging_step: open automated `action` steps on `vendor` Assets whose staging task is active. */
-export function openStepsQuery(vendor: OemVendor, action: ClaimAction): string {
+function openStepsQuery(vendor: OemVendor, action: ClaimAction): string {
     return `automation=${action}^done=false^staging_task.active=true^staging_task.asset.model.x_daas_ham_oem_source=${vendor}`
 }
 
 /**
  * Encoded query on x_daas_ham_staging_step: open `action` steps (openStepsQuery) that are pending, or failed
- * over 30 minutes ago with fewer than 5 attempts; those conditions are in every OR group (andEachClause).
+ * over 30 minutes ago with fewer than 5 attempts (never waiting ones); those conditions are in every OR group (andEachClause).
  */
 export function dueStepsQuery(vendor: OemVendor, action: ClaimAction): string {
     return andEachClause(
         `automation_status=pending^NQautomation_status=failed^attempts<${MAX_CLAIM_ATTEMPTS}^sys_updated_on<javascript:gs.minutesAgoStart(30)`,
         openStepsQuery(vendor, action),
     )
-}
-
-/** A failed step that used up its attempts: it is left for a person. */
-export function isExhausted(step: { status: string; attempts: number }): boolean {
-    return step.status === 'failed' && step.attempts >= MAX_CLAIM_ATTEMPTS
-}
-
-/**
- * automation_message of a step parked because its prerequisite step is exhausted: it is failed with
- * attempts at the maximum, and goes back to pending when that prerequisite step is done.
- */
-export const PARKED_MESSAGE = 'waits for the OEM claim step, which needs a person'
-
-/** The actions whose steps wait on an `action` step (CLAIM_PREREQUISITE). */
-export function dependentActions(action: string): ClaimAction[] {
-    return CLAIM_ORDER.filter((dependent) => CLAIM_PREREQUISITE[dependent] === action)
-}
-
-/** The candidates whose staging task is not waiting on a prerequisite step, at most `limit`, in order. */
-export function readyTargets<C extends { task: string }>(candidates: readonly C[], waitingTasks: ReadonlySet<string>, limit: number): C[] {
-    return candidates.filter((c) => !waitingTasks.has(c.task)).slice(0, Math.max(0, limit))
 }
