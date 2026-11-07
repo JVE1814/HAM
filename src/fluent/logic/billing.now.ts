@@ -3,6 +3,7 @@ import { BusinessRule, Record, ScheduledScript, ScriptAction, UiAction } from '@
 import {
     exportBillingPeriod,
     generateBillingLines,
+    guardBillingPeriodMonth,
     guardClosedBillingLine,
     guardClosedBillingPeriod,
     openMonthlyBillingPeriod,
@@ -126,4 +127,15 @@ BusinessRule({
     action: ['update', 'delete'],
     order: 100,
     script: guardClosedBillingPeriod,
+})
+
+BusinessRule({
+    $id: Now.ID['br_billing_period_month'],
+    name: 'NaaS - billing period month is YYYY-MM',
+    table: 'x_daas_ham_billing_period',
+    when: 'before',
+    action: ['insert', 'update'],
+    order: 100,
+    condition: 'current.period.changes()',
+    script: guardBillingPeriodMonth,
 })

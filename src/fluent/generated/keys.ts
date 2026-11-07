@@ -1197,6 +1197,10 @@ declare global {
                         table: 'sys_script'
                         id: 'af4661aa5fc74276b5c4758fcf1846a9'
                     }
+                    br_billing_period_month: {
+                        table: 'sys_script'
+                        id: '9fc93f3f784940b3b69de7dd46343329'
+                    }
                     br_case_failed_asset: {
                         table: 'sys_script'
                         id: '2a4f4c5137b24aa7a946de7591c00f4a'
@@ -6340,6 +6344,14 @@ declare global {
                             name: 'x_daas_ham_agreement'
                             element: 'customer'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_index'
+                        id: '0f644094497b469c93065bd9aee58b8d'
+                        key: {
+                            logical_table_name: 'x_daas_ham_billing_line'
+                            col_name_string: 'billing_period,customer'
                         }
                     },
                     {
@@ -15593,6 +15605,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_index'
+                        id: '45c19d0fd5b64bdd88e783893945723d'
+                        key: {
+                            logical_table_name: 'x_daas_ham_fee_event'
+                            col_name_string: 'billing_period'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '45ded724578e403e9db02a656f4d5a16'
                         key: {
@@ -22237,6 +22257,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '6bd33427c7914a038b635285d0615c17'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation_status'
+                            value: 'waiting'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '6bd3849e46354e52b6f059f997acc46a'
                         key: {
@@ -28682,6 +28713,14 @@ declare global {
                             cat_item: '5d455ea958a8443a8913cf053541396f'
                             variable_set: 'NULL'
                             name: 'agreement'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '8ed79523400946b58f5386fd95c0592e'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'run'
                         }
                     },
                     {
@@ -44744,6 +44783,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_agreement'
                             element: 'renewal_notified'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'ec81df72d72b40d1a230c2ef9a0b4dee'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'run'
+                            language: 'en'
                         }
                     },
                     {

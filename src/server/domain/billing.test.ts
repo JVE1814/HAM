@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { activeDays, intervalEnd, isMonth, restartInterval, monthBounds, overlapsMonth, previousMonth, prorate, subscriptionCharges, toCsv, type ChargeSources, type ServiceInterval } from './billing'
+import {
+    activeDays,
+    billsFromIntervals,
+    intervalEnd,
+    isMonth,
+    monthBounds,
+    overlapsMonth,
+    previousMonth,
+    prorate,
+    restartInterval,
+    subscriptionCharges,
+    toCsv,
+    type ChargeSources,
+    type ServiceInterval,
+} from './billing'
 
 const nov = monthBounds('2026-11')
 const feb = monthBounds('2028-02')
@@ -9,6 +23,12 @@ describe('monthBounds', () => {
         expect(nov).toEqual({ month: '2026-11', first: '2026-11-01', last: '2026-11-30', days: 30 })
         expect(feb.days).toBe(29)
         expect(monthBounds('2026-12').last).toBe('2026-12-31')
+    })
+
+    it('refuses a value that is not a YYYY-MM month', () => {
+        expect(() => monthBounds('')).toThrow("'' is not a YYYY-MM month")
+        expect(() => monthBounds('2026-13')).toThrow("'2026-13' is not a YYYY-MM month")
+        for (const bad of ['abc', '2026-00', '2026-3', '2026-11-01']) expect(() => monthBounds(bad)).toThrow('is not a YYYY-MM month')
     })
 })
 
@@ -88,6 +108,17 @@ function sources(intervals: readonly ServiceInterval[] = []): ChargeSources & { 
         },
     }
 }
+
+describe('billsFromIntervals', () => {
+    const terms = { monthlyRate: 45, siteId: '', description: 'Laptop' }
+
+    it('bills only a per-device line from its Service intervals', () => {
+        expect(billsFromIntervals({ ...terms, lineType: 'device_class' })).toBe(true)
+        expect(billsFromIntervals({ ...terms, lineType: 'site_package' })).toBe(false)
+        expect(billsFromIntervals({ ...terms, lineType: 'per_seat' })).toBe(false)
+        expect(billsFromIntervals({ ...terms, lineType: '' })).toBe(false)
+    })
+})
 
 describe('subscriptionCharges', () => {
     const sitePackage = { lineType: 'site_package', monthlyRate: 4500, siteId: 'hq', description: 'Site package' }

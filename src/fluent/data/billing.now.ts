@@ -42,7 +42,7 @@ export const x_daas_ham_billing_period = Table({
             dropdown: 'dropdown_without_none',
         }),
         generated_at: DateTimeColumn({ label: 'Generated at', readOnly: true }),
-        failed_lines: IntegerColumn({ label: 'Subscription lines that failed to bill', default: 0, readOnly: true }),
+        failed_lines: IntegerColumn({ label: 'Lines that failed to bill', default: 0, readOnly: true }),
         last_error: StringColumn({ label: 'Last generation error', maxLength: 255, readOnly: true }),
         line_count: IntegerColumn({ label: 'Lines', readOnly: true }),
         total_amount: DecimalColumn({ label: 'Total', readOnly: true }),
@@ -78,5 +78,6 @@ export const x_daas_ham_billing_line = Table({
     index: [
         { name: 'x_daas_ham_bl_period', unique: false, element: 'billing_period' },
         { name: 'x_daas_ham_bl_customer', unique: false, element: 'customer' },
+        { name: 'x_daas_ham_bl_period_customer', unique: false, element: ['billing_period', 'customer'] },
     ],
 })

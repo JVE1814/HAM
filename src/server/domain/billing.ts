@@ -15,7 +15,9 @@ export function isMonth(value: string): boolean {
     return /^\d{4}-(0[1-9]|1[0-2])$/.test(value)
 }
 
+/** The first and last day and the length of a YYYY-MM month; throws for any other value. */
 export function monthBounds(month: string): MonthBounds {
+    if (!isMonth(month)) throw new Error(`'${month}' is not a YYYY-MM month`)
     const first = `${month}-01`
     const next = addMonths(first, 1)
     return { month, first, last: addDays(next, -1), days: daysBetween(first, next) }
@@ -90,6 +92,11 @@ export interface SubscriptionLineTerms {
     end?: string
 }
 
+/** Whether a Subscription line is billed from its Service intervals (a per-device line). */
+export function billsFromIntervals(line: SubscriptionLineTerms): boolean {
+    return line.lineType === 'device_class'
+}
+
 /** What one Subscription line bills at one Site for the month: the content of its Billing line. */
 export interface Charge {
     siteId: string
@@ -102,7 +109,7 @@ export interface Charge {
 
 /** What a charge is drafted from beyond the line itself, read only when the line's type needs it. */
 export interface ChargeSources {
-    /** The line's Service intervals overlapping the month. Called at most once, and only for a 'device_class' line. */
+    /** The line's Service intervals overlapping the month. Called at most once, and only for a line billsFromIntervals accepts. */
     intervals(): readonly ServiceInterval[]
     /** A Site's name; '' for '' or an unknown Site. */
     siteName(siteId: string): string
@@ -130,7 +137,7 @@ function unitsBySite(line: SubscriptionLineTerms, bounds: MonthBounds, sources: 
     if (line.lineType === 'site_package') {
         const units = line.start ? activeDays(bounds, line.start, line.end) : 0
         if (units > 0) bySite.set(line.siteId, units)
-    } else if (line.lineType === 'device_class') {
+    } else if (billsFromIntervals(line)) {
         for (const interval of sources.intervals()) {
             const units = activeDays(bounds, interval.start, interval.end) * (interval.count ?? 1)
             if (units > 0) bySite.set(interval.siteId, (bySite.get(interval.siteId) ?? 0) + units)

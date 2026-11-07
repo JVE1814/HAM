@@ -734,9 +734,9 @@ Sources:
 | `GlideSysAttachment.write()` and `deleteAttachment()` | As used (`billing.ts:243,255-258`) | Same signatures | matches | N25, N26 |
 | `sys_attachment` fields | `table_name`, `table_sys_id`, `file_name` (`billing.ts:268`) | Documented | matches | N27, N28 |
 | Scripted REST `request.queryParams` | Each parameter is an array (`rest-api.ts:12`) | Type Array; examples are arrays | matches | N29 |
-| `GlideRecord.updateMultiple()` and clearing a field | Clears `billing_period` record by record (`billing.ts:185-192,205-209`) | `updateMultiple` does not clear values unless set to `'NULL'` | matches | N30 |
+| `GlideRecord.updateMultiple()` and clearing a field | Clears `billing_period` record by record (`billing.ts` unlinkFees) | `updateMultiple` does not clear values unless set to `'NULL'` | matches | N30 |
 | `RESTMessageV2(name, methodName)`, `setStringParameterNoEscape` | As used; app URL-encodes values itself (`rest-port.ts:8,26-28`) | Constructor documented; neither method URL-encodes | matches | N31, N32, N33 |
-| `GlideAggregate.groupBy` on date fields | Grouped `start_date`/`end_date` read as `YYYY-MM-DD` (`billing.ts:94-111`) | Format of a grouped `glide_date` key not documented | unverifiable | N34 |
+| `GlideAggregate.groupBy` on date fields | Grouped `start_date`/`end_date` read as `YYYY-MM-DD` (`billing.ts` intervalsByLine) | Format of a grouped `glide_date` key not documented | unverifiable | N34 |
 | `setWorkflow(false)` on a global table from the scoped app | Skips the app's before-query rule on `alm_hardware` (`assets.ts:87,94`; `billing.ts:183`) | "This method can't be set for cross-scoped applications" | unverifiable | N30 |
 
 Notes:
@@ -814,7 +814,7 @@ Notes:
   existing value, use the setValue() method and set the field to 'NULL'." Also "use the setValue()
   method instead of direct assignments" and "Do not use this method with the chooseWindow() or
   setLimit() methods when working with large tables." The docs example calls `addQuery`, `setValue`,
-  `updateMultiple`, with no `query()`. Optional simplification at `billing.ts:186-192`:
+  `updateMultiple`, with no `query()`. Optional simplification in `billing.ts` unlinkFees:
   `fee.setValue('billing_period', 'NULL'); fee.updateMultiple()`; the current loop is also correct.
 - **RESTMessageV2.** Scoped and global, `sn_ws` namespace: `RESTMessageV2(String name, String
   methodName)`; name is "The name of the REST message record in the REST Message [sys_rest_message]
