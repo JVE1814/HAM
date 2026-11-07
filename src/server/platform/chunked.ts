@@ -1,5 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { runChunked, type ChunkedJobResult } from '../domain/chunked-job'
+import { andEachClause } from '../domain/encoded-query'
 import { msToGlide, nowMs } from './clock'
 import { intProperty, PROPERTY } from './properties'
 
@@ -72,8 +73,7 @@ export function runEventTableJob<T>(
 
 function fetchBatch<T>(spec: Pick<TableJob<T>, 'table' | 'query' | 'read'>, after: string, size: number) {
     const gr = new GlideRecord(spec.table)
-    gr.addEncodedQuery(spec.query)
-    if (after) gr.addQuery('sys_id', '>', after)
+    gr.addEncodedQuery(after ? andEachClause(spec.query, `sys_id>${after}`) : spec.query)
     gr.orderBy('sys_id')
     gr.setLimit(size)
     gr.query()
