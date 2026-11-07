@@ -54,7 +54,8 @@ function ownersOf(orderId: string): LegalOwner[] {
 
 /** UI action "Submit for approval" on a draft disposal order. */
 export function uiSubmitDisposal(current: GlideRecord): void {
-    current.update()
+    // A refused form save (the platform says why) asks nobody: the order is not what the approvers would decide.
+    if (!current.update()) return
     const assets = assetsOf(current.getUniqueValue())
     if (assets.length === 0) {
         gs.addErrorMessage('Add the assets to dispose of first')
@@ -79,7 +80,8 @@ export function uiSubmitDisposal(current: GlideRecord): void {
     }
     current.setValue('stage', 'awaiting_approval')
     current.setValue('approval', 'requested')
-    current.update()
+    // Still a draft (the platform says why): its requests could never decide it, so they are cancelled again.
+    if (!current.update()) cancelPendingApprovals(current.getUniqueValue())
 }
 
 /** After-update rule on sysapproval_approver for disposal orders. */
@@ -92,7 +94,11 @@ export function onDisposalApprovalDecision(current: GlideRecord): void {
     order.setValue('approval', outcome)
     order.setValue('stage', outcome === 'approved' ? 'approved' : 'rejected')
     if (outcome === 'rejected') order.setValue('state', 4)
-    order.update()
+    // Refused: it still awaits approval with its requests open, so the next decision on them rolls it up again.
+    if (!order.update()) {
+        const reason = order.getLastErrorMessage() || 'the save was refused'
+        return void gs.warn(`[x_daas_ham] Disposal ${str(order, 'number')} not saved as ${outcome}: ${reason}`)
+    }
     // After the save, so the approval rule each cancellation runs finds the order no longer awaiting approval.
     cancelPendingApprovals(order.getUniqueValue())
 }
@@ -102,6 +108,7 @@ export function uiCompleteDisposal(current: GlideRecord): void {
     // A refused form save (a method or Customer changed after submit) leaves the refused values on `current`.
     if (!current.update()) return
     let blocked = 0
+    let unsaved = 0
     const line = lines(current.getUniqueValue())
     while (line.next()) {
         if (str(line, 'status') === 'done') continue
@@ -109,12 +116,16 @@ export function uiCompleteDisposal(current: GlideRecord): void {
         if (refusal) blocked++
         line.setValue('status', refusal ? 'blocked' : 'done')
         line.setValue('blockers', refusal)
-        line.update()
+        if (line.update()) continue
+        // A line not saved as done keeps the order open: its Asset may be retired already, so it is set done by hand.
+        unsaved++
+        const reason = line.getLastErrorMessage() || 'the save was refused'
+        const what = `${str(current, 'number')} line for ${line.getDisplayValue('asset')}`
+        gs.warn(`[x_daas_ham] ${what} not saved (${refusal ? 'blocked' : 'done, its asset retired'}): ${reason}`)
     }
-    if (blocked > 0) {
-        gs.addErrorMessage(`${blocked} line(s) are blocked; see "Blocked by" on the lines`)
-        return
-    }
+    if (blocked > 0) gs.addErrorMessage(`${blocked} line(s) are blocked; see "Blocked by" on the lines`)
+    if (unsaved > 0) gs.addErrorMessage(`${unsaved} line(s) could not be saved (see the system log)`)
+    if (blocked > 0 || unsaved > 0) return
     current.setValue('stage', 'completed')
     current.setValue('state', 3)
     current.update()

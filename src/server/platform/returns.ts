@@ -5,7 +5,7 @@ import { feeAmount, INSTALLED_STAGES, returnDueDate, SITE_RECOVERY_STAGES, type 
 import { moveAndSave, readStage } from './assets'
 import { todayIso } from './clock'
 import { openFieldWork } from './field-work'
-import { findById, num, str } from './records'
+import { exists, findById, num, str } from './records'
 
 /** Return orders, their lines and Fee events (P2.4). */
 
@@ -82,9 +82,14 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
         const moving = isDeployed(stage) && stage !== 'pending_return'
         // Leaving service closes the Asset's service interval (entry/assets.ts onAssetServiceChange). A refused move
         // (moveAndSave warns) takes the line off again: it would await a unit still in service, later declared missing.
-        if (moving && !moveAndSave(asset, 'pending_return', `return ${str(order, 'number')}`) && line.deleteRecord()) {
-            refused++
-            continue
+        // One that cannot be taken off is logged, to remove by hand before the overdue job gets to it.
+        if (moving && !moveAndSave(asset, 'pending_return', `return ${str(order, 'number')}`)) {
+            if (line.deleteRecord()) {
+                refused++
+                continue
+            }
+            const kept = `${str(asset, 'serial_number')} not pending return but kept on return ${str(order, 'number')}`
+            gs.warn(`[x_daas_ham] ${kept}: ${line.getLastErrorMessage() || 'delete refused'}; remove its line`)
         }
         lines++
     }
@@ -109,7 +114,10 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
             order.setValue('work_notes', 'De-install work not opened (see the system log): open it by hand.')
         }
     }
-    order.update()
+    // Its lines and moves are saved, but a Return without its due date is never chased: logged to set it by hand.
+    if (!order.update()) {
+        gs.warn(`[x_daas_ham] Return ${str(order, 'number')} due date, state and links not saved: ${refusal(order)}`)
+    }
 }
 
 export interface InstalledFilter {
@@ -178,11 +186,18 @@ export function waiveOpenFees(type: FeeType, assetId: string, returnOrderId: str
     fee.query()
     while (fee.next()) {
         fee.setValue('status', 'waived')
-        fee.update()
+        // Left open, it is billed for a unit that came back.
+        if (!fee.update()) gs.warn(`[x_daas_ham] ${type} fee ${fee.getUniqueValue()} not waived: ${refusal(fee)}`)
     }
 }
 
+/**
+ * Charge a Fee event of `type` for the Asset on the Return order, once: a step retried after a refused save (an
+ * evaluation chosen again, a line declared missing again) does not charge it twice. A refused fee is logged.
+ */
 export function recordFee(type: FeeType, asset: GlideRecord, returnOrderId: string): void {
+    const charged = `fee_type=${type}^asset=${asset.getUniqueValue()}^return_order=${returnOrderId}^status!=waived`
+    if (exists('x_daas_ham_fee_event', charged)) return
     const agreement = findById('x_daas_ham_agreement', str(asset, 'x_daas_ham_agreement'))
     const amount = feeAmount(type, {
         lost: agreement ? num(agreement, 'lost_asset_fee') : 0,
@@ -199,7 +214,8 @@ export function recordFee(type: FeeType, asset: GlideRecord, returnOrderId: stri
     fee.setValue('return_order', returnOrderId)
     fee.setValue('amount', amount)
     fee.setValue('occurred_on', todayIso())
-    fee.insert()
+    if (fee.insert()) return
+    gs.warn(`[x_daas_ham] ${type} fee for ${str(asset, 'serial_number')} not recorded: ${refusal(fee)}`)
 }
 
 /** Close a Return order once every line is evaluated or declared missing. */
@@ -213,9 +229,15 @@ export function closeReturnIfDone(returnOrderId: string): void {
     const order = findById('x_daas_ham_return_order', returnOrderId)
     if (!order || str(order, 'state') === '3') return
     order.setValue('state', 3)
-    order.update()
+    // No later line calls this again, and an open Return still asks the Customer for its equipment.
+    if (!order.update()) gs.warn(`[x_daas_ham] Return ${str(order, 'number')} not closed: ${refusal(order)}; close it`)
 }
 
 export function stampNow(record: GlideRecord, field: string): void {
     record.setValue(field, new GlideDateTime().getValue())
+}
+
+/** Why the platform refused to save `record`, for the log. */
+function refusal(record: GlideRecord): string {
+    return record.getLastErrorMessage() || 'the save was refused'
 }

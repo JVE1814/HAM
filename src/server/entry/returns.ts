@@ -47,7 +47,8 @@ export function afterReturnProduced(producer: Record<string, unknown>, current: 
     const findings = returnRequestFindings(requestedReturn(order), returnRequester(order))
     if (findings.length > 0) {
         gs.addErrorMessage(`Return not raised. ${findings.join('. ')}.`)
-        order.deleteRecord()
+        // Never completed, it moves nothing; one the platform keeps is logged, to cancel by hand.
+        if (!order.deleteRecord()) warnRefused(order, `Refused return ${str(order, 'number')} not removed`)
         return
     }
     const decommission = str(order, 'trigger') === 'site_decommission'
@@ -94,11 +95,13 @@ function agreementOf(assetId: string | undefined): string {
 }
 
 /**
- * A returned Asset arrived at the depot: it awaits evaluation, its subscription line no longer
- * includes it, its earlier wipe evidence no longer counts, and a late return is charged.
+ * A returned Asset arrived at the depot: it awaits evaluation, its subscription line no longer includes it, its earlier
+ * wipe evidence no longer counts, and a late return is charged. Null when the unit is not coming back from a Site (it
+ * is received as stock instead); otherwise why the platform refused the receipt, '' once received. A refused unit
+ * stays pending return (or missing), with nothing settled, to scan again.
  */
-export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): boolean {
-    if (readStage(asset) !== 'pending_return' && readStage(asset) !== 'missing') return false
+export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): string | null {
+    if (readStage(asset) !== 'pending_return' && readStage(asset) !== 'missing') return null
     const line = expectedReturnLine(asset.getUniqueValue())
     const siteId = str(asset, 'x_daas_ham_site')
     asset.setValue('stockroom', stockroomId)
@@ -108,25 +111,30 @@ export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): b
     asset.setValue('x_daas_ham_wiped_on', '')
     asset.setValue('x_daas_ham_wipe_certificate', '')
     clearRackPlacement(asset)
-    if (!moveAndSave(asset, 'pending_evaluation', 'return received')) return false
+    const verdict = moveAsset(asset, 'pending_evaluation')
+    if (!verdict.allowed) return verdict.reason
+    if (!asset.update()) return asset.getLastErrorMessage() || 'the platform refused the save'
     endSitePackageIfEmpty(siteId, str(asset, 'x_daas_ham_agreement'))
-    if (!line) return true
+    if (!line) return ''
     const turnedUp = str(line, 'status') === 'missing'
     line.setValue('status', 'received')
     stampNow(line, 'received_at')
-    line.update()
+    // The unit is received all the same; a line left unreceived cannot be evaluated, so it is logged to fix by hand.
+    const serial = str(asset, 'serial_number')
+    const lineOf = `Line of ${serial} on ${line.getDisplayValue('return_order')}`
+    if (!line.update()) warnRefused(line, `${lineOf} not marked received`)
     const returnOrder = findById('x_daas_ham_return_order', str(line, 'return_order'))
-    if (!returnOrder) return true
+    if (!returnOrder) return ''
     if (turnedUp) {
         // Declared missing, then found: it is late, not lost, and its line needs evaluating again.
         waiveOpenFees('lost', asset.getUniqueValue(), returnOrder.getUniqueValue())
         returnOrder.setValue('state', 2)
-        returnOrder.update()
+        if (!returnOrder.update()) warnRefused(returnOrder, `${str(returnOrder, 'number')} not reopened for ${serial}`)
     }
     if (str(returnOrder, 'due_date') && todayIso() > str(returnOrder, 'due_date')) {
         recordFee('late_return', asset, returnOrder.getUniqueValue())
     }
-    return true
+    return ''
 }
 
 /**
@@ -155,8 +163,14 @@ function endSitePackageIfEmpty(siteId: string, agreementId: string): void {
     while (line.next()) {
         line.setValue('status', 'ended')
         line.setValue('end_date', toIsoDate(nowMs()))
-        line.update()
+        // A site package bills its own dates, and no later unit leaving ends it: logged for finance to end by hand.
+        if (!line.update()) warnRefused(line, `Site package "${str(line, 'description')}" not ended`)
     }
+}
+
+/** Log that the platform refused a save, and why: `what` names what was therefore not done. */
+function warnRefused(record: GlideRecord, what: string): void {
+    gs.warn(`[x_daas_ham] ${what}: ${record.getLastErrorMessage() || 'the save was refused'}`)
 }
 
 /**
@@ -173,6 +187,7 @@ export function onReturnEvaluated(current: GlideRecord): void {
         legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner,
         leaseEndAction: str(asset, 'x_daas_ham_lease.end_action') as LeaseEndAction | '',
     })
+    // Charged before refurbishing hands the unit back to the Provider; choosing the evaluation again charges it once.
     if (str(current, 'condition') === 'damaged') recordFee('damaged', asset, str(current, 'return_order'))
     if (target === 'available') {
         asset.setValue('company', stringProperty(PROPERTY.providerCompany))
@@ -183,9 +198,18 @@ export function onReturnEvaluated(current: GlideRecord): void {
         gs.addErrorMessage(`The asset cannot go to ${target} from its current stage`)
         return
     }
-    asset.update()
+    // Refused: the line stays received, so the evaluation can be chosen again.
+    if (!asset.update()) {
+        const reason = asset.getLastErrorMessage() || 'the save was refused'
+        gs.addErrorMessage(`The asset was not moved to ${target}: ${reason}`)
+        return
+    }
     current.setValue('status', 'evaluated')
-    current.update()
+    if (!current.update()) {
+        const reason = current.getLastErrorMessage() || 'the save was refused'
+        gs.addErrorMessage(`The asset went to ${target}, but its return line was not marked evaluated: ${reason}`)
+        return
+    }
     closeReturnIfDone(str(current, 'return_order'))
 }
 
@@ -206,17 +230,21 @@ export function chaseOverdueReturns(): void {
             // Read the header fresh: an earlier line of the same order may have escalated it in this batch.
             const returnOrder = findById('x_daas_ham_return_order', line.returnOrderId)
             if (!returnOrder) return
+            const number = str(returnOrder, 'number')
             const step = overdueStep({ dueDate: line.dueDate, today, graceDays: grace, received: false, escalated: bool(returnOrder, 'escalated') })
             if (step === 'escalate') {
                 returnOrder.setValue('escalated', true)
                 returnOrder.setValue('work_notes', `Return overdue since ${line.dueDate}; customer and account manager notified.`)
-                returnOrder.update()
+                // Not marked escalated, it would be escalated again every day: nobody is told until the mark holds.
+                if (!returnOrder.update()) return warnRefused(returnOrder, `${number} not escalated`)
                 const recipients = [...customerAdminIds(str(returnOrder, 'customer')), str(returnOrder, 'agreement.account_manager')]
                 gs.eventQueue(EVENT.returnOverdue, returnOrder, recipients.filter(Boolean).join(','), line.assetId)
             } else if (step === 'declare_missing') {
                 const asset = findById('alm_hardware', line.assetId)
-                if (asset) clearRackPlacement(asset)
-                if (asset && moveAndSave(asset, 'missing', `return ${returnOrder.getDisplayValue('number')} overdue`)) {
+                if (asset) {
+                    clearRackPlacement(asset)
+                    // Refused (moveAndSave warns): the unit and its awaiting line stay as they are, for the next run.
+                    if (!moveAndSave(asset, 'missing', `return ${number} overdue`)) return
                     recordFee('lost', asset, line.returnOrderId)
                     // A missing unit no longer holds its site package open. It keeps its Site and line so that, found
                     // again and back in service, it bills on that line again while it is open (entry/assets.ts
@@ -224,8 +252,12 @@ export function chaseOverdueReturns(): void {
                     endSitePackageIfEmpty(str(asset, 'x_daas_ham_site'), str(asset, 'x_daas_ham_agreement'))
                 }
                 const record = findById('x_daas_ham_return_order_line', lineId)
-                record?.setValue('status', 'missing')
-                record?.update()
+                if (!record) return
+                record.setValue('status', 'missing')
+                // Left awaiting, it is declared again on the next run, which finds the unit missing and charges no
+                // second fee (recordFee).
+                const unit = asset ? str(asset, 'serial_number') : line.assetId
+                if (!record.update()) return warnRefused(record, `Line of ${unit} on ${number} not declared missing`)
                 closeReturnIfDone(line.returnOrderId)
             }
         },
@@ -302,11 +334,15 @@ export function raiseScheduledReturns(): void {
     }
 }
 
-/** UI action "Raise return" on the defective asset of a swap: used by completeInstall for replaced Assets. */
-export function returnReplacedAssets(order: GlideRecord, assetIds: readonly string[]): void {
-    if (assetIds.length === 0) return
+/**
+ * The Assets an install replaced (refresh swap-back, defective unit) go back on a Return (entry/delivery
+ * completeInstall). False when the platform refused it (raiseReturn logs why): the units stay in service and billed, so
+ * the caller reports it, and completing the install again raises it, as they are not yet pending return.
+ */
+export function returnReplacedAssets(order: GlideRecord, assetIds: readonly string[]): boolean {
+    if (assetIds.length === 0) return true
     const refresh = str(order, 'order_type') === 'refresh'
-    raiseReturn({
+    const returnId = raiseReturn({
         trigger: refresh ? 'refresh_swap_back' : 'defective_return',
         customerId: str(order, 'customer'),
         siteId: str(order, 'site'),
@@ -318,4 +354,5 @@ export function returnReplacedAssets(order: GlideRecord, assetIds: readonly stri
         openFieldWork: false,
         description: `${refresh ? 'Refresh swap-back' : 'Defective unit'} from ${str(order, 'number')}`,
     })
+    return returnId !== null
 }

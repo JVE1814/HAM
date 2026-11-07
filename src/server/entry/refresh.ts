@@ -1,4 +1,4 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { refreshWaves, replacementModel, type RefreshCandidate } from '../domain/refresh'
 import type { LifecycleDates } from '../domain/model-lifecycle'
 import { toIsoDate } from '../domain/calendar'
@@ -58,18 +58,22 @@ function raiseWave(customerId: string, siteId: string, agreementId: string, asse
     order.setValue('agreement', agreementId)
     order.setValue('install_mode', 'fsm_engineer')
     order.setValue('short_description', `Refresh of ${assets.length} asset(s) due by ${todayIso()}`)
-    order.insert()
+    // Refused, or a line refused: those Assets are on no open line, so the next run raises them again.
+    if (!order.insert()) return void gs.warn(`[x_daas_ham] No refresh Order for site ${siteId}: ${refusal(order)}`)
     const unmatched: string[] = []
     for (const candidate of assets) {
         const modelId = replacementModel(candidate, catalog, lifecycle, todayIso())
-        if (!modelId) unmatched.push(candidate.assetId)
         const line = new GlideRecord('x_daas_ham_order_line')
         line.initialize()
         line.setValue('order', order.getUniqueValue())
         line.setValue('model', modelId ?? candidate.modelId)
         line.setValue('quantity', 1)
         line.setValue('replaces_asset', candidate.assetId)
-        line.insert()
+        if (!line.insert()) {
+            gs.warn(`[x_daas_ham] Asset ${candidate.assetId} left off ${str(order, 'number')}: ${refusal(line)}`)
+            continue
+        }
+        if (!modelId) unmatched.push(candidate.assetId)
     }
     if (unmatched.length > 0) {
         order.setValue('work_notes', `${unmatched.length} asset(s) have no sellable catalogued successor; their lines reuse the current model. Review before submitting.`)
@@ -77,4 +81,9 @@ function raiseWave(customerId: string, siteId: string, agreementId: string, asse
         return // left in draft for the account manager to adjust
     }
     submitOrder(order)
+}
+
+/** Why the platform refused to save `record`, for the log. */
+function refusal(record: GlideRecord): string {
+    return record.getLastErrorMessage() || 'insert refused'
 }

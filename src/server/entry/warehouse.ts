@@ -105,7 +105,11 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
         if ('error' in created) return reply(response, 422, created)
         asset = created.asset
     }
-    if (receiveReturnedAsset(asset, input.stockroom)) return reply(response, 200, summarise(asset))
+    // A unit coming back from a Site is received ('') or refused, staying pending return (or missing) for a rescan, and
+    // its unsaved move is not shown. Any other unit (null) is received as stock below.
+    const returnRefusal = receiveReturnedAsset(asset, input.stockroom)
+    if (returnRefusal) return reply(response, 422, { error: `Not received: ${returnRefusal}` })
+    if (returnRefusal === '') return reply(response, 200, summarise(asset))
     const stage = readStage(asset)
     if (!awaitsReceipt(stage) || !moveAsset(asset, 'available').allowed) {
         return reply(response, 409, { error: `Not awaiting receipt (${stage ?? 'unknown stage'})` })
@@ -145,7 +149,10 @@ function allocateToWaitingLine(asset: GlideRecord): void {
         const rma = findById('x_daas_ham_oem_rma', viaRma.rmaId)
         rma?.setValue('state', 'replacement_received')
         rma?.setValue('replacement_serial', str(asset, 'serial_number'))
-        rma?.update()
+        // The unit still goes to its line, which needs it; an RMA left open counts as a replacement still to come.
+        if (rma && !rma.update()) {
+            gs.warn(`[x_daas_ham] RMA ${str(rma, 'rma_number')} not marked replacement received: ${refusal(rma)}`)
+        }
     } else {
         // A line lists every purchase order it raised, so units of an earlier one still find it.
         const poId = purchaseOrderId(poNumber)
@@ -157,8 +164,9 @@ function allocateToWaitingLine(asset: GlideRecord): void {
         line.query()
         if (!line.next()) return
         // Arrived, so no longer on order: re-sourcing covers quantity - allocated - on order and must not wait for it.
+        // A refused count is logged to correct by hand; the unit still goes to the line, which would otherwise wait.
         line.setValue('quantity_to_purchase', Math.max(0, num(line, 'quantity_to_purchase') - 1))
-        line.update()
+        if (!line.update()) gs.warn(`[x_daas_ham] ${str(line, 'number')} keeps a unit on order: ${refusal(line)}`)
     }
     if (!moveAsset(asset, 'reserved').allowed) return
     asset.setValue('x_daas_ham_order_line', line.getUniqueValue())
@@ -170,8 +178,10 @@ function allocateToWaitingLine(asset: GlideRecord): void {
         asset.get(asset.getUniqueValue())
         return
     }
-    // Without its Staging task the Asset stays reserved for the line, not staging with no task to finish.
-    if (openStagingTask(asset, line.getUniqueValue())) moveAndSave(asset, 'staging', 'receiving')
+    // Without its Staging task the Asset stays reserved for the line, not staging with no task to finish. A refused
+    // move (moveAndSave warns) leaves it reserved too, so it is read again for the reply, as above.
+    if (!openStagingTask(asset, line.getUniqueValue())) return
+    if (!moveAndSave(asset, 'staging', 'receiving')) asset.get(asset.getUniqueValue())
 }
 
 /** POST /putaway { code, stockroom }: record the stockroom an in-stock asset now sits in, when it is free to move there. */
@@ -185,7 +195,7 @@ export function putAwayAsset(request: RESTAPIRequest, response: RESTAPIResponse)
     const problem = putAwayProblem(readStage(asset), stockroomType(stockroom))
     if (problem) return reply(response, 409, { error: problem })
     asset.setValue('stockroom', input.stockroom)
-    asset.update()
+    if (!asset.update()) return reply(response, 422, { error: `Not put away: ${refusal(asset)}` })
     reply(response, 200, summarise(asset))
 }
 

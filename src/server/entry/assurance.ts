@@ -20,12 +20,24 @@ import { currentSession } from '../platform/session'
 
 const IN_STOCK_STAGES: readonly Stage[] = ['available', 'reserved', 'spare_pool', 'staging', 'staged', 'pending_evaluation', 'pending_wipe', 'pending_disposal']
 
-function expectedLine(auditId: string, assetId: string): void {
-    const line = new GlideRecord('x_daas_ham_audit_line')
-    line.initialize()
-    line.setValue('audit', auditId)
-    line.setValue('asset', assetId)
-    line.insert()
+/**
+ * List the Assets a saved audit expects; how many were listed. Close compares scans with the listed ones only, so a
+ * line the platform refuses is logged, left out of the count, and the user told.
+ */
+function listExpected(audit: GlideRecord, assetIds: readonly string[]): number {
+    const number = str(audit, 'number')
+    let listed = 0
+    for (const assetId of assetIds) {
+        const line = new GlideRecord('x_daas_ham_audit_line')
+        line.initialize()
+        line.setValue('audit', audit.getUniqueValue())
+        line.setValue('asset', assetId)
+        if (line.insert()) listed++
+        else gs.warn(`[x_daas_ham] Asset ${assetId} left off audit ${number}: ${refusal(line)}`)
+    }
+    const left = assetIds.length - listed
+    if (left > 0) gs.addErrorMessage(`${left} asset(s) left off ${number} and not counted (see the system log)`)
+    return listed
 }
 
 /** UI action "Start blind count" on a stockroom: the expected list is everything in stock there. */
@@ -36,15 +48,13 @@ export function uiStartStockroomAudit(current: GlideRecord): void {
     audit.setValue('stockroom', current.getUniqueValue())
     audit.setValue('short_description', `Blind count of ${str(current, 'name')}`)
     audit.setValue('state', 2)
-    const auditId = audit.insert() ?? ''
+    if (!audit.insert()) return void gs.addErrorMessage(`Blind count not started: ${refusal(audit)}`)
     const asset = new GlideRecord('alm_hardware')
     asset.addEncodedQuery(stagesQuery(IN_STOCK_STAGES, `stockroom=${current.getUniqueValue()}`))
     asset.query()
-    let expected = 0
-    while (asset.next()) {
-        expectedLine(auditId, asset.getUniqueValue())
-        expected++
-    }
+    const inStock: string[] = []
+    while (asset.next()) inStock.push(asset.getUniqueValue())
+    const expected = listExpected(audit, inStock)
     audit.setValue('expected_count', expected)
     audit.update()
     gs.addInfoMessage(`Audit ${str(audit, 'number')} started with ${expected} expected asset(s); scan them in the warehouse app (Audit mode)`)
@@ -61,8 +71,7 @@ export function uiStartSiteAudit(current: GlideRecord): void {
     audit.setValue('state', 2)
     const auditId = audit.insert()
     if (!auditId) return void gs.addErrorMessage(`Site audit not started: ${audit.getLastErrorMessage() || 'save refused'}`)
-    const assets = installedAssetIds({ siteId: current.getUniqueValue() })
-    for (const assetId of assets) expectedLine(auditId, assetId)
+    const expected = listExpected(audit, installedAssetIds({ siteId: current.getUniqueValue() }))
     const context = {
         customerId: str(current, 'company'),
         siteId: current.getUniqueValue(),
@@ -70,7 +79,7 @@ export function uiStartSiteAudit(current: GlideRecord): void {
         source: { field: 'x_daas_ham_audit' as const, id: auditId },
     }
     const work = openFieldWork(context, { changeType: 'standard', purpose: 'site_audit', subcontracted: false })
-    audit.setValue('expected_count', assets.length)
+    audit.setValue('expected_count', expected)
     if (work) audit.setValue('work_order', work.workOrderId)
     else gs.addErrorMessage(`No work order for ${str(audit, 'number')} (see the system log): open one by hand`)
     audit.update()
@@ -101,7 +110,12 @@ export function scanAudit(request: RESTAPIRequest, response: RESTAPIResponse): v
     line.setValue('scanned_code', code)
     line.setValue('result', 'found')
     line.setValue('scanned_at', new GlideDateTime().getValue())
-    line.insert()
+    // An unrecorded scan would count its unit missing at close, so the technician is told to scan again.
+    if (!line.insert()) {
+        response.setStatus(422)
+        response.setBody({ error: `Scan not recorded: ${refusal(line)}` } as never)
+        return
+    }
     response.setStatus(200)
     response.setBody({ audit: str(audit, 'number'), scanned: code } as never)
 }
@@ -227,18 +241,25 @@ function openAttestation(agreement: GlideRecord, siteId: string): void {
     attestation.setValue('assigned_to', customerAdminIds(customerId)[0] ?? '')
     attestation.setValue('short_description', 'Confirm the equipment installed at your site')
     attestation.setValue('state', 1)
-    const attestationId = attestation.insert() ?? ''
+    const attestationId = attestation.insert()
+    // Refused: none is open at the Site, so the next run raises it again.
+    if (!attestationId) return void gs.warn(`[x_daas_ham] No attestation for site ${siteId}: ${refusal(attestation)}`)
+    const number = str(attestation, 'number')
     for (const assetId of installedAssetIds({ siteId })) {
         const item = new GlideRecord('x_daas_ham_attestation_item')
         item.initialize()
         item.setValue('attestation', attestationId)
         item.setValue('asset', assetId)
-        item.insert()
+        // The Customer cannot confirm an Asset left off: logged, so its absence is not taken for a confirmation.
+        if (!item.insert()) gs.warn(`[x_daas_ham] Asset ${assetId} left off ${number}: ${refusal(item)}`)
     }
 }
 
-/** Close an attestation answered by the customer; assets reported missing become exceptions. */
-export function completeAttestation(attestation: GlideRecord): void {
+/**
+ * Close an attestation answered by the customer; assets reported missing become exceptions. Why the platform refused
+ * to close it ('' once closed): it stays open to submit again, which raises no exception twice (openException).
+ */
+export function completeAttestation(attestation: GlideRecord): string {
     const item = new GlideRecord('x_daas_ham_attestation_item')
     item.addQuery('attestation', attestation.getUniqueValue())
     item.addQuery('response', 'missing')
@@ -253,7 +274,15 @@ export function completeAttestation(attestation: GlideRecord): void {
     attestation.setValue('attested_by', gs.getUserID())
     attestation.setValue('attested_at', new GlideDateTime().getValue())
     attestation.setValue('state', 3)
-    attestation.update()
+    if (attestation.update()) return ''
+    const reason = refusal(attestation)
+    gs.warn(`[x_daas_ham] Attestation ${str(attestation, 'number')} not closed: ${reason}`)
+    return reason
+}
+
+/** Why the platform refused to save `record`. */
+function refusal(record: GlideRecord): string {
+    return record.getLastErrorMessage() || 'the save was refused'
 }
 
 const MONITORING_TYPES: readonly ExceptionType[] = ['unseen', 'serial_mismatch', 'location_mismatch']
