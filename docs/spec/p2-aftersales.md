@@ -53,8 +53,11 @@
   must be one of the Customer's Sites. Otherwise the request is removed again and the requester is
   told why (`domain/returns.ts` `returnRequestFindings`). The Site choices follow the chosen Customer.
 - From the customer page, only a Customer admin limited to their own Customer requests returns
-  (`domain/visibility.ts` `actsAsCustomerAdmin`); provider staff and platform admins get HTTP 403
-  there and use the record producer.
+  (`domain/visibility.ts` `actsAsCustomerAdmin`), under the record producer's rule
+  (`domain/returns.ts` `returnRequestFindings`). The API answers HTTP 403 when the Return create rule
+  leaves the caller out, and HTTP 400 when the Site is not one of their Customer's Sites. The Return
+  is raised for the caller's own Customer. Provider staff and platform admins get HTTP 403 there and
+  use the record producer.
 - Installed and shipped Assets on a return become *pending return*. The due date is the Agreement's
   return allowance.
 - An Asset already awaiting another return is not added again; completing an install twice raises
@@ -139,6 +142,10 @@
   with the reasons in its work notes.
 - An Order or line the platform refuses is logged; its Assets, on no open replacing line, are raised
   again on the next run.
+- A run holds the job lock `refresh_orders` (ADR 0013) from its read of the open replacing lines to
+  its last Order. A run that finds it held, such as the scheduled job and an *Execute now* at once,
+  raises nothing and logs so. A run that outlasts the lock stops after the wave it lost it in and
+  logs an error naming that Order, to check its Assets are on no other open Order.
 - Shipping opens a **normal** change for the Customer's approval inside the maintenance window.
 
 ## Disposal (D61)

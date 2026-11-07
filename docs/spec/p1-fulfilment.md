@@ -166,9 +166,11 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
 - At that moment:
   - the in-service date is set;
   - the Asset joins its Site's package line, or else the Agreement's line for its device class;
-  - a pending line becomes active with its start date, only while it is still pending when read
-    again: a line another go-live started is joined with its start date kept; one ended meanwhile
-    leaves the Asset pending in service (logged), and its next sighting chooses among the open lines;
+  - a pending line becomes active with its start date under a job lock on the line
+    (`subscription_line_<sys_id>`), only while it is still pending when read again there. A line
+    another go-live started is joined with its start date kept. One ended meanwhile, or whose lock
+    another go-live holds through 5 tries, leaves the Asset pending in service (logged), and its
+    next sighting chooses among the open lines;
   - the lifecycle phase and refresh due date are computed.
 - Sightings of one Asset are applied one at a time under a job lock on it (`seen_asset_<sys_id>`),
   from a fresh read: last_seen only moves forward and only a still-pending Asset goes live. An NMS

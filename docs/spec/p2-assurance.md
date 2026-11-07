@@ -83,7 +83,8 @@ portal menu. Asset managers can open it as a preview (navigator *Customer self-s
 they see every Customer and take only the *Everyone* actions. Returns and attestations are for
 Customer admins limited to their own Customer (`domain/visibility.ts` `actsAsCustomerAdmin`); staff
 raise returns through the *Return or decommission network equipment* record producer, and the API
-refuses anyone else with HTTP 403. Visibility rules limit everything to the user's Customer (Site
+refuses anyone else with HTTP 403, and a return request for a location that is not one of the
+Customer's Sites with HTTP 400. Visibility rules limit everything to the user's Customer (Site
 contacts: their Sites).
 
 | Who | Can |

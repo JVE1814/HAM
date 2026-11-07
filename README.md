@@ -284,7 +284,19 @@ What remains can only be confirmed on an instance or behind a vendor login:
   tries logs two *Unique Key violation* errors. The 15-minute detection job leaves that Asset pending
   and logs nothing of its own for it: only the *Unique Key violation* errors of its refused tries
   appear. Delete the row and the next event or run puts it in service. No `seen_asset_` row is left
-  afterwards.
+  afterwards. A go-live starts a pending Subscription line under `subscription_line_<line sys_id>`.
+  With a row of that name created by hand in *Job lock*, a *seen* event for an Asset going live on
+  that line is accepted. The Asset stays pending in service, ten *Unique Key violation* errors are
+  logged, and so is *[x_daas_ham] <serial> stays pending in service, line not started: another
+  go-live held its lock through every try* (warning). Delete the row and the next sighting starts the
+  line. A row left more than 10 minutes is cleared as abandoned by the next take, which then starts
+  the line. No `subscription_line_` row is left afterwards.
+- **Refresh lock** (daily refresh Orders): the daily *NaaS - raise refresh orders* run holds the job
+  lock `refresh_orders`. With a row of that name in *Job lock*, *Execute now* raises nothing. It logs
+  two *Unique Key violation* errors and *[x_daas_ham] Refresh Orders not raised: another run holds the
+  refresh_orders lock and raises them* (info). Delete the row and the next run raises them. A row left
+  more than 10 minutes is cleared as abandoned by the next take, which then raises them. No
+  `refresh_orders` row is left once a run ends.
 - **Sourcing locks** (Order sourcing and receiving): a sourcing pass holds the job lock
   `source_order_<Order sys_id>` for its whole run, and reads and saves each line under
   `order_line_<line sys_id>`, which a receipt for a waiting line takes too. A pass that finds the
@@ -365,6 +377,9 @@ What remains can only be confirmed on an instance or behind a vendor login:
   per Asset and Return order. Before this release, a damage fee could be charged twice when an
   evaluation was chosen again after the lifecycle refused the move: list Fee events (not waived) that
   share type, Asset and Return order, and waive the duplicates.
+- **Meraki coverage** (after an upgrade): Meraki Assets' coverage is now asked of Cisco SN2INFO only
+  when both `x_daas_ham.oem.meraki.enabled` and `x_daas_ham.oem.cisco.enabled` are true. An install
+  that had only Cisco enabled stops refreshing Meraki coverage until the Meraki property is turned on.
 - **Order create rule in jobs**: an Order is submitted only when its user passes the Order create rule
   (`GlideRecord.canCreate()`). The daily job *NaaS - raise refresh orders* relies on its *Run as* user
   (expected to be the system user) passing it; one without an Order raiser role leaves its refresh

@@ -20,8 +20,12 @@
 ## Applying a decision
 
 A lease takes one buy out or return: once its end action is *Buy out* or *Return to lessor*, applying
-another decision is refused (an extension leaves it undecided, so a later decision is allowed). If the
-lease cannot be saved, nothing is applied and the decision stays open.
+another decision is refused (an extension leaves it undecided, so a later decision is allowed). Apply
+closes the decision before it changes the lease. If the platform refuses that save, nothing is
+applied. If the lease then cannot be saved, nothing is applied and the decision is reopened. If the
+reopen is refused too, it stays closed (logged) and the daily review raises a new decision for the
+still-undecided lease (while the lease ended no more than 30 days ago). A closed decision is never
+applied again, even from a form opened before it closed.
 
 | Decision | Effect |
 |---|---|

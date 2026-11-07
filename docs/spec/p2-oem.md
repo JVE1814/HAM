@@ -20,7 +20,7 @@
 
 | Vendor | REST message | Credentials | Enable with |
 |---|---|---|---|
-| Cisco | `NaaS Cisco Support` | OAuth 2.0 client-credentials profile (id.cisco.com) attached to the message; SNTC/PSS entitlement | `x_daas_ham.oem.cisco.enabled` |
+| Cisco | `NaaS Cisco Support` | OAuth 2.0 client-credentials profile (id.cisco.com) attached to the message; SNTC/PSS entitlement | `x_daas_ham.oem.cisco.enabled` (also serves Meraki coverage, which needs `x_daas_ham.oem.meraki.enabled` too) |
 | Meraki | `NaaS Meraki Dashboard` | `x_daas_ham.meraki.api_key` (password2); orgs in `x_daas_ham.meraki.org_ids` | `x_daas_ham.oem.meraki.enabled` (Cisco must be enabled too for Meraki coverage) |
 | Fortinet | `NaaS FortiCare` | OAuth profile (IAM API user, `client_id=assetmanagement`) | `x_daas_ham.oem.fortinet.enabled` |
 | HPE Mist | `NaaS HPE Mist` | `x_daas_ham.mist.api_token` (password2); orgs in `x_daas_ham.mist.org_ids` | `x_daas_ham.oem.mist.enabled` |
@@ -34,6 +34,10 @@
 - **Coverage (every 4 h, time-boxed)**:
   - Covers Assets not retired and not checked for `x_daas_ham.oem.coverage_refresh_days`, oldest
     first.
+  - A vendor's coverage runs only when that vendor is enabled and so is the vendor whose REST message
+    serves it (`enabledRoute`): Meraki coverage needs both `x_daas_ham.oem.meraki.enabled` and
+    `x_daas_ham.oem.cisco.enabled`. With Cisco enabled alone, SN2INFO is not asked about Meraki
+    serials.
   - The enabled vendors take turns, one batch each, until the time budget
     (`x_daas_ham.job.budget_seconds`) is spent, so a vendor with a backlog does not hold up the
     others and the budget is not left unused while one is behind. Each enabled vendor gets at least
