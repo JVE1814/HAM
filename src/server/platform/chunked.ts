@@ -1,5 +1,5 @@
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
-import { runChunked, type ChunkedJobPorts, type ChunkedJobResult } from '../domain/chunked-job'
+import { runChunked, writeChunkUnderLock, writeHoldingLock, type ChunkedJobPorts, type ChunkedJobResult, type ChunkWrite, type LockLost } from '../domain/chunked-job'
 import { andEachClause } from '../domain/encoded-query'
 import { msToGlide, nowMs } from './clock'
 import { isLocked, withLock } from './locks'
@@ -113,8 +113,10 @@ const LOCKED_RETRY_SECONDS = 60
  * (ADR 0013), and each checks under it that its pass is still the current one: a fresh pass starts only
  * between them, so a superseded chunk neither flushes, queues the next chunk nor completes its pass, and
  * nothing it handled is written. A chunk that finds the lock held runs again later from the same cursor
- * and pass; a pass that completes is marked complete on its job cursor. A superseded or retried chunk
- * reports `done: false` and no counts.
+ * and pass; a pass that completes is marked complete on its job cursor. A holder that outlasts the lock's
+ * abandonment time can lose it mid-write to a fresh pass, so after each write, and when a write throws,
+ * it checks it still holds it; one that lost it writes nothing more and starts another fresh pass, which
+ * clears what both wrote. A superseded, retried or restarted chunk reports `done: false` and no counts.
  */
 export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): ChunkedJobResult {
     const supersede = spec.supersede
@@ -134,44 +136,50 @@ export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): ChunkedJo
     const idle = { processed: 0, failed: 0, done: false, cursor, lastError: '' }
     try {
         if (!token) {
-            const started = withLock(job, () => {
-                token = startRun(job)
-                supersede.onStart()
+            // Set inside the start's lock.
+            let lost = null as LockLost | null
+            const started = withLock(job, (lock) => {
+                lost = writeHoldingLock(
+                    () => lock.held(),
+                    () => {
+                        token = startRun(job)
+                        supersede.onStart()
+                    },
+                )
             })
             if (!started) return retryLater(spec, '')
+            if (lost) return restartPass(spec, lost.error)
         } else if (!isCurrentRun(job, token)) {
             return idle
         }
         // A cheap probe first: a chunk only takes the lock at its end, and would throw its work away then.
         if (isLocked(job)) return retryLater(spec, `${token}:${cursor}`)
         // Set inside saveCursor's lock.
-        let outcome = 'written' as 'written' | 'superseded' | 'locked'
+        let write = { outcome: 'written' } as ChunkWrite | { outcome: 'locked' }
         const result = runOverTable(spec, {
             loadCursor: () => cursor,
             saveCursor: (next, _processed, done, failures) => {
                 const taken = withLock(job, (lock) => {
-                    if (!isCurrentRun(job, token)) {
-                        outcome = 'superseded'
-                        return
-                    }
-                    spec.flush?.(failures)
-                    if (!done) {
-                        gs.eventQueue(spec.eventName, spec.record, spec.parm1, `${token}:${next}`)
-                        return
-                    }
-                    // A flush that outlasted the lock may have lost it to a fresh pass, which then owns the period.
-                    if (!lock.held()) {
-                        outcome = 'superseded'
-                        return
-                    }
-                    supersede.complete?.()
-                    completeRun(job)
+                    write = writeChunkUnderLock(
+                        {
+                            isCurrent: () => isCurrentRun(job, token),
+                            held: () => lock.held(),
+                            flush: () => spec.flush?.(failures),
+                            queueNext: () => gs.eventQueue(spec.eventName, spec.record, spec.parm1, `${token}:${next}`),
+                            complete: () => {
+                                supersede.complete?.()
+                                completeRun(job)
+                            },
+                        },
+                        done,
+                    )
                 })
-                if (!taken) outcome = 'locked'
+                if (!taken) write = { outcome: 'locked' }
             },
         })
-        if (outcome === 'locked') return retryLater(spec, `${token}:${cursor}`)
-        return outcome === 'superseded' ? idle : result
+        if (write.outcome === 'locked') return retryLater(spec, `${token}:${cursor}`)
+        if (write.outcome === 'lost') return restartPass(spec, write.error)
+        return write.outcome === 'superseded' ? idle : result
     } catch (error) {
         if (token) recordStop(supersede, token, error instanceof Error ? error.message : String(error))
         throw error
@@ -196,6 +204,17 @@ function retryLater(spec: Pick<EventJobFields, 'eventName' | 'record' | 'parm1'>
     when.addSeconds(LOCKED_RETRY_SECONDS)
     gs.eventQueueScheduled(spec.eventName, spec.record, spec.parm1, parm2, when)
     return { processed: 0, failed: 0, done: false, cursor: parm2, lastError: 'job locked: retried later' }
+}
+
+/**
+ * Start a fresh pass at once, after a chunk lost the job's lock mid-write: it clears what that chunk wrote beside the pass that took over.
+ * `error` is what the write threw after losing the lock ('' when it finished): the chunk throws nothing, so it is logged here.
+ */
+function restartPass(spec: Pick<EventJobFields, 'eventName' | 'record' | 'parm1'>, error: string): ChunkedJobResult {
+    const threw = error ? ` (the write then threw: ${error})` : ''
+    gs.warn(`[x_daas_ham] ${spec.eventName} ${spec.parm1}: job lock lost while writing${threw}, starting a fresh pass`)
+    gs.eventQueue(spec.eventName, spec.record, spec.parm1, '')
+    return { processed: 0, failed: 0, done: false, cursor: '', lastError: 'job lock lost: pass restarted' }
 }
 
 type TableSource<T, R> = Pick<TableJobFields<T, R>, 'table' | 'query' | 'read' | 'handle'> & { prepare?: PrepareBatch<T, R> }

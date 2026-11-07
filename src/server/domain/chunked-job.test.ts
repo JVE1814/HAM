@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { runChunked, type ChunkedJobPorts } from './chunked-job'
+import { runChunked, writeChunkUnderLock, writeHoldingLock, type ChunkedJobPorts, type LockedChunkPorts } from './chunked-job'
 
 function fakePorts(keys: string[], opts: { cursor?: string; tickMs?: number; failOn?: string[] } = {}) {
     let clock = 0
     const handled: string[] = []
+    const fetched: number[] = []
     const saved: Array<{ cursor: string; processed: number; done: boolean; failed?: number }> = []
     const ports: ChunkedJobPorts<string> = {
         loadCursor: () => opts.cursor ?? '',
-        fetchBatch: (after, size) => keys.filter((k) => k > after).slice(0, size),
+        fetchBatch: (after, size) => {
+            // A runner that never reaches the end fails here instead of hanging the test run.
+            if (fetched.push(size) > 100) throw new Error('runaway')
+            return keys.filter((k) => k > after).slice(0, size)
+        },
         keyOf: (k) => k,
         handle: (k) => {
             clock += opts.tickMs ?? 1
@@ -17,7 +22,7 @@ function fakePorts(keys: string[], opts: { cursor?: string; tickMs?: number; fai
         saveCursor: (cursor, processed, done, failures) => saved.push({ cursor, processed, done, ...(failures.failed > 0 ? { failed: failures.failed } : {}) }),
         now: () => clock,
     }
-    return { ports, handled, saved }
+    return { ports, handled, fetched, saved }
 }
 
 describe('runChunked', () => {
@@ -64,5 +69,121 @@ describe('runChunked', () => {
         const { ports } = fakePorts(['a', 'b', 'c'], { failOn: ['a', 'c'] })
         runChunked({ ...ports, saveCursor: (_cursor, _processed, _done, f) => failures.push(f) }, { batchSize: 10, budgetMs: 100 })
         expect(failures).toEqual([{ failed: 2, lastError: 'c: boom c' }])
+    })
+
+    it.each([0, -5])('fetches one record at a time with a batch size of %i, and still gets to the end', (batchSize) => {
+        const { ports, handled, fetched } = fakePorts(['a', 'b', 'c'])
+        const result = runChunked(ports, { batchSize, budgetMs: 100 })
+        expect(handled).toEqual(['a', 'b', 'c'])
+        expect(result.done).toBe(true)
+        expect(fetched).toEqual([1, 1, 1, 1])
+    })
+
+    it.each([0, -1000])('handles one record before pausing on a budget of %i ms', (budgetMs) => {
+        const { ports, handled, saved } = fakePorts(['a', 'b'])
+        const result = runChunked(ports, { batchSize: 10, budgetMs })
+        expect(handled).toEqual(['a'])
+        expect(result).toMatchObject({ done: false, cursor: 'a' })
+        expect(saved).toEqual([{ cursor: 'a', processed: 1, done: false }])
+    })
+})
+
+type Write = 'flush' | 'complete'
+
+function lockedChunk(opts: { current?: boolean; heldUntil?: Write; throwsIn?: Write } = {}) {
+    const steps: string[] = []
+    const write = (step: Write) => {
+        steps.push(step)
+        if (opts.throwsIn === step) throw new Error(`${step} failed`)
+    }
+    const ports: LockedChunkPorts = {
+        isCurrent: () => opts.current ?? true,
+        // `heldUntil` is the write during which a taker clears the lock.
+        held: () => !(opts.heldUntil && steps.includes(opts.heldUntil)),
+        flush: () => write('flush'),
+        queueNext: () => steps.push('queueNext'),
+        complete: () => write('complete'),
+    }
+    return { ports, steps }
+}
+
+describe('writeChunkUnderLock', () => {
+    it('flushes a chunk and queues the next one', () => {
+        const { ports, steps } = lockedChunk()
+        expect(writeChunkUnderLock(ports, false)).toEqual({ outcome: 'written' })
+        expect(steps).toEqual(['flush', 'queueNext'])
+    })
+
+    it('flushes the last chunk and completes the pass', () => {
+        const { ports, steps } = lockedChunk()
+        expect(writeChunkUnderLock(ports, true)).toEqual({ outcome: 'written' })
+        expect(steps).toEqual(['flush', 'complete'])
+    })
+
+    it('writes nothing for a superseded pass', () => {
+        const { ports, steps } = lockedChunk({ current: false })
+        expect(writeChunkUnderLock(ports, true)).toEqual({ outcome: 'superseded' })
+        expect(steps).toEqual([])
+    })
+
+    it.each([false, true])('writes nothing more after losing the lock during its flush (last chunk: %s)', (last) => {
+        const { ports, steps } = lockedChunk({ heldUntil: 'flush' })
+        expect(writeChunkUnderLock(ports, last)).toEqual({ outcome: 'lost', error: '' })
+        expect(steps).toEqual(['flush'])
+    })
+
+    it('reports a pass whose lock was lost during its completion', () => {
+        const { ports, steps } = lockedChunk({ heldUntil: 'complete' })
+        expect(writeChunkUnderLock(ports, true)).toEqual({ outcome: 'lost', error: '' })
+        expect(steps).toEqual(['flush', 'complete'])
+    })
+
+    it.each<Write>(['flush', 'complete'])('reports the lock as lost, with the error, when the %s throws after losing it', (step) => {
+        const { ports, steps } = lockedChunk({ heldUntil: step, throwsIn: step })
+        expect(writeChunkUnderLock(ports, true)).toEqual({ outcome: 'lost', error: `${step} failed` })
+        expect(steps.at(-1)).toBe(step)
+    })
+
+    it.each<Write>(['flush', 'complete'])('throws on when the %s throws while the lock is still held', (step) => {
+        const { ports, steps } = lockedChunk({ throwsIn: step })
+        expect(() => writeChunkUnderLock(ports, true)).toThrow(`${step} failed`)
+        expect(steps).not.toContain('queueNext')
+    })
+
+    it('neither queues the next chunk nor throws after a flush that threw having lost the lock', () => {
+        const { ports, steps } = lockedChunk({ heldUntil: 'flush', throwsIn: 'flush' })
+        expect(writeChunkUnderLock(ports, false)).toEqual({ outcome: 'lost', error: 'flush failed' })
+        expect(steps).toEqual(['flush'])
+    })
+})
+
+describe('writeHoldingLock', () => {
+    it('gives nothing for a write that held the lock throughout', () => {
+        expect(writeHoldingLock(() => true, () => {})).toBeNull()
+    })
+
+    it('reports a write that finished after losing the lock', () => {
+        let held = true
+        expect(writeHoldingLock(() => held, () => (held = false))).toEqual({ outcome: 'lost', error: '' })
+    })
+
+    it('reports a write that threw after losing the lock, with what it threw', () => {
+        let held = true
+        const write = () => {
+            held = false
+            throw 'deadlock'
+        }
+        expect(writeHoldingLock(() => held, write)).toEqual({ outcome: 'lost', error: 'deadlock' })
+    })
+
+    it('throws on from a write that threw still holding the lock', () => {
+        expect(() =>
+            writeHoldingLock(
+                () => true,
+                () => {
+                    throw new Error('insert refused')
+                },
+            ),
+        ).toThrow('insert refused')
     })
 })

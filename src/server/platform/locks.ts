@@ -4,7 +4,11 @@ import { exists } from './records'
 /** Job locks (ADR 0013): a row per lock held, behind a unique index, so taking a lock is one insert only one holder wins. */
 const LOCK = 'x_daas_ham_job_lock'
 
-/** A lock held this long is taken as abandoned (its holder's transaction died) and cleared by the next taker. */
+/**
+ * A lock held this long is taken as abandoned (its holder's transaction died) and cleared by the next taker. A holder
+ * still running is not stopped, so one whose writes must not overlap the next holder's checks `held()` after each write
+ * and when one throws.
+ */
 const ABANDONED_AFTER_MINUTES = 10
 
 /** A lock being held: `held()` says whether it still is (a holder past the abandonment time may have lost it). */
