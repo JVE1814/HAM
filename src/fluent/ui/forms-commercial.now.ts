@@ -124,3 +124,37 @@ export const service_interval_form = Form({
         },
     ],
 })
+
+export const cost_fact_form = Form({
+    table: 'x_daas_ham_cost_fact',
+    view: default_view,
+    sections: [
+        {
+            caption: 'Cost fact',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'billing_period', type: 'table_field' }, { field: 'customer', type: 'table_field' }, { field: 'site', type: 'table_field' }],
+                    rightElements: [{ field: 'cost_type', type: 'table_field' }, { field: 'amount', type: 'table_field' }, { field: 'currency', type: 'table_field' }],
+                },
+            ],
+        },
+    ],
+})
+
+export const margin_form = Form({
+    table: 'x_daas_ham_margin',
+    view: default_view,
+    sections: [
+        {
+            caption: 'Margin',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'billing_period', type: 'table_field' }, { field: 'customer', type: 'table_field' }, { field: 'site', type: 'table_field' }],
+                    rightElements: [{ field: 'revenue', type: 'table_field' }, { field: 'cost', type: 'table_field' }, { field: 'margin', type: 'table_field' }, { field: 'margin_pct', type: 'table_field' }],
+                },
+            ],
+        },
+    ],
+})

@@ -1,5 +1,5 @@
 import '@servicenow/sdk/global'
-import { BooleanColumn, ChoiceColumn, DateColumn, DateTimeColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
+import { BooleanColumn, ChoiceColumn, DateColumn, DateTimeColumn, DecimalColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 
 /* OEM coverage contracts and RMAs (P2.1, P2.3). */
 
@@ -32,6 +32,7 @@ export const x_daas_ham_oem_coverage = Table({
         }),
         last_checked: DateTimeColumn({ label: 'Last checked', readOnly: true }),
         expiry_notified: BooleanColumn({ label: 'Expiry warning sent', default: false, readOnly: true }),
+        annual_cost: DecimalColumn({ label: 'Annual cost to the Provider' }),
     },
     index: [
         { name: 'x_daas_ham_cov_serial', unique: false, element: 'serial_number' },
@@ -84,5 +85,6 @@ export const x_daas_ham_coverage_import = Table({
         service_level: StringColumn({ label: 'Service level', maxLength: 160 }),
         start_date: StringColumn({ label: 'Start date (YYYY-MM-DD)', maxLength: 20 }),
         end_date: StringColumn({ label: 'End date (YYYY-MM-DD)', maxLength: 20 }),
+        annual_cost: StringColumn({ label: 'Annual cost (optional)', maxLength: 20 }),
     },
 })

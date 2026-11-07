@@ -185,6 +185,22 @@ declare global {
                         table: 'sys_security_acl'
                         id: 'fc94cf5a6d08480daff8b29c90da210e'
                     }
+                    acl_cost_fact_create: {
+                        table: 'sys_security_acl'
+                        id: '1a6406f198fa4328a8091cad89478640'
+                    }
+                    acl_cost_fact_delete: {
+                        table: 'sys_security_acl'
+                        id: '82ac69c7a43b4e3ebe0659ad8859e82e'
+                    }
+                    acl_cost_fact_read: {
+                        table: 'sys_security_acl'
+                        id: 'a145710733bd416e9d988166bbc19381'
+                    }
+                    acl_cost_fact_write: {
+                        table: 'sys_security_acl'
+                        id: '3aa803fae8ab44eb96ffd67b4135f958'
+                    }
                     acl_coverage_import_create: {
                         table: 'sys_security_acl'
                         id: 'c6df5113cc5b48dc962d3a18964906d7'
@@ -344,6 +360,22 @@ declare global {
                     acl_manufacturer_alias_write: {
                         table: 'sys_security_acl'
                         id: '2cec2f0234664687a8e2912c42bfb039'
+                    }
+                    acl_margin_create: {
+                        table: 'sys_security_acl'
+                        id: '1ddad537cbd243cbbf9a2b1e720ae492'
+                    }
+                    acl_margin_delete: {
+                        table: 'sys_security_acl'
+                        id: '97ca7a3f7e344878a9d5b2da844db67d'
+                    }
+                    acl_margin_read: {
+                        table: 'sys_security_acl'
+                        id: 'c5c6cbe1212543638e5eecd327844033'
+                    }
+                    acl_margin_write: {
+                        table: 'sys_security_acl'
+                        id: '19334033a44f4208bbbdaf7da6ed8717'
                     }
                     acl_model_lifecycle_create: {
                         table: 'sys_security_acl'
@@ -1101,6 +1133,10 @@ declare global {
                         table: 'par_dashboard_tab'
                         id: '0baf34b88b1d4f768aebd61feefd5369'
                     }
+                    dash_tab_margin: {
+                        table: 'par_dashboard_tab'
+                        id: '0e4dd35d81f548abb235cbbc950dddf7'
+                    }
                     dash_tab_operations: {
                         table: 'par_dashboard_tab'
                         id: '111ed9a3503b465f898c4489af04d60e'
@@ -1113,6 +1149,14 @@ declare global {
                         table: 'par_dashboard_widget'
                         id: '37e75b0279654866a8247611f2c6e30e'
                     }
+                    dash_w_cost_by_type: {
+                        table: 'par_dashboard_widget'
+                        id: '0ee3b0f1050a4f0b88b79b923f6a2259'
+                    }
+                    dash_w_cost_last_month: {
+                        table: 'par_dashboard_widget'
+                        id: '5ec1036ab76243a49ec8b568448cd001'
+                    }
                     dash_w_exception_types: {
                         table: 'par_dashboard_widget'
                         id: '2b1d992881204939a7bf0891ce08c990'
@@ -1120,6 +1164,14 @@ declare global {
                     dash_w_lines_by_customer: {
                         table: 'par_dashboard_widget'
                         id: '4e59e6aee26f4e6e8a905b33ef7a1090'
+                    }
+                    dash_w_margin_by_customer: {
+                        table: 'par_dashboard_widget'
+                        id: 'f947630430154bbf8440799efc78a3d8'
+                    }
+                    dash_w_margin_last_month: {
+                        table: 'par_dashboard_widget'
+                        id: '9775543c02014608a91a53ed47f75a56'
                     }
                     dash_w_no_coverage: {
                         table: 'par_dashboard_widget'
@@ -1161,6 +1213,10 @@ declare global {
                         table: 'par_dashboard_widget'
                         id: 'fdfaaf2b93c34212a1735084f602bfc3'
                     }
+                    dash_w_revenue_last_month: {
+                        table: 'par_dashboard_widget'
+                        id: '6dfb0203657b4b3f9752a913f64a2410'
+                    }
                     dash_w_spares_by_customer: {
                         table: 'par_dashboard_widget'
                         id: '94568fdc5e164a3ca6fa837fbd0dcc73'
@@ -1192,6 +1248,10 @@ declare global {
                     event_lease_mismatch: {
                         table: 'sysevent_register'
                         id: '60256580d1c4438ab66fca9f72e3c158'
+                    }
+                    event_margin_compute: {
+                        table: 'sysevent_register'
+                        id: 'b90d1a3f099c462c8ec4751a11b9e1f6'
                     }
                     event_model_lifecycle: {
                         table: 'sysevent_register'
@@ -1517,6 +1577,14 @@ declare global {
                         table: 'sys_properties'
                         id: 'a33876ff6c594934b6b3909392b0af67'
                     }
+                    prop_margin_amortisation_months: {
+                        table: 'sys_properties'
+                        id: '6094ba93a5de405c884bedd3dfe757c5'
+                    }
+                    prop_margin_visit_cost: {
+                        table: 'sys_properties'
+                        id: '9ec7eb4434794f9398f6ddf35756426d'
+                    }
                     prop_meraki_key: {
                         table: 'sys_properties'
                         id: 'db826d3f9ed7493190273208cac43582'
@@ -1777,6 +1845,10 @@ declare global {
                         table: 'sysevent_script_action'
                         id: '3159a22dccc642e2959d500f7283c75e'
                     }
+                    sa_margin_compute: {
+                        table: 'sysevent_script_action'
+                        id: 'fc1dac783e8e49868a43c4a1fc7310f5'
+                    }
                     sa_model_lifecycle: {
                         table: 'sysevent_script_action'
                         id: '5f60634c8b984ee59951e980daa3add8'
@@ -1856,6 +1928,10 @@ declare global {
                     src_server_domain_lifecycle_ts: {
                         table: 'sys_module'
                         id: '66118dbddb2b499e9ec71d75e49c9d34'
+                    }
+                    src_server_domain_margin_ts: {
+                        table: 'sys_module'
+                        id: '1117c5ce1de44237a43fe486ffaef0e7'
                     }
                     'src_server_domain_model-lifecycle_ts': {
                         table: 'sys_module'
@@ -1960,6 +2036,10 @@ declare global {
                     src_server_entry_leases_ts: {
                         table: 'sys_module'
                         id: 'd5d5950d160e4d1d8a34a6513f6b61eb'
+                    }
+                    src_server_entry_margin_ts: {
+                        table: 'sys_module'
+                        id: '4ac858cf09d84ce59b9534778dd74877'
                     }
                     src_server_entry_models_ts: {
                         table: 'sys_module'
@@ -2116,6 +2196,10 @@ declare global {
                     ua_billing_close: {
                         table: 'sys_ui_action'
                         id: '0cf47e3f1a014fbfb56c557f56c1cb93'
+                    }
+                    ua_billing_recompute_margin: {
+                        table: 'sys_ui_action'
+                        id: '717d626484814bdda1dd68c818e81385'
                     }
                     ua_billing_regenerate: {
                         table: 'sys_ui_action'
@@ -2329,6 +2413,14 @@ declare global {
                         table: 'sys_ux_applicability_m2m_list'
                         id: '28822af28b784baab057555168939767'
                     }
+                    ws_cost_facts: {
+                        table: 'sys_ux_list'
+                        id: 'd4596ae654bd4a08a9d26f2fcee5cd71'
+                    }
+                    ws_cost_facts_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '2a736571cbf840abbef093cf21e7f75d'
+                    }
                     ws_coverage: {
                         table: 'sys_ux_list'
                         id: '6c47e036a1184dd18aa2e3eb0fc4ec53'
@@ -2404,6 +2496,14 @@ declare global {
                     ws_list_menu: {
                         table: 'sys_ux_list_menu_config'
                         id: '199c5950d8f14416ae378252b536d482'
+                    }
+                    ws_margin: {
+                        table: 'sys_ux_list'
+                        id: '5882c300e08a43dc9320c8cc7a25e8b6'
+                    }
+                    ws_margin_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '5f11dc8430e24ee9a2798fdfb3857790'
                     }
                     ws_models_canonical: {
                         table: 'sys_ux_list'
@@ -3456,6 +3556,28 @@ declare global {
                     },
                     {
                         table: 'sys_ui_element'
+                        id: '02b86a4f71dc4737be617e664cc5d32d'
+                        key: {
+                            sys_ui_section: {
+                                id: '9c68a39be3814797a1fc4e14303ce9f7'
+                                key: {
+                                    name: 'x_daas_ham_margin'
+                                    caption: 'Margin'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
                         id: '02e1ca5907e94f1ba0f387e0128b18d9'
                         key: {
                             sys_ui_section: {
@@ -3587,6 +3709,14 @@ declare global {
                                     name: 'x_daas_ham.inventory_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '03c412f82f91490094bccbcecb7fa4ab'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'billing_period'
                         }
                     },
                     {
@@ -3989,6 +4119,19 @@ declare global {
                                 id: '4e548db0cdee42dfb31bc76a4de6214d'
                                 key: {
                                     name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '065df85a38fd4e87b39c697cb83d07e1'
+                        key: {
+                            sys_security_acl: '1a6406f198fa4328a8091cad89478640'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
                                 }
                             }
                         }
@@ -5102,6 +5245,23 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '0e0113f6b3db45d6a055b96731e14e53'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'billing_period'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '0e06a3950d144164b9d6eaa0d3b9447c'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'cost'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '0e2ec3508ec9488dbe299f730955def1'
                         key: {
@@ -5242,6 +5402,14 @@ declare global {
                                     name: 'x_daas_ham.inventory_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_index'
+                        id: '0f1540844af943d1b3e6935843614039'
+                        key: {
+                            logical_table_name: 'x_daas_ham_margin'
+                            col_name_string: 'customer'
                         }
                     },
                     {
@@ -5639,6 +5807,19 @@ declare global {
                             }
                             element: 'asset'
                             position: '1'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '1156d027ee9c4712a8fdcd4de6904959'
+                        key: {
+                            sys_security_acl: 'c5c6cbe1212543638e5eecd327844033'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -7382,6 +7563,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_db_object'
+                        id: '1cd5cca3cf254f7fb81cb8773e652dd2'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '1cdf0b2602d044e7bac28dc3200fa927'
                         key: {
@@ -7804,6 +7992,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '1f9bf3fe63694c8e91e75a50c018356f'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'billing_period'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '1fa4085b96504104a326d94543481ab7'
                         key: {
@@ -7963,6 +8160,15 @@ declare global {
                             cat_item: 'b7ba0f44835549bb85650282ff5a23aa'
                             variable_set: 'NULL'
                             name: 'assets'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '20aa9f8a2c414c2eab65b84768bc0b33'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'revenue'
+                            language: 'en'
                         }
                     },
                     {
@@ -8808,6 +9014,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '256091a51aa9421bb8086db75432b3d4'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'customer'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_section'
                         id: '25691a0fa614484b8b34e17b33c2d5bd'
                         key: {
@@ -8997,6 +9212,14 @@ declare global {
                                 }
                             }
                             sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '26f6912f48f1496d993c749bd6a0072f'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'NULL'
                         }
                     },
                     {
@@ -9610,6 +9833,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '2ad2f5b149e641abb7cb96cd90559d6e'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'revenue'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '2ada8ed8c971461d9a4445d420139208'
                         key: {
@@ -9661,6 +9892,15 @@ declare global {
                             }
                             element: 'customer'
                             position: '2'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '2b2f5511319e4a459a8625e5ab04ffff'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'margin'
+                            language: 'en'
                         }
                     },
                     {
@@ -10462,6 +10702,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '30053bba847549a2a64426c467490d9f'
+                        key: {
+                            sys_security_acl: '19334033a44f4208bbbdaf7da6ed8717'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'ua_table_licensing_config'
                         id: '300564c0ba3d4fddbcd36d51f72dbdcf'
                         key: {
@@ -10739,6 +10992,28 @@ declare global {
                                 }
                             }
                             element: '.split'
+                            position: '6'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '32721aac2b93489fadb5d7c974ffc07a'
+                        key: {
+                            sys_ui_section: {
+                                id: '9c68a39be3814797a1fc4e14303ce9f7'
+                                key: {
+                                    name: 'x_daas_ham_margin'
+                                    caption: 'Margin'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'cost'
                             position: '6'
                         }
                     },
@@ -11169,6 +11444,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '35024453610f4b998ec26e4c41f90660'
+                        key: {
+                            sys_ui_section: {
+                                id: '9c68a39be3814797a1fc4e14303ce9f7'
+                                key: {
+                                    name: 'x_daas_ham_margin'
+                                    caption: 'Margin'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'revenue'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '352aee43c75a4e8fa61fa813afac2f7c'
                         key: {
@@ -11372,6 +11669,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_staging_template'
                             element: 'customer'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '35b3910a35e3495dad4d687db24f98ca'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'cost_type'
                         }
                     },
                     {
@@ -11586,6 +11891,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_staging_task'
                             element: 'order_line'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '37d542cb4c0e442b8d90dbb0dd29ebee'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'customer'
                         }
                     },
                     {
@@ -12121,6 +12434,20 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: '3b3b73bd61a640ed88111dbed5f13813'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: '3b4489b1f38a4dbab7e32ec5408644bb'
                         key: {
@@ -12275,6 +12602,15 @@ declare global {
                             }
                             element: '.begin_split'
                             position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '3bb7a5991dc44c5e9565f79e17f4af6e'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'NULL'
+                            language: 'en'
                         }
                     },
                     {
@@ -13082,6 +13418,28 @@ declare global {
                         key: {
                             document_key: '936166a4bcf84ecbba62aef297b882d4'
                             variable: '9024a37f671003007ba405225685efe5'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '4321e52bce29417ab8cf6f932a4db4f0'
+                        key: {
+                            sys_ui_section: {
+                                id: '55fd461cbfea4385af2c3061bcfbe00c'
+                                key: {
+                                    name: 'x_daas_ham_cost_fact'
+                                    caption: 'Cost fact'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -14061,6 +14419,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '49092d5296704e20be46378c20dfa79d'
+                        key: {
+                            sys_ui_section: {
+                                id: '55fd461cbfea4385af2c3061bcfbe00c'
+                                key: {
+                                    name: 'x_daas_ham_cost_fact'
+                                    caption: 'Cost fact'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'amount'
+                            position: '6'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '490f8c56225645b7bdb1b85bffc5cc74'
                         key: {
@@ -14930,6 +15310,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '4f512d7742774024a1fbd6954d2c1792'
+                        key: {
+                            name: 'alm_hardware'
+                            element: 'x_daas_ham_support_cost'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '4f7d3be32130442699bcba9a566fb164'
                         key: {
@@ -14997,6 +15385,14 @@ declare global {
                                 }
                             }
                             element: 'occurrences'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '501783c3af1b487eaf40e0e5a344b233'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'site'
                         }
                     },
                     {
@@ -15544,6 +15940,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '5350b14ef52c4d7184e1c32641ab727b'
+                        key: {
+                            name: 'x_daas_ham_coverage_import'
+                            element: 'annual_cost'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '5354a1f4d42b4a76a8d12dcd0ae74986'
                         key: {
@@ -15605,6 +16010,28 @@ declare global {
                             name: 'x_daas_ham_staging_step'
                             element: 'done_at'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '542eee7dccf04dce9530d03f07d112db'
+                        key: {
+                            sys_ui_section: {
+                                id: '9c68a39be3814797a1fc4e14303ce9f7'
+                                key: {
+                                    name: 'x_daas_ham_margin'
+                                    caption: 'Margin'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'billing_period'
+                            position: '1'
                         }
                     },
                     {
@@ -15697,6 +16124,17 @@ declare global {
                             }
                             element: '.split'
                             position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '55046f60c94d44e597f3447bff6f316a'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'cost_type'
+                            value: 'oem_support'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -15875,6 +16313,21 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '55fd461cbfea4385af2c3061bcfbe00c'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            caption: 'Cost fact'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -16346,6 +16799,28 @@ declare global {
                     },
                     {
                         table: 'sys_ui_element'
+                        id: '5a2cbdb9306f49ab9dd0e75c3d89dc1a'
+                        key: {
+                            sys_ui_section: {
+                                id: '55fd461cbfea4385af2c3061bcfbe00c'
+                                key: {
+                                    name: 'x_daas_ham_cost_fact'
+                                    caption: 'Cost fact'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'billing_period'
+                            position: '1'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
                         id: '5a3412777d01409abc8097d54d4b1b20'
                         key: {
                             sys_ui_section: {
@@ -16478,6 +16953,28 @@ declare global {
                             }
                             element: '.split'
                             position: '6'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '5b08078b6a5240159782a1a9e963bd61'
+                        key: {
+                            sys_ui_section: {
+                                id: '55fd461cbfea4385af2c3061bcfbe00c'
+                                key: {
+                                    name: 'x_daas_ham_cost_fact'
+                                    caption: 'Cost fact'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '8'
                         }
                     },
                     {
@@ -17019,6 +17516,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '5e502dcdd0a6405994970f49a1faa0b3'
+                        key: {
+                            sys_ui_section: {
+                                id: '55fd461cbfea4385af2c3061bcfbe00c'
+                                key: {
+                                    name: 'x_daas_ham_cost_fact'
+                                    caption: 'Cost fact'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'site'
+                            position: '3'
+                        }
+                    },
+                    {
                         table: 'sys_ui_form'
                         id: '5e58bb93cb894fad82f8ed1c23d4fa6f'
                         key: {
@@ -17155,6 +17674,19 @@ declare global {
                                 id: '50893530c7b94924ba2610453d4ebd3e'
                                 key: {
                                     name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '5ee70cd3368d4dcf91ab0ce576830240'
+                        key: {
+                            sys_security_acl: '82ac69c7a43b4e3ebe0659ad8859e82e'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
                                 }
                             }
                         }
@@ -19038,6 +19570,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: '6a86f6f2d53648eab86cee542d79d461'
+                        key: {
+                            sys_ui_form: {
+                                id: 'cee23a973ebd42109913d5f46647a693'
+                                key: {
+                                    name: 'x_daas_ham_cost_fact'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '55fd461cbfea4385af2c3061bcfbe00c'
+                                key: {
+                                    name: 'x_daas_ham_cost_fact'
+                                    caption: 'Cost fact'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '6a8baedcd5e14ef38269c4eb44bfabc0'
                         key: {
@@ -19139,6 +19704,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_coverage_import'
                             element: 'start_date'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '6b55f1ec96b04f99b9d209b89968c054'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'currency'
                         }
                     },
                     {
@@ -19292,6 +19865,28 @@ declare global {
                                     name: 'x_daas_ham.admin'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '6c6630ef4270457e8353880279cf3b2e'
+                        key: {
+                            sys_ui_section: {
+                                id: '9c68a39be3814797a1fc4e14303ce9f7'
+                                key: {
+                                    name: 'x_daas_ham_margin'
+                                    caption: 'Margin'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'margin_pct'
+                            position: '8'
                         }
                     },
                     {
@@ -19880,6 +20475,36 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '6fcde72f8d2c4e3aa863434c4c399033'
+                        key: {
+                            sys_ui_section: {
+                                id: '55fd461cbfea4385af2c3061bcfbe00c'
+                                key: {
+                                    name: 'x_daas_ham_cost_fact'
+                                    caption: 'Cost fact'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'currency'
+                            position: '7'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '6fd3fdeb5014420ebdfd44f123164191'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'customer'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '6fddd03320c044bcb2e44f264e290454'
                         key: {
@@ -19989,6 +20614,17 @@ declare global {
                                     name: 'x_daas_ham.inventory_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '705dec392c434ae0afb7cd3d718aae80'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'cost_type'
+                            value: 'purchase'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -20909,6 +21545,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '7543c5a3e56b4d27a149cf03dddd594d'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'margin'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: '756b4e56989a49e3961c50229553d7db'
                         key: {
@@ -20969,6 +21613,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '75768f1ec22341f4ade273b55bc7cbb0'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'site'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '75827cdbf7a946cb84f710cfcaddb6a9'
                         key: {
@@ -21010,6 +21663,15 @@ declare global {
                             }
                             element: 'currency'
                             position: '8'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '7596961eb11943358ec24fba2e30f141'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'margin_pct'
+                            language: 'en'
                         }
                     },
                     {
@@ -21150,6 +21812,13 @@ declare global {
                             }
                             element: '.begin_split'
                             position: '0'
+                        }
+                    },
+                    {
+                        table: 'ua_table_licensing_config'
+                        id: '7675eb122f764a939f4a745ad912399c'
+                        key: {
+                            name: 'x_daas_ham_margin'
                         }
                     },
                     {
@@ -21443,6 +22112,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '7890d43508d343dbbe7c366116d50be5'
+                        key: {
+                            sys_ui_section: {
+                                id: '9c68a39be3814797a1fc4e14303ce9f7'
+                                key: {
+                                    name: 'x_daas_ham_margin'
+                                    caption: 'Margin'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '9'
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: '7899c073a2cd476f9370a0972eeb431d'
                         key: {
@@ -21705,6 +22396,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '7a6b5b60fb274ae3aaec8a2fa58859d4'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'cost_type'
+                            value: 'lease'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '7a716352ac9c44e6a07e4c12f1ed742d'
                         key: {
@@ -21731,6 +22433,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_staging_template'
                             element: 'name'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '7ae05a432cac4cc09269cb41d8c6de52'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'customer'
                             language: 'en'
                         }
                     },
@@ -22665,6 +23376,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_index'
+                        id: '81c1ca6c2c78458b82419458c4203924'
+                        key: {
+                            logical_table_name: 'x_daas_ham_margin'
+                            col_name_string: 'billing_period'
+                        }
+                    },
+                    {
                         table: 'sys_ui_section'
                         id: '81e257c64b1545eb88bddc11ed7fc4fc'
                         key: {
@@ -22975,6 +23694,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '8312f110da544c57b28f2d3500436035'
+                        key: {
+                            sys_security_acl: 'a145710733bd416e9d988166bbc19381'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_section'
                         id: '83688335000648f2916f1244c40ee18b'
                         key: {
@@ -23183,6 +23915,28 @@ declare global {
                             value: 'ap'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '84e0a10077a54356b977c68a52667903'
+                        key: {
+                            sys_ui_section: {
+                                id: '55fd461cbfea4385af2c3061bcfbe00c'
+                                key: {
+                                    name: 'x_daas_ham_cost_fact'
+                                    caption: 'Cost fact'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'customer'
+                            position: '2'
                         }
                     },
                     {
@@ -23658,6 +24412,14 @@ declare global {
                             name: 'x_daas_ham_agreement'
                             element: 'replacement_tier'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_choice_set'
+                        id: '8798b116c4d540d09f897c8cb4d21f04'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'cost_type'
                         }
                     },
                     {
@@ -24599,6 +25361,28 @@ declare global {
                     },
                     {
                         table: 'sys_ui_element'
+                        id: '8e91160694c549d6af2c90c8d5f3b349'
+                        key: {
+                            sys_ui_section: {
+                                id: '9c68a39be3814797a1fc4e14303ce9f7'
+                                key: {
+                                    name: 'x_daas_ham_margin'
+                                    caption: 'Margin'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
                         id: '8e9a9907b93444c2968851f45e86049d'
                         key: {
                             sys_ui_section: {
@@ -24648,6 +25432,13 @@ declare global {
                         key: {
                             name: 'x_daas_ham_catalog_entry'
                             element: 'monthly_rate'
+                        }
+                    },
+                    {
+                        table: 'sys_db_object'
+                        id: '8eba570a10ff4943b170135c2a0070a9'
+                        key: {
+                            name: 'x_daas_ham_margin'
                         }
                     },
                     {
@@ -24833,6 +25624,28 @@ declare global {
                             name: 'x_daas_ham_oem_coverage'
                             element: 'source'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '8f69cc2a04d9456f99370a6ef23a6a0d'
+                        key: {
+                            sys_ui_section: {
+                                id: '9c68a39be3814797a1fc4e14303ce9f7'
+                                key: {
+                                    name: 'x_daas_ham_margin'
+                                    caption: 'Margin'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'margin'
+                            position: '7'
                         }
                     },
                     {
@@ -25964,6 +26777,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '95b2a834c5d744faabbb31067f563f72'
+                        key: {
+                            name: 'alm_hardware'
+                            element: 'x_daas_ham_support_cost'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '95b513f3461c4cbaae6d300e363a744c'
                         key: {
@@ -26334,6 +27156,14 @@ declare global {
                                     name: 'x_daas_ham.admin'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '9879c24157854345b9c9edd2bd6561c2'
+                        key: {
+                            name: 'x_daas_ham_oem_coverage'
+                            element: 'annual_cost'
                         }
                     },
                     {
@@ -27094,6 +27924,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '9c68a39be3814797a1fc4e14303ce9f7'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            caption: 'Margin'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '9c705a628a634faf994d43ca614bc9cb'
                         key: {
@@ -27476,6 +28321,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_index'
+                        id: '9eb9e6b354a640c5a6332422b6ef2a6f'
+                        key: {
+                            logical_table_name: 'x_daas_ham_cost_fact'
+                            col_name_string: 'billing_period'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '9edb62282a044e5d8c79703dc545aafb'
                         key: {
@@ -27486,6 +28339,14 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '9edbbb8995d4421682a375961b3baa7a'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'NULL'
                         }
                     },
                     {
@@ -28474,6 +29335,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'a40f6b267eee400ab36fcbac95b40b00'
+                        key: {
+                            name: 'wm_order'
+                            element: 'x_daas_ham_labour_cost'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'a427b40db85d4266830e5402a1865866'
                         key: {
@@ -28676,6 +29546,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: 'a4e7a6b0f8a4475f9b8438637eeab73f'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'amount'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'a4fd00115c5f4732bcd5a659dec2e790'
                         key: {
@@ -28705,6 +29583,19 @@ declare global {
                         key: {
                             name: 'x_daas_ham_order_line'
                             element: 'sourcing_summary'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: 'a53a4ba0ab514f979196befa34072181'
+                        key: {
+                            sys_ui_action: '717d626484814bdda1dd68c818e81385'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
                         }
                     },
                     {
@@ -28943,6 +29834,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'a6e026c4e5c7455fbdbf11fe1769345f'
+                        key: {
+                            sys_security_acl: '97ca7a3f7e344878a9d5b2da844db67d'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'a700ee61c5f74d4a81058bfe99461b6a'
                         key: {
@@ -29099,6 +30003,28 @@ declare global {
                                     sys_domain: 'global'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'a82bb0f5a9434fb591225a2a9c20d1c2'
+                        key: {
+                            sys_ui_section: {
+                                id: '9c68a39be3814797a1fc4e14303ce9f7'
+                                key: {
+                                    name: 'x_daas_ham_margin'
+                                    caption: 'Margin'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'customer'
+                            position: '2'
                         }
                     },
                     {
@@ -29687,6 +30613,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'acae1b35a3294d3a945e4b3626f83e55'
+                        key: {
+                            sys_security_acl: 'a145710733bd416e9d988166bbc19381'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'io_set_item'
                         id: 'acdc6c9f97cd48dfaac5921e0cbbaf2a'
                         key: {
@@ -30086,6 +31025,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'par_dashboard_canvas'
+                        id: 'b05e8863ff534cb29285fcd123fd5079'
+                        key: {
+                            dashboard: '2201d220760d41669225280628c65eb8'
+                            dashboard_tab: '0e4dd35d81f548abb235cbbc950dddf7'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'b05f64d4efd547e8aa66d77342468cb6'
                         key: {
@@ -30204,6 +31151,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'b0d75c3bf94345bea96bf4fe10e72e1d'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'cost'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: 'b0f67d0f38994c08a587f290f9e00bce'
                         key: {
@@ -30255,6 +31211,14 @@ declare global {
                             value: 'end_of_support'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_index'
+                        id: 'b15fa51687a7487d929da15558fdda24'
+                        key: {
+                            logical_table_name: 'x_daas_ham_cost_fact'
+                            col_name_string: 'customer'
                         }
                     },
                     {
@@ -30788,6 +31752,19 @@ declare global {
                         key: {
                             category: 'x_daas_ham_agreement'
                             prefix: 'NAG'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'b52d7de51297410995b5b70a6d9af69c'
+                        key: {
+                            sys_security_acl: '3aa803fae8ab44eb96ffd67b4135f958'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
                         }
                     },
                     {
@@ -31593,6 +32570,15 @@ declare global {
                                     name: 'x_daas_ham.noc'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'b9cbcb89863444058aec0254242cd8e3'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'cost_type'
+                            language: 'en'
                         }
                     },
                     {
@@ -32689,6 +33675,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'c2864cd6ce344c6da7981e96fcfcf018'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'amount'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: 'c2a3c9ddf59842c8bbf58a097b1d3549'
                         key: {
@@ -33000,6 +33995,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_oem_rma'
                             element: 'status'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'c47a4e53a5694578889de52e1d883c9a'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'NULL'
+                            language: 'en'
                         }
                     },
                     {
@@ -33630,6 +34634,19 @@ declare global {
                                 id: '78194a26d2db4ae7b0ee4efbcc2a7361'
                                 key: {
                                     name: 'snc_external'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'c73213ec413a4212a30d76edfda9c686'
+                        key: {
+                            sys_security_acl: '1ddad537cbd243cbbf9a2b1e720ae492'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
                                 }
                             }
                         }
@@ -34440,6 +35457,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'cc2e9b6b043a468dbff4c5e597c52a1c'
+                        key: {
+                            sys_ui_section: {
+                                id: '55fd461cbfea4385af2c3061bcfbe00c'
+                                key: {
+                                    name: 'x_daas_ham_cost_fact'
+                                    caption: 'Cost fact'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'cost_type'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: 'cc3e5624377d4b7a89089c1fe196f780'
                         key: {
@@ -34985,6 +36024,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'ceaab644e2e34f77be063729351bf9de'
+                        key: {
+                            sys_security_acl: 'a145710733bd416e9d988166bbc19381'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: 'cec1c3c72a0147a191fb2ccbcbd0ad1d'
                         key: {
@@ -35023,6 +36075,29 @@ declare global {
                             value: 'switch'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form'
+                        id: 'cee23a973ebd42109913d5f46647a693'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'cef2f861d7f74f50a10694b147d87d29'
+                        key: {
+                            name: 'x_daas_ham_oem_coverage'
+                            element: 'annual_cost'
+                            language: 'en'
                         }
                     },
                     {
@@ -35421,6 +36496,28 @@ declare global {
                             }
                             element: 'model'
                             position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'd28046d552e148249abf1507300404ec'
+                        key: {
+                            sys_ui_section: {
+                                id: '55fd461cbfea4385af2c3061bcfbe00c'
+                                key: {
+                                    name: 'x_daas_ham_cost_fact'
+                                    caption: 'Cost fact'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '4'
                         }
                     },
                     {
@@ -35925,6 +37022,15 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
+                        id: 'd6b04638644f4dea95603b64ec167a88'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'currency'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
                         id: 'd6b64c093f384814b668e8aa99469c35'
                         key: {
                             name: 'x_daas_ham_model_match_rule'
@@ -36400,6 +37506,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'd971842f546d453180c2e44f9145ad5f'
+                        key: {
+                            sys_ui_section: {
+                                id: '9c68a39be3814797a1fc4e14303ce9f7'
+                                key: {
+                                    name: 'x_daas_ham_margin'
+                                    caption: 'Margin'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'site'
+                            position: '3'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: 'd976f65605b64c72995f15339b5b2ca4'
                         key: {
@@ -36526,6 +37654,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: 'dac21937e2be4c56a3fe4bbd7043fb8c'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'margin_pct'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'dad9e6952dfd423286d2b9a8b2e0a8c4'
                         key: {
@@ -36608,6 +37744,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'db46e8d7739642d89a1c288dd7d6cc21'
+                        key: {
+                            sys_security_acl: 'c5c6cbe1212543638e5eecd327844033'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: 'db56747967c74a2599a5b67f04ace7ed'
                         key: {
@@ -36663,6 +37812,15 @@ declare global {
                                 }
                             }
                             value: 'site_decommission'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'dbcb017e43eb4ba7aaa435dca8e84244'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'site'
+                            language: 'en'
                         }
                     },
                     {
@@ -37451,6 +38609,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'e144d6eda6ad41b49813c2c26da8b91b'
+                        key: {
+                            sys_security_acl: 'c5c6cbe1212543638e5eecd327844033'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: 'e1459e21e69b4204b8dbbbee10e6e30b'
                         key: {
@@ -37548,6 +38719,13 @@ declare global {
                             value: 'completed'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'ua_table_licensing_config'
+                        id: 'e1ecfd224c0a4ba3910febbdee4e4a4b'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
                         }
                     },
                     {
@@ -38062,6 +39240,14 @@ declare global {
                                 }
                             }
                             element: 'audit'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'e5a30af89c404b5ca86cf06f6fc10553'
+                        key: {
+                            name: 'x_daas_ham_coverage_import'
+                            element: 'annual_cost'
                         }
                     },
                     {
@@ -38582,6 +39768,14 @@ declare global {
                     },
                     {
                         table: 'sys_dictionary'
+                        id: 'e99e262d96854e88a687684c5f92ce01'
+                        key: {
+                            name: 'wm_order'
+                            element: 'x_daas_ham_labour_cost'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
                         id: 'e9afd3ef5f62420db667967ac488b4c7'
                         key: {
                             name: 'x_daas_ham_return_order'
@@ -39024,6 +40218,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: 'ecb0166256e74a91a7bc212d452ff186'
+                        key: {
+                            sys_ui_form: {
+                                id: '3b3b73bd61a640ed88111dbed5f13813'
+                                key: {
+                                    name: 'x_daas_ham_margin'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '9c68a39be3814797a1fc4e14303ce9f7'
+                                key: {
+                                    name: 'x_daas_ham_margin'
+                                    caption: 'Margin'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: 'ecbd9b87ce494fd0bc75613c42b4d5ed'
                         key: {
@@ -39344,6 +40571,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_staging_tmpl_item'
                             element: 'mandatory'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'eec9aa56b3be4fe0bf23102b6c4cdc04'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'site'
                         }
                     },
                     {
@@ -40632,6 +41867,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: 'f9e45248ac3c4c9485cb3e08765a9625'
+                        key: {
+                            name: 'x_daas_ham_cost_fact'
+                            element: 'cost_type'
+                            value: 'field_labour'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'fa0489944c8c4f0490ec89b787978c6c'
                         key: {
@@ -40678,6 +41924,14 @@ declare global {
                             }
                             element: '.end_split'
                             position: '6'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'fa392ed15dde481990d5169bdcb9f878'
+                        key: {
+                            name: 'x_daas_ham_margin'
+                            element: 'billing_period'
                         }
                     },
                     {

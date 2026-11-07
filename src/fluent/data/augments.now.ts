@@ -4,6 +4,7 @@ import {
     ChoiceColumn,
     DateColumn,
     DateTimeColumn,
+    DecimalColumn,
     IntegerColumn,
     ListColumn,
     ReferenceColumn,
@@ -79,6 +80,7 @@ export const alm_hardware = Table({
         x_daas_ham_coverage_end: DateColumn({ label: 'OEM coverage end', readOnly: true }),
         x_daas_ham_coverage_level: StringColumn({ label: 'OEM service level', maxLength: 160, readOnly: true }),
         x_daas_ham_coverage_checked: DateTimeColumn({ label: 'OEM coverage checked', readOnly: true }),
+        x_daas_ham_support_cost: DecimalColumn({ label: 'OEM support cost per year', readOnly: true }),
         x_daas_ham_wiped_on: DateColumn({ label: 'Wiped on' }),
         x_daas_ham_wipe_certificate: StringColumn({ label: 'Wipe certificate', maxLength: 100 }),
     },
@@ -187,6 +189,7 @@ export const wm_order = Table({
                 site_audit: { label: 'Site audit', sequence: 3 },
             },
         }),
+        x_daas_ham_labour_cost: DecimalColumn({ label: 'NaaS field labour cost (blank = standard visit cost)' }),
     },
     index: [{ name: 'x_daas_ham_wm_order', unique: false, element: 'x_daas_ham_order' }],
 })

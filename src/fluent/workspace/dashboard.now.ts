@@ -2,7 +2,7 @@ import '@servicenow/sdk/global'
 import { Dashboard } from '@servicenow/sdk/core'
 import { naasWorkspace } from './workspace.now'
 
-/* Workspace landing dashboard. Operations and billing-integrity KPIs (P1). */
+/* Workspace landing dashboard: operations, billing integrity (P1), lifecycle risk (P2) and margin (P3). */
 
 export const naasDashboard = Dashboard({
     $id: Now.ID['dash_naas'],
@@ -278,6 +278,75 @@ export const naasDashboard = Dashboard({
                         headerTitle: 'Open exceptions by type',
                         metrics: [{ dataSource: 'dash_w_exception_types_ds', id: 'dash_w_exception_types_m', aggregateFunction: 'COUNT', axisId: 'primary' }],
                         groupBy: [{ groupBy: [{ dataSource: 'dash_w_exception_types_ds', groupByField: 'exception_type' }], maxNumberOfGroups: 10, showOthers: true }],
+                    },
+                    height: 16,
+                    width: 24,
+                    position: { x: 24, y: 12 },
+                },
+            ],
+        },
+        {
+            $id: Now.ID['dash_tab_margin'],
+            name: 'Margin',
+            widgets: [
+                {
+                    $id: Now.ID['dash_w_revenue_last_month'],
+                    component: 'single-score',
+                    componentProps: {
+                        dataSources: [{ label: 'Revenue last month', sourceType: 'table', tableOrViewName: 'x_daas_ham_margin', filterQuery: 'billing_period.period_startONLast month@javascript:gs.beginningOfLastMonth()@javascript:gs.endOfLastMonth()', id: 'dash_w_revenue_last_month_ds' }],
+                        headerTitle: 'Revenue last month',
+                        metrics: [{ dataSource: 'dash_w_revenue_last_month_ds', id: 'dash_w_revenue_last_month_m', aggregateFunction: 'SUM', field: 'revenue', axisId: 'primary' }],
+                    },
+                    height: 12,
+                    width: 16,
+                    position: { x: 0, y: 0 },
+                },
+                {
+                    $id: Now.ID['dash_w_cost_last_month'],
+                    component: 'single-score',
+                    componentProps: {
+                        dataSources: [{ label: 'Cost last month', sourceType: 'table', tableOrViewName: 'x_daas_ham_margin', filterQuery: 'billing_period.period_startONLast month@javascript:gs.beginningOfLastMonth()@javascript:gs.endOfLastMonth()', id: 'dash_w_cost_last_month_ds' }],
+                        headerTitle: 'Cost last month',
+                        metrics: [{ dataSource: 'dash_w_cost_last_month_ds', id: 'dash_w_cost_last_month_m', aggregateFunction: 'SUM', field: 'cost', axisId: 'primary' }],
+                    },
+                    height: 12,
+                    width: 16,
+                    position: { x: 16, y: 0 },
+                },
+                {
+                    $id: Now.ID['dash_w_margin_last_month'],
+                    component: 'single-score',
+                    componentProps: {
+                        dataSources: [{ label: 'Margin last month', sourceType: 'table', tableOrViewName: 'x_daas_ham_margin', filterQuery: 'billing_period.period_startONLast month@javascript:gs.beginningOfLastMonth()@javascript:gs.endOfLastMonth()', id: 'dash_w_margin_last_month_ds' }],
+                        headerTitle: 'Margin last month',
+                        metrics: [{ dataSource: 'dash_w_margin_last_month_ds', id: 'dash_w_margin_last_month_m', aggregateFunction: 'SUM', field: 'margin', axisId: 'primary' }],
+                    },
+                    height: 12,
+                    width: 16,
+                    position: { x: 32, y: 0 },
+                },
+                {
+                    $id: Now.ID['dash_w_margin_by_customer'],
+                    component: 'horizontal-bar',
+                    componentProps: {
+                        dataSources: [{ label: 'Margin', sourceType: 'table', tableOrViewName: 'x_daas_ham_margin', filterQuery: 'billing_period.period_start>=javascript:gs.beginningOfLast12Months()', id: 'dash_w_margin_by_customer_ds' }],
+                        headerTitle: 'Margin by customer (12 months)',
+                        metrics: [{ dataSource: 'dash_w_margin_by_customer_ds', id: 'dash_w_margin_by_customer_m', aggregateFunction: 'SUM', field: 'margin', axisId: 'primary' }],
+                        groupBy: [{ groupBy: [{ dataSource: 'dash_w_margin_by_customer_ds', groupByField: 'customer' }], maxNumberOfGroups: 15, showOthers: true }],
+                        sortBy: 'value',
+                    },
+                    height: 16,
+                    width: 24,
+                    position: { x: 0, y: 12 },
+                },
+                {
+                    $id: Now.ID['dash_w_cost_by_type'],
+                    component: 'donut',
+                    componentProps: {
+                        dataSources: [{ label: 'Cost fact', sourceType: 'table', tableOrViewName: 'x_daas_ham_cost_fact', filterQuery: 'billing_period.period_startONLast month@javascript:gs.beginningOfLastMonth()@javascript:gs.endOfLastMonth()', id: 'dash_w_cost_by_type_ds' }],
+                        headerTitle: 'Cost last month by type',
+                        metrics: [{ dataSource: 'dash_w_cost_by_type_ds', id: 'dash_w_cost_by_type_m', aggregateFunction: 'SUM', field: 'amount', axisId: 'primary' }],
+                        groupBy: [{ groupBy: [{ dataSource: 'dash_w_cost_by_type_ds', groupByField: 'cost_type', isChoice: true }], maxNumberOfGroups: 10, showOthers: false }],
                     },
                     height: 16,
                     width: 24,

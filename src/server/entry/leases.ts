@@ -4,6 +4,7 @@ import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
 import { addDays } from '../domain/calendar'
 import { groupExpiringCoverage, leaseDecisionProblem, leaseMismatch, renewedEnd, withinLead, type LeaseEndAction } from '../domain/leases'
 import { stagesQuery, type Stage } from '../domain/lifecycle'
+import { leaseShare } from '../domain/margin'
 import { providerApproverIds } from '../platform/approvals'
 import { runEventTableJob } from '../platform/chunked'
 import { todayIso } from '../platform/clock'
@@ -128,7 +129,9 @@ export function uiApplyLeaseDecision(current: GlideRecord): void {
     current.update()
 }
 
+/** Buyout: the Provider owns the Assets, each costing its share of the buyout price (for Margin). */
 function transferToProvider(lease: GlideRecord): void {
+    const share = leaseShare(num(lease, 'buyout_price'), countAssets(lease.getUniqueValue()))
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery('x_daas_ham_lease', lease.getUniqueValue())
     asset.query()
@@ -136,6 +139,7 @@ function transferToProvider(lease: GlideRecord): void {
         asset.setValue('x_daas_ham_lease', '')
         asset.setValue('x_daas_ham_lessor', '')
         asset.setValue('x_daas_ham_legal_owner', 'provider')
+        if (share > 0) asset.setValue('cost', share)
         asset.update()
     }
 }

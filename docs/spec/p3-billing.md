@@ -30,3 +30,21 @@
   - `GET /api/x_daas_ham/naas/billing_periods` lists recent periods with status and totals;
   - `GET /api/x_daas_ham/naas/billing_periods/{id}/lines?offset=0&limit=1000` returns one page of
     lines; `final` is true once the period is closed and `nextOffset` is null on the last page.
+
+# Margin and TCO (P3.28, D72)
+
+Closing a period (or **Recompute margin** on a closed one) rebuilds its **Cost facts** and
+**Margin**, one row per Customer and Site (Site blank for customer-level amounts such as fees).
+
+| Cost type | Source | Attributed by |
+|---|---|---|
+| Purchase | The Asset's cost, written off over `x_daas_ham.margin.amortisation_months` (Provider-owned only; a buyout sets the cost to the Asset's share of the buyout price) | Service-interval days in the month |
+| Lease | The lease's monthly payment split evenly over the Assets it covers (lessor-owned) | Service-interval days |
+| OEM support | Annual cost of the coverage contracts covering the Asset today (`annual_cost`, from the coverage CSV or entered on the contract) ÷ 12 | Service-interval days |
+| Field labour | NaaS work orders closed in the month: their *NaaS field labour cost*, else `x_daas_ham.margin.visit_cost` | The work order's company and location |
+
+- Customer-owned Assets carry no capital cost.
+- **Revenue** is the period's billing lines (subscriptions per Site, fees at Customer level).
+- **Margin** = revenue − cost; margin % = margin ÷ revenue (blank without revenue).
+- The workspace dashboard's **Margin** tab shows last month's revenue, cost and margin, margin by
+  Customer over 12 months, and last month's cost by type.

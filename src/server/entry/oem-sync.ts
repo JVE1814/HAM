@@ -2,7 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import { isIsoDate } from '../domain/calendar'
-import { coverageSummary, type CoverageView } from '../domain/coverage'
+import { annualSupportCost, coverageSummary, type CoverageView } from '../domain/coverage'
 import { mergeLifecycle, type LifecycleDates } from '../domain/model-lifecycle'
 import { OEM_ADAPTERS } from '../domain/oem/adapters'
 import type { CoverageFact, OemVendor } from '../domain/oem/types'
@@ -10,7 +10,7 @@ import { normalizeSerial } from '../domain/asn'
 import { msToGlide, nowMs, todayIso } from '../platform/clock'
 import { oemContext, oemEnabled } from '../platform/oem-http'
 import { intProperty } from '../platform/properties'
-import { bool, str } from '../platform/records'
+import { bool, num, str } from '../platform/records'
 
 /** OEM lifecycle, coverage and RMA-status synchronisation (P2.1, ADR 0008). */
 
@@ -125,7 +125,7 @@ function staleAssets(vendor: OemVendor, staleBefore: string, limit: number): Map
     return assets
 }
 
-function upsertCoverage(assetId: string, vendor: OemVendor, fact: CoverageFact, source: 'api' | 'csv'): void {
+function upsertCoverage(assetId: string, vendor: OemVendor, fact: CoverageFact, source: 'api' | 'csv', annualCost?: number): void {
     const coverage = new GlideRecord('x_daas_ham_oem_coverage')
     coverage.addQuery('serial_number', normalizeSerial(fact.serial))
     coverage.addQuery('contract_number', fact.contractNumber)
@@ -144,6 +144,7 @@ function upsertCoverage(assetId: string, vendor: OemVendor, fact: CoverageFact, 
     if (str(coverage, 'end_date') !== (fact.endDate ?? '')) coverage.setValue('expiry_notified', false)
     coverage.setValue('end_date', fact.endDate ?? '')
     coverage.setValue('source', source)
+    if (annualCost !== undefined) coverage.setValue('annual_cost', annualCost)
     coverage.setValue('last_checked', msToGlide(nowMs()))
     if (exists) coverage.update()
     else coverage.insert()
@@ -158,11 +159,17 @@ export function refreshAssetCoverage(assetId: string): void {
     coverage.addQuery('asset', assetId)
     coverage.query()
     while (coverage.next()) {
-        contracts.push({ covered: bool(coverage, 'covered'), endDate: str(coverage, 'end_date') || undefined, serviceLevel: str(coverage, 'service_level') })
+        contracts.push({
+            covered: bool(coverage, 'covered'),
+            endDate: str(coverage, 'end_date') || undefined,
+            serviceLevel: str(coverage, 'service_level'),
+            annualCost: num(coverage, 'annual_cost'),
+        })
     }
     const summary = coverageSummary(contracts, todayIso())
     asset.setValue('x_daas_ham_coverage_end', summary.coverageEnd)
     asset.setValue('x_daas_ham_coverage_level', summary.serviceLevel)
+    asset.setValue('x_daas_ham_support_cost', annualSupportCost(contracts, todayIso()))
     asset.setValue('x_daas_ham_coverage_checked', msToGlide(nowMs()))
     asset.update()
 }
@@ -203,9 +210,11 @@ export function processCoverageRow(current: GlideRecord): void {
     const serial = normalizeSerial(str(current, 'serial_number'))
     const start = str(current, 'start_date')
     const end = str(current, 'end_date')
+    const cost = str(current, 'annual_cost').trim()
     if (!VENDORS.includes(vendor)) return finish('error', `vendor must be one of ${VENDORS.join(', ')}`)
     if (!serial) return finish('error', 'serial number is required')
     if ((start && !isIsoDate(start)) || (end && !isIsoDate(end))) return finish('error', 'dates must be YYYY-MM-DD')
+    if (cost && !Number.isFinite(Number(cost))) return finish('error', 'annual cost must be a number')
     const asset = new GlideRecord('alm_hardware')
     if (!asset.get('serial_number', serial)) return finish('error', `no asset with serial ${serial}`)
     upsertCoverage(
@@ -220,6 +229,7 @@ export function processCoverageRow(current: GlideRecord): void {
             endDate: end || undefined,
         },
         'csv',
+        cost ? Number(cost) : undefined,
     )
     refreshAssetCoverage(asset.getUniqueValue())
     finish('inserted', `Coverage for ${serial}`)

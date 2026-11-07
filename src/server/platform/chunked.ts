@@ -51,7 +51,14 @@ function loadCursorRecord(job: string): GlideRecord {
  * and the event is queued again (with the new cursor) until the pass is complete.
  */
 export function runEventTableJob<T>(
-    spec: Omit<TableJob<T>, 'job'> & { eventName: string; record: GlideRecord; parm1: string; cursor: string },
+    spec: Omit<TableJob<T>, 'job'> & {
+        eventName: string
+        record: GlideRecord
+        parm1: string
+        cursor: string
+        /** Write out anything accumulated in memory before the next chunk can start. */
+        flush?: () => void
+    },
 ): ChunkedJobResult {
     return runChunked<{ id: string; item: T }>(
         {
@@ -60,6 +67,7 @@ export function runEventTableJob<T>(
             keyOf: (record) => record.id,
             handle: (record) => spec.handle(record.item, record.id),
             saveCursor: (cursor, _processed, done) => {
+                spec.flush?.()
                 if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, cursor)
             },
             now: nowMs,

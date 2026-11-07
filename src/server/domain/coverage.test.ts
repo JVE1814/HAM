@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { coverageSummary } from './coverage'
+import { annualSupportCost, coverageSummary } from './coverage'
 
 describe('coverageSummary', () => {
     it('is covered until the latest end date among covering contracts', () => {
@@ -25,5 +25,22 @@ describe('coverageSummary', () => {
 
     it('has no end without contracts', () => {
         expect(coverageSummary([], '2026-11-07')).toEqual({ coveredToday: false, coverageEnd: '', serviceLevel: '' })
+    })
+})
+
+describe('annualSupportCost', () => {
+    it('sums the contracts covering the asset today', () => {
+        expect(
+            annualSupportCost(
+                [
+                    { covered: true, endDate: '2027-06-30', serviceLevel: '8x5xNBD', annualCost: 120 },
+                    { covered: true, serviceLevel: 'open-ended', annualCost: 30 },
+                    { covered: true, endDate: '2026-01-31', serviceLevel: 'ended', annualCost: 500 },
+                    { covered: false, endDate: '2030-01-01', serviceLevel: 'not covering', annualCost: 900 },
+                    { covered: true, endDate: '2028-01-31', serviceLevel: 'no cost known' },
+                ],
+                '2026-11-07',
+            ),
+        ).toBe(150)
     })
 })

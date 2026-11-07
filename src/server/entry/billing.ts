@@ -152,7 +152,7 @@ export function uiRegenerateBillingPeriod(current: GlideRecord): void {
 
 const CSV_HEADER = ['period', 'kind', 'customer', 'agreement', 'subscription_line', 'site', 'description', 'units', 'monthly_rate', 'amount', 'currency']
 
-/** UI action "Close period": attach the CSV export, mark its fees billed and lock it. */
+/** UI action "Close period": attach the CSV export, mark its fees billed, lock it and compute its margin. */
 export function uiCloseBillingPeriod(current: GlideRecord): void {
     if (str(current, 'status') !== 'ready') return void gs.addErrorMessage('Only a period ready for review can be closed')
     const rows: Array<Array<string | number>> = [CSV_HEADER]
@@ -172,7 +172,8 @@ export function uiCloseBillingPeriod(current: GlideRecord): void {
     current.setValue('closed_at', new GlideDateTime().getValue())
     current.setValue('closed_by', gs.getUserID())
     current.update()
-    gs.addInfoMessage(`${str(current, 'period')} closed and locked`)
+    fire(EVENT.marginCompute, current, current.getUniqueValue())
+    gs.addInfoMessage(`${str(current, 'period')} closed and locked; margin is being computed`)
 }
 
 function linesOf(periodId: string, offset = 0, limit = 0): GlideRecord {

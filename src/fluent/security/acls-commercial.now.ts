@@ -166,3 +166,67 @@ Acl({
     operation: 'delete',
     roles: [admin],
 })
+
+Acl({
+    $id: Now.ID['acl_cost_fact_read'],
+    type: 'record',
+    table: 'x_daas_ham_cost_fact',
+    operation: 'read',
+    roles: moneyReaders,
+})
+
+Acl({
+    $id: Now.ID['acl_cost_fact_write'],
+    type: 'record',
+    table: 'x_daas_ham_cost_fact',
+    operation: 'write',
+    roles: [finance],
+})
+
+Acl({
+    $id: Now.ID['acl_cost_fact_create'],
+    type: 'record',
+    table: 'x_daas_ham_cost_fact',
+    operation: 'create',
+    roles: [finance],
+})
+
+Acl({
+    $id: Now.ID['acl_cost_fact_delete'],
+    type: 'record',
+    table: 'x_daas_ham_cost_fact',
+    operation: 'delete',
+    roles: [finance],
+})
+
+Acl({
+    $id: Now.ID['acl_margin_read'],
+    type: 'record',
+    table: 'x_daas_ham_margin',
+    operation: 'read',
+    roles: moneyReaders,
+})
+
+Acl({
+    $id: Now.ID['acl_margin_write'],
+    type: 'record',
+    table: 'x_daas_ham_margin',
+    operation: 'write',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_margin_create'],
+    type: 'record',
+    table: 'x_daas_ham_margin',
+    operation: 'create',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_margin_delete'],
+    type: 'record',
+    table: 'x_daas_ham_margin',
+    operation: 'delete',
+    roles: [admin],
+})
