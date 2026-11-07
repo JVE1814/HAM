@@ -25,20 +25,24 @@ import { queryInt, reply } from '../platform/rest-api'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
 
-/** Monthly (day 1): open last month's Billing period and generate its lines. */
+/**
+ * Monthly (day 1): open last month's Billing period unless it exists. Its insert rules set its days and start its
+ * generation, as for a period created by hand, so each new period is generated once.
+ */
 export function openMonthlyBillingPeriod(): void {
     const month = previousMonth(todayIso())
     const existing = new GlideRecord('x_daas_ham_billing_period')
     if (existing.get('period', month)) return
-    const bounds = monthBounds(month)
     const period = new GlideRecord('x_daas_ham_billing_period')
     period.initialize()
     period.setValue('period', month)
-    period.setValue('period_start', bounds.first)
-    period.setValue('period_end', bounds.last)
     period.setValue('status', 'generating')
     period.insert()
-    fire(EVENT.billingGenerate, period, period.getUniqueValue())
+}
+
+/** After insert rule on billing periods still generating (the monthly job's or one made by hand): generate it. */
+export function startBillingPeriodGeneration(current: GlideRecord): void {
+    fire(EVENT.billingGenerate, current, current.getUniqueValue())
 }
 
 /**
@@ -413,17 +417,33 @@ function csvRow(period: GlideRecord, line: GlideRecord, display: ReferenceDispla
     ]
 }
 
-/** Before update/delete rule on billing lines: a closed period's lines never change. */
-export function guardClosedBillingLine(current: GlideRecord): void {
-    if (str(current, 'billing_period.status') !== 'closed') return
+/**
+ * Before update/delete rule on billing lines: a closed period's lines never change. The dot-walk on current follows
+ * the period being saved, so an update moving the line to another period also checks the stored one: no line leaves
+ * a closed period.
+ */
+export function guardClosedBillingLine(current: GlideRecord, previous: GlideRecord): void {
+    const statuses = [str(current, 'billing_period.status')]
+    if (current.operation() === 'update' && str(previous, 'billing_period') !== str(current, 'billing_period')) {
+        statuses.push(str(previous, 'billing_period.status'))
+    }
+    if (!statuses.includes('closed')) return
     gs.addErrorMessage('This billing period is closed; its lines cannot change')
     current.setAbortAction(true)
 }
 
-/** Before insert/update rule on billing periods (when the month changes): the month is billed only as YYYY-MM. */
+/**
+ * Before insert/update rule on billing periods (when the month changes): the month is billed only as YYYY-MM, and the
+ * period's first and last day follow it (a period created by hand has them too).
+ */
 export function guardBillingPeriodMonth(current: GlideRecord): void {
     const month = str(current, 'period')
-    if (isMonth(month)) return
+    if (isMonth(month)) {
+        const bounds = monthBounds(month)
+        current.setValue('period_start', bounds.first)
+        current.setValue('period_end', bounds.last)
+        return
+    }
     gs.addErrorMessage(`'${month}' is not a month: enter it as YYYY-MM (e.g. 2026-11)`)
     current.setAbortAction(true)
 }

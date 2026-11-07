@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { monthBounds } from './billing'
+import { addMonths } from './calendar'
 import { CostLedger, costFactKey, leaseShare, marginRows, serviceIntervalCosts, type AssetCostFacts, type LeaseTerms } from './margin'
 
 const november = monthBounds('2026-11')
@@ -12,6 +13,24 @@ function costs(asset: AssetCostFacts, interval: { start: string; end?: string } 
     return serviceIntervalCosts(interval, asset, november, amortisationMonths)
 }
 
+/** A purchase write-off of about `amount` (fractions of a month's days do not divide exactly). */
+function purchaseOf(amount: number) {
+    return [{ type: 'purchase', amount: expect.closeTo(amount, 10) }]
+}
+
+/** The purchase cost of an Asset in service from its purchase date on, summed until a year after its write-off ends. */
+function lifetimePurchaseCost(purchaseDate: string, amortisationMonths: number): number {
+    const asset = { ...provider, purchaseDate }
+    let total = 0
+    for (let i = 0; i <= amortisationMonths + 12; i++) {
+        const month = monthBounds(addMonths(`${purchaseDate.slice(0, 7)}-01`, i).slice(0, 7))
+        for (const cost of serviceIntervalCosts({ start: purchaseDate }, asset, month, amortisationMonths)) {
+            total += cost.amount
+        }
+    }
+    return total
+}
+
 describe('serviceIntervalCosts', () => {
     it('writes a provider-owned purchase off evenly over the amortisation period', () => {
         expect(costs(provider)).toEqual([{ type: 'purchase', amount: 100 }])
@@ -22,13 +41,31 @@ describe('serviceIntervalCosts', () => {
 
     it('ends the write-off the amortisation period after the purchase date', () => {
         expect(costs({ ...provider, purchaseDate: '2021-11-01' })).toEqual([])
-        expect(costs({ ...provider, purchaseDate: '2021-11-02' })).toEqual([{ type: 'purchase', amount: 100 }])
+        expect(costs({ ...provider, purchaseDate: '2021-12-01' })).toEqual([{ type: 'purchase', amount: 100 }])
+    })
+
+    it('charges the last month of a write-off only up to its last day', () => {
+        // Bought 2 Nov 2021: the first month carried 29/30 of a monthly write-off, so 1 Nov 2026 carries the rest.
+        expect(costs({ ...provider, purchaseDate: '2021-11-02' })).toEqual(purchaseOf(100 / 30))
+        expect(costs({ ...provider, purchaseDate: '2021-11-16' })).toEqual(purchaseOf(50))
+        expect(costs({ ...provider, purchaseDate: '2021-11-16' }, { start: '2026-11-10', end: '2026-11-20' })).toEqual(purchaseOf(20))
+        expect(costs({ ...provider, purchaseDate: '2021-11-16' }, { start: '2026-11-16' })).toEqual(purchaseOf(0))
+    })
+
+    it('writes off exactly the cost over the life of an Asset in service throughout', () => {
+        expect(lifetimePurchaseCost('2021-11-16', 60)).toBeCloseTo(6000, 6)
+        expect(lifetimePurchaseCost('2026-01-01', 60)).toBeCloseTo(6000, 6)
+        // First and last months of different lengths, and anniversaries past the end of a short month.
+        expect(lifetimePurchaseCost('2026-01-16', 13)).toBeCloseTo(6000, 6)
+        expect(lifetimePurchaseCost('2024-02-10', 60)).toBeCloseTo(6000, 6)
+        expect(lifetimePurchaseCost('2026-01-31', 1)).toBeCloseTo(6000, 6)
+        expect(lifetimePurchaseCost('2026-03-31', 7)).toBeCloseTo(6000, 6)
     })
 
     it('starts the write-off at the in-service date, cut to a date, when there is no purchase date', () => {
         expect(costs({ ...provider, inServiceDate: '2021-11-01 09:30:00' })).toEqual([])
-        expect(costs({ ...provider, inServiceDate: '2021-11-02 00:00:00' })).toEqual([{ type: 'purchase', amount: 100 }])
-        expect(costs({ ...provider, purchaseDate: '2021-11-02', inServiceDate: '2021-11-01 09:30:00' })).toEqual([{ type: 'purchase', amount: 100 }])
+        expect(costs({ ...provider, inServiceDate: '2021-11-02 00:00:00' })).toEqual(purchaseOf(100 / 30))
+        expect(costs({ ...provider, purchaseDate: '2021-11-02', inServiceDate: '2021-11-01 09:30:00' })).toEqual(purchaseOf(100 / 30))
     })
 
     it('starts the write-off no earlier than the purchase, e.g. a lease buyout', () => {

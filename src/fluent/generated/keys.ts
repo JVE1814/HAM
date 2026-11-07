@@ -1281,6 +1281,10 @@ declare global {
                         table: 'sys_script'
                         id: '216a1d5c79a84537958a483183e41d82'
                     }
+                    br_billing_period_generate: {
+                        table: 'sys_script'
+                        id: '22094c586b8c400983caa7a72e14f66b'
+                    }
                     br_billing_period_locked: {
                         table: 'sys_script'
                         id: 'af4661aa5fc74276b5c4758fcf1846a9'

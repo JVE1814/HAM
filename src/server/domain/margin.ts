@@ -1,5 +1,5 @@
-import { activeDays, type MonthBounds } from './billing'
-import { addMonths } from './calendar'
+import { activeDays, monthBounds, type MonthBounds } from './billing'
+import { addDays, addMonths } from './calendar'
 import { evenShare } from './leases'
 import type { LegalOwner } from './lifecycle'
 
@@ -38,7 +38,7 @@ export interface AssetCostFacts {
 /**
  * The costs one Asset carried over one Service interval, prorated by the interval's days in the month.
  * Provider-owned Assets carry their purchase write-off from its start (no earlier than the purchase,
- * e.g. a lease buyout) until it is complete; leased ones their share of the lease payment while the
+ * e.g. a lease buyout) through its last day; leased ones their share of the lease payment while the
  * lease runs; customer-owned ones neither. Any Asset carries the OEM support the Provider pays for it.
  * Costs follow the Asset as it is now: a month recomputed after a buyout is costed as provider-owned.
  */
@@ -48,14 +48,13 @@ export function serviceIntervalCosts(
     bounds: MonthBounds,
     amortisationMonths: number,
 ): Array<Pick<CostEntry, 'type' | 'amount'>> {
-    const shareFrom = (from: string) => activeDays(bounds, from, interval.end) / bounds.days
-    const share = shareFrom(interval.start)
+    const share = activeDays(bounds, interval.start, interval.end) / bounds.days
     const costs: Array<Pick<CostEntry, 'type' | 'amount'>> = []
     const owner = asset.legalOwner || 'provider'
-    const writeOffFrom = writeOffStart(asset)
-    if (owner === 'provider' && asset.purchaseCost > 0 && amortisationMonths > 0 && !writtenOff(writeOffFrom, bounds, amortisationMonths)) {
-        const from = writeOffFrom > interval.start ? writeOffFrom : interval.start
-        costs.push({ type: 'purchase', amount: (asset.purchaseCost / amortisationMonths) * shareFrom(from) })
+    if (owner === 'provider' && asset.purchaseCost > 0 && amortisationMonths > 0) {
+        const writeOff = writeOffShare(interval, writeOffStart(asset), bounds, amortisationMonths)
+        const monthly = asset.purchaseCost / amortisationMonths
+        if (writeOff !== null) costs.push({ type: 'purchase', amount: monthly * writeOff })
     }
     if (owner === 'lessor' && asset.lease && leaseRunsIn(asset.lease, bounds)) {
         const monthly = leaseShare(asset.lease)
@@ -70,9 +69,27 @@ function writeOffStart(asset: AssetCostFacts): string {
     return asset.purchaseDate.slice(0, 10) || asset.inServiceDate.slice(0, 10)
 }
 
-/** Whether the write-off from `start` ended by the month; an unknown start = still running. */
-function writtenOff(start: string, bounds: MonthBounds, amortisationMonths: number): boolean {
-    return !!start && addMonths(start, amortisationMonths) <= bounds.first
+/**
+ * The share of a monthly write-off the interval carries in the month, counted from the write-off start through
+ * its last day (null once it is complete; an unknown start keeps it running). One that starts mid-month ends
+ * mid-month `amortisationMonths` later, and that last month carries what the first month left of a monthly
+ * write-off: an Asset in service throughout is written off exactly its cost, whatever the two months' lengths.
+ */
+function writeOffShare(
+    interval: { start: string; end?: string },
+    start: string,
+    bounds: MonthBounds,
+    amortisationMonths: number,
+): number | null {
+    if (!start) return activeDays(bounds, interval.start, interval.end) / bounds.days
+    const last = addDays(addMonths(start, amortisationMonths), -1)
+    if (last < bounds.first) return null
+    const from = start > interval.start ? start : interval.start
+    const days = activeDays(bounds, from, interval.end && interval.end < last ? interval.end : last)
+    if (last >= bounds.last) return days / bounds.days
+    const first = monthBounds(start.slice(0, 7))
+    const leftByFirstMonth = (first.days - activeDays(first, start)) / first.days
+    return leftByFirstMonth * (days / activeDays(bounds, bounds.first, last))
 }
 
 /**

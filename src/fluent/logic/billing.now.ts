@@ -7,6 +7,7 @@ import {
     guardClosedBillingLine,
     guardClosedBillingPeriod,
     openMonthlyBillingPeriod,
+    startBillingPeriodGeneration,
     uiCloseBillingPeriod,
     uiExportBillingPeriod,
     uiRegenerateBillingPeriod,
@@ -34,7 +35,7 @@ export const billingGenerateEvent = Record({
         event_name: 'x_daas_ham.billing.generate',
         table: 'x_daas_ham_billing_period',
         description: 'Generate the lines of a billing period; parm1 = period, parm2 = cursor.',
-        fired_by: 'entry/billing.ts openMonthlyBillingPeriod, uiRegenerateBillingPeriod',
+        fired_by: 'entry/billing.ts startBillingPeriodGeneration, uiRegenerateBillingPeriod',
         priority: 200,
     },
 })
@@ -131,11 +132,23 @@ BusinessRule({
 
 BusinessRule({
     $id: Now.ID['br_billing_period_month'],
-    name: 'NaaS - billing period month is YYYY-MM',
+    name: 'NaaS - billing period month is YYYY-MM and sets its days',
     table: 'x_daas_ham_billing_period',
     when: 'before',
     action: ['insert', 'update'],
     order: 100,
     condition: 'current.period.changes()',
     script: guardBillingPeriodMonth,
+})
+
+// Where a new period's generation starts, whether the monthly job or a person created it (Regenerate starts its own).
+BusinessRule({
+    $id: Now.ID['br_billing_period_generate'],
+    name: 'NaaS - generate a new billing period',
+    table: 'x_daas_ham_billing_period',
+    when: 'after',
+    action: ['insert'],
+    order: 200,
+    condition: "current.status == 'generating'",
+    script: startBillingPeriodGeneration,
 })
