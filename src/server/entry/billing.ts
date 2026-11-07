@@ -82,6 +82,8 @@ function generateChunk(period: GlideRecord, cursor: string, current: GlideRecord
         }),
         prepare: (lines: readonly LineRow[]) => withIntervals(lines, bounds),
         handle: (line, lineId) => {
+            // Counted as this line's failure, as if it had read its intervals itself.
+            if (line.intervalsError !== undefined) throw line.intervalsError
             for (const charge of subscriptionCharges(line.terms, bounds, { intervals: line.intervals, siteName })) {
                 insertLine(period, {
                     kind: 'subscription',
@@ -135,12 +137,22 @@ interface LineRow {
 }
 
 /** A Subscription line ready to bill: its row, and its Service intervals in the month. */
-type BillableLine = LineRow & { intervals: readonly ServiceInterval[] }
+type BillableLine = LineRow & { intervals: readonly ServiceInterval[]; intervalsError?: unknown }
 
-/** The batch's lines with their Service intervals in the month (none for a line not billed from them), read with one aggregate for the whole batch. */
+/**
+ * The batch's lines with their Service intervals in the month (none for a line not billed from them), read with
+ * one aggregate for the whole batch. If that read fails, only the lines billed from intervals carry its error,
+ * so the others still bill.
+ */
 function withIntervals(lines: readonly LineRow[], bounds: MonthBounds): BillableLine[] {
-    const byLine = intervalsByLine(lines.filter((line) => billsFromIntervals(line.terms)).map((line) => line.lineId), bounds)
-    return lines.map((line) => ({ ...line, intervals: byLine.get(line.lineId) ?? [] }))
+    const perDevice = lines.filter((line) => billsFromIntervals(line.terms)).map((line) => line.lineId)
+    try {
+        const byLine = intervalsByLine(perDevice, bounds)
+        return lines.map((line) => ({ ...line, intervals: byLine.get(line.lineId) ?? [] }))
+    } catch (error) {
+        const unread = new Set(perDevice)
+        return lines.map((line) => ({ ...line, intervals: [], intervalsError: unread.has(line.lineId) ? error : undefined }))
+    }
 }
 
 /** The Service intervals in the month of each of these lines: one per Site and dates, with the number of Assets sharing them. */
