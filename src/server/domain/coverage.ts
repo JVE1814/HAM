@@ -1,7 +1,8 @@
 import { normalizeSerial } from './asn'
+import { appendTo } from './collections'
 import type { CoverageFact, CoverageFetched } from './oem/types'
 
-/** OEM coverage of one Asset, summarised from its coverage contracts. */
+/** One coverage contract, as an Asset's coverage is summarised from it. */
 export interface CoverageView {
     covered: boolean
     endDate?: string
@@ -43,10 +44,7 @@ export function coverageDisposition(result: CoverageFetched): (serial: string) =
     const failed = new Set(result.failed.map(normalizeSerial))
     const rejected = new Set(result.rejected.map(normalizeSerial))
     const facts = new Map<string, CoverageFact[]>()
-    for (const fact of result.facts) {
-        const key = normalizeSerial(fact.serial)
-        facts.set(key, [...(facts.get(key) ?? []), fact])
-    }
+    for (const fact of result.facts) appendTo(facts, normalizeSerial(fact.serial), fact)
     return (serial) => {
         const key = normalizeSerial(serial)
         if (failed.has(key)) return { kind: 'skip' }
@@ -75,4 +73,52 @@ export function mergeCoverage(stored: CoverageDates, incoming: CoverageDates): C
         endDate: incoming.endDate,
         resetExpiryNotified: (stored.endDate ?? '') !== (incoming.endDate ?? ''),
     }
+}
+
+/** One answered contract to write onto the coverage record of its serial and contract number. */
+export interface CoverageAnswer {
+    /** The Asset the record points at: of duplicate Assets sharing the serial, the last answered. */
+    assetId: string
+    fact: CoverageFact
+    /** What the Provider pays the OEM per year; only a CSV import row gives it. */
+    annualCost?: number
+}
+
+/** A coverage contract's identity: its serial and contract number, ignoring case as the database's own match does. */
+export function contractKey(serial: string, contractNumber: string): string {
+    return `${normalizeSerial(serial)}\n${contractNumber}`.toLowerCase()
+}
+
+/** The answers for each contract (by contractKey), in answer order, so that each contract's record is written once. */
+export function answersByContract(answers: readonly CoverageAnswer[]): Map<string, CoverageAnswer[]> {
+    const byContract = new Map<string, CoverageAnswer[]>()
+    for (const answer of answers) appendTo(byContract, contractKey(answer.fact.serial, answer.fact.contractNumber), answer)
+    return byContract
+}
+
+/** A stored coverage contract and the serial it covers. */
+export interface SerialCoverage extends CoverageView {
+    serial: string
+}
+
+/** The coverage an Asset is given: the summary of its serial's contracts and what the Provider pays for them per year. */
+export interface AssetCoverage extends CoverageSummary {
+    supportCost: number
+}
+
+/**
+ * The coverage of each of `serials`, by normalised serial, summarised from the stored contracts whose serial
+ * matches after normalisation; a serial without contracts gets an empty summary and no support cost, so its Assets
+ * are cleared. Duplicate Assets sharing a serial share it.
+ */
+export function coverageBySerial(serials: Iterable<string>, contracts: readonly SerialCoverage[], today: string): Map<string, AssetCoverage> {
+    const contractsOf = new Map<string, CoverageView[]>()
+    for (const contract of contracts) appendTo(contractsOf, normalizeSerial(contract.serial), contract)
+    const coverage = new Map<string, AssetCoverage>()
+    for (const serial of serials) {
+        const key = normalizeSerial(serial)
+        const views = contractsOf.get(key) ?? []
+        coverage.set(key, { ...coverageSummary(views, today), supportCost: annualSupportCost(views, today) })
+    }
+    return coverage
 }

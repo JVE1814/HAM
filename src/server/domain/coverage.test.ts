@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { annualSupportCost, coverageDisposition, coverageSummary, mergeCoverage } from './coverage'
+import { annualSupportCost, answersByContract, contractKey, coverageBySerial, coverageDisposition, coverageSummary, mergeCoverage } from './coverage'
 import type { CoverageFact } from './oem/types'
 
 describe('coverageSummary', () => {
@@ -91,5 +91,61 @@ describe('mergeCoverage', () => {
         expect(mergeCoverage({}, { endDate: '2029-01-31' }).resetExpiryNotified).toBe(true)
         expect(mergeCoverage({}, {}).resetExpiryNotified).toBe(false)
     })
+})
 
+describe('contractKey', () => {
+    it('is the same for a serial and contract number differing only in case or surrounding spaces of the serial', () => {
+        expect(contractKey(' foc1 ', 'Con-1')).toBe(contractKey('FOC1', 'CON-1'))
+    })
+
+    it('tells apart contracts of one serial, and one contract number on two serials', () => {
+        expect(contractKey('FOC1', 'C1')).not.toBe(contractKey('FOC1', 'C2'))
+        expect(contractKey('FOC1', 'C1')).not.toBe(contractKey('FOC2', 'C1'))
+    })
+})
+
+describe('answersByContract', () => {
+    const fact = (serial: string, contractNumber: string, endDate: string): CoverageFact => ({ serial, covered: true, contractNumber, serviceLevel: 'NBD', endDate })
+
+    it('groups the answers for one serial and contract number, in answer order, apart from the others', () => {
+        const first = { assetId: 'a1', fact: fact('foc1', 'c1', '2027-01-31') }
+        const second = { assetId: 'a1', fact: fact('FOC1', 'C1', '2028-01-31') }
+        const other = { assetId: 'a1', fact: fact('FOC1', 'C2', '2028-01-31') }
+        const elsewhere = { assetId: 'a2', fact: fact('FOC2', 'C1', '2028-01-31'), annualCost: 120 }
+        const grouped = answersByContract([first, other, second, elsewhere])
+        expect([...grouped.values()]).toEqual([[first, second], [other], [elsewhere]])
+        expect(grouped.get(contractKey('FOC1', 'C1'))).toEqual([first, second])
+    })
+
+    it('has no contracts without answers', () => {
+        expect(answersByContract([]).size).toBe(0)
+    })
+})
+
+describe('coverageBySerial', () => {
+    const today = '2026-11-07'
+
+    it('summarises each serial from the contracts with its serial after normalisation', () => {
+        const coverage = coverageBySerial(
+            ['FOC1', 'FOC2'],
+            [
+                { serial: 'foc1 ', covered: true, endDate: '2027-06-30', serviceLevel: '8x5xNBD', annualCost: 100 },
+                { serial: 'FOC1', covered: true, endDate: '2028-01-31', serviceLevel: '24x7x4', annualCost: 50 },
+                { serial: 'FOC2', covered: true, endDate: '2026-01-31', serviceLevel: 'NBD', annualCost: 500 },
+            ],
+            today,
+        )
+        expect(coverage.get('FOC1')).toEqual({ coveredToday: true, coverageEnd: '2028-01-31', serviceLevel: '24x7x4', supportCost: 150 })
+        expect(coverage.get('FOC2')).toEqual({ coveredToday: false, coverageEnd: '2026-01-31', serviceLevel: 'NBD', supportCost: 0 })
+    })
+
+    it('gives an asked serial without contracts no coverage, so its Assets are cleared', () => {
+        expect(coverageBySerial(['FOC3'], [{ serial: 'FOC1', covered: true, endDate: '2028-01-31', serviceLevel: 'NBD' }], today)).toEqual(
+            new Map([['FOC3', { coveredToday: false, coverageEnd: '', serviceLevel: '', supportCost: 0 }]]),
+        )
+    })
+
+    it('keys the coverage by normalised serial', () => {
+        expect([...coverageBySerial([' foc1 '], [], today).keys()]).toEqual(['FOC1'])
+    })
 })

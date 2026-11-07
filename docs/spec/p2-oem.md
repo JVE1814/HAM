@@ -35,8 +35,9 @@
   - Covers Assets not retired and not checked for `x_daas_ham.oem.coverage_refresh_days`, oldest
     first.
   - Contracts are upserted per serial + contract number.
-  - Each Asset gets its coverage end and service level (latest covering contract) and is stamped as
-    checked. Records sharing a serial are all updated.
+  - Each Asset gets its coverage end and service level (latest covering contract) and its annual
+    support cost from the contracts of its serial, and is stamped as checked. Assets sharing a serial
+    all get that serial's coverage; its contracts point at the last of them.
   - When a vendor call fails, only the serials it was asked about are left unchecked (the answered
     ones are stamped), and that vendor waits for the next run. When the vendor answers with an
     error of its own (FortiCloud status other than 0, an SN2INFO answer without `serial_numbers`),
