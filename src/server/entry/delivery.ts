@@ -6,7 +6,7 @@ import { moveAndSave, moveAsset, readStage } from '../platform/assets'
 import { glideToMs } from '../platform/clock'
 import { openFieldWork, type WorkContext } from '../platform/field-work'
 import { recomputeOrder } from '../platform/fulfilment'
-import { findById, str } from '../platform/records'
+import { findById, refusal, str } from '../platform/records'
 import { returnReplacedAssets } from './returns'
 import { labelOrder, shippingEnabled } from './shipping'
 
@@ -134,11 +134,6 @@ function openOnSiteWork(order: GlideRecord, work: OnSiteWork): void {
     order.setValue('work_order', opened.workOrderId)
     // Unlinked, the next Ship opens the work again; the change and work order name the Order, to link them by hand.
     if (!order.update()) gs.addErrorMessage(`On-site work opened but not linked to the Order: ${refusal(order)}`)
-}
-
-/** Why the platform refused to save `record`, for the message. */
-function refusal(record: GlideRecord): string {
-    return record.getLastErrorMessage() || 'the save was refused'
 }
 
 /**

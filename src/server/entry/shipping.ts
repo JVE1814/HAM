@@ -21,7 +21,7 @@ import {
 } from '../domain/shipping'
 import { msToGlide, nowMs } from '../platform/clock'
 import { boolProperty, intProperty, PROPERTY, stagingStockroom, stringProperty } from '../platform/properties'
-import { count, findById, str } from '../platform/records'
+import { count, findById, refusal, str } from '../platform/records'
 import { restMessagePort } from '../platform/rest-port'
 import { queryParam, reply } from '../platform/rest-api'
 
@@ -106,7 +106,7 @@ function createShipment(direction: 'to_site' | 'return', parent: GlideRecord, pa
     shipment.setValue('status', 'label_created')
     if (shipment.insert()) return result
     // The label is paid for, yet tracking, a later Ship and the open-label check cannot find it: name it to be voided.
-    const reason = shipment.getLastErrorMessage() || 'insert refused'
+    const reason = refusal(shipment)
     const label = `${result.carrier} ${result.trackingNumber}, label ${result.labelId}`
     gs.warn(`[x_daas_ham] Label bought for ${str(parent, 'number')} but no Shipment saved (${label}): ${reason}`)
     return { ok: false, error: `the label bought (${label}) was not recorded: ${reason}. Void it with the carrier` }
@@ -196,7 +196,7 @@ export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIRes
     }
     if (!shipment.update()) {
         // Nothing below runs on a status that was not saved: the retry does it.
-        const reason = shipment.getLastErrorMessage() || 'the save was refused'
+        const reason = refusal(shipment)
         gs.warn(`[x_daas_ham] Tracking update of ${update.trackingNumber} not saved: ${reason}`)
         return reply(response, 500, { error: 'Shipment not saved; send the update again' })
     }
@@ -233,7 +233,7 @@ function recordEvents(shipmentId: string, trackingNumber: string, events: readon
         record.setValue('location', event.location)
         if (record.insert()) continue
         refused++
-        const reason = record.getLastErrorMessage() || 'insert refused'
+        const reason = refusal(record)
         gs.warn(`[x_daas_ham] Tracking event of ${trackingNumber} at ${event.occurredAt} not recorded: ${reason}`)
     }
     return refused

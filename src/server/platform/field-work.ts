@@ -1,5 +1,5 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { str } from './records'
+import { refusal, str } from './records'
 
 /**
  * On-site work: an FSM work order (wm_order) and the change request it runs under (D57).
@@ -65,9 +65,4 @@ function workRecord(table: 'change_request' | 'wm_order', context: WorkContext):
     record.setValue('location', context.siteId)
     record.setValue(context.source.field, context.source.id)
     return record
-}
-
-/** Why the platform refused to save `record`, for the log. */
-function refusal(record: GlideRecord): string {
-    return record.getLastErrorMessage() || 'insert refused'
 }

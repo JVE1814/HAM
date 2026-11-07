@@ -1,7 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { initialAutomationStatus } from '../domain/oem/claims'
 import { selectStagingTemplate, type StagingTemplateView } from '../domain/staging'
-import { bool, deleteWhere, num, str } from './records'
+import { bool, deleteWhere, num, refusal, str } from './records'
 
 /** Creating Staging tasks with their checklist steps. */
 
@@ -46,7 +46,7 @@ export function openStagingTask(asset: GlideRecord, orderLineId: string): string
     if (templateId) task.setValue('template', templateId)
     const taskId = task.insert()
     if (!taskId) {
-        gs.warn(`[x_daas_ham] No Staging task for ${str(asset, 'serial_number')}: ${task.getLastErrorMessage() || 'insert refused'}`)
+        gs.warn(`[x_daas_ham] No Staging task for ${str(asset, 'serial_number')}: ${refusal(task)}`)
         return null
     }
     const stepRefused = templateId ? copyTemplateSteps(templateId, taskId) : null
@@ -83,7 +83,7 @@ function copyTemplateSteps(templateId: string, taskId: string): string | null {
             step.setValue('automation', automation)
             step.setValue('automation_status', initialAutomationStatus(automation, taskActions))
         }
-        if (!step.insert()) return `step "${label}" not saved: ${step.getLastErrorMessage() || 'insert refused'}`
+        if (!step.insert()) return `step "${label}" not saved: ${refusal(step)}`
     }
     return null
 }

@@ -5,7 +5,7 @@ import { feeAmount, INSTALLED_STAGES, returnDueDate, SITE_RECOVERY_STAGES, type 
 import { moveAndSave, readStage } from './assets'
 import { todayIso } from './clock'
 import { openFieldWork } from './field-work'
-import { exists, findById, num, str } from './records'
+import { exists, findById, num, refusal, str } from './records'
 
 /** Return orders, their lines and Fee events (P2.4). */
 
@@ -46,7 +46,7 @@ export function raiseReturn(request: ReturnRequest): string | null {
     order.setValue('short_description', request.description)
     const orderId = order.insert()
     if (!orderId) {
-        const reason = order.getLastErrorMessage() || 'insert refused'
+        const reason = refusal(order)
         gs.warn(`[x_daas_ham] Return not raised (${request.description}): ${reason}`)
         return null
     }
@@ -73,7 +73,7 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
         line.setValue('return_order', order.getUniqueValue())
         line.setValue('asset', assetId)
         if (!line.insert()) {
-            const reason = line.getLastErrorMessage() || 'insert refused'
+            const reason = refusal(line)
             gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left off return ${str(order, 'number')}: ${reason}`)
             refused++
             continue
@@ -89,7 +89,7 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
                 continue
             }
             const kept = `${str(asset, 'serial_number')} not pending return but kept on return ${str(order, 'number')}`
-            gs.warn(`[x_daas_ham] ${kept}: ${line.getLastErrorMessage() || 'delete refused'}; remove its line`)
+            gs.warn(`[x_daas_ham] ${kept}: ${refusal(line, 'delete refused')}; remove its line`)
         }
         lines++
     }
@@ -235,9 +235,4 @@ export function closeReturnIfDone(returnOrderId: string): void {
 
 export function stampNow(record: GlideRecord, field: string): void {
     record.setValue(field, new GlideDateTime().getValue())
-}
-
-/** Why the platform refused to save `record`, for the log. */
-function refusal(record: GlideRecord): string {
-    return record.getLastErrorMessage() || 'the save was refused'
 }

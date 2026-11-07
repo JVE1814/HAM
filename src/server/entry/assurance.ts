@@ -12,7 +12,7 @@ import { glideToIsoDate, glideToMs, nowMs, todayIso } from '../platform/clock'
 import { openFieldWork } from '../platform/field-work'
 import { openException, resolveExceptions } from '../platform/exceptions'
 import { intProperty, PROPERTY } from '../platform/properties'
-import { exists, num, str } from '../platform/records'
+import { exists, num, refusal, str } from '../platform/records'
 import { installedAssetIds } from '../platform/returns'
 import { currentSession } from '../platform/session'
 
@@ -70,7 +70,7 @@ export function uiStartSiteAudit(current: GlideRecord): void {
     audit.setValue('short_description', `Site audit of ${str(current, 'name')}`)
     audit.setValue('state', 2)
     const auditId = audit.insert()
-    if (!auditId) return void gs.addErrorMessage(`Site audit not started: ${audit.getLastErrorMessage() || 'save refused'}`)
+    if (!auditId) return void gs.addErrorMessage(`Site audit not started: ${refusal(audit)}`)
     const expected = listExpected(audit, installedAssetIds({ siteId: current.getUniqueValue() }))
     const context = {
         customerId: str(current, 'company'),
@@ -278,11 +278,6 @@ export function completeAttestation(attestation: GlideRecord): string {
     const reason = refusal(attestation)
     gs.warn(`[x_daas_ham] Attestation ${str(attestation, 'number')} not closed: ${reason}`)
     return reason
-}
-
-/** Why the platform refused to save `record`. */
-function refusal(record: GlideRecord): string {
-    return record.getLastErrorMessage() || 'the save was refused'
 }
 
 const MONITORING_TYPES: readonly ExceptionType[] = ['unseen', 'serial_mismatch', 'location_mismatch']

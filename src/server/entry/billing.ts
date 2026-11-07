@@ -20,7 +20,7 @@ import { ROLE } from '../domain/visibility'
 import { RowFailure, runEventTableJob } from '../platform/chunked'
 import { msToGlide, nowMs, todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
-import { deleteWhere, exists, findById, num, pluck, str } from '../platform/records'
+import { deleteWhere, exists, findById, num, pluck, refusal, str } from '../platform/records'
 import { queryInt, reply } from '../platform/rest-api'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
@@ -184,18 +184,13 @@ function intervalsByLine(lineIds: readonly string[], bounds: MonthBounds): Map<s
     return byLine
 }
 
-/** Why the platform refused to save `record`, for the log and the period's last error. */
-function refusal(record: GlideRecord): string {
-    return record.getLastErrorMessage() || 'the save was refused'
-}
-
 /** Insert a Billing line; throws when the platform refuses it, so the line counts as failed instead of vanishing. */
 function insertLine(period: GlideRecord, values: { [field: string]: string | number }): void {
     const line = new GlideRecord('x_daas_ham_billing_line')
     line.initialize()
     line.setValue('billing_period', period.getUniqueValue())
     for (const [field, value] of Object.entries(values)) line.setValue(field, value)
-    if (!line.insert()) throw new Error(`billing line not saved: ${line.getLastErrorMessage() || 'insert refused'}`)
+    if (!line.insert()) throw new Error(`billing line not saved: ${refusal(line)}`)
 }
 
 /** Count lines that failed to bill on the period (does not save): Close period refuses until a regeneration bills them. */

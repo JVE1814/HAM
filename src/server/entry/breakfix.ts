@@ -3,7 +3,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { replacementStep } from '../domain/breakfix'
 import { moveAsset, readStage } from '../platform/assets'
-import { findById, str } from '../platform/records'
+import { findById, refusal, str } from '../platform/records'
 import { submitOrder } from './orders'
 
 /** Break-fix: a CSM case about a failed Asset drives a device-replace Order (P2.3, D58). */
@@ -70,11 +70,6 @@ export function uiRaiseReplacement(current: GlideRecord): void {
         return void gs.addErrorMessage(`${draft}: ${refusal(current)}. Link it and submit it`)
     }
     submitReplacement(order)
-}
-
-/** Why the platform refused to save `record`, for the message. */
-function refusal(record: GlideRecord): string {
-    return record.getLastErrorMessage() || 'the save was refused'
 }
 
 function submitReplacement(order: GlideRecord): void {

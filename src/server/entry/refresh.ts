@@ -5,7 +5,7 @@ import { toIsoDate } from '../domain/calendar'
 import { nowMs, todayIso } from '../platform/clock'
 import { modelLifecycle } from '../platform/lifecycle-dates'
 import { intProperty, PROPERTY } from '../platform/properties'
-import { pluck, str } from '../platform/records'
+import { pluck, refusal, str } from '../platform/records'
 import { submitOrder } from './orders'
 
 /** Daily: refresh Orders for in-service Assets due within the horizon (P2.2, D48: fully automatic). */
@@ -81,9 +81,4 @@ function raiseWave(customerId: string, siteId: string, agreementId: string, asse
         return // left in draft for the account manager to adjust
     }
     submitOrder(order)
-}
-
-/** Why the platform refused to save `record`, for the log. */
-function refusal(record: GlideRecord): string {
-    return record.getLastErrorMessage() || 'insert refused'
 }

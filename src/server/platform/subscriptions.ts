@@ -1,7 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { toIsoDate } from '../domain/calendar'
 import { chooseSubscriptionLine, type SubscriptionLineView } from '../domain/in-service'
-import { findById, str } from './records'
+import { findById, refusal, str } from './records'
 
 /**
  * Attach an Asset going into service to the Subscription line it delivers and start that line (the caller saves the
@@ -34,7 +34,7 @@ export function attachToSubscription(asset: GlideRecord, inServiceAt: number): b
         line?.setValue('status', 'active')
         line?.setValue('start_date', toIsoDate(inServiceAt))
         if (!line?.update()) {
-            const reason = line ? line.getLastErrorMessage() || 'the save was refused' : 'the line is gone'
+            const reason = line ? refusal(line) : 'the line is gone'
             gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} stays pending in service, line not started: ${reason}`)
             return false
         }

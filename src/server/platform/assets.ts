@@ -10,7 +10,7 @@ import {
     type TransitionVerdict,
     voidsWipeEvidence,
 } from '../domain/lifecycle'
-import { str } from './records'
+import { refusal, str } from './records'
 
 /** Reading and moving Assets (alm_hardware) through their Lifecycle stage (ADR 0002). */
 
@@ -59,7 +59,7 @@ export function clearWipeEvidence(asset: GlideRecord): void {
 export function moveAndSave(asset: GlideRecord, to: Stage, context: string): boolean {
     const verdict = moveAsset(asset, to)
     if (verdict.allowed && asset.update()) return true
-    const reason = verdict.allowed ? asset.getLastErrorMessage() || 'the save was refused' : verdict.reason
+    const reason = verdict.allowed ? refusal(asset) : verdict.reason
     gs.warn(`[x_daas_ham] ${context}: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
     return false
 }

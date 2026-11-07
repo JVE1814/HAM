@@ -11,7 +11,7 @@ import { loadNormalizationData, resolveModel } from '../platform/normalization'
 import { PROPERTY, stringProperty } from '../platform/properties'
 import { lineAwaitingRma } from '../platform/oem-rma'
 import { purchaseOrderId } from '../platform/procurement'
-import { findById, num, str } from '../platform/records'
+import { findById, num, refusal, str } from '../platform/records'
 import { openStagingTask } from '../platform/staging-tasks'
 import { nextProviderTag } from '../platform/tags'
 import { receiveReturnedAsset } from './returns'
@@ -61,11 +61,6 @@ function visibleStockroom(stockroomId: string | undefined): GlideRecord | null {
 /** The stockroom's type; a stockroom saved without one counts as a central depot, the field's default. */
 function stockroomType(stockroom: GlideRecord): StockroomType {
     return (str(stockroom, 'x_daas_ham_stockroom_type') || 'central_depot') as StockroomType
-}
-
-/** Why the platform refused to save `record`, for the reply. */
-function refusal(record: GlideRecord): string {
-    return record.getLastErrorMessage() || 'the platform refused the save'
 }
 
 function body(request: RESTAPIRequest): Record<string, string> {

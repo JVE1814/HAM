@@ -6,7 +6,7 @@ import { parseLifecycleRow } from '../domain/model-lifecycle'
 import { newAsset } from '../platform/assets'
 import { loadNormalizationData, recordNormalizationException, resolveModel } from '../platform/normalization'
 import { PROPERTY, stringProperty } from '../platform/properties'
-import { str } from '../platform/records'
+import { refusal, str } from '../platform/records'
 
 /** Import-set rows processed on insert (ASN, lifecycle CSV). */
 
@@ -86,8 +86,4 @@ export function processLifecycleRow(current: GlideRecord): void {
     const saved = exists ? lifecycle.update() : lifecycle.insert()
     if (!saved) return finish(current, 'error', `Lifecycle for ${parsed.pid} not saved: ${refusal(lifecycle)}`)
     finish(current, exists ? 'updated' : 'inserted', `Lifecycle for ${parsed.pid}`)
-}
-
-function refusal(record: GlideRecord): string {
-    return record.getLastErrorMessage() || 'the save was refused'
 }

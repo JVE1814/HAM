@@ -12,7 +12,7 @@ import {
     recordNormalizationException,
     resolveModel,
 } from '../platform/normalization'
-import { str } from '../platform/records'
+import { refusal, str } from '../platform/records'
 
 /** Model normalization and Lifecycle phase / Refresh due date upkeep (P1.2). */
 
@@ -53,7 +53,7 @@ function repointModel(rawModelId: string, canonicalModelId: string): void {
         asset.setValue('model', canonicalModelId)
         if (asset.update()) continue
         refused++
-        const reason = asset.getLastErrorMessage() || 'the save was refused'
+        const reason = refusal(asset)
         gs.warn(`[x_daas_ham] Model normalization: ${str(asset, 'serial_number')} left on its raw model: ${reason}`)
     }
     if (refused > 0) return

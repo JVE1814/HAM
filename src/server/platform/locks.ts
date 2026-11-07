@@ -1,5 +1,5 @@
 import { GlideDateTime, GlideRecord } from '@servicenow/glide'
-import { exists } from './records'
+import { exists, refusal } from './records'
 
 /** Job locks (ADR 0013): a row per lock held, behind a unique index, so taking a lock is one insert only one holder wins. */
 const LOCK = 'x_daas_ham_job_lock'
@@ -46,7 +46,7 @@ function take(name: string): string | null {
     // The holder let go between the refusal and the probe: one more try, so only a refusal with no lock row throws.
     const third = insertLock(name)
     if (third.id) return third.id
-    if (!isLocked(name)) throw new Error(`job lock ${name} could not be taken: ${third.error || 'insert refused'}`)
+    if (!isLocked(name)) throw new Error(`job lock ${name} could not be taken: ${third.error}`)
     return null
 }
 
@@ -56,7 +56,7 @@ function insertLock(name: string): { id: string | null; error: string } {
     lock.initialize()
     lock.setValue('name', name)
     const id = lock.insert()
-    return { id: id || null, error: id ? '' : lock.getLastErrorMessage() }
+    return { id: id || null, error: id ? '' : refusal(lock) }
 }
 
 function clearAbandoned(name: string): void {

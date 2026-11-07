@@ -24,7 +24,7 @@ import { todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
 import { refreshLifecycleDates } from '../platform/lifecycle-dates'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties'
-import { bool, count, exists, findById, num, str } from '../platform/records'
+import { bool, count, exists, findById, num, refusal, str } from '../platform/records'
 import { stockUnit } from '../platform/stock'
 
 /** Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
@@ -388,9 +388,4 @@ export function uiRenewAgreement(current: GlideRecord): void {
     // A refused form save (the platform says why) renewed nothing.
     if (!current.update()) return
     gs.addInfoMessage(`Agreement renewed until ${ends}`)
-}
-
-/** Why the platform refused to save `record`, for the log. */
-function refusal(record: GlideRecord): string {
-    return record.getLastErrorMessage() || 'the save was refused'
 }

@@ -37,7 +37,7 @@ import { todayIso } from '../platform/clock'
 import { openOemRma, openRmaCount } from '../platform/oem-rma'
 import { requestPurchase } from '../platform/procurement'
 import { PROPERTY, stagingStockroom, stringProperty } from '../platform/properties'
-import { bool, count, findById, num, str } from '../platform/records'
+import { bool, count, findById, num, refusal, str } from '../platform/records'
 import { currentSession } from '../platform/session'
 import { openStagingTask } from '../platform/staging-tasks'
 import { linkHotSpare, reserveAsset, stockCandidates } from '../platform/stock'
@@ -123,7 +123,7 @@ function addLine(order: GlideRecord, modelId: string, quantity: number, fromSite
 
 /** Why the platform refused to save `record`, logged with what that leaves undone. */
 function saveRefused(record: GlideRecord, undone: string): string {
-    const reason = record.getLastErrorMessage() || 'the save was refused'
+    const reason = refusal(record)
     gs.warn(`[x_daas_ham] ${undone}: ${reason}`)
     return reason
 }

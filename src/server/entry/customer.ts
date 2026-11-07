@@ -7,7 +7,7 @@ import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
 import { ROLE } from '../domain/visibility'
 import { readStage } from '../platform/assets'
 import { currentSession } from '../platform/session'
-import { exists, findById, str } from '../platform/records'
+import { exists, findById, refusal, str } from '../platform/records'
 import { installedAssetIds, raiseReturn } from '../platform/returns'
 import { returnLabels } from '../platform/shipments'
 import { completeAttestation } from './assurance'
@@ -240,9 +240,4 @@ export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPI
         return reply(response, 422, { error: 'No device could be added: each is already on a return or was refused' })
     }
     reply(response, 201, { returnOrder: findById('x_daas_ham_return_order', returnId)?.getDisplayValue('number') ?? returnId })
-}
-
-/** Why the platform refused to save `record`, for the log. */
-function refusal(record: GlideRecord): string {
-    return record.getLastErrorMessage() || 'the save was refused'
 }

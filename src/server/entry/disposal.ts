@@ -21,7 +21,7 @@ import {
     requestApprovals,
 } from '../platform/approvals'
 import { moveAsset, readStage, transitionFacts } from '../platform/assets'
-import { findById, str } from '../platform/records'
+import { findById, refusal, str } from '../platform/records'
 
 /** Disposal orders: approve, then retire each wiped Asset by its method (P2.5, D61). */
 
@@ -96,7 +96,7 @@ export function onDisposalApprovalDecision(current: GlideRecord): void {
     if (outcome === 'rejected') order.setValue('state', 4)
     // Refused: it still awaits approval with its requests open, so the next decision on them rolls it up again.
     if (!order.update()) {
-        const reason = order.getLastErrorMessage() || 'the save was refused'
+        const reason = refusal(order)
         return void gs.warn(`[x_daas_ham] Disposal ${str(order, 'number')} not saved as ${outcome}: ${reason}`)
     }
     // After the save, so the approval rule each cancellation runs finds the order no longer awaiting approval.
@@ -112,16 +112,16 @@ export function uiCompleteDisposal(current: GlideRecord): void {
     const line = lines(current.getUniqueValue())
     while (line.next()) {
         if (str(line, 'status') === 'done') continue
-        const refusal = retire(line, current)
-        if (refusal) blocked++
-        line.setValue('status', refusal ? 'blocked' : 'done')
-        line.setValue('blockers', refusal)
+        const blockers = retire(line, current)
+        if (blockers) blocked++
+        line.setValue('status', blockers ? 'blocked' : 'done')
+        line.setValue('blockers', blockers)
         if (line.update()) continue
         // A line not saved as done keeps the order open: its Asset may be retired already, so it is set done by hand.
         unsaved++
-        const reason = line.getLastErrorMessage() || 'the save was refused'
+        const reason = refusal(line)
         const what = `${str(current, 'number')} line for ${line.getDisplayValue('asset')}`
-        gs.warn(`[x_daas_ham] ${what} not saved (${refusal ? 'blocked' : 'done, its asset retired'}): ${reason}`)
+        gs.warn(`[x_daas_ham] ${what} not saved (${blockers ? 'blocked' : 'done, its asset retired'}): ${reason}`)
     }
     if (blocked > 0) gs.addErrorMessage(`${blocked} line(s) are blocked; see "Blocked by" on the lines`)
     if (unsaved > 0) gs.addErrorMessage(`${unsaved} line(s) could not be saved (see the system log)`)
@@ -162,7 +162,7 @@ function retire(line: GlideRecord, order: GlideRecord): string {
 function moveAndKeep(asset: GlideRecord, to: Stage): string {
     const verdict = moveAsset(asset, to)
     if (!verdict.allowed) return verdict.reason
-    return asset.update() ? '' : asset.getLastErrorMessage() || `the asset could not be saved as ${to}`
+    return asset.update() ? '' : refusal(asset, `the asset could not be saved as ${to}`)
 }
 
 /**

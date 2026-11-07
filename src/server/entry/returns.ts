@@ -19,7 +19,7 @@ import { runTableJob } from '../platform/chunked'
 import { EVENT } from '../platform/events'
 import { nowMs, todayIso } from '../platform/clock'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties'
-import { bool, findById, str } from '../platform/records'
+import { bool, findById, refusal, str } from '../platform/records'
 import { currentSession } from '../platform/session'
 import {
     closeReturnIfDone,
@@ -113,7 +113,7 @@ export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): s
     clearRackPlacement(asset)
     const verdict = moveAsset(asset, 'pending_evaluation')
     if (!verdict.allowed) return verdict.reason
-    if (!asset.update()) return asset.getLastErrorMessage() || 'the platform refused the save'
+    if (!asset.update()) return refusal(asset)
     endSitePackageIfEmpty(siteId, str(asset, 'x_daas_ham_agreement'))
     if (!line) return ''
     const turnedUp = str(line, 'status') === 'missing'
@@ -170,7 +170,7 @@ function endSitePackageIfEmpty(siteId: string, agreementId: string): void {
 
 /** Log that the platform refused a save, and why: `what` names what was therefore not done. */
 function warnRefused(record: GlideRecord, what: string): void {
-    gs.warn(`[x_daas_ham] ${what}: ${record.getLastErrorMessage() || 'the save was refused'}`)
+    gs.warn(`[x_daas_ham] ${what}: ${refusal(record)}`)
 }
 
 /**
@@ -200,13 +200,13 @@ export function onReturnEvaluated(current: GlideRecord): void {
     }
     // Refused: the line stays received, so the evaluation can be chosen again.
     if (!asset.update()) {
-        const reason = asset.getLastErrorMessage() || 'the save was refused'
+        const reason = refusal(asset)
         gs.addErrorMessage(`The asset was not moved to ${target}: ${reason}`)
         return
     }
     current.setValue('status', 'evaluated')
     if (!current.update()) {
-        const reason = current.getLastErrorMessage() || 'the save was refused'
+        const reason = refusal(current)
         gs.addErrorMessage(`The asset went to ${target}, but its return line was not marked evaluated: ${reason}`)
         return
     }

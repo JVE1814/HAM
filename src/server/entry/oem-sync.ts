@@ -20,7 +20,7 @@ import { normalizeSerial } from '../domain/asn'
 import { msToGlide, nowMs, todayIso } from '../platform/clock'
 import { oemContext, oemEnabled } from '../platform/oem-http'
 import { intProperty } from '../platform/properties'
-import { addAnyOf, bool, num, str } from '../platform/records'
+import { addAnyOf, bool, num, refusal, str } from '../platform/records'
 
 /** OEM lifecycle, coverage and RMA-status synchronisation (P2.1, ADR 0008). */
 
@@ -31,11 +31,6 @@ const COVERAGE_BATCH = 200
 
 function report(job: string, errors: readonly string[]): void {
     for (const error of errors.slice(0, 20)) gs.warn(`[x_daas_ham] ${job}: ${error}`)
-}
-
-/** Why the platform refused to save `record`, for the log. */
-function refusal(record: GlideRecord): string {
-    return record.getLastErrorMessage() || 'the save was refused'
 }
 
 /** Daily: EoX milestones for canonical models of every vendor with a lifecycle API. */

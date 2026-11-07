@@ -1,7 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { addDays } from '../domain/calendar'
 import { todayIso } from './clock'
-import { str } from './records'
+import { refusal, str } from './records'
 
 /** OEM RMA records (opening the RMA with the vendor is manual, ADR 0008). */
 
@@ -18,7 +18,7 @@ export function openOemRma(input: { defectiveAsset: GlideRecord; orderLineId: st
     rma.setValue('ship_back_due', addDays(todayIso(), 10))
     const rmaId = rma.insert()
     if (rmaId) return rmaId
-    const reason = rma.getLastErrorMessage() || 'insert refused'
+    const reason = refusal(rma)
     gs.warn(`[x_daas_ham] No OEM RMA for ${str(input.defectiveAsset, 'serial_number')}: ${reason}`)
     return ''
 }

@@ -1,6 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { normalizeModel, shouldLearnAlias, type ManufacturerAlias, type ModelMatchRule } from '../domain/normalization'
-import { bool, num, str } from './records'
+import { bool, num, refusal, str } from './records'
 
 /** Resolving raw manufacturer/model strings to canonical Models (domain/normalization). */
 
@@ -111,6 +111,6 @@ export function learnFromResolution(exception: GlideRecord, data: NormalizationD
 
 function learned(record: GlideRecord, what: string, rawPair: string): boolean {
     if (record.insert()) return true
-    gs.warn(`[x_daas_ham] No ${what} learned for ${rawPair}: ${record.getLastErrorMessage() || 'the save was refused'}`)
+    gs.warn(`[x_daas_ham] No ${what} learned for ${rawPair}: ${refusal(record)}`)
     return false
 }

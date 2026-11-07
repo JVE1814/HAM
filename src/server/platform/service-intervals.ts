@@ -1,6 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { intervalEnd, restartInterval } from '../domain/billing'
-import { exists, str } from './records'
+import { exists, refusal, str } from './records'
 
 /** Service intervals: the days each Asset delivered a Subscription line (P3.25). */
 
@@ -33,7 +33,7 @@ export function openServiceInterval(asset: GlideRecord, lineId: string, startIso
 }
 
 function warnUnbilled(asset: GlideRecord, startIso: string, interval: GlideRecord): void {
-    const reason = interval.getLastErrorMessage() || 'the save was refused'
+    const reason = refusal(interval)
     gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} in service from ${startIso}, no interval open: ${reason}`)
 }
 
@@ -57,7 +57,7 @@ export function closeServiceIntervals(assetId: string, endIso: string): void {
         interval.setValue('end_date', intervalEnd(str(interval, 'start_date'), endIso))
         if (interval.update()) continue
         // Left open, the interval goes on billing an Asset that has left service.
-        const reason = interval.getLastErrorMessage() || 'the save was refused'
+        const reason = refusal(interval)
         gs.warn(
             `[x_daas_ham] ${str(interval, 'asset.serial_number')} left service on ${endIso}, ` +
                 `its Service interval did not close: ${reason}`,

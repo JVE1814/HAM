@@ -9,7 +9,7 @@ import { memoized } from '../domain/memo'
 import { runEventTableJob } from '../platform/chunked'
 import { EVENT, fire } from '../platform/events'
 import { intProperty, PROPERTY } from '../platform/properties'
-import { count, deleteWhere, findById, num, recordsById, str } from '../platform/records'
+import { count, deleteWhere, findById, num, recordsById, refusal, str } from '../platform/records'
 
 /** Cost facts and Margin per Customer and Site, computed when a Billing period closes (P3.28). */
 
@@ -193,7 +193,7 @@ function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void
  * (ADR 0013) instead of completing with that cost or Margin row left out.
  */
 function checkSaved(sysId: string | null, record: GlideRecord, what: string): void {
-    if (!sysId) throw new Error(`${what} not saved: ${record.getLastErrorMessage() || 'the save was refused'}`)
+    if (!sysId) throw new Error(`${what} not saved: ${refusal(record)}`)
 }
 
 /** Field work orders closed in the month, as Cost facts: their labour cost, or the standard visit cost. */

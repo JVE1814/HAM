@@ -4,7 +4,7 @@ import { andEachClause } from '../domain/encoded-query'
 import { msToGlide, nowMs } from './clock'
 import { isLocked, withLock } from './locks'
 import { intProperty, PROPERTY } from './properties'
-import { str } from './records'
+import { refusal, str } from './records'
 
 /**
  * Run the chunked-job runner over a table, persisting the cursor in x_daas_ham_job_cursor (ADR 0007).
@@ -48,7 +48,7 @@ export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
             cursorRecord.setValue('last_status', done ? 'complete' : 'paused (time budget)')
             if (cursorRecord.update()) return
             // The next run starts again from the cursor last saved, and would do so unseen.
-            const reason = cursorRecord.getLastErrorMessage() || 'the save was refused'
+            const reason = refusal(cursorRecord)
             gs.warn(`[x_daas_ham] ${spec.job}: cursor not saved, so the next run repeats this one: ${reason}`)
         },
     })
@@ -65,7 +65,7 @@ function startRun(job: string): string {
     record.setValue('last_run', msToGlide(nowMs()))
     record.setValue('last_status', 'running')
     if (record.update()) return token
-    throw new Error(`job cursor ${job} not saved: ${record.getLastErrorMessage() || 'the save was refused'}`)
+    throw new Error(`job cursor ${job} not saved: ${refusal(record)}`)
 }
 
 /** Mark the current run of `job` complete (a run still 'running' with an old last run has stalled). */

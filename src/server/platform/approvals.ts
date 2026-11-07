@@ -2,7 +2,7 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import { groupDecisions, rollupApprovals, type ApprovalState } from '../domain/approvals'
 import type { Approver } from '../domain/entitlement'
 import { ROLE } from '../domain/visibility'
-import { pluck, str } from './records'
+import { pluck, refusal, str } from './records'
 
 /** sysapproval_approver records for app tasks (ADR 0004). */
 
@@ -71,7 +71,7 @@ function requestApproval(task: GlideRecord, approverId: string): string {
     approval.setValue('approver', approverId)
     approval.setValue('state', 'requested')
     if (approval.insert()) return ''
-    const reason = approval.getLastErrorMessage() || 'insert refused'
+    const reason = refusal(approval)
     gs.warn(`[x_daas_ham] No approval request for ${str(task, 'number')} to ${approverId}: ${reason}`)
     return reason
 }
@@ -98,7 +98,7 @@ export function cancelPendingApprovals(taskId: string): void {
         approval.setValue('state', 'cancelled')
         if (approval.update()) continue
         // Left waiting, it still counts in the rollup if a draft task is submitted again (a rejection rejects it).
-        const reason = approval.getLastErrorMessage() || 'the save was refused'
+        const reason = refusal(approval)
         gs.warn(`[x_daas_ham] Approval request ${approval.getUniqueValue()} left requested, cancel it: ${reason}`)
     }
 }

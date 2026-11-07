@@ -1,7 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { dependentActions, dueStepsQuery, type ClaimAction, type ClaimOutcome, type ClaimStore, type ClaimTarget } from '../domain/oem/claims'
 import type { OemVendor } from '../domain/oem/types'
-import { num, pluck, recordsById, str } from './records'
+import { num, pluck, recordsById, refusal, str } from './records'
 import { memoized } from '../domain/memo'
 
 const STEP = 'x_daas_ham_staging_step'
@@ -97,7 +97,7 @@ function settle(outcomes: readonly ClaimOutcome[]): void {
             step.setValue('attempts', num(step, 'attempts') + 1)
         }
         if (step.update()) continue
-        const reason = step.getLastErrorMessage() || 'the save was refused'
+        const reason = refusal(step)
         const which = `"${str(step, 'label')}" of ${step.getDisplayValue('staging_task')}`
         gs.warn(`[x_daas_ham] OEM claim step ${which} not saved as ${outcome.ok ? 'done' : 'failed'}: ${reason}`)
     }

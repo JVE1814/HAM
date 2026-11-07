@@ -2,7 +2,7 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import { followsLines, lineStageFor, orderStageFor, type LineStage } from '../domain/fulfilment'
 import type { Stage } from '../domain/lifecycle'
 import { readStage } from './assets'
-import { findById, num, str } from './records'
+import { findById, num, refusal, str } from './records'
 
 /** Keeps Order-line and Order stages in step with their Assets (derived, see domain/fulfilment). */
 
@@ -56,5 +56,5 @@ export function recomputeOrder(orderId: string): void {
  * Order with the actions offered at its stage (Ship, Confirm installed), where they are.
  */
 function warnNotMoved(record: GlideRecord, what: string): void {
-    gs.warn(`[x_daas_ham] ${what}: ${record.getLastErrorMessage() || 'the save was refused'}`)
+    gs.warn(`[x_daas_ham] ${what}: ${refusal(record)}`)
 }

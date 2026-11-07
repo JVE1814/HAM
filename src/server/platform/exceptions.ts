@@ -2,6 +2,7 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import type { ExceptionType } from '../domain/reconciliation'
 import { msToGlide, nowMs } from './clock'
 import { withLock } from './locks'
+import { refusal } from './records'
 
 /** Reconciliation exceptions: at most one open exception per type and asset (or CI). */
 
@@ -67,7 +68,7 @@ function insertException(type: ExceptionType, subject: ExceptionSubject): void {
     exception.setValue('detected_at', msToGlide(nowMs()))
     // An audit or attestation is closed once and does not raise it again, so a refused one is logged, not lost.
     if (exception.insert()) return
-    const reason = exception.getLastErrorMessage() || 'insert refused'
+    const reason = refusal(exception)
     const subjectId = subject.assetId || subject.ciId || ''
     gs.warn(`[x_daas_ham] No ${type} exception for ${subjectId} (${subject.detail}): ${reason}`)
 }

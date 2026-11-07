@@ -67,6 +67,11 @@ export function count(table: string, encodedQuery: string): number {
     return ga.next() ? Number(ga.getAggregate('COUNT', '')) : 0
 }
 
+/** Why the platform refused to save (or delete) `record`: its last error message, or `fallback` when it gave none. */
+export function refusal(record: GlideRecord, fallback = 'the save was refused'): string {
+    return record.getLastErrorMessage() || fallback
+}
+
 export function str(gr: GlideRecord, field: string): string {
     const value = gr.getValue(field)
     return value === null || value === undefined ? '' : String(value)
