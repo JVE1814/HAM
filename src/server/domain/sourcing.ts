@@ -86,8 +86,8 @@ export function isFree(unit: StockUnit, from: readonly Stage[]): boolean {
 
 /**
  * Free, and not bound for its Lessor (on a lease being returned). A returned lease's units can reach free stock after
- * the decision (a swapped-back unit evaluated as refurbish, a released reservation), so this check on the claim's fresh
- * read is the guard that holds; `stockQueries` leaves them out too.
+ * the decision (a released reservation, a unit put back from pending wipe), so this check on the claim's fresh read is
+ * the guard that holds; `stockQueries` leaves them out too.
  */
 export function isClaimable(unit: StockUnit, from: readonly Stage[]): boolean {
     return isFree(unit, from) && unit.leaseEndAction !== RETURNING
