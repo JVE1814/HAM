@@ -553,6 +553,7 @@ Sources:
 | ShipEngine track webhook payload | `data.tracking_number`, `status_code`, descriptions, dates, `events[]` (`domain/shipping.ts:182-200`) | Same fields | matches | S5, S6, S1 |
 | ShipEngine `status_code` values | 8 codes mapped (`domain/shipping.ts:120-129`) | Enum UN, AC, IT, DE, EX, AT, NY, SP | matches | S1, S7, S6 |
 | ShipEngine webhook URL auth | `?token=` in the URL (`entry/shipping.ts:146-147`, `rest.now.ts:178-186`) | Query strings not documented; custom headers and RSA-SHA256 signatures documented | partially | S1, S5, S8 |
+| ShipEngine webhook delivery and retries | A delivery held off by the Shipment's tracking lock is answered 503 for the aggregator to send again (`entry/shipping.ts` `postTrackingUpdate`, commit e197f67) | 10 s to answer 2xx; then at most two more attempts, typically 30 minutes apart, and the event is dropped | differs | S9 |
 | EasyPost Event envelope | Any body with `result.tracking_code` is a tracking update (`domain/shipping.ts:201-203`) | `result` can be another object type, e.g. Insurance, which also has `tracking_code` | partially | E1, E2, E3 |
 | EasyPost Tracker fields and status values | `tracking_code`, `status`, `status_detail`, `est_delivery_date`; 10 statuses (`domain/shipping.ts:131-142,202-212`) | Same | matches | E4 |
 | EasyPost `tracking_details[]` | Field names; last element is the latest scan (`domain/shipping.ts:205-218`) | Field names match; order not documented | partially | E4 |
@@ -650,6 +651,18 @@ Notes:
   5-minute window). Tracking for non-ShipEngine labels needs
   `POST /v1/tracking/start?carrier_code=&tracking_number=` (204). The docs do not say whether labels
   bought through ShipEngine are subscribed automatically.
+- **ShipEngine webhook retries.** The "Webhook Payloads" section of S9, read 2026-11-07, says: "When
+  ShipStation API dispatches a webhook, we allow 10 seconds for you to acknowledge you have successfully
+  received the payload (your listener should return a 2xx response to us). If we don't receive an
+  acknowledgement within 10 seconds, the system will put the payload back into the queue and make a
+  maximum of **two additional attempts** to dispatch the given payload. These attempts are typically
+  separated by 30 minutes. However, this can swap to other timing intervals under certain conditions.
+  If all three attempts receive no response, the event will be removed from the dispatch queue." The
+  ShipStation API webhooks overview (S10, "Delivery & Retry Logic") repeats it word for word. So a
+  `track` delivery answered 503 because the Shipment's tracking lock was held (commit e197f67) waits
+  about 30 minutes for its second attempt, and after three is lost, a *Delivered* update included.
+  EasyPost resends a failed delivery up to 6 times (E3). A busy lock must therefore be retried inside
+  the app, not by the aggregator.
 - **EasyPost Event.** Fields: `object` "Event", `mode`, `description` (e.g. `tracker.created`,
   `tracker.updated`, `insurance.cancelled`, `refund.successful`, `batch.updated`),
   `previous_attributes`, `result` ("See the object attribute on the result to determine its specific
@@ -711,6 +724,10 @@ Sources:
 - S7: https://docs.shipstation.com/apis/shipengine/docs/tracking/tracking.md (Tracking Status Codes
   table).
 - S8: https://docs.shipstation.com/apis/shipengine/docs/reference/start-tracking.md
+- S9: https://docs.shipstation.com/apis/shipengine/docs/guides/webhooks ("Webhook Payloads"), read
+  2026-11-07.
+- S10: https://docs.shipstation.com/apis/docs/guides/webhooks-overview ("Delivery & Retry Logic"), read
+  2026-11-07.
 - E1: https://docs.easypost.com/docs/events.md
 - E2: https://docs.easypost.com/docs/insurance.md
 - E3: https://docs.easypost.com/guides/webhooks-guide.md
@@ -1081,6 +1098,11 @@ recommended hardening are described in the notes of their area.
   Register the EasyPost webhook with `custom_headers: [{ name: 'X-NaaS-Webhook-Token', value: <token> }]`
   (not `X-EasyPost-*`). Optionally verify `X-Hmac-Signature` with `webhook_secret` against
   `request.body.dataString`.
+- **ShipEngine webhook delivery and retries (differs).** `entry/shipping.ts` `postTrackingUpdate`: when
+  the Shipment's tracking lock stays held, answer 2xx at once and apply the update in the background
+  (an event whose script action takes the same lock and queues itself again a minute later, a bounded
+  number of times), keeping 503 only for an update that cannot be queued. Applied on 2026-11-07: HTTP
+  202 and the event `x_daas_ham.shipment.track`.
 
 ### ServiceNow platform
 

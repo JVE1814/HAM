@@ -208,10 +208,12 @@ What remains can only be confirmed on an instance or behind a vendor login:
   (otherwise use `setEndpoint`), that the GreenLake `find_device` filter URL is accepted, and that the
   Fortinet OAuth profiles (password grant, no client secret) obtain tokens for FortiCare and FortiZTP.
 - **Vendor-login-only contracts**: FortiCloud `products/register` and FortiZTP provisioning schemas
-  (FNDN), Cisco API quotas (API Console), whether ShipEngine labels are tracked automatically or
-  need `/v1/tracking/start`, and whether ShipEngine retries a `track` webhook answered non-2xx, and
-  how often. The tracking webhook's 500 (refused save) and 503 (Shipment lock held) replies rely on
-  that retry; EasyPost's is documented (up to 6 times, with a 7 s response window).
+  (FNDN), Cisco API quotas (API Console), and whether ShipEngine labels are tracked automatically or
+  need `/v1/tracking/start`. ShipEngine documents its retry: 10 s to answer 2xx, then at most two
+  more attempts, typically 30 minutes apart, before the update is dropped; EasyPost retries up to 6
+  times, with a 7 s response window. So a held Shipment lock is retried inside the app (below), and
+  only the tracking webhook's 500 (refused save) and its rare 503 (update that cannot be queued) rely
+  on the aggregator's retry.
 - **Job lock** (margin recomputes, ADR 0013): *Job lock* shows a unique database index on *Lock*; a
   second row with the same name is refused (`GlideRecord.insert()` returns no sys_id) without
   throwing, and the `x_daas_ham.margin.compute` event still ends as processed (a refused take tries
@@ -314,9 +316,23 @@ What remains can only be confirmed on an instance or behind a vendor login:
   nothing. *Ship* holds `ship_order_<Order sys_id>`: a second Ship says *Another Ship of this Order is
   running* and ships, buys and opens nothing. Each refused take logs two *Unique Key violation*
   errors. The tracking webhook holds `track_shipment_<Shipment sys_id>` while it saves the status and
-  inserts new events. With a row of that name created by hand in *Job lock*, a delivery answers HTTP
-  503 *Another update of this Shipment is being saved; send it again* and logs two *Unique Key
-  violation* errors per try (up to 10). No lock row is left afterwards.
+  inserts new events, and *Mark label voided* while it checks and saves the void. A busy lock is
+  retried inside the app, not by the aggregator. With a row of that name created by hand in *Job
+  lock*, a delivery answers HTTP 202 `{"matched": true, "queued": true}` within a second, logs two
+  *Unique Key violation* errors per try (up to 10) and *[x_daas_ham] Tracking update of Shipment
+  <number> (<tracking number>) queued in 1 event(s): another update held its lock* (info), and saves
+  nothing yet. The `x_daas_ham.shipment.track` event then tries again as soon as it is processed and
+  about every minute after, each try logging up to 10 more errors and *... tried again in 60 s:
+  another update held its lock*. Delete the row and the next try saves the status and events (and
+  notes a delivery on the Order once); left in place, the first try once the row is 10 minutes old
+  clears it as abandoned and saves them.
+  A retry still held off after 15 re-queues logs *[x_daas_ham] Tracking update of Shipment <number>
+  (<tracking number>) dropped after 15 tries (...): check the Shipment with the carrier* (warning).
+  With the row in place, *Mark label voided* says *Label <tracking number> not marked voided: a
+  tracking update of it is being saved. Try again* and changes nothing. No lock row is left afterwards.
+  The queued update travels in the event's `parm1`, cut to fit 4000 characters (several events for a
+  long history): check that `sysevent.parm1` holds that many on the instance (its dictionary max
+  length), as the 4000 comes from community answers, not ServiceNow's documentation.
 - **Inventory tech access** (ADR 0005), also after upgrading an existing install: the ACLs that
   `security/acls*.now.ts` give `broadStaff` (agreements, subscription lines, catalog entries, site
   templates, fee events, attestations, leases, OEM coverage and cloud accounts, model data, device

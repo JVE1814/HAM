@@ -1573,6 +1573,10 @@ declare global {
                         table: 'sysevent_register'
                         id: 'a5716908b10d4a8eac0d9cd19328f52b'
                     }
+                    event_shipment_track: {
+                        table: 'sysevent_register'
+                        id: '89b082f9863a44a0a1438dc73ebc0640'
+                    }
                     job_chase_overdue_returns: {
                         table: 'sysauto_script'
                         id: '344af88c525d4b26abde811bb393201e'
@@ -2414,6 +2418,10 @@ declare global {
                     sa_order_source: {
                         table: 'sysevent_script_action'
                         id: '0adefbcda0cf4aaab63825b57a928fe4'
+                    }
+                    sa_shipment_track: {
+                        table: 'sysevent_script_action'
+                        id: '1af7527311dd46e5915c1a60b7810643'
                     }
                     sla_replace_four_hour: {
                         table: 'contract_sla'

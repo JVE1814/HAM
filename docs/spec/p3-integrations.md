@@ -30,6 +30,9 @@
   managers, inventory techs and the NOC, while it is *Label created* or *Exception*). Nothing is sent
   to the aggregator. The Shipment becomes *Voided*, which is final, and the Return order gets a work
   note (if the save is refused, the Shipment stays open and the Return order gets no note). The
+  check and the save are made under the Shipment's tracking lock, from the Shipment read again
+  there, so a tracking update saved at the same moment cannot put a voided label back to
+  *Exception*; while the lock stays held it says to try again and changes nothing. The
   customer page stops offering the label and a new return label can be created. Voided Shipments,
   like delivered and returned ones, are left out of the workspace list *Shipments under way*.
 - Addresses need a name, street, city, postal code and country (U.S. and Canadian states as their
@@ -51,13 +54,22 @@
   Unknown tracking numbers are acknowledged and ignored.
   Each update is applied under the job lock `track_shipment_<Shipment sys_id>`, from the Shipment and
   its events read again there. So overlapping deliveries of the same history store each event once
-  and note the delivery once, and an older status cannot replace a delivery. A delivery that finds
-  the lock held 5 times in a row saves nothing and is answered HTTP 503 *Another update of this
-  Shipment is being saved; send it again*, so an aggregator that retries failed deliveries (EasyPost
-  does) sends it again.
+  and note the delivery once, and an older status cannot replace a delivery.
+  A delivery that finds the lock held 5 times in a row is retried inside the app, not by the
+  aggregator: ShipEngine waits 10 seconds for a 2xx, then makes at most two more attempts, typically
+  30 minutes apart, and drops the update (EasyPost up to 6). The delivery is answered HTTP 202
+  `{"matched": true, "queued": true}` at once, and the update (status, detail, estimated delivery,
+  delivery time and the events not stored yet) is queued as the event `x_daas_ham.shipment.track` on
+  the Shipment, in its `parm1` (at most 4000 characters, the event parameter's size; events that do
+  not fit one are shared out over several events, each a whole update). Its script action applies it
+  as the webhook would, under the same lock, and while the lock is still held, or the Shipment or an
+  event is refused, queues it again about a minute later, at most 15 times (past the lock's ten-minute
+  abandonment), then drops it with a warning naming the Shipment and its tracking number. Only an
+  update that cannot be queued (one tracking event too long for a parameter by itself) is answered
+  HTTP 503 *Another update of this Shipment is being saved; send it again*.
   If the platform refuses the Shipment or a tracking event, the refusal is logged and the reply is
-  500, not 2xx. An aggregator that retries failed deliveries (EasyPost does) then sends the update
-  again; the retry skips events already stored and does not repeat the delivered note.
+  500, not 2xx. An aggregator that retries failed deliveries then sends the update again; the retry
+  skips events already stored and does not repeat the delivered note.
 
 | Aggregator status | Shipment status |
 |---|---|

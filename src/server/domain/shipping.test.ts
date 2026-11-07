@@ -12,10 +12,13 @@ import {
     nextShipmentStatus,
     OPEN_SHIPMENTS,
     packageCount,
+    parseTrackingRetry,
     parseTrackingWebhook,
     returnLabelRefusal,
     tokenMatches,
     trackingEventKey,
+    TRACKING_RETRY_CHARS,
+    trackingRetryParams,
     WEBHOOK_TOKEN_HEADER,
     webhookToken,
     type Address,
@@ -465,6 +468,89 @@ describe('newTrackingEvents', () => {
         expect(event.description).toBe('d'.repeat(255))
         expect(event.location).toBe('l'.repeat(120))
         expect(newTrackingEvents(new Set([trackingEventKey(long)]), [{ ...long, description: `${'d'.repeat(255)}more` }])).toEqual([])
+    })
+})
+
+describe('trackingRetryParams and parseTrackingRetry', () => {
+    const departed: TrackingEvent = {
+        occurredAt: '2026-11-06T08:00:00Z',
+        status: 'in_transit',
+        description: 'Departed hub',
+        location: 'Utrecht, NL',
+    }
+    const delivered: TrackingEvent = {
+        occurredAt: '2026-11-07T10:00:00Z',
+        status: 'delivered',
+        description: 'Delivered',
+        location: 'Amsterdam, NL',
+    }
+    const update: TrackingUpdate = {
+        trackingNumber: '1Z999',
+        status: 'delivered',
+        description: 'Delivered, front desk',
+        estimatedDelivery: '2026-11-07',
+        deliveredAt: '2026-11-07T10:00:00Z',
+        events: [departed, delivered],
+    }
+
+    it('carries the whole update in one parameter when it fits', () => {
+        expect(TRACKING_RETRY_CHARS).toBe(4000)
+        const params = trackingRetryParams(update, new Set())
+        expect(params).toHaveLength(1)
+        expect(parseTrackingRetry(params![0])).toEqual(update)
+    })
+
+    it('leaves out the events already stored, keeping the status and dates', () => {
+        const [param] = trackingRetryParams(update, new Set([trackingEventKey(departed), trackingEventKey(delivered)]))!
+        expect(parseTrackingRetry(param)).toEqual({ ...update, events: [] })
+    })
+
+    it('shares the events out over parameters that fit, each a whole update', () => {
+        const events = Array.from({ length: 60 }, (_, i) => ({
+            ...departed,
+            occurredAt: `2026-11-06T08:${String(i).padStart(2, '0')}:00Z`,
+            description: `Scan ${i} ${'x'.repeat(80)}`,
+        }))
+        const params = trackingRetryParams({ ...update, events }, new Set())!
+        expect(params.length).toBeGreaterThan(1)
+        const parsed = params.map((param) => parseTrackingRetry(param)!)
+        for (const param of params) expect(param.length).toBeLessThanOrEqual(TRACKING_RETRY_CHARS)
+        for (const part of parsed) expect({ ...part, events: [] }).toEqual({ ...update, events: [] })
+        expect(parsed.flatMap((part) => part.events)).toEqual(events)
+    })
+
+    it('carries the stored lengths, and the detail cut to 255 characters', () => {
+        const long = { ...departed, description: 'd'.repeat(300), location: 'l'.repeat(150) }
+        const [param] = trackingRetryParams({ ...update, description: 'x'.repeat(300), events: [long] }, new Set())!
+        const parsed = parseTrackingRetry(param)!
+        expect(parsed.description).toHaveLength(255)
+        expect(parsed.events).toEqual(newTrackingEvents(new Set(), [long]))
+    })
+
+    it('keeps a stored description as written, so the retried event is skipped once stored', () => {
+        const spaced = { ...departed, description: `${'d'.repeat(254)} trailing` }
+        const [param] = trackingRetryParams({ ...update, events: [spaced] }, new Set())!
+        const [event] = parseTrackingRetry(param)!.events
+        expect(event.description).toBe(`${'d'.repeat(254)} `)
+        expect(trackingEventKey(event)).toBe(trackingEventKey(spaced))
+    })
+
+    it('is null when one event does not fit a parameter on its own', () => {
+        expect(trackingRetryParams({ ...update, events: [departed] }, new Set(), 200)).toBeNull()
+        expect(trackingRetryParams({ ...update, events: [] }, new Set(), 50)).toBeNull()
+    })
+
+    it('reads nothing but a queued update, and no status tracking cannot set', () => {
+        expect(parseTrackingRetry('')).toBeNull()
+        expect(parseTrackingRetry('{"status":"delivered","events":[]}')).toBeNull()
+        expect(parseTrackingRetry('{"trackingNumber":"1Z999","status":"delivered"}')).toBeNull()
+        const voided = '{"trackingNumber":"1Z999","status":"voided","events":[{"status":"toString"}]}'
+        const forged = parseTrackingRetry(voided)!
+        expect(forged.status).toBe('unknown')
+        expect(forged.events[0]).toEqual({ occurredAt: '', status: 'unknown', description: '', location: '' })
+        const undated = '{"trackingNumber":"1Z999","status":"returned","estimatedDelivery":"soon","events":[]}'
+        const read = { trackingNumber: '1Z999', status: 'returned', description: '', events: [] }
+        expect(parseTrackingRetry(undated)).toEqual(read)
     })
 })
 

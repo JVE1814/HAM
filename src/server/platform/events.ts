@@ -14,6 +14,7 @@ export const EVENT = {
     coverageExpiring: 'x_daas_ham.coverage.expiring',
     billingGenerate: 'x_daas_ham.billing.generate',
     marginCompute: 'x_daas_ham.margin.compute',
+    trackShipment: 'x_daas_ham.shipment.track',
 } as const
 
 export function fire(event: string, record: GlideRecord, parm1 = '', parm2 = ''): void {

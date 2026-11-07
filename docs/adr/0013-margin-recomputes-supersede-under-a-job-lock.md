@@ -40,7 +40,9 @@ cancel and a pass take turns; a cancel that finds it held changes nothing and as
 again. Short critical sections, such as an Order line, an ASN row's serial, the Provider tag
 counter, a stock change, a Service interval, a sighting or a tracking update, take locks of the same
 kind and, finding one held, try again back to back a few times (`withLockTries` in
-`platform/locks.ts`) before they give up.
+`platform/locks.ts`) before they give up. A tracking update that gives up is not left to the
+aggregator (ShipEngine resends it at most twice, typically 30 minutes apart, then drops it): it is
+queued as an event that tries the lock again, then a minute apart, at most 15 more times.
 
 Locks are not re-entrant: a holder that takes a lock it already holds is refused, as any other taker
 would be. A take never waits either: it tries and gives up. So locks are taken in one order, and a
@@ -52,8 +54,10 @@ holder only takes locks later in it than those it holds:
 
 Only the device-events REST handler and the in-service detection job take `seen_asset_<sys_id>`, and
 they hold no other lock when they do. The go-live save under it takes `service_interval_<sys_id>`.
-`track_shipment_<Shipment sys_id>` is a leaf: only the tracking webhook takes it, holding no other
-lock, and nothing takes another lock while holding it, because the Order's delivered note is written
-after it is released. So it has no place it must keep, and is listed after `ship_order`.
+`track_shipment_<Shipment sys_id>` is a leaf: only the tracking webhook, its queued retry
+(`x_daas_ham.shipment.track`) and *Mark label voided* take it, holding no other lock, and nothing
+takes another lock while holding it, because the Order's delivered note and the Return order's voided
+note are written after it is released. So it has no place it must keep, and is listed after
+`ship_order`.
 
 Whether the instance behaves as expected is on the first-install checklist.

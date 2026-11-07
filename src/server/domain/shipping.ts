@@ -349,6 +349,78 @@ export function newTrackingEvents(known: ReadonlySet<string>, events: readonly T
     return fresh
 }
 
+/** The statuses tracking can set: what the aggregators' codes map to (never `voided`). */
+const TRACKING_STATUSES: ReadonlySet<string> = new Set([
+    ...Object.values(SHIPENGINE_STATUS),
+    ...Object.values(EASYPOST_STATUS),
+])
+
+/** A status read back from a queued retry; anything else is unknown, which changes no status. */
+function trackingStatus(value: unknown): ShipmentStatus {
+    return typeof value === 'string' && TRACKING_STATUSES.has(value) ? (value as ShipmentStatus) : 'unknown'
+}
+
+/** A string as written, untrimmed so that a retried event keeps the key it is stored under; '' for anything else. */
+function written(value: unknown): string {
+    return typeof value === 'string' ? value : ''
+}
+
+/** The most characters one queued tracking retry carries: its event's parm1, a 4000-character string on sysevent. */
+export const TRACKING_RETRY_CHARS = 4000
+
+/**
+ * A tracking update held off by its Shipment's lock, as the parm1 (JSON, at most `maxChars` long) of each event that
+ * retries it. Each carries the update's status, detail, estimate and delivery time, and the events not in `known`
+ * (stored already, so never needed again) are shared out among them. Applying them all, in any order, does what the
+ * update would have: the status is the same in each, a delivery is noted by the first, and stored events are skipped.
+ * Null when one event does not fit on its own.
+ */
+export function trackingRetryParams(
+    update: TrackingUpdate,
+    known: ReadonlySet<string>,
+    maxChars = TRACKING_RETRY_CHARS,
+): string[] | null {
+    const head = {
+        trackingNumber: update.trackingNumber,
+        status: update.status,
+        description: update.description.slice(0, 255),
+        estimatedDelivery: update.estimatedDelivery,
+        deliveredAt: update.deliveredAt,
+    }
+    const encode = (events: TrackingEvent[]) => JSON.stringify({ ...head, events })
+    const fits = (events: TrackingEvent[]) => encode(events).length <= maxChars
+    if (!fits([])) return null
+    const parts: TrackingEvent[][] = [[]]
+    for (const event of newTrackingEvents(known, update.events)) {
+        const last = parts[parts.length - 1]
+        if (fits([...last, event])) last.push(event)
+        else if (fits([event])) parts.push([event])
+        else return null
+    }
+    return parts.map(encode)
+}
+
+/** A queued retry's parm1 back as the update it carries (`trackingRetryParams`), or null when it is not one. */
+export function parseTrackingRetry(param: string): TrackingUpdate | null {
+    const json = parseJson(param)
+    const trackingNumber = written(field(json, 'trackingNumber'))
+    const events = field(json, 'events')
+    if (!trackingNumber || !Array.isArray(events)) return null
+    return {
+        trackingNumber,
+        status: trackingStatus(field(json, 'status')),
+        description: written(field(json, 'description')),
+        estimatedDelivery: isoDate(field(json, 'estimatedDelivery')),
+        deliveredAt: written(field(json, 'deliveredAt')) || undefined,
+        events: events.map((event: unknown) => ({
+            occurredAt: written(field(event, 'occurredAt')),
+            status: trackingStatus(field(event, 'status')),
+            description: written(field(event, 'description')),
+            location: written(field(event, 'location')),
+        })),
+    }
+}
+
 /** The header the aggregators are registered to send the webhook token in (registered as X-NaaS-Webhook-Token; names are case-insensitive). */
 export const WEBHOOK_TOKEN_HEADER = 'x-naas-webhook-token'
 
