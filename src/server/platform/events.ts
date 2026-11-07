@@ -10,6 +10,7 @@ export const EVENT = {
     leaseMismatch: 'x_daas_ham.lease.mismatch',
     agreementRenewal: 'x_daas_ham.agreement.renewal',
     coverageExpiring: 'x_daas_ham.coverage.expiring',
+    billingGenerate: 'x_daas_ham.billing.generate',
 } as const
 
 export function fire(event: string, record: GlideRecord, parm1 = '', parm2 = ''): void {

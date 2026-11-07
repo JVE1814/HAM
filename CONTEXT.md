@@ -223,6 +223,10 @@ A Lease schedule that ends before an Agreement its deployed Assets serve.
 A calendar month of prorated Subscription line charges and Fee events, locked once closed.
 _Avoid_: invoice (issued by finance, not here)
 
+**Service interval**:
+The days one Asset delivered a Subscription line, from in service to the day it goes on a Return order.
+_Avoid_: usage, billable period
+
 **Cost fact**:
 A cost attributed to an Asset or Site (purchase, lease, OEM support, field labour) used for Margin.
 

@@ -22,6 +22,7 @@ import {
     type ReturnTrigger,
     waiveOpenFees,
 } from '../platform/returns'
+import { closeServiceIntervals } from '../platform/service-intervals'
 
 /** Returns, decommissions, depot evaluation and overdue chasing (P2.4). */
 
@@ -72,6 +73,7 @@ export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): b
     asset.setValue('x_daas_ham_subscription_line', '')
     clearRackPlacement(asset)
     if (!moveAndSave(asset, 'pending_evaluation', 'return received')) return false
+    closeServiceIntervals(asset.getUniqueValue(), todayIso())
     endLineIfEmpty(subscriptionLine)
     if (!line) return true
     const turnedUp = str(line, 'status') === 'missing'

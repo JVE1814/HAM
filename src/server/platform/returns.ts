@@ -5,6 +5,7 @@ import { moveAndSave, readStage } from './assets'
 import { todayIso } from './clock'
 import { openChange, openWorkOrder } from './field-work'
 import { findById, num, str } from './records'
+import { closeServiceIntervals } from './service-intervals'
 
 /** Return orders, their lines and Fee events (P2.4). */
 
@@ -58,7 +59,11 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
         const asset = findById('alm_hardware', assetId)
         if (!asset || latestReturnLine(assetId, 'awaiting')) continue
         const stage = readStage(asset)
-        if (isDeployed(stage) && stage !== 'pending_return') moveAndSave(asset, 'pending_return', `return ${str(order, 'number')}`)
+        if (isDeployed(stage) && stage !== 'pending_return') {
+            moveAndSave(asset, 'pending_return', `return ${str(order, 'number')}`)
+            // Billing stops the day the Asset goes on a Return order (D52).
+            closeServiceIntervals(assetId, todayIso())
+        }
         const line = new GlideRecord('x_daas_ham_return_order_line')
         line.initialize()
         line.setValue('return_order', order.getUniqueValue())

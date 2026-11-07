@@ -134,6 +134,10 @@ export const x_daas_ham_fee_event = Table({
             default: 'open',
             dropdown: 'dropdown_without_none',
         }),
+        billing_period: ReferenceColumn({ label: 'Billed in', referenceTable: 'x_daas_ham_billing_period', readOnly: true }),
     },
-    index: [{ name: 'x_daas_ham_fee_customer', unique: false, element: 'customer' }],
+    index: [
+        { name: 'x_daas_ham_fee_customer', unique: false, element: 'customer' },
+        { name: 'x_daas_ham_fee_occurred', unique: false, element: 'occurred_on' },
+    ],
 })

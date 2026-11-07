@@ -5,6 +5,7 @@ import { listStockrooms, lookupAsset, pickAsset, putAwayAsset, receiveAsset } fr
 import { scanAudit } from '../../server/entry/assurance'
 import { getRack, listRacks, listSites } from '../../server/entry/racks'
 import { answerAttestation, confirmInstalled, customerOverview, reportFault, requestCustomerReturn } from '../../server/entry/customer'
+import { getBillingLines, listBillingPeriods } from '../../server/entry/billing'
 
 /* Scripted REST API: /api/x_daas_ham/naas/... */
 
@@ -153,6 +154,24 @@ RestApi({
             shortDescription: 'Request selected devices or a whole site to be taken back.',
             authentication: true,
             script: requestCustomerReturn,
+        },
+        {
+            $id: Now.ID['rest_naas_billing_periods'],
+            name: 'billing_periods',
+            method: 'GET',
+            path: '/billing_periods',
+            shortDescription: 'Most recent billing periods with their status and totals (finance, integration).',
+            authentication: true,
+            script: listBillingPeriods,
+        },
+        {
+            $id: Now.ID['rest_naas_billing_lines'],
+            name: 'billing_lines',
+            method: 'GET',
+            path: '/billing_periods/{id}/lines',
+            shortDescription: 'One page of a billing period\'s lines (?offset=0&limit=1000); final once the period is closed.',
+            authentication: true,
+            script: getBillingLines,
         },
     ],
 })

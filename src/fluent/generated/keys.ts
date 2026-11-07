@@ -133,6 +133,38 @@ declare global {
                         table: 'sys_security_acl'
                         id: '06a44c19d8a6485e9c268976c6804edd'
                     }
+                    acl_billing_line_create: {
+                        table: 'sys_security_acl'
+                        id: '58ef8d56020f401da36dcf5430cdf6ee'
+                    }
+                    acl_billing_line_delete: {
+                        table: 'sys_security_acl'
+                        id: '28c7b5d31ad14e93b40c8fe2ea64ad67'
+                    }
+                    acl_billing_line_read: {
+                        table: 'sys_security_acl'
+                        id: 'adc6151e7cab44e3a33f63420d3f37d7'
+                    }
+                    acl_billing_line_write: {
+                        table: 'sys_security_acl'
+                        id: '95fed36ddc274c299b7a01fa7b6f112d'
+                    }
+                    acl_billing_period_create: {
+                        table: 'sys_security_acl'
+                        id: '6bd8289294254c17b382638e2e398d4a'
+                    }
+                    acl_billing_period_delete: {
+                        table: 'sys_security_acl'
+                        id: '63727d0be58d4151b3c18297492f70de'
+                    }
+                    acl_billing_period_read: {
+                        table: 'sys_security_acl'
+                        id: 'b728b193f7ec44b1a9e4592c17d5010b'
+                    }
+                    acl_billing_period_write: {
+                        table: 'sys_security_acl'
+                        id: '8b450f96cd0f4590ba042cceefa569d4'
+                    }
                     acl_catalog_entry_create: {
                         table: 'sys_security_acl'
                         id: '7d398babba5c46f7ad8ee9dfebaa9a50'
@@ -500,6 +532,22 @@ declare global {
                     acl_return_order_write: {
                         table: 'sys_security_acl'
                         id: 'd2723438df534bafbaa5cc127e2f2a38'
+                    }
+                    acl_service_interval_create: {
+                        table: 'sys_security_acl'
+                        id: '0e24debcecd74252a9f35b3fb7bad76c'
+                    }
+                    acl_service_interval_delete: {
+                        table: 'sys_security_acl'
+                        id: 'cb63089d913442cb8fcbe3c68293f4ca'
+                    }
+                    acl_service_interval_read: {
+                        table: 'sys_security_acl'
+                        id: 'c0140ca8d45142f28b734a3cc0d306d1'
+                    }
+                    acl_service_interval_write: {
+                        table: 'sys_security_acl'
+                        id: 'b3c27e35a5e248b487fd407324985b01'
                     }
                     acl_site_template_create: {
                         table: 'sys_security_acl'
@@ -933,6 +981,14 @@ declare global {
                         table: 'sys_script'
                         id: 'f712caf500154d8ea81c399fe85d3247'
                     }
+                    br_billing_line_locked: {
+                        table: 'sys_script'
+                        id: '216a1d5c79a84537958a483183e41d82'
+                    }
+                    br_billing_period_locked: {
+                        table: 'sys_script'
+                        id: 'af4661aa5fc74276b5c4758fcf1846a9'
+                    }
                     br_case_failed_asset: {
                         table: 'sys_script'
                         id: '2a4f4c5137b24aa7a946de7591c00f4a'
@@ -1121,6 +1177,10 @@ declare global {
                         table: 'sysevent_register'
                         id: '2ee72d8d68e345ec871e4689ef4a3bc5'
                     }
+                    event_billing_generate: {
+                        table: 'sysevent_register'
+                        id: '68f942ccbb4549e6b4b6910fed1e3288'
+                    }
                     event_coverage_expiring: {
                         table: 'sysevent_register'
                         id: 'd36908fdca8b47f7b2a85b7e77f601c3'
@@ -1172,6 +1232,10 @@ declare global {
                     job_oem_rma_status: {
                         table: 'sysauto_script'
                         id: '3c879cea1a224fd7acc0a6cc672a11d2'
+                    }
+                    job_open_billing_period: {
+                        table: 'sysauto_script'
+                        id: 'a6b3d5db87e54ba694f0fde066fbdd1d'
                     }
                     job_preflight: {
                         table: 'sysauto_script'
@@ -1529,6 +1593,14 @@ declare global {
                         table: 'sys_ws_operation'
                         id: '227bc2070a0a41a8b4833f63d5926a9d'
                     }
+                    rest_naas_billing_lines: {
+                        table: 'sys_ws_operation'
+                        id: '4789434baec34ea193e085335e6e867c'
+                    }
+                    rest_naas_billing_periods: {
+                        table: 'sys_ws_operation'
+                        id: 'c32918ae63c746bb83ff864d9c0ae3c1'
+                    }
                     rest_naas_customer_attestation: {
                         table: 'sys_ws_operation'
                         id: 'f4005e2901014a7dbe3d3d4271367b34'
@@ -1697,6 +1769,10 @@ declare global {
                         table: 'sysevent_script_action'
                         id: 'd9d7971bfd144538bf7bc09e295dbcd2'
                     }
+                    sa_billing_generate: {
+                        table: 'sysevent_script_action'
+                        id: '89abf9e8734f4c60aec4ce84b955c738'
+                    }
                     sa_lease_assets: {
                         table: 'sysevent_script_action'
                         id: '3159a22dccc642e2959d500f7283c75e'
@@ -1733,6 +1809,10 @@ declare global {
                         table: 'sys_module'
                         id: '3dd2facc48c643e3a065e9472a4ff0a0'
                     }
+                    src_server_domain_billing_ts: {
+                        table: 'sys_module'
+                        id: '7ceb99170ccd4aa4bd5247a5ab054e7c'
+                    }
                     src_server_domain_calendar_ts: {
                         table: 'sys_module'
                         id: '7461777040a24dc0a39e08bc4a774cc4'
@@ -1752,6 +1832,10 @@ declare global {
                     src_server_domain_disposal_ts: {
                         table: 'sys_module'
                         id: 'b3859fe2442547cca4609d3880b6486f'
+                    }
+                    'src_server_domain_encoded-query_ts': {
+                        table: 'sys_module'
+                        id: '9345d49a6f7f41408d210c762e22f7a4'
                     }
                     src_server_domain_entitlement_ts: {
                         table: 'sys_module'
@@ -1840,6 +1924,10 @@ declare global {
                     src_server_entry_assurance_ts: {
                         table: 'sys_module'
                         id: '6df81f4164a84a5a98e376ce0f0ee3ac'
+                    }
+                    src_server_entry_billing_ts: {
+                        table: 'sys_module'
+                        id: 'efba175bbd2045069f54e8dc59ef590b'
                     }
                     src_server_entry_breakfix_ts: {
                         table: 'sys_module'
@@ -1989,6 +2077,10 @@ declare global {
                         table: 'sys_module'
                         id: 'd236066f0a2640a4ae36f40a2e385776'
                     }
+                    'src_server_platform_service-intervals_ts': {
+                        table: 'sys_module'
+                        id: '880d866c39d246229e2ed033207b9fd0'
+                    }
                     src_server_platform_session_ts: {
                         table: 'sys_module'
                         id: 'ff6163d33d6e493890b5e2c135ad7997'
@@ -2020,6 +2112,14 @@ declare global {
                     ua_audit_close: {
                         table: 'sys_ui_action'
                         id: '7215e61aa4c84959900ecfdb36ba7051'
+                    }
+                    ua_billing_close: {
+                        table: 'sys_ui_action'
+                        id: '0cf47e3f1a014fbfb56c557f56c1cb93'
+                    }
+                    ua_billing_regenerate: {
+                        table: 'sys_ui_action'
+                        id: 'd3641bdb2998498da3eff3e227d43ecb'
                     }
                     ua_case_raise_replacement: {
                         table: 'sys_ui_action'
@@ -2165,6 +2265,22 @@ declare global {
                         table: 'sys_ux_applicability_m2m_list'
                         id: '35928bf943f440df93140f65d475edc5'
                     }
+                    ws_billing_lines: {
+                        table: 'sys_ux_list'
+                        id: '156688db66544bc1a5ba64ae703382ed'
+                    }
+                    ws_billing_lines_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '754a4d5ad134489399994cd60d3c0ee4'
+                    }
+                    ws_billing_periods: {
+                        table: 'sys_ux_list'
+                        id: '1f752d9f210c4a90ad8c21a1d9a9b7bc'
+                    }
+                    ws_billing_periods_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '8e0829384de54e4dae8e55bd48b62088'
+                    }
                     ws_cat_admin: {
                         table: 'sys_ux_list_category'
                         id: '174c393513f0424e85650502cba0926f'
@@ -2176,6 +2292,10 @@ declare global {
                     ws_cat_assurance: {
                         table: 'sys_ux_list_category'
                         id: 'c4de686ffc114f5399ae637e67275bea'
+                    }
+                    ws_cat_billing: {
+                        table: 'sys_ux_list_category'
+                        id: 'f817f408aef94891ba2cd0bde1cfe250'
                     }
                     ws_cat_commercial: {
                         table: 'sys_ux_list_category'
@@ -2248,6 +2368,14 @@ declare global {
                     ws_fees_open_aud: {
                         table: 'sys_ux_applicability_m2m_list'
                         id: '3441992d7c8045d3a08f36c19ac6fa82'
+                    }
+                    ws_fees_unbilled: {
+                        table: 'sys_ux_list'
+                        id: '2e72bb923a7f4d209b04e715edc628c2'
+                    }
+                    ws_fees_unbilled_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '86d38d3b10024dc0ade513e64a07d7b2'
                     }
                     ws_lease_decisions: {
                         table: 'sys_ux_list'
@@ -2504,6 +2632,14 @@ declare global {
                     ws_risk_past_support_aud: {
                         table: 'sys_ux_applicability_m2m_list'
                         id: 'e1c36137196d442092d0240adfc75e71'
+                    }
+                    ws_service_intervals: {
+                        table: 'sys_ux_list'
+                        id: 'ac9d5a2709e149a9bf57725d244343c3'
+                    }
+                    ws_service_intervals_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: 'b805d7e6b75a4ce686f39658ade3f6e1'
                     }
                     ws_site_templates: {
                         table: 'sys_ux_list'
@@ -2833,6 +2969,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '0071d62af53e48a5a2dab494fe6f1521'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'monthly_rate'
+                            position: '11'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '00817fd5a65c4d99bf02b46363c69db9'
                         key: {
@@ -2920,6 +3078,19 @@ declare global {
                             value: 'device_add'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '00c8fdae3f334a1d92b6f18c5ead143f'
+                        key: {
+                            sys_security_acl: 'c0140ca8d45142f28b734a3cc0d306d1'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
                         }
                     },
                     {
@@ -3154,6 +3325,14 @@ declare global {
                                 }
                             }
                             element: 'template'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '0215382c3fc9470f9b5d1095f9d01f4b'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            element: 'site'
                         }
                     },
                     {
@@ -3601,6 +3780,14 @@ declare global {
                                 }
                             }
                             element: 'active'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '04c224ab346d40bab0c79c77bd0927dd'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'monthly_rate'
                         }
                     },
                     {
@@ -4129,6 +4316,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '082a1bb3d7f24f6aba7277f95467ee73'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'NULL'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: '083819ac7e244208a88796a631b594b3'
                         key: {
@@ -4462,6 +4658,15 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
+                        id: '09ed8e2c925443faa72e85121fec02a4'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'monthly_rate'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
                         id: '09eea9db9a8a433496d876917bebc0f2'
                         key: {
                             name: 'x_daas_ham_staging_step'
@@ -4479,6 +4684,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '0a1ccd7a8db14488884a9ea95de6486b'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            element: 'customer'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '0a9688764bff4faa90d101a2a1c35744'
                         key: {
@@ -4489,6 +4703,13 @@ declare global {
                                     name: 'x_daas_ham.finance'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_db_object'
+                        id: '0ab93282216941f9a537c988e6198ebe'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
                         }
                     },
                     {
@@ -4741,6 +4962,17 @@ declare global {
                                     name: 'x_daas_ham.noc'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '0ca5405bbd624e8e870139bc76f9e878'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'status'
+                            value: 'closed'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -5272,6 +5504,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '105beb2b2aa64a2899616103a3483ae6'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'site'
+                            position: '6'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '1060b5f87c0345e0a847997307117a51'
                         key: {
@@ -5628,6 +5882,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_index'
+                        id: '1275ff3793bb4d7ab8e74b0947411729'
+                        key: {
+                            logical_table_name: 'x_daas_ham_service_interval'
+                            col_name_string: 'subscription_line'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '127d80fc85714b868f2dd2aac77af1b5'
                         key: {
@@ -5658,6 +5920,13 @@ declare global {
                             name: 'x_daas_ham_asn_import'
                             element: 'customer_tag'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_db_object'
+                        id: '12ac45882db243bb9f9032405980d462'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
                         }
                     },
                     {
@@ -5819,6 +6088,19 @@ declare global {
                                 }
                             }
                             element: 'starts'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '13665f3588d64da18693dd45cc52a57b'
+                        key: {
+                            sys_security_acl: 'cb63089d913442cb8fcbe3c68293f4ca'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
+                                }
+                            }
                         }
                     },
                     {
@@ -6164,6 +6446,28 @@ declare global {
                             value: 'shipped_to_site'
                             language: 'en'
                             dependent_value: '9'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '15d301f275d345c5b3a27216337b7cb9'
+                        key: {
+                            sys_ui_section: {
+                                id: '5908ba5a3c394a30961dd1cb85d708f2'
+                                key: {
+                                    name: 'x_daas_ham_service_interval'
+                                    caption: 'Service interval'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'start_date'
+                            position: '6'
                         }
                     },
                     {
@@ -6535,6 +6839,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '18de3eeaaca94d0c8d9f40354399f8f8'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'period_end'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '18ea621db27e492b9bdcf02363f0c531'
                         key: {
@@ -6658,6 +6971,28 @@ declare global {
                             name: 'x_daas_ham_order'
                             element: 'carrier'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '19995934f66b482ea92542e987b27a3a'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '14'
                         }
                     },
                     {
@@ -7039,6 +7374,23 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
+                        id: '1cd142d0a63c478aa36bad192f616ed5'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            element: 'NULL'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '1cdf0b2602d044e7bac28dc3200fa927'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'period_end'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
                         id: '1cf09900d47046c684d5e805795b49f2'
                         key: {
                             name: 'cmn_location'
@@ -7208,6 +7560,28 @@ declare global {
                             value: 'received'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '1e0c003f4844412f925e79ecd0c01ee4'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a46ecad23d0c4886b2b529439d12194c'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Billing period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'total_amount'
+                            position: '7'
                         }
                     },
                     {
@@ -7450,6 +7824,14 @@ declare global {
                                 }
                             }
                             sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '20064fdf1eef48d0865be81c13c2dad2'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            element: 'start_date'
                         }
                     },
                     {
@@ -7861,6 +8243,20 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: '2214abee52c54fdda419460747bb4707'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '221bf64241a34c54a4b5eaf2ed7f95ee'
                         key: {
@@ -8099,6 +8495,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_attestation_item'
                             element: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '23e94c7c856f41e4ac90d59317791efc'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -8967,6 +9385,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '29bbdb07eb814f08995b677562ec0185'
+                        key: {
+                            sys_ui_section: {
+                                id: '5908ba5a3c394a30961dd1cb85d708f2'
+                                key: {
+                                    name: 'x_daas_ham_service_interval'
+                                    caption: 'Service interval'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'site'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '29cad16925ff4f55a1d17cd9042a52b7'
                         key: {
@@ -9103,6 +9543,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '2a7d43c083204b65a39b61bf54f0318b'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a46ecad23d0c4886b2b529439d12194c'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Billing period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'closed_by'
+                            position: '10'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '2a9eaeb68ad04a63ab91b0311c58bf1f'
                         key: {
@@ -9113,6 +9575,14 @@ declare global {
                                     name: 'x_daas_ham.site_contact'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '2aa38724bfbf4a4281a43bcacf81d234'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            element: 'asset'
                         }
                     },
                     {
@@ -9150,6 +9620,14 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '2adaf77fb09a4accac5c2fe002ed906b'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'agreement'
                         }
                     },
                     {
@@ -9537,6 +10015,20 @@ declare global {
                             value: 'within_agreement'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form'
+                        id: '2d0c4abca2db42a4b8cdf00df59d8988'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -10532,6 +11024,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice_set'
+                        id: '342c60ad925a45cd87421d78bc65122a'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'status'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '343412060fdc4d9ebc0b0458dba2e9a4'
                         key: {
@@ -10817,6 +11317,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: '357230190c4f4b1c842f689df3a7f799'
+                        key: {
+                            sys_ui_form: {
+                                id: '2d0c4abca2db42a4b8cdf00df59d8988'
+                                key: {
+                                    name: 'x_daas_ham_service_interval'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '5908ba5a3c394a30961dd1cb85d708f2'
+                                key: {
+                                    name: 'x_daas_ham_service_interval'
+                                    caption: 'Service interval'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '3587b2a8102243f5aebd58b79088e9db'
                         key: {
@@ -10842,12 +11375,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '35c6b156a577491ca028601c624c1437'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'kind'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '361ccd9562ba46478c597c8ab85f5984'
                         key: {
                             name: 'x_daas_ham_staging_step'
                             element: 'mandatory'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '36243802bfd34ba2baae5a73cc7dcae7'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'period'
                         }
                     },
                     {
@@ -10870,6 +11419,14 @@ declare global {
                             name: 'x_daas_ham_agreement_quantity'
                             element: 'agreement'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '369c4502fea64768952dd6096f53796f'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'closed_at'
                         }
                     },
                     {
@@ -11207,6 +11764,41 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '38aa1ecee4824819850735edb6ee4db7'
+                        key: {
+                            sys_security_acl: '95fed36ddc274c299b7a01fa7b6f112d'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '38cd21e45f034abaa7df277a1366f3d5'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a46ecad23d0c4886b2b529439d12194c'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Billing period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'status'
+                            position: '4'
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: '38e2836fec234f828bd2c42883bfa99d'
                         key: {
@@ -11295,6 +11887,21 @@ declare global {
                             }
                             element: 'asset'
                             position: '2'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '39b2833080744cb6a20533cc78bfa213'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            caption: 'Lines'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -11398,6 +12005,19 @@ declare global {
                             value: 'defective_return'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '3a57863752e340a696e8f042e1a0d02d'
+                        key: {
+                            sys_security_acl: '0e24debcecd74252a9f35b3fb7bad76c'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
                         }
                     },
                     {
@@ -11542,6 +12162,28 @@ declare global {
                                 }
                             }
                             sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '3b50c57a289e4ccc80a21b74b800fcf5'
+                        key: {
+                            sys_ui_section: {
+                                id: '5908ba5a3c394a30961dd1cb85d708f2'
+                                key: {
+                                    name: 'x_daas_ham_service_interval'
+                                    caption: 'Service interval'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'customer'
+                            position: '3'
                         }
                     },
                     {
@@ -12028,6 +12670,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '3ef5891e86ab4e438fdf674b763c68f4'
+                        key: {
+                            sys_ui_section: {
+                                id: '5908ba5a3c394a30961dd1cb85d708f2'
+                                key: {
+                                    name: 'x_daas_ham_service_interval'
+                                    caption: 'Service interval'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '4'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '3efee4d11444404cadbe536e5422333f'
                         key: {
@@ -12251,6 +12915,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '41ad875d3e6f4b6eb34daa6fd5924125'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a46ecad23d0c4886b2b529439d12194c'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Billing period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'closed_at'
+                            position: '9'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: '41b02276efb8493999d774b7085bd132'
                         key: {
@@ -12322,6 +13008,13 @@ declare global {
                         key: {
                             document_key: 'd5c060d03b1e44e6abebdba35539bde9'
                             variable: 'e6e3c7535320220002c6435723dc3496'
+                        }
+                    },
+                    {
+                        table: 'ua_table_licensing_config'
+                        id: '423d13e96b6c456f91a0c0e60762d3e6'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
                         }
                     },
                     {
@@ -12433,6 +13126,14 @@ declare global {
                             }
                             element: '.split'
                             position: '7'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '435a1d0c471f4e40977e9b614cee0dce'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'description'
                         }
                     },
                     {
@@ -12557,6 +13258,28 @@ declare global {
                         id: '446b9ac303b94c81ad32c646ff3dcc8b'
                         key: {
                             name: 'x_daas_ham_return_order_line'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '44973acbdeb6451fbd4b52c452b944ad'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'kind'
+                            position: '2'
                         }
                     },
                     {
@@ -12916,6 +13639,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '469e54ba0f3c4a49bf8a3834691d656d'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'description'
+                            position: '9'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '46b881873b794c6cbbf3f1d69644af33'
                         key: {
@@ -13155,6 +13900,15 @@ declare global {
                             value: 'broker_resale'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '47ba526f84db44cc8f37240d029c8b2a'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            element: 'site'
+                            language: 'en'
                         }
                     },
                     {
@@ -13633,6 +14387,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '4c0c51408e6f4ff8bc4b9e7167cb90c9'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'closed_by'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '4c2367bd1d5e44ea9b884ea18a862d35'
                         key: {
@@ -13659,6 +14422,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_staging_task'
                             element: 'result'
+                        }
+                    },
+                    {
+                        table: 'sys_index'
+                        id: '4c5a189f79764d758e3f813359c06b22'
+                        key: {
+                            logical_table_name: 'x_daas_ham_fee_event'
+                            col_name_string: 'occurred_on'
                         }
                     },
                     {
@@ -13784,11 +14555,27 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '4ce55cc4c77e4142be4129182e8bbba5'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'currency'
+                        }
+                    },
+                    {
                         table: 'sys_number'
                         id: '4cf786be6cf440e1bc863b594db3de4b'
                         key: {
                             category: 'x_daas_ham_return_order'
                             prefix: 'NRET'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '4d005a2afdfd484e819bfe3fd14dc97e'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            element: 'NULL'
                         }
                     },
                     {
@@ -14024,6 +14811,28 @@ declare global {
                             }
                             element: 'refresh_basis'
                             position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '4ed18534a37a4b31b63e255c86196b9b'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'amount'
+                            position: '12'
                         }
                     },
                     {
@@ -14416,6 +15225,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '519e103a61324a09845d6b45a127e209'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'customer'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_user_role_contains'
                         id: '51ba898afaf24dfd942a48be9e669761'
                         key: {
@@ -14651,6 +15469,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '52f3fb5fd5334ccebb424c0791349b4b'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a46ecad23d0c4886b2b529439d12194c'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Billing period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '11'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '5304b40891b44ef3bec693a6edcbfbb0'
                         key: {
@@ -14679,6 +15519,15 @@ declare global {
                                 }
                             }
                             element: 'asset'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '53282c16da914aa0844d415db9cf7f72'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            element: 'end_date'
+                            language: 'en'
                         }
                     },
                     {
@@ -15029,6 +15878,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_index'
+                        id: '5606dc17215c482484c63043cf72ffa9'
+                        key: {
+                            logical_table_name: 'x_daas_ham_billing_line'
+                            col_name_string: 'billing_period'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '560ab14abf6e4f7ba02fc644a459bd39'
                         key: {
@@ -15347,6 +16204,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '5908ba5a3c394a30961dd1cb85d708f2'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            caption: 'Service interval'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '5919b2515f0a4e5ba217788c7777203f'
                         key: {
@@ -15514,6 +16386,19 @@ declare global {
                             }
                             element: 'end_of_support'
                             position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '5a49872b7a374843b8c07006183d87b4'
+                        key: {
+                            sys_security_acl: '8b450f96cd0f4590ba042cceefa569d4'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
                         }
                     },
                     {
@@ -15921,6 +16806,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '5d021e884d8f4915a36be396c328d973'
+                        key: {
+                            sys_security_acl: '63727d0be58d4151b3c18297492f70de'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '5d10847c8a2b4943b23beeffa227e884'
                         key: {
@@ -16164,6 +17062,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '5e70597b969f45b3833a3786c0840221'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a46ecad23d0c4886b2b529439d12194c'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Billing period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'line_count'
+                            position: '6'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '5e87d97dabf744ed930b00be2b0e3cf6'
                         key: {
@@ -16346,6 +17266,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '5f8d0232e42e46089bea44c2d0dd086f'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'kind'
+                            value: 'fee'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '5fc07f7f4b2b471d8a1c1f9d520af31c'
                         key: {
@@ -16374,6 +17305,13 @@ declare global {
                                 }
                             }
                             element: 'manufacturer'
+                        }
+                    },
+                    {
+                        table: 'sys_db_object'
+                        id: '5fd47033d0ad479fa5c3e6aa9d3cf4eb'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
                         }
                     },
                     {
@@ -16561,6 +17499,28 @@ declare global {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_in_service_date'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '6179809a96144a01a13740fa2cd33e33'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'customer'
+                            position: '3'
                         }
                     },
                     {
@@ -16861,6 +17821,15 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
+                        id: '6395a84a0ad948b990edc15736f43ac5'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'description'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
                         id: '63a3df6b1c064223840657031f3e08f7'
                         key: {
                             name: 'x_daas_ham_order'
@@ -17157,6 +18126,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '652e2a491abe478a85769b78f9c609c3'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'amount'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: '65835544697345ddb2db3b16ab25e023'
                         key: {
@@ -17302,6 +18279,39 @@ declare global {
                         key: {
                             name: 'x_daas_ham_attestation'
                             element: 'customer'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '664a1d5acab9491ebd02027c1df2f82a'
+                        key: {
+                            sys_ui_form: {
+                                id: 'c909c5665081486ab86c896666d7f3ab'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '39b2833080744cb6a20533cc78bfa213'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Lines'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
                         }
                     },
                     {
@@ -17475,6 +18485,14 @@ declare global {
                             value: 'connector'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '680c1c4a08244d06a2b5674ee8bd08b4'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'generated_at'
                         }
                     },
                     {
@@ -17751,6 +18769,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '68e833724d094389aead140c44586045'
+                        key: {
+                            sys_security_acl: 'b3c27e35a5e248b487fd407324985b01'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '69112ca0b532441793d5ffdd1661c8c1'
                         key: {
@@ -17801,6 +18832,37 @@ declare global {
                         key: {
                             name: 'x_daas_ham_asn_import'
                             element: 'ship_date'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '697352286fca4862a2e0095982b631c4'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a46ecad23d0c4886b2b529439d12194c'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Billing period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'generated_at'
+                            position: '8'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '6973bf1c717743f2962c1a2d6a221cb3'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'NULL'
                             language: 'en'
                         }
                     },
@@ -18114,6 +19176,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '6b9782b24ea547bcae8b4663b04f2d76'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'site'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_form_section'
                         id: '6ba4822036084be19bcc9898fdb8849b'
                         key: {
@@ -18208,6 +19279,19 @@ declare global {
                             id: 'e01c2b8e22e64c2996dc7829a076ce0c'
                             table: 'var__m_atf_input_variable_1f39a288df60220062fe6c7a4df2639d'
                             field: 'record_id'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '6c27c099e9044d5cba261a8d20637f67'
+                        key: {
+                            sys_security_acl: '28c7b5d31ad14e93b40c8fe2ea64ad67'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
+                                }
+                            }
                         }
                     },
                     {
@@ -18407,6 +19491,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '6d6c5ed121cc4c219195c02247d59115'
+                        key: {
+                            name: 'x_daas_ham_fee_event'
+                            element: 'billing_period'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '6d84f277a08c44f0a6e2bbfc905d88bc'
                         key: {
@@ -18498,6 +19590,14 @@ declare global {
                         key: {
                             document_key: '50906ef9786541b7a7cf9e9bdf396c30'
                             variable: 'dd54cf535320220002c6435723dc34fd'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '6e0b41a53664485c86adc8244358109f'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'NULL'
                         }
                     },
                     {
@@ -18802,6 +19902,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '6fe077b32107498d83761da999409a13'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            element: 'subscription_line'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '6fee5ebf79fb402996550b699b787949'
                         key: {
@@ -19070,6 +20178,22 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '71a1e4004e4147d4ad4757fc8a5f0f20'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '71ad0fd57b704fe194e570246179afc8'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'total_amount'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '71cb9d4e41a645a8ba2267973e298aea'
                         key: {
@@ -19107,6 +20231,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_model_match_rule'
                             element: 'match_type'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '721825aa529e4a79bcd7572d351c4d70'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'agreement'
+                            position: '4'
                         }
                     },
                     {
@@ -19212,6 +20358,28 @@ declare global {
                                     name: 'x_daas_ham.finance'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '7294efae05cb45d392bb77bc18ddd705'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a46ecad23d0c4886b2b529439d12194c'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Billing period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '5'
                         }
                     },
                     {
@@ -19418,6 +20586,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_action_role'
+                        id: '73f7e574553143639ff62a0c7d0d4b42'
+                        key: {
+                            sys_ui_action: '0cf47e3f1a014fbfb56c557f56c1cb93'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '740e3f8b1ec34ca3bcde757226bd0570'
                         key: {
@@ -19455,6 +20636,13 @@ declare global {
                             name: 'x_daas_ham_return_order_line'
                             element: 'status'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'ua_table_licensing_config'
+                        id: '743588ac86534470aab6212ab4b9176e'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
                         }
                     },
                     {
@@ -19644,6 +20832,28 @@ declare global {
                         key: {
                             document_key: '1f092954c27243f3a2a450d375789f34'
                             variable: '6aad5a575360220002c6435723dc34b0'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '75171134845947d68ec4dc9bdd516502'
+                        key: {
+                            sys_ui_section: {
+                                id: '39b2833080744cb6a20533cc78bfa213'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Lines'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_billing_period.x_daas_ham_billing_line.billing_period'
+                            position: '0'
                         }
                     },
                     {
@@ -19842,6 +21052,39 @@ declare global {
                             }
                             element: '.split'
                             position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '75d6c52cea324edf858f004ef83d784d'
+                        key: {
+                            sys_ui_form: {
+                                id: '2214abee52c54fdda419460747bb4707'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
                         }
                     },
                     {
@@ -20692,6 +21935,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '7cac4ff007bb4d0f80e9ec33840ac095'
+                        key: {
+                            sys_security_acl: 'c0140ca8d45142f28b734a3cc0d306d1'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_atf_test_suite_test'
                         id: '7cb91ad61b294803add7617f0c8ebf59'
                         key: {
@@ -20841,6 +22097,28 @@ declare global {
                                     name: 'x_daas_ham.inventory_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '7e04f8cfcc1a4206b65440e39d6292d9'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a46ecad23d0c4886b2b529439d12194c'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Billing period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -21012,6 +22290,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '7f6351c7330b43aca2c070470ee5928d'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'units'
+                            position: '10'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '7f808fb831244daea98a95bd7559ee22'
                         key: {
@@ -21078,6 +22378,15 @@ declare global {
                             value: 'pending_oem_rma'
                             language: 'en'
                             dependent_value: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '7fe5a1bba0aa48e2932320eae4a832b5'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'amount'
+                            language: 'en'
                         }
                     },
                     {
@@ -21637,6 +22946,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '830543feb9c648c4a15e7c19cc38bd52'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'kind'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'ua_table_licensing_config'
                         id: '83075caeb2c1409d8204adf349af9514'
                         key: {
@@ -21654,6 +22972,21 @@ declare global {
                                     name: 'x_daas_ham.inventory_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '83688335000648f2916f1244c40ee18b'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            caption: 'Billing line'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -22234,6 +23567,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '873cdb68af154e6a8545f789bdf6947f'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'total_amount'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_user_role_contains'
                         id: '873f6ececa14448ba0fa965f77e1dc2f'
                         key: {
@@ -22602,6 +23944,15 @@ declare global {
                         key: {
                             document_key: '437fedf3c81a47ec97cdfdda5f21b4a3'
                             variable: '586e2c4253e0220002c6435723dc3415'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '89657f1b5d3e4a3380e228ec496af2b5'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'closed_at'
+                            language: 'en'
                         }
                     },
                     {
@@ -22990,6 +24341,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '8c38404e64534ca88a4d68351b5cf29d'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'closed_by'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '8c44a4fdb70b4d66885afff925ac14ed'
                         key: {
@@ -23100,6 +24459,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_action_role'
+                        id: '8d9c9ef31c914bca9ac7b76712246e86'
+                        key: {
+                            sys_ui_action: 'd3641bdb2998498da3eff3e227d43ecb'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: '8db14a1215484df5a6b453fd9631ecd6'
                         key: {
@@ -23202,6 +24574,14 @@ declare global {
                         key: {
                             document_key: '6e9345afffda46bc9e62437cefc52277'
                             variable: 'b27b2b29ff6033008d3f5d9ad53bf164'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '8e8502c619c74137a4c85a54feed72be'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'customer'
                         }
                     },
                     {
@@ -24760,6 +26140,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '96a1e7ffe2a1433c89045a158d9838ac'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'status'
+                            value: 'ready'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: '96aeadb4d9e2448aa5b408d089ba4861'
                         key: {
@@ -24933,6 +26324,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '986b15073bf4409ca678681e85f0a2c4'
+                        key: {
+                            sys_security_acl: '58ef8d56020f401da36dcf5430cdf6ee'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '987f8ed829344ea586c269c5308ecdf3'
                         key: {
@@ -25025,6 +26429,15 @@ declare global {
                             value: 'blocked'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '98e7cb479c924ccdab9b2b8c49f3d2cc'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'status'
+                            language: 'en'
                         }
                     },
                     {
@@ -26264,11 +27677,42 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '9fe38283c8374f4db4098cace5f2860d'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'line_count'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '9ff15a9e8b2345339b39e213d94a7a0f'
                         key: {
                             name: 'x_daas_ham_eox_import'
                             element: 'end_of_support'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'a01ead0b97c2414185522af8015fd638'
+                        key: {
+                            sys_ui_section: {
+                                id: '5908ba5a3c394a30961dd1cb85d708f2'
+                                key: {
+                                    name: 'x_daas_ham_service_interval'
+                                    caption: 'Service interval'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '8'
                         }
                     },
                     {
@@ -26304,6 +27748,17 @@ declare global {
                             name: 'x_daas_ham_oem_coverage'
                             element: 'vendor'
                             value: 'meraki'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'a06bbcdad1d249f981321893a5e39668'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'status'
+                            value: 'generating'
                             language: 'en'
                             dependent_value: 'NULL'
                         }
@@ -26611,6 +28066,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_manufacturer_alias'
                             element: 'alias'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'a206414109c54284a231dc6e67465a63'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            element: 'start_date'
+                            language: 'en'
                         }
                     },
                     {
@@ -27001,6 +28465,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'a408e61360204174a828ff5c9b647349'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'billing_period'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'a427b40db85d4266830e5402a1865866'
                         key: {
@@ -27065,6 +28538,21 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: 'a46ecad23d0c4886b2b529439d12194c'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            caption: 'Billing period'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -27268,6 +28756,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: 'a55cc6e8b5ec4f299d3758d9779fd410'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'subscription_line'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'a57003ebad404b9aba6eb777172f7689'
                         key: {
@@ -27380,6 +28876,15 @@ declare global {
                             value: 'other'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'a650c90c000a44dda36ca047a98dd40d'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'subscription_line'
+                            language: 'en'
                         }
                     },
                     {
@@ -27515,6 +29020,37 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'a7b9d7f660694763a59ec47fbfa4d78b'
+                        key: {
+                            sys_ui_section: {
+                                id: '5908ba5a3c394a30961dd1cb85d708f2'
+                                key: {
+                                    name: 'x_daas_ham_service_interval'
+                                    caption: 'Service interval'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'subscription_line'
+                            position: '2'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'a7cd2815d32340febb08fc5cbb85cac8'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'units'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'a7d158ed9c764d0daa6f169cb009d6aa'
                         key: {
@@ -27590,6 +29126,14 @@ declare global {
                             name: 'x_daas_ham_audit_line'
                             element: 'NULL'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'a878150bca574fa7921c840b2aab99b6'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'status'
                         }
                     },
                     {
@@ -27739,6 +29283,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_order'
                             element: 'case'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'a9ed482caebf4a9c850beed85ac8e9e7'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'fee_event'
+                            language: 'en'
                         }
                     },
                     {
@@ -28105,6 +29658,32 @@ declare global {
                         id: 'ac78f029ad284de4923492a694c71317'
                         key: {
                             name: 'x_daas_ham/warehouse/main.js.map'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'ac873f62875e4665b100b11c96bc50c4'
+                        key: {
+                            sys_security_acl: 'b728b193f7ec44b1a9e4592c17d5010b'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'acabf1f5dc9f4dd3a3ea9af6812ddc2a'
+                        key: {
+                            sys_security_acl: '0e24debcecd74252a9f35b3fb7bad76c'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -28538,6 +30117,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'b0852a7962f94bffb56d6641fe8d75cc'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'period'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ux_lib_asset'
                         id: 'b0978c99f340487e9f32eb3883dd6232'
                         key: {
@@ -28828,6 +30416,41 @@ declare global {
                         key: {
                             document_key: 'dabbe8b9c72449968e658c6edb67e860'
                             variable: '74d6e7a0a3023110571967d1361e616b'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'b2a4451a74a342258fef2ba1782ec43a'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'currency'
+                            position: '13'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'b2a67bd1ff474c8f8195088c48e85ab1'
+                        key: {
+                            sys_security_acl: 'b728b193f7ec44b1a9e4592c17d5010b'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -29217,6 +30840,14 @@ declare global {
                             name: 'x_daas_ham_agreement_quantity'
                             element: 'NULL'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'b56dc5b504f14dddaa6a76213e0c7b01'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            element: 'end_date'
                         }
                     },
                     {
@@ -30072,6 +31703,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'bab6f7f0a17440e48cd6eb06b040c2b3'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'agreement'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_section'
                         id: 'bab76e695e1f4f1fa1dd7884fc529a04'
                         key: {
@@ -30103,6 +31743,14 @@ declare global {
                         key: {
                             logical_table_name: 'x_daas_ham_recon_exception'
                             col_name_string: 'status'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'bb1b2939513946c799db0e794a3c97aa'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'billing_period'
                         }
                     },
                     {
@@ -30157,6 +31805,14 @@ declare global {
                                 }
                             }
                             sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'bbcb5eb20ab741f89c37c5065ad9118e'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'fee_event'
                         }
                     },
                     {
@@ -30367,6 +32023,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'bd84df86244749548dc04872d31e9a78'
+                        key: {
+                            sys_security_acl: 'adc6151e7cab44e3a33f63420d3f37d7'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: 'bd85dd3ab5b448a990c5167887452820'
                         key: {
@@ -30444,6 +32113,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_order_line'
                             element: 'transfer_orders'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'be41e521bc7d470d954a721d93cd5a84'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'subscription_line'
+                            position: '5'
                         }
                     },
                     {
@@ -30630,6 +32321,35 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'c027f71f696e4a68979deb6c8cf67aa2'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '8'
+                        }
+                    },
+                    {
+                        table: 'ua_table_licensing_config'
+                        id: 'c0313383ee6640f898b063bfea4c9c54'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: 'c0613f5e6a3e478aa21499ecb354f104'
                         key: {
@@ -30702,6 +32422,19 @@ declare global {
                                 }
                             }
                             element: 'resolved_model'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'c11e3ffc02d94144ba39d33996d6aa22'
+                        key: {
+                            sys_security_acl: 'b728b193f7ec44b1a9e4592c17d5010b'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
                         }
                     },
                     {
@@ -31138,6 +32871,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: 'c3f628a6b5ca44f0803940c3517ea111'
+                        key: {
+                            sys_ui_form: {
+                                id: 'c909c5665081486ab86c896666d7f3ab'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'a46ecad23d0c4886b2b529439d12194c'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Billing period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'c409b6848f9a4a45bccc1d77b9af12ac'
                         key: {
@@ -31372,6 +33138,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_index'
+                        id: 'c4f52134b0d74e8aaab0e5deec97fe0b'
+                        key: {
+                            logical_table_name: 'x_daas_ham_billing_line'
+                            col_name_string: 'customer'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'c508346e0c8c48b6a0649ee155f9444e'
                         key: {
@@ -31481,6 +33255,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'c57a27cd068e4005a76124d54acd3299'
+                        key: {
+                            name: 'x_daas_ham_fee_event'
+                            element: 'billing_period'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'c5810a1593534241ae5d3402eb77a302'
                         key: {
@@ -31550,6 +33333,28 @@ declare global {
                         id: 'c60eda6c4c17459a983a0dd72e04e9c9'
                         key: {
                             name: 'x_daas_ham_recon_exception'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'c649b3ac5eec45a4b5057dbff715ff68'
+                        key: {
+                            sys_ui_section: {
+                                id: '5908ba5a3c394a30961dd1cb85d708f2'
+                                key: {
+                                    name: 'x_daas_ham_service_interval'
+                                    caption: 'Service interval'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'asset'
+                            position: '1'
                         }
                     },
                     {
@@ -32162,6 +33967,20 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: 'c909c5665081486ab86c896666d7f3ab'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'c921491c237844388f4d3a85412460b2'
                         key: {
@@ -32333,6 +34152,19 @@ declare global {
                         id: 'c9f975c2804a4264bd357ffaeaeec4ea'
                         key: {
                             sys_security_acl: 'da56cb4ee9d54178b929fb10eb8cb70e'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'ca15a2186ba040b08d5b4293f0181362'
+                        key: {
+                            sys_security_acl: 'adc6151e7cab44e3a33f63420d3f37d7'
                             sys_user_role: {
                                 id: 'd33813ebacca4b79aad41517026036d8'
                                 key: {
@@ -32968,6 +34800,17 @@ declare global {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_coverage_end'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'cdc4439f7df2402a93dd99f4b4228be1'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'kind'
+                            value: 'subscription'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -35429,6 +37272,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: 'e03ece980d52480899908bdc5d65359f'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'line_count'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: 'e04ba8cad9ff4bd99105ab49f8c1a575'
                         key: {
@@ -35753,6 +37604,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'e2472245b7fe406396834ef9c5434621'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'fee_event'
+                            position: '7'
+                        }
+                    },
+                    {
                         table: 'ua_table_licensing_config'
                         id: 'e2acb9c757684036b715cd3101635f2d'
                         key: {
@@ -35809,6 +37682,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_asn_import'
                             element: 'po_number'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'e2eadf378e334893b337048f754e80a3'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'generated_at'
+                            language: 'en'
                         }
                     },
                     {
@@ -35881,6 +37763,14 @@ declare global {
                             name: 'x_daas_ham_staging_step'
                             element: 'label'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'e381b106b1f140b9a4a3e97a0055533a'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'units'
                         }
                     },
                     {
@@ -36003,6 +37893,28 @@ declare global {
                                 }
                             }
                             sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'e4614b04ae264a24aa7d0919ee8c4749'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a46ecad23d0c4886b2b529439d12194c'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Billing period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'period_end'
+                            position: '3'
                         }
                     },
                     {
@@ -36295,6 +38207,28 @@ declare global {
                             }
                             element: 'disposal_order'
                             position: '1'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'e62b4a2be1984133aa45da4f09a76ce3'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a46ecad23d0c4886b2b529439d12194c'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Billing period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'period_start'
+                            position: '2'
                         }
                     },
                     {
@@ -36791,6 +38725,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_index'
+                        id: 'eacd6f7cd87046a7a1dfb4d9e483d77c'
+                        key: {
+                            logical_table_name: 'x_daas_ham_billing_period'
+                            col_name_string: 'period'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'eafcab1ce4eb4f9295289f37fa5bc667'
                         key: {
@@ -36894,6 +38836,28 @@ declare global {
                         key: {
                             category: 'x_daas_ham_order'
                             prefix: 'NORD'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'ebe3e791eb4c402bbe9ccbd77e924d99'
+                        key: {
+                            sys_ui_section: {
+                                id: 'a46ecad23d0c4886b2b529439d12194c'
+                                key: {
+                                    name: 'x_daas_ham_billing_period'
+                                    caption: 'Billing period'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'period'
+                            position: '1'
                         }
                     },
                     {
@@ -37153,6 +39117,14 @@ declare global {
                                 }
                             }
                             element: 'install_mode'
+                        }
+                    },
+                    {
+                        table: 'sys_choice_set'
+                        id: 'ed5ebc695cb64047b247a0ff98d8a3f5'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'kind'
                         }
                     },
                     {
@@ -37435,6 +39407,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: 'ef72cf4d4c8d4fca97f1c7f451c76031'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'site'
+                        }
+                    },
+                    {
                         table: 'sys_number'
                         id: 'efa12459d87142cebfc3212a1f7d7c63'
                         key: {
@@ -37456,6 +39436,40 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'f00609cca6df4c8a9549c4b0fb8c98a2'
+                        key: {
+                            sys_security_acl: 'c0140ca8d45142f28b734a3cc0d306d1'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'f006499c461b418694be6c5866a194a4'
+                        key: {
+                            sys_security_acl: 'adc6151e7cab44e3a33f63420d3f37d7'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_index'
+                        id: 'f06c0e49b17a4f6fa6655c17cbcc99b9'
+                        key: {
+                            logical_table_name: 'x_daas_ham_service_interval'
+                            col_name_string: 'asset'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: 'f096a25f3c0e4c7f8bd2e8321e54d081'
                         key: {
@@ -37464,6 +39478,28 @@ declare global {
                             value: 'staged'
                             language: 'en'
                             dependent_value: '6'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'f0a87843c64c404fb09e945ecb5b8bf0'
+                        key: {
+                            sys_ui_section: {
+                                id: '5908ba5a3c394a30961dd1cb85d708f2'
+                                key: {
+                                    name: 'x_daas_ham_service_interval'
+                                    caption: 'Service interval'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -37657,6 +39693,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'f23a7b02223640e19245c93fc24b3c19'
+                        key: {
+                            sys_ui_section: {
+                                id: '83688335000648f2916f1244c40ee18b'
+                                key: {
+                                    name: 'x_daas_ham_billing_line'
+                                    caption: 'Billing line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'billing_period'
+                            position: '1'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: 'f294cc1583434aebb395e352a952f483'
                         key: {
@@ -37832,6 +39890,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: 'f3a77059e72d47a4a5e2f352c500c3ff'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'period_start'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: 'f3ba7ff7c8424fcea6afa55ade1f6384'
                         key: {
@@ -37965,6 +40031,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'f50b23fef08842c2a8087899a12b0375'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            element: 'subscription_line'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: 'f539f3468613402387305cf32101d1e6'
                         key: {
@@ -38095,6 +40170,14 @@ declare global {
                         key: {
                             document_key: '637c8bee2eea4a4086c16522e8a93cd9'
                             variable: '90144b535320220002c6435723dc3488'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'f62d33643ecd4509bbdef0003a15d068'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            element: 'customer'
                         }
                     },
                     {
@@ -38245,6 +40328,15 @@ declare global {
                                 }
                             }
                             element: 'occurred_on'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'f7a6d74e039b4079a3b55c9c75c6b189'
+                        key: {
+                            name: 'x_daas_ham_billing_line'
+                            element: 'currency'
+                            language: 'en'
                         }
                     },
                     {
@@ -38657,6 +40749,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'faf99fc99bdc471498234521e7095376'
+                        key: {
+                            sys_security_acl: '6bd8289294254c17b382638e2e398d4a'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'question_choice'
                         id: 'fb04b92e197d49caaa3f42d46ee1c9b7'
                         key: {
@@ -38818,6 +40923,15 @@ declare global {
                             id: '7657d40346d849c3b678c6436810b1c0'
                             table: 'var__m_atf_input_variable_1f39a288df60220062fe6c7a4df2639d'
                             field: 'record_id'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'fbf0548e729448c4a318c97aef96648a'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'period_start'
+                            language: 'en'
                         }
                     },
                     {
@@ -39069,6 +41183,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'fd806a4e8a064b8fb6bc54150b6f346b'
+                        key: {
+                            sys_ui_section: {
+                                id: '5908ba5a3c394a30961dd1cb85d708f2'
+                                key: {
+                                    name: 'x_daas_ham_service_interval'
+                                    caption: 'Service interval'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'end_date'
+                            position: '7'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: 'fdb288f21e984d8db55948448bf72edb'
                         key: {
@@ -39122,6 +41258,15 @@ declare global {
                                     name: 'x_daas_ham.field_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'fe075bc19f804cecabaaa4db6401a423'
+                        key: {
+                            name: 'x_daas_ham_service_interval'
+                            element: 'asset'
+                            language: 'en'
                         }
                     },
                     {
@@ -39392,6 +41537,19 @@ declare global {
                             name: 'change_request'
                             element: 'x_daas_ham_audit'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'ffb08a3b40c3409db6c57f37bcc6be16'
+                        key: {
+                            sys_security_acl: 'b3c27e35a5e248b487fd407324985b01'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
