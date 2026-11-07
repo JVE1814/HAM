@@ -329,6 +329,14 @@ declare global {
                         table: 'sys_security_acl'
                         id: '06d51e6b0c9e42fa8d66ece13665d0d3'
                     }
+                    acl_job_lock_delete: {
+                        table: 'sys_security_acl'
+                        id: '75f530829a9845758913df987e3ac5fb'
+                    }
+                    acl_job_lock_read: {
+                        table: 'sys_security_acl'
+                        id: 'cafbbaeac05d444f83ee1cb630ca77ab'
+                    }
                     acl_lease_decision_create: {
                         table: 'sys_security_acl'
                         id: '804f4791a31e424e9d9e2914a6520037'
@@ -2620,6 +2628,10 @@ declare global {
                         table: 'sys_module'
                         id: '799d3e78a7604861a5f1cfaeae905bf1'
                     }
+                    src_server_platform_locks_ts: {
+                        table: 'sys_module'
+                        id: 'd959aeddfa4042d3bf17fda638d0cf0f'
+                    }
                     src_server_platform_normalization_ts: {
                         table: 'sys_module'
                         id: '1a00b7f9e64745ce89fed0b37aa9a7fd'
@@ -3915,6 +3927,15 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '015d7c6f09ad4871b9c756f4cca558a2'
+                        key: {
+                            name: 'x_daas_ham_job_lock'
+                            element: 'NULL'
+                            language: 'en'
                         }
                     },
                     {
@@ -6711,6 +6732,15 @@ declare global {
                             }
                             element: 'asset'
                             position: '1'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '113d7d54a5e44dbb9bbf333a201c2e53'
+                        key: {
+                            name: 'x_daas_ham_job_lock'
+                            element: 'name'
+                            language: 'en'
                         }
                     },
                     {
@@ -13247,6 +13277,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'ua_table_licensing_config'
+                        id: '36e613e109da4146b8488e0a7e10d55e'
+                        key: {
+                            name: 'x_daas_ham_job_lock'
+                        }
+                    },
+                    {
                         table: 'item_option_new'
                         id: '36f05e19dce742b695f6db51de0ff636'
                         key: {
@@ -15453,6 +15490,14 @@ declare global {
                             }
                             element: '.split'
                             position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '44f0900a9967488f8a7368e74530f121'
+                        key: {
+                            name: 'x_daas_ham_job_lock'
+                            element: 'NULL'
                         }
                     },
                     {
@@ -24722,6 +24767,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '779ecf04020d47d480830388a4996974'
+                        key: {
+                            sys_security_acl: '75f530829a9845758913df987e3ac5fb'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '77bb3cc4fca640e0a3a069d43c66fd8d'
                         key: {
@@ -28743,6 +28801,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: '8ed79523400946b58f5386fd95c0592e'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham_cost_fact'
                             element: 'run'
@@ -34150,6 +34209,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_index'
+                        id: 'ab070a5d0cda49e580ec1f542f4f976f'
+                        key: {
+                            logical_table_name: 'x_daas_ham_job_lock'
+                            col_name_string: 'name'
+                        }
+                    },
+                    {
                         table: 'sys_ui_section'
                         id: 'ab14b9b2f3ba4e8db17d772c8d66c32a'
                         key: {
@@ -35479,6 +35546,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: 'b381b77cdf8b430d953e06c8d049f847'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham_billing_period'
                             element: 'margin_run'
@@ -39219,6 +39287,14 @@ declare global {
                                 }
                             }
                             sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'c9116ca7292446f5963953e1664a96e2'
+                        key: {
+                            name: 'x_daas_ham_job_lock'
+                            element: 'name'
                         }
                     },
                     {
@@ -43702,6 +43778,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_db_object'
+                        id: 'e54d3172ea2c41dc8d9aa2bb894e2a1b'
+                        key: {
+                            name: 'x_daas_ham_job_lock'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: 'e54fa04787504307bd3f806e96a2981b'
                         key: {
@@ -44838,6 +44921,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: 'ec81df72d72b40d1a230c2ef9a0b4dee'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham_cost_fact'
                             element: 'run'
@@ -45227,6 +45311,19 @@ declare global {
                         key: {
                             document_key: '6dd0cddf681c445ea3000f270d9b1de7'
                             variable: '9024a37f671003007ba405225685efe5'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'eeb528fe38f945da8587dafd66bf3487'
+                        key: {
+                            sys_security_acl: 'cafbbaeac05d444f83ee1cb630ca77ab'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
+                                }
+                            }
                         }
                     },
                     {
@@ -46545,6 +46642,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: 'f858e00b1e7849afbb5678f690e8ed48'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham_billing_period'
                             element: 'margin_run'

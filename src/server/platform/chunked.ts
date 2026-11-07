@@ -1,7 +1,8 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import { runChunked, type ChunkedJobPorts, type ChunkedJobResult } from '../domain/chunked-job'
 import { andEachClause } from '../domain/encoded-query'
 import { msToGlide, nowMs } from './clock'
+import { withLock } from './locks'
 import { intProperty, PROPERTY } from './properties'
 import { str } from './records'
 
@@ -50,7 +51,7 @@ export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
     })
 }
 
-/** Start a new run of `job`, superseding any run still in progress; returns the run's token (see runsBefore). */
+/** Start a new run of `job`, superseding any run still in progress; returns the run's token (its start time). */
 function startRun(job: string): string {
     const record = loadCursorRecord(job)
     const token = String(nowMs())
@@ -59,15 +60,6 @@ function startRun(job: string): string {
     record.setValue('last_status', 'running')
     record.update()
     return token
-}
-
-/**
- * An encoded query clause matching records whose `field` holds the token of a run started before the
- * run `token`. A run's token is its start time in epoch ms, and all tokens have the same length (13
- * digits), so a later run's token sorts after an earlier one's as text too.
- */
-export function runsBefore(field: string, token: string): string {
-    return `${field}<${token}`
 }
 
 /** Mark the current run of `job` complete (a run still 'running' with an old last run has stalled). */
@@ -99,71 +91,78 @@ interface EventJobFields {
     parm1: string
     /** The event's parm2 as received ('' on the first event of a pass). */
     cursor: string
-    /** Write out anything accumulated in memory before the next chunk can start; `run` is the pass's token ('' without `supersede`). */
-    flush?: (run: string) => void
-    /** Make each fresh pass supersede one still running under `job`; `onStart` runs once as a pass starts, with its token (see runEventTableJob). */
-    supersede?: { job: string; onStart(run: string): void }
+    /** Write out what the chunk accumulated in memory, with its records that failed, before the next chunk can start. */
+    flush?: (failures: { failed: number; lastError: string }) => void
+    /**
+     * Make each fresh pass supersede one still running under `job` (see runEventTableJob): `onStart` runs once
+     * as a pass starts, and `complete` once its last chunk is flushed, while it is still the current pass.
+     */
+    supersede?: { job: string; onStart(): void; complete?(): void }
 }
 
-export interface EventTableJobResult extends ChunkedJobResult {
-    /** The pass's token: a new one for each pass when `supersede` is set, else ''. */
-    run: string
-    /** The chunk's pass was superseded (see runEventTableJob): `done` is false and the chunk's counts no longer matter. */
-    superseded: boolean
-    /**
-     * Whether the chunk's pass is still the current one, asked again now (always true without `supersede`): what
-     * completes a pass asks before each of its writes, so a pass superseded meanwhile stops completing.
-     */
-    stillCurrent(): boolean
-}
+/** How long a chunk that finds its job locked waits before it runs again from the same cursor. */
+const LOCKED_RETRY_SECONDS = 60
 
 /**
  * The same runner driven by an event instead of a schedule: the cursor travels in the event's parm2
  * (with the pass token when `supersede` is set) and the event is queued again until the pass is complete.
  *
- * With `supersede`, a chunk checks that its pass is still current as it starts (else it handles nothing),
- * before it flushes (else it neither flushes nor queues the next chunk) and once it has flushed (else it
- * queues no next chunk and reports `superseded`: the caller ignores the chunk's counts, and a last chunk
- * does not complete the pass; a pass that completes is marked complete on its job cursor). A chunk superseded during its
- * flush still flushes under its own pass's token, so whatever completes a pass tells its own records from
- * an older pass's by the token (see runsBefore). A fresh pass starting while a last chunk completes its
- * pass is caught by the caller asking `stillCurrent` before each completion write; one starting between
- * that question and the write is not, and the fresh pass's own completion replaces what that write did
- * (ADR 0013: no lock).
+ * With `supersede`, a pass's start, each chunk's flush and the pass's completion hold the job's lock
+ * (ADR 0013), and each checks under it that its pass is still the current one: a fresh pass starts only
+ * between them, so a superseded chunk neither flushes, queues the next chunk nor completes its pass, and
+ * nothing it handled is written. A chunk that finds the lock held runs again later from the same cursor;
+ * a pass that completes is marked complete on its job cursor.
  */
-export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): EventTableJobResult {
+export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): ChunkedJobResult {
     const supersede = spec.supersede
-    let token = ''
-    let cursor = spec.cursor
-    let superseded = false
-    const stillCurrent = () => !supersede || isCurrentRun(supersede.job, token)
-    if (supersede) {
-        const separator = spec.cursor.indexOf(':')
-        token = separator < 0 ? '' : spec.cursor.slice(0, separator)
-        cursor = separator < 0 ? '' : spec.cursor.slice(separator + 1)
-        if (!token) {
-            token = startRun(supersede.job)
-            supersede.onStart(token)
-        } else {
-            superseded = !stillCurrent()
-        }
+    if (!supersede) {
+        return runOverTable(spec, {
+            loadCursor: () => spec.cursor,
+            saveCursor: (next, _processed, done, failures) => {
+                spec.flush?.(failures)
+                if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, next)
+            },
+        })
     }
-    // A chunk of a pass superseded before it starts handles nothing.
-    const result = superseded ? { processed: 0, failed: 0, done: false, cursor, lastError: '' } : runOverTable(spec, {
+    const separator = spec.cursor.indexOf(':')
+    let token = separator < 0 ? '' : spec.cursor.slice(0, separator)
+    const cursor = separator < 0 ? '' : spec.cursor.slice(separator + 1)
+    const idle = { processed: 0, failed: 0, done: false, cursor, lastError: '' }
+    if (!token) {
+        const started = withLock(supersede.job, () => {
+            token = startRun(supersede.job)
+            supersede.onStart()
+        })
+        if (!started) return retryLater(spec)
+    } else if (!isCurrentRun(supersede.job, token)) {
+        return idle
+    }
+    let locked = false
+    const result = runOverTable(spec, {
         loadCursor: () => cursor,
-        saveCursor: (next, _processed, done) => {
-            if (!stillCurrent()) {
-                superseded = true
-                return
-            }
-            spec.flush?.(token)
-            superseded = !stillCurrent()
-            if (superseded) return
-            if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, supersede ? `${token}:${next}` : next)
-            else if (supersede) completeRun(supersede.job)
+        saveCursor: (next, _processed, done, failures) => {
+            locked = !withLock(supersede.job, () => {
+                if (!isCurrentRun(supersede.job, token)) return
+                spec.flush?.(failures)
+                if (!done) {
+                    gs.eventQueue(spec.eventName, spec.record, spec.parm1, `${token}:${next}`)
+                } else {
+                    completeRun(supersede.job)
+                    supersede.complete?.()
+                }
+            })
         },
     })
-    return { ...result, done: result.done && !superseded, run: token, superseded, stillCurrent }
+    // Nothing of the chunk was written: it runs again from the cursor it was given.
+    return locked ? retryLater(spec) : result
+}
+
+/** Queue the event again, as received, to run once the job's lock is free. */
+function retryLater(spec: Pick<EventJobFields, 'eventName' | 'record' | 'parm1' | 'cursor'>): ChunkedJobResult {
+    const when = new GlideDateTime()
+    when.addSeconds(LOCKED_RETRY_SECONDS)
+    gs.eventQueueScheduled(spec.eventName, spec.record, spec.parm1, spec.cursor, when)
+    return { processed: 0, failed: 0, done: false, cursor: spec.cursor, lastError: 'job locked: retried later' }
 }
 
 type TableSource<T, R> = Pick<TableJobFields<T, R>, 'table' | 'query' | 'read' | 'handle'> & { prepare?: PrepareBatch<T, R> }

@@ -47,8 +47,6 @@ export const x_daas_ham_billing_period = Table({
         /** Service intervals the latest margin computation failed to cost (its Cost facts and Margin miss them), with the last error; both cleared as one starts. */
         margin_failed: IntegerColumn({ label: 'Service intervals that failed to cost', default: 0, readOnly: true }),
         margin_error: StringColumn({ label: 'Last margin error', maxLength: 255, readOnly: true }),
-        /** The margin computation the two fields above belong to: only its chunks add to them. */
-        margin_run: StringColumn({ label: 'Margin computation run', maxLength: 40, readOnly: true }),
         line_count: IntegerColumn({ label: 'Lines', readOnly: true }),
         total_amount: DecimalColumn({ label: 'Total', readOnly: true }),
         closed_at: DateTimeColumn({ label: 'Closed at', readOnly: true }),

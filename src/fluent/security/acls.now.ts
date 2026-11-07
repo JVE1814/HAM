@@ -694,6 +694,22 @@ Acl({
 })
 
 Acl({
+    $id: Now.ID['acl_job_lock_read'],
+    type: 'record',
+    table: 'x_daas_ham_job_lock',
+    operation: 'read',
+    roles: [admin],
+})
+
+Acl({
+    $id: Now.ID['acl_job_lock_delete'],
+    type: 'record',
+    table: 'x_daas_ham_job_lock',
+    operation: 'delete',
+    roles: [admin],
+})
+
+Acl({
     $id: Now.ID['acl_alm_hardware_read_staff'],
     type: 'record',
     table: 'alm_hardware',

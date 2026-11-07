@@ -62,3 +62,14 @@ export const x_daas_ham_job_cursor = Table({
     },
     index: [{ name: 'x_daas_ham_jc_job', unique: true, element: 'job' }],
 })
+
+/** Job locks: one row per lock held, behind a unique index so that only one holder can take it (ADR 0013). */
+export const x_daas_ham_job_lock = Table({
+    name: 'x_daas_ham_job_lock',
+    label: 'Job lock',
+    display: 'name',
+    schema: {
+        name: StringColumn({ label: 'Lock', maxLength: 100, mandatory: true }),
+    },
+    index: [{ name: 'x_daas_ham_jl_name', unique: true, element: 'name' }],
+})

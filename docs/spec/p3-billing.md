@@ -53,10 +53,9 @@ Closing a period (or **Recompute margin** on a closed one) rebuilds its **Cost f
 
 - Customer-owned Assets carry no capital cost.
 - Costs use the Assets' current ownership, cost and coverage: *Recompute margin* on an old period
-  reflects today's data. A recompute started while another is running supersedes it: each Cost fact
-  records the recompute that wrote it (*Computation run*), and a recompute that completes drops the
-  Cost facts of earlier ones, adds field labour and rebuilds Margin from its own; a superseded one
-  stops before each of those steps, so the latest recompute's results are the ones left. Service intervals
+  reflects today's data. A recompute started while another is running supersedes it: the new one
+  starts afresh and the older one writes nothing more (its start, each batch it writes and its
+  completion take a job lock, ADR 0013), so the latest recompute's results are the ones left. Service intervals
   that fail to cost are left out, counted on the period (*Service intervals that failed to cost*) with
   the last error (*Last margin error*); both are cleared when a recompute starts.
 - While a buyout transfer is still running, a lease's payment keeps being split over the Assets it

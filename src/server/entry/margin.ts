@@ -5,7 +5,7 @@ import { monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing'
 import type { LegalOwner } from '../domain/lifecycle'
 import { cents, CostLedger, costFactKey, marginRows, serviceIntervalCosts, type Amount, type AssetCostFacts, type CostEntry, type LeaseTerms } from '../domain/margin'
 import { memoized } from '../domain/memo'
-import { runEventTableJob, runsBefore } from '../platform/chunked'
+import { runEventTableJob } from '../platform/chunked'
 import { EVENT, fire } from '../platform/events'
 import { intProperty, PROPERTY } from '../platform/properties'
 import { count, deleteWhere, findById, num, recordsById, str } from '../platform/records'
@@ -20,9 +20,7 @@ export function uiRecomputeMargin(current: GlideRecord): void {
 
 /**
  * Script action on x_daas_ham.margin.compute (parm1 = period): Asset costs over the month's service
- * intervals, then labour and margin. A fresh trigger supersedes a pass still in progress: each pass
- * writes Cost facts under its own run, and a pass that completes drops older passes' facts and sums
- * Margin from its own.
+ * intervals, then labour and margin. A fresh trigger supersedes a pass still in progress (ADR 0013).
  */
 export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     const periodId = str(event, 'parm1')
@@ -35,27 +33,31 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
         const message = error instanceof Error ? error.message : String(error)
         gs.error(`[x_daas_ham] Margin of ${str(period, 'period')} stopped: ${message}`)
         const fresh = findById('x_daas_ham_billing_period', periodId)
-        if (fresh) saveMarginStatus(fresh, { run: str(fresh, 'margin_run'), failed: num(fresh, 'margin_failed'), error: `stopped: ${message}` })
+        if (fresh) saveMarginStatus(fresh, num(fresh, 'margin_failed'), `stopped: ${message}`)
     }
 }
 
-/** One chunk of a margin pass over the period's Service intervals after `cursor`; the last one adds field labour and writes Margin. */
+/** One chunk of a margin pass over the period's Service intervals after `cursor`; the pass's completion adds field labour and writes Margin. */
 function computeMarginChunk(period: GlideRecord, cursor: string, current: GlideRecord): void {
     const periodId = period.getUniqueValue()
     const bounds = monthBounds(str(period, 'period'))
     const amortisationMonths = intProperty(PROPERTY.amortisationMonths, 60)
     const ledger = new CostLedger()
     const leases = memoized(leaseTermsOf)
-    const result = runEventTableJob({
+    runEventTableJob({
         eventName: EVENT.marginCompute,
         record: current,
         parm1: periodId,
         cursor,
         supersede: {
             job: `margin_${periodId}`,
-            onStart: (run) => {
+            onStart: () => {
                 clearPeriod(periodId)
-                saveMarginStatus(period, { run, failed: 0, error: '' })
+                saveMarginStatus(period, 0, '')
+            },
+            complete: () => {
+                addFieldLabour(periodId, bounds)
+                writeMargin(periodId)
             },
         },
         table: 'x_daas_ham_service_interval',
@@ -73,52 +75,34 @@ function computeMarginChunk(period: GlideRecord, cursor: string, current: GlideR
             const costs = serviceIntervalCosts(interval, { ...asset, lease: (asset.leaseId ? leases(asset.leaseId) : null) }, bounds, amortisationMonths)
             for (const cost of costs) ledger.add(interval.customerId, interval.siteId, cost.type, cost.amount)
         },
-        flush: (run) => writeCostFacts(periodId, run, ledger.drain()),
+        flush: (failures) => {
+            writeCostFacts(periodId, ledger.drain())
+            // Failed Service intervals are left out of Margin, so the period counts them to show it is incomplete.
+            if (failures.failed > 0) addMarginFailures(periodId, failures.failed, failures.lastError)
+        },
     })
-    if (result.superseded) return
-    // Failed Service intervals are left out of Margin, so the period counts them to show it is incomplete.
-    if (result.failed > 0) addMarginFailures(periodId, result.run, result.failed, result.lastError)
-    if (!result.done) return
-    // Each completion step first checks that no fresh pass has started meanwhile: its own completion owns the period then.
-    // Drop older passes' Cost facts (a superseded pass may have flushed a last batch after this one
-    // started), but not a newer pass's.
-    if (!result.stillCurrent()) return
-    deleteWhere('x_daas_ham_cost_fact', `billing_period=${periodId}^${runsBefore('run', result.run)}`)
-    if (!result.stillCurrent()) return
-    addFieldLabour(periodId, result.run, bounds)
-    if (!result.stillCurrent()) return
-    writeMargin(periodId, result.run)
 }
 
-/**
- * Count Service intervals a chunk of the pass `run` failed to cost on its Billing period, with the last
- * error. The period is read as the count is added, and only while `run` is the pass its status belongs to.
- */
-function addMarginFailures(periodId: string, run: string, failed: number, lastError: string): void {
+/** Count Service intervals a chunk of the margin pass failed to cost on its Billing period, with the last error. */
+function addMarginFailures(periodId: string, failed: number, lastError: string): void {
     const period = findById('x_daas_ham_billing_period', periodId)
     if (!period) return
     gs.error(`[x_daas_ham] Margin of ${str(period, 'period')}: ${failed} service interval(s) failed: ${lastError}`)
-    if (str(period, 'margin_run') !== run) return
-    saveMarginStatus(period, { run, failed: num(period, 'margin_failed') + failed, error: lastError })
+    saveMarginStatus(period, num(period, 'margin_failed') + failed, lastError)
 }
 
 /**
- * Save a margin pass's status on its Billing period: its run, how many Service intervals it failed to cost
- * and the last error. The period is closed and locked; these fields are about Margin, not the bill, so the
- * lock's rule is not run.
+ * Save the margin pass's failure count and last error on its Billing period (0 and '' clear them). The
+ * period is closed and locked; these fields are about Margin, not the bill, so the lock's rule is not run.
  */
-function saveMarginStatus(period: GlideRecord, status: { run: string; failed: number; error: string }): void {
-    period.setValue('margin_run', status.run)
-    period.setValue('margin_failed', status.failed)
-    period.setValue('margin_error', status.error.slice(0, 255))
+function saveMarginStatus(period: GlideRecord, failed: number, error: string): void {
+    period.setValue('margin_failed', failed)
+    period.setValue('margin_error', error.slice(0, 255))
     period.setWorkflow(false)
     period.update()
 }
 
-/**
- * Empty the period's Cost facts and Margin as a pass starts: the dashboard reads Cost facts whatever
- * their run, so the period must not show an earlier pass's facts alongside this one's.
- */
+/** Empty the period's Cost facts and Margin as a pass starts. */
 function clearPeriod(periodId: string): void {
     for (const table of ['x_daas_ham_cost_fact', 'x_daas_ham_margin']) deleteWhere(table, `billing_period=${periodId}`)
 }
@@ -168,16 +152,16 @@ function leaseTermsOf(leaseId: string): LeaseTerms | null {
 }
 
 /**
- * Add a batch's totals by costFactKey (as CostLedger.drain hands them over; this uses them up) to the
- * Cost facts the pass `run` wrote for the period, reading the ones they add to with one query.
+ * Add a batch's totals by costFactKey (as CostLedger.drain hands them over; this uses them up) to
+ * the period's Cost facts, reading the ones they add to with one query.
  */
-function writeCostFacts(periodId: string, run: string, pending: Map<string, CostEntry>): void {
+function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void {
     if (pending.size === 0) return
     const entries = [...pending.values()]
     const customers = [...new Set(entries.map((entry) => entry.customerId))]
     const types = [...new Set(entries.map((entry) => entry.type))]
     const fact = new GlideRecord('x_daas_ham_cost_fact')
-    fact.addEncodedQuery(`billing_period=${periodId}^run=${run}^customerIN${customers.join(',')}^cost_typeIN${types.join(',')}`)
+    fact.addEncodedQuery(`billing_period=${periodId}^customerIN${customers.join(',')}^cost_typeIN${types.join(',')}`)
     fact.query()
     while (fact.next()) {
         const key = costFactKey(str(fact, 'customer'), str(fact, 'site'), str(fact, 'cost_type'))
@@ -191,7 +175,6 @@ function writeCostFacts(periodId: string, run: string, pending: Map<string, Cost
         const added = new GlideRecord('x_daas_ham_cost_fact')
         added.initialize()
         added.setValue('billing_period', periodId)
-        added.setValue('run', run)
         added.setValue('customer', entry.customerId)
         added.setValue('site', entry.siteId)
         added.setValue('cost_type', entry.type)
@@ -200,8 +183,8 @@ function writeCostFacts(periodId: string, run: string, pending: Map<string, Cost
     }
 }
 
-/** Field work orders closed in the month, as Cost facts of the pass `run`: their labour cost, or the standard visit cost. */
-function addFieldLabour(periodId: string, run: string, bounds: MonthBounds): void {
+/** Field work orders closed in the month, as Cost facts: their labour cost, or the standard visit cost. */
+function addFieldLabour(periodId: string, bounds: MonthBounds): void {
     const visitCost = intProperty(PROPERTY.visitCost, 250)
     const ledger = new CostLedger()
     const workOrder = new GlideRecord('wm_order')
@@ -210,7 +193,7 @@ function addFieldLabour(periodId: string, run: string, bounds: MonthBounds): voi
     while (workOrder.next()) {
         ledger.add(str(workOrder, 'company'), str(workOrder, 'location'), 'field_labour', num(workOrder, 'x_daas_ham_labour_cost') || visitCost)
     }
-    writeCostFacts(periodId, run, ledger.drain())
+    writeCostFacts(periodId, ledger.drain())
 }
 
 /** The amounts of a table's records matching an encoded query, summed per Customer and Site. */
@@ -232,11 +215,11 @@ function sumsBy(table: string, encodedQuery: string): Amount[] {
     return sums
 }
 
-/** Replace the period's Margin rows with its revenue against the Cost facts of the pass `run`. */
-function writeMargin(periodId: string, run: string): void {
+/** Replace the period's Margin rows with its revenue against its Cost facts. */
+function writeMargin(periodId: string): void {
     deleteWhere('x_daas_ham_margin', `billing_period=${periodId}`)
     const revenue = sumsBy('x_daas_ham_billing_line', `billing_period=${periodId}`)
-    const cost = sumsBy('x_daas_ham_cost_fact', `billing_period=${periodId}^run=${run}`)
+    const cost = sumsBy('x_daas_ham_cost_fact', `billing_period=${periodId}`)
     for (const row of marginRows(revenue, cost)) {
         const margin = new GlideRecord('x_daas_ham_margin')
         margin.initialize()

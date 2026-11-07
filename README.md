@@ -198,6 +198,8 @@ What remains can only be confirmed on an instance or behind a vendor login:
 - **Vendor-login-only contracts**: FortiCloud `products/register` and FortiZTP provisioning schemas
   (FNDN), Cisco API quotas (API Console), and whether ShipEngine labels are tracked automatically or
   need `/v1/tracking/start`.
+- **Job lock**: that inserting a second `x_daas_ham_job_lock` row with the same name is refused by the
+  unique index (`GlideRecord.insert()` returns no sys_id), which margin recomputes rely on (ADR 0013).
 - **Scale**: before-query rule performance and the chunked jobs at your data volumes (indexes are
   declared on the scoped columns).
 - **Currency**: amounts are written in each line's currency (default EUR); confirm the session
