@@ -38,7 +38,15 @@ export type TableJob<T, R = T> = TableJobFields<T, R> & Prepare<T, R>
 
 // The row type comes first so that, without `prepare`, the item type defaults to it.
 export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
-    const cursorRecord = loadCursorRecord(spec.job)
+    let cursorRecord: GlideRecord
+    try {
+        cursorRecord = loadCursorRecord(spec.job)
+    } catch (error) {
+        // Without a cursor no progress is kept, and every run would handle the same records again from the start.
+        const reason = error instanceof Error ? error.message : String(error)
+        gs.error(`[x_daas_ham] ${spec.job}: not run: ${reason}`)
+        return { processed: 0, failed: 0, done: false, cursor: '', lastError: reason }
+    }
     return runOverTable(spec, {
         loadCursor: () => str(cursorRecord, 'cursor'),
         saveCursor: (cursor, processed, done) => {
@@ -80,13 +88,23 @@ function isCurrentRun(job: string, token: string): boolean {
     return str(loadCursorRecord(job), 'cursor') === token
 }
 
+/** The job's cursor record, created on its first run; throws (with why) when there is none and it cannot be created. */
 function loadCursorRecord(job: string): GlideRecord {
+    const found = findCursorRecord(job)
+    if (found) return found
+    const created = new GlideRecord('x_daas_ham_job_cursor')
+    created.initialize()
+    created.setValue('job', job)
+    if (created.insert()) return created
+    // Another run inserted it first (the unique index on job): go on from that run's record, never an unsaved one.
+    const raced = findCursorRecord(job)
+    if (raced) return raced
+    throw new Error(`job cursor ${job} could not be created: ${refusal(created)}`)
+}
+
+function findCursorRecord(job: string): GlideRecord | null {
     const gr = new GlideRecord('x_daas_ham_job_cursor')
-    if (gr.get('job', job)) return gr
-    gr.initialize()
-    gr.setValue('job', job)
-    gr.insert()
-    return gr
+    return gr.get('job', job) ? gr : null
 }
 
 export type EventTableJob<T, R = T> = Omit<TableJobFields<T, R>, 'job'> & Prepare<T, R> & EventJobFields

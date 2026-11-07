@@ -20,7 +20,7 @@ import { ROLE } from '../domain/visibility'
 import { RowFailure, runEventTableJob } from '../platform/chunked'
 import { msToGlide, nowMs, todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
-import { deleteWhere, exists, findById, num, pluck, refusal, str } from '../platform/records'
+import { deleteWhere, exists, findById, num, refusal, str } from '../platform/records'
 import { queryInt, reply } from '../platform/rest-api'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
@@ -217,7 +217,7 @@ function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
                 customer: str(fee, 'customer'),
                 agreement: str(fee, 'agreement'),
                 fee_event: fee.getUniqueValue(),
-                description: `${fee.getDisplayValue('fee_type')} fee: ${fee.getDisplayValue('asset')} (${str(fee, 'occurred_on')})`,
+                description: feeLabel(fee),
                 units: 1,
                 amount: num(fee, 'amount'),
                 currency: str(fee, 'currency') || 'EUR',
@@ -256,39 +256,43 @@ function setTotals(period: GlideRecord): void {
     period.setValue('total_amount', hasTotals ? Number(totals.getAggregate('SUM', 'amount')) || 0 : 0)
 }
 
-/**
- * Fee lines whose fee was waived after generation (e.g. a missing unit turned up) are not billed: the fees
- * leave the period and their lines are deleted (does not redo the totals). Returns how many fees could not
- * leave it (Close refuses then; a retry finds them again). Only called while the period is still ready for
- * review, so the closed-line guard lets the lines go.
- */
-function dropWaivedFeeLines(period: GlideRecord): number {
-    let stuck = 0
-    // In pages of a bounded id list, in sys_id order, so the loop ends even if an unlink does not take.
-    let after = ''
-    for (;;) {
-        const waived = pluck('x_daas_ham_fee_event', `billing_period=${period.getUniqueValue()}^status=waived${after ? `^sys_id>${after}` : ''}^ORDERBYsys_id`, 'sys_id', 500)
-        if (waived.length === 0) return stuck
-        // Lines first, by the fees' ids (a set-based delete is not relied on to follow a dot-walked
-        // condition): if the delete fails, the fees still point at the period and a retry finds them.
-        deleteWhere('x_daas_ham_billing_line', `billing_period=${period.getUniqueValue()}^kind=fee^fee_eventIN${waived.join(',')}`)
-        stuck += unlinkFees(`sys_idIN${waived.join(',')}`)
-        after = waived[waived.length - 1]
-    }
+/** How a Fee event reads on its billing line, and in the messages that name it. */
+function feeLabel(fee: GlideRecord): string {
+    return `${fee.getDisplayValue('fee_type')} fee: ${fee.getDisplayValue('asset')} (${str(fee, 'occurred_on')})`
 }
 
-/** Unlink the Fee events matching an encoded query from their Billing period; returns how many could not be saved. */
-function unlinkFees(encodedQuery: string): number {
-    // Per record: updateMultiple does not reliably clear a reference to empty.
-    const fee = new GlideRecord('x_daas_ham_fee_event')
-    fee.addEncodedQuery(encodedQuery)
-    fee.query()
-    let failed = 0
-    while (fee.next()) {
-        fee.setValue('billing_period', '')
-        if (!fee.update()) failed++
+/**
+ * Fee lines whose fee was waived after generation (e.g. a missing unit turned up) are not billed: their lines are
+ * deleted and the fees leave the period (does not redo the totals). Returns each fee that could not leave it, named
+ * with why, for Close to refuse with; a retry finds them again. Only called while the period is still ready for
+ * review, so the closed-line guard lets the lines go.
+ */
+function dropWaivedFeeLines(period: GlideRecord): string[] {
+    const stuck: string[] = []
+    // In pages, in sys_id order, so the loop ends even if a fee cannot leave the period.
+    let after = ''
+    for (;;) {
+        const fee = new GlideRecord('x_daas_ham_fee_event')
+        fee.addEncodedQuery(`billing_period=${period.getUniqueValue()}^status=waived${after ? `^sys_id>${after}` : ''}`)
+        fee.orderBy('sys_id')
+        fee.setLimit(500)
+        fee.query()
+        if (!fee.hasNext()) return stuck
+        while (fee.next()) {
+            after = fee.getUniqueValue()
+            // Lines first, by the fee's id (a set-based delete is not relied on to follow a dot-walked condition).
+            // A fee whose line survives stays on the period: unlinked, the closed period would keep a line it no
+            // longer bills.
+            const lines = `billing_period=${period.getUniqueValue()}^kind=fee^fee_event=${after}`
+            if (deleteWhere('x_daas_ham_billing_line', lines) > 0) {
+                stuck.push(`${feeLabel(fee)}: its billing line could not be removed`)
+                continue
+            }
+            // Per record: updateMultiple does not reliably clear a reference to empty.
+            fee.setValue('billing_period', '')
+            if (!fee.update()) stuck.push(`${feeLabel(fee)}: ${refusal(fee)}`)
+        }
     }
-    return failed
 }
 
 /** UI action "Regenerate" on a period ready for review: rebuild its lines from current data. */
@@ -300,12 +304,9 @@ export function uiRegenerateBillingPeriod(current: GlideRecord): void {
     // Saved first: a refused form save (the platform says why) keeps the period ready with its lines, not without them.
     if (!current.update()) return
     // Without business rules: the period is generating, not closed, so the closed-line guard has nothing to stop.
-    const lines = new GlideRecord('x_daas_ham_billing_line')
-    lines.addQuery('billing_period', current.getUniqueValue())
-    lines.setWorkflow(false)
-    lines.deleteMultiple()
-    // deleteMultiple reports nothing, and lines it left would be billed twice by the new generation.
-    if (hasLines(current.getUniqueValue())) {
+    // Lines the delete left would be billed twice by the new generation.
+    const lines = `billing_period=${current.getUniqueValue()}`
+    if (deleteWhere('x_daas_ham_billing_line', lines, { businessRules: false }) > 0) {
         current.setValue('status', 'ready')
         current.setValue('last_error', 'Regenerate could not remove all of the old lines; remove them and Regenerate again')
         current.update()
@@ -314,16 +315,6 @@ export function uiRegenerateBillingPeriod(current: GlideRecord): void {
     // The period's open fees stay linked to it: the generation bills them again (finishGeneration).
     fire(EVENT.billingGenerate, current, current.getUniqueValue())
     gs.addInfoMessage(`Regenerating ${str(current, 'period')}`)
-}
-
-/** Whether the period still has billing lines, read past business rules like the delete before it. */
-function hasLines(periodId: string): boolean {
-    const line = new GlideRecord('x_daas_ham_billing_line')
-    line.addQuery('billing_period', periodId)
-    line.setWorkflow(false)
-    line.setLimit(1)
-    line.query()
-    return line.hasNext()
 }
 
 const CSV_HEADER = ['period', 'kind', 'customer', 'agreement', 'subscription_line', 'site', 'description', 'units', 'monthly_rate', 'amount', 'currency']
@@ -339,7 +330,12 @@ export function uiCloseBillingPeriod(current: GlideRecord): void {
         )
     }
     const stuck = dropWaivedFeeLines(current)
-    if (stuck > 0) return void gs.addErrorMessage(`${stuck} waived fee(s) could not leave ${str(current, 'period')}; check them and Close again`)
+    if (stuck.length > 0) {
+        const named = stuck.slice(0, 3).join('; ') + (stuck.length > 3 ? `; and ${stuck.length - 3} more` : '')
+        return void gs.addErrorMessage(
+            `${str(current, 'period')} not closed, as ${stuck.length} waived fee(s) could not leave it: ${named}. Fix them and Close again`,
+        )
+    }
     // Always: finance may have adjusted lines during review, and the locked total must match the locked lines.
     setTotals(current)
     current.setValue('status', 'closed')

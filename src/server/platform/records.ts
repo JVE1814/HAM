@@ -42,11 +42,22 @@ export function addAnyOf(gr: GlideRecord, field: string, values: readonly string
     for (const value of separate) condition.addOrCondition(field, value)
 }
 
-/** Delete every record matching an encoded query, with one set-based delete (business rules run). */
-export function deleteWhere(table: string, encodedQuery: string): void {
+/**
+ * Delete every record matching an encoded query with one set-based delete (business rules run unless `businessRules`
+ * is false), and return how many still match. deleteMultiple reports nothing and a rule can keep a record, so a
+ * caller that must not go on past one checks this; it is counted past before-query rules, so one hidden from the user
+ * still counts.
+ */
+export function deleteWhere(table: string, encodedQuery: string, options: { businessRules?: boolean } = {}): number {
     const gr = new GlideRecord(table)
     gr.addEncodedQuery(encodedQuery)
+    if (options.businessRules === false) gr.setWorkflow(false)
     gr.deleteMultiple()
+    const left = new GlideRecord(table)
+    left.addEncodedQuery(encodedQuery)
+    left.setWorkflow(false)
+    left.query()
+    return left.getRowCount()
 }
 
 /** Whether any record matches an encoded query (stops at the first). */
