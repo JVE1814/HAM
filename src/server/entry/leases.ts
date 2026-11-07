@@ -9,12 +9,15 @@ import {
     leaseDecisionProblem,
     leaseMismatch,
     renewedEnd,
+    stillCovered,
+    stockReturnMoves,
     withinLead,
     type ExpiringCoverage,
     type LeaseEndAction,
 } from '../domain/leases'
-import { SERVING_STAGES, stagesQuery, type Stage } from '../domain/lifecycle'
+import { isRetired, SERVING_STAGES, stagesQuery, type Stage } from '../domain/lifecycle'
 import { providerApproverIds } from '../platform/approvals'
+import { moveAsset, readStage } from '../platform/assets'
 import { runEventTableJob } from '../platform/chunked'
 import { todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
@@ -59,10 +62,10 @@ export function reviewLeases(): void {
     }
 }
 
-/** Queue the transfer again for each bought-out lease that still has Assets. */
+/** Queue the transfer again for each bought-out lease that still covers Assets (retired ones stay on it). */
 function resumeBuyouts(): void {
     const ga = new GlideAggregate('alm_hardware')
-    ga.addEncodedQuery('x_daas_ham_lease.end_action=buyout')
+    ga.addEncodedQuery(stillCovered('x_daas_ham_lease.end_action=buyout'))
     ga.addAggregate('COUNT', '')
     ga.groupBy('x_daas_ham_lease')
     ga.query()
@@ -92,9 +95,10 @@ function openDecision(leaseId: string): boolean {
     return exists('x_daas_ham_lease_decision', `lease=${leaseId}^active=true`)
 }
 
+/** The Assets the lease covers (those in `stages`, when given). */
 function countAssets(leaseId: string, stages?: readonly Stage[]): number {
     const ofLease = `x_daas_ham_lease=${leaseId}`
-    return count('alm_hardware', stages ? stagesQuery(stages, ofLease) : ofLease)
+    return count('alm_hardware', stages ? stagesQuery(stages, ofLease) : stillCovered(ofLease))
 }
 
 function raiseDecision(lease: GlideRecord, mismatch: boolean): void {
@@ -119,14 +123,20 @@ function raiseDecision(lease: GlideRecord, mismatch: boolean): void {
  * - buy out: the Provider owns the Assets from now on (transferred in the background, see
  *   transferLeaseAssets);
  * - extend: the lease runs to the new end date;
- * - return: stock goes on a draft return-to-lessor disposal, and Assets at Sites get a Refresh due
- *   date no later than the lease end so automatic refresh swaps them out in time.
+ * - return: stock leaves circulation onto a draft return-to-lessor disposal, and Assets at Sites get a
+ *   Refresh due date no later than the lease end so automatic refresh swaps them out in time.
+ * A lease being bought out or returned takes no further decision (domain/leases `leaseDecisionProblem`).
  */
 export function uiApplyLeaseDecision(current: GlideRecord): void {
     const lease = findById('x_daas_ham_lease_schedule', str(current, 'lease'))
     if (!lease) return void gs.addErrorMessage('The lease schedule no longer exists')
     const decision = str(current, 'decision') as LeaseEndAction | ''
-    const problem = leaseDecisionProblem({ decision, leaseEnd: str(lease, 'ends'), newEndDate: str(current, 'new_end_date') })
+    const problem = leaseDecisionProblem({
+        decision,
+        endAction: str(lease, 'end_action') as LeaseEndAction | '',
+        leaseEnd: str(lease, 'ends'),
+        newEndDate: str(current, 'new_end_date'),
+    })
     if (problem) return void gs.addErrorMessage(problem)
 
     if (decision === 'extend') {
@@ -149,34 +159,83 @@ export function uiApplyLeaseDecision(current: GlideRecord): void {
         gs.addInfoMessage("The lease's assets become Provider-owned in the background")
     }
     if (decision === 'return') {
-        const disposal = disposeStockToLessor(lease)
-        if (disposal) gs.addInfoMessage(`Stock covered by the lease is on draft disposal order ${disposal}`)
+        const stock = disposeStockToLessor(lease)
+        if (stock.disposal) gs.addInfoMessage(`The lease's stock awaits wipe on draft disposal order ${stock.disposal}`)
+        if (stock.refused > 0) {
+            const units = `${stock.refused} stock unit(s) of the lease`
+            gs.addErrorMessage(`${units} could not go to pending wipe, so are not on the disposal; see the system log`)
+        }
         fire(EVENT.leaseAssets, lease, lease.getUniqueValue())
     }
     current.setValue('state', 3)
     current.update()
 }
 
-/** Draft a return-to-lessor disposal for the lease's Assets still in stock; returns its number. */
-function disposeStockToLessor(lease: GlideRecord): string | null {
+/** What a return did with the lease's stock: its draft disposal's number (null without one), and units not moved. */
+interface StockReturn {
+    disposal: string | null
+    refused: number
+}
+
+/**
+ * Take the lease's stock out of circulation onto a draft return-to-lessor disposal: each unit is saved at pending
+ * wipe, so sourcing and the spare-pool top-up can no longer claim it, and only then gets its line. A hot spare already
+ * linked to an Order line is left to that line; once at a Site, its Refresh due date is the lease end like the rest.
+ */
+function disposeStockToLessor(lease: GlideRecord): StockReturn {
     const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(stagesQuery(IN_STOCK, `x_daas_ham_lease=${lease.getUniqueValue()}`))
+    const unclaimed = `x_daas_ham_lease=${lease.getUniqueValue()}^x_daas_ham_order_lineISEMPTY`
+    asset.addEncodedQuery(stagesQuery(IN_STOCK, unclaimed))
     asset.query()
-    if (!asset.hasNext()) return null
-    const order = new GlideRecord('x_daas_ham_disposal_order')
-    order.initialize()
-    order.setValue('method', 'return_to_lessor')
-    order.setValue('disposal_vendor', str(lease, 'lessor'))
-    order.setValue('short_description', `Return stock to the lessor at the end of lease ${str(lease, 'number')}`)
-    order.insert()
+    let order: GlideRecord | null = null
+    let refused = 0
     while (asset.next()) {
+        if (!withdrawFromStock(asset)) {
+            refused++
+            continue
+        }
+        if (!order) order = lessorDisposal(lease)
         const line = new GlideRecord('x_daas_ham_disposal_line')
         line.initialize()
         line.setValue('disposal_order', order.getUniqueValue())
         line.setValue('asset', asset.getUniqueValue())
         line.insert()
     }
-    return str(order, 'number')
+    return { disposal: order ? str(order, 'number') : null, refused }
+}
+
+/** Save the Asset through its stock-return moves (domain/leases `stockReturnMoves`); false when one is refused. */
+function withdrawFromStock(asset: GlideRecord): boolean {
+    const moves = stockReturnMoves(readStage(asset))
+    for (const to of moves) {
+        if (to === 'available') {
+            // Out of the Customer's Spare pool: Provider stock again, as when an Order lets a unit go.
+            asset.setValue('company', stringProperty(PROPERTY.providerCompany))
+            asset.setValue('x_daas_ham_agreement', '')
+        }
+        const verdict = moveAsset(asset, to)
+        if (!verdict.allowed || !asset.update()) {
+            const reason = verdict.allowed ? asset.getLastErrorMessage() || 'the save was refused' : verdict.reason
+            gs.warn(`[x_daas_ham] Lease return: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
+            return false
+        }
+    }
+    return moves.length > 0
+}
+
+function lessorDisposal(lease: GlideRecord): GlideRecord {
+    const order = new GlideRecord('x_daas_ham_disposal_order')
+    order.initialize()
+    order.setValue('method', 'return_to_lessor')
+    order.setValue('disposal_vendor', str(lease, 'lessor'))
+    order.setValue('short_description', `Return stock to the lessor at the end of lease ${str(lease, 'number')}`)
+    order.insert()
+    return order
+}
+
+/** After-update rule on returned leases whose end date changed: their deployed Assets' Refresh due dates follow it. */
+export function onReturnedLeaseEndChanged(current: GlideRecord): void {
+    fire(EVENT.leaseAssets, current, current.getUniqueValue())
 }
 
 /** Script action on x_daas_ham.lease.assets: recompute Refresh due dates of the lease's Assets. */
@@ -192,8 +251,9 @@ export function refreshLeaseAssets(event: GlideRecord, current: GlideRecord): vo
 }
 
 /**
- * Script action on x_daas_ham.lease.buyout: the Provider owns the lease's Assets, each costing the
- * lease's Buyout cost per asset (for Margin).
+ * Script action on x_daas_ham.lease.buyout: the Provider owns the Assets the lease covers, each costing
+ * the lease's Buyout cost per asset (for Margin). Retired units, which the Lessor or the OEM holds, keep
+ * their lease link and are not transferred.
  *
  * Every transferred Asset leaves the query set. The cursor (sys_id > last handled) still holds:
  * batches run in ascending sys_id order, so the Assets that were on the lease when the pass reached
@@ -214,11 +274,11 @@ export function transferLeaseAssets(event: GlideRecord, current: GlideRecord): v
         parm1: leaseId,
         cursor: str(event, 'parm2'),
         table: 'alm_hardware',
-        query: `x_daas_ham_lease=${leaseId}`,
+        query: stillCovered(`x_daas_ham_lease=${leaseId}`),
         read: (asset) => asset.getUniqueValue(),
         handle: (assetId) => {
             const asset = findById('alm_hardware', assetId)
-            if (!asset || str(asset, 'x_daas_ham_lease') !== leaseId) return
+            if (!asset || str(asset, 'x_daas_ham_lease') !== leaseId || isRetired(readStage(asset))) return
             asset.setValue('x_daas_ham_lease', '')
             asset.setValue('x_daas_ham_lessor', '')
             asset.setValue('x_daas_ham_legal_owner', 'provider')

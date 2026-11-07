@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { buyoutPurchase, evenShare, groupExpiringCoverage, leaseDecisionProblem, leaseMismatch, renewedEnd, withinLead } from './leases'
+import {
+    buyoutPurchase,
+    evenShare,
+    groupExpiringCoverage,
+    leaseDecisionProblem,
+    leaseMismatch,
+    renewedEnd,
+    stillCovered,
+    stockReturnMoves,
+    withinLead,
+} from './leases'
+import { ALL_STAGES, checkTransition, type TransitionFacts } from './lifecycle'
 
 describe('withinLead', () => {
     it('is due from lead days before the end date onwards', () => {
@@ -30,19 +41,73 @@ describe('leaseMismatch', () => {
 })
 
 describe('leaseDecisionProblem', () => {
+    const undecided = { endAction: 'undecided', leaseEnd: '2027-06-30', newEndDate: '' } as const
+
     it('requires a decision', () => {
-        expect(leaseDecisionProblem({ decision: '', leaseEnd: '2027-06-30', newEndDate: '' })).toMatch(/Choose/)
-        expect(leaseDecisionProblem({ decision: 'undecided', leaseEnd: '2027-06-30', newEndDate: '' })).toMatch(/Choose/)
+        expect(leaseDecisionProblem({ ...undecided, decision: '' })).toMatch(/Choose/)
+        expect(leaseDecisionProblem({ ...undecided, decision: 'undecided' })).toMatch(/Choose/)
     })
 
     it('requires an extension to move the end date out', () => {
-        expect(leaseDecisionProblem({ decision: 'extend', leaseEnd: '2027-06-30', newEndDate: '2027-06-30' })).toMatch(/new end date/)
-        expect(leaseDecisionProblem({ decision: 'extend', leaseEnd: '2027-06-30', newEndDate: '2028-06-30' })).toBeNull()
+        const extend = { ...undecided, decision: 'extend' } as const
+        expect(leaseDecisionProblem({ ...extend, newEndDate: '2027-06-30' })).toMatch(/new end date/)
+        expect(leaseDecisionProblem({ ...extend, newEndDate: '2028-06-30' })).toBeNull()
     })
 
     it('accepts buyout and return as they are', () => {
-        expect(leaseDecisionProblem({ decision: 'buyout', leaseEnd: '2027-06-30', newEndDate: '' })).toBeNull()
-        expect(leaseDecisionProblem({ decision: 'return', leaseEnd: '2027-06-30', newEndDate: '' })).toBeNull()
+        expect(leaseDecisionProblem({ ...undecided, decision: 'buyout' })).toBeNull()
+        expect(leaseDecisionProblem({ ...undecided, decision: 'return' })).toBeNull()
+    })
+
+    it('treats a blank end action as undecided, and a lease extended before as open to a new decision', () => {
+        expect(leaseDecisionProblem({ ...undecided, endAction: '', decision: 'return' })).toBeNull()
+        expect(leaseDecisionProblem({ ...undecided, endAction: 'extend', decision: 'buyout' })).toBeNull()
+    })
+
+    it('refuses any further decision on a lease being bought out or returned', () => {
+        for (const decision of ['buyout', 'extend', 'return'] as const) {
+            const input = { ...undecided, decision, newEndDate: '2028-06-30' }
+            expect(leaseDecisionProblem({ ...input, endAction: 'return' })).toMatch(/already being returned/)
+            expect(leaseDecisionProblem({ ...input, endAction: 'buyout' })).toMatch(/already being bought out/)
+        }
+    })
+})
+
+describe('stillCovered', () => {
+    it('leaves retired units, which keep their lease as history, out of what the lease covers', () => {
+        expect(stillCovered('x_daas_ham_lease=L1')).toBe('x_daas_ham_lease=L1^install_status!=7')
+        const bought = 'x_daas_ham_lease.end_action=buyout'
+        expect(stillCovered(bought)).toBe(`${bought}^install_status!=7`)
+    })
+})
+
+describe('stockReturnMoves', () => {
+    const lessorOwned: TransitionFacts = {
+        hasSite: false,
+        hasAgreement: false,
+        legalOwner: 'lessor',
+        wipeEvidenceComplete: false,
+    }
+
+    it('takes free stock to pending wipe, and spare-pool stock there through available', () => {
+        expect(stockReturnMoves('available')).toEqual(['pending_wipe'])
+        expect(stockReturnMoves('spare_pool')).toEqual(['available', 'pending_wipe'])
+    })
+
+    it('moves nothing that is not stock', () => {
+        expect(stockReturnMoves('in_service')).toEqual([])
+        expect(stockReturnMoves('reserved')).toEqual([])
+        expect(stockReturnMoves(null)).toEqual([])
+    })
+
+    it('only makes moves the lifecycle allows, one save at a time', () => {
+        for (const from of ALL_STAGES) {
+            let stage = from
+            for (const to of stockReturnMoves(from)) {
+                expect(checkTransition(stage, to, lessorOwned), `${stage} -> ${to}`).toEqual({ allowed: true })
+                stage = to
+            }
+        }
     })
 })
 
@@ -60,6 +125,19 @@ describe('renewedEnd', () => {
     it('adds the renewal term (at least one month)', () => {
         expect(renewedEnd('2026-12-31', 12)).toBe('2027-12-31')
         expect(renewedEnd('2026-12-31', 0)).toBe('2027-01-31')
+        expect(renewedEnd('2026-11-15', 3)).toBe('2027-02-15')
+    })
+
+    it('keeps a month-end end at month end, so a day clamped in a short month is not lost', () => {
+        expect(renewedEnd('2026-11-30', 3)).toBe('2027-02-28')
+        expect(renewedEnd('2027-02-28', 3)).toBe('2027-05-31')
+        expect(renewedEnd('2027-02-28', 12)).toBe('2028-02-29')
+        expect(renewedEnd('2026-09-30', 3)).toBe('2026-12-31')
+        expect(renewedEnd('2027-04-30', 1)).toBe('2027-05-31')
+    })
+
+    it('clamps an end past the last day of a shorter month, as before', () => {
+        expect(renewedEnd('2027-01-30', 1)).toBe('2027-02-28')
     })
 })
 

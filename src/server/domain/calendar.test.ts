@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { addDays, addMonths, daysBetween, earliest, isIsoDate, toIsoDate } from './calendar'
+import { addDays, addMonths, daysBetween, earliest, endOfMonth, isIsoDate, isMonthEnd, toIsoDate } from './calendar'
 
 describe('calendar', () => {
     it('adds months and clamps to the end of shorter months', () => {
         expect(addMonths('2024-01-31', 1)).toBe('2024-02-29')
         expect(addMonths('2023-01-31', 1)).toBe('2023-02-28')
         expect(addMonths('2024-11-15', 60)).toBe('2029-11-15')
+    })
+
+    it('finds the last day of a month, leap years included', () => {
+        expect(endOfMonth('2027-02-10')).toBe('2027-02-28')
+        expect(endOfMonth('2028-02-01')).toBe('2028-02-29')
+        expect(endOfMonth('2026-12-31')).toBe('2026-12-31')
+        expect(isMonthEnd('2026-09-30')).toBe(true)
+        expect(isMonthEnd('2028-02-28')).toBe(false)
+        expect(isMonthEnd('2026-12-30')).toBe(false)
     })
 
     it('counts days between dates (end exclusive) and adds days', () => {

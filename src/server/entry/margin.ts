@@ -2,6 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
 import { monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing'
+import { stillCovered } from '../domain/leases'
 import type { LegalOwner } from '../domain/lifecycle'
 import { cents, CostLedger, costFactKey, marginRows, serviceIntervalCosts, type Amount, type AssetCostFacts, type CostEntry, type LeaseTerms } from '../domain/margin'
 import { memoized } from '../domain/memo'
@@ -148,7 +149,7 @@ function leaseTermsOf(leaseId: string): LeaseTerms | null {
         starts: str(lease, 'starts'),
         ends: str(lease, 'ends'),
         monthlyPayment: num(lease, 'monthly_payment'),
-        coveredAssets: count('alm_hardware', `x_daas_ham_lease=${leaseId}`),
+        coveredAssets: count('alm_hardware', stillCovered(`x_daas_ham_lease=${leaseId}`)),
         buyoutAssets: num(lease, 'buyout_assets'),
     }
 }

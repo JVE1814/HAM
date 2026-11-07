@@ -1,6 +1,16 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, EmailNotification, Property, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
-import { onAgreementEndChanged, onAssetLeaseChanged, refreshLeaseAssets, reviewLeases, transferLeaseAssets, uiApplyLeaseDecision, uiRenewAgreement, warnRenewals } from '../../server/entry/leases'
+import {
+    onAgreementEndChanged,
+    onAssetLeaseChanged,
+    onReturnedLeaseEndChanged,
+    refreshLeaseAssets,
+    reviewLeases,
+    transferLeaseAssets,
+    uiApplyLeaseDecision,
+    uiRenewAgreement,
+    warnRenewals,
+} from '../../server/entry/leases'
 import { accountManager, admin, assetManager, finance } from '../security/roles.now'
 
 /* Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
@@ -21,12 +31,23 @@ UiAction({
     name: 'Apply decision',
     table: 'x_daas_ham_lease_decision',
     actionName: 'x_daas_ham_lease_apply_decision',
-    hint: 'Buy out (the Provider owns the assets), extend (the lease runs to the new end date) or return (stock to the lessor, deployed assets refreshed before the lease end).',
+    hint: 'Buy out (the Provider owns the assets), extend (the lease runs to the new end date) or return (stock to pending wipe for the lessor, deployed assets refreshed before the lease end). A lease being bought out or returned takes no further decision.',
     condition: 'current.active == true',
     roles: [assetManager, finance],
     form: { showButton: true, style: 'primary' },
     showUpdate: true,
     script: uiApplyLeaseDecision,
+})
+
+BusinessRule({
+    $id: Now.ID['br_returned_lease_end_changed'],
+    name: 'NaaS - refresh due dates follow a returned lease end',
+    table: 'x_daas_ham_lease_schedule',
+    when: 'after',
+    action: ['update'],
+    order: 200,
+    condition: "current.ends.changes() && current.end_action == 'return'",
+    script: onReturnedLeaseEndChanged,
 })
 
 BusinessRule({
@@ -80,8 +101,8 @@ export const leaseAssetsEvent = Record({
         suffix: 'lease.assets',
         event_name: 'x_daas_ham.lease.assets',
         table: 'x_daas_ham_lease_schedule',
-        description: "A lease is being returned; recompute its deployed assets' refresh due dates. parm1 = lease, parm2 = cursor.",
-        fired_by: 'entry/leases.ts uiApplyLeaseDecision',
+        description: "A lease is being returned, or a returned lease's end moved; recompute its deployed assets' refresh due dates. parm1 = lease, parm2 = cursor.",
+        fired_by: 'entry/leases.ts uiApplyLeaseDecision, onReturnedLeaseEndChanged',
         priority: 200,
     },
 })
@@ -92,7 +113,7 @@ ScriptAction({
     eventName: 'x_daas_ham.lease.assets',
     active: true,
     script: refreshLeaseAssets,
-    description: 'Brings refresh due dates forward to the lease end so automatic refresh swaps the equipment out in time.',
+    description: "Sets refresh due dates no later than the lease end (again when a returned lease's end moves) so automatic refresh swaps the equipment out in time.",
 })
 
 export const leaseBuyoutEvent = Record({

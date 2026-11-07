@@ -1333,6 +1333,10 @@ declare global {
                         table: 'sys_script'
                         id: '6bfdb105c685422eae8b2488e27c1f97'
                     }
+                    br_returned_lease_end_changed: {
+                        table: 'sys_script'
+                        id: '8d1d4a5440744c9f8bc747845fdb992a'
+                    }
                     br_scope_agreement: {
                         table: 'sys_script'
                         id: 'f9e5be95c87b4c9f8b5bec4f5a3cc722'

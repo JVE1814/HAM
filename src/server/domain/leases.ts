@@ -1,8 +1,18 @@
-import { addDays, addMonths } from './calendar'
+import { addDays, addMonths, endOfMonth, isMonthEnd } from './calendar'
+import { INSTALL_STATUS, type Stage } from './lifecycle'
 
 /** Lease schedules, end-of-lease decisions and renewals (P3.23–P3.24). */
 
 export type LeaseEndAction = 'undecided' | 'buyout' | 'extend' | 'return'
+
+/**
+ * `leaseCondition` (an encoded query on the Asset's lease) narrowed to the Assets the lease still covers. A retired
+ * unit (returned to the Lessor or the OEM, disposed of) keeps its lease as history, but is no longer counted, bought
+ * out, transferred or paid for.
+ */
+export function stillCovered(leaseCondition: string): string {
+    return `${leaseCondition}^install_status!=${INSTALL_STATUS.retired}`
+}
 
 /** True once `today` is within `leadDays` of `endDate` (or past it). */
 export function withinLead(endDate: string, today: string, leadDays: number): boolean {
@@ -21,12 +31,24 @@ export function leaseMismatch(leaseEnd: string, serviceEnds: readonly string[]):
 
 export interface LeaseDecisionInput {
     decision: LeaseEndAction | ''
+    /** The lease's end action now ('' is undecided). */
+    endAction: LeaseEndAction | ''
     leaseEnd: string
     newEndDate: string
 }
 
-/** Why an end-of-lease decision cannot be applied yet, or null when it can. */
+const DECIDED: Partial<Record<LeaseEndAction, string>> = {
+    buyout: 'The lease is already being bought out',
+    return: 'The lease is already being returned to the lessor',
+}
+
+/**
+ * Why an end-of-lease decision cannot be applied, or null when it can. A lease takes one buy out or return: a second
+ * decision would act on Assets the first already transferred, put on a disposal or set to be swapped out.
+ */
 export function leaseDecisionProblem(input: LeaseDecisionInput): string | null {
+    const decided = input.endAction && DECIDED[input.endAction]
+    if (decided) return decided
     if (!input.decision || input.decision === 'undecided') return 'Choose buy out, extend or return'
     if (input.decision === 'extend' && !(input.newEndDate > input.leaseEnd)) return 'An extension needs a new end date after the current lease end'
     return null
@@ -46,9 +68,24 @@ export function buyoutPurchase(buyoutShare: number, buyoutDay: string): { cost: 
     return buyoutShare > 0 ? { cost: buyoutShare, date: buyoutDay } : undefined
 }
 
-/** The Agreement's end after renewing it for `termMonths`. */
+/**
+ * The Agreement's end after renewing it for `termMonths`. A term ending on a month end renews to a month end
+ * (28 Feb + 3 months is 31 May, not 28 May), so a day clamped in a short month is not lost for good.
+ */
 export function renewedEnd(currentEnd: string, termMonths: number): string {
-    return addMonths(currentEnd, Math.max(1, termMonths))
+    const renewed = addMonths(currentEnd, Math.max(1, termMonths))
+    return isMonthEnd(currentEnd) ? endOfMonth(renewed) : renewed
+}
+
+/**
+ * The moves, one save each, that take a returned lease's stock out of circulation: to pending wipe, where its
+ * return-to-lessor disposal starts and sourcing and the spare-pool top-up no longer find it. Spare-pool stock leaves
+ * its pool through available (the lifecycle has no direct move); anything else is not stock and has none.
+ */
+export function stockReturnMoves(stage: Stage | null): readonly Stage[] {
+    if (stage === 'available') return ['pending_wipe']
+    if (stage === 'spare_pool') return ['available', 'pending_wipe']
+    return []
 }
 
 export interface ExpiringCoverage {
