@@ -91,8 +91,9 @@ Then configure (System Properties, `x_daas_ham.*`):
 | `x_daas_ham.oem.coverage_warning_days` | warn about OEM coverage of deployed assets ending within (60) days |
 | `x_daas_ham.leases.decision_group` | group that end-of-lease decisions are assigned to |
 | `x_daas_ham.margin.amortisation_months` / `.visit_cost` | purchase write-off period (60) and standard field visit cost (250) |
-| `x_daas_ham.shipping.*` | shipping aggregator: `enabled`, `api_key`, `webhook_token`, `service_code`, `package_kg`, `sender_name` |
-| `x_daas_ham.oem.claim.<vendor>.enabled`, `.max_calls`, `x_daas_ham.checkpoint.api_key` | OEM claims, see [integrations spec](docs/spec/p3-integrations.md) |
+| `x_daas_ham.shipping.*` | shipping aggregator: `enabled`, `api_key`, `carrier_id`, `webhook_token`, `service_code`, `package_kg`, `sender_name` |
+| `x_daas_ham.oem.claim.<vendor>.enabled`, `.max_calls`, `x_daas_ham.checkpoint.api_client_id` / `.api_key` | OEM claims, see [integrations spec](docs/spec/p3-integrations.md) |
+| `x_daas_ham.meraki.api_host`, `x_daas_ham.mist.api_host` | regional API hosts (defaults `api.meraki.com`, `api.mist.com`; set for Canada, China, India, FedRAMP or another Mist cloud) |
 
 Assign roles (`x_daas_ham.asset_manager`, `.inventory_tech`, `.field_tech`, `.noc`, `.account_manager`,
 `.finance`, `.admin`; customers: `.customer_admin`, `.site_contact`) and add inventory techs to
@@ -131,14 +132,18 @@ Load Data; each row is processed on insert and its import state/comment shows th
 closed, `nextOffset` null on the last page).
 
 **Shipping aggregator**: labels through the *NaaS Shipping aggregator* REST message (ShipEngine label
-API). Register the tracking webhook at
-`https://<instance>/api/x_daas_ham/naas/shipping/tracking?token=<x_daas_ham.shipping.webhook_token>`;
-ShipEngine and EasyPost payloads are accepted.
+API, billed to `x_daas_ham.shipping.carrier_id`). Register the tracking webhook at
+`https://<instance>/api/x_daas_ham/naas/shipping/tracking` with the custom header
+`X-NaaS-Webhook-Token: <x_daas_ham.shipping.webhook_token>` (ShipEngine `headers`, EasyPost
+`custom_headers`; `?token=` also works where the URL keeps it). ShipEngine and EasyPost tracker
+payloads are accepted.
 
 **OEM clouds**: REST messages *NaaS Meraki Dashboard*, *NaaS HPE Mist*, *NaaS HPE GreenLake*,
 *NaaS FortiCare*, *NaaS FortiZTP* and *NaaS Check Point Zero Touch*. Attach OAuth 2.0 profiles to
 GreenLake, FortiCare and FortiZTP; Meraki, Mist and Check Point take keys from password2 properties.
-Each customer's org / subscription / FortiManager / template is an *OEM cloud account* record.
+Each customer's org / subscription / FortiManager / Check Point "`<User Center account id>/<template id>`"
+is an *OEM cloud account* record. Every contract the adapters rely on is checked against the vendors'
+documentation in [docs/research/external-contracts.md](docs/research/external-contracts.md).
 
 ## Development
 
@@ -173,19 +178,27 @@ Conventions that the build or tests enforce:
 
 ## Verify on the first install
 
-These cannot be checked without an instance:
+The vendor and platform contracts were checked against primary documentation
+([docs/research/external-contracts.md](docs/research/external-contracts.md)) and the code follows it.
+What remains can only be confirmed on an instance or behind a vendor login:
 
-- `sys_choice` records for `alm_asset.substatus` from a scoped app (ADR 0002).
-- Cross-scope writes to `alm_hardware`, `change_request`, `wm_order`, `proc_po` (privileges are in
-  `security/cross-scope.now.ts`; adjust target scopes if the instance reports different ones).
-- Procurement field names used by `platform/procurement.ts` (`proc_po.status`, `ship_to`,
-  `proc_po_item.ordered_quantity`).
-- FSM work-order state 3 = Closed Complete and the `expected_start` / `estimated_end` fields.
-- CI `last_discovered` / `discovery_source` as written by your connectors.
-- Before-query rule performance at your data volumes (indexes are declared on the scoped columns).
-- `wm_order.closed_at`, `company` and `location` for field-labour cost facts; `alm_asset.cost` as the
-  purchase cost.
-- Currency of the billing exports (amounts are written in each line's currency, default EUR).
-- OEM claim endpoints and payloads against each vendor's current API (recorded fixtures in
-  `domain/oem/claims.test.ts`); the Check Point Zero Touch endpoint in particular.
-- That the shipping aggregator account accepts the configured `service_code` and depot address.
+- **Choices**: the instance accepts the app's `alm_asset.substatus` choice set (v2 format, only the
+  app's 12 values) and none of them collides with an out-of-box value; check
+  `sys_choice name=alm_asset^element=substatus^dependent_value=6` for an existing *Pending evaluation*
+  before the first install, and if it exists drop the app's `pending_evaluation` choice (and its
+  `keys.ts` entry) and map the stage to the out-of-box value.
+- **Cross-scope access**: the privileges in `security/cross-scope.now.ts` match the scopes the instance
+  reports (`alm_hardware`, `change_request`, `wm_order`, `proc_po`, `sys_attachment`, ...).
+- **Procurement and FSM data**: the stored `proc_po` / `proc_po_item` status values and column names,
+  `wm_order` state 3 = Closed Complete, and `last_discovered` / `discovery_source` as your connectors
+  write them.
+- **REST messages**: that `${meraki_host}` / `${mist_host}` substitute inside the endpoint host
+  (otherwise use `setEndpoint`), that the GreenLake `find_device` filter URL is accepted, and that the
+  Fortinet OAuth profiles (password grant, no client secret) obtain tokens for FortiCare and FortiZTP.
+- **Vendor-login-only contracts**: FortiCloud `products/register` and FortiZTP provisioning schemas
+  (FNDN), Cisco API quotas (API Console), and whether ShipEngine labels are tracked automatically or
+  need `/v1/tracking/start`.
+- **Scale**: before-query rule performance and the chunked jobs at your data volumes (indexes are
+  declared on the scoped columns).
+- **Currency**: amounts are written in each line's currency (default EUR); confirm the session
+  currency of the job user if you bill in several currencies.

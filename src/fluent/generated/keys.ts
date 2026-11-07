@@ -1737,6 +1737,10 @@ declare global {
                         table: 'sys_module'
                         id: '868b3cfa23784eeca9561f3bf685c420'
                     }
+                    prop_checkpoint_client_id: {
+                        table: 'sys_properties'
+                        id: 'ef4ce95c30034c9e943cad960d97efbb'
+                    }
                     prop_checkpoint_key: {
                         table: 'sys_properties'
                         id: '3a97d483d6c04f7c9ba40e4ded5469ab'
@@ -1801,6 +1805,10 @@ declare global {
                         table: 'sys_properties'
                         id: '9ec7eb4434794f9398f6ddf35756426d'
                     }
+                    prop_meraki_host: {
+                        table: 'sys_properties'
+                        id: '623f5eeb68b2436889cebd9dfb77fcf9'
+                    }
                     prop_meraki_key: {
                         table: 'sys_properties'
                         id: 'db826d3f9ed7493190273208cac43582'
@@ -1808,6 +1816,10 @@ declare global {
                     prop_meraki_orgs: {
                         table: 'sys_properties'
                         id: 'f58210e233294b7087deff0eae724384'
+                    }
+                    prop_mist_host: {
+                        table: 'sys_properties'
+                        id: '29e4495552ca4f3f9de922953704ede6'
                     }
                     prop_mist_orgs: {
                         table: 'sys_properties'
@@ -1848,6 +1860,10 @@ declare global {
                     prop_shipping_api_key: {
                         table: 'sys_properties'
                         id: 'a87c6a7508a54236a9c09dc42ec21881'
+                    }
+                    prop_shipping_carrier_id: {
+                        table: 'sys_properties'
+                        id: '71ed0f0199534ebebe3cfb34afcf0d64'
                     }
                     prop_shipping_enabled: {
                         table: 'sys_properties'
@@ -1973,6 +1989,14 @@ declare global {
                         table: 'sys_rest_message_headers'
                         id: '58e77a775b5a48d29262a1a6936581ae'
                     }
+                    rm_checkpoint_claim_sid: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: '0c65661a1b4649d0b4f6cfd8e77b94de'
+                    }
+                    rm_checkpoint_claim_sid_header: {
+                        table: 'sys_rest_message_fn_headers'
+                        id: '0410646806aa49cf81b5c7d569948676'
+                    }
                     rm_checkpoint_ct: {
                         table: 'sys_rest_message_headers'
                         id: '96d6ef8fe05a4e6fbad841690ead0645'
@@ -1980,10 +2004,28 @@ declare global {
                     rm_checkpoint_key: {
                         table: 'sys_rest_message_fn_parameters'
                         id: '34693db61a5c4fdba1f8aed641ad6d57'
+                        deleted: true
                     }
                     rm_checkpoint_key_header: {
                         table: 'sys_rest_message_fn_headers'
                         id: '622b47f2cf1a4470baae0a0d33338377'
+                        deleted: true
+                    }
+                    rm_checkpoint_login_client_id: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: '1f463d8ab9f94f3f9b8bb3f22ae5c209'
+                    }
+                    rm_checkpoint_login_key: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: '92df0b44eda64f93aff837d6d1eea0ed'
+                    }
+                    rm_checkpoint_logout_sid: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: 'e046df20822c4d7e9b4e2a235d360c4c'
+                    }
+                    rm_checkpoint_logout_sid_header: {
+                        table: 'sys_rest_message_fn_headers'
+                        id: 'da615ef216f444dd948bd1ed5d11d316'
                     }
                     rm_checkpoint_zt: {
                         table: 'sys_rest_message'
@@ -2057,6 +2099,10 @@ declare global {
                         table: 'sys_rest_message_fn_parameters'
                         id: '29dbe2fdb4f642a4aa6326e8b96478ff'
                     }
+                    rm_greenlake_patch_ct: {
+                        table: 'sys_rest_message_fn_headers'
+                        id: '88f42079ddff42c5a669e4e8816ce35a'
+                    }
                     rm_greenlake_serial: {
                         table: 'sys_rest_message_fn_parameters'
                         id: 'a48467fba4b6470e8dbc46a0c3451580'
@@ -2081,6 +2127,10 @@ declare global {
                         table: 'sys_rest_message_fn_headers'
                         id: 'f56a02758a3541309335c2db69dbcde8'
                     }
+                    rm_meraki_claim_host: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: '9cf220e09eb246ae918e0fc42dbc4a95'
+                    }
                     rm_meraki_claim_key: {
                         table: 'sys_rest_message_fn_parameters'
                         id: 'ef7ab8a0b23a4bcd9c146f3491dc2847'
@@ -2088,6 +2138,10 @@ declare global {
                     rm_meraki_claim_org: {
                         table: 'sys_rest_message_fn_parameters'
                         id: 'e61610459e9d4e6b9f4725cba203caa8'
+                    }
+                    rm_meraki_host: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: 'f838ef08a81c43629202f26cebaf0060'
                     }
                     rm_meraki_key: {
                         table: 'sys_rest_message_fn_parameters'
@@ -2132,6 +2186,18 @@ declare global {
                     rm_mist_claim_token: {
                         table: 'sys_rest_message_fn_parameters'
                         id: '179faa79c98c4128a5cf4fcc02692253'
+                    }
+                    rm_mist_host_claim: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: '9a0595c3012b4384b7b7b2ae0ac8382a'
+                    }
+                    rm_mist_host_m: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: '719c4dc48ff14a86b1d57a5b7a836520'
+                    }
+                    rm_mist_host_s: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: '9363aebf89e348aa8e071830ae879f83'
                     }
                     rm_mist_model: {
                         table: 'sys_rest_message_fn_parameters'
@@ -20550,6 +20616,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_rest_message_fn'
+                        id: '63c269d59dca4268adccae12562ca8c9'
+                        key: {
+                            rest_message: '416e435f84ec4080bda69e7f003afe73'
+                            function_name: 'login'
+                        }
+                    },
+                    {
                         table: 'sys_ui_form'
                         id: '63c77f7a77284bca9c04175a6098118d'
                         key: {
@@ -21636,6 +21710,7 @@ declare global {
                     {
                         table: 'sys_rest_message_fn'
                         id: '698e1d0a477c44f7b5ef4309c8aaf578'
+                        deleted: true
                         key: {
                             rest_message: '416e435f84ec4080bda69e7f003afe73'
                             function_name: 'assign_gateway'
@@ -26466,6 +26541,14 @@ declare global {
                             }
                             element: 'raw_manufacturer'
                             position: '1'
+                        }
+                    },
+                    {
+                        table: 'sys_choice_set'
+                        id: '82deaf7417b74327b1fe72801b2c9b4d'
+                        key: {
+                            name: 'alm_asset'
+                            element: 'substatus'
                         }
                     },
                     {
@@ -38707,6 +38790,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_rest_message_fn'
+                        id: 'c833eae5ef744d30b0838086037fdd57'
+                        key: {
+                            rest_message: '416e435f84ec4080bda69e7f003afe73'
+                            function_name: 'claim_gateway'
+                        }
+                    },
+                    {
                         table: 'sys_db_object'
                         id: 'c838ba5721a94d3bb24c149853134c9b'
                         key: {
@@ -41426,6 +41517,14 @@ declare global {
                         key: {
                             document_key: '1fb51464a3164cdebad8571a0d6f8631'
                             variable: 'e6e3c7535320220002c6435723dc3496'
+                        }
+                    },
+                    {
+                        table: 'sys_rest_message_fn'
+                        id: 'd8c9d8859de9467bb3abd50712f11cb5'
+                        key: {
+                            rest_message: '416e435f84ec4080bda69e7f003afe73'
+                            function_name: 'logout'
                         }
                     },
                     {

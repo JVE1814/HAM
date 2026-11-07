@@ -29,6 +29,12 @@ Short file names used below:
 | `http.ts`, `json.ts`, `domain/shipping.ts`, `shipping.test.ts`, `lifecycle.ts`, `model-lifecycle.ts`, `substatus-choices.test.ts` | `src/server/domain/` |
 | `keys.ts` | `src/fluent/generated/` |
 
+
+**Status (2026-11-07):** every change under "Changes needed in the app" has been applied, except the
+optional EoX pagination and SN2INFO `EXCEEDED_OUTPUT` handling (a batch that always errors would block
+the queue) and the speculative FortiZTP v2 / FortiCloud `accountId` changes, which wait for an FNDN
+check. What still needs an instance or a vendor login is listed in the README.
+
 ## Cisco Support APIs
 
 | Item | App assumes | Source says | Verdict | Source |
