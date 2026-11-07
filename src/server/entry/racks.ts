@@ -7,7 +7,7 @@ import { placementProblem, powerBudget, type Placement, type RackFace } from '..
 import { visibilityFilter } from '../domain/visibility'
 import { readStage } from '../platform/assets'
 import { currentSession } from '../platform/session'
-import { num, recordsById, str } from '../platform/records'
+import { findById, num, recordsById, str } from '../platform/records'
 import { queryParam, reply } from '../platform/rest-api'
 
 /** Rack placement and the rack elevation view (P2.8, D67). */
@@ -119,8 +119,11 @@ export function getRack(request: RESTAPIRequest, response: RESTAPIResponse): voi
     asset.addQuery('x_daas_ham_rack', rack.getUniqueValue())
     asset.addNotNullQuery('x_daas_ham_ru_start')
     asset.query()
-    // Read from the device in hand, once per Customer.
-    const customerName = memoized(() => asset.getDisplayValue('company'))
+    // Each Customer's name is read once.
+    const customerName = memoized((companyId) => {
+        const company = findById('core_company', companyId)
+        return company ? str(company, 'name') : ''
+    })
     const found: Array<{ slot: Slot; device: Record<string, unknown> }> = []
     while (asset.next()) {
         found.push({

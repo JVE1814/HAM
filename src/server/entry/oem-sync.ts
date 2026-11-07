@@ -152,14 +152,20 @@ function writeCoverage(vendor: OemVendor, source: 'api' | 'csv', answers: readon
     const pending = new Map<string, CoverageAnswer[]>()
     for (const answer of answers) {
         const key = contractKey(answer.fact.serial, answer.fact.contractNumber)
-        pending.set(key, [...(pending.get(key) ?? []), answer])
+        const contractAnswers = pending.get(key)
+        if (contractAnswers) contractAnswers.push(answer)
+        else pending.set(key, [answer])
     }
     const saved = new Map<string, string[]>()
     const save = (record: GlideRecord, contractAnswers: readonly CoverageAnswer[], exists: boolean) => {
         for (const answer of contractAnswers) setCoverage(record, vendor, source, answer, checkedAt)
         const id = exists ? record.update() : record.insert()
         if (!id) return
-        for (const assetId of new Set(contractAnswers.map((answer) => answer.assetId))) saved.set(assetId, [...(saved.get(assetId) ?? []), id])
+        for (const assetId of new Set(contractAnswers.map((answer) => answer.assetId))) {
+            const ids = saved.get(assetId)
+            if (ids) ids.push(id)
+            else saved.set(assetId, [id])
+        }
     }
     if (pending.size === 0) return saved
     const stored = new GlideRecord('x_daas_ham_oem_coverage')
