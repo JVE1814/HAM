@@ -47,15 +47,17 @@ export function moveAsset(asset: GlideRecord, to: Stage, options: { force?: bool
     return verdict
 }
 
-/** Move and save, logging (not throwing) when the lifecycle refuses the move. */
+/**
+ * Move and save; false (and a warning, not a throw) when the lifecycle or the platform refuses, so the caller stops
+ * before work that needs the move. A refused record keeps the unsaved move: it is not re-read, as it may be a query's
+ * cursor or found past the before-query rules.
+ */
 export function moveAndSave(asset: GlideRecord, to: Stage, context: string): boolean {
     const verdict = moveAsset(asset, to)
-    if (!verdict.allowed) {
-        gs.warn(`[x_daas_ham] ${context}: ${str(asset, 'serial_number')} not moved to ${to}: ${verdict.reason}`)
-        return false
-    }
-    asset.update()
-    return true
+    if (verdict.allowed && asset.update()) return true
+    const reason = verdict.allowed ? asset.getLastErrorMessage() || 'the save was refused' : verdict.reason
+    gs.warn(`[x_daas_ham] ${context}: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
+    return false
 }
 
 /** The Asset left its Site: free its Rack units (the caller saves). */

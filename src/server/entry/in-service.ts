@@ -36,12 +36,12 @@ function goLiveIfSeen(asset: GlideRecord, readers: LifecycleReaders): void {
         // Only a pending Asset can go live, so only it pays for the dot-walk to its Order.
         temporary: stage === 'pending_in_service' && str(asset, 'x_daas_ham_order_line.order.order_type') === 'temporary',
     })
-    if (!decision.goesLive) {
+    // An Asset whose Subscription line could not be started stays pending, so a later sighting or run attaches it.
+    if (!decision.goesLive || !attachToSubscription(asset, decision.at)) {
         asset.update()
         return
     }
     asset.setValue('x_daas_ham_in_service_date', msToGlide(decision.at))
-    attachToSubscription(asset, decision.at)
     applyLifecycleDates(asset, readers)
     moveAndSave(asset, decision.stage, 'in-service detection')
 }
