@@ -368,14 +368,18 @@ export function withOrderLineLock(lineId: string, work: (lock: HeldLock) => void
     })
 }
 
-/** What sourcing found and did for a line before routing its shortfall: what `settleHolding` buys and saves. */
+/** What sourcing found and did for a line outside its lock: what `settleHolding` routes, buys and saves. */
 interface Sourced {
     lineId: string
     modelId: string
-    route: ShortfallRoute
+    /** Routes what is still missing when the line is saved (domain/returns `shortfallRoute`). */
+    route: (missing: number) => ShortfallRoute
     /** The Asset a break-fix line replaces, which an OEM advance replacement is asked for. */
     replaced: GlideRecord | null
+    /** What the pass would buy by its own read: the shortfall less the stock it claimed. */
     toPurchase: number
+    /** Claimed units put back for want of a transfer order: missing again, but not bought (`shortfallOutcome`). */
+    putBack: number
     planSummary: string
     unmoved: UnmovedStock[]
     transfers: string[]
@@ -422,6 +426,7 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
     // Stock outside the staging centre is only staged once its transfer order exists; without one it goes back.
     const transfers: string[] = []
     const unmoved: UnmovedStock[] = []
+    let putBack = 0
     for (const [from, picked] of toTransfer) {
         const transfer = requestTransfer({ fromStockroomId: from, toStockroomId: stagingId, assets: picked.map(({ asset }) => ({ assetId: asset.getUniqueValue(), modelId })) })
         if (transfer.ok) {
@@ -430,7 +435,9 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
             continue
         }
         unmoved.push({ units: picked.length, from: picked[0].asset.getDisplayValue('stockroom'), reason: transfer.reason })
-        for (const { asset, source } of picked) unreserve(asset, source)
+        for (const { asset, source } of picked) {
+            if (unreserve(asset, source)) putBack++
+        }
     }
     // An Asset whose Staging task could not be opened stays reserved for the line rather than staging with no task to finish.
     for (const asset of toStage) {
@@ -442,13 +449,10 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
     // refresh line also names the Asset it replaces, but that Asset is healthy.
     const replaced = breakFix ? findById('alm_hardware', str(line, 'replaces_asset')) : null
     const sameModel = !!replaced && str(replaced, 'model') === modelId
-    const route = shortfallRoute({
-        missing: toPurchase,
-        purpose: sameModel ? 'replace' : 'new',
-        coveredToday: !!replaced && sameModel && str(replaced, 'x_daas_ham_coverage_end') >= todayIso(),
-    })
+    const coveredToday = !!replaced && sameModel && str(replaced, 'x_daas_ham_coverage_end') >= todayIso()
+    const route = (missing: number) => shortfallRoute({ missing, purpose: sameModel ? 'replace' : 'new', coveredToday })
     const planSummary = plan.summary
-    const sourced: Sourced = { lineId, modelId, route, replaced, toPurchase, planSummary, unmoved, transfers }
+    const sourced: Sourced = { lineId, modelId, route, replaced, toPurchase, putBack, planSummary, unmoved, transfers }
     // Set inside the line's lock.
     let settled = 'line busy' as Exclude<LineSourcing, 'done'> | 'saved' | 'unsaved' | 'closed'
     withOrderLineLock(lineId, (lineLock) => {
@@ -466,8 +470,22 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
  */
 function lineShortfall(lineId: string): number | null {
     const line = openLine(lineId)
-    if (!line) return null
-    return num(line, 'quantity') - countAllocated(lineId) - num(line, 'quantity_to_purchase') - openRmaCount(lineId)
+    return line ? shortfallOf(line, countAllocated(lineId)) : null
+}
+
+/** Units the open `line` still needs beside its `allocated` ones (see `lineShortfall`). */
+function shortfallOf(line: GlideRecord, allocated: number): number {
+    return num(line, 'quantity') - allocated - num(line, 'quantity_to_purchase') - openRmaCount(line.getUniqueValue())
+}
+
+/**
+ * Units to buy when the line is saved: what the pass planned (`toPurchase`), less any need met since it read the line,
+ * as when a receipt is allocated with nothing left on order to take it off. `shortfall` is read afresh at the save and
+ * counts the stock the pass `putBack` (not bought). A need grown meanwhile is left to a later pass, which picks stock
+ * before it buys.
+ */
+function stillToBuy(toPurchase: number, shortfall: number, putBack: number): number {
+    return Math.max(0, Math.min(toPurchase, shortfall - putBack))
 }
 
 /** Order stages in which nothing is sourced, even for a line a refused save left open. */
@@ -487,9 +505,10 @@ function openLine(lineId: string): GlideRecord | null {
 }
 
 /**
- * Route the line's shortfall and save the line, holding its `lineLock` and the Order's: from a fresh read, adding what
- * is bought to the on-order count and purchase orders as they now stand, since receipts take units off order meanwhile.
- * 'closed' when the line is gone or no longer open (`openLine`), 'unsaved' when its save is refused (logged).
+ * Route what the line still misses and save it, holding its `lineLock` and the Order's. The stock pick ran outside the
+ * line's lock, so receipts may have changed its counts since: what is bought is worked out again from a fresh read
+ * (`stillToBuy`) and added to the on-order count and purchase orders as they now stand. 'closed' when the line is gone
+ * or no longer open (`openLine`), 'unsaved' when its save is refused (logged).
  */
 function settleHolding(
     orderLock: HeldLock,
@@ -502,8 +521,11 @@ function settleHolding(
     const line = openLine(sourced.lineId)
     if (!line) return 'closed'
     const number = str(line, 'number')
+    const allocated = countAllocated(sourced.lineId)
+    const missing = stillToBuy(sourced.toPurchase, shortfallOf(line, allocated), sourced.putBack)
+    const route = sourced.route(missing)
     let rmaRefused = false
-    if (sourced.route === 'oem_advance_replacement' && sourced.replaced) {
+    if (route === 'oem_advance_replacement' && sourced.replaced) {
         // Unrecorded, the line would wait for a replacement nobody asked the OEM for: logged and in its summary.
         const rma = { defectiveAsset: sourced.replaced, orderLineId: sourced.lineId, caseId: str(order, 'case') }
         if (!openOemRma(rma)) {
@@ -511,14 +533,18 @@ function settleHolding(
             gs.warn(`[x_daas_ham] ${number}: no OEM RMA saved for ${str(sourced.replaced, 'serial_number')}`)
         }
     }
-    const { toPurchase, planSummary, unmoved, transfers } = sourced
+    const { toPurchase, unmoved, transfers } = sourced
+    // The plan's summary counts what the pass would buy by its own read.
+    const met = toPurchase - missing
+    const planSummary =
+        met > 0 ? `${sourced.planSummary} (${met} not bought: met since the line was counted)` : sourced.planSummary
     const purchase = () =>
         requestPurchase({
             modelId: sourced.modelId,
-            quantity: toPurchase,
-            description: `${str(order, 'number')} ${number}: ${toPurchase} x ${str(line, 'model.display_name')}`,
+            quantity: missing,
+            description: `${str(order, 'number')} ${number}: ${missing} x ${str(line, 'model.display_name')}`,
         })
-    const outcome = shortfallOutcome(sourced.route, { planSummary, missing: toPurchase, unmoved }, purchase)
+    const outcome = shortfallOutcome(route, { planSummary, missing, unmoved }, purchase)
     if (transfers.length > 0) {
         line.setValue('transfer_orders', [str(line, 'transfer_orders'), ...transfers].filter(Boolean).join(','))
     }
@@ -529,7 +555,7 @@ function settleHolding(
         line.setValue('purchase_orders', listed.join(','))
     }
     // Counted again: a receipt may have allocated a unit to the line since this pass read it.
-    line.setValue('quantity_allocated', countAllocated(sourced.lineId))
+    line.setValue('quantity_allocated', allocated)
     line.setValue('quantity_to_purchase', num(line, 'quantity_to_purchase') + outcome.purchased)
     line.setValue('sourcing_summary', rmaRefused ? `${outcome.summary} (none saved: open it by hand)` : outcome.summary)
     line.setValue('line_stage', outcome.stage)
@@ -567,16 +593,16 @@ function countAllocated(lineId: string): number {
     return count('alm_hardware', `x_daas_ham_order_line=${lineId}`)
 }
 
-/** Put back stock reserved for a line but never moved to staging: Spare-pool stock to the pool, the rest to free stock. */
-function unreserve(asset: GlideRecord, source: Source): void {
+/**
+ * Put back stock reserved for a line but never moved to staging: Spare-pool stock to the pool, the rest to free stock.
+ * False when the platform refuses (logged): the Asset stays on the line.
+ */
+function unreserve(asset: GlideRecord, source: Source): boolean {
     asset.setValue('x_daas_ham_order_line', '')
-    if (source === 'spare_pool') {
-        moveAndSave(asset, 'spare_pool', 'no transfer order')
-        return
-    }
+    if (source === 'spare_pool') return moveAndSave(asset, 'spare_pool', 'no transfer order')
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('x_daas_ham_agreement', '')
-    moveAndSave(asset, 'available', 'no transfer order')
+    return moveAndSave(asset, 'available', 'no transfer order')
 }
 
 /**

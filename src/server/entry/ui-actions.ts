@@ -10,11 +10,13 @@ import { cancelOrder, submitOrder } from './orders'
 
 /*
  * Server-side UI action handlers. Each saves the form before it acts so values typed before clicking
- * (tracking number, carrier, ...) are not lost; Ship, which uses them, stops when that save is refused.
+ * (tracking number, carrier, Site, ...) are not lost. Submit, Ship and Confirm installed, which use them, stop when that
+ * save is refused (the platform says why). Cancel order does not use them, and saves the Order itself first.
  */
 
 export function uiSubmitOrder(current: GlideRecord): void {
-    current.update()
+    // Submit assesses the Order as the form holds it and may ask approvers to decide it: never on values not saved.
+    if (!current.update()) return
     submitOrder(current)
 }
 
@@ -36,7 +38,8 @@ export function uiConfirmInstalled(current: GlideRecord): void {
         gs.addErrorMessage('Only a self-install can be confirmed here; other installs complete when their work order is closed')
         return
     }
-    current.update()
+    // Each unit takes the Order's Site as the form holds it: one not saved is not where it was installed.
+    if (!current.update()) return
     const refused = completeInstall(current)
     if (refused > 0) gs.addErrorMessage(`${refused} unit(s) not confirmed installed (see the system log): try again`)
 }
