@@ -80,7 +80,7 @@ demo data are illustrative, not vendor bulletins.
 ## Integrations
 
 **Provider NMS → device events** (`POST /api/x_daas_ham/naas/device_events`, role
-`x_daas_ham.integration` or an asset role):
+`x_daas_ham.integration` or `x_daas_ham.asset_manager`):
 
 ```json
 { "events": [ { "identifier": "FOC1234X0AB", "event": "seen", "observed_at": "2026-11-06T10:00:00Z", "source": "nms" } ] }

@@ -17,3 +17,20 @@ export function rollupApprovals(required: readonly Approver[], decisions: readon
     const approvedGroups = new Set(decisions.filter((d) => d.state === 'approved').map((d) => d.group))
     return required.every((group) => approvedGroups.has(group)) ? 'approved' : 'requested'
 }
+
+/**
+ * Tag raw approvals with their group: Customer admins of the Customer decide for the customer-admin
+ * group; everyone else (the account manager or the asset managers standing in for them) for the
+ * account-manager group. A Customer without Customer admins has its customer-admin approval given by
+ * the provider-side approvers.
+ */
+export function groupDecisions(
+    approvals: ReadonlyArray<{ approverId: string; state: ApprovalState }>,
+    customerAdminIds: readonly string[],
+): ApprovalDecision[] {
+    return approvals.flatMap(({ approverId, state }): ApprovalDecision[] => {
+        if (customerAdminIds.includes(approverId)) return [{ group: 'customer_admin', state }]
+        const provider: ApprovalDecision = { group: 'account_manager', state }
+        return customerAdminIds.length === 0 ? [provider, { group: 'customer_admin', state }] : [provider]
+    })
+}

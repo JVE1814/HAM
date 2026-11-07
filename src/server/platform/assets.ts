@@ -68,15 +68,22 @@ export function newAsset(modelId: string, stage: Stage): GlideRecord {
     return asset
 }
 
-/** The Asset with this serial number, Provider tag or Customer tag. */
-export function findAssetByIdentifier(identifier: string): GlideRecord | null {
+/**
+ * The Asset with this serial number, Provider tag or Customer tag. `beyondVisibility` skips the
+ * before-query visibility rules (ADR 0005): receiving must find incoming units that belong to no
+ * stockroom yet, and the device-events API must find any asset.
+ */
+export function findAssetByIdentifier(identifier: string, options: { beyondVisibility?: boolean } = {}): GlideRecord | null {
     const code = identifier.trim()
     if (!code) return null
     const asset = new GlideRecord('alm_hardware')
+    if (options.beyondVisibility) asset.setWorkflow(false)
     const byIdentifier = asset.addQuery('serial_number', normalizeSerial(code))
     byIdentifier.addOrCondition('asset_tag', code)
     byIdentifier.addOrCondition('x_daas_ham_customer_tag', code)
     asset.setLimit(1)
     asset.query()
+    // Re-enable rules so later updates of this record run asset-CI sync and the app's own rules.
+    asset.setWorkflow(true)
     return asset.next() ? asset : null
 }

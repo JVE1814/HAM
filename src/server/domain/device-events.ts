@@ -18,7 +18,10 @@ export type ParsedEvents =
 const KINDS: readonly DeviceEventKind[] = ['seen', 'down', 'up']
 const SOURCES: readonly SeenSource[] = ['discovery', 'connector', 'nms']
 
-export function parseDeviceEvents(body: unknown, maxBatch: number): ParsedEvents {
+/** Monitoring clocks may run slightly ahead; anything further in the future is rejected. */
+const MAX_CLOCK_SKEW_MS = 5 * 60_000
+
+export function parseDeviceEvents(body: unknown, maxBatch: number, now: number): ParsedEvents {
     const raw = (body as { events?: unknown } | null)?.events
     if (!Array.isArray(raw)) return { error: 'Body must be { "events": [...] }' }
     if (raw.length > maxBatch) return { error: `At most ${maxBatch} events per request` }
@@ -33,6 +36,7 @@ export function parseDeviceEvents(body: unknown, maxBatch: number): ParsedEvents
         if (!identifier) return void rejected.push({ index, reason: 'identifier is required' })
         if (!KINDS.includes(event)) return void rejected.push({ index, reason: 'event must be one of seen, down, up' })
         if (Number.isNaN(observedAt)) return void rejected.push({ index, reason: 'observed_at must be an ISO-8601 timestamp' })
+        if (observedAt > now + MAX_CLOCK_SKEW_MS) return void rejected.push({ index, reason: 'observed_at is in the future' })
         if (!SOURCES.includes(source)) return void rejected.push({ index, reason: 'source must be one of discovery, connector, nms' })
         events.push({ identifier, event, observedAt, source })
     })

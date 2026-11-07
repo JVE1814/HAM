@@ -9226,6 +9226,7 @@ declare global {
                     {
                         table: 'sys_user_role_contains'
                         id: '5f4d033399bd4f6ba54fc649aeb4c983'
+                        deleted: true
                         key: {
                             role: {
                                 id: 'c3ca08139644469a86cf680d968cad76'
@@ -10272,6 +10273,28 @@ declare global {
                                 }
                             }
                             element: 'line_type'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '6d50fc7bd8364b8dbc95d28ce73ccb99'
+                        key: {
+                            sys_ui_section: {
+                                id: 'dd586e2cd8b8499b9546de0069a7e385'
+                                key: {
+                                    name: 'x_daas_ham_order_line'
+                                    caption: 'Line'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'transfer_orders'
+                            position: '12'
                         }
                     },
                     {
@@ -12313,6 +12336,15 @@ declare global {
                                 }
                             }
                             value: 'subcontractor'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '85f2a2f5f831470395524d220dbbc0f4'
+                        key: {
+                            name: 'x_daas_ham_order_line'
+                            element: 'transfer_orders'
+                            language: 'en'
                         }
                     },
                     {
@@ -14366,14 +14398,6 @@ declare global {
                         }
                     },
                     {
-                        table: 'sys_dictionary'
-                        id: '9a21f56f138049069c48341efba5559a'
-                        key: {
-                            name: 'x_daas_ham_order_line'
-                            element: 'transfer_order'
-                        }
-                    },
-                    {
                         table: 'sys_user_role_contains'
                         id: '9a3c11b933d5452b936d72ea70a2cebc'
                         key: {
@@ -15225,28 +15249,6 @@ declare global {
                         key: {
                             document_key: 'e01c2b8e22e64c2996dc7829a076ce0c'
                             variable: '6aad5a575360220002c6435723dc34b0'
-                        }
-                    },
-                    {
-                        table: 'sys_ui_element'
-                        id: 'a293e2aff1e84f4cb0e613e073a436e9'
-                        key: {
-                            sys_ui_section: {
-                                id: 'dd586e2cd8b8499b9546de0069a7e385'
-                                key: {
-                                    name: 'x_daas_ham_order_line'
-                                    caption: 'Line'
-                                    view: {
-                                        id: 'Default view'
-                                        key: {
-                                            name: 'NULL'
-                                        }
-                                    }
-                                    sys_domain: 'global'
-                                }
-                            }
-                            element: 'transfer_order'
-                            position: '12'
                         }
                     },
                     {
@@ -17138,15 +17140,6 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
-                        id: 'ba61696d6abe48638fd9a8c58196a933'
-                        key: {
-                            name: 'x_daas_ham_order_line'
-                            element: 'transfer_order'
-                            language: 'en'
-                        }
-                    },
-                    {
-                        table: 'sys_documentation'
                         id: 'bb33e8f0fb744bd7bbc2bd9caec111b9'
                         key: {
                             name: 'alm_stockroom'
@@ -17390,6 +17383,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_staging_task'
                             element: 'asset'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'be2cf54898424f6ebf13bec7f7023003'
+                        key: {
+                            name: 'x_daas_ham_order_line'
+                            element: 'transfer_orders'
                         }
                     },
                     {

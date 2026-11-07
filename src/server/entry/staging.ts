@@ -1,8 +1,15 @@
 import { GlideDateTime, gs, type GlideRecord } from '@servicenow/glide'
 import { stagingOutcome } from '../domain/staging'
 import { moveAndSave } from '../platform/assets'
+import { recomputeLine } from '../platform/fulfilment'
 import { findById, str } from '../platform/records'
 import { stagingSteps } from '../platform/staging-tasks'
+import { resourceOrder } from './orders'
+
+function orderOfLine(lineId: string): string {
+    const line = findById('x_daas_ham_order_line', lineId)
+    return line ? str(line, 'order') : ''
+}
 
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
@@ -33,8 +40,13 @@ export function onStagingClosed(current: GlideRecord): void {
     const asset = findById('alm_hardware', str(current, 'asset'))
     if (!asset) return
     if (str(current, 'result') === 'failed') {
+        const lineId = str(asset, 'x_daas_ham_order_line')
         asset.setValue('x_daas_ham_order_line', '')
         moveAndSave(asset, 'pending_evaluation', `staging ${str(current, 'number')} failed`)
+        if (lineId) {
+            recomputeLine(lineId)
+            resourceOrder(orderOfLine(lineId))
+        }
         return
     }
     moveAndSave(asset, 'staged', `staging ${str(current, 'number')}`)

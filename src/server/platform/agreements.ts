@@ -71,7 +71,9 @@ function deployedUsage(agreementId: string): Usage[] {
 /** Quantities on other open Order lines of the Agreement that have not shipped yet. */
 function inFlightUsage(agreementId: string, excludeOrderId: string): Usage[] {
     const ga = new GlideAggregate('x_daas_ham_order_line')
-    ga.addEncodedQuery(`order.agreement=${agreementId}^order!=${excludeOrderId}^line_stageIN${OPEN_LINE_STAGES}`)
+    ga.addEncodedQuery(
+        `order.agreement=${agreementId}^order!=${excludeOrderId}^order.stageNOT INdraft,rejected,cancelled^line_stageIN${OPEN_LINE_STAGES}`,
+    )
     ga.addAggregate('SUM', 'quantity')
     ga.groupBy('model')
     ga.groupBy('model.x_daas_ham_device_class')

@@ -67,7 +67,7 @@ export const order_line_form = Form({
                 {
                     layout: 'two-column',
                     leftElements: [{ field: 'number', type: 'table_field' }, { field: 'order', type: 'table_field' }, { field: 'model', type: 'table_field' }, { field: 'quantity', type: 'table_field' }, { field: 'replaces_asset', type: 'table_field' }, { field: 'from_site_template', type: 'table_field' }],
-                    rightElements: [{ field: 'line_stage', type: 'table_field' }, { field: 'quantity_allocated', type: 'table_field' }, { field: 'quantity_to_purchase', type: 'table_field' }, { field: 'sourcing_summary', type: 'table_field' }, { field: 'transfer_order', type: 'table_field' }, { field: 'purchase_order', type: 'table_field' }],
+                    rightElements: [{ field: 'line_stage', type: 'table_field' }, { field: 'quantity_allocated', type: 'table_field' }, { field: 'quantity_to_purchase', type: 'table_field' }, { field: 'sourcing_summary', type: 'table_field' }, { field: 'transfer_orders', type: 'table_field' }, { field: 'purchase_order', type: 'table_field' }],
                 },
             ],
         },

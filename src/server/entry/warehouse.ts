@@ -52,6 +52,13 @@ function allowed(response: RESTAPIResponse): boolean {
     return false
 }
 
+/** A stockroom the user may see (the stockroom visibility rule applies to this lookup). */
+function visibleStockroom(stockroomId: string | undefined): boolean {
+    if (!stockroomId) return false
+    const stockroom = new GlideRecord('alm_stockroom')
+    return stockroom.get(stockroomId)
+}
+
 function body(request: RESTAPIRequest): Record<string, string> {
     const data = request.body.data as Record<string, unknown> | null
     return Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [k, String(v ?? '').trim()]))
@@ -74,7 +81,9 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
     const input = body(request)
     if (!input.code || !input.stockroom) return reply(response, 400, { error: 'code and stockroom are required' })
 
-    let asset = findAssetByIdentifier(input.code)
+    if (!visibleStockroom(input.stockroom)) return reply(response, 400, { error: 'Choose one of your stockrooms' })
+
+    let asset = findAssetByIdentifier(input.code, { beyondVisibility: true })
     if (!asset) {
         if (!input.pid) return reply(response, 404, { error: 'Unknown serial: scan the PID too to receive without an ASN' })
         const created = createReceivedAsset(input)
@@ -125,6 +134,7 @@ function allocateToWaitingLine(asset: GlideRecord): void {
 export function putAwayAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const input = body(request)
+    if (!visibleStockroom(input.stockroom)) return reply(response, 400, { error: 'Choose one of your stockrooms' })
     const asset = findAssetByIdentifier(input.code ?? '')
     if (!asset) return reply(response, 404, { error: 'No asset with that serial or tag' })
     if (str(asset, 'install_status') !== '6') return reply(response, 409, { error: 'Only in-stock assets can be put away' })

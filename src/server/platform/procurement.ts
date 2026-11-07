@@ -26,3 +26,15 @@ export function requestPurchase(input: {
     item.insert()
     return poId
 }
+
+/** Units of a model on purchase orders (by description prefix) that are not yet received or cancelled. */
+export function openPurchaseQuantity(descriptionPrefix: string, modelId: string): number {
+    const item = new GlideRecord('proc_po_item')
+    item.addQuery('model', modelId)
+    item.addQuery('purchase_order.short_description', 'STARTSWITH', descriptionPrefix)
+    item.addQuery('purchase_order.status', 'NOT IN', 'received,canceled,cancelled')
+    item.query()
+    let open = 0
+    while (item.next()) open += Math.max(0, Number(item.getValue('ordered_quantity')) - Number(item.getValue('received_quantity') || 0))
+    return open
+}

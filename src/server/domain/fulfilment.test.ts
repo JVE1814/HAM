@@ -23,6 +23,10 @@ describe('lineStageFor', () => {
         expect(lineStageFor({ quantity: 1, assetStages: ['pending_evaluation'], cancelled: false })).toBe('awaiting_stock')
     })
 
+    it('treats a line for nothing as cancelled', () => {
+        expect(lineStageFor({ quantity: 0, assetStages: [], cancelled: false })).toBe('cancelled')
+    })
+
     it('stays cancelled', () => {
         expect(lineStageFor({ quantity: 1, assetStages: ['staged'], cancelled: true })).toBe('cancelled')
     })

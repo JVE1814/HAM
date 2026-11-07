@@ -40,7 +40,7 @@ const LINE_FOR_PROGRESS: Record<number, LineStage> = {
 }
 
 export function lineStageFor(line: { quantity: number; assetStages: ReadonlyArray<Stage | null>; cancelled: boolean }): LineStage {
-    if (line.cancelled) return 'cancelled'
+    if (line.cancelled || line.quantity <= 0) return 'cancelled'
     const progress = line.assetStages.map((stage) => (stage ? PROGRESS[stage] : undefined)).filter((p): p is number => p !== undefined)
     if (progress.length < line.quantity) return 'awaiting_stock'
     return LINE_FOR_PROGRESS[Math.min(...progress)]

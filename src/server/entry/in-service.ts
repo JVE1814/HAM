@@ -6,7 +6,7 @@ import { stagesQuery } from '../domain/lifecycle'
 import { ROLE } from '../domain/visibility'
 import { findAssetByIdentifier, moveAndSave, readStage } from '../platform/assets'
 import { runTableJob } from '../platform/chunked'
-import { glideToMs, msToGlide } from '../platform/clock'
+import { glideToMs, msToGlide, nowMs } from '../platform/clock'
 import { applyLifecycleDates } from '../platform/lifecycle-dates'
 import { intProperty, PROPERTY } from '../platform/properties'
 import { str } from '../platform/records'
@@ -50,7 +50,7 @@ export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIRespo
         response.setBody({ error: 'Requires the x_daas_ham.integration role' } as never)
         return
     }
-    const parsed = parseDeviceEvents(request.body.data, intProperty(PROPERTY.eventsMaxBatch, 500))
+    const parsed = parseDeviceEvents(request.body.data, intProperty(PROPERTY.eventsMaxBatch, 500), nowMs())
     if ('error' in parsed) {
         response.setStatus(400)
         response.setBody({ error: parsed.error } as never)
@@ -58,7 +58,7 @@ export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIRespo
     }
     const unknown: string[] = []
     for (const event of parsed.events) {
-        const asset = findAssetByIdentifier(event.identifier)
+        const asset = findAssetByIdentifier(event.identifier, { beyondVisibility: true })
         if (!asset) {
             unknown.push(event.identifier)
             continue

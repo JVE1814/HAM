@@ -6,7 +6,8 @@ import { findById, num, str } from './records'
 
 /** Keeps Order-line and Order stages in step with their Assets (derived, see domain/fulfilment). */
 
-const PRE_FULFILMENT = ['draft', 'awaiting_approval', 'rejected']
+/** Order stages the derived stage never overrides. */
+const FIXED_ORDER_STAGES = ['draft', 'awaiting_approval', 'rejected', 'cancelled']
 
 export function lineAssetStages(lineId: string): Array<Stage | null> {
     const asset = new GlideRecord('alm_hardware')
@@ -36,7 +37,7 @@ export function recomputeLine(lineId: string): void {
 
 export function recomputeOrder(orderId: string): void {
     const order = findById('x_daas_ham_order', orderId)
-    if (!order || PRE_FULFILMENT.includes(str(order, 'stage'))) return
+    if (!order || FIXED_ORDER_STAGES.includes(str(order, 'stage'))) return
     const line = new GlideRecord('x_daas_ham_order_line')
     line.addQuery('order', orderId)
     line.query()

@@ -1,10 +1,10 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { rollupApprovals } from '../domain/approvals'
+import { groupDecisions, rollupApprovals } from '../domain/approvals'
 import { approversFor, assessOrder, type EntitlementVerdict, type RequestedLine } from '../domain/entitlement'
 import { planSourcing } from '../domain/sourcing'
 import { entitlementContext } from '../platform/agreements'
-import { approvalDecisions, cancelPendingApprovals, customerAdminIds, requestApproval } from '../platform/approvals'
-import { moveAndSave, readStage } from '../platform/assets'
+import { approvalsOf, cancelPendingApprovals, customerAdminIds, providerApproverIds, requestApproval } from '../platform/approvals'
+import { moveAndSave, moveAsset, readStage } from '../platform/assets'
 import { EVENT, fire } from '../platform/events'
 import { recomputeLine, recomputeOrder } from '../platform/fulfilment'
 import { requestPurchase } from '../platform/procurement'
@@ -92,7 +92,7 @@ export function submitOrder(order: GlideRecord): void {
     order.update()
     const approvers = approverIds(order, assessment.verdict)
     if (approvers.length === 0) {
-        order.setValue('work_notes', 'No customer admin or account manager to approve; add an approver manually.')
+        order.setValue('work_notes', 'No customer admin, account manager or asset manager to approve; add an approver manually.')
         order.update()
     }
     for (const approverId of approvers) requestApproval(order, approverId)
@@ -115,14 +115,16 @@ function requestedLines(orderId: string): RequestedLine[] {
     return lines
 }
 
-/** Customer admins (or the account manager standing in when the Customer has none) plus the account manager if needed. */
+/**
+ * Customer admins for the customer-admin group (provider approvers stand in when the Customer has
+ * none); the account manager, or else the asset managers, for the account-manager group.
+ */
 function approverIds(order: GlideRecord, verdict: EntitlementVerdict): string[] {
-    const accountManager = str(order, 'agreement.account_manager')
+    const provider = providerApproverIds(str(order, 'agreement.account_manager'))
     const ids = new Set<string>()
     for (const group of approversFor(verdict)) {
-        const members = group === 'account_manager' ? [accountManager] : customerAdminIds(str(order, 'customer'))
-        const chosen = members.filter(Boolean)
-        for (const id of chosen.length > 0 ? chosen : [accountManager].filter(Boolean)) ids.add(id)
+        const admins = group === 'customer_admin' ? customerAdminIds(str(order, 'customer')) : []
+        for (const id of admins.length > 0 ? admins : provider) ids.add(id)
     }
     return [...ids]
 }
@@ -139,23 +141,19 @@ function startSourcing(order: GlideRecord): void {
 export function onOrderApprovalDecision(current: GlideRecord): void {
     const order = findById('x_daas_ham_order', str(current, 'document_id'))
     if (!order || str(order, 'stage') !== 'awaiting_approval') return
-    const accountManager = str(order, 'agreement.account_manager')
-    const noCustomerAdmins = customerAdminIds(str(order, 'customer')).length === 0
-    const decisions = approvalDecisions(order.getUniqueValue(), accountManager).flatMap((d) =>
-        // An account manager standing in for absent Customer admins decides for both groups.
-        noCustomerAdmins && d.group === 'account_manager' ? [d, { ...d, group: 'customer_admin' as const }] : [d],
-    )
+    const decisions = groupDecisions(approvalsOf(order.getUniqueValue()), customerAdminIds(str(order, 'customer')))
     const outcome = rollupApprovals(approversFor(str(order, 'entitlement_verdict') as EntitlementVerdict), decisions)
     if (outcome === 'requested') return
     cancelPendingApprovals(order.getUniqueValue())
     if (outcome === 'approved') {
         startSourcing(order)
-    } else {
-        order.setValue('approval', 'rejected')
-        order.setValue('stage', 'rejected')
-        order.setValue('state', 4)
-        order.update()
+        return
     }
+    cancelOpenLines(order.getUniqueValue())
+    order.setValue('approval', 'rejected')
+    order.setValue('stage', 'rejected')
+    order.setValue('state', 4)
+    order.update()
 }
 
 /** Script action on x_daas_ham.order.source: allocate stock, request transfers and purchases. */
@@ -188,8 +186,7 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
     for (const pick of plan.picks) {
         const reservation = { orderLineId: line.getUniqueValue(), customerId, agreementId: str(order, 'agreement') }
         if (pick.source === 'customer_site_stock') {
-            linkHotSpare(pick.assetId, reservation)
-            reserved++
+            if (linkHotSpare(pick.assetId, reservation)) reserved++
             continue
         }
         const asset = reserveAsset(pick.assetId, reservation)
@@ -202,8 +199,11 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
         openStagingTask(asset, line.getUniqueValue())
         moveAndSave(asset, 'staging', 'sourcing')
     }
-    for (const [from, assets] of toTransfer) {
-        line.setValue('transfer_order', requestTransfer({ fromStockroomId: from, toStockroomId: stagingStockroom, assets }))
+    const transfers = [...toTransfer].map(([from, assets]) =>
+        requestTransfer({ fromStockroomId: from, toStockroomId: stagingStockroom, assets }),
+    )
+    if (transfers.length > 0) {
+        line.setValue('transfer_orders', [str(line, 'transfer_orders'), ...transfers].filter(Boolean).join(','))
     }
     const toPurchase = shortfall - reserved
     if (toPurchase > 0) {
@@ -232,17 +232,23 @@ function countAllocated(lineId: string): number {
     return asset.getRowCount()
 }
 
-/** A hot spare already at the customer site needs no staging or shipping; it is installed from where it is. */
-function linkHotSpare(assetId: string, reservation: { orderLineId: string; agreementId: string }): void {
+/**
+ * A hot spare already at the customer site needs no staging or shipping; it is installed from where
+ * it is. Stock in a customer-site stockroom is that Customer's spare pool by definition.
+ */
+function linkHotSpare(assetId: string, reservation: { orderLineId: string; customerId: string; agreementId: string }): boolean {
     const asset = findById('alm_hardware', assetId)
-    if (!asset) return
+    if (!asset || !moveAsset(asset, 'spare_pool').allowed) return false
     asset.setValue('x_daas_ham_order_line', reservation.orderLineId)
+    asset.setValue('company', reservation.customerId)
     asset.setValue('x_daas_ham_agreement', reservation.agreementId)
     asset.update()
+    return true
 }
 
 /** Give an allocated Asset back to stock: hot spares stay in the Spare pool, the rest become free stock. */
 function releaseAsset(asset: GlideRecord): void {
+    closeOpenStagingTasks(asset.getUniqueValue())
     asset.setValue('x_daas_ham_order_line', '')
     if (readStage(asset) === 'spare_pool') {
         asset.update()
@@ -253,22 +259,60 @@ function releaseAsset(asset: GlideRecord): void {
     moveAndSave(asset, 'available', 'order cancelled')
 }
 
-/** UI action "Cancel order": release allocated stock and cancel open lines. */
-export function cancelOrder(order: GlideRecord): void {
+function closeOpenStagingTasks(assetId: string): void {
+    const task = new GlideRecord('x_daas_ham_staging_task')
+    task.addQuery('asset', assetId)
+    task.addQuery('active', true)
+    task.query()
+    while (task.next()) {
+        task.setValue('state', 7)
+        task.setValue('work_notes', 'Order cancelled; staging skipped.')
+        task.update()
+    }
+}
+
+/** Cancel every line that has not shipped, releasing its stock. Returns the purchase orders left to cancel. */
+function cancelOpenLines(orderId: string): string[] {
+    const purchases: string[] = []
     const line = new GlideRecord('x_daas_ham_order_line')
-    line.addQuery('order', order.getUniqueValue())
-    line.addQuery('line_stage', 'IN', 'new,awaiting_stock,sourced,staging,ready_to_ship')
+    line.addQuery('order', orderId)
+    line.addQuery('line_stage', 'IN', CANCELLABLE_LINE_STAGES)
     line.query()
     while (line.next()) {
         const asset = new GlideRecord('alm_hardware')
         asset.addQuery('x_daas_ham_order_line', line.getUniqueValue())
         asset.query()
         while (asset.next()) releaseAsset(asset)
+        if (str(line, 'purchase_order')) purchases.push(line.getDisplayValue('purchase_order'))
         line.setValue('line_stage', 'cancelled')
         line.update()
     }
+    return purchases
+}
+
+const CANCELLABLE_LINE_STAGES = 'new,awaiting_stock,sourced,staging,ready_to_ship'
+
+/** UI action "Cancel order": only before anything has shipped; releases stock and staging work. */
+export function cancelOrder(order: GlideRecord): void {
+    const shipped = new GlideRecord('x_daas_ham_order_line')
+    shipped.addQuery('order', order.getUniqueValue())
+    shipped.addQuery('line_stage', 'IN', 'shipped,installed,in_service')
+    shipped.setLimit(1)
+    shipped.query()
+    if (shipped.hasNext()) {
+        gs.addErrorMessage('Equipment has already shipped; return it with a return order instead of cancelling')
+        return
+    }
+    const purchases = cancelOpenLines(order.getUniqueValue())
     cancelPendingApprovals(order.getUniqueValue())
     order.setValue('stage', 'cancelled')
     order.setValue('state', 7)
+    if (purchases.length > 0) order.setValue('work_notes', `Cancel these purchase orders in Procurement: ${purchases.join(', ')}`)
     order.update()
+}
+
+/** Re-source a line that lost an allocated Asset (failed staging). */
+export function resourceOrder(orderId: string): void {
+    const order = findById('x_daas_ham_order', orderId)
+    if (order) fire(EVENT.sourceOrder, order)
 }

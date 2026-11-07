@@ -15,33 +15,47 @@ export default function ScanField({ label, onScan, busy }: { label: string; onSc
         if (!busy) inputRef.current?.focus()
     }, [busy])
 
+    // Keep the latest callback without restarting the camera when it changes.
+    const onScanRef = useRef(onScan)
+    onScanRef.current = onScan
+
     useEffect(() => {
         if (!cameraOn) return
+        let cancelled = false
         let stream: MediaStream | undefined
         let timer: number | undefined
+        let detecting = false
         const detector = new BarcodeDetector({ formats: ['code_128', 'qr_code', 'data_matrix', 'ean_13'] })
+        const stop = () => {
+            cancelled = true
+            window.clearInterval(timer)
+            stream?.getTracks().forEach((track) => track.stop())
+        }
         navigator.mediaDevices
             .getUserMedia({ video: { facingMode: 'environment' } })
             .then((media) => {
                 stream = media
-                if (!videoRef.current) return
+                if (cancelled || !videoRef.current) return stop()
                 videoRef.current.srcObject = media
                 void videoRef.current.play()
                 timer = window.setInterval(async () => {
-                    if (!videoRef.current) return
-                    const [code] = await detector.detect(videoRef.current)
-                    if (code?.rawValue) {
-                        setCameraOn(false)
-                        onScan(code.rawValue)
+                    if (detecting || cancelled || !videoRef.current) return
+                    detecting = true
+                    try {
+                        const [code] = await detector.detect(videoRef.current)
+                        if (code?.rawValue && !cancelled) {
+                            stop()
+                            setCameraOn(false)
+                            onScanRef.current(code.rawValue)
+                        }
+                    } finally {
+                        detecting = false
                     }
                 }, 300)
             })
             .catch(() => setCameraOn(false))
-        return () => {
-            window.clearInterval(timer)
-            stream?.getTracks().forEach((track) => track.stop())
-        }
-    }, [cameraOn, onScan])
+        return stop
+    }, [cameraOn])
 
     const submit = (event: React.FormEvent) => {
         event.preventDefault()

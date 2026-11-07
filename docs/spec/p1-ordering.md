@@ -33,8 +33,11 @@
 
 - Approvals are `sysapproval_approver` records; a rule rolls them up: any rejection rejects the
   Order; it is approved once each required group has an approval. Remaining requests are cancelled.
-- If the Customer has no Customer admins, the account manager stands in for them. If there is no
-  approver at all, the Order gets a work note and someone must add an approver manually.
+- Provider-side approvers are the Agreement's account manager or, if it has none, the asset managers.
+  If the Customer has no Customer admins, the provider-side approvers stand in for them. If there is
+  no approver at all, the Order gets a work note and someone must add an approver manually.
+- A rejected Order cancels its lines, so they stop counting as usage. Usage also ignores draft and
+  cancelled Orders.
 
 ## Sourcing (`domain/sourcing.ts`)
 
@@ -52,8 +55,15 @@
 - Shortfalls become one requested purchase order per line (ship to the staging centre); received units
   of that PO are allocated to the line on receipt.
 - Re-sourcing a line only covers `quantity − allocated − on order`.
-- Cancelling an Order releases its stock: hot spares stay in the pool; other Assets return to free
-  stock under the Provider company.
+- Several source stockrooms give several transfer orders, all listed on the line.
+- A failed staging takes the Asset off the line, which goes back to awaiting stock and is re-sourced.
+- **Cancel** is refused once anything has shipped (use a return order then). Otherwise it:
+  - releases the stock: hot spares stay in the pool, other Assets return to free stock under the
+    Provider company;
+  - skips open staging tasks;
+  - lists any purchase orders for cancelling in Procurement.
+
+  A cancelled or rejected Order keeps its stage.
 
 ## Spare-pool top-up (daily)
 

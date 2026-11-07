@@ -3,7 +3,7 @@ import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
 import { pickForSparePool, sparePoolShortfall } from '../domain/sourcing'
 import { moveAsset } from '../platform/assets'
 import { runTableJob } from '../platform/chunked'
-import { requestPurchase } from '../platform/procurement'
+import { openPurchaseQuantity, requestPurchase } from '../platform/procurement'
 import { boolProperty, PROPERTY, stringProperty } from '../platform/properties'
 import { num, str } from '../platform/records'
 import { stockCandidates } from '../platform/stock'
@@ -44,13 +44,15 @@ function topUpAgreement(agreementId: string, customerId: string, ratio: number):
             asset.setValue('x_daas_ham_agreement', agreementId)
             asset.update()
         }
-        const missing = shortfall - picked.length
-        if (missing > 0 && boolProperty(PROPERTY.autoPurchaseSpares, false)) {
+        if (!boolProperty(PROPERTY.autoPurchaseSpares, false)) continue
+        const prefix = `Spare-pool top-up ${agreementId}:`
+        const missing = shortfall - picked.length - openPurchaseQuantity(prefix, modelId)
+        if (missing > 0) {
             requestPurchase({
                 modelId,
                 quantity: missing,
                 shipToStockroomId: stringProperty(PROPERTY.stagingStockroom),
-                description: `Spare-pool top-up for agreement ${agreementId}: ${missing} unit(s)`,
+                description: `${prefix} ${missing} unit(s)`,
             })
         }
     }

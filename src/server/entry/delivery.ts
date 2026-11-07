@@ -29,14 +29,22 @@ export function shipOrder(order: GlideRecord): void {
     const siteId = str(order, 'site')
     const asset = orderAssets(order.getUniqueValue())
     let shipped = 0
+    let hotSpares = 0
     while (asset.next()) {
+        const stage = readStage(asset)
+        if (stage !== 'staged' && stage !== 'spare_pool') continue
         asset.setValue('x_daas_ham_site', siteId)
         asset.setValue('location', siteId)
-        if (readStage(asset) === 'staged') {
-            if (moveAndSave(asset, 'shipped', `ship ${str(order, 'number')}`)) shipped++
-        } else {
+        if (stage === 'spare_pool') {
             asset.update()
+            hotSpares++
+        } else if (moveAndSave(asset, 'shipped', `ship ${str(order, 'number')}`)) {
+            shipped++
         }
+    }
+    if (shipped + hotSpares === 0) {
+        gs.addErrorMessage('Nothing is staged for this order yet')
+        return
     }
     if (str(order, 'install_mode') !== 'self_install' && !str(order, 'work_order')) openOnSiteWork(order)
     gs.addInfoMessage(`${shipped} asset(s) shipped to ${str(order, 'site.name')}`)

@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import type { ApprovalDecision, ApprovalState } from '../domain/approvals'
+import type { ApprovalState } from '../domain/approvals'
 import { ROLE } from '../domain/visibility'
 import { pluck, str } from './records'
 
@@ -14,6 +14,12 @@ export function customerAdminIds(customerId: string): string[] {
     )
 }
 
+/** Provider-side approvers: the account manager, or the asset managers when there is none. */
+export function providerApproverIds(accountManagerId: string): string[] {
+    if (accountManagerId) return [accountManagerId]
+    return pluck('sys_user_has_role', `role.name=${ROLE.assetManager}^user.active=true^state=active`, 'user', 20)
+}
+
 export function requestApproval(task: GlideRecord, approverId: string): void {
     const approval = new GlideRecord('sysapproval_approver')
     approval.initialize()
@@ -25,19 +31,13 @@ export function requestApproval(task: GlideRecord, approverId: string): void {
     approval.insert()
 }
 
-/** Decisions on a task, tagged with the approver group (the account manager vs any Customer admin). */
-export function approvalDecisions(taskId: string, accountManagerId: string): ApprovalDecision[] {
+export function approvalsOf(taskId: string): Array<{ approverId: string; state: ApprovalState }> {
     const approval = new GlideRecord('sysapproval_approver')
     approval.addQuery('sysapproval', taskId)
     approval.query()
-    const decisions: ApprovalDecision[] = []
-    while (approval.next()) {
-        decisions.push({
-            group: str(approval, 'approver') === accountManagerId ? 'account_manager' : 'customer_admin',
-            state: str(approval, 'state') as ApprovalState,
-        })
-    }
-    return decisions
+    const approvals: Array<{ approverId: string; state: ApprovalState }> = []
+    while (approval.next()) approvals.push({ approverId: str(approval, 'approver'), state: str(approval, 'state') as ApprovalState })
+    return approvals
 }
 
 /** Cancel approvals still waiting once the outcome is decided. */
