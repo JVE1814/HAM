@@ -1,3 +1,4 @@
+import { andEachClause } from '../encoded-query'
 import { errorText, isSuccess, type HttpPort, type HttpRequest, type HttpResponse } from '../http'
 import { asArray, chunks, field, parseJson, text } from '../json'
 import type { OemVendor } from './types'
@@ -6,6 +7,7 @@ import type { OemVendor } from './types'
  * OEM claim and provisioning (P3.27, D70): staging checklist steps that the manufacturer's cloud can
  * do for us. Each adapter takes a batch of steps, makes at most `maxCalls` calls and reports an
  * outcome for every step it attempted; steps left out wait for the next run (rate limits).
+ * runVendorClaims runs one vendor's adapters within its call budget against a ClaimStore.
  */
 
 export type ClaimAction = 'oem_claim' | 'oem_licence' | 'oem_ztp'
@@ -32,7 +34,7 @@ export interface ClaimRun {
 
 export type ClaimAdapter = (targets: readonly ClaimTarget[], http: HttpPort, maxCalls: number) => ClaimRun
 
-export interface ClaimRoute {
+interface ClaimRoute {
     /** Name of the REST message that serves the calls. */
     message: string
     run: ClaimAdapter
@@ -238,5 +240,62 @@ export const CLAIM_ROUTES: Partial<Record<OemVendor, Partial<Record<ClaimAction,
     checkpoint: { oem_ztp: { message: 'NaaS Check Point Zero Touch', run: checkPointZeroTouch, perCall: 1 } },
 }
 
+/** Vendors with at least one automated step (Cisco has none). */
+export const CLAIM_VENDORS: readonly OemVendor[] = Object.keys(CLAIM_ROUTES) as OemVendor[]
+
+/** The order a vendor's actions run in: a device is claimed before it is licensed or provisioned (every action ranked). */
+const CLAIM_RANK: Record<ClaimAction, number> = { oem_claim: 0, oem_licence: 1, oem_ztp: 2 }
+const CLAIM_ORDER = (Object.keys(CLAIM_RANK) as ClaimAction[]).sort((a, b) => CLAIM_RANK[a] - CLAIM_RANK[b])
+
+/** Steps loaded per action and run at most. */
+const MAX_STEPS_PER_LOAD = 200
+
 /** Attempts after which a failing step is left for a person. */
-export const MAX_CLAIM_ATTEMPTS = 5
+const MAX_CLAIM_ATTEMPTS = 5
+
+/** Length of a staging step's automation_message. */
+const MESSAGE_LENGTH = 255
+
+/** Where a run reads its due steps and records their outcomes (the Glide store is in platform/claim-steps.ts). */
+export interface ClaimStore {
+    /** Up to `limit` of `vendor`'s steps due for `action` (dueStepsQuery), fewest attempts first, then oldest; each carries the Customer's OEM cloud account for `action` ('' when none). */
+    due(vendor: OemVendor, action: ClaimAction, limit: number): ClaimTarget[]
+    /** Record one attempted or refused step. ok: tick it (automation_status=done, done=true); otherwise automation_status=failed and one more attempt. outcome.message is at most 255 characters. */
+    settle(outcome: ClaimOutcome): void
+}
+
+/** Steps `remaining` calls of `route` can carry: at least one, at most MAX_STEPS_PER_LOAD. */
+function stepsFor(route: ClaimRoute, remaining: number): number {
+    return Math.min(MAX_STEPS_PER_LOAD, Math.max(1, Math.ceil(remaining * route.perCall)))
+}
+
+/**
+ * One vendor's 5-minute run. Its actions run in the fixed order oem_claim, oem_licence, oem_ztp and share maxCalls.
+ * An action is loaded only while calls remain, with limit = min(200, max(1, ceil(remaining x perCall))).
+ * Every outcome the adapter returns (attempted or refused) is settled exactly once; loaded steps the
+ * budget did not reach are not settled and wait for the next run. Returns the calls made (<= maxCalls).
+ */
+export function runVendorClaims(vendor: OemVendor, store: ClaimStore, transport: (message: string) => HttpPort, maxCalls: number): number {
+    const routes = CLAIM_ROUTES[vendor] ?? {}
+    let calls = 0
+    for (const action of CLAIM_ORDER) {
+        const route = routes[action]
+        if (!route) continue
+        const remaining = maxCalls - calls
+        if (remaining <= 0) break
+        const targets = store.due(vendor, action, stepsFor(route, remaining))
+        if (targets.length === 0) continue
+        const run = route.run(targets, transport(route.message), remaining)
+        calls += run.calls
+        for (const outcome of run.outcomes) store.settle({ ...outcome, message: outcome.message.slice(0, MESSAGE_LENGTH) })
+    }
+    return calls
+}
+
+/** Encoded query on x_daas_ham_staging_step: open automated `action` steps on `vendor` Assets (active task) that are pending, or failed over 30 minutes ago with fewer than 5 attempts; the vendor/action condition is in every OR group (andEachClause). */
+export function dueStepsQuery(vendor: OemVendor, action: ClaimAction): string {
+    return andEachClause(
+        `automation_status=pending^NQautomation_status=failed^attempts<${MAX_CLAIM_ATTEMPTS}^sys_updated_on<javascript:gs.minutesAgoStart(30)`,
+        `automation=${action}^done=false^staging_task.active=true^staging_task.asset.model.x_daas_ham_oem_source=${vendor}`,
+    )
+}

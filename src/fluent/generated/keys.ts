@@ -2241,6 +2241,10 @@ declare global {
                         table: 'sys_module'
                         id: '02bd27b0af66429589216a33a7904d12'
                     }
+                    src_server_domain_delivery_ts: {
+                        table: 'sys_module'
+                        id: 'c1213aa1a1b94f8f8929726ae70d8c2f'
+                    }
                     'src_server_domain_device-events_ts': {
                         table: 'sys_module'
                         id: 'e44a4df9fc464258a320aa05a33d25fc'
@@ -2473,6 +2477,10 @@ declare global {
                     src_server_platform_chunked_ts: {
                         table: 'sys_module'
                         id: '3d992cdf9e2447bd89a824a94f2280bd'
+                    }
+                    'src_server_platform_claim-steps_ts': {
+                        table: 'sys_module'
+                        id: 'ceb35b16c73d4833b07481e84d9c486a'
                     }
                     src_server_platform_clock_ts: {
                         table: 'sys_module'

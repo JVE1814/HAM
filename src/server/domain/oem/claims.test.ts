@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HttpRequest, HttpResponse } from '../http'
-import { CLAIM_ROUTES, type ClaimTarget } from './claims'
+import { CLAIM_ROUTES, CLAIM_VENDORS, dueStepsQuery, runVendorClaims, type ClaimAction, type ClaimOutcome, type ClaimStore, type ClaimTarget } from './claims'
 
 function fake(responses: Array<HttpResponse | ((request: HttpRequest) => HttpResponse)>) {
     const calls: HttpRequest[] = []
@@ -157,18 +157,163 @@ describe('Check Point Zero Touch', () => {
     })
 })
 
-describe('CLAIM_ROUTES', () => {
-    it('has nothing for Cisco (PnP has no public API)', () => {
-        expect(CLAIM_ROUTES.cisco).toBeUndefined()
+/** A ClaimStore over fixed due steps per action (cut to `limit`), recording what is loaded and settled. */
+function fakeStore(due: Partial<Record<ClaimAction, ClaimTarget[]>> = {}) {
+    const loads: Array<[ClaimAction, number]> = []
+    const vendors: string[] = []
+    const settled: ClaimOutcome[] = []
+    const store: ClaimStore = {
+        due: (vendor, action, limit) => {
+            vendors.push(vendor)
+            loads.push([action, limit])
+            return (due[action] ?? []).slice(0, limit)
+        },
+        settle: (outcome) => {
+            settled.push(outcome)
+        },
+    }
+    return { store, loads, vendors, settled }
+}
+
+/** A transport that hands out one HTTP fake, recording which REST message each action asked for. */
+function fakeTransport(responses: Array<HttpResponse | ((request: HttpRequest) => HttpResponse)>) {
+    const { http, calls } = fake(responses)
+    const messages: string[] = []
+    const transport = (message: string) => {
+        messages.push(message)
+        return http
+    }
+    return { transport, messages, calls }
+}
+
+/** Answers every vendor function with success (GreenLake finds the device, FortiCloud status 0). */
+const succeed = (request: HttpRequest): HttpResponse =>
+    request.fn === 'find_device' ? { status: 200, body: JSON.stringify({ items: [{ id: 'dev-1' }] }) } : { status: 200, body: JSON.stringify({ status: 0 }) }
+
+const many = (prefix: string, count: number, accounts = 1): ClaimTarget[] =>
+    Array.from({ length: count }, (_, i) => target(`${prefix}${i}`, { account: `acct${i % accounts}` }))
+
+describe('runVendorClaims', () => {
+    it('loads the steps of the vendor it runs, sized for Mist and Check Point too', () => {
+        const { store, loads, vendors } = fakeStore()
+        runVendorClaims('mist', store, fakeTransport([succeed]).transport, 1)
+        runVendorClaims('checkpoint', store, fakeTransport([succeed]).transport, 8)
+        expect(vendors).toEqual(['mist', 'checkpoint'])
+        expect(loads).toEqual([
+            ['oem_claim', 100],
+            ['oem_ztp', 8],
+        ])
     })
 
-    it('says how many devices one call carries, to size each run', () => {
-        expect(CLAIM_ROUTES.meraki!.oem_claim!.perCall).toBe(50)
-        expect(CLAIM_ROUTES.mist!.oem_claim!.perCall).toBe(100)
-        expect(CLAIM_ROUTES.aruba!.oem_claim!.perCall).toBe(25)
-        expect(CLAIM_ROUTES.aruba!.oem_licence!.perCall).toBe(0.5)
-        expect(CLAIM_ROUTES.fortinet!.oem_claim!.perCall).toBe(10)
-        expect(CLAIM_ROUTES.fortinet!.oem_ztp!.perCall).toBe(1)
-        expect(CLAIM_ROUTES.checkpoint!.oem_ztp!.perCall).toBe(1)
+    it('loads as many steps as the budget can carry, at most 200', () => {
+        const { store, loads } = fakeStore()
+        runVendorClaims('meraki', store, fakeTransport([succeed]).transport, 8)
+        runVendorClaims('meraki', store, fakeTransport([succeed]).transport, 1)
+        expect(loads).toEqual([
+            ['oem_claim', 200],
+            ['oem_claim', 50],
+        ])
+    })
+
+    it('adds Aruba devices before assigning subscriptions, from one shared budget', () => {
+        const { store, loads, settled } = fakeStore({
+            oem_claim: [target('A', { account: '' }), target('B', { account: '' })],
+            oem_licence: many('L', 5),
+        })
+        const { transport, messages, calls } = fakeTransport([succeed])
+        expect(runVendorClaims('aruba', store, transport, 8)).toBe(7)
+        expect(loads).toEqual([
+            ['oem_claim', 200],
+            ['oem_licence', 4],
+        ])
+        expect(messages).toEqual(['NaaS HPE GreenLake', 'NaaS HPE GreenLake'])
+        expect(calls.map((c) => c.fn)).toEqual(['add_devices', ...Array(3).fill(['find_device', 'assign_subscription']).flat()])
+        expect(settled.map((o) => o.stepId)).toEqual(['A', 'B', 'L0', 'L1', 'L2'])
+    })
+
+    it('registers FortiGates in FortiCloud before provisioning them through FortiZTP', () => {
+        const { store, loads } = fakeStore({ oem_claim: [target('A', { account: '' })], oem_ztp: [target('B', { account: 'FMG-1' })] })
+        const { transport, messages } = fakeTransport([succeed])
+        expect(runVendorClaims('fortinet', store, transport, 8)).toBe(2)
+        expect(loads).toEqual([
+            ['oem_claim', 80],
+            ['oem_ztp', 7],
+        ])
+        expect(messages).toEqual(['NaaS FortiCare', 'NaaS FortiZTP'])
+    })
+
+    it('spends no calls on an action with no due steps', () => {
+        const { store, loads } = fakeStore()
+        const { transport, messages } = fakeTransport([succeed])
+        expect(runVendorClaims('aruba', store, transport, 8)).toBe(0)
+        expect(loads).toEqual([
+            ['oem_claim', 200],
+            ['oem_licence', 4],
+        ])
+        expect(messages).toEqual([])
+    })
+
+    it('does not load later actions once the budget is spent', () => {
+        const { store, loads } = fakeStore({ oem_claim: [target('A')], oem_ztp: [target('B')] })
+        expect(runVendorClaims('fortinet', store, fakeTransport([succeed]).transport, 1)).toBe(1)
+        expect(loads).toEqual([['oem_claim', 10]])
+    })
+
+    it('loads nothing when no calls are allowed', () => {
+        const { store, loads } = fakeStore({ oem_claim: [target('A')] })
+        expect(runVendorClaims('meraki', store, fakeTransport([succeed]).transport, 0)).toBe(0)
+        expect(loads).toEqual([])
+    })
+
+    it('never makes more calls than maxCalls', () => {
+        for (const vendor of CLAIM_VENDORS) {
+            for (let maxCalls = 0; maxCalls <= 12; maxCalls++) {
+                const { store } = fakeStore({ oem_claim: many('C', 300, 7), oem_licence: many('L', 300, 7), oem_ztp: many('Z', 300, 7) })
+                const { transport, calls } = fakeTransport([succeed])
+                const made = runVendorClaims(vendor, store, transport, maxCalls)
+                expect(calls.length, `${vendor} with ${maxCalls} calls`).toBeLessThanOrEqual(maxCalls)
+                expect(made, `${vendor} with ${maxCalls} calls`).toBe(calls.length)
+            }
+        }
+    })
+
+    it('settles every attempted or refused step once, with the message cut to 255 characters', () => {
+        const error = 'x'.repeat(300)
+        const { store, settled } = fakeStore({ oem_claim: [target('A'), target('B', { account: '' })] })
+        runVendorClaims('meraki', store, fakeTransport([{ status: 400, body: JSON.stringify({ errors: [error] }) }]).transport, 8)
+        expect(settled).toEqual([
+            { stepId: 'B', ok: false, message: 'no cloud account configured for this customer' },
+            { stepId: 'A', ok: false, message: `HTTP 400: ${error}`.slice(0, 255) },
+        ])
+        expect(settled[1].message).toHaveLength(255)
+    })
+
+    it('leaves loaded steps the budget did not reach for the next run', () => {
+        const { store, settled } = fakeStore({ oem_claim: [target('A'), target('B', { account: 'org2' })] })
+        expect(runVendorClaims('meraki', store, fakeTransport([{ status: 200, body: '{}' }]).transport, 1)).toBe(1)
+        expect(settled.map((o) => o.stepId)).toEqual(['A'])
+    })
+
+    it('has nothing for Cisco (PnP has no public API)', () => {
+        const { store, loads } = fakeStore({ oem_claim: [target('A')] })
+        expect(CLAIM_VENDORS).not.toContain('cisco')
+        expect(runVendorClaims('cisco', store, fakeTransport([succeed]).transport, 8)).toBe(0)
+        expect(loads).toEqual([])
+    })
+})
+
+describe('dueStepsQuery', () => {
+    it('finds open pending steps, and failed ones to retry, of the vendor and action in each OR group', () => {
+        const groups = dueStepsQuery('aruba', 'oem_licence')
+            .split('^NQ')
+            .map((group) => group.split('^'))
+        expect(groups).toHaveLength(2)
+        for (const group of groups) {
+            expect(group).toEqual(
+                expect.arrayContaining(['automation=oem_licence', 'done=false', 'staging_task.active=true', 'staging_task.asset.model.x_daas_ham_oem_source=aruba']),
+            )
+        }
+        expect(groups[0]).toContain('automation_status=pending')
+        expect(groups[1]).toEqual(expect.arrayContaining(['automation_status=failed', 'attempts<5', 'sys_updated_on<javascript:gs.minutesAgoStart(30)']))
     })
 })
