@@ -1,5 +1,6 @@
 import { activeDays, type MonthBounds } from './billing'
 import { addMonths } from './calendar'
+import { evenShare } from './leases'
 import type { LegalOwner } from './lifecycle'
 
 /** Cost facts and Margin per Customer and Site (P3.28, D72). */
@@ -81,11 +82,6 @@ function writtenOff(start: string, bounds: MonthBounds, amortisationMonths: numb
  */
 export function leaseShare(lease: Pick<LeaseTerms, 'monthlyPayment' | 'coveredAssets' | 'buyoutAssets'>): number {
     return evenShare(lease.monthlyPayment, Math.max(lease.coveredAssets, lease.buyoutAssets))
-}
-
-/** One share of `amount` split evenly over `count` (0 when `count` is 0), e.g. an Asset's share of a lease payment or a buyout price. */
-export function evenShare(amount: number, count: number): number {
-    return count > 0 ? amount / count : 0
 }
 
 /** Whether the lease (either end open) is payable in the month. */

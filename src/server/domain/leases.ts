@@ -32,6 +32,11 @@ export function leaseDecisionProblem(input: LeaseDecisionInput): string | null {
     return null
 }
 
+/** One share of `amount` split evenly over `count` Assets (0 without any): a lease payment's or a buyout price's. */
+export function evenShare(amount: number, count: number): number {
+    return count > 0 ? amount / count : 0
+}
+
 /**
  * The purchase to record on a bought-out Asset: when the buyout has a price, the Asset costs its share
  * of it (`buyoutShare`), bought on `buyoutDay` (its write-off for Margin starts then). Without one

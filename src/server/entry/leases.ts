@@ -4,6 +4,7 @@ import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
 import { addDays } from '../domain/calendar'
 import {
     buyoutPurchase,
+    evenShare,
     groupExpiringCoverage,
     leaseDecisionProblem,
     leaseMismatch,
@@ -13,7 +14,6 @@ import {
     type LeaseEndAction,
 } from '../domain/leases'
 import { SERVING_STAGES, stagesQuery, type Stage } from '../domain/lifecycle'
-import { evenShare } from '../domain/margin'
 import { providerApproverIds } from '../platform/approvals'
 import { runEventTableJob } from '../platform/chunked'
 import { todayIso } from '../platform/clock'

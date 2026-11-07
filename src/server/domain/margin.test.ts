@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { monthBounds } from './billing'
-import { CostLedger, costFactKey, evenShare, leaseShare, marginRows, serviceIntervalCosts, type AssetCostFacts, type LeaseTerms } from './margin'
+import { CostLedger, costFactKey, leaseShare, marginRows, serviceIntervalCosts, type AssetCostFacts, type LeaseTerms } from './margin'
 
 const november = monthBounds('2026-11')
 const wholeMonth = { start: '2026-01-15' }
@@ -104,16 +104,6 @@ describe('leaseShare', () => {
     })
 })
 
-describe('evenShare', () => {
-    it('splits an amount evenly, e.g. a buyout price over the Assets covered', () => {
-        expect(evenShare(9000, 3)).toBe(3000)
-        expect(evenShare(0, 3)).toBe(0)
-    })
-
-    it('gives no share when there is none to split it over', () => {
-        expect(evenShare(9000, 0)).toBe(0)
-    })
-})
 
 describe('costFactKey', () => {
     it('tells Cost facts apart by customer, site and type', () => {

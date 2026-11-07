@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buyoutPurchase, groupExpiringCoverage, leaseDecisionProblem, leaseMismatch, renewedEnd, withinLead } from './leases'
+import { buyoutPurchase, evenShare, groupExpiringCoverage, leaseDecisionProblem, leaseMismatch, renewedEnd, withinLead } from './leases'
 
 describe('withinLead', () => {
     it('is due from lead days before the end date onwards', () => {
@@ -72,5 +72,16 @@ describe('groupExpiringCoverage', () => {
         ])
         expect(groups.get('acme')).toEqual({ count: 2, firstEnd: '2026-12-01' })
         expect(groups.get('globex')).toEqual({ count: 1, firstEnd: '2027-01-05' })
+    })
+})
+
+describe('evenShare', () => {
+    it('splits an amount evenly, e.g. a buyout price over the Assets covered', () => {
+        expect(evenShare(9000, 3)).toBe(3000)
+        expect(evenShare(0, 3)).toBe(0)
+    })
+
+    it('gives no share when there is none to split it over', () => {
+        expect(evenShare(9000, 0)).toBe(0)
     })
 })
