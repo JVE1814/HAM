@@ -52,8 +52,8 @@ const LINE_LOCK_TRIES = 5
  * the line is read afresh under its lock `subscription_line_<sys_id>` (ADR 0013): one another go-live started is joined
  * with its start date kept. One ended since (by hand) is not set active again: the Asset stays pending, as it does when
  * another go-live held the lock through every try, and its next sighting chooses among the open lines left. Taken under
- * the sighting lock and released before the go-live save takes the interval lock; a lock that cannot be taken throws
- * (platform/locks), and that error escapes.
+ * the sighting lock, nothing is taken under it, and it is released before the go-live save takes the interval lock. A
+ * take that throws is tried again (platform/locks `withLockTries`), and its error escapes only when every try threw.
  */
 function startLine(lineId: string, inServiceAt: number): string {
     // Set inside the lock; null gives the try up, the lock lost before the save.
