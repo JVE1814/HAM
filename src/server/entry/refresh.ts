@@ -1,15 +1,45 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { refreshWaves, replacementModel, type RefreshCandidate } from '../domain/refresh'
+import { refreshWaves, replacementModel, type RefreshCandidate, type RefreshWave } from '../domain/refresh'
 import type { LifecycleDates } from '../domain/model-lifecycle'
 import { toIsoDate } from '../domain/calendar'
 import { nowMs, todayIso } from '../platform/clock'
 import { modelLifecycle } from '../platform/lifecycle-dates'
+import { withLock, type HeldLock } from '../platform/locks'
 import { intProperty, PROPERTY } from '../platform/properties'
 import { pluck, refusal, str } from '../platform/records'
 import { submitOrder } from './orders'
 
-/** Daily: refresh Orders for in-service Assets due within the horizon (P2.2, D48: fully automatic). */
+/** The job lock (ADR 0013) a refresh run holds from its read of the Assets due to its last Order. */
+const REFRESH_LOCK = 'refresh_orders'
+
+/**
+ * Daily: refresh Orders for in-service Assets due within the horizon (P2.2, D48: fully automatic). Two runs at once
+ * (the scheduled job and an *Execute now*) would both read an Asset as on no open replacing line and raise it twice, so
+ * a run holds a job lock; one that finds it held raises nothing and logs so. Taking the lock throws only when an insert
+ * is refused with no lock row (platform/locks): that error escapes.
+ */
 export function raiseRefreshOrders(): void {
+    if (withLock(REFRESH_LOCK, raiseHolding)) return
+    gs.info(`[x_daas_ham] Refresh Orders not raised: another run holds the ${REFRESH_LOCK} lock and raises them`)
+}
+
+/**
+ * Raise a wave at a time holding `lock`. A run that outlasts it (ADR 0013) stops after the wave it lost it in: the run
+ * that took it over read what is on order afresh and raises the rest, but may have read that wave's Assets before
+ * their lines were saved.
+ */
+function raiseHolding(lock: HeldLock): void {
+    for (const wave of refreshWaves(dueCandidates())) {
+        const number = raiseWave(wave)
+        if (lock.held()) continue
+        const check = number ? `; check ${number}'s Assets are on no other open Order` : ''
+        gs.error(`[x_daas_ham] Refresh run stopped, its lock lost: the run that took it over raises the rest${check}`)
+        return
+    }
+}
+
+/** In-service Assets due within the horizon and on no open replacing line, earliest due first. */
+function dueCandidates(): RefreshCandidate[] {
     const horizon = toIsoDate(nowMs() + intProperty(PROPERTY.refreshHorizonDays, 90) * 86_400_000)
     const onOrder = new Set(
         pluck('x_daas_ham_order_line', 'replaces_assetISNOTEMPTY^order.stageNOT INcomplete,cancelled,rejected', 'replaces_asset'),
@@ -31,7 +61,7 @@ export function raiseRefreshOrders(): void {
             deviceClass: str(asset, 'model.x_daas_ham_device_class'),
         })
     }
-    for (const wave of refreshWaves(candidates)) raiseWave(wave.customerId, wave.siteId, wave.agreementId, wave.assets)
+    return candidates
 }
 
 function catalogModels(customerId: string): Array<{ modelId: string; deviceClass: string }> {
@@ -45,7 +75,8 @@ function catalogModels(customerId: string): Array<{ modelId: string; deviceClass
     return models
 }
 
-function raiseWave(customerId: string, siteId: string, agreementId: string, assets: readonly RefreshCandidate[]): void {
+/** Raise one wave's Order and lines and submit it: the Order's number, or '' when none was raised. */
+function raiseWave({ customerId, siteId, agreementId, assets }: RefreshWave): string {
     const catalog = catalogModels(customerId)
     const lifecycle = new Map<string, LifecycleDates>()
     for (const modelId of new Set([...catalog.map((c) => c.modelId), ...assets.map((a) => a.modelId)])) lifecycle.set(modelId, modelLifecycle(modelId))
@@ -59,7 +90,10 @@ function raiseWave(customerId: string, siteId: string, agreementId: string, asse
     order.setValue('install_mode', 'fsm_engineer')
     order.setValue('short_description', `Refresh of ${assets.length} asset(s) due by ${todayIso()}`)
     // Refused, or a line refused: those Assets are on no open line, so the next run raises them again.
-    if (!order.insert()) return void gs.warn(`[x_daas_ham] No refresh Order for site ${siteId}: ${refusal(order)}`)
+    if (!order.insert()) {
+        gs.warn(`[x_daas_ham] No refresh Order for site ${siteId}: ${refusal(order)}`)
+        return ''
+    }
     const unmatched: string[] = []
     for (const candidate of assets) {
         const modelId = replacementModel(candidate, catalog, lifecycle, todayIso())
@@ -78,7 +112,8 @@ function raiseWave(customerId: string, siteId: string, agreementId: string, asse
     if (unmatched.length > 0) {
         order.setValue('work_notes', `${unmatched.length} asset(s) have no sellable catalogued successor; their lines reuse the current model. Review before submitting.`)
         order.update()
-        return // left in draft for the account manager to adjust
+        return str(order, 'number') // left in draft for the account manager to adjust
     }
     submitOrder(order)
+    return str(order, 'number')
 }
