@@ -30,7 +30,7 @@ export interface ReturnRequest {
     description: string
 }
 
-/** Create a Return order with one line per Asset; installed Assets become pending return. */
+/** Create a Return order with one line per Asset; installed or shipped Assets become pending return. */
 export function raiseReturn(request: ReturnRequest): string {
     const order = new GlideRecord('x_daas_ham_return_order')
     order.initialize()
