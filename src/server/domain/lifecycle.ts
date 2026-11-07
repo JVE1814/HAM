@@ -191,7 +191,6 @@ function checkRetirement(to: Stage, facts: TransitionFacts): TransitionVerdict {
 
 export const DEPLOYED_STAGES: readonly Stage[] = [...AT_OR_TOWARDS_SITE]
 
-/** Serving a customer: at or on the way to a Site, and not already coming back. */
 /** At or on the way to a customer Site and not coming back: what leases, coverage warnings and lifecycle refreshes count as serving. */
 export const SERVING_STAGES: readonly Stage[] = ['shipped', 'pending_in_service', 'in_service', 'temporary_deployment']
 

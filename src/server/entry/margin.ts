@@ -27,6 +27,7 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     const period = findById('x_daas_ham_billing_period', periodId)
     if (!period) return
     const bounds = monthBounds(str(period, 'period'))
+    if (!(bounds.days > 0)) return void gs.error(`[x_daas_ham] Margin not computed: billing period ${periodId} has a malformed month '${str(period, 'period')}'`)
     const amortisationMonths = intProperty(PROPERTY.amortisationMonths, 60)
     const ledger = new CostLedger()
     const leases = memoized(leaseTermsOf)
@@ -104,7 +105,6 @@ function withAssets(intervals: readonly IntervalRow[]): Array<IntervalRow & { as
     return intervals.map((interval) => ({ ...interval, asset: found.get(interval.assetId) ?? NO_ASSET }))
 }
 
-/** The Lease schedule's terms, read once per schedule; null without one or when it is not found. */
 /** A Lease schedule's terms for Margin; null when it is not found. */
 function leaseTermsOf(leaseId: string): LeaseTerms | null {
     const lease = findById('x_daas_ham_lease_schedule', leaseId)

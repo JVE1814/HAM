@@ -130,14 +130,11 @@ export function refreshLifecycleDates(pass: LifecycleRefresh): void {
         table: 'alm_hardware',
         read: stampInputs,
         handle: (inputs, assetId) => {
-            // The stamp is worked out from the batch row; only Assets whose stamp changes are loaded and saved.
+            // Only Assets whose stamp changes by their batch row are loaded; the stamp saved is worked out from the loaded record.
             const { phase, refreshDue } = stampOf(inputs, readers)
             if (inputs.phase === phase && inputs.refreshDue === refreshDue) return
             const asset = findById('alm_hardware', assetId)
-            if (!asset) return
-            asset.setValue('x_daas_ham_lifecycle_phase', phase)
-            asset.setValue('x_daas_ham_refresh_due', refreshDue)
-            asset.update()
+            if (asset && applyLifecycleDates(asset, readers)) asset.update()
         },
     })
 }

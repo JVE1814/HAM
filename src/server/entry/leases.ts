@@ -179,8 +179,6 @@ function disposeStockToLessor(lease: GlideRecord): string | null {
 /** Script action on x_daas_ham.lease.assets: recompute Refresh due dates of the lease's Assets. */
 export function refreshLeaseAssets(event: GlideRecord, current: GlideRecord): void {
     const leaseId = str(event, 'parm1')
-    // Never run with a blank lease: the query would match every Asset that has no lease.
-    if (!leaseId) return
     refreshLifecycleDates({
         eventName: EVENT.leaseAssets,
         record: current,
