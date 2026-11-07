@@ -10,7 +10,7 @@ import { normalizeSerial } from '../domain/asn'
 import { msToGlide, nowMs, todayIso } from '../platform/clock'
 import { oemContext, oemEnabled } from '../platform/oem-http'
 import { intProperty } from '../platform/properties'
-import { bool, num, str } from '../platform/records'
+import { addAnyOf, bool, num, str } from '../platform/records'
 
 /** OEM lifecycle, coverage and RMA-status synchronisation (P2.1, ADR 0008). */
 
@@ -163,7 +163,7 @@ function writeCoverage(vendor: OemVendor, source: 'api' | 'csv', answers: readon
     }
     if (pending.size === 0) return saved
     const stored = new GlideRecord('x_daas_ham_oem_coverage')
-    stored.addQuery('serial_number', 'IN', [...new Set(answers.map((answer) => normalizeSerial(answer.fact.serial)))].join(','))
+    addAnyOf(stored, 'serial_number', [...new Set(answers.map((answer) => normalizeSerial(answer.fact.serial)))])
     stored.query()
     while (stored.next()) {
         const key = contractKey(str(stored, 'serial_number'), str(stored, 'contract_number'))

@@ -31,6 +31,17 @@ export function recordsById<T>(table: string, ids: Iterable<string>, read: (reco
     return found
 }
 
+/**
+ * Match records whose `field` is any of `values` (at least one). Free-text values such as serial numbers can
+ * hold a comma, which would split an IN list, so those are matched one by one with OR conditions.
+ */
+export function addAnyOf(gr: GlideRecord, field: string, values: readonly string[]): void {
+    const listed = values.filter((value) => !value.includes(','))
+    const separate = values.filter((value) => value.includes(','))
+    const condition = listed.length > 0 ? gr.addQuery(field, 'IN', listed.join(',')) : gr.addQuery(field, separate.shift() ?? '')
+    for (const value of separate) condition.addOrCondition(field, value)
+}
+
 /** Whether any record matches an encoded query (stops at the first). */
 export function exists(table: string, encodedQuery: string): boolean {
     const gr = new GlideRecord(table)
