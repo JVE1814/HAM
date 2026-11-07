@@ -14,7 +14,7 @@ import {
     type SerialCoverage,
 } from '../domain/coverage'
 import { mergeLifecycle, type LifecycleDates } from '../domain/model-lifecycle'
-import { OEM_ADAPTERS } from '../domain/oem/adapters'
+import { enabledRoute, type CoverageRoute } from '../domain/oem/adapters'
 import type { CoverageFact, OemVendor } from '../domain/oem/types'
 import { normalizeSerial } from '../domain/asn'
 import { msToGlide, nowMs, todayIso } from '../platform/clock'
@@ -36,8 +36,8 @@ function report(job: string, errors: readonly string[]): void {
 /** Daily: EoX milestones for canonical models of every vendor with a lifecycle API. */
 export function syncOemLifecycle(): void {
     for (const vendor of VENDORS) {
-        const route = OEM_ADAPTERS[vendor].lifecycle
-        if (!route || !oemEnabled(route.via)) continue
+        const route = enabledRoute(vendor, 'lifecycle', oemEnabled)
+        if (!route) continue
         const models = new Map<string, string>()
         const model = new GlideRecord('cmdb_model')
         model.addQuery('x_daas_ham_oem_source', vendor)
@@ -82,8 +82,6 @@ function upsertLifecycle(modelId: string, incoming: LifecycleDates, vendor: OemV
     else lifecycle.insert()
 }
 
-type CoverageRoute = NonNullable<(typeof OEM_ADAPTERS)[OemVendor]['coverage']>
-
 /**
  * Every 4 hours: OEM coverage of assets not checked for x_daas_ham.oem.coverage_refresh_days, oldest
  * first, until the time budget is spent. The enabled vendors take turns, one batch each per round, so one
@@ -97,8 +95,8 @@ export function syncOemCoverage(): void {
     const staleBefore = new GlideDateTime()
     staleBefore.addDaysUTC(-intProperty('x_daas_ham.oem.coverage_refresh_days', 7))
     let due = VENDORS.flatMap((vendor) => {
-        const route = OEM_ADAPTERS[vendor].coverage
-        return route && oemEnabled(route.via) ? [{ vendor, route }] : []
+        const route = enabledRoute(vendor, 'coverage', oemEnabled)
+        return route ? [{ vendor, route }] : []
     })
     for (let round = 0; due.length > 0; round++) {
         const behind: typeof due = []
@@ -279,8 +277,8 @@ function refreshAssetCoverage(answered: ReadonlyMap<string, string>, coverageOf:
  */
 export function syncOemRmaStatus(): void {
     for (const vendor of VENDORS) {
-        const route = OEM_ADAPTERS[vendor].rmaStatus
-        if (!route || !oemEnabled(route.via)) continue
+        const route = enabledRoute(vendor, 'rmaStatus', oemEnabled)
+        if (!route) continue
         const rma = new GlideRecord('x_daas_ham_oem_rma')
         rma.addQuery('vendor', vendor)
         rma.addQuery('state', 'IN', 'open,replacement_received')

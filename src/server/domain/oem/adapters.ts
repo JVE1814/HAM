@@ -270,16 +270,19 @@ interface Route<Result> {
     run: Capability<Result>
 }
 
-interface CoverageRoute extends Route<CoverageFetched> {
+export interface CoverageRoute extends Route<CoverageFetched> {
     /** Serials asked per sync run, as one batch, for a rate-limited API; unset: batches until the job's time budget is spent. */
     maxKeysPerRun?: number
 }
 
+interface VendorRoutes {
+    lifecycle?: Route<Fetched<LifecycleFact>>
+    coverage?: CoverageRoute
+    rmaStatus?: Route<Fetched<RmaFact>>
+}
+
 /** What each vendor's API can do; missing capabilities fall back to CSV import. */
-export const OEM_ADAPTERS: Record<
-    OemVendor,
-    { lifecycle?: Route<Fetched<LifecycleFact>>; coverage?: CoverageRoute; rmaStatus?: Route<Fetched<RmaFact>> }
-> = {
+export const OEM_ADAPTERS: Record<OemVendor, VendorRoutes> = {
     cisco: {
         lifecycle: { via: 'cisco', run: ciscoLifecycle },
         coverage: { via: 'cisco', run: ciscoCoverage },
@@ -294,4 +297,18 @@ export const OEM_ADAPTERS: Record<
     mist: { lifecycle: { via: 'mist', run: mistLifecycle }, coverage: { via: 'mist', run: mistCoverage } },
     aruba: {},
     checkpoint: {},
+}
+
+/**
+ * `vendor`'s route for `capability` when it may run: `vendor` is enabled and so is the vendor whose REST message
+ * serves the call. Meraki coverage therefore needs Cisco enabled too, and with Meraki off no Meraki serial goes to
+ * Cisco SN2INFO.
+ */
+export function enabledRoute<K extends keyof VendorRoutes>(
+    vendor: OemVendor,
+    capability: K,
+    enabled: (vendor: OemVendor) => boolean,
+): VendorRoutes[K] | undefined {
+    const route = OEM_ADAPTERS[vendor][capability]
+    return route && enabled(vendor) && enabled(route.via) ? route : undefined
 }

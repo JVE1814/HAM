@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { OEM_ADAPTERS, type OemContext } from './adapters'
+import { enabledRoute, OEM_ADAPTERS, type OemContext } from './adapters'
+import type { OemVendor } from './types'
 import type { HttpRequest, HttpResponse } from '../http'
 
 function fakeHttp(routes: Record<string, (params: Record<string, string>) => unknown>) {
@@ -285,6 +286,28 @@ describe('rate limits', () => {
     it('ask FortiCloud (100 calls a minute, one serial per call) for at most 90 serials per run, the other coverage APIs without a cap', () => {
         expect(OEM_ADAPTERS.fortinet.coverage?.maxKeysPerRun).toBe(90)
         for (const vendor of ['cisco', 'meraki', 'mist'] as const) expect(OEM_ADAPTERS[vendor].coverage?.maxKeysPerRun).toBeUndefined()
+    })
+})
+
+describe('enabledRoute', () => {
+    const only = (...vendors: OemVendor[]) => (vendor: OemVendor) => vendors.includes(vendor)
+
+    it('runs Meraki coverage, which Cisco SN2INFO serves, only when Meraki and Cisco are both enabled', () => {
+        expect(enabledRoute('meraki', 'coverage', only('cisco'))).toBeUndefined()
+        expect(enabledRoute('meraki', 'coverage', only('meraki'))).toBeUndefined()
+        expect(enabledRoute('meraki', 'coverage', only('meraki', 'cisco'))).toBe(OEM_ADAPTERS.meraki.coverage)
+    })
+
+    it('runs a route served by the vendor itself whenever that vendor is enabled', () => {
+        expect(enabledRoute('meraki', 'lifecycle', only('meraki'))).toBe(OEM_ADAPTERS.meraki.lifecycle)
+        expect(enabledRoute('cisco', 'coverage', only('cisco'))).toBe(OEM_ADAPTERS.cisco.coverage)
+        expect(enabledRoute('cisco', 'rmaStatus', only('cisco'))).toBe(OEM_ADAPTERS.cisco.rmaStatus)
+        expect(enabledRoute('cisco', 'lifecycle', only('meraki'))).toBeUndefined()
+    })
+
+    it('has no route for a capability without an API, enabled or not', () => {
+        expect(enabledRoute('fortinet', 'lifecycle', only('fortinet'))).toBeUndefined()
+        expect(enabledRoute('aruba', 'coverage', only('aruba'))).toBeUndefined()
     })
 })
 
