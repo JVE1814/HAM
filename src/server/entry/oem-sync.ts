@@ -115,10 +115,7 @@ export function syncOemCoverage(): void {
                 const lastAsset = assetIds[assetIds.length - 1]
                 for (const fact of disposition.facts) answers.push({ assetId: lastAsset, fact })
             }
-            const checkedAt = msToGlide(nowMs())
-            const serials = [...new Set(answered.values())]
-            const contracts = writeCoverage(vendor, 'api', serials, answers, checkedAt)
-            refreshAssetCoverage(answered, coverageBySerial(serials, contracts, todayIso()), stamped, checkedAt)
+            applyCoverage(vendor, 'api', answered, answers, stamped)
             // A batch with errors ends the vendor's run; a rate-limited vendor gets one batch per run.
             if (result.errors.length > 0 || route.maxKeysPerRun !== undefined) break
         }
@@ -138,6 +135,18 @@ function staleAssets(vendor: OemVendor, staleBefore: string, limit: number): Map
     const assets = new Map<string, string[]>()
     while (asset.next()) appendTo(assets, normalizeSerial(str(asset, 'serial_number')), asset.getUniqueValue())
     return assets
+}
+
+/**
+ * Write the answers onto the coverage of the answered Assets' serials (`answered`: Asset sys_id to normalised
+ * serial), give each answered Asset its serial's coverage, and stamp it and each `stamped` Asset (the vendor
+ * answered with an error: its coverage is kept) checked.
+ */
+function applyCoverage(vendor: OemVendor, source: 'api' | 'csv', answered: ReadonlyMap<string, string>, answers: readonly CoverageAnswer[], stamped: readonly string[]): void {
+    const checkedAt = msToGlide(nowMs())
+    const serials = [...new Set(answered.values())]
+    const contracts = writeCoverage(vendor, source, serials, answers, checkedAt)
+    refreshAssetCoverage(answered, coverageBySerial(serials, contracts, todayIso()), stamped, checkedAt)
 }
 
 /**
@@ -279,8 +288,6 @@ export function processCoverageRow(current: GlideRecord): void {
         startDate: start || undefined,
         endDate: end || undefined,
     }
-    const checkedAt = msToGlide(nowMs())
-    const contracts = writeCoverage(vendor, 'csv', [serial], [{ assetId, fact, annualCost: cost ? Number(cost) : undefined }], checkedAt)
-    refreshAssetCoverage(new Map([[assetId, serial]]), coverageBySerial([serial], contracts, todayIso()), [], checkedAt)
+    applyCoverage(vendor, 'csv', new Map([[assetId, serial]]), [{ assetId, fact, annualCost: cost ? Number(cost) : undefined }], [])
     finish('inserted', `Coverage for ${serial}`)
 }
