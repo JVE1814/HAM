@@ -6,6 +6,7 @@
  *   A model-specific quantity caps that model; a device-class quantity caps the class.
  *   Classes without a quantity are not capped.
  * Off-catalog needs the Customer admin; over quota also needs the account manager.
+ * Lines replacing a deployed Asset (break-fix, refresh) are exempt from both checks.
  */
 
 export type Approver = 'customer_admin' | 'account_manager'
@@ -44,6 +45,8 @@ export interface RequestedLine {
     deviceClass: string
     quantity: number
     fromSiteTemplate?: boolean
+    /** A like-for-like replacement of a deployed Asset: neither a new model choice nor extra usage. */
+    replacesAsset?: boolean
 }
 
 export interface OrderRequest {
@@ -73,7 +76,8 @@ export function assessOrder(request: OrderRequest, context: EntitlementContext):
     if (request.siteTemplateId && !catalogued('site_template', request.siteTemplateId)) {
         offCatalog.push(`Site template ${request.siteTemplateId} is not in the customer catalog`)
     }
-    for (const line of request.lines) {
+    const additions = request.lines.filter((line) => !line.replacesAsset)
+    for (const line of additions) {
         const viaTemplate = line.fromSiteTemplate && request.siteTemplateId
         if (!viaTemplate && !catalogued('model', line.modelId)) {
             offCatalog.push(`Model ${line.modelId} is not in the customer catalog`)
@@ -84,7 +88,7 @@ export function assessOrder(request: OrderRequest, context: EntitlementContext):
         const applies = (item: { deviceClass: string; modelId: string }) =>
             quantity.modelId ? item.modelId === quantity.modelId : item.deviceClass === quantity.deviceClass
         const inUse = sum(context.usage.filter(applies).map((u) => u.count))
-        const requested = sum(request.lines.filter(applies).map((l) => l.quantity))
+        const requested = sum(additions.filter(applies).map((l) => l.quantity))
         if (requested === 0 || inUse + requested <= quantity.contracted) return []
         const scope = quantity.modelId ? `${quantity.deviceClass} ${quantity.modelId}` : quantity.deviceClass
         return [`${scope}: ${inUse} in use + ${requested} requested exceeds ${quantity.contracted} contracted`]

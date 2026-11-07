@@ -1,5 +1,4 @@
 import { GlideRecord } from '@servicenow/glide'
-import { str } from './records'
 
 /**
  * On-site work: an FSM work order (wm_order) and the change request it runs under (D57).
@@ -8,29 +7,35 @@ import { str } from './records'
 
 export type FieldPurpose = 'install' | 'swap' | 'de_install' | 'site_audit'
 
-export function openChange(order: GlideRecord, input: { type: 'standard' | 'normal'; description: string }): string {
+/** What the work is for: the Customer, Site and the app record that asked for it. */
+export interface WorkContext {
+    customerId: string
+    siteId: string
+    description: string
+    /** The app record the work belongs to, linked from the change and work order. */
+    source: { field: 'x_daas_ham_order' | 'x_daas_ham_return_order' | 'x_daas_ham_audit'; id: string }
+}
+
+export function openChange(context: WorkContext, type: 'standard' | 'normal'): string {
     const change = new GlideRecord('change_request')
     change.initialize()
-    change.setValue('type', input.type)
-    change.setValue('short_description', input.description)
-    change.setValue('company', str(order, 'customer'))
-    change.setValue('location', str(order, 'site'))
-    change.setValue('x_daas_ham_order', order.getUniqueValue())
+    change.setValue('type', type)
+    change.setValue('short_description', context.description)
+    change.setValue('company', context.customerId)
+    change.setValue('location', context.siteId)
+    change.setValue(context.source.field, context.source.id)
     return change.insert() ?? ''
 }
 
-export function openWorkOrder(
-    order: GlideRecord,
-    input: { purpose: FieldPurpose; description: string; changeId: string; subcontracted: boolean },
-): string {
+export function openWorkOrder(context: WorkContext, purpose: FieldPurpose, changeId: string, subcontracted: boolean): string {
     const workOrder = new GlideRecord('wm_order')
     workOrder.initialize()
-    workOrder.setValue('short_description', input.description)
-    workOrder.setValue('company', str(order, 'customer'))
-    workOrder.setValue('location', str(order, 'site'))
-    workOrder.setValue('x_daas_ham_order', order.getUniqueValue())
-    workOrder.setValue('x_daas_ham_purpose', input.purpose)
-    if (input.changeId) workOrder.setValue('parent', input.changeId)
-    if (input.subcontracted) workOrder.setValue('work_notes', 'Dispatch to subcontractor / remote hands.')
+    workOrder.setValue('short_description', context.description)
+    workOrder.setValue('company', context.customerId)
+    workOrder.setValue('location', context.siteId)
+    workOrder.setValue(context.source.field, context.source.id)
+    workOrder.setValue('x_daas_ham_purpose', purpose)
+    if (changeId) workOrder.setValue('parent', changeId)
+    if (subcontracted) workOrder.setValue('work_notes', 'Dispatch to subcontractor / remote hands.')
     return workOrder.insert() ?? ''
 }

@@ -1,12 +1,15 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { groupDecisions, rollupApprovals } from '../domain/approvals'
 import { approversFor, assessOrder, type EntitlementVerdict, type RequestedLine } from '../domain/entitlement'
+import { shortfallRoute } from '../domain/returns'
 import { planSourcing } from '../domain/sourcing'
 import { entitlementContext } from '../platform/agreements'
 import { approvalsOf, cancelPendingApprovals, customerAdminIds, providerApproverIds, requestApproval } from '../platform/approvals'
 import { moveAndSave, moveAsset, readStage } from '../platform/assets'
 import { EVENT, fire } from '../platform/events'
 import { recomputeLine, recomputeOrder } from '../platform/fulfilment'
+import { todayIso } from '../platform/clock'
+import { openOemRma, openRmaCount } from '../platform/oem-rma'
 import { requestPurchase } from '../platform/procurement'
 import { PROPERTY, stringProperty } from '../platform/properties'
 import { bool, findById, num, str } from '../platform/records'
@@ -110,6 +113,7 @@ function requestedLines(orderId: string): RequestedLine[] {
             deviceClass: str(line, 'model.x_daas_ham_device_class'),
             quantity: num(line, 'quantity'),
             fromSiteTemplate: bool(line, 'from_site_template'),
+            replacesAsset: !!str(line, 'replaces_asset'),
         })
     }
     return lines
@@ -170,7 +174,7 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
     const quantity = num(line, 'quantity')
     const allocated = countAllocated(line.getUniqueValue())
     const onOrder = str(line, 'purchase_order') ? num(line, 'quantity_to_purchase') : 0
-    const shortfall = quantity - allocated - onOrder
+    const shortfall = quantity - allocated - onOrder - openRmaCount(line.getUniqueValue())
     if (shortfall <= 0) return
 
     const modelId = str(line, 'model')
@@ -206,7 +210,16 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
         line.setValue('transfer_orders', [str(line, 'transfer_orders'), ...transfers].filter(Boolean).join(','))
     }
     const toPurchase = shortfall - reserved
-    if (toPurchase > 0) {
+    const replaced = findById('alm_hardware', str(line, 'replaces_asset'))
+    const route = shortfallRoute({
+        missing: toPurchase,
+        purpose: replaced ? 'replace' : 'new',
+        coveredToday: !!replaced && str(replaced, 'x_daas_ham_coverage_end') >= todayIso(),
+    })
+    if (route === 'oem_advance_replacement' && replaced) {
+        openOemRma({ defectiveAsset: replaced, orderLineId: line.getUniqueValue(), caseId: str(order, 'case') })
+        line.setValue('sourcing_summary', `${plan.summary} (OEM advance replacement under RMA)`)
+    } else if (route === 'purchase') {
         line.setValue(
             'purchase_order',
             requestPurchase({
@@ -218,8 +231,8 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
         )
     }
     line.setValue('quantity_allocated', allocated + reserved)
-    line.setValue('quantity_to_purchase', onOrder + Math.max(0, toPurchase))
-    line.setValue('sourcing_summary', plan.summary)
+    line.setValue('quantity_to_purchase', onOrder + (route === 'purchase' ? toPurchase : 0))
+    if (route !== 'oem_advance_replacement') line.setValue('sourcing_summary', plan.summary)
     line.setValue('line_stage', 'sourced')
     line.update()
     recomputeLine(line.getUniqueValue())

@@ -12,6 +12,9 @@ export const PROPERTY = {
     eventsRetentionDays: 'x_daas_ham.events.retention_days',
     autoPurchaseSpares: 'x_daas_ham.spare_pool.auto_purchase',
     unseenDays: 'x_daas_ham.reconciliation.unseen_days',
+    returnGraceDays: 'x_daas_ham.returns.grace_days',
+    temporaryReturnLeadDays: 'x_daas_ham.returns.temporary_lead_days',
+    refreshHorizonDays: 'x_daas_ham.refresh.horizon_days',
 } as const
 
 export function intProperty(name: string, fallback: number): number {

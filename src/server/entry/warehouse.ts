@@ -7,9 +7,11 @@ import { ROLE } from '../domain/visibility'
 import { findAssetByIdentifier, moveAndSave, moveAsset, newAsset, readStage } from '../platform/assets'
 import { loadNormalizationData, resolveModel } from '../platform/normalization'
 import { PROPERTY, stringProperty } from '../platform/properties'
-import { str } from '../platform/records'
+import { lineAwaitingRma } from '../platform/oem-rma'
+import { findById, str } from '../platform/records'
 import { openStagingTask } from '../platform/staging-tasks'
 import { nextProviderTag } from '../platform/tags'
+import { receiveReturnedAsset } from './returns'
 
 /** Warehouse scanning API used by the warehouse React app (P1.5). */
 
@@ -90,6 +92,7 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
         if ('error' in created) return reply(response, 422, created)
         asset = created.asset
     }
+    if (receiveReturnedAsset(asset, input.stockroom)) return reply(response, 200, summarise(asset))
     const verdict = moveAsset(asset, 'available')
     if (!verdict.allowed) return reply(response, 409, { error: `Already received (${readStage(asset)})` })
     asset.setValue('stockroom', input.stockroom)
@@ -110,17 +113,29 @@ function createReceivedAsset(input: Record<string, string>): { asset: GlideRecor
     return { asset }
 }
 
-/** A received purchase goes straight to the Order line that requested it. */
+/**
+ * A received purchase (or OEM advance replacement, announced with its RMA number in the PO field)
+ * goes straight to the Order line waiting for it.
+ */
 function allocateToWaitingLine(asset: GlideRecord): void {
     const poNumber = str(asset, 'po_number')
     if (!poNumber) return
     const line = new GlideRecord('x_daas_ham_order_line')
-    line.addQuery('purchase_order.number', poNumber)
-    line.addQuery('model', str(asset, 'model'))
-    line.addQuery('line_stage', 'awaiting_stock')
-    line.setLimit(1)
-    line.query()
-    if (!line.next()) return
+    const viaRma = lineAwaitingRma(poNumber, str(asset, 'model'))
+    if (viaRma) {
+        if (!line.get(viaRma.lineId)) return
+        const rma = findById('x_daas_ham_oem_rma', viaRma.rmaId)
+        rma?.setValue('state', 'replacement_received')
+        rma?.setValue('replacement_serial', str(asset, 'serial_number'))
+        rma?.update()
+    } else {
+        line.addQuery('purchase_order.number', poNumber)
+        line.addQuery('model', str(asset, 'model'))
+        line.addQuery('line_stage', 'awaiting_stock')
+        line.setLimit(1)
+        line.query()
+        if (!line.next()) return
+    }
     if (!moveAsset(asset, 'reserved').allowed) return
     asset.setValue('x_daas_ham_order_line', line.getUniqueValue())
     asset.setValue('company', str(line, 'order.customer'))

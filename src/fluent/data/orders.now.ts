@@ -24,6 +24,7 @@ export const x_daas_ham_order = Table({
                 device_add: { label: 'Device add', sequence: 1 },
                 device_replace: { label: 'Device replace', sequence: 2 },
                 temporary: { label: 'Temporary deployment', sequence: 3 },
+                refresh: { label: 'Refresh', sequence: 4 },
             },
             mandatory: true,
             default: 'device_add',
@@ -79,6 +80,8 @@ export const x_daas_ham_order = Table({
         work_order: ReferenceColumn({ label: 'Work order', referenceTable: 'wm_order' }),
         tracking_number: StringColumn({ label: 'Tracking number', maxLength: 100 }),
         carrier: StringColumn({ label: 'Carrier', maxLength: 60 }),
+        case: ReferenceColumn({ label: 'Case', referenceTable: 'sn_customerservice_case' }),
+        return_raised: BooleanColumn({ label: 'Return raised', default: false, readOnly: true }),
     },
     autoNumber: { prefix: 'NORD', number: 1000, numberOfDigits: 7 },
     index: [

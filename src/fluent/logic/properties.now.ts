@@ -174,3 +174,30 @@ Property({
     description: "Days before an asset's OEM coverage is checked again.",
     roles: { read: [admin], write: [admin] },
 })
+
+Property({
+    $id: Now.ID['prop_return_grace'],
+    name: 'x_daas_ham.returns.grace_days',
+    type: 'integer',
+    value: 14,
+    description: 'Days after the due date before unreturned equipment is declared missing and charged as lost.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_temporary_lead'],
+    name: 'x_daas_ham.returns.temporary_lead_days',
+    type: 'integer',
+    value: 7,
+    description: 'Days before a temporary deployment ends that its return order is raised.',
+    roles: { read: [admin], write: [admin] },
+})
+
+Property({
+    $id: Now.ID['prop_refresh_horizon'],
+    name: 'x_daas_ham.refresh.horizon_days',
+    type: 'integer',
+    value: 90,
+    description: 'Assets whose refresh is due within this many days get refresh orders.',
+    roles: { read: [admin], write: [admin] },
+})

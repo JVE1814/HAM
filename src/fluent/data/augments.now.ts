@@ -174,6 +174,8 @@ export const wm_order = Table({
     augments: 'wm_order',
     schema: {
         x_daas_ham_order: ReferenceColumn({ label: 'NaaS order', referenceTable: 'x_daas_ham_order' }),
+        x_daas_ham_return_order: ReferenceColumn({ label: 'NaaS return order', referenceTable: 'x_daas_ham_return_order' }),
+        x_daas_ham_audit: ReferenceColumn({ label: 'NaaS audit', referenceTable: 'x_daas_ham_audit' }),
         x_daas_ham_purpose: ChoiceColumn({
             label: 'NaaS purpose',
             choices: {
@@ -187,10 +189,35 @@ export const wm_order = Table({
     index: [{ name: 'x_daas_ham_wm_order', unique: false, element: 'x_daas_ham_order' }],
 })
 
+export const sn_customerservice_case = Table({
+    augments: 'sn_customerservice_case',
+    schema: {
+        x_daas_ham_failed_asset: ReferenceColumn({ label: 'Failed asset', referenceTable: 'alm_hardware' }),
+        x_daas_ham_replacement_order: ReferenceColumn({
+            label: 'Replacement order',
+            referenceTable: 'x_daas_ham_order',
+            readOnly: true,
+        }),
+        x_daas_ham_replacement_tier: ChoiceColumn({
+            label: 'Replacement service level',
+            readOnly: true,
+            choices: {
+                nbd: { label: 'Next business day', sequence: 0 },
+                same_day: { label: 'Same day (8x5x4)', sequence: 1 },
+                four_hour: { label: '24x7x4', sequence: 2 },
+            },
+        }),
+        x_daas_ham_proactive: BooleanColumn({ label: 'Raised by NOC', default: false }),
+    },
+    index: [{ name: 'x_daas_ham_case_failed_asset', unique: false, element: 'x_daas_ham_failed_asset' }],
+})
+
 export const change_request = Table({
     augments: 'change_request',
     schema: {
         x_daas_ham_order: ReferenceColumn({ label: 'NaaS order', referenceTable: 'x_daas_ham_order' }),
+        x_daas_ham_return_order: ReferenceColumn({ label: 'NaaS return order', referenceTable: 'x_daas_ham_return_order' }),
+        x_daas_ham_audit: ReferenceColumn({ label: 'NaaS audit', referenceTable: 'x_daas_ham_audit' }),
     },
     index: [{ name: 'x_daas_ham_chg_order', unique: false, element: 'x_daas_ham_order' }],
 })

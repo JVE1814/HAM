@@ -171,7 +171,7 @@ The recurring time at a Site during which on-site changes may be carried out.
 ### After-sales
 
 **Replacement order**:
-The Provider's response to a failed in-service Asset: a replacement from a Spare pool or the OEM, raised from a case.
+An Order of type device replace raised from a case about a failed Asset, served from a hot spare, the Spare pool, stock, an OEM advance replacement or a purchase.
 _Avoid_: RMA (that is the OEM's), break-fix ticket, swap
 
 **OEM RMA**:
@@ -182,7 +182,7 @@ The manufacturer support contract covering one Asset's serial number, with its s
 _Avoid_: warranty (one kind of coverage), SmartNet
 
 **Refresh order**:
-A planned replacement of Assets reaching their Refresh due date, with the old Assets returned.
+An Order of type refresh replacing Assets that reach their Refresh due date; the old Assets go back on a Return order.
 
 **Return order**:
 Bringing Assets back from a Site (decommission, removal, refresh swap-back, agreement end, defective return).
@@ -195,7 +195,7 @@ Retiring Assets for good by resale, OEM takeback, recycling, or return to the Cu
 Proof that an Asset's configuration, keys and credentials were erased before it left the Provider's control.
 
 **Temporary deployment**:
-Equipment installed for a fixed period (event, pop-up site, trial) that returns automatically at the end.
+An Order of type temporary: equipment installed for a fixed period (event, pop-up site, trial) whose Return order is raised automatically before the end date.
 _Avoid_: loaner
 
 **Audit**:

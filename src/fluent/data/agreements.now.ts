@@ -57,6 +57,7 @@ export const x_daas_ham_agreement = Table({
         late_return_fee: DecimalColumn({ label: 'Late return fee' }),
         damage_fee: DecimalColumn({ label: 'Damage fee' }),
         attestation_interval_months: IntegerColumn({ label: 'Attestation every (months)', default: 12, min: 0 }),
+        end_return_raised: BooleanColumn({ label: 'End-of-agreement return raised', default: false, readOnly: true }),
     },
     autoNumber: { prefix: 'NAG', number: 1000, numberOfDigits: 7 },
     index: [{ name: 'x_daas_ham_agr_customer', unique: false, element: 'customer' }],

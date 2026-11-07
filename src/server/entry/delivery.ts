@@ -1,10 +1,12 @@
 import { GlideDateTime, GlideRecord, GlideSchedule, gs } from '@servicenow/glide'
+import { isDeployed } from '../domain/lifecycle'
 import { checkJobWindow } from '../domain/scheduling'
 import { moveAndSave, readStage } from '../platform/assets'
 import { glideToMs } from '../platform/clock'
-import { openChange, openWorkOrder } from '../platform/field-work'
+import { openChange, openWorkOrder, type WorkContext } from '../platform/field-work'
 import { recomputeOrder } from '../platform/fulfilment'
 import { findById, str } from '../platform/records'
+import { returnReplacedAssets } from './returns'
 
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
@@ -52,17 +54,19 @@ export function shipOrder(order: GlideRecord): void {
 }
 
 function openOnSiteWork(order: GlideRecord): void {
-    const description = `${str(order, 'number')}: ${str(order, 'order_type')} at ${str(order, 'site.name')}`
-    const changeId = openChange(order, {
-        type: ROUTINE_ORDER_TYPES.includes(str(order, 'order_type')) ? 'standard' : 'normal',
-        description,
-    })
-    const workOrderId = openWorkOrder(order, {
-        purpose: str(order, 'order_type') === 'device_replace' ? 'swap' : 'install',
-        description,
+    const context: WorkContext = {
+        customerId: str(order, 'customer'),
+        siteId: str(order, 'site'),
+        description: `${str(order, 'number')}: ${str(order, 'order_type')} at ${str(order, 'site.name')}`,
+        source: { field: 'x_daas_ham_order', id: order.getUniqueValue() },
+    }
+    const changeId = openChange(context, ROUTINE_ORDER_TYPES.includes(str(order, 'order_type')) ? 'standard' : 'normal')
+    const workOrderId = openWorkOrder(
+        context,
+        ['device_replace', 'refresh'].includes(str(order, 'order_type')) ? 'swap' : 'install',
         changeId,
-        subcontracted: ['subcontractor', 'remote_hands'].includes(str(order, 'install_mode')),
-    })
+        ['subcontractor', 'remote_hands'].includes(str(order, 'install_mode')),
+    )
     order.setValue('change_request', changeId)
     order.setValue('work_order', workOrderId)
     order.update()
@@ -79,20 +83,22 @@ export function completeInstall(order: GlideRecord): void {
         asset.setValue('x_daas_ham_site', str(order, 'site'))
         moveAndSave(asset, 'pending_in_service', `install ${str(order, 'number')}`)
     }
-    retireReplacedAssets(order.getUniqueValue())
+    retireReplacedAssets(order)
     recomputeOrder(order.getUniqueValue())
 }
 
-/** The Assets a device-replace Order replaced come out of service and await return. */
-function retireReplacedAssets(orderId: string): void {
+/** The Assets an Order replaced (break-fix, refresh) come out of service and go back on a Return order. */
+function retireReplacedAssets(order: GlideRecord): void {
     const line = new GlideRecord('x_daas_ham_order_line')
-    line.addQuery('order', orderId)
+    line.addQuery('order', order.getUniqueValue())
     line.addNotNullQuery('replaces_asset')
     line.query()
+    const replaced: string[] = []
     while (line.next()) {
-        const replaced = findById('alm_hardware', str(line, 'replaces_asset'))
-        if (replaced && readStage(replaced) === 'in_service') moveAndSave(replaced, 'pending_return', `replaced by ${str(line, 'number')}`)
+        const asset = findById('alm_hardware', str(line, 'replaces_asset'))
+        if (asset && isDeployed(readStage(asset))) replaced.push(asset.getUniqueValue())
     }
+    returnReplacedAssets(order, replaced)
 }
 
 /** After-update rule on wm_order closed complete for a NaaS Order. */

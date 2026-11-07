@@ -78,3 +78,13 @@ describe('assessOrder', () => {
         expect(result.findings).toHaveLength(2)
     })
 })
+
+describe('replacement lines', () => {
+    it('are within the agreement even when the model is no longer catalogued or the class is at its cap', () => {
+        const result = assessOrder(
+            { lines: [{ modelId: 'old-switch', deviceClass: 'switch', quantity: 1, replacesAsset: true }, { modelId: 'c9300', deviceClass: 'switch', quantity: 2, replacesAsset: true }] },
+            { ...context, usage: [{ deviceClass: 'switch', modelId: 'c9300', count: 10 }] },
+        )
+        expect(result).toEqual({ verdict: 'within_agreement', approvers: [], findings: [] })
+    })
+})
