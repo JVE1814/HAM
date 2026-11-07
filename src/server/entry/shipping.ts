@@ -312,7 +312,14 @@ export function retryTrackingUpdate(event: GlideRecord, current: GlideRecord): v
     }
     const { update, newestAt } = queued
     const tries = Number(str(event, 'parm2')) || 0
-    const tracked = trackUnderLock(shipmentId, update, newestAt)
+    let tracked: ReturnType<typeof trackUnderLock>
+    try {
+        tracked = trackUnderLock(shipmentId, update, newestAt)
+    } catch (error) {
+        // The webhook answered 2xx, so nothing else would bring this update back: try again like a busy lock, and
+        // the give-up warning names it if the error persists.
+        return trackAgain(current, param, tries, error instanceof Error ? error.message : String(error))
+    }
     if (tracked === 'busy') return trackAgain(current, param, tries, 'another update held its lock')
     if (!tracked) return
     if ('error' in tracked) return trackAgain(current, param, tries, 'the platform refused the Shipment')
