@@ -1,3 +1,5 @@
+import { restErrorMessage } from '../rest-error'
+
 /** Customer self-service endpoints (/api/x_daas_ham/naas/customer). */
 
 export interface CustomerAsset {
@@ -48,7 +50,7 @@ async function call<T>(method: 'GET' | 'POST', path: string, body?: object): Pro
     })
     const payload = await response.json().catch(() => ({}))
     const result = payload.result ?? payload
-    if (!response.ok) throw new Error(result.error ?? `HTTP ${response.status}`)
+    if (!response.ok) throw new Error(restErrorMessage(result.error, response.status))
     return result as T
 }
 

@@ -1,4 +1,4 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { stagesQuery } from '../domain/lifecycle'
 import type { StockCandidate, StockroomType } from '../domain/sourcing'
 import { moveAsset, readStage } from './assets'
@@ -44,11 +44,24 @@ export interface Reservation {
  * Reserve an in-stock Asset for an Order line (company becomes the Customer, ADR 0006), or null when it is no longer
  * free or the save is refused. Two sourcing runs may pick the same Asset, so the claim is made under a lock on that
  * Asset and checks a fresh read: still available or in a spare pool, and on no Order line. A run that finds the lock
- * held leaves the Asset to the other one.
+ * held (or cannot take it, when the holder lets go mid-take) leaves the Asset to the other one.
  */
 export function reserveAsset(assetId: string, reservation: Reservation): GlideRecord | null {
     let reserved: GlideRecord | null = null
-    withLock(`reserve_asset_${assetId}`, () => {
+    let claimed = false
+    try {
+        withLock(`reserve_asset_${assetId}`, () => {
+            claimed = true
+            reserve()
+        })
+    } catch (error) {
+        // An error from the claim itself is the reservation's to report; one from taking the lock only means not now.
+        if (claimed) throw error
+        gs.warn(`[x_daas_ham] Asset ${assetId} not reserved: ${error instanceof Error ? error.message : String(error)}`)
+    }
+    return reserved
+
+    function reserve(): void {
         const asset = new GlideRecord('alm_hardware')
         if (!asset.get(assetId)) return
         const stage = readStage(asset)
@@ -58,6 +71,5 @@ export function reserveAsset(assetId: string, reservation: Reservation): GlideRe
         asset.setValue('company', reservation.customerId)
         asset.setValue('x_daas_ham_agreement', reservation.agreementId)
         if (asset.update()) reserved = asset
-    })
-    return reserved
+    }
 }

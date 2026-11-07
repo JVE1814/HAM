@@ -1,4 +1,5 @@
 import type { PowerBudget } from '../../server/domain/rack'
+import { restErrorMessage } from '../rest-error'
 
 /** Calls to the NaaS rack endpoints (/api/x_daas_ham/naas). */
 
@@ -37,7 +38,7 @@ async function get<T>(path: string): Promise<T> {
     })
     const payload = await response.json().catch(() => ({}))
     const result = payload.result ?? payload
-    if (!response.ok) throw new Error(result.error ?? `HTTP ${response.status}`)
+    if (!response.ok) throw new Error(restErrorMessage(result.error, response.status))
     return result as T
 }
 
