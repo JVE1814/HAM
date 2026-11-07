@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { evaluationTarget, feeAmount, overdueStep, returnDueDate, returnRequestFindings, shortfallRoute, type RequestedReturn, type ReturnRequester } from './returns'
+import { stagesQuery, type Stage } from './lifecycle'
+import {
+    evaluationTarget,
+    feeAmount,
+    overdueStep,
+    returnDueDate,
+    returnRequestFindings,
+    shortfallRoute,
+    sitePackageHoldersQuery,
+    type RequestedReturn,
+    type ReturnRequester,
+} from './returns'
 
 describe('returnRequestFindings', () => {
     const acmeSite: RequestedReturn = { customerId: 'acme', site: { id: 'acme-hq', customerId: 'acme', isSite: true } }
@@ -67,6 +78,26 @@ describe('overdueStep', () => {
 
     it('declares the asset missing after the grace period', () => {
         expect(overdueStep({ dueDate: due, today: '2026-12-22', graceDays: 14, received: false, escalated: true })).toBe('declare_missing')
+    })
+})
+
+describe('sitePackageHoldersQuery', () => {
+    const query = sitePackageHoldersQuery({ siteId: 'acme-hq', agreementId: 'acme-msa' })
+
+    it('counts only Assets at the Site under the Agreement', () => {
+        for (const clause of query.split('^NQ')) {
+            expect(clause).toContain('x_daas_ham_site=acme-hq^x_daas_ham_agreement=acme-msa')
+        }
+    })
+
+    // A swap's new units before monitoring sees them, units serving there and units still to come back.
+    it.each<Stage>(['shipped', 'pending_in_service', 'in_service', 'temporary_deployment', 'pending_return'])(
+        'is held open by a unit %s',
+        (stage) => expect(query).toContain(stagesQuery([stage])),
+    )
+
+    it.each<Stage>(['pending_evaluation', 'missing', 'available'])('lets go of a unit %s', (stage) => {
+        expect(query).not.toContain(stagesQuery([stage]))
     })
 })
 

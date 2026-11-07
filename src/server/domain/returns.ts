@@ -1,6 +1,6 @@
 import { addDays } from './calendar'
 import type { NamedRecord } from './entitlement'
-import type { LegalOwner, Stage } from './lifecycle'
+import { DEPLOYED_STAGES, stagesQuery, type LegalOwner, type Stage } from './lifecycle'
 import type { VisibilityScope } from './visibility'
 
 /** Returns, depot evaluation, Fee events and break-fix shortfalls (P2.3–P2.4). */
@@ -43,6 +43,16 @@ export function overdueStep(input: { dueDate: string; today: string; graceDays: 
     if (input.received || input.today <= input.dueDate) return 'none'
     if (input.today > addDays(input.dueDate, input.graceDays)) return 'declare_missing'
     return input.escalated ? 'none' : 'escalate'
+}
+
+/**
+ * The Assets that keep a site package open, as an encoded alm_hardware query: those at its Site under its Agreement
+ * on their way there, serving there or on their way back. A unit received at the depot or declared missing no longer
+ * counts. A swap's new units do, before monitoring first sees them and attaches them to the package, so a swap-back
+ * that reaches the depot first does not end it (D60).
+ */
+export function sitePackageHoldersQuery(line: { siteId: string; agreementId: string }): string {
+    return stagesQuery(DEPLOYED_STAGES, `x_daas_ham_site=${line.siteId}^x_daas_ham_agreement=${line.agreementId}`)
 }
 
 export type EvaluationOutcome = 'refurbish' | 'oem_rma' | 'scrap' | 'return_to_owner'

@@ -1,4 +1,5 @@
 import { GlideDateTime, GlideRecord } from '@servicenow/glide'
+import { appendTo } from '../domain/collections'
 import { isDeployed, stagesQuery } from '../domain/lifecycle'
 import { feeAmount, returnDueDate, type FeeType } from '../domain/returns'
 import { moveAndSave, readStage } from './assets'
@@ -86,8 +87,29 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
     order.update()
 }
 
+export interface InstalledFilter {
+    agreementId?: string
+    siteId?: string
+    orderId?: string
+}
+
 /** Assets installed at a Site (in service, temporary or awaiting first sighting), by Agreement, Site or Order. */
-export function installedAssetIds(filter: { agreementId?: string; siteId?: string; orderId?: string }): string[] {
+export function installedAssetIds(filter: InstalledFilter): string[] {
+    const asset = queryInstalled(filter)
+    const ids: string[] = []
+    while (asset.next()) ids.push(asset.getUniqueValue())
+    return ids
+}
+
+/** The installed Assets (as installedAssetIds) under the Site each is at. */
+export function installedAssetIdsBySite(filter: InstalledFilter): Map<string, string[]> {
+    const asset = queryInstalled(filter)
+    const bySite = new Map<string, string[]>()
+    while (asset.next()) appendTo(bySite, str(asset, 'x_daas_ham_site'), asset.getUniqueValue())
+    return bySite
+}
+
+function queryInstalled(filter: InstalledFilter): GlideRecord {
     const base = [
         filter.agreementId ? `x_daas_ham_agreement=${filter.agreementId}` : '',
         filter.siteId ? `x_daas_ham_site=${filter.siteId}` : '',
@@ -98,9 +120,7 @@ export function installedAssetIds(filter: { agreementId?: string; siteId?: strin
     const asset = new GlideRecord('alm_hardware')
     asset.addEncodedQuery(stagesQuery(['in_service', 'temporary_deployment', 'pending_in_service'], base))
     asset.query()
-    const ids: string[] = []
-    while (asset.next()) ids.push(asset.getUniqueValue())
-    return ids
+    return asset
 }
 
 /** The return line an arriving Asset settles: awaiting, or declared missing and now turning up late. */

@@ -3,7 +3,15 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { toIsoDate } from '../domain/calendar'
 import type { LegalOwner } from '../domain/lifecycle'
-import { evaluationTarget, overdueStep, returnRequestFindings, type EvaluationOutcome, type RequestedReturn, type ReturnRequester } from '../domain/returns'
+import {
+    evaluationTarget,
+    overdueStep,
+    returnRequestFindings,
+    sitePackageHoldersQuery,
+    type EvaluationOutcome,
+    type RequestedReturn,
+    type ReturnRequester,
+} from '../domain/returns'
 import { clearRackPlacement, moveAndSave, moveAsset, readStage } from '../platform/assets'
 import { customerAdminIds } from '../platform/approvals'
 import { runTableJob } from '../platform/chunked'
@@ -17,6 +25,7 @@ import {
     completeReturn,
     expectedReturnLine,
     installedAssetIds,
+    installedAssetIdsBySite,
     raiseReturn,
     recordFee,
     stampNow,
@@ -86,18 +95,21 @@ function agreementOf(assetId: string | undefined): string {
 
 /**
  * A returned Asset arrived at the depot: it awaits evaluation, its subscription line no longer
- * includes it, and a late return is charged.
+ * includes it, its earlier wipe evidence no longer counts, and a late return is charged.
  */
 export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): boolean {
     if (readStage(asset) !== 'pending_return' && readStage(asset) !== 'missing') return false
     const line = expectedReturnLine(asset.getUniqueValue())
-    const subscriptionLine = str(asset, 'x_daas_ham_subscription_line')
+    const siteId = str(asset, 'x_daas_ham_site')
     asset.setValue('stockroom', stockroomId)
     asset.setValue('x_daas_ham_site', '')
     asset.setValue('x_daas_ham_subscription_line', '')
+    // A wipe recorded before this receipt does not cover what it picked up at the Site, so it must be wiped again.
+    asset.setValue('x_daas_ham_wiped_on', '')
+    asset.setValue('x_daas_ham_wipe_certificate', '')
     clearRackPlacement(asset)
     if (!moveAndSave(asset, 'pending_evaluation', 'return received')) return false
-    endLineIfEmpty(subscriptionLine)
+    endSitePackageIfEmpty(siteId, str(asset, 'x_daas_ham_agreement'))
     if (!line) return true
     const turnedUp = str(line, 'status') === 'missing'
     line.setValue('status', 'received')
@@ -118,24 +130,33 @@ export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): b
 }
 
 /**
- * A site package whose last Asset came back ends on the day of receipt. Its remaining Assets are counted past the
+ * An active site package ends on the day nothing is left at its Site under its Agreement (domain/returns
+ * `sitePackageHoldersQuery`). It is found by the Site and Agreement the unit leaves, not the line it carries, so a
+ * swap's new unit that leaves before monitoring attached it still ends it. The Assets left are counted past the
  * before-query visibility rules (ADR 0005): the receiving tech sees only Assets in their stockrooms, so the units
  * still at the Site would be missed and the line would end on the first unit back.
  */
-function endLineIfEmpty(lineId: string): void {
-    if (!lineId) return
+function endSitePackageIfEmpty(siteId: string, agreementId: string): void {
+    if (!siteId || !agreementId) return
+    const line = new GlideRecord('x_daas_ham_subscription_line')
+    line.addQuery('agreement', agreementId)
+    line.addQuery('site', siteId)
+    line.addQuery('line_type', 'site_package')
+    line.addQuery('status', 'active')
+    line.query()
+    if (!line.hasNext()) return
     const remaining = new GlideRecord('alm_hardware')
     // Only counted, never updated, so the rules need not be turned back on.
     remaining.setWorkflow(false)
-    remaining.addQuery('x_daas_ham_subscription_line', lineId)
+    remaining.addEncodedQuery(sitePackageHoldersQuery({ siteId, agreementId }))
     remaining.setLimit(1)
     remaining.query()
     if (remaining.hasNext()) return
-    const line = findById('x_daas_ham_subscription_line', lineId)
-    if (!line || str(line, 'line_type') !== 'site_package' || str(line, 'status') === 'ended') return
-    line.setValue('status', 'ended')
-    line.setValue('end_date', toIsoDate(nowMs()))
-    line.update()
+    while (line.next()) {
+        line.setValue('status', 'ended')
+        line.setValue('end_date', toIsoDate(nowMs()))
+        line.update()
+    }
 }
 
 /** After-update rule on return lines whose evaluation was set: route the Asset onward. */
@@ -191,6 +212,10 @@ export function chaseOverdueReturns(): void {
                 if (asset) clearRackPlacement(asset)
                 if (asset && moveAndSave(asset, 'missing', `return ${returnOrder.getDisplayValue('number')} overdue`)) {
                     recordFee('lost', asset, line.returnOrderId)
+                    // A missing unit no longer holds its site package open. It keeps its Site and line so that, found
+                    // again and back in service, it bills on that line again while it is open (entry/assets.ts
+                    // onAssetServiceChange).
+                    endSitePackageIfEmpty(str(asset, 'x_daas_ham_site'), str(asset, 'x_daas_ham_agreement'))
                 }
                 const record = findById('x_daas_ham_return_order_line', lineId)
                 record?.setValue('status', 'missing')
@@ -211,17 +236,19 @@ export function raiseScheduledReturns(): void {
     agreement.setLimit(50)
     agreement.query()
     while (agreement.next()) {
-        const assets = installedAssetIds({ agreementId: agreement.getUniqueValue() })
-        if (assets.length > 0) {
+        const recover = `Agreement ${str(agreement, 'number')} ended ${str(agreement, 'ends')}: recover all equipment`
+        // One Return per Site, each a field de-install with its own change and work order there.
+        for (const [siteId, assetIds] of installedAssetIdsBySite({ agreementId: agreement.getUniqueValue() })) {
+            const site = findById('cmn_location', siteId)
             raiseReturn({
                 trigger: 'agreement_end',
                 customerId: str(agreement, 'customer'),
-                siteId: '',
+                siteId,
                 agreementId: agreement.getUniqueValue(),
                 method: 'fsm_deinstall',
-                assetIds: assets,
-                openFieldWork: false,
-                description: `Agreement ${str(agreement, 'number')} ended ${str(agreement, 'ends')}: recover all equipment`,
+                assetIds,
+                openFieldWork: true,
+                description: site ? `${recover} from ${str(site, 'name')}` : recover,
             })
         }
         agreement.setValue('end_return_raised', true)
