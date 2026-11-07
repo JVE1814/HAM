@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activeDays, monthBounds, overlapsMonth, previousMonth, prorate, subscriptionCharges, toCsv, type ChargeSources, type ServiceInterval } from './billing'
+import { activeDays, intervalEnd, monthBounds, overlapsMonth, previousMonth, prorate, subscriptionCharges, toCsv, type ChargeSources, type ServiceInterval } from './billing'
 
 const nov = monthBounds('2026-11')
 const feb = monthBounds('2028-02')
@@ -41,6 +41,17 @@ describe('activeDays', () => {
         expect(activeDays(nov, '2026-12-01')).toBe(0)
         expect(activeDays(nov, '2026-09-01', '2026-10-31')).toBe(0)
         expect(activeDays(nov, '')).toBe(0)
+    })
+})
+
+describe('intervalEnd', () => {
+    it('ends a Service interval on the day it is closed', () => {
+        expect(intervalEnd('2026-11-02', '2026-11-07')).toBe('2026-11-07')
+        expect(intervalEnd('2026-11-07', '2026-11-07')).toBe('2026-11-07')
+    })
+
+    it('never ends one before it started', () => {
+        expect(intervalEnd('2026-11-10', '2026-11-07')).toBe('2026-11-10')
     })
 })
 

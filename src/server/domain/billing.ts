@@ -20,8 +20,8 @@ export function monthBounds(month: string): MonthBounds {
  * An encoded query for records whose date range (end blank = still open) overlaps the month.
  * The ^OR binds to the end-date clause only: start <= last AND (end empty OR end >= first).
  */
-export function overlapsMonth(bounds: MonthBounds, startField = 'start_date', endField = 'end_date'): string {
-    return `${startField}<=${bounds.last}^${endField}ISEMPTY^OR${endField}>=${bounds.first}`
+export function overlapsMonth(bounds: MonthBounds): string {
+    return `start_date<=${bounds.last}^end_dateISEMPTY^ORend_date>=${bounds.first}`
 }
 
 /** The calendar month before the one `today` falls in. */
@@ -49,6 +49,11 @@ export interface ServiceInterval {
     end?: string
     /** Assets that share this Site and these dates (default 1). */
     count?: number
+}
+
+/** The last day (inclusive) of a Service interval that started on `start` and is closed on `closedOn`: never before it started. */
+export function intervalEnd(start: string, closedOn: string): string {
+    return closedOn < start ? start : closedOn
 }
 
 /** What a Subscription line is billed by, as stored on it. */

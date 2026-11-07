@@ -7,9 +7,10 @@ import { ROLE } from '../domain/visibility'
 import { findAssetByIdentifier, moveAndSave, readStage } from '../platform/assets'
 import { runTableJob } from '../platform/chunked'
 import { glideToMs, msToGlide, nowMs } from '../platform/clock'
-import { applyLifecycleDates, modelLifecycles, type ModelLifecycles } from '../platform/lifecycle-dates'
+import { applyLifecycleDates, lifecycleReaders, type LifecycleReaders } from '../platform/lifecycle-dates'
 import { intProperty, PROPERTY } from '../platform/properties'
 import { str } from '../platform/records'
+import { reply } from '../platform/rest-api'
 import { attachToSubscription } from '../platform/subscriptions'
 
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
@@ -26,12 +27,14 @@ function recordSeen(asset: GlideRecord, at: number, source: string): void {
 }
 
 /** Put a pending Asset in service if it has been seen since its install. Saves the asset. */
-function goLiveIfSeen(asset: GlideRecord, lifecycles: ModelLifecycles): void {
+function goLiveIfSeen(asset: GlideRecord, readers: LifecycleReaders): void {
+    const stage = readStage(asset)
     const decision = decideInService({
-        stage: readStage(asset),
+        stage,
         installCompletedAt: glideToMs(str(asset, 'x_daas_ham_install_completed')),
         lastSeenAt: glideToMs(str(asset, 'x_daas_ham_last_seen')),
-        temporary: str(asset, 'x_daas_ham_order_line.order.order_type') === 'temporary',
+        // Only a pending Asset can go live, so only it pays for the dot-walk to its Order.
+        temporary: stage === 'pending_in_service' && str(asset, 'x_daas_ham_order_line.order.order_type') === 'temporary',
     })
     if (!decision.goesLive) {
         asset.update()
@@ -39,24 +42,16 @@ function goLiveIfSeen(asset: GlideRecord, lifecycles: ModelLifecycles): void {
     }
     asset.setValue('x_daas_ham_in_service_date', msToGlide(decision.at))
     attachToSubscription(asset, decision.at)
-    applyLifecycleDates(asset, lifecycles)
+    applyLifecycleDates(asset, readers)
     moveAndSave(asset, decision.stage, 'in-service detection')
 }
 
 /** POST /api/x_daas_ham/naas/v1/device_events - Seen signals from the Provider NMS. */
 export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIResponse): void {
-    if (!gs.hasRole(ROLE.integration) && !gs.hasRole(ROLE.assetManager)) {
-        response.setStatus(403)
-        response.setBody({ error: 'Requires the x_daas_ham.integration role' } as never)
-        return
-    }
+    if (!gs.hasRole(ROLE.integration) && !gs.hasRole(ROLE.assetManager)) return reply(response, 403, { error: 'Requires the x_daas_ham.integration role' })
     const parsed = parseDeviceEvents(request.body.data, intProperty(PROPERTY.eventsMaxBatch, 500), nowMs())
-    if ('error' in parsed) {
-        response.setStatus(400)
-        response.setBody({ error: parsed.error } as never)
-        return
-    }
-    const lifecycles = modelLifecycles()
+    if ('error' in parsed) return reply(response, 400, { error: parsed.error })
+    const readers = lifecycleReaders()
     const unknown: string[] = []
     for (const event of parsed.events) {
         const asset = findAssetByIdentifier(event.identifier, { beyondVisibility: true })
@@ -64,22 +59,21 @@ export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIRespo
             unknown.push(event.identifier)
             continue
         }
-        applyEvent(asset, event, lifecycles)
+        applyEvent(asset, event, readers)
     }
-    response.setStatus(202)
-    response.setBody({
+    reply(response, 202, {
         accepted: parsed.events.length - unknown.length,
         unknown_identifiers: unknown,
         rejected: parsed.rejected,
-    } as never)
+    })
 }
 
-function applyEvent(asset: GlideRecord, event: DeviceEvent, lifecycles: ModelLifecycles): void {
+function applyEvent(asset: GlideRecord, event: DeviceEvent, readers: LifecycleReaders): void {
     const lastKind = lastEventKind(asset.getUniqueValue())
     if (event.event !== 'seen' || lastKind !== 'seen') storeEvent(asset.getUniqueValue(), event)
     if (event.event === 'down') return
     recordSeen(asset, event.observedAt, event.source)
-    goLiveIfSeen(asset, lifecycles)
+    goLiveIfSeen(asset, readers)
 }
 
 function lastEventKind(assetId: string): string {
@@ -104,7 +98,7 @@ function storeEvent(assetId: string, event: DeviceEvent): void {
 
 /** Scheduled job: pick up Discovery / connector sightings of pending Assets and put them in service. */
 export function evaluatePendingInService(): void {
-    const lifecycles = modelLifecycles()
+    const readers = lifecycleReaders()
     runTableJob({
         job: 'in_service_detection',
         table: 'alm_hardware',
@@ -117,7 +111,7 @@ export function evaluatePendingInService(): void {
             if (discovered !== undefined) {
                 recordSeen(asset, discovered, str(asset, 'ci.discovery_source') === 'ServiceNow' ? 'discovery' : 'connector')
             }
-            goLiveIfSeen(asset, lifecycles)
+            goLiveIfSeen(asset, readers)
         },
     })
 }

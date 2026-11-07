@@ -2,7 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { stagesQuery } from '../domain/lifecycle'
+import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
 import { ROLE } from '../domain/visibility'
 import { readStage } from '../platform/assets'
 import { currentSession } from '../platform/session'
@@ -38,7 +38,7 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
 
     const assets: object[] = []
     const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(stagesQuery(['shipped', 'pending_in_service', 'in_service', 'temporary_deployment', 'pending_return']))
+    asset.addEncodedQuery(stagesQuery(DEPLOYED_STAGES))
     asset.orderBy('x_daas_ham_site')
     asset.setLimit(5000)
     asset.query()

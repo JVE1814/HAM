@@ -191,6 +191,9 @@ function checkRetirement(to: Stage, facts: TransitionFacts): TransitionVerdict {
 
 export const DEPLOYED_STAGES: readonly Stage[] = [...AT_OR_TOWARDS_SITE]
 
+/** Serving a customer: at or on the way to a Site, and not already coming back. */
+export const SERVING_STAGES: readonly Stage[] = [...NEEDS_SITE_AND_AGREEMENT]
+
 /**
  * An encoded query matching assets in any of `stages` (and `base`, repeated per clause because
  * ^NQ starts a new top-level OR group). `via` dot-walks to the asset from another table (`asset.`).
@@ -212,8 +215,23 @@ export function isBillable(stage: Stage | null): boolean {
     return stage !== null && BILLABLE.has(stage)
 }
 
-/** Whether a stage change starts or stops an Asset's billing (its Service interval), or neither. */
-export function billingChange(before: Stage | null, after: Stage | null): 'start' | 'stop' | null {
+/** The dates a stage change can start or stop an Asset's billing on (YYYY-MM-DD). */
+export interface BillingDates {
+    /** The day the Asset went into service, once it has. */
+    inServiceDate?: string
+    today: string
+}
+
+/** Billing (the Asset's Service interval) starts or stops on this day (YYYY-MM-DD). */
+export type BillingChange = { start: string } | { stop: string }
+
+/**
+ * Whether a stage change starts or stops an Asset's billing, and on which day: it starts from the
+ * in-service date on first go-live (from pending in service), else today (e.g. found after being
+ * missing), and stops today, whatever moved it (D52, ADR 0009).
+ */
+export function billingChange(before: Stage | null, after: Stage | null, dates: BillingDates): BillingChange | null {
     if (isBillable(before) === isBillable(after)) return null
-    return isBillable(after) ? 'start' : 'stop'
+    if (!isBillable(after)) return { stop: dates.today }
+    return { start: (before === 'pending_in_service' && dates.inServiceDate) || dates.today }
 }

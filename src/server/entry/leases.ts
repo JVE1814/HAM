@@ -2,21 +2,19 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
 import { addDays } from '../domain/calendar'
-import { groupExpiringCoverage, leaseDecisionProblem, leaseMismatch, renewedEnd, withinLead, type LeaseEndAction } from '../domain/leases'
-import { stagesQuery, type Stage } from '../domain/lifecycle'
+import { groupExpiringCoverage, leaseDecisionProblem, leaseMismatch, renewedEnd, withinLead, type ExpiringCoverage, type LeaseEndAction } from '../domain/leases'
+import { SERVING_STAGES, stagesQuery, type Stage } from '../domain/lifecycle'
 import { leaseShare } from '../domain/margin'
 import { providerApproverIds } from '../platform/approvals'
 import { runEventTableJob } from '../platform/chunked'
 import { todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
-import { applyLifecycleDates, modelLifecycles } from '../platform/lifecycle-dates'
+import { refreshLifecycleDates } from '../platform/lifecycle-dates'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties'
 import { bool, count, findById, num, str } from '../platform/records'
 
 /** Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
 
-/** At or on the way to a customer Site, and not already coming back. */
-const SERVING: readonly Stage[] = ['shipped', 'pending_in_service', 'in_service', 'temporary_deployment']
 /** Healthy stock that can go straight back to the Lessor. */
 const IN_STOCK: readonly Stage[] = ['available', 'spare_pool']
 
@@ -52,17 +50,24 @@ export function reviewLeases(): void {
     }
 }
 
+/** Queue the transfer again for each bought-out lease that still has Assets. */
 function resumeBuyouts(): void {
-    const lease = new GlideRecord('x_daas_ham_lease_schedule')
-    lease.addQuery('end_action', 'buyout')
-    lease.query()
-    while (lease.next()) if (countAssets(lease.getUniqueValue()) > 0) fire(EVENT.leaseBuyout, lease, lease.getUniqueValue())
+    const ga = new GlideAggregate('alm_hardware')
+    ga.addEncodedQuery('x_daas_ham_lease.end_action=buyout')
+    ga.addAggregate('COUNT', '')
+    ga.groupBy('x_daas_ham_lease')
+    ga.query()
+    while (ga.next()) {
+        const lease = findById('x_daas_ham_lease_schedule', String(ga.getValue('x_daas_ham_lease') ?? ''))
+        if (lease) fire(EVENT.leaseBuyout, lease, lease.getUniqueValue())
+    }
 }
 
 /** Agreement end dates of the Assets a lease covers that are serving customers ('' = open-ended). */
 function serviceEnds(leaseId: string): string[] {
+    // One row per Agreement, its end read as a stored date (a grouped dot-walked date's format is undocumented).
     const ga = new GlideAggregate('alm_hardware')
-    ga.addEncodedQuery(stagesQuery(SERVING, `x_daas_ham_lease=${leaseId}`))
+    ga.addEncodedQuery(stagesQuery(SERVING_STAGES, `x_daas_ham_lease=${leaseId}`))
     ga.addAggregate('COUNT', '')
     ga.groupBy('x_daas_ham_agreement')
     ga.query()
@@ -95,7 +100,7 @@ function raiseDecision(lease: GlideRecord, mismatch: boolean): void {
     decision.setValue('lease_end', str(lease, 'ends'))
     decision.setValue('due_date', `${str(lease, 'ends')} 00:00:00`)
     decision.setValue('covered_assets', countAssets(lease.getUniqueValue()))
-    decision.setValue('deployed_assets', countAssets(lease.getUniqueValue(), SERVING))
+    decision.setValue('deployed_assets', countAssets(lease.getUniqueValue(), SERVING_STAGES))
     decision.setValue('mismatch', mismatch)
     decision.setValue('assignment_group', stringProperty(PROPERTY.leaseDecisionGroup))
     decision.setValue(
@@ -176,19 +181,12 @@ export function refreshLeaseAssets(event: GlideRecord, current: GlideRecord): vo
     const leaseId = str(event, 'parm1')
     // Never run with a blank lease: the query would match every Asset that has no lease.
     if (!leaseId) return
-    const lifecycles = modelLifecycles()
-    runEventTableJob({
+    refreshLifecycleDates({
         eventName: EVENT.leaseAssets,
         record: current,
         parm1: leaseId,
         cursor: str(event, 'parm2'),
-        table: 'alm_hardware',
-        query: stagesQuery(SERVING, `x_daas_ham_lease=${leaseId}`),
-        read: (asset) => asset.getUniqueValue(),
-        handle: (assetId) => {
-            const asset = new GlideRecord('alm_hardware')
-            if (asset.get(assetId) && applyLifecycleDates(asset, lifecycles)) asset.update()
-        },
+        query: stagesQuery(SERVING_STAGES, `x_daas_ham_lease=${leaseId}`),
     })
 }
 
@@ -217,8 +215,8 @@ export function transferLeaseAssets(event: GlideRecord, current: GlideRecord): v
         query: `x_daas_ham_lease=${leaseId}`,
         read: (asset) => asset.getUniqueValue(),
         handle: (assetId) => {
-            const asset = new GlideRecord('alm_hardware')
-            if (!asset.get(assetId) || str(asset, 'x_daas_ham_lease') !== leaseId) return
+            const asset = findById('alm_hardware', assetId)
+            if (!asset || str(asset, 'x_daas_ham_lease') !== leaseId) return
             asset.setValue('x_daas_ham_lease', '')
             asset.setValue('x_daas_ham_lessor', '')
             asset.setValue('x_daas_ham_legal_owner', 'provider')
@@ -249,14 +247,17 @@ export function warnRenewals(): void {
     warnExpiringCoverage(today)
 }
 
-/** One warning per Customer for covered, deployed Assets whose OEM coverage ends soon. */
+/**
+ * One warning per Customer for covered, deployed Assets whose OEM coverage ends soon; each contract is
+ * warned about once. Exactly the rows counted are marked (a daily job, at most 5000 contracts a run).
+ */
 function warnExpiringCoverage(today: string): void {
     const horizon = addDays(today, intProperty(PROPERTY.coverageWarningDays, 60))
     const coverage = new GlideRecord('x_daas_ham_oem_coverage')
-    coverage.addEncodedQuery(stagesQuery(SERVING, `covered=true^expiry_notified=false^end_date>=${today}^end_date<=${horizon}`, 'asset.'))
+    coverage.addEncodedQuery(stagesQuery(SERVING_STAGES, `covered=true^expiry_notified=false^end_date>=${today}^end_date<=${horizon}`, 'asset.'))
     coverage.setLimit(5000)
     coverage.query()
-    const rows: Array<{ customerId: string; endDate: string }> = []
+    const rows: ExpiringCoverage[] = []
     while (coverage.next()) {
         rows.push({ customerId: str(coverage, 'asset.company'), endDate: str(coverage, 'end_date') })
         coverage.setValue('expiry_notified', true)

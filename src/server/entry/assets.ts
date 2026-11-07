@@ -1,6 +1,6 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { toIsoDate } from '../domain/calendar'
-import { billingChange, checkTransition, stageOf } from '../domain/lifecycle'
+import { billingChange, checkTransition } from '../domain/lifecycle'
 import { readStage, transitionFacts } from '../platform/assets'
 import { glideToMs, todayIso } from '../platform/clock'
 import { recomputeLine } from '../platform/fulfilment'
@@ -17,7 +17,7 @@ import { ROLE } from '../domain/visibility'
  */
 export function enforceLifecycle(current: GlideRecord, previous: GlideRecord): void {
     if (!gs.isInteractive() || gs.hasRole(ROLE.admin)) return
-    const from = stageOf({ installStatus: str(previous, 'install_status'), substatus: str(previous, 'substatus') })
+    const from = readStage(previous)
     const to = readStage(current)
     if (to === null) {
         gs.addErrorMessage('This install status / substatus combination is not used by NaaS asset management')
@@ -39,15 +39,15 @@ export function onAllocatedAssetStageChange(current: GlideRecord): void {
 
 /**
  * After-update rule on alm_hardware stage changes: billing (the Service interval) starts when an Asset
- * enters service — from its in-service date on first go-live, else today (e.g. found after being
- * missing) — and stops the day it leaves service, whatever moved it (D52, ADR 0009).
+ * enters service and stops when it leaves, on the day billingChange gives (D52, ADR 0009).
  */
 export function onAssetServiceChange(current: GlideRecord, previous: GlideRecord): void {
-    const before = stageOf({ installStatus: str(previous, 'install_status'), substatus: str(previous, 'substatus') })
-    const change = billingChange(before, readStage(current))
-    if (change === 'stop') closeServiceIntervals(current.getUniqueValue(), todayIso())
-    if (change !== 'start') return
     const inService = glideToMs(str(current, 'x_daas_ham_in_service_date'))
-    const start = before === 'pending_in_service' && inService !== undefined ? toIsoDate(inService) : todayIso()
-    openServiceInterval(current, str(current, 'x_daas_ham_subscription_line'), start)
+    const change = billingChange(readStage(previous), readStage(current), {
+        inServiceDate: inService === undefined ? undefined : toIsoDate(inService),
+        today: todayIso(),
+    })
+    if (!change) return
+    if ('stop' in change) closeServiceIntervals(current.getUniqueValue(), change.stop)
+    else openServiceInterval(current, str(current, 'x_daas_ham_subscription_line'), change.start)
 }

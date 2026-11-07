@@ -2,10 +2,10 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord } from '@servicenow/glide'
 import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
-import { runEventTableJob, runTableJob } from '../platform/chunked'
+import { runTableJob } from '../platform/chunked'
 import { todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
-import { applyLifecycleDates, modelLifecycles } from '../platform/lifecycle-dates'
+import { refreshLifecycleDates } from '../platform/lifecycle-dates'
 import {
     learnFromResolution,
     loadNormalizationData,
@@ -67,19 +67,12 @@ export function onModelLifecycleChanged(current: GlideRecord): void {
 /** Script action on x_daas_ham.model.lifecycle (parm1 = model, parm2 = cursor). */
 export function refreshModelAssets(event: GlideRecord, current: GlideRecord): void {
     const modelId = str(event, 'parm1')
-    const lifecycles = modelLifecycles()
-    runEventTableJob({
+    refreshLifecycleDates({
         eventName: EVENT.lifecycleChanged,
         record: current,
         parm1: modelId,
         cursor: str(event, 'parm2'),
-        table: 'alm_hardware',
         query: `model=${modelId}^install_status!=7`,
-        read: (asset) => asset.getUniqueValue(),
-        handle: (assetId) => {
-            const asset = new GlideRecord('alm_hardware')
-            if (asset.get(assetId) && applyLifecycleDates(asset, lifecycles)) asset.update()
-        },
     })
 }
 
@@ -102,18 +95,11 @@ export function onAgreementTermsChanged(current: GlideRecord): void {
 /** Script action on x_daas_ham.agreement.terms (parm1 = agreement, parm2 = cursor). */
 export function refreshAgreementAssets(event: GlideRecord, current: GlideRecord): void {
     const agreementId = str(event, 'parm1')
-    const lifecycles = modelLifecycles()
-    runEventTableJob({
+    refreshLifecycleDates({
         eventName: EVENT.agreementTermsChanged,
         record: current,
         parm1: agreementId,
         cursor: str(event, 'parm2'),
-        table: 'alm_hardware',
         query: stagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}`),
-        read: (asset) => asset.getUniqueValue(),
-        handle: (assetId) => {
-            const asset = new GlideRecord('alm_hardware')
-            if (asset.get(assetId) && applyLifecycleDates(asset, lifecycles)) asset.update()
-        },
     })
 }

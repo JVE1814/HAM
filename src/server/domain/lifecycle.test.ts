@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { billingChange, checkTransition, fieldsOf, isBillable, isDeployed, stageOf, stagesQuery, type Stage, type TransitionFacts } from './lifecycle'
+import { billingChange, checkTransition, DEPLOYED_STAGES, fieldsOf, isBillable, isDeployed, SERVING_STAGES, stageOf, stagesQuery, type Stage, type TransitionFacts } from './lifecycle'
 
 const deployable: TransitionFacts = {
     hasSite: true,
@@ -123,18 +123,44 @@ describe('stagesQuery', () => {
             'asset.install_status=1^asset.substatusISEMPTY^covered=true^NQasset.install_status=6^asset.substatus=available^covered=true',
         )
     })
+})
 
-    it('starts billing on entering service and stops it on leaving, whatever the route', () => {
-        expect(billingChange('pending_in_service', 'in_service')).toBe('start')
-        expect(billingChange('missing', 'in_service')).toBe('start')
-        expect(billingChange('in_service', 'pending_return')).toBe('stop')
-        expect(billingChange('in_service', 'missing')).toBe('stop')
-        expect(billingChange('in_service', 'temporary_deployment')).toBeNull()
-        expect(billingChange('pending_return', 'pending_evaluation')).toBeNull()
+describe('serving and deployed stages', () => {
+    it('serves customers at or on the way to a site, and counts assets coming back as deployed too', () => {
+        expect(SERVING_STAGES).toEqual(['shipped', 'pending_in_service', 'in_service', 'temporary_deployment'])
+        expect(DEPLOYED_STAGES).toEqual([...SERVING_STAGES, 'pending_return'])
     })
+})
 
+describe('isBillable', () => {
     it('marks in-service and temporary assets as billable', () => {
         expect(['in_service', 'temporary_deployment', 'pending_return', 'shipped'].map((s) => isBillable(s as Stage))).toEqual([true, true, false, false])
         expect(isBillable(null)).toBe(false)
+    })
+})
+
+describe('billingChange', () => {
+    const dates = { inServiceDate: '2026-11-02', today: '2026-11-07' }
+
+    it('starts billing from the in-service date on first go-live', () => {
+        expect(billingChange('pending_in_service', 'in_service', dates)).toEqual({ start: '2026-11-02' })
+        expect(billingChange('pending_in_service', 'temporary_deployment', dates)).toEqual({ start: '2026-11-02' })
+    })
+
+    it('starts billing today when an asset comes back into service, or has no in-service date', () => {
+        expect(billingChange('missing', 'in_service', dates)).toEqual({ start: '2026-11-07' })
+        expect(billingChange('pending_in_service', 'in_service', { today: '2026-11-07' })).toEqual({ start: '2026-11-07' })
+    })
+
+    it('stops billing today on leaving service, whatever the route', () => {
+        expect(billingChange('in_service', 'pending_return', dates)).toEqual({ stop: '2026-11-07' })
+        expect(billingChange('temporary_deployment', 'missing', dates)).toEqual({ stop: '2026-11-07' })
+        expect(billingChange('in_service', null, dates)).toEqual({ stop: '2026-11-07' })
+    })
+
+    it('leaves billing alone when the asset stays in or out of service', () => {
+        expect(billingChange('in_service', 'temporary_deployment', dates)).toBeNull()
+        expect(billingChange('pending_return', 'pending_evaluation', dates)).toBeNull()
+        expect(billingChange(null, 'available', dates)).toBeNull()
     })
 })
