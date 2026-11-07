@@ -12,7 +12,7 @@ import { glideToIsoDate, glideToMs, nowMs, todayIso } from '../platform/clock'
 import { openFieldWork } from '../platform/field-work'
 import { openException, resolveExceptions } from '../platform/exceptions'
 import { intProperty, PROPERTY } from '../platform/properties'
-import { exists, num, refusal, str } from '../platform/records'
+import { bool, exists, num, refusal, str } from '../platform/records'
 import { installedAssetIds } from '../platform/returns'
 import { currentSession } from '../platform/session'
 
@@ -276,12 +276,14 @@ function listAttested(attestationId: string, assetIds: readonly string[]): strin
 
 /**
  * Close an attestation answered by the customer; assets reported missing become exceptions. Why it was not closed
- * ('' once closed): one still pending may not list every installed Asset (openAttestation), and one the platform
- * refuses to close stays open to submit again, which raises no exception twice (openException).
+ * ('' once closed): one still pending, or cancelled as one left pending is (openAttestation), may not list every
+ * installed Asset, and one the platform refuses to close stays open to submit again, which raises no exception twice
+ * (openException).
  */
 export function completeAttestation(attestation: GlideRecord): string {
     const number = str(attestation, 'number')
     if (num(attestation, 'state') === ATTESTATION_STATE.pending) return notClosed(number, 'it may not list every asset')
+    if (!bool(attestation, 'active')) return notClosed(number, 'it is closed')
     const item = new GlideRecord('x_daas_ham_attestation_item')
     item.addQuery('attestation', attestation.getUniqueValue())
     item.addQuery('response', 'missing')

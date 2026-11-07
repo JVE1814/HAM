@@ -60,12 +60,12 @@ const SEEN_LOCK_TRIES = 10
 
 /**
  * Run `see` on the Asset read afresh, holding its sighting lock `seen_asset_<sys_id>`: true once `see` applied the
- * sighting (or the Asset is gone), false when another sighting held the lock through every try or `see` saved nothing.
- * Two NMS batches, or a batch and the detection job, can see one Asset at once; each reading it before the other saved,
- * the later save would put back an older last_seen and in-service date, or move an Asset the other had put in service
- * (and since moved on) into service again. Taken before any other lock, by these entry points only: the go-live save's
- * rule takes the Asset's interval lock (platform/service-intervals), and a second take of a lock is refused. A lock
- * that cannot be taken throws (platform/locks); that error escapes.
+ * sighting (or the Asset is gone), false when another sighting held the lock through every try, or `see` found it lost
+ * before saving. Two NMS batches, or a batch and the detection job, can see one Asset at once; each reading it before
+ * the other saved, the later save would put back an older last_seen and in-service date, or move an Asset the other had
+ * put in service (and since moved on) into service again. Taken before any other lock, by these entry points only: the
+ * go-live save's rule takes the Asset's interval lock (platform/service-intervals), and a second take of a lock is
+ * refused. A lock that cannot be taken throws (platform/locks); that error escapes.
  */
 function underSeenLock(assetId: string, see: (lock: HeldLock, asset: GlideRecord) => boolean): boolean {
     // Set inside the lock.
