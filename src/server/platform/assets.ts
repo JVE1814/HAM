@@ -51,6 +51,23 @@ export function moveAndSave(asset: GlideRecord, to: Stage, context: string): boo
     return true
 }
 
+/**
+ * A new, unsaved hardware Asset of `modelId` in `stage`. Sets the fields the platform treats as
+ * mandatory on assets (model category, quantity), which GlideRecord inserts do not enforce.
+ */
+export function newAsset(modelId: string, stage: Stage): GlideRecord {
+    const asset = new GlideRecord('alm_hardware')
+    asset.initialize()
+    asset.setValue('model', modelId)
+    asset.setValue('quantity', 1)
+    const model = new GlideRecord('cmdb_model')
+    if (model.get(modelId)) asset.setValue('model_category', str(model, 'cmdb_model_category').split(',')[0])
+    const fields = fieldsOf(stage)
+    asset.setValue('install_status', fields.installStatus)
+    asset.setValue('substatus', fields.substatus ?? '')
+    return asset
+}
+
 /** The Asset with this serial number, Provider tag or Customer tag. */
 export function findAssetByIdentifier(identifier: string): GlideRecord | null {
     const code = identifier.trim()

@@ -2,8 +2,8 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideDateTime, GlideRecord } from '@servicenow/glide'
 import { normalizeSerial, validateAsnRows } from '../domain/asn'
-import { fieldsOf } from '../domain/lifecycle'
 import { parseLifecycleRow } from '../domain/model-lifecycle'
+import { newAsset } from '../platform/assets'
 import { loadNormalizationData, recordNormalizationException, resolveModel } from '../platform/normalization'
 import { PROPERTY, stringProperty } from '../platform/properties'
 import { str } from '../platform/records'
@@ -35,18 +35,13 @@ export function processAsnRow(current: GlideRecord): void {
         return finish(current, 'error', `PID ${raw.model} does not map to a model; see normalization exceptions`)
     }
 
-    const asset = new GlideRecord('alm_hardware')
-    asset.initialize()
+    const asset = newAsset(resolution.modelId, 'in_transit')
     asset.setValue('serial_number', serial)
-    asset.setValue('model', resolution.modelId)
     asset.setValue('po_number', str(current, 'po_number'))
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('x_daas_ham_legal_owner', 'provider')
     asset.setValue('x_daas_ham_customer_tag', str(current, 'customer_tag'))
     asset.setValue('x_daas_ham_staging_source', str(current, 'staging_source') === 'distributor' ? 'distributor' : 'in_house')
-    const inTransit = fieldsOf('in_transit')
-    asset.setValue('install_status', inTransit.installStatus)
-    asset.setValue('substatus', inTransit.substatus ?? '')
     const assetId = asset.insert()
     finish(current, assetId ? 'inserted' : 'error', assetId ? `Asset ${serial} in transit` : 'Asset insert failed')
 }

@@ -533,6 +533,10 @@ declare global {
                         table: 'sysauto_script'
                         id: '3cb429e59cd649dfa00e1baa560e354e'
                     }
+                    job_load_demo_data: {
+                        table: 'sysauto_script'
+                        id: 'db16ad71728f4485a57f7d1d6aa281b7'
+                    }
                     job_normalize_raw_models: {
                         table: 'sysauto_script'
                         id: '7a20295a2aae40e0a60fd3d470be780d'
@@ -848,6 +852,10 @@ declare global {
                     src_server_entry_delivery_ts: {
                         table: 'sys_module'
                         id: 'b52eda6b1d484aaa91c13d6057ea87bd'
+                    }
+                    'src_server_entry_demo-seed_ts': {
+                        table: 'sys_module'
+                        id: 'ddc90a1a74954336b44c9ffca19aaf48'
                     }
                     src_server_entry_imports_ts: {
                         table: 'sys_module'

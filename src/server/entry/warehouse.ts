@@ -3,9 +3,8 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { normalizeSerial } from '../domain/asn'
-import { fieldsOf } from '../domain/lifecycle'
 import { ROLE } from '../domain/visibility'
-import { findAssetByIdentifier, moveAndSave, moveAsset, readStage } from '../platform/assets'
+import { findAssetByIdentifier, moveAndSave, moveAsset, newAsset, readStage } from '../platform/assets'
 import { loadNormalizationData, resolveModel } from '../platform/normalization'
 import { PROPERTY, stringProperty } from '../platform/properties'
 import { str } from '../platform/records'
@@ -94,15 +93,10 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
 function createReceivedAsset(input: Record<string, string>): { asset: GlideRecord } | { error: string } {
     const resolution = resolveModel({ manufacturer: input.manufacturer ?? '', model: input.pid }, loadNormalizationData())
     if (!resolution.modelId) return { error: `PID ${input.pid} does not map to a model` }
-    const asset = new GlideRecord('alm_hardware')
-    asset.initialize()
+    const asset = newAsset(resolution.modelId, 'on_order')
     asset.setValue('serial_number', normalizeSerial(input.code))
-    asset.setValue('model', resolution.modelId)
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('x_daas_ham_legal_owner', 'provider')
-    const onOrder = fieldsOf('on_order')
-    asset.setValue('install_status', onOrder.installStatus)
-    asset.setValue('substatus', onOrder.substatus ?? '')
     asset.insert()
     return { asset }
 }
