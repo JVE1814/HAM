@@ -17,7 +17,7 @@ import { shortfallRoute } from '../domain/returns'
 import { planSourcing, shortfallOutcome, type Source, type UnmovedStock } from '../domain/sourcing'
 import { entitlementContext } from '../platform/agreements'
 import { approvalsOf, cancelPendingApprovals, customerAdminIds, providerApproverIds, requestApproval } from '../platform/approvals'
-import { moveAndSave, moveAsset, readStage } from '../platform/assets'
+import { moveAndSave, readStage } from '../platform/assets'
 import { EVENT, fire } from '../platform/events'
 import { recomputeLine, recomputeOrder } from '../platform/fulfilment'
 import { todayIso } from '../platform/clock'
@@ -27,7 +27,7 @@ import { PROPERTY, stagingStockroom, stringProperty } from '../platform/properti
 import { bool, count, findById, num, str } from '../platform/records'
 import { currentSession } from '../platform/session'
 import { openStagingTask } from '../platform/staging-tasks'
-import { reserveAsset, stockCandidates } from '../platform/stock'
+import { linkHotSpare, reserveAsset, stockCandidates } from '../platform/stock'
 import { requestTransfer } from '../platform/transfers'
 
 /*
@@ -260,6 +260,7 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
     const toTransfer = new Map<string, Array<{ asset: GlideRecord; source: Source }>>()
     let reserved = 0
     for (const pick of plan.picks) {
+        // A hot spare already at the customer site needs no staging or shipping: it is installed from where it is.
         if (pick.source === 'customer_site_stock') {
             if (linkHotSpare(pick.assetId, reservation)) reserved++
             continue
@@ -325,20 +326,6 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
 
 function countAllocated(lineId: string): number {
     return count('alm_hardware', `x_daas_ham_order_line=${lineId}`)
-}
-
-/**
- * A hot spare already at the customer site needs no staging or shipping; it is installed from where
- * it is. Stock in a customer-site stockroom is that Customer's spare pool by definition.
- */
-function linkHotSpare(assetId: string, reservation: { orderLineId: string; customerId: string; agreementId: string }): boolean {
-    const asset = findById('alm_hardware', assetId)
-    if (!asset || !moveAsset(asset, 'spare_pool').allowed) return false
-    asset.setValue('x_daas_ham_order_line', reservation.orderLineId)
-    asset.setValue('company', reservation.customerId)
-    asset.setValue('x_daas_ham_agreement', reservation.agreementId)
-    asset.update()
-    return true
 }
 
 /** Put back stock reserved for a line but never moved to staging: Spare-pool stock to the pool, the rest to free stock. */
