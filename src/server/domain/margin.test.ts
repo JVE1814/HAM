@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { monthBounds } from './billing'
-import { CostLedger, leaseShare, marginRows, serviceIntervalCosts, type AssetCostFacts, type LeaseTerms } from './margin'
+import { CostLedger, costFactKey, leaseShare, marginRows, serviceIntervalCosts, type AssetCostFacts, type LeaseTerms } from './margin'
 
 const november = monthBounds('2026-11')
 const wholeMonth = { start: '2026-01-15' }
 const provider: AssetCostFacts = { legalOwner: 'provider', purchaseCost: 6000, purchaseDate: '', inServiceDate: '', supportAnnual: 0, lease: null }
-const lease: LeaseTerms = { starts: '2024-02-01 00:00:00', ends: '2027-01-31 23:59:59', monthlyPayment: 180, coveredAssets: 2 }
+const lease: LeaseTerms = { starts: '2024-02-01 00:00:00', ends: '2027-01-31 23:59:59', monthlyPayment: 180, coveredAssets: 2, buyoutAssets: 0 }
 const lessor: AssetCostFacts = { ...provider, legalOwner: 'lessor', lease }
 
 function costs(asset: AssetCostFacts, interval: { start: string; end?: string } = wholeMonth, amortisationMonths = 60) {
@@ -54,6 +54,10 @@ describe('serviceIntervalCosts', () => {
         expect(costs({ ...lessor, lease: { ...lease, starts: '2026-12-01 00:00:00', ends: '' } })).toEqual([])
     })
 
+    it('keeps splitting the payment over the Assets covered at buyout while the transfer runs', () => {
+        expect(costs({ ...lessor, lease: { ...lease, coveredAssets: 1, buyoutAssets: 3 } })).toEqual([{ type: 'lease', amount: 60 }])
+    })
+
     it('charges no lease without covered Assets, a Lease schedule, or the Lessor as owner', () => {
         expect(costs({ ...lessor, lease: { ...lease, coveredAssets: 0 } })).toEqual([])
         expect(costs({ ...lessor, lease: null })).toEqual([])
@@ -86,8 +90,25 @@ describe('serviceIntervalCosts', () => {
 
 describe('leaseShare', () => {
     it('splits the monthly payment over the covered assets', () => {
-        expect(leaseShare(180, 2)).toBe(90)
-        expect(leaseShare(180, 0)).toBe(0)
+        expect(leaseShare({ monthlyPayment: 180, coveredAssets: 2, buyoutAssets: 0 })).toBe(90)
+        expect(leaseShare({ monthlyPayment: 180, coveredAssets: 0, buyoutAssets: 0 })).toBe(0)
+    })
+
+    it('splits over the Assets covered at buyout while fewer are left on the lease', () => {
+        expect(leaseShare({ monthlyPayment: 180, coveredAssets: 1, buyoutAssets: 3 })).toBe(60)
+        expect(leaseShare({ monthlyPayment: 180, coveredAssets: 0, buyoutAssets: 3 })).toBe(60)
+    })
+
+    it('splits over the Assets on the lease when there are more than at buyout', () => {
+        expect(leaseShare({ monthlyPayment: 180, coveredAssets: 4, buyoutAssets: 3 })).toBe(45)
+    })
+})
+
+describe('costFactKey', () => {
+    it('tells Cost facts apart by customer, site and type', () => {
+        const keys = [costFactKey('acme', 'hq', 'lease'), costFactKey('acme', 'hq', 'purchase'), costFactKey('acme', '', 'lease'), costFactKey('globex', 'hq', 'lease')]
+        expect(new Set(keys).size).toBe(4)
+        expect(costFactKey('acme', 'hq', 'lease')).toBe(costFactKey('acme', 'hq', 'lease'))
     })
 })
 
@@ -105,6 +126,15 @@ describe('CostLedger', () => {
             { customerId: 'acme', siteId: '', type: 'field_labour', amount: 250 },
         ])
         expect(ledger.drain()).toEqual([])
+    })
+
+    it('drains one entry per cost fact key', () => {
+        const ledger = new CostLedger()
+        ledger.add('acme', 'hq', 'purchase', 10)
+        ledger.add('acme', 'hq', 'purchase', 5)
+        ledger.add('acme', '', 'purchase', 1)
+        const keys = ledger.drain().map((entry) => costFactKey(entry.customerId, entry.siteId, entry.type))
+        expect(keys).toEqual([costFactKey('acme', 'hq', 'purchase'), costFactKey('acme', '', 'purchase')])
     })
 })
 

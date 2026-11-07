@@ -24,6 +24,8 @@ export const x_daas_ham_cost_fact = Table({
         }),
         amount: DecimalColumn({ label: 'Amount', mandatory: true }),
         currency: StringColumn({ label: 'Currency', maxLength: 3, default: 'EUR' }),
+        /** The margin computation pass that wrote the fact; the pass that completes keeps only its own. */
+        run: StringColumn({ label: 'Computation run', maxLength: 40, readOnly: true }),
     },
     index: [
         { name: 'x_daas_ham_cf_period', unique: false, element: 'billing_period' },

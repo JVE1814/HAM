@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupExpiringCoverage, leaseDecisionProblem, leaseMismatch, renewedEnd, withinLead } from './leases'
+import { boughtOutAsset, buyoutTerms, groupExpiringCoverage, leaseDecisionProblem, leaseMismatch, renewedEnd, withinLead } from './leases'
 
 describe('withinLead', () => {
     it('is due from lead days before the end date onwards', () => {
@@ -43,6 +43,32 @@ describe('leaseDecisionProblem', () => {
     it('accepts buyout and return as they are', () => {
         expect(leaseDecisionProblem({ decision: 'buyout', leaseEnd: '2027-06-30', newEndDate: '' })).toBeNull()
         expect(leaseDecisionProblem({ decision: 'return', leaseEnd: '2027-06-30', newEndDate: '' })).toBeNull()
+    })
+})
+
+describe('buyoutTerms', () => {
+    it('fixes how many Assets were covered and splits the buyout price over them', () => {
+        expect(buyoutTerms(9000, 3)).toEqual({ buyoutAssets: 3, buyoutShare: 3000 })
+    })
+
+    it('gives no share without a buyout price or covered Assets', () => {
+        expect(buyoutTerms(0, 3)).toEqual({ buyoutAssets: 3, buyoutShare: 0 })
+        expect(buyoutTerms(9000, 0)).toEqual({ buyoutAssets: 0, buyoutShare: 0 })
+    })
+})
+
+describe('boughtOutAsset', () => {
+    it('makes the Asset Provider-owned, off the lease, bought at its share on the buyout day', () => {
+        expect(boughtOutAsset(3000, '2026-11-07')).toEqual({
+            legalOwner: 'provider',
+            leaseId: '',
+            lessorId: '',
+            purchase: { cost: 3000, date: '2026-11-07' },
+        })
+    })
+
+    it('keeps the cost and purchase date without a buyout price', () => {
+        expect(boughtOutAsset(0, '2026-11-07')).toEqual({ legalOwner: 'provider', leaseId: '', lessorId: '' })
     })
 })
 

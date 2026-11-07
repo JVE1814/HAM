@@ -1,14 +1,14 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
-import { isMonth, monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing'
+import { monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing'
 import type { LegalOwner } from '../domain/lifecycle'
-import { cents, CostLedger, marginRows, serviceIntervalCosts, type Amount, type AssetCostFacts, type CostEntry, type LeaseTerms } from '../domain/margin'
+import { cents, CostLedger, costFactKey, marginRows, serviceIntervalCosts, type Amount, type AssetCostFacts, type CostEntry, type LeaseTerms } from '../domain/margin'
+import { memoized } from '../domain/memo'
 import { runEventTableJob } from '../platform/chunked'
 import { EVENT, fire } from '../platform/events'
 import { intProperty, PROPERTY } from '../platform/properties'
-import { count, findById, num, str } from '../platform/records'
-import { memoized } from '../domain/memo'
+import { count, findById, num, recordsById, str } from '../platform/records'
 
 /** Cost facts and Margin per Customer and Site, computed when a Billing period closes (P3.28). */
 
@@ -20,15 +20,14 @@ export function uiRecomputeMargin(current: GlideRecord): void {
 
 /**
  * Script action on x_daas_ham.margin.compute (parm1 = period): Asset costs over the month's service
- * intervals, then labour and margin. A fresh trigger supersedes a pass still in progress.
+ * intervals, then labour and margin. A fresh trigger supersedes a pass still in progress: each pass
+ * writes Cost facts under its own run, and the pass that completes keeps only its own.
  */
 export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     const periodId = str(event, 'parm1')
     const period = findById('x_daas_ham_billing_period', periodId)
     if (!period) return
-    const month = str(period, 'period')
-    if (!isMonth(month)) return void gs.error(`[x_daas_ham] Margin not computed: billing period ${periodId} has a malformed month '${month}'`)
-    const bounds = monthBounds(month)
+    const bounds = monthBounds(str(period, 'period'))
     const amortisationMonths = intProperty(PROPERTY.amortisationMonths, 60)
     const ledger = new CostLedger()
     const leases = memoized(leaseTermsOf)
@@ -53,11 +52,13 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
             const costs = serviceIntervalCosts(interval, { ...asset, lease: (asset.leaseId ? leases(asset.leaseId) : null) }, bounds, amortisationMonths)
             for (const cost of costs) ledger.add(interval.customerId, interval.siteId, cost.type, cost.amount)
         },
-        flush: () => writeCostFacts(periodId, ledger.drain()),
+        flush: (run) => writeCostFacts(periodId, run, ledger.drain()),
     })
     if (result.failed > 0) gs.error(`[x_daas_ham] Margin of ${str(period, 'period')}: ${result.failed} service interval(s) failed: ${result.lastError}`)
     if (!result.done) return
-    addFieldLabour(periodId, bounds)
+    // Keep only this pass's Cost facts: a superseded pass may have flushed a last batch after this one started.
+    deleteWhere('x_daas_ham_cost_fact', `billing_period=${periodId}^run!=${result.run}`)
+    addFieldLabour(periodId, result.run, bounds)
     writeMargin(periodId)
 }
 
@@ -88,23 +89,18 @@ const NO_ASSET: AssetFields = { legalOwner: '', purchaseCost: 0, purchaseDate: '
 
 /** The batch's intervals with their Assets' cost fields, read with one query. */
 function withAssets(intervals: readonly IntervalRow[]): Array<IntervalRow & { asset: AssetFields }> {
-    const ids = [...new Set(intervals.map((interval) => interval.assetId).filter(Boolean))]
-    const found = new Map<string, AssetFields>()
-    if (ids.length > 0) {
-        const asset = new GlideRecord('alm_hardware')
-        asset.addEncodedQuery(`sys_idIN${ids.join(',')}`)
-        asset.query()
-        while (asset.next()) {
-            found.set(asset.getUniqueValue(), {
-                legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner,
-                purchaseCost: num(asset, 'cost'),
-                purchaseDate: str(asset, 'purchase_date'),
-                inServiceDate: str(asset, 'x_daas_ham_in_service_date'),
-                supportAnnual: num(asset, 'x_daas_ham_support_cost'),
-                leaseId: str(asset, 'x_daas_ham_lease'),
-            })
-        }
-    }
+    const found = recordsById(
+        'alm_hardware',
+        intervals.map((interval) => interval.assetId),
+        (asset): AssetFields => ({
+            legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner,
+            purchaseCost: num(asset, 'cost'),
+            purchaseDate: str(asset, 'purchase_date'),
+            inServiceDate: str(asset, 'x_daas_ham_in_service_date'),
+            supportAnnual: num(asset, 'x_daas_ham_support_cost'),
+            leaseId: str(asset, 'x_daas_ham_lease'),
+        }),
+    )
     return intervals.map((interval) => ({ ...interval, asset: found.get(interval.assetId) ?? NO_ASSET }))
 }
 
@@ -115,28 +111,22 @@ function leaseTermsOf(leaseId: string): LeaseTerms | null {
         starts: str(lease, 'starts'),
         ends: str(lease, 'ends'),
         monthlyPayment: num(lease, 'monthly_payment'),
-        // While a buyout transfer runs, keep splitting over the Assets covered when it was decided.
-        coveredAssets: Math.max(count('alm_hardware', `x_daas_ham_lease=${leaseId}`), num(lease, 'buyout_assets')),
+        coveredAssets: count('alm_hardware', `x_daas_ham_lease=${leaseId}`),
+        buyoutAssets: num(lease, 'buyout_assets'),
     }
 }
 
-function costFactKey(customerId: string, siteId: string, type: string): string {
-    return `${customerId}|${siteId}|${type}`
-}
-
-/** Add amounts to the period's Cost facts (one per Customer, Site and type), reading the period's facts once. */
-function writeCostFacts(periodId: string, entries: readonly CostEntry[]): void {
+/**
+ * Add a batch's totals (at most one per Customer, Site and type, as CostLedger.drain gives them) to
+ * the Cost facts the pass `run` wrote for the period, reading the ones they add to with one query.
+ */
+function writeCostFacts(periodId: string, run: string, entries: readonly CostEntry[]): void {
     if (entries.length === 0) return
-    const pending = new Map<string, CostEntry>()
-    for (const entry of entries) {
-        const key = costFactKey(entry.customerId, entry.siteId, entry.type)
-        const amount = (pending.get(key)?.amount ?? 0) + entry.amount
-        pending.set(key, { ...entry, amount })
-    }
-    // Only the facts of the customers being written are read, not the whole period's.
-    const customers = [...new Set(entries.map((e) => e.customerId))]
+    const pending = new Map(entries.map((entry) => [costFactKey(entry.customerId, entry.siteId, entry.type), entry]))
+    const customers = [...new Set(entries.map((entry) => entry.customerId))]
+    const types = [...new Set(entries.map((entry) => entry.type))]
     const fact = new GlideRecord('x_daas_ham_cost_fact')
-    fact.addEncodedQuery(`billing_period=${periodId}^customerIN${customers.join(',')}`)
+    fact.addEncodedQuery(`billing_period=${periodId}^run=${run}^customerIN${customers.join(',')}^cost_typeIN${types.join(',')}`)
     fact.query()
     while (fact.next()) {
         const key = costFactKey(str(fact, 'customer'), str(fact, 'site'), str(fact, 'cost_type'))
@@ -150,6 +140,7 @@ function writeCostFacts(periodId: string, entries: readonly CostEntry[]): void {
         const added = new GlideRecord('x_daas_ham_cost_fact')
         added.initialize()
         added.setValue('billing_period', periodId)
+        added.setValue('run', run)
         added.setValue('customer', entry.customerId)
         added.setValue('site', entry.siteId)
         added.setValue('cost_type', entry.type)
@@ -158,13 +149,8 @@ function writeCostFacts(periodId: string, entries: readonly CostEntry[]): void {
     }
 }
 
-/**
- * Field work orders closed in the month: their labour cost, or the standard visit cost. Replaces the
- * period's labour facts, as writeMargin replaces its Margin rows, so a superseded pass finishing late
- * leaves nothing a fresh pass does not overwrite.
- */
-function addFieldLabour(periodId: string, bounds: MonthBounds): void {
-    deleteWhere('x_daas_ham_cost_fact', `billing_period=${periodId}^cost_type=field_labour`)
+/** Field work orders closed in the month, as Cost facts of the pass `run`: their labour cost, or the standard visit cost. */
+function addFieldLabour(periodId: string, run: string, bounds: MonthBounds): void {
     const visitCost = intProperty(PROPERTY.visitCost, 250)
     const ledger = new CostLedger()
     const workOrder = new GlideRecord('wm_order')
@@ -173,7 +159,7 @@ function addFieldLabour(periodId: string, bounds: MonthBounds): void {
     while (workOrder.next()) {
         ledger.add(str(workOrder, 'company'), str(workOrder, 'location'), 'field_labour', num(workOrder, 'x_daas_ham_labour_cost') || visitCost)
     }
-    writeCostFacts(periodId, ledger.drain())
+    writeCostFacts(periodId, run, ledger.drain())
 }
 
 /** The period's amounts in a table, summed per Customer and Site. */

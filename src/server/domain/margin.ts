@@ -15,6 +15,8 @@ export interface LeaseTerms {
     monthlyPayment: number
     /** Assets on the schedule today. */
     coveredAssets: number
+    /** Assets it covered when a buyout was decided (0 without one). */
+    buyoutAssets: number
 }
 
 /** What an Asset's costs are worked out from, as stored on it. */
@@ -45,8 +47,7 @@ export function serviceIntervalCosts(
     bounds: MonthBounds,
     amortisationMonths: number,
 ): Array<Pick<CostEntry, 'type' | 'amount'>> {
-    // A malformed period (no days) carries no cost rather than NaN.
-    const shareFrom = (from: string) => (bounds.days > 0 ? activeDays(bounds, from, interval.end) / bounds.days : 0)
+    const shareFrom = (from: string) => activeDays(bounds, from, interval.end) / bounds.days
     const share = shareFrom(interval.start)
     const costs: Array<Pick<CostEntry, 'type' | 'amount'>> = []
     const owner = asset.legalOwner || 'provider'
@@ -56,7 +57,7 @@ export function serviceIntervalCosts(
         costs.push({ type: 'purchase', amount: (asset.purchaseCost / amortisationMonths) * shareFrom(from) })
     }
     if (owner === 'lessor' && asset.lease && leaseRunsIn(asset.lease, bounds)) {
-        const monthly = leaseShare(asset.lease.monthlyPayment, asset.lease.coveredAssets)
+        const monthly = leaseShare(asset.lease)
         if (monthly > 0) costs.push({ type: 'lease', amount: monthly * share })
     }
     if (asset.supportAnnual > 0) costs.push({ type: 'oem_support', amount: (asset.supportAnnual / 12) * share })
@@ -73,9 +74,14 @@ function writtenOff(start: string, bounds: MonthBounds, amortisationMonths: numb
     return !!start && addMonths(start, amortisationMonths) <= bounds.first
 }
 
-/** A lease's monthly payment split evenly over the Assets it covers. */
-export function leaseShare(monthlyPayment: number, coveredAssets: number): number {
-    return coveredAssets > 0 ? monthlyPayment / coveredAssets : 0
+/**
+ * Each Asset's share of a lease's monthly payment: split evenly over the Assets it covers. While a
+ * buyout transfer runs, Assets leave the schedule one by one, so the payment keeps being split over
+ * the Assets it covered when the buyout was decided.
+ */
+export function leaseShare(lease: Pick<LeaseTerms, 'monthlyPayment' | 'coveredAssets' | 'buyoutAssets'>): number {
+    const assets = Math.max(lease.coveredAssets, lease.buyoutAssets)
+    return assets > 0 ? lease.monthlyPayment / assets : 0
 }
 
 /** Whether the lease (either end open) is payable in the month. */
@@ -95,22 +101,26 @@ function splitMarginKey(key: string): { customerId: string; siteId: string } {
     return { customerId, siteId }
 }
 
+/** Which Cost fact an amount belongs to: one per Customer, Site and cost type in a period. */
+export function costFactKey(customerId: string, siteId: string, type: string): string {
+    return `${marginKey(customerId, siteId)}|${type}`
+}
+
 /** Running totals of cost per Customer, Site and type, flushed to Cost facts in batches. */
 export class CostLedger {
-    private readonly totals = new Map<string, number>()
+    private readonly totals = new Map<string, CostEntry>()
 
     add(customerId: string, siteId: string, type: CostType, amount: number): void {
         if (!customerId || amount === 0) return
-        const key = `${marginKey(customerId, siteId)}|${type}`
-        this.totals.set(key, (this.totals.get(key) ?? 0) + amount)
+        const key = costFactKey(customerId, siteId, type)
+        const total = this.totals.get(key)
+        if (total) total.amount += amount
+        else this.totals.set(key, { customerId, siteId, type, amount })
     }
 
-    /** The totals so far, emptying the ledger. */
+    /** The totals so far, one per Customer, Site and type, emptying the ledger. */
     drain(): CostEntry[] {
-        const entries = [...this.totals].map(([key, amount]) => {
-            const [customerId, siteId, type] = key.split('|')
-            return { customerId, siteId, type: type as CostType, amount }
-        })
+        const entries = [...this.totals.values()]
         this.totals.clear()
         return entries
     }

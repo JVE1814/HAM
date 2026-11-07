@@ -3,6 +3,7 @@ import { runChunked, type ChunkedJobPorts, type ChunkedJobResult } from '../doma
 import { andEachClause } from '../domain/encoded-query'
 import { msToGlide, nowMs } from './clock'
 import { intProperty, PROPERTY } from './properties'
+import { str } from './records'
 
 /**
  * Run the chunked-job runner over a table, persisting the cursor in x_daas_ham_job_cursor (ADR 0007).
@@ -30,7 +31,7 @@ export type TableJob<T, R = T> = TableJobFields<T, R> & Prepare<T, R>
 export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
     const cursorRecord = loadCursorRecord(spec.job)
     return runOverTable(spec, {
-        loadCursor: () => String(cursorRecord.getValue('cursor') ?? ''),
+        loadCursor: () => str(cursorRecord, 'cursor'),
         saveCursor: (cursor, processed, done) => {
             cursorRecord.setValue('cursor', cursor)
             cursorRecord.setValue('last_run', msToGlide(nowMs()))
@@ -53,7 +54,7 @@ function startRun(job: string): string {
 }
 
 function isCurrentRun(job: string, token: string): boolean {
-    return String(loadCursorRecord(job).getValue('cursor') ?? '') === token
+    return str(loadCursorRecord(job), 'cursor') === token
 }
 
 function loadCursorRecord(job: string): GlideRecord {
@@ -73,8 +74,11 @@ interface EventJobFields {
     parm1: string
     /** The event's parm2 as received ('' on the first event of a pass). */
     cursor: string
-    /** Write out anything accumulated in memory before the next chunk can start. */
-    flush?: () => void
+    /**
+     * Write out anything accumulated in memory before the next chunk can start; `run` is the pass's
+     * token ('' without `supersede`), to tell what this pass wrote from what a superseded one did.
+     */
+    flush?: (run: string) => void
     /**
      * Make each fresh pass supersede one still running under `job`: `onStart` runs once at the start
      * of a pass, and chunks of a superseded pass stop without flushing or queueing more events.
@@ -82,39 +86,48 @@ interface EventJobFields {
     supersede?: { job: string; onStart(): void }
 }
 
+export interface EventTableJobResult extends ChunkedJobResult {
+    /** The pass's token: a new one for each pass when `supersede` is set, else ''. */
+    run: string
+}
+
 /**
  * The same runner driven by an event instead of a schedule: the cursor travels in the event's parm2
  * (with the pass token when `supersede` is set) and the event is queued again until the pass is
- * complete. A superseded chunk reports `done: false`.
+ * complete. A superseded chunk reports `done: false`, as does a last chunk whose pass is superseded
+ * while it flushes; a chunk superseded between its check and its flush still flushes, under its own
+ * pass's token.
  */
-export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): ChunkedJobResult {
-    const run = spec.supersede
+export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): EventTableJobResult {
+    const supersede = spec.supersede
     let token = ''
     let cursor = spec.cursor
-    if (run) {
+    if (supersede) {
         const separator = spec.cursor.indexOf(':')
         token = separator < 0 ? '' : spec.cursor.slice(0, separator)
         cursor = separator < 0 ? '' : spec.cursor.slice(separator + 1)
         if (!token) {
-            token = startRun(run.job)
-            run.onStart()
-        } else if (!isCurrentRun(run.job, token)) {
-            return { processed: 0, failed: 0, done: false, cursor, lastError: 'superseded' }
+            token = startRun(supersede.job)
+            supersede.onStart()
+        } else if (!isCurrentRun(supersede.job, token)) {
+            return { processed: 0, failed: 0, done: false, cursor, lastError: 'superseded', run: token }
         }
     }
     let superseded = false
     const result = runOverTable(spec, {
         loadCursor: () => cursor,
         saveCursor: (next, _processed, done) => {
-            if (run && !isCurrentRun(run.job, token)) {
+            if (supersede && !isCurrentRun(supersede.job, token)) {
                 superseded = true
                 return
             }
-            spec.flush?.()
-            if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, run ? `${token}:${next}` : next)
+            spec.flush?.(token)
+            if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, supersede ? `${token}:${next}` : next)
+            // Whatever completes the pass must not run once a fresh pass has started.
+            else if (supersede && !isCurrentRun(supersede.job, token)) superseded = true
         },
     })
-    return superseded ? { ...result, done: false, lastError: 'superseded' } : result
+    return superseded ? { ...result, done: false, lastError: 'superseded', run: token } : { ...result, run: token }
 }
 
 type TableSource<T, R> = Pick<TableJobFields<T, R>, 'table' | 'query' | 'read' | 'handle'> & { prepare?: (rows: readonly R[]) => T[] }
