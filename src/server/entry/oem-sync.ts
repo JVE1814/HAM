@@ -33,6 +33,11 @@ function report(job: string, errors: readonly string[]): void {
     for (const error of errors.slice(0, 20)) gs.warn(`[x_daas_ham] ${job}: ${error}`)
 }
 
+/** Why the platform refused to save `record`, for the log. */
+function refusal(record: GlideRecord): string {
+    return record.getLastErrorMessage() || 'the save was refused'
+}
+
 /** Daily: EoX milestones for canonical models of every vendor with a lifecycle API. */
 export function syncOemLifecycle(): void {
     for (const vendor of VENDORS) {
@@ -132,9 +137,11 @@ function syncCoverageBatch(vendor: OemVendor, route: CoverageRoute, staleBefore:
         const lastAsset = assetIds[assetIds.length - 1]
         for (const fact of disposition.facts) answers.push({ assetId: lastAsset, fact })
     }
-    applyCoverage(vendor, 'api', answered, answers, stamped)
-    // A batch with errors ends the vendor's run; a rate-limited vendor (maxKeysPerRun) gets one batch per run.
-    return result.errors.length === 0 && route.maxKeysPerRun === undefined
+    const refused = applyCoverage(vendor, 'api', answered, answers, stamped)
+    report(`coverage ${vendor}`, refused)
+    // A batch with errors ends the vendor's run, as does one with refused saves (its Assets, still stale, would come
+    // straight back); a rate-limited vendor (maxKeysPerRun) gets one batch per run.
+    return result.errors.length === 0 && refused.length === 0 && route.maxKeysPerRun === undefined
 }
 
 /** Stale Assets by normalized serial (a serial can be shared by duplicate records). */
@@ -152,23 +159,36 @@ function staleAssets(vendor: OemVendor, staleBefore: string, limit: number): Map
     return assets
 }
 
-/** Write the answers onto the answered serials' coverage (writeCoverage) and summarise it onto the Assets (refreshAssetCoverage), with one check time; shared by the API sync and the CSV import. */
-function applyCoverage(vendor: OemVendor, source: 'api' | 'csv', answered: ReadonlyMap<string, string>, answers: readonly CoverageAnswer[], stamped: readonly string[]): void {
+/**
+ * Write the answers onto the answered serials' coverage (writeCoverage) and summarise it onto the Assets
+ * (refreshAssetCoverage), with one check time; shared by the API sync and the CSV import. Returns the saves the
+ * platform refused: a serial whose coverage is refused leaves its Assets unsummarised and unchecked, so it is asked
+ * again rather than summarised from contracts that were not stored.
+ */
+function applyCoverage(vendor: OemVendor, source: 'api' | 'csv', answered: ReadonlyMap<string, string>, answers: readonly CoverageAnswer[], stamped: readonly string[]): string[] {
     const checkedAt = msToGlide(nowMs())
     const serials = [...new Set(answered.values())]
-    const contracts = writeCoverage(vendor, source, serials, answers, checkedAt)
-    refreshAssetCoverage(answered, coverageBySerial(serials, contracts, todayIso()), stamped, checkedAt)
+    const { contracts, refused } = writeCoverage(vendor, source, serials, answers, checkedAt)
+    const saved = new Map([...answered].filter(([, serial]) => !refused.has(serial)))
+    const unstamped = refreshAssetCoverage(saved, coverageBySerial(serials, contracts, todayIso()), stamped, checkedAt)
+    return [...[...refused].map(([serial, reason]) => `coverage of ${serial} not saved: ${reason}`), ...unstamped]
 }
 
 /**
  * Write the answered contracts of `serials` (normalised) onto their coverage records, found by serial and
  * contract number with one query (of duplicate stored records, the first found is updated) and created when
  * missing; answers for the same contract are set on its record one after the other and saved once. Returns
- * every stored contract of `serials` as it is after the write, which the Assets are summarised from.
+ * every stored contract of `serials` as it is after the write, which the Assets are summarised from, and why
+ * each serial with a refused save was refused.
  */
-function writeCoverage(vendor: OemVendor, source: 'api' | 'csv', serials: readonly string[], answers: readonly CoverageAnswer[], checkedAt: string): SerialCoverage[] {
+function writeCoverage(vendor: OemVendor, source: 'api' | 'csv', serials: readonly string[], answers: readonly CoverageAnswer[], checkedAt: string): CoverageWrite {
     const contracts: SerialCoverage[] = []
-    if (serials.length === 0) return contracts
+    const refused = new Map<string, string>()
+    if (serials.length === 0) return { contracts, refused }
+    const refuse = (coverage: GlideRecord) => {
+        const contract = str(coverage, 'contract_number')
+        refused.set(str(coverage, 'serial_number'), `contract ${contract}: ${refusal(coverage)}`)
+    }
     const pending = answersByContract(answers)
     const stored = new GlideRecord('x_daas_ham_oem_coverage')
     addAnyOf(stored, 'serial_number', serials)
@@ -179,7 +199,7 @@ function writeCoverage(vendor: OemVendor, source: 'api' | 'csv', serials: readon
         if (contractAnswers) {
             pending.delete(key)
             for (const answer of contractAnswers) setCoverage(stored, vendor, source, answer, checkedAt)
-            stored.update()
+            if (!stored.update()) refuse(stored)
         }
         contracts.push(contractOf(stored))
     }
@@ -188,8 +208,15 @@ function writeCoverage(vendor: OemVendor, source: 'api' | 'csv', serials: readon
         fresh.initialize()
         for (const answer of contractAnswers) setCoverage(fresh, vendor, source, answer, checkedAt)
         if (fresh.insert()) contracts.push(contractOf(fresh))
+        else refuse(fresh)
     }
-    return contracts
+    return { contracts, refused }
+}
+
+/** What writeCoverage stored: the contracts the Assets are summarised from, and why each refused serial was refused. */
+interface CoverageWrite {
+    contracts: SerialCoverage[]
+    refused: Map<string, string>
 }
 
 function contractOf(coverage: GlideRecord): SerialCoverage {
@@ -227,10 +254,12 @@ function setCoverage(coverage: GlideRecord, vendor: OemVendor, source: 'api' | '
 /**
  * Give each answered Asset (by sys_id, with its normalised serial) its serial's coverage, and stamp it and each
  * `stamped` Asset (the vendor answered with an error: its coverage is kept) checked, with one query for the Assets.
+ * Returns why each Asset the platform refused was refused (it stays unchecked, so it is asked again).
  */
-function refreshAssetCoverage(answered: ReadonlyMap<string, string>, coverageOf: ReadonlyMap<string, AssetCoverage>, stamped: readonly string[], checkedAt: string): void {
+function refreshAssetCoverage(answered: ReadonlyMap<string, string>, coverageOf: ReadonlyMap<string, AssetCoverage>, stamped: readonly string[], checkedAt: string): string[] {
+    const refused: string[] = []
     const ids = [...answered.keys(), ...stamped]
-    if (ids.length === 0) return
+    if (ids.length === 0) return refused
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery('sys_id', 'IN', ids.join(','))
     asset.query()
@@ -243,13 +272,15 @@ function refreshAssetCoverage(answered: ReadonlyMap<string, string>, coverageOf:
             asset.setValue('x_daas_ham_support_cost', coverage.supportCost)
         }
         asset.setValue('x_daas_ham_coverage_checked', checkedAt)
-        asset.update()
+        if (!asset.update()) refused.push(`${str(asset, 'serial_number')} not saved: ${refusal(asset)}`)
     }
+    return refused
 }
 
 /**
  * Hourly: status of open OEM RMAs for vendors with an RMA lookup API, at most 200 per vendor, least recently
- * synced (never synced) first. Every RMA asked is stamped synced, answered or not, so the whole set rotates.
+ * synced (never synced) first. Every RMA asked is stamped synced, answered or not, so the whole set rotates; one the
+ * platform refuses is logged, as it keeps its place at the front and would take a turn of the others unseen.
  */
 export function syncOemRmaStatus(): void {
     for (const vendor of VENDORS) {
@@ -273,6 +304,7 @@ export function syncOemRmaStatus(): void {
         report(`rma ${vendor}`, result.errors)
         const statusOf = new Map(result.facts.map((fact) => [fact.rmaNumber, fact.status]))
         const syncedAt = msToGlide(nowMs())
+        const refused: string[] = []
         const asked = new GlideRecord('x_daas_ham_oem_rma')
         asked.addQuery('sys_id', 'IN', ids.join(','))
         asked.query()
@@ -280,8 +312,9 @@ export function syncOemRmaStatus(): void {
             const status = statusOf.get(str(asked, 'rma_number'))
             if (status !== undefined) asked.setValue('status', status)
             asked.setValue('last_synced', syncedAt)
-            asked.update()
+            if (!asked.update()) refused.push(`${str(asked, 'rma_number')} not saved: ${refusal(asked)}`)
         }
+        report(`rma ${vendor}`, refused)
     }
 }
 
@@ -312,6 +345,9 @@ export function processCoverageRow(current: GlideRecord): void {
         startDate: start || undefined,
         endDate: end || undefined,
     }
-    applyCoverage(vendor, 'csv', new Map([[assetId, serial]]), [{ assetId, fact, annualCost: cost ? Number(cost) : undefined }], [])
+    const answer: CoverageAnswer = { assetId, fact, annualCost: cost ? Number(cost) : undefined }
+    const refused = applyCoverage(vendor, 'csv', new Map([[assetId, serial]]), [answer], [])
+    // Refused, the row is not imported: load it again once the cause is fixed.
+    if (refused.length > 0) return finish('error', refused.join('; '))
     finish('inserted', `Coverage for ${serial}`)
 }

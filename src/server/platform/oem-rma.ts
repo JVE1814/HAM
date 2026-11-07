@@ -1,10 +1,11 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { addDays } from '../domain/calendar'
 import { todayIso } from './clock'
 import { str } from './records'
 
 /** OEM RMA records (opening the RMA with the vendor is manual, ADR 0008). */
 
+/** Open an OEM RMA for an advance replacement: its sys_id, or '' (logged) when the platform refuses it. */
 export function openOemRma(input: { defectiveAsset: GlideRecord; orderLineId: string; caseId: string }): string {
     const rma = new GlideRecord('x_daas_ham_oem_rma')
     rma.initialize()
@@ -15,7 +16,11 @@ export function openOemRma(input: { defectiveAsset: GlideRecord; orderLineId: st
     rma.setValue('advance_replacement', true)
     rma.setValue('state', 'to_open')
     rma.setValue('ship_back_due', addDays(todayIso(), 10))
-    return rma.insert() ?? ''
+    const rmaId = rma.insert()
+    if (rmaId) return rmaId
+    const reason = rma.getLastErrorMessage() || 'insert refused'
+    gs.warn(`[x_daas_ham] No OEM RMA for ${str(input.defectiveAsset, 'serial_number')}: ${reason}`)
+    return ''
 }
 
 /** OEM advance replacements still expected for an Order line. */

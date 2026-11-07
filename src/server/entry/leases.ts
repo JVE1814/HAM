@@ -57,7 +57,10 @@ export function reviewLeases(): void {
         const mismatch = leaseMismatch(str(lease, 'ends'), serviceEnds(leaseId))
         if (mismatch !== bool(lease, 'mismatch')) {
             lease.setValue('mismatch', mismatch)
-            lease.update()
+            // Refused: tomorrow's review alerts again, which beats not alerting at all.
+            if (!lease.update()) {
+                gs.warn(`[x_daas_ham] Lease ${str(lease, 'number')} mismatch flag not saved: ${refusal(lease)}`)
+            }
             if (mismatch) fire(EVENT.leaseMismatch, lease, providerApproverIds('').join(','))
         }
         if (withinLead(str(lease, 'ends'), today, num(lease, 'decision_lead_days')) && !openDecision(leaseId)) raiseDecision(lease, mismatch)
@@ -155,7 +158,8 @@ export function uiApplyLeaseDecision(current: GlideRecord): void {
         lease.setValue('buyout_assets', covered)
         lease.setValue('buyout_share', evenShare(num(lease, 'buyout_price'), covered))
     }
-    lease.update()
+    // Refused: no transfer or return may act on a decision the lease does not record, and the decision stays open.
+    if (!lease.update()) return void gs.addErrorMessage(`Lease ${str(lease, 'number')} not saved: ${refusal(lease)}`)
     if (decision === 'buyout') {
         fire(EVENT.leaseBuyout, lease, lease.getUniqueValue())
         gs.addInfoMessage("The lease's assets become Provider-owned in the background")
@@ -167,16 +171,24 @@ export function uiApplyLeaseDecision(current: GlideRecord): void {
             const units = `${stock.refused} stock unit(s) of the lease`
             gs.addErrorMessage(`${units} could not go to pending wipe, so are not on the disposal; see the system log`)
         }
+        if (stock.unlisted > 0) {
+            const units = `${stock.unlisted} stock unit(s) of the lease went to pending wipe`
+            gs.addErrorMessage(`${units} but are on no disposal order; see the system log and add them to one by hand`)
+        }
         fire(EVENT.leaseAssets, lease, lease.getUniqueValue())
     }
     current.setValue('state', 3)
     current.update()
 }
 
-/** What a return did with the lease's stock: its draft disposal's number (null without one), and units not moved. */
+/** What a return did with the lease's stock. */
 interface StockReturn {
+    /** Its draft disposal's number; null without one. */
     disposal: string | null
+    /** Units not moved to pending wipe. */
     refused: number
+    /** Units at pending wipe but on no disposal: their line, or the disposal, was refused. */
+    unlisted: number
 }
 
 /**
@@ -185,15 +197,18 @@ interface StockReturn {
  * linked to an Order line is left to that line; once at a Site, its Refresh due date is the lease end like the rest.
  * Each unit is read again and moved only while still free, so one reserved since the query keeps its reservation. No
  * lock is taken: the return is saved first, and from then on sourcing and the top-up refuse the lease's units on their
- * own fresh read (domain/sourcing `isClaimable`).
+ * own fresh read (domain/sourcing `isClaimable`). A unit whose line, or the disposal itself, is refused stays at
+ * pending wipe on no disposal and is counted as unlisted, to be put on one by hand.
  */
 function disposeStockToLessor(lease: GlideRecord): StockReturn {
     const found = new GlideRecord('alm_hardware')
     const unclaimed = `x_daas_ham_lease=${lease.getUniqueValue()}^x_daas_ham_order_lineISEMPTY`
     found.addEncodedQuery(stagesQuery(IN_STOCK, unclaimed))
     found.query()
-    let order: GlideRecord | null = null
+    // Undefined until the first unit is withdrawn; null once refused, so it is not tried again for every unit.
+    let order: GlideRecord | null | undefined
     let refused = 0
+    let unlisted = 0
     while (found.next()) {
         const asset = findById('alm_hardware', found.getUniqueValue())
         if (!asset || !isFree(stockUnit(asset), IN_STOCK)) continue
@@ -201,14 +216,21 @@ function disposeStockToLessor(lease: GlideRecord): StockReturn {
             refused++
             continue
         }
-        if (!order) order = lessorDisposal(lease)
+        if (order === undefined) order = lessorDisposal(lease)
+        if (!order) {
+            unlisted++
+            continue
+        }
         const line = new GlideRecord('x_daas_ham_disposal_line')
         line.initialize()
         line.setValue('disposal_order', order.getUniqueValue())
         line.setValue('asset', asset.getUniqueValue())
-        line.insert()
+        if (line.insert()) continue
+        unlisted++
+        const serial = str(asset, 'serial_number')
+        gs.warn(`[x_daas_ham] Lease return: ${serial} left off ${str(order, 'number')}: ${refusal(line)}`)
     }
-    return { disposal: order ? str(order, 'number') : null, refused }
+    return { disposal: order ? str(order, 'number') : null, refused, unlisted }
 }
 
 /** Save the Asset through its stock-return moves (domain/leases `stockReturnMoves`); false when one is refused. */
@@ -222,7 +244,7 @@ function withdrawFromStock(asset: GlideRecord): boolean {
         }
         const verdict = moveAsset(asset, to)
         if (!verdict.allowed || !asset.update()) {
-            const reason = verdict.allowed ? asset.getLastErrorMessage() || 'the save was refused' : verdict.reason
+            const reason = verdict.allowed ? refusal(asset) : verdict.reason
             gs.warn(`[x_daas_ham] Lease return: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
             return false
         }
@@ -230,14 +252,16 @@ function withdrawFromStock(asset: GlideRecord): boolean {
     return moves.length > 0
 }
 
-function lessorDisposal(lease: GlideRecord): GlideRecord {
+/** A draft return-to-lessor disposal order for the lease's stock; null when the platform refuses it (logged). */
+function lessorDisposal(lease: GlideRecord): GlideRecord | null {
     const order = new GlideRecord('x_daas_ham_disposal_order')
     order.initialize()
     order.setValue('method', 'return_to_lessor')
     order.setValue('disposal_vendor', str(lease, 'lessor'))
     order.setValue('short_description', `Return stock to the lessor at the end of lease ${str(lease, 'number')}`)
-    order.insert()
-    return order
+    if (order.insert()) return order
+    gs.warn(`[x_daas_ham] Lease return: no disposal order for ${str(lease, 'number')}: ${refusal(order)}`)
+    return null
 }
 
 /** After-update rule on returned leases whose end date changed: their deployed Assets' Refresh due dates follow it. */
@@ -293,7 +317,10 @@ export function transferLeaseAssets(event: GlideRecord, current: GlideRecord): v
                 asset.setValue('cost', purchase.cost)
                 asset.setValue('purchase_date', purchase.date)
             }
-            asset.update()
+            if (asset.update()) return
+            // It stays the Lessor's until the daily review queues the transfer again; nothing else would say so.
+            const serial = str(asset, 'serial_number')
+            gs.warn(`[x_daas_ham] Buyout of ${str(current, 'number')}: ${serial} not transferred: ${refusal(asset)}`)
         },
     })
 }
@@ -309,7 +336,10 @@ export function warnRenewals(): void {
     while (agreement.next()) {
         if (!withinLead(str(agreement, 'ends'), today, num(agreement, 'renewal_lead_days'))) continue
         agreement.setValue('renewal_notified', true)
-        agreement.update()
+        // Refused: tomorrow's run warns again, which beats not warning at all.
+        if (!agreement.update()) {
+            gs.warn(`[x_daas_ham] Agreement ${str(agreement, 'number')} not marked warned: ${refusal(agreement)}`)
+        }
         fire(EVENT.agreementRenewal, agreement, providerApproverIds(str(agreement, 'account_manager')).join(','))
     }
     warnExpiringCoverage(today)
@@ -317,7 +347,8 @@ export function warnRenewals(): void {
 
 /**
  * One warning per Customer for covered, deployed Assets whose OEM coverage ends soon; each contract is
- * warned about once. Exactly the rows counted are marked (a daily job, at most 5000 contracts a run).
+ * warned about once. Exactly the rows counted are marked (a daily job, at most 5000 contracts a run); a row
+ * whose mark is refused is logged and counted again the next day, which beats not warning at all.
  */
 function warnExpiringCoverage(today: string): void {
     const horizon = addDays(today, intProperty(PROPERTY.coverageWarningDays, 60))
@@ -329,7 +360,10 @@ function warnExpiringCoverage(today: string): void {
     while (coverage.next()) {
         rows.push({ customerId: str(coverage, 'asset.company'), endDate: str(coverage, 'end_date') })
         coverage.setValue('expiry_notified', true)
-        coverage.update()
+        if (!coverage.update()) {
+            const contract = `${str(coverage, 'contract_number')} of ${str(coverage, 'serial_number')}`
+            gs.warn(`[x_daas_ham] Coverage ${contract} not marked warned: ${refusal(coverage)}`)
+        }
     }
     const recipients = providerApproverIds('').join(',')
     for (const [customerId, group] of groupExpiringCoverage(rows)) {
@@ -351,6 +385,12 @@ export function uiRenewAgreement(current: GlideRecord): void {
     current.setValue('ends', ends)
     current.setValue('renewal_notified', false)
     current.setValue('end_return_raised', false)
-    current.update()
+    // A refused form save (the platform says why) renewed nothing.
+    if (!current.update()) return
     gs.addInfoMessage(`Agreement renewed until ${ends}`)
+}
+
+/** Why the platform refused to save `record`, for the log. */
+function refusal(record: GlideRecord): string {
+    return record.getLastErrorMessage() || 'the save was refused'
 }

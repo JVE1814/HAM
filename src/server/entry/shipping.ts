@@ -161,7 +161,8 @@ export function uiMarkLabelVoided(current: GlideRecord): void {
     }
     current.setValue('status', 'voided')
     current.setValue('status_detail', `Voided with the carrier (marked by ${gs.getUserDisplayName()})`)
-    current.update()
+    // A refused form save (the platform says why) leaves the label open: the Return order is not told it is voided.
+    if (!current.update()) return
     const returnOrder = findById('x_daas_ham_return_order', str(current, 'return_order'))
     if (returnOrder) {
         returnOrder.setValue('work_notes', `Return label ${trackingNumber} voided with the carrier: do not ship on it.`)
@@ -172,7 +173,10 @@ export function uiMarkLabelVoided(current: GlideRecord): void {
 
 /**
  * POST /shipping/tracking: tracking webhook from the aggregator (no platform login), authenticated by
- * the X-NaaS-Webhook-Token header, or by ?token= when the header is absent.
+ * the X-NaaS-Webhook-Token header, or by ?token= when the header is absent. A Shipment or tracking event
+ * the platform refuses is answered 500, not as a success, so an aggregator that retries failed deliveries
+ * (EasyPost does) sends the update again; a retry is harmless, as the events already stored are skipped
+ * and a saved delivery is not noted twice.
  */
 export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIResponse): void {
     const token = webhookToken(request.getHeader(WEBHOOK_TOKEN_HEADER), queryParam(request, 'token'))
@@ -190,8 +194,13 @@ export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIRes
         const deliveredMs = Date.parse(update.deliveredAt ?? '')
         shipment.setValue('delivered_at', msToGlide(Number.isFinite(deliveredMs) ? deliveredMs : nowMs()))
     }
-    shipment.update()
-    recordEvents(shipment.getUniqueValue(), update.events)
+    if (!shipment.update()) {
+        // Nothing below runs on a status that was not saved: the retry does it.
+        const reason = shipment.getLastErrorMessage() || 'the save was refused'
+        gs.warn(`[x_daas_ham] Tracking update of ${update.trackingNumber} not saved: ${reason}`)
+        return reply(response, 500, { error: 'Shipment not saved; send the update again' })
+    }
+    const unrecorded = recordEvents(shipment.getUniqueValue(), update.trackingNumber, update.events)
 
     if (deliveredNow) {
         const order = findById('x_daas_ham_order', str(shipment, 'order'))
@@ -200,16 +209,20 @@ export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIRes
             order.update()
         }
     }
+    if (unrecorded > 0) {
+        return reply(response, 500, { error: `${unrecorded} tracking event(s) not recorded; send the update again` })
+    }
     reply(response, 200, { matched: true, status })
 }
 
-/** Add the tracking events not recorded yet (the aggregator resends the whole history). */
-function recordEvents(shipmentId: string, events: readonly TrackingEvent[]): void {
+/** Add the tracking events not stored yet (the aggregator resends the whole history); returns how many were refused. */
+function recordEvents(shipmentId: string, trackingNumber: string, events: readonly TrackingEvent[]): number {
     const known = new Set<string>()
     const existing = new GlideRecord('x_daas_ham_shipment_event')
     existing.addQuery('shipment', shipmentId)
     existing.query()
     while (existing.next()) known.add(trackingEventKey({ occurredAt: str(existing, 'occurred_at'), description: str(existing, 'description') }))
+    let refused = 0
     for (const event of newTrackingEvents(known, events)) {
         const record = new GlideRecord('x_daas_ham_shipment_event')
         record.initialize()
@@ -218,6 +231,10 @@ function recordEvents(shipmentId: string, events: readonly TrackingEvent[]): voi
         record.setValue('status', event.status)
         record.setValue('description', event.description)
         record.setValue('location', event.location)
-        record.insert()
+        if (record.insert()) continue
+        refused++
+        const reason = record.getLastErrorMessage() || 'insert refused'
+        gs.warn(`[x_daas_ham] Tracking event of ${trackingNumber} at ${event.occurredAt} not recorded: ${reason}`)
     }
+    return refused
 }

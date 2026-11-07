@@ -46,20 +46,26 @@ export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
             cursorRecord.setValue('last_run', msToGlide(nowMs()))
             cursorRecord.setValue('processed_total', processed)
             cursorRecord.setValue('last_status', done ? 'complete' : 'paused (time budget)')
-            cursorRecord.update()
+            if (cursorRecord.update()) return
+            // The next run starts again from the cursor last saved, and would do so unseen.
+            const reason = cursorRecord.getLastErrorMessage() || 'the save was refused'
+            gs.warn(`[x_daas_ham] ${spec.job}: cursor not saved, so the next run repeats this one: ${reason}`)
         },
     })
 }
 
-/** Start a new run of `job`, superseding any run still in progress; returns the run's token (its start time). */
+/**
+ * Start a new run of `job`, superseding any run still in progress; returns the run's token (its start time). Throws
+ * when the cursor is refused: that run could never be current, so its `onStart` must not clear anything for it.
+ */
 function startRun(job: string): string {
     const record = loadCursorRecord(job)
     const token = String(nowMs())
     record.setValue('cursor', token)
     record.setValue('last_run', msToGlide(nowMs()))
     record.setValue('last_status', 'running')
-    record.update()
-    return token
+    if (record.update()) return token
+    throw new Error(`job cursor ${job} not saved: ${record.getLastErrorMessage() || 'the save was refused'}`)
 }
 
 /** Mark the current run of `job` complete (a run still 'running' with an old last run has stalled). */
@@ -192,8 +198,10 @@ function recordStop(supersede: NonNullable<EventJobFields['supersede']>, token: 
         withLock(supersede.job, () => {
             if (isCurrentRun(supersede.job, token)) supersede.stopped?.(error)
         })
-    } catch {
-        // The original error is what the caller sees.
+    } catch (unrecorded) {
+        // The original error is what the caller sees; this one (e.g. a refused save in `stopped`) is only logged.
+        const reason = unrecorded instanceof Error ? unrecorded.message : String(unrecorded)
+        gs.warn(`[x_daas_ham] ${supersede.job}: why the pass stopped was not recorded: ${reason}`)
     }
 }
 

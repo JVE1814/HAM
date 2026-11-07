@@ -50,8 +50,9 @@ function computeMarginChunk(period: GlideRecord, cursor: string, current: GlideR
         supersede: {
             job: `margin_${periodId}`,
             onStart: () => {
-                clearPeriod(periodId)
+                // The status first: if the period refuses it, the pass stops before its Margin is cleared.
                 saveMarginStatus(period, 0, '')
+                clearPeriod(periodId)
             },
             complete: () => {
                 addFieldLabour(periodId, bounds)
@@ -97,12 +98,13 @@ function addMarginFailures(periodId: string, failed: number, lastError: string):
 /**
  * Save the margin pass's failure count and last error on its Billing period (0 and '' clear them). The
  * period is closed and locked; these fields are about Margin, not the bill, so the lock's rule is not run.
+ * A refused save throws (see checkSaved): a period whose count is not saved would read as complete.
  */
 function saveMarginStatus(period: GlideRecord, failed: number, error: string): void {
     period.setValue('margin_failed', failed)
     period.setValue('margin_error', error.slice(0, 255))
     period.setWorkflow(false)
-    period.update()
+    checkSaved(period.update(), period, 'Margin status')
 }
 
 /** Empty the period's Cost facts and Margin as a pass starts. */

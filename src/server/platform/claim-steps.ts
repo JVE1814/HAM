@@ -1,4 +1,4 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { dependentActions, dueStepsQuery, type ClaimAction, type ClaimOutcome, type ClaimStore, type ClaimTarget } from '../domain/oem/claims'
 import type { OemVendor } from '../domain/oem/types'
 import { num, pluck, recordsById, str } from './records'
@@ -74,7 +74,11 @@ function cloudAccount(key: string): string {
     return pluck('x_daas_ham_cloud_account', `customer=${customerId}^vendor=${vendor}^purpose=${action}`, 'account_id', 1)[0] ?? ''
 }
 
-/** Tick each step of a run done, or count its failed attempt (it is left for a person after the last one); one query for the run. */
+/**
+ * Tick each step of a run done, or count its failed attempt (it is left for a person after the last one); one query
+ * for the run. A step the platform refuses stays due, so the next run sends it again: that is logged, as nothing else
+ * would say why a claim repeats or a failing step is never left for a person.
+ */
 function settle(outcomes: readonly ClaimOutcome[]): void {
     if (outcomes.length === 0) return
     const byStep = new Map<string, ClaimOutcome>(outcomes.map((outcome) => [outcome.stepId, outcome]))
@@ -92,6 +96,9 @@ function settle(outcomes: readonly ClaimOutcome[]): void {
             step.setValue('automation_status', 'failed')
             step.setValue('attempts', num(step, 'attempts') + 1)
         }
-        step.update()
+        if (step.update()) continue
+        const reason = step.getLastErrorMessage() || 'the save was refused'
+        const which = `"${str(step, 'label')}" of ${step.getDisplayValue('staging_task')}`
+        gs.warn(`[x_daas_ham] OEM claim step ${which} not saved as ${outcome.ok ? 'done' : 'failed'}: ${reason}`)
     }
 }

@@ -37,7 +37,9 @@ export function openMonthlyBillingPeriod(): void {
     period.initialize()
     period.setValue('period', month)
     period.setValue('status', 'generating')
-    period.insert()
+    if (period.insert()) return
+    // No later run opens this month, so a refused one would go unbilled unseen.
+    gs.error(`[x_daas_ham] Billing period ${month} not opened: ${refusal(period)}; create it by hand`)
 }
 
 /** After insert rule on billing periods still generating (the monthly job's or one made by hand): generate it. */
@@ -85,6 +87,13 @@ function generateChunk(period: GlideRecord, cursor: string, current: GlideRecord
             currency: str(line, 'currency') || 'EUR',
         }),
         prepare: (lines: readonly LineRow[]) => withIntervals(lines, bounds),
+        // Before the next chunk is queued: a line that could not be billed must not vanish from the bill, so a count
+        // the period refuses stops the generation (held for review) instead of letting it finish as clean.
+        flush: (failures) => {
+            if (failures.failed === 0) return
+            addFailedLines(period, failures.failed, failures.lastError)
+            if (!period.update()) throw new Error(`${failures.failed} failed line(s) not counted: ${refusal(period)}`)
+        },
         handle: (line, lineId) => {
             for (const charge of subscriptionCharges(line.terms, bounds, { intervals: line.intervals, siteName })) {
                 insertLine(period, {
@@ -102,11 +111,6 @@ function generateChunk(period: GlideRecord, cursor: string, current: GlideRecord
             }
         },
     })
-    if (result.failed > 0) {
-        // A line that could not be billed must not vanish from the bill.
-        addFailedLines(period, result.failed, result.lastError)
-        period.update()
-    }
     if (result.done) finishGeneration(period, bounds)
 }
 
@@ -120,7 +124,10 @@ function stopGeneration(period: GlideRecord, error: string): void {
     // A Regenerate keeps the previous totals until the end, so a held period must not show them against its new lines.
     setTotals(period)
     period.setValue('status', 'ready')
-    period.update()
+    // Refused, it stays generating with no chunk queued, which Close and Regenerate refuse: say why.
+    if (!period.update()) {
+        gs.error(`[x_daas_ham] Billing period ${str(period, 'period')} not held for review: ${refusal(period)}`)
+    }
 }
 
 /** A Site's name ('' without a Site); a generation chunk reads each once. */
@@ -177,6 +184,11 @@ function intervalsByLine(lineIds: readonly string[], bounds: MonthBounds): Map<s
     return byLine
 }
 
+/** Why the platform refused to save `record`, for the log and the period's last error. */
+function refusal(record: GlideRecord): string {
+    return record.getLastErrorMessage() || 'the save was refused'
+}
+
 /** Insert a Billing line; throws when the platform refuses it, so the line counts as failed instead of vanishing. */
 function insertLine(period: GlideRecord, values: { [field: string]: string | number }): void {
     const line = new GlideRecord('x_daas_ham_billing_line')
@@ -222,13 +234,19 @@ function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
             continue
         }
         fee.setValue('billing_period', period.getUniqueValue())
-        fee.update()
+        if (fee.update()) continue
+        // Unlinked, Close would not mark it billed and a later month would bill it again: Regenerate links it.
+        failed++
+        lastError = `${fee.getUniqueValue()}: fee not linked to the period: ${refusal(fee)}`
     }
     if (failed > 0) addFailedLines(period, failed, lastError)
     setTotals(period)
     period.setValue('generated_at', msToGlide(nowMs()))
     period.setValue('status', 'ready')
-    period.update()
+    // Refused, it stays generating, which Close and Regenerate refuse: say why.
+    if (!period.update()) {
+        gs.error(`[x_daas_ham] Billing period ${str(period, 'period')} not saved as ready: ${refusal(period)}`)
+    }
 }
 
 /** Line count and total of the period (does not save). */
@@ -281,23 +299,24 @@ function unlinkFees(encodedQuery: string): number {
 /** UI action "Regenerate" on a period ready for review: rebuild its lines from current data. */
 export function uiRegenerateBillingPeriod(current: GlideRecord): void {
     if (str(current, 'status') !== 'ready') return void gs.addErrorMessage('Only a period ready for review can be regenerated')
-    // Without business rules: the period is ready, not closed, so the closed-line guard has nothing to stop.
+    current.setValue('status', 'generating')
+    current.setValue('failed_lines', 0)
+    current.setValue('last_error', '')
+    // Saved first: a refused form save (the platform says why) keeps the period ready with its lines, not without them.
+    if (!current.update()) return
+    // Without business rules: the period is generating, not closed, so the closed-line guard has nothing to stop.
     const lines = new GlideRecord('x_daas_ham_billing_line')
     lines.addQuery('billing_period', current.getUniqueValue())
     lines.setWorkflow(false)
     lines.deleteMultiple()
     // The period's open fees stay linked to it: the generation bills them again (finishGeneration).
-    current.setValue('status', 'generating')
-    current.setValue('failed_lines', 0)
-    current.setValue('last_error', '')
-    current.update()
     fire(EVENT.billingGenerate, current, current.getUniqueValue())
     gs.addInfoMessage(`Regenerating ${str(current, 'period')}`)
 }
 
 const CSV_HEADER = ['period', 'kind', 'customer', 'agreement', 'subscription_line', 'site', 'description', 'units', 'monthly_rate', 'amount', 'currency']
 
-/** UI action "Close period": mark its fees billed, lock it, then export its CSV and compute its margin in the background. */
+/** UI action "Close period": lock it, mark its fees billed, then export its CSV and compute its margin in the background. */
 export function uiCloseBillingPeriod(current: GlideRecord): void {
     if (str(current, 'status') !== 'ready') return void gs.addErrorMessage('Only a period ready for review can be closed')
     const failed = num(current, 'failed_lines')
@@ -311,15 +330,16 @@ export function uiCloseBillingPeriod(current: GlideRecord): void {
     if (stuck > 0) return void gs.addErrorMessage(`${stuck} waived fee(s) could not leave ${str(current, 'period')}; check them and Close again`)
     // Always: finance may have adjusted lines during review, and the locked total must match the locked lines.
     setTotals(current)
+    current.setValue('status', 'closed')
+    current.setValue('closed_at', msToGlide(nowMs()))
+    current.setValue('closed_by', gs.getUserID())
+    // Closed first: a refused form save (the platform says why) leaves its fees open, so a Regenerate still bills them.
+    if (!current.update()) return
     const fees = new GlideRecord('x_daas_ham_fee_event')
     fees.addQuery('billing_period', current.getUniqueValue())
     fees.addQuery('status', 'open')
     fees.setValue('status', 'billed')
     fees.updateMultiple()
-    current.setValue('status', 'closed')
-    current.setValue('closed_at', msToGlide(nowMs()))
-    current.setValue('closed_by', gs.getUserID())
-    current.update()
     fire(EVENT.billingExport, current, current.getUniqueValue())
     fire(EVENT.marginCompute, current, current.getUniqueValue())
     gs.addInfoMessage(`${str(current, 'period')} closed and locked; the CSV export and margin are being prepared`)
