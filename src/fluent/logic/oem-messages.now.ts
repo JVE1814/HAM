@@ -57,6 +57,19 @@ RestMessage({
                 { $id: Now.ID['rm_meraki_key'], name: 'api_key' },
             ],
         },
+        {
+            name: 'claim_inventory',
+            httpMethod: 'POST',
+            endpoint: 'https://api.meraki.com/api/v1/organizations/${org_id}/inventory/claim',
+            headers: [
+                { $id: Now.ID['rm_meraki_claim_auth'], name: 'Authorization', value: 'Bearer ${api_key}' },
+                { $id: Now.ID['rm_meraki_claim_ct'], name: 'Content-Type', value: 'application/json' },
+            ],
+            variables: [
+                { $id: Now.ID['rm_meraki_claim_org'], name: 'org_id' },
+                { $id: Now.ID['rm_meraki_claim_key'], name: 'api_key' },
+            ],
+        },
     ],
 })
 
@@ -77,6 +90,11 @@ RestMessage({
             endpoint: 'https://support.fortinet.com/ES/api/registration/v3/products/list',
             content: '{ "serialNumber": "${serial}" }',
             variables: [{ $id: Now.ID['rm_forti_serial'], name: 'serial' }],
+        },
+        {
+            name: 'register_products',
+            httpMethod: 'POST',
+            endpoint: 'https://support.fortinet.com/ES/api/registration/v3/products/register',
         },
     ],
 })
@@ -109,6 +127,92 @@ RestMessage({
                 { $id: Now.ID['rm_mist_serial'], name: 'serial' },
                 { $id: Now.ID['rm_mist_token_s'], name: 'api_token' },
             ],
+        },
+        {
+            name: 'claim_inventory',
+            httpMethod: 'POST',
+            endpoint: 'https://api.mist.com/api/v1/orgs/${org_id}/inventory',
+            headers: [
+                { $id: Now.ID['rm_mist_claim_auth'], name: 'Authorization', value: 'Token ${api_token}' },
+                { $id: Now.ID['rm_mist_claim_ct'], name: 'Content-Type', value: 'application/json' },
+            ],
+            variables: [
+                { $id: Now.ID['rm_mist_claim_org'], name: 'org_id' },
+                { $id: Now.ID['rm_mist_claim_token'], name: 'api_token' },
+            ],
+        },
+    ],
+})
+
+/*
+ * Claim and provisioning (P3.27). GreenLake and FortiZTP authenticate with an OAuth 2.0 profile
+ * attached on the instance; Check Point Zero Touch takes the key in x_daas_ham.checkpoint.api_key.
+ * The Check Point endpoint is the one to confirm against the tenant's Zero Touch API documentation.
+ */
+
+RestMessage({
+    $id: Now.ID['rm_greenlake'],
+    name: 'NaaS HPE GreenLake',
+    endpoint: 'https://global.api.greenlake.hpe.com',
+    description: 'HPE GreenLake platform: add network devices to the workspace and assign subscriptions.',
+    authenticationType: 'oauth2',
+    headers: [
+        { $id: Now.ID['rm_greenlake_accept'], name: 'Accept', value: 'application/json' },
+        { $id: Now.ID['rm_greenlake_ct'], name: 'Content-Type', value: 'application/json' },
+    ],
+    functions: [
+        { name: 'add_devices', httpMethod: 'POST', endpoint: 'https://global.api.greenlake.hpe.com/devices/v1/devices' },
+        {
+            name: 'find_device',
+            httpMethod: 'GET',
+            endpoint: "https://global.api.greenlake.hpe.com/devices/v1/devices?filter=serialNumber eq '${serial}'",
+            variables: [{ $id: Now.ID['rm_greenlake_serial'], name: 'serial' }],
+        },
+        {
+            name: 'assign_subscription',
+            httpMethod: 'PATCH',
+            endpoint: 'https://global.api.greenlake.hpe.com/devices/v1/devices?id=${device_id}',
+            variables: [{ $id: Now.ID['rm_greenlake_device'], name: 'device_id' }],
+        },
+    ],
+})
+
+RestMessage({
+    $id: Now.ID['rm_fortiztp'],
+    name: 'NaaS FortiZTP',
+    endpoint: 'https://fortiztp.forticloud.com/public/api/v1',
+    description: 'FortiZTP: provision registered FortiGates to the customer FortiManager.',
+    authenticationType: 'oauth2',
+    headers: [
+        { $id: Now.ID['rm_fortiztp_accept'], name: 'Accept', value: 'application/json' },
+        { $id: Now.ID['rm_fortiztp_ct'], name: 'Content-Type', value: 'application/json' },
+    ],
+    functions: [
+        {
+            name: 'provision_device',
+            httpMethod: 'PUT',
+            endpoint: 'https://fortiztp.forticloud.com/public/api/v1/devices/${serial}',
+            variables: [{ $id: Now.ID['rm_fortiztp_serial'], name: 'serial' }],
+        },
+    ],
+})
+
+RestMessage({
+    $id: Now.ID['rm_checkpoint_zt'],
+    name: 'NaaS Check Point Zero Touch',
+    endpoint: 'https://zerotouch.checkpoint.com/api/v1',
+    description: 'Check Point Zero Touch: assign Quantum Spark gateways to a customer template.',
+    headers: [
+        { $id: Now.ID['rm_checkpoint_accept'], name: 'Accept', value: 'application/json' },
+        { $id: Now.ID['rm_checkpoint_ct'], name: 'Content-Type', value: 'application/json' },
+    ],
+    functions: [
+        {
+            name: 'assign_gateway',
+            httpMethod: 'POST',
+            endpoint: 'https://zerotouch.checkpoint.com/api/v1/gateways',
+            headers: [{ $id: Now.ID['rm_checkpoint_key_header'], name: 'X-API-Key', value: '${api_key}' }],
+            variables: [{ $id: Now.ID['rm_checkpoint_key'], name: 'api_key' }],
         },
     ],
 })

@@ -107,6 +107,15 @@ export const naasListMenu = UxListMenuConfig({
                     applicabilities: [{ $id: Now.ID['ws_staging_mine_aud'], applicability: staffAudience }],
                 },
                 {
+                    $id: Now.ID['ws_claims_failed'],
+                    title: 'OEM claims to do by hand',
+                    order: 85,
+                    table: 'x_daas_ham_staging_step',
+                    condition: 'automation_status=failed^done=false^staging_task.active=true^ORDERBYDESCsys_updated_on^EQ',
+                    columns: 'staging_task,label,automation,automation_message,attempts',
+                    applicabilities: [{ $id: Now.ID['ws_claims_failed_aud'], applicability: staffAudience }],
+                },
+                {
                     $id: Now.ID['ws_shipments_open'],
                     title: 'Shipments under way',
                     order: 90,
@@ -541,6 +550,15 @@ export const naasListMenu = UxListMenuConfig({
             title: 'Administration',
             order: 90,
             lists: [
+                {
+                    $id: Now.ID['ws_cloud_accounts'],
+                    title: 'OEM cloud accounts',
+                    order: 5,
+                    table: 'x_daas_ham_cloud_account',
+                    condition: 'ORDERBYcustomer^EQ',
+                    columns: 'customer,vendor,purpose,account_id',
+                    applicabilities: [{ $id: Now.ID['ws_cloud_accounts_aud'], applicability: staffAudience }],
+                },
                 {
                     $id: Now.ID['ws_admin_jobs'],
                     title: 'Background job cursors',

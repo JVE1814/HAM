@@ -38,3 +38,20 @@ export const shipment_form = Form({
         },
     ],
 })
+
+export const cloud_account_form = Form({
+    table: 'x_daas_ham_cloud_account',
+    view: default_view,
+    sections: [
+        {
+            caption: 'OEM cloud account',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'customer', type: 'table_field' }, { field: 'vendor', type: 'table_field' }],
+                    rightElements: [{ field: 'purpose', type: 'table_field' }, { field: 'account_id', type: 'table_field' }],
+                },
+            ],
+        },
+    ],
+})

@@ -25,6 +25,7 @@ export const PROPERTY = {
     shippingServiceCode: 'x_daas_ham.shipping.service_code',
     shippingPackageKg: 'x_daas_ham.shipping.package_kg',
     shippingSenderName: 'x_daas_ham.shipping.sender_name',
+    claimMaxCalls: 'x_daas_ham.oem.claim.max_calls',
 } as const
 
 export function intProperty(name: string, fallback: number): number {

@@ -132,6 +132,16 @@ export const staging_step_form = Form({
                 },
             ],
         },
+        {
+            caption: 'OEM cloud',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'automation', type: 'table_field' }, { field: 'automation_status', type: 'table_field' }],
+                    rightElements: [{ field: 'automation_message', type: 'table_field' }, { field: 'attempts', type: 'table_field' }],
+                },
+            ],
+        },
     ],
 })
 
@@ -170,7 +180,7 @@ export const staging_tmpl_item_form = Form({
             content: [
                 {
                     layout: 'one-column',
-                    elements: [{ field: 'template', type: 'table_field' }, { field: 'label', type: 'table_field' }, { field: 'order', type: 'table_field' }, { field: 'mandatory', type: 'table_field' }],
+                    elements: [{ field: 'template', type: 'table_field' }, { field: 'label', type: 'table_field' }, { field: 'order', type: 'table_field' }, { field: 'mandatory', type: 'table_field' }, { field: 'automation', type: 'table_field' }],
                 },
             ],
         },
@@ -476,11 +486,11 @@ List({ table: 'x_daas_ham_order_line', view: default_view, columns: ['number', '
 
 List({ table: 'x_daas_ham_staging_task', view: default_view, columns: ['number', 'asset', 'staging_source', 'template', 'assigned_to', 'state', 'result'] })
 
-List({ table: 'x_daas_ham_staging_step', view: default_view, columns: ['order', 'label', 'mandatory', 'done', 'done_by', 'done_at'] })
+List({ table: 'x_daas_ham_staging_step', view: default_view, columns: ['order', 'label', 'mandatory', 'done', 'automation', 'automation_status', 'automation_message', 'done_by', 'done_at'] })
 
 List({ table: 'x_daas_ham_staging_template', view: default_view, columns: ['name', 'staging_source', 'customer', 'manufacturer', 'device_class', 'active'] })
 
-List({ table: 'x_daas_ham_staging_tmpl_item', view: default_view, columns: ['template', 'order', 'label', 'mandatory'] })
+List({ table: 'x_daas_ham_staging_tmpl_item', view: default_view, columns: ['template', 'order', 'label', 'mandatory', 'automation'] })
 
 List({ table: 'x_daas_ham_agreement', view: default_view, columns: ['number', 'customer', 'account_manager', 'state', 'starts', 'ends', 'replacement_tier', 'refresh_cycle_months'] })
 

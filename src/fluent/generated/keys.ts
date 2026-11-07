@@ -185,6 +185,22 @@ declare global {
                         table: 'sys_security_acl'
                         id: 'fc94cf5a6d08480daff8b29c90da210e'
                     }
+                    acl_cloud_account_create: {
+                        table: 'sys_security_acl'
+                        id: '6a03858cd6fe4d1da282222f5685c909'
+                    }
+                    acl_cloud_account_delete: {
+                        table: 'sys_security_acl'
+                        id: '77bf13bb1d9e4b1ea58b7b7212fecd35'
+                    }
+                    acl_cloud_account_read: {
+                        table: 'sys_security_acl'
+                        id: 'd7cdb2c007e3407a86fa1f66580fd149'
+                    }
+                    acl_cloud_account_write: {
+                        table: 'sys_security_acl'
+                        id: '83785ce4949c4c2f9d11c742b09b1a6a'
+                    }
                     acl_cost_fact_create: {
                         table: 'sys_security_acl'
                         id: '1a6406f198fa4328a8091cad89478640'
@@ -1325,6 +1341,10 @@ declare global {
                         table: 'sysauto_script'
                         id: '7a20295a2aae40e0a60fd3d470be780d'
                     }
+                    job_oem_claims: {
+                        table: 'sysauto_script'
+                        id: 'ab76636225044a968902a40a47173ed2'
+                    }
                     job_oem_coverage: {
                         table: 'sysauto_script'
                         id: '8d67d3f57cb34d2ca490a7aa0e7f583a'
@@ -1593,6 +1613,34 @@ declare global {
                         table: 'sys_module'
                         id: '868b3cfa23784eeca9561f3bf685c420'
                     }
+                    prop_checkpoint_key: {
+                        table: 'sys_properties'
+                        id: '3a97d483d6c04f7c9ba40e4ded5469ab'
+                    }
+                    prop_claim_aruba: {
+                        table: 'sys_properties'
+                        id: '34f62e884281428cbf7958d145ba2e28'
+                    }
+                    prop_claim_checkpoint: {
+                        table: 'sys_properties'
+                        id: '117e80dff27f4aa59d64a2e8756ccf3f'
+                    }
+                    prop_claim_fortinet: {
+                        table: 'sys_properties'
+                        id: '982015abb5e9440e916c3bb246ba0dda'
+                    }
+                    prop_claim_max_calls: {
+                        table: 'sys_properties'
+                        id: '958cdcbe687f40e4992693ab45e7acec'
+                    }
+                    prop_claim_meraki: {
+                        table: 'sys_properties'
+                        id: '20686c4001ab4a0b96946bbc52b68aa8'
+                    }
+                    prop_claim_mist: {
+                        table: 'sys_properties'
+                        id: 'c64ffe54694e4a5584f9fb2546ee940e'
+                    }
                     prop_coverage_refresh: {
                         table: 'sys_properties'
                         id: 'd1f10a97f63e46249f4b7371a0216566'
@@ -1797,6 +1845,26 @@ declare global {
                         table: 'sys_ws_operation'
                         id: 'acdf5257c9bb49feba199e2d5b3cc8ef'
                     }
+                    rm_checkpoint_accept: {
+                        table: 'sys_rest_message_headers'
+                        id: '58e77a775b5a48d29262a1a6936581ae'
+                    }
+                    rm_checkpoint_ct: {
+                        table: 'sys_rest_message_headers'
+                        id: '96d6ef8fe05a4e6fbad841690ead0645'
+                    }
+                    rm_checkpoint_key: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: '34693db61a5c4fdba1f8aed641ad6d57'
+                    }
+                    rm_checkpoint_key_header: {
+                        table: 'sys_rest_message_fn_headers'
+                        id: '622b47f2cf1a4470baae0a0d33338377'
+                    }
+                    rm_checkpoint_zt: {
+                        table: 'sys_rest_message'
+                        id: '416e435f84ec4080bda69e7f003afe73'
+                    }
                     rm_cisco_accept: {
                         table: 'sys_rest_message_headers'
                         id: 'e0b39f9afb4e4d709a71709ced468297'
@@ -1833,6 +1901,42 @@ declare global {
                         table: 'sys_rest_message'
                         id: '4b1519f5ce524ea281279ea8e87113a4'
                     }
+                    rm_fortiztp: {
+                        table: 'sys_rest_message'
+                        id: '8b1cb5630b2942739e13cbcd9ee5fc66'
+                    }
+                    rm_fortiztp_accept: {
+                        table: 'sys_rest_message_headers'
+                        id: '2f83c69b927f43c3afa4b12544c12ee5'
+                    }
+                    rm_fortiztp_ct: {
+                        table: 'sys_rest_message_headers'
+                        id: '06630bdb841e4f35ba12eb780713361a'
+                    }
+                    rm_fortiztp_serial: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: '23ab34618fa54d29a8d7a46959b34cbd'
+                    }
+                    rm_greenlake: {
+                        table: 'sys_rest_message'
+                        id: '32c9c6c3e483496b9f97a7baf069a54d'
+                    }
+                    rm_greenlake_accept: {
+                        table: 'sys_rest_message_headers'
+                        id: '6e436d65272b4e3c8f657bce0017116a'
+                    }
+                    rm_greenlake_ct: {
+                        table: 'sys_rest_message_headers'
+                        id: '08ad004f254b474a8ae29db49d0fc7f6'
+                    }
+                    rm_greenlake_device: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: '29dbe2fdb4f642a4aa6326e8b96478ff'
+                    }
+                    rm_greenlake_serial: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: 'a48467fba4b6470e8dbc46a0c3451580'
+                    }
                     rm_meraki: {
                         table: 'sys_rest_message'
                         id: 'bd28c06489df4190bb20fade79e91641'
@@ -1844,6 +1948,22 @@ declare global {
                     rm_meraki_auth: {
                         table: 'sys_rest_message_fn_headers'
                         id: 'fe5171bc37274dd586b530eaddaf2067'
+                    }
+                    rm_meraki_claim_auth: {
+                        table: 'sys_rest_message_fn_headers'
+                        id: 'ac85aebb392f4d6aa6a7da468970cc0e'
+                    }
+                    rm_meraki_claim_ct: {
+                        table: 'sys_rest_message_fn_headers'
+                        id: 'f56a02758a3541309335c2db69dbcde8'
+                    }
+                    rm_meraki_claim_key: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: 'ef7ab8a0b23a4bcd9c146f3491dc2847'
+                    }
+                    rm_meraki_claim_org: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: 'e61610459e9d4e6b9f4725cba203caa8'
                     }
                     rm_meraki_key: {
                         table: 'sys_rest_message_fn_parameters'
@@ -1872,6 +1992,22 @@ declare global {
                     rm_mist_auth_serial: {
                         table: 'sys_rest_message_fn_headers'
                         id: '1c9debdac1fb462e8bf3b389b81617fd'
+                    }
+                    rm_mist_claim_auth: {
+                        table: 'sys_rest_message_fn_headers'
+                        id: '5dec4b2509a3488bafe470ab5a4e4791'
+                    }
+                    rm_mist_claim_ct: {
+                        table: 'sys_rest_message_fn_headers'
+                        id: 'ab2c0d168f284b8f8d253ec7e2f01ce7'
+                    }
+                    rm_mist_claim_org: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: 'eb5a15f24f2140589d60171f3e001709'
+                    }
+                    rm_mist_claim_token: {
+                        table: 'sys_rest_message_fn_parameters'
+                        id: '179faa79c98c4128a5cf4fcc02692253'
                     }
                     rm_mist_model: {
                         table: 'sys_rest_message_fn_parameters'
@@ -2045,6 +2181,10 @@ declare global {
                         table: 'sys_module'
                         id: '3e742f506a82462580d00cec26db4db6'
                     }
+                    src_server_domain_oem_claims_ts: {
+                        table: 'sys_module'
+                        id: '56f7a0a317d2447bbb3e28c63281cd56'
+                    }
                     src_server_domain_oem_json_ts: {
                         table: 'sys_module'
                         id: 'f19ec875c0b445ccb4062a3fa36da90b'
@@ -2149,6 +2289,10 @@ declare global {
                     src_server_entry_models_ts: {
                         table: 'sys_module'
                         id: '54e4bf8d35704bbfaf57b46ec0f8949b'
+                    }
+                    'src_server_entry_oem-claims_ts': {
+                        table: 'sys_module'
+                        id: 'd93ffacd56a849a190cb8f4bf30e6794'
                     }
                     'src_server_entry_oem-sync_ts': {
                         table: 'sys_module'
@@ -2529,6 +2673,22 @@ declare global {
                     ws_catalog_entries_aud: {
                         table: 'sys_ux_applicability_m2m_list'
                         id: '28822af28b784baab057555168939767'
+                    }
+                    ws_claims_failed: {
+                        table: 'sys_ux_list'
+                        id: '06241f40a5954d2a86986d82cbf50bac'
+                    }
+                    ws_claims_failed_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: 'd91a509ba5ae43bca8f06191ec047146'
+                    }
+                    ws_cloud_accounts: {
+                        table: 'sys_ux_list'
+                        id: '24f2ee3d6a75426d8e91af4a9750694a'
+                    }
+                    ws_cloud_accounts_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: 'f046964225714018a90db5967cb2ed9c'
                     }
                     ws_cost_facts: {
                         table: 'sys_ux_list'
@@ -3146,6 +3306,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_rest_message_fn'
+                        id: '001fe28897c84e688c850d6db9c09f93'
+                        key: {
+                            rest_message: '4b1519f5ce524ea281279ea8e87113a4'
+                            function_name: 'register_products'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '0028be5b56d8401886fdf17475e46e54'
                         key: {
@@ -3332,6 +3500,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_coverage_import'
                             element: 'start_date'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '00e092bdeb5848168ef46ba77a8e7f22'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation_status'
                             language: 'en'
                         }
                     },
@@ -4479,6 +4656,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '07287af59e464cacb867fa66476e2cff'
+                        key: {
+                            sys_ui_section: {
+                                id: '39a1d89831574a2dbeb78a176c61206b'
+                                key: {
+                                    name: 'x_daas_ham_cloud_account'
+                                    caption: 'OEM cloud account'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'account_id'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '072aa3575f7d47e6bb57a9740cdb82d1'
                         key: {
@@ -4902,6 +5101,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '0942e3ca9c144225bb5a0c6999c6c2b8'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'vendor'
+                            value: 'mist'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '0952eb3f737a472cba10799770df256e'
                         key: {
@@ -5041,6 +5251,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice_set'
+                        id: '0a392412d4e54acf901ca762d9d43a19'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '0a73692cfb0b49f29c53830ecc0cc58a'
                         key: {
@@ -5143,6 +5361,15 @@ declare global {
                         key: {
                             logical_table_name: 'x_daas_ham_shipment'
                             col_name_string: 'order'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '0b7fc09f5a8845f88b942156d6df2b4e'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'NULL'
+                            language: 'en'
                         }
                     },
                     {
@@ -5425,6 +5652,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '0d601387ebf54c37a8dbb9dabc61f3dd'
+                        key: {
+                            sys_ui_section: {
+                                id: '11ae6e55a53c4a22a7715d832dc29113'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'OEM cloud'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '6'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '0d8834683783499fbf54ea4561f60c1a'
                         key: {
@@ -5463,6 +5712,17 @@ declare global {
                         id: '0dcbad7ae789406888edb363c58b0c28'
                         key: {
                             name: 'x_daas_ham_staging_tmpl_item'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '0de54bcb433b4dc79681fe5768fec7fa'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'vendor'
+                            value: 'fortinet'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -5690,6 +5950,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '0f268b00f96649828264a21c010f9ccb'
+                        key: {
+                            sys_security_acl: 'd7cdb2c007e3407a86fa1f66580fd149'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_section'
                         id: '0f43b4aa14b44a1f9a783e3b1f6d3b75'
                         key: {
@@ -5807,6 +6080,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_oem_rma'
                             element: 'last_synced'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '0feb135772864209a75f285f6035fbd6'
+                        key: {
+                            sys_ui_section: {
+                                id: '11ae6e55a53c4a22a7715d832dc29113'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'OEM cloud'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'attempts'
+                            position: '5'
                         }
                     },
                     {
@@ -6104,6 +6399,21 @@ declare global {
                         id: '1192dd07fce34582aa3954e4752bcd82'
                         key: {
                             name: 'x_daas_ham_audit_line'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: '11ae6e55a53c4a22a7715d832dc29113'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            caption: 'OEM cloud'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -6537,6 +6847,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice_set'
+                        id: '1351a3807bbd4309881210fb284b2e53'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation_status'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: '13604bd836064e15a9080602d45ad93b'
                         key: {
@@ -6768,6 +7086,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '14c892b5b9594b6ea6dc7d7d6621b27d'
+                        key: {
+                            list_id: {
+                                id: '6afd066c9b5d40b4b0b27ef810fcf701'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'automation_message'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '14da4f03ad744b8c90e57bc55be1597f'
                         key: {
@@ -6896,6 +7237,15 @@ declare global {
                             }
                             element: 'state'
                             position: '8'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '15a36eae6be64da489f35486746debf1'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'account_id'
+                            language: 'en'
                         }
                     },
                     {
@@ -7357,6 +7707,17 @@ declare global {
                             }
                             element: 'model'
                             position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '191b04b61dc946cab360776b6141bc10'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'purpose'
+                            value: 'oem_claim'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -8345,6 +8706,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '1fdee43de37146ef908da6b2f3ad8940'
+                        key: {
+                            sys_security_acl: 'd7cdb2c007e3407a86fa1f66580fd149'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_section'
                         id: '1ff71778d3914860acada2c25aee406a'
                         key: {
@@ -9153,6 +9527,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '248d90112d5e43489ba2fc87ea30dc9f'
+                        key: {
+                            list_id: {
+                                id: '6afd066c9b5d40b4b0b27ef810fcf701'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'automation_status'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '248dcf71e02d4120bd715a6c0d84dfa6'
                         key: {
@@ -9497,6 +9894,17 @@ declare global {
                                     sys_domain: 'global'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '26579bda30c842fea11da3e6868598bf'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'vendor'
+                            value: 'meraki'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -10035,6 +10443,19 @@ declare global {
                     },
                     {
                         table: 'sys_security_acl_role'
+                        id: '2a565e3b24864017b43499a63b427185'
+                        key: {
+                            sys_security_acl: '6a03858cd6fe4d1da282222f5685c909'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
                         id: '2a58bd51537743a7b0c76a8a749346c5'
                         key: {
                             sys_security_acl: '7dd7190d34174cc58a14a938edcc1b58'
@@ -10175,6 +10596,17 @@ declare global {
                                     name: 'x_daas_ham.finance'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '2ab7c3f9b11a489f899fc62ea46f5418'
+                        key: {
+                            name: 'x_daas_ham_staging_tmpl_item'
+                            element: 'automation'
+                            value: 'oem_ztp'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -10930,6 +11362,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '2f10d2197fe04065867df1bc3eee7dad'
+                        key: {
+                            sys_ui_section: {
+                                id: '39a1d89831574a2dbeb78a176c61206b'
+                                key: {
+                                    name: 'x_daas_ham_cloud_account'
+                                    caption: 'OEM cloud account'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '2f139f0d318d4708b8f47d2d9305b6a5'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation'
+                            value: 'oem_claim'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_db_object'
                         id: '2f1e50e17bfd4fbc98102ebb23abef73'
                         key: {
@@ -10942,6 +11407,19 @@ declare global {
                         key: {
                             document_key: '02073d3ed26e485bbbb9d3ea80fe4b5f'
                             variable: '6f69fc4aff6433008d3f5d9ad53bf18c'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '2f42e1412f4941f188f5a6d6e6b3abcc'
+                        key: {
+                            sys_security_acl: '83785ce4949c4c2f9d11c742b09b1a6a'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -11886,6 +12364,15 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
+                        id: '352bb93e83be4912824a2d4d57fd2c5c'
+                        key: {
+                            name: 'alm_hardware'
+                            element: 'x_daas_ham_claim_code'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
                         id: '352d4d572347463db849f1f9677ff78d'
                         key: {
                             name: 'x_daas_ham_order'
@@ -12170,6 +12657,19 @@ declare global {
                         id: '369e4a1bcfc54fb38605149dc901ed02'
                         key: {
                             name: 'change_request'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '36bfcd5a6fec4d3a8d1e335ef6ec1e8d'
+                        key: {
+                            sys_security_acl: 'd7cdb2c007e3407a86fa1f66580fd149'
+                            sys_user_role: {
+                                id: 'b1a9a9832f01483a9c4e6fc55ca84188'
+                                key: {
+                                    name: 'x_daas_ham.field_tech'
+                                }
+                            }
                         }
                     },
                     {
@@ -12477,6 +12977,29 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '388380354ec44bfab6220c43a75347a3'
+                        key: {
+                            list_id: {
+                                id: '6afd066c9b5d40b4b0b27ef810fcf701'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'automation'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '388f704479e543babf90a3da755e1a2b'
                         key: {
@@ -12636,6 +13159,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '39a1d89831574a2dbeb78a176c61206b'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            caption: 'OEM cloud account'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '39a4db522720411eb033c11f8666ebd7'
                         key: {
@@ -12786,6 +13324,28 @@ declare global {
                             value: 'defective_return'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '3a54e7538b754f7f8545af191f736d02'
+                        key: {
+                            sys_ui_section: {
+                                id: '11ae6e55a53c4a22a7715d832dc29113'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'OEM cloud'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -14366,6 +14926,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '461ccfe7055b435f9d36055e09508311'
+                        key: {
+                            name: 'alm_hardware'
+                            element: 'x_daas_ham_mac_address'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '461da9f3e3a14b9db3ff46a3fd97c187'
                         key: {
@@ -15771,6 +16339,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_db_object'
+                        id: '4ec30097bb2c4625b3d42880d24d58aa'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '4ed18534a37a4b31b63e255c86196b9b'
                         key: {
@@ -15812,6 +16387,14 @@ declare global {
                             }
                             element: 'order'
                             position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_choice_set'
+                        id: '4eff9b9a8b5e440ea6e5cb5e473d5f95'
+                        key: {
+                            name: 'x_daas_ham_staging_tmpl_item'
+                            element: 'automation'
                         }
                     },
                     {
@@ -16156,6 +16739,61 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '51170e8d49ba4d4397c1ec4b98f91a73'
+                        key: {
+                            sys_ui_section: {
+                                id: '11ae6e55a53c4a22a7715d832dc29113'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'OEM cloud'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'automation'
+                            position: '1'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '511d88703c8d4c6c9896d675167cb299'
+                        key: {
+                            sys_ui_form: {
+                                id: 'd8e83b41cc584f7fa8119aece8aa70ba'
+                                key: {
+                                    name: 'x_daas_ham_cloud_account'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '39a1d89831574a2dbeb78a176c61206b'
+                                key: {
+                                    name: 'x_daas_ham_cloud_account'
+                                    caption: 'OEM cloud account'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '513316161df441b5adde9d144661d25e'
                         key: {
@@ -16412,6 +17050,13 @@ declare global {
                             }
                             element: '.end_split'
                             position: '10'
+                        }
+                    },
+                    {
+                        table: 'ua_table_licensing_config'
+                        id: '529c271e927a4825a427ce4f887028b9'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
                         }
                     },
                     {
@@ -17045,6 +17690,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '56ab9358f8474588aa204fab3773d3dd'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation_message'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '56dc906f7be44a37b46b600d4347ea6a'
                         key: {
@@ -17567,6 +18221,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '5a528cb396c74e0c81c72d5f549ba357'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'customer'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '5a91fffee3c94d7783416c6d23f370bb'
                         key: {
@@ -17795,6 +18458,28 @@ declare global {
                             name: 'x_daas_ham_return_order'
                             element: 'NULL'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '5c072cedaa9f41a8812a6823187db521'
+                        key: {
+                            sys_ui_section: {
+                                id: '39a1d89831574a2dbeb78a176c61206b'
+                                key: {
+                                    name: 'x_daas_ham_cloud_account'
+                                    caption: 'OEM cloud account'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'purpose'
+                            position: '4'
                         }
                     },
                     {
@@ -18551,6 +19236,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '5fc4cc18754d41c9bb41c25ae6bdfad1'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'vendor'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: '5fd2bcf90a5b41aa86d666a0c9efdfcd'
                         key: {
@@ -18617,6 +19310,17 @@ declare global {
                         key: {
                             document_key: '9dfc9b1038954736994b419f15b20ad0'
                             variable: 'b124164e53a0220002c6435723dc34c5'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '5fff89f1a4e744f5a3207dafceb1b505'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation'
+                            value: 'oem_licence'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -20202,6 +20906,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_rest_message_fn'
+                        id: '698e1d0a477c44f7b5ef4309c8aaf578'
+                        key: {
+                            rest_message: '416e435f84ec4080bda69e7f003afe73'
+                            function_name: 'assign_gateway'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '699359ae0c814ed285b83048a4574bef'
                         key: {
@@ -21021,6 +21733,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: '6dfc59cc966649e4b99f4854bd56bb62'
+                        key: {
+                            sys_ui_form: {
+                                id: '7cc4bf7571d4435daf24d57b337f0bec'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '11ae6e55a53c4a22a7715d832dc29113'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'OEM cloud'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '6e0b41a53664485c86adc8244358109f'
                         key: {
@@ -21160,6 +21905,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '6ec125277ea343669d5086454884e7a8'
+                        key: {
+                            name: 'alm_hardware'
+                            element: 'x_daas_ham_claim_code'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '6ecade06ab8e4e4081def701ef8db383'
                         key: {
@@ -21202,6 +21955,17 @@ declare global {
                                 }
                             }
                             element: 'raw_manufacturer'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '6ef36a1edb244108b8315a468b4bee55'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'vendor'
+                            value: 'aruba'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -21336,6 +22100,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_recon_exception'
                             element: 'detected_at'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '6faf851088d9400a9a7c0e9fadca9736'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'account_id'
                         }
                     },
                     {
@@ -21580,6 +22352,14 @@ declare global {
                             name: 'x_daas_ham_model_match_rule'
                             element: 'manufacturer'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '70cc8b964a054251bfa791820d6d2cf7'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'purpose'
                         }
                     },
                     {
@@ -22483,6 +23263,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '753c4a63184641b3b4c7bb03c0e20eac'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'purpose'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '7543c5a3e56b4d27a149cf03dddd594d'
                         key: {
@@ -22915,6 +23704,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '7780f594ee96448188fe28c4bbb61af6'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation_status'
+                            value: 'failed'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: '77975d4d9f2441ceb61c95a77da48bf3'
                         key: {
@@ -22992,6 +23792,29 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '780eb42834bb40f483fcc29c1409328c'
+                        key: {
+                            list_id: {
+                                id: 'eeb6dba331fb49a7b9346ad5d3ce9ff1'
+                                key: {
+                                    name: 'x_daas_ham_staging_tmpl_item'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'automation'
                         }
                     },
                     {
@@ -23152,6 +23975,19 @@ declare global {
                                 }
                             }
                             element: 'match_type'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '78c5a6f2f6164a7ca7082630818186f1'
+                        key: {
+                            sys_security_acl: '77bf13bb1d9e4b1ea58b7b7212fecd35'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -23358,6 +24194,28 @@ declare global {
                             }
                             element: 'delivered_at'
                             position: '12'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '79f2ebca8d014b818eb6c02fe0794ea8'
+                        key: {
+                            sys_ui_section: {
+                                id: '11ae6e55a53c4a22a7715d832dc29113'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'OEM cloud'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'automation_status'
+                            position: '2'
                         }
                     },
                     {
@@ -23628,6 +24486,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '7c4be0ea17a448c7bc6e886baff2f09a'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'vendor'
+                            value: 'checkpoint'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_element_mapping'
                         id: '7c9c0e4fdb9a4ac3a367981724862bde'
                         key: {
@@ -23707,6 +24576,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_rest_message_fn'
+                        id: '7cf1c7f6c90c47aa8475343a9094465b'
+                        key: {
+                            rest_message: '8b1cb5630b2942739e13cbcd9ee5fc66'
+                            function_name: 'provision_device'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '7d245ed05d6b458fb78e58bc07bd1a8c'
                         key: {
@@ -23751,6 +24628,14 @@ declare global {
                                     name: 'x_daas_ham.field_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '7d70d02a58af43f99dd0969e5d7cc01d'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation'
                         }
                     },
                     {
@@ -23817,6 +24702,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '7dec7cf86c7946c2b367328a5e90acdd'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'attempts'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_action_role'
                         id: '7df123bc62a145f9bc4ce630f6992362'
                         key: {
@@ -23849,6 +24743,17 @@ declare global {
                             }
                             element: '.begin_split'
                             position: '0'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '7e0783450d6e4a86bd8fc476d7dec1c9'
+                        key: {
+                            name: 'x_daas_ham_staging_tmpl_item'
+                            element: 'automation'
+                            value: 'oem_claim'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -24221,6 +25126,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '808769b87d534247bb40abf7d739b26e'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation_status'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: '808f7727cd4c43bebe454d1d746e6606'
                         key: {
@@ -24420,6 +25333,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '81cf214a96974eb3b6c1a90a808eaebe'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd586f712f31b44bdbafc8411d8ccd759'
+                                key: {
+                                    name: 'x_daas_ham_staging_tmpl_item'
+                                    caption: 'Step'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'automation'
+                            position: '4'
+                        }
+                    },
+                    {
                         table: 'sys_ui_section'
                         id: '81e257c64b1545eb88bddc11ed7fc4fc'
                         key: {
@@ -24566,6 +25501,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '8266bda72a324f059ebe3f4ad02f2822'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'customer'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '8280b3720138441da2cef4e58aaec630'
                         key: {
@@ -24611,6 +25554,14 @@ declare global {
                             }
                             element: '.end_split'
                             position: '7'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '82a387b45cd141a088133442a0f3ec28'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation_message'
                         }
                     },
                     {
@@ -25196,6 +26147,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '8690809cbf144087b37174d9bb671210'
+                        key: {
+                            name: 'x_daas_ham_staging_tmpl_item'
+                            element: 'automation'
+                            value: 'oem_licence'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '8699a677d01848148efa03af7425ddfd'
                         key: {
@@ -25553,6 +26515,14 @@ declare global {
                         id: '880bf8bbe743487793f2764e5e4ed42e'
                         key: {
                             name: 'x_daas_ham_site_template'
+                        }
+                    },
+                    {
+                        table: 'sys_rest_message_fn'
+                        id: '8817bab4a3b747a981fe2e4bbf0b8859'
+                        key: {
+                            rest_message: '32c9c6c3e483496b9f97a7baf069a54d'
+                            function_name: 'assign_subscription'
                         }
                     },
                     {
@@ -27317,6 +28287,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_rest_message_fn'
+                        id: '92996eea96d3440fa0b1846bdfd51be1'
+                        key: {
+                            rest_message: 'bd28c06489df4190bb20fade79e91641'
+                            function_name: 'claim_inventory'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '929b88d12d234bdcbc1b91c60aa25b3a'
                         key: {
@@ -28835,6 +29813,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '9a9eedc907c5451c90ed9a67a0645b75'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'attempts'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '9aa1e4faed7543e4b6a8b9508efbe4f0'
                         key: {
@@ -29227,6 +30213,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_index'
+                        id: '9c7e770389e74bbcbc4177f9dfce8354'
+                        key: {
+                            logical_table_name: 'x_daas_ham_staging_step'
+                            col_name_string: 'automation_status'
+                        }
+                    },
+                    {
                         table: 'sys_element_mapping'
                         id: '9c8402a5d58f412cb5da8bc9b2092531'
                         key: {
@@ -29452,6 +30446,14 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_index'
+                        id: '9de864908b4141c2ab997599710ae0aa'
+                        key: {
+                            logical_table_name: 'x_daas_ham_cloud_account'
+                            col_name_string: 'customer'
                         }
                     },
                     {
@@ -29973,6 +30975,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_oem_rma'
                             element: 'defective_asset'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'a0c0d78968404cf39358dd69a3e55a51'
+                        key: {
+                            name: 'x_daas_ham_staging_tmpl_item'
+                            element: 'automation'
                         }
                     },
                     {
@@ -30578,6 +31588,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'a3c417f3de9d481e8436ada012fac1e2'
+                        key: {
+                            sys_security_acl: 'd7cdb2c007e3407a86fa1f66580fd149'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: 'a3cb1524863643d980660213b36cc08b'
                         key: {
@@ -30740,6 +31763,17 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'a46d1695841248c099b899879e3e9351'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'purpose'
+                            value: 'oem_licence'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -31110,6 +32144,17 @@ declare global {
                         key: {
                             document_key: '9f6a68c257824c3ca509902a8d89f903'
                             variable: '46dbcb535320220002c6435723dc3409'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'a62649d1c6d1470797ff846a69e5a76b'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation_status'
+                            value: 'done'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -32242,6 +33287,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice_set'
+                        id: 'aef67a4e265840bab6d53fa110a95aa3'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'vendor'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: 'af00345305e242c8af912b8278bb89e9'
                         key: {
@@ -32275,6 +33328,28 @@ declare global {
                                     name: 'sn_customerservice_agent'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'af27e0c528cc4205bfbe0b9debf2435e'
+                        key: {
+                            sys_ui_section: {
+                                id: '39a1d89831574a2dbeb78a176c61206b'
+                                key: {
+                                    name: 'x_daas_ham_cloud_account'
+                                    caption: 'OEM cloud account'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '6'
                         }
                     },
                     {
@@ -32350,6 +33425,28 @@ declare global {
                             value: 'cisco'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'aff6acdbabdf4b8db9144383bcfc641a'
+                        key: {
+                            sys_ui_section: {
+                                id: '39a1d89831574a2dbeb78a176c61206b'
+                                key: {
+                                    name: 'x_daas_ham_cloud_account'
+                                    caption: 'OEM cloud account'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'vendor'
+                            position: '2'
                         }
                     },
                     {
@@ -32565,6 +33662,28 @@ declare global {
                                     sys_domain: 'global'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'b0b0170240fd4734b288107fdfbdd5c9'
+                        key: {
+                            sys_ui_section: {
+                                id: '39a1d89831574a2dbeb78a176c61206b'
+                                key: {
+                                    name: 'x_daas_ham_cloud_account'
+                                    caption: 'OEM cloud account'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'customer'
+                            position: '1'
                         }
                     },
                     {
@@ -32867,6 +33986,19 @@ declare global {
                                 id: 'd33813ebacca4b79aad41517026036d8'
                                 key: {
                                     name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'b2a7dc137458498bb9d3ff2e6037dc76'
+                        key: {
+                            sys_security_acl: 'd7cdb2c007e3407a86fa1f66580fd149'
+                            sys_user_role: {
+                                id: 'c5156577be814d2aa8bf557ddec8bf0e'
+                                key: {
+                                    name: 'x_daas_ham.noc'
                                 }
                             }
                         }
@@ -33741,6 +34873,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'b7fc9d36ee9d46c4b5a142e47cbd3d84'
+                        key: {
+                            sys_ui_section: {
+                                id: '11ae6e55a53c4a22a7715d832dc29113'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'OEM cloud'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '3'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'b7fe3ebb7fd7485983f0923d927f0f98'
                         key: {
@@ -34396,6 +35550,15 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
+                        id: 'bc7ddcae0ff84daf9870dd8c82154092'
+                        key: {
+                            name: 'x_daas_ham_staging_tmpl_item'
+                            element: 'automation'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
                         id: 'bc9d9a31e8ba415c809c1a24a384763f'
                         key: {
                             name: 'x_daas_ham_catalog_entry'
@@ -34918,6 +36081,14 @@ declare global {
                             }
                             element: '.split'
                             position: '6'
+                        }
+                    },
+                    {
+                        table: 'sys_choice_set'
+                        id: 'c08b794a7bde42e19bc748efa99efa8f'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'purpose'
                         }
                     },
                     {
@@ -36335,6 +37506,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'c7d91b83ab8946bdbb77a0340987a4f8'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: 'c7e3b8c862e24d9a976b20ac8866509c'
                         key: {
@@ -37251,6 +38431,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'ccc53157195542dfaa77db47815aaeba'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'vendor'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'cccc091590cd44df8920d95fc6117f3b'
                         key: {
@@ -37321,6 +38510,14 @@ declare global {
                         id: 'cd1837f26ddb4deea75a4db3dfe89d76'
                         key: {
                             name: 'x_daas_ham/vendor-react-dom--55da69dc.js.map'
+                        }
+                    },
+                    {
+                        table: 'sys_rest_message_fn'
+                        id: 'cd20fdaea5d84e8fac83a5bc2da41f1a'
+                        key: {
+                            rest_message: '32c9c6c3e483496b9f97a7baf069a54d'
+                            function_name: 'find_device'
                         }
                     },
                     {
@@ -38243,6 +39440,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'd3097d58a3934220880e1fab2a78c05e'
+                        key: {
+                            sys_ui_section: {
+                                id: '11ae6e55a53c4a22a7715d832dc29113'
+                                key: {
+                                    name: 'x_daas_ham_staging_step'
+                                    caption: 'OEM cloud'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'automation_message'
+                            position: '4'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'd31d89b69d4643e7a4fe724fe4ad8a7c'
                         key: {
@@ -38690,6 +39909,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: 'd697ba6053a543afa337d1f38371b532'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation'
+                            value: 'oem_ztp'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'd6ac71b05bd848c68c6c883d6de74ddd'
                         key: {
@@ -39100,6 +40330,20 @@ declare global {
                             name: 'x_daas_ham_asn_import'
                             element: 'tracking_number'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form'
+                        id: 'd8e83b41cc584f7fa8119aece8aa70ba'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -40078,6 +41322,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_rest_message_fn'
+                        id: 'df7a5bda202942b58be73d8eb68c3c56'
+                        key: {
+                            rest_message: '32c9c6c3e483496b9f97a7baf069a54d'
+                            function_name: 'add_devices'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'df8efbe4c5e542af8ae33a1fdd3a6fc3'
                         key: {
@@ -41046,6 +42298,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_rest_message_fn'
+                        id: 'e5e42042204e421781c70573d42fae49'
+                        key: {
+                            rest_message: '05f10e6505da4e22a6d2ab06daa0a75e'
+                            function_name: 'claim_inventory'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: 'e5e686337e3d4ff48ea0e859898c077f'
                         key: {
@@ -41099,6 +42359,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_device_event'
                             element: 'source'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'e5ef90c7bb9246a293b5790d3f11d64c'
+                        key: {
+                            name: 'alm_hardware'
+                            element: 'x_daas_ham_mac_address'
+                            language: 'en'
                         }
                     },
                     {
@@ -41366,6 +42635,30 @@ declare global {
                                 }
                             }
                             value: 'device_add'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'e886997da94549e5b6ba05420553bb98'
+                        key: {
+                            sys_security_acl: 'd7cdb2c007e3407a86fa1f66580fd149'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'e8ae2ecc2ad84ab3b130d840ba0738e5'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'purpose'
+                            value: 'oem_ztp'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -43322,6 +44615,28 @@ declare global {
                     },
                     {
                         table: 'sys_ui_element'
+                        id: 'f63b3dbb5d4445b281777eae44cb1365'
+                        key: {
+                            sys_ui_section: {
+                                id: '39a1d89831574a2dbeb78a176c61206b'
+                                key: {
+                                    name: 'x_daas_ham_cloud_account'
+                                    caption: 'OEM cloud account'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
                         id: 'f68d502815a94482910f3aa169944381'
                         key: {
                             sys_ui_section: {
@@ -43603,6 +44918,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: 'f80bda7b0a484ba29bf78a24a3aa0680'
+                        key: {
+                            name: 'x_daas_ham_staging_step'
+                            element: 'automation_status'
+                            value: 'pending'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'f824afb4da7b463280dc30699c19cea0'
                         key: {
@@ -43616,6 +44942,14 @@ declare global {
                         key: {
                             document_key: '734616e614cc4a5db34a82caaef1e9d5'
                             variable: '9024a37f671003007ba405225685efe5'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'f8a30b8978634fcfbc9a65e6ac05c03a'
+                        key: {
+                            name: 'x_daas_ham_cloud_account'
+                            element: 'NULL'
                         }
                     },
                     {

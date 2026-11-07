@@ -19,6 +19,7 @@ export const x_daas_ham_asn_import = Table({
         pid: StringColumn({ label: 'PID', maxLength: 100 }),
         serial: StringColumn({ label: 'Serial number', maxLength: 100 }),
         mac_address: StringColumn({ label: 'MAC address', maxLength: 40 }),
+        claim_code: StringColumn({ label: 'OEM claim code', maxLength: 40 }),
         customer_tag: StringColumn({ label: 'Customer tag', maxLength: 80 }),
         staging_source: StringColumn({ label: 'Staging source (in_house/distributor)', maxLength: 20 }),
         ship_date: StringColumn({ label: 'Ship date', maxLength: 20 }),

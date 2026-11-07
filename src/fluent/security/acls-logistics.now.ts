@@ -2,7 +2,7 @@ import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
 import { admin, assetManager, customerRoles, inventoryTech, providerStaff } from './roles.now'
 
-/* Access controls for shipping (P3.26). Customer contacts see their own shipments (labels for returns). */
+/* Access controls for shipping (P3.26) and OEM cloud accounts (P3.27). Customer contacts see their own shipments. */
 
 const shippers = [assetManager, inventoryTech]
 
@@ -86,4 +86,36 @@ Acl({
     operation: 'read',
     roles: customerRoles,
     script: "answer = current.shipment.customer + '' == gs.getUser().getCompanyID();",
+})
+
+Acl({
+    $id: Now.ID['acl_cloud_account_read'],
+    type: 'record',
+    table: 'x_daas_ham_cloud_account',
+    operation: 'read',
+    roles: providerStaff,
+})
+
+Acl({
+    $id: Now.ID['acl_cloud_account_write'],
+    type: 'record',
+    table: 'x_daas_ham_cloud_account',
+    operation: 'write',
+    roles: [assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_cloud_account_create'],
+    type: 'record',
+    table: 'x_daas_ham_cloud_account',
+    operation: 'create',
+    roles: [assetManager],
+})
+
+Acl({
+    $id: Now.ID['acl_cloud_account_delete'],
+    type: 'record',
+    table: 'x_daas_ham_cloud_account',
+    operation: 'delete',
+    roles: [assetManager],
 })

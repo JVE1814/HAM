@@ -9,6 +9,13 @@ import {
     Table,
 } from '@servicenow/sdk/core'
 
+/** Checklist steps the manufacturer's cloud can do (P3.27); blank = by hand. */
+const automationChoices = {
+    oem_claim: { label: 'Claim / register in the OEM cloud', sequence: 0 },
+    oem_licence: { label: 'Assign the OEM subscription', sequence: 1 },
+    oem_ztp: { label: 'Zero-touch provisioning', sequence: 2 },
+}
+
 /** Preparing one Asset before shipment. */
 export const x_daas_ham_staging_task = Table({
     name: 'x_daas_ham_staging_task',
@@ -62,8 +69,23 @@ export const x_daas_ham_staging_step = Table({
         done: BooleanColumn({ label: 'Done', default: false }),
         done_by: ReferenceColumn({ label: 'Done by', referenceTable: 'sys_user', readOnly: true }),
         done_at: DateTimeColumn({ label: 'Done at', readOnly: true }),
+        automation: ChoiceColumn({ label: 'Done by the OEM cloud', choices: automationChoices, readOnly: true }),
+        automation_status: ChoiceColumn({
+            label: 'Automation status',
+            choices: {
+                pending: { label: 'Pending', sequence: 0 },
+                done: { label: 'Done', sequence: 1 },
+                failed: { label: 'Failed (do it by hand)', sequence: 2 },
+            },
+            readOnly: true,
+        }),
+        automation_message: StringColumn({ label: 'Automation result', maxLength: 255, readOnly: true }),
+        attempts: IntegerColumn({ label: 'Attempts', default: 0, readOnly: true }),
     },
-    index: [{ name: 'x_daas_ham_ss_task', unique: false, element: 'staging_task' }],
+    index: [
+        { name: 'x_daas_ham_ss_task', unique: false, element: 'staging_task' },
+        { name: 'x_daas_ham_ss_automation', unique: false, element: 'automation_status' },
+    ],
 })
 
 /** The checklist used to stage a kind of Asset, optionally specific to a Customer. */
@@ -112,6 +134,32 @@ export const x_daas_ham_staging_tmpl_item = Table({
         label: StringColumn({ label: 'Step', maxLength: 160, mandatory: true }),
         order: IntegerColumn({ label: 'Order', default: 100 }),
         mandatory: BooleanColumn({ label: 'Mandatory', default: true }),
+        automation: ChoiceColumn({ label: 'Done by the OEM cloud', choices: automationChoices }),
     },
     index: [{ name: 'x_daas_ham_sti_tmpl', unique: false, element: 'template' }],
+})
+
+/** A Customer's account in a manufacturer cloud that claimed devices go to (P3.27). */
+export const x_daas_ham_cloud_account = Table({
+    name: 'x_daas_ham_cloud_account',
+    label: 'OEM cloud account',
+    display: 'account_id',
+    schema: {
+        customer: ReferenceColumn({ label: 'Customer', referenceTable: 'customer_account', mandatory: true }),
+        vendor: ChoiceColumn({
+            label: 'Vendor',
+            choices: {
+                meraki: { label: 'Cisco Meraki (organization id)', sequence: 0 },
+                mist: { label: 'HPE Mist (org id)', sequence: 1 },
+                aruba: { label: 'HPE GreenLake (subscription id)', sequence: 2 },
+                fortinet: { label: 'FortiZTP (FortiManager OID)', sequence: 3 },
+                checkpoint: { label: 'Check Point Zero Touch (template)', sequence: 4 },
+            },
+            mandatory: true,
+            dropdown: 'dropdown_without_none',
+        }),
+        purpose: ChoiceColumn({ label: 'Used for', choices: automationChoices, mandatory: true, dropdown: 'dropdown_without_none' }),
+        account_id: StringColumn({ label: 'Account', maxLength: 100, mandatory: true }),
+    },
+    index: [{ name: 'x_daas_ham_ca_customer', unique: false, element: 'customer' }],
 })

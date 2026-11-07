@@ -39,6 +39,8 @@ export const alm_hardware = Table({
         x_daas_ham_site: ReferenceColumn({ label: 'Site', referenceTable: 'cmn_location' }),
         x_daas_ham_order_line: ReferenceColumn({ label: 'Order line', referenceTable: 'x_daas_ham_order_line' }),
         x_daas_ham_customer_tag: StringColumn({ label: 'Customer tag', maxLength: 80 }),
+        x_daas_ham_mac_address: StringColumn({ label: 'MAC address', maxLength: 20 }),
+        x_daas_ham_claim_code: StringColumn({ label: 'OEM claim code', maxLength: 40 }),
         x_daas_ham_staging_source: ChoiceColumn({
             label: 'Staging source',
             choices: {

@@ -56,6 +56,10 @@ function copyTemplateSteps(templateId: string, taskId: string): void {
         step.setValue('label', str(item, 'label'))
         step.setValue('order', num(item, 'order'))
         step.setValue('mandatory', bool(item, 'mandatory'))
+        if (str(item, 'automation')) {
+            step.setValue('automation', str(item, 'automation'))
+            step.setValue('automation_status', 'pending')
+        }
         step.insert()
     }
 }

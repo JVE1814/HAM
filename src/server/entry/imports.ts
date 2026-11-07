@@ -41,6 +41,8 @@ export function processAsnRow(current: GlideRecord): void {
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('x_daas_ham_legal_owner', 'provider')
     asset.setValue('x_daas_ham_customer_tag', str(current, 'customer_tag'))
+    asset.setValue('x_daas_ham_mac_address', str(current, 'mac_address'))
+    asset.setValue('x_daas_ham_claim_code', str(current, 'claim_code'))
     asset.setValue('x_daas_ham_staging_source', str(current, 'staging_source') === 'distributor' ? 'distributor' : 'in_house')
     const assetId = asset.insert()
     finish(current, assetId ? 'inserted' : 'error', assetId ? `Asset ${serial} in transit` : 'Asset insert failed')
