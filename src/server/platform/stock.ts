@@ -109,7 +109,8 @@ interface Claim {
  * Make `wanted` on an in-stock Asset. Sourcing runs and the spare-pool top-up may pick the same Asset, so the claim is
  * made under the Asset's stock lock (`underStockLock`) and checks a fresh read: still in one of the `from` stages, on
  * no Order line, and not bound for its Lessor (domain/sourcing `isClaimable`). A run that finds the lock held leaves
- * the Asset to the other one, so it tries once.
+ * the Asset, so it tries once: the holder is another claim taking it, or a change (`changeStock`) holding it for one
+ * read and one save, and the unit then counts as short just as one another run claimed.
  */
 function claim(assetId: string, wanted: Claim): GlideRecord | null {
     let claimed: GlideRecord | null = null

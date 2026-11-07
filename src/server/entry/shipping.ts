@@ -222,11 +222,12 @@ type Tracked =
  * and a saved delivery is not noted twice.
  *
  * Deliveries can overlap (a retry sent while a slow first try runs, or two updates moments apart): both reading the
- * Shipment and its events before the other saved, both would insert the same events, and an older status could replace
- * a delivery or note it twice. So each is applied under the lock `track_shipment_<sys_id>`, from the Shipment and its
- * events read again there; one held off through every try saves nothing and is answered 503 to be sent again. The lock
- * is taken alone and takes no other (the Order is noted after it). Taking it throws only when an insert is refused with
- * no lock row (platform/locks `withLockTries` tries again, and that error escapes only when every try threw).
+ * Shipment and its events before the other saved, both would insert the same events, an older status could replace a
+ * delivery, and both could note the delivery. So each is applied under the lock `track_shipment_<sys_id>`, from the
+ * Shipment and its events read again there; one held off through every try saves nothing and is answered 503 to be
+ * sent again. The lock is taken alone and takes no other (the Order is noted after it). Taking it throws only when an
+ * insert is refused with no lock row (platform/locks `withLockTries` tries again, and that error escapes only when
+ * every try threw).
  */
 export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIResponse): void {
     const token = webhookToken(request.getHeader(WEBHOOK_TOKEN_HEADER), queryParam(request, 'token'))
