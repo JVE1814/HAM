@@ -1,4 +1,4 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { initialAutomationStatus } from '../domain/oem/claims'
 import { selectStagingTemplate, type StagingTemplateView } from '../domain/staging'
 import { bool, num, str } from './records'
@@ -24,7 +24,8 @@ function templates(): StagingTemplateView[] {
     return list
 }
 
-export function openStagingTask(asset: GlideRecord, orderLineId: string): string {
+/** Open the Asset's Staging task with its template's steps; null (and a warning) when the platform refuses the task. */
+export function openStagingTask(asset: GlideRecord, orderLineId: string): string | null {
     const source = (str(asset, 'x_daas_ham_staging_source') || 'in_house') as StagingTemplateView['source']
     const templateId = selectStagingTemplate(templates(), {
         customerId: str(asset, 'company'),
@@ -40,7 +41,11 @@ export function openStagingTask(asset: GlideRecord, orderLineId: string): string
     task.setValue('staging_source', source)
     task.setValue('short_description', `Stage ${str(asset, 'model.display_name') || 'asset'} ${str(asset, 'serial_number')}`)
     if (templateId) task.setValue('template', templateId)
-    const taskId = task.insert() ?? ''
+    const taskId = task.insert()
+    if (!taskId) {
+        gs.warn(`[x_daas_ham] No Staging task for ${str(asset, 'serial_number')}: ${task.getLastErrorMessage() || 'insert refused'}`)
+        return null
+    }
     if (templateId) copyTemplateSteps(templateId, taskId)
     return taskId
 }

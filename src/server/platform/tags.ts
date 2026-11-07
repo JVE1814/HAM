@@ -24,11 +24,14 @@ export function nextProviderTag(): string | null {
         let sequence = 0
         let counted = false
         try {
-            const taken = withLock(SEQUENCE_JOB, () => {
+            let lost = false
+            const taken = withLock(SEQUENCE_JOB, (lock) => {
                 counted = true
                 sequence = advanceCounter()
+                // A holder that outlasted the lock may share its number with the next holder: that number is not used.
+                lost = !lock.held()
             })
-            if (taken) return formatProviderTag(stringProperty(PROPERTY.tagPrefix, 'NAAS'), sequence, intProperty(PROPERTY.tagDigits, 7))
+            if (taken && !lost) return formatProviderTag(stringProperty(PROPERTY.tagPrefix, 'NAAS'), sequence, intProperty(PROPERTY.tagDigits, 7))
             refused = true
         } catch (error) {
             if (counted) throw error

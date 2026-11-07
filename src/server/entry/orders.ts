@@ -286,9 +286,9 @@ function sourceLine(order: GlideRecord, line: GlideRecord): void {
         for (const { asset, source } of picked) unreserve(asset, source)
         released += picked.length
     }
+    // An Asset whose Staging task could not be opened stays reserved for the line rather than staging with no task to finish.
     for (const asset of toStage) {
-        openStagingTask(asset, line.getUniqueValue())
-        moveAndSave(asset, 'staging', 'sourcing')
+        if (openStagingTask(asset, line.getUniqueValue())) moveAndSave(asset, 'staging', 'sourcing')
     }
     if (transfers.length > 0) {
         line.setValue('transfer_orders', [str(line, 'transfer_orders'), ...transfers].filter(Boolean).join(','))

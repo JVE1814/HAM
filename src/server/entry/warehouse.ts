@@ -143,8 +143,8 @@ function allocateToWaitingLine(asset: GlideRecord): void {
     asset.setValue('company', str(line, 'order.customer'))
     asset.setValue('x_daas_ham_agreement', str(line, 'order.agreement'))
     asset.update()
-    openStagingTask(asset, line.getUniqueValue())
-    moveAndSave(asset, 'staging', 'receiving')
+    // Without its Staging task the Asset stays reserved for the line, not staging with no task to finish.
+    if (openStagingTask(asset, line.getUniqueValue())) moveAndSave(asset, 'staging', 'receiving')
 }
 
 /** POST /putaway { code, stockroom }: record the stockroom an in-stock asset now sits in, when it is free to move there. */
