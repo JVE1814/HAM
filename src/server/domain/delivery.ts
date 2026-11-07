@@ -7,17 +7,19 @@ export type InstallMode = 'fsm_engineer' | 'self_install' | 'subcontractor' | 'r
 export interface ShipFacts {
     orderType: OrderType
     installMode: InstallMode
-    /** A carrier and tracking number were entered by hand. */
+    /** The Order has a carrier and tracking number. */
     hasTrackingNumber: boolean
+    /** That tracking number is a label an earlier Ship bought: it covers only the Assets that Ship packed. */
+    trackingNumberBought: boolean
     /** On-site work is already open (an earlier Ship). */
     hasWorkOrder: boolean
     /** The Order's Assets in 'staged' that the lifecycle lets ship. */
     staged: number
-    /** The Order's Assets in 'staged' that the lifecycle refuses to ship. */
+    /** The Order's staged Assets and hot spares that the lifecycle refuses to ship. */
     refused: number
     /** Why the first refused Asset may not ship ('' when none is refused). */
     refusedReason: string
-    /** The Order's Assets in 'spare_pool': hot spares already at the Site. */
+    /** The Order's Assets in 'spare_pool' that the lifecycle lets ship: hot spares already at the Site, handed over. */
     hotSpares: number
     /** The shipping aggregator is on. */
     shippingEnabled: boolean
@@ -38,19 +40,20 @@ export type ShipPlan = { errors: string[] } & ({ ok: false } | { ok: true; label
 
 /** What "Ship" does for an Order: refuse, buy a label for N packages, open on-site work. Total, no I/O. */
 export function planShipment(facts: ShipFacts): ShipPlan {
-    const refusals = facts.refused > 0 ? [`${facts.refused} staged asset(s) cannot ship: ${facts.refusedReason}`] : []
+    const refusals = facts.refused > 0 ? [`${facts.refused} asset(s) cannot ship: ${facts.refusedReason}`] : []
     if (facts.staged + facts.hotSpares === 0) {
         return { ok: false, errors: refusals.length > 0 ? refusals : ['Nothing is staged for this order yet'] }
     }
-    const needsCarrier = facts.staged > 0 && !facts.hasTrackingNumber && facts.installMode !== 'remote_hands'
+    const enteredByHand = facts.hasTrackingNumber && !facts.trackingNumberBought
+    const needsCarrier = facts.staged > 0 && !enteredByHand && facts.installMode !== 'remote_hands'
     if (needsCarrier && !facts.shippingEnabled) {
         return { ok: false, errors: [...refusals, 'Enter the carrier and tracking number before shipping'] }
     }
     return {
         ok: true,
         errors: refusals,
-        // The shipping aggregator replaces manual tracking numbers (P3.26): one package per staged Asset.
-        // Hot spares are already at the Site, so they are never packaged.
+        // The shipping aggregator replaces manual tracking numbers (P3.26): one package per staged Asset, and a
+        // new label for Assets staged after an earlier Ship. Hot spares are already at the Site, so never packaged.
         labelPackages: needsCarrier ? facts.staged : null,
         onSiteWork: facts.installMode === 'self_install' || facts.hasWorkOrder ? null : onSiteWork(facts),
     }

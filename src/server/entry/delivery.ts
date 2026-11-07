@@ -24,16 +24,18 @@ function orderAssets(orderId: string): GlideRecord {
 
 /**
  * UI action "Ship": send every staged Asset the lifecycle lets ship to the Site (buying the label for
- * those when the aggregator is on) and open the on-site work. Hot spares already at the Site are linked
- * without shipping. Which Assets may ship is checked before a label is bought.
+ * those when the aggregator is on) and open the on-site work. Hot spares already at the Site are handed
+ * over as shipped, without a package. Which Assets may ship is checked before a label is bought.
  */
 export function shipOrder(order: GlideRecord): void {
     const siteId = str(order, 'site')
     const found = shippable(order.getUniqueValue(), siteId)
+    const trackingNumber = str(order, 'tracking_number')
     const plan = planShipment({
         orderType: str(order, 'order_type') as OrderType,
         installMode: str(order, 'install_mode') as InstallMode,
-        hasTrackingNumber: !!str(order, 'tracking_number'),
+        hasTrackingNumber: !!trackingNumber,
+        trackingNumberBought: !!trackingNumber && labelBought(order.getUniqueValue(), trackingNumber),
         hasWorkOrder: !!str(order, 'work_order'),
         staged: found.staged.length,
         refused: found.refused,
@@ -50,17 +52,18 @@ export function shipOrder(order: GlideRecord): void {
     }
     const hotSpares = new Set(found.hotSpares)
     const asset = new GlideRecord('alm_hardware')
+    // Found past the user's rules as shippable() found them, then saved with the rules on so the line moves on.
+    asset.setWorkflow(false)
     asset.addQuery('sys_id', 'IN', [...found.staged, ...found.hotSpares].join(','))
     asset.query()
+    asset.setWorkflow(true)
     let shipped = 0
     while (asset.next()) {
         // The label purchase takes time: an Asset moved on meanwhile is left alone.
-        const stage = readStage(asset)
-        const hotSpare = hotSpares.has(asset.getUniqueValue())
-        if (stage !== (hotSpare ? 'spare_pool' : 'staged')) continue
+        if (readStage(asset) !== (hotSpares.has(asset.getUniqueValue()) ? 'spare_pool' : 'staged')) continue
         placeAtSite(asset, siteId)
-        if (hotSpare) asset.update()
-        else if (moveAndSave(asset, 'shipped', `ship ${str(order, 'number')}`)) shipped++
+        // A hot spare is handed over where it is, as shipped: otherwise its line never gets past ready to ship.
+        if (moveAndSave(asset, 'shipped', `ship ${str(order, 'number')}`)) shipped++
     }
     if (plan.onSiteWork) openOnSiteWork(order, plan.onSiteWork)
     gs.addInfoMessage(`${shipped} asset(s) shipped to ${str(order, 'site.name')}`)
@@ -68,29 +71,43 @@ export function shipOrder(order: GlideRecord): void {
 }
 
 /**
- * The Order's staged Assets that may ship to `siteId` and its hot spares (sys_ids), with how many staged
- * ones are refused and the first reason. Each staged Asset is tried with the move Ship makes, on the
- * Site Ship gives it, without saving.
+ * The Order's staged Assets and hot spares that may ship to `siteId` (sys_ids), with how many are refused
+ * and the first reason. Each is tried with the move Ship makes, on the Site Ship gives it, without saving.
+ * They are read past the user's before-query rules (ADR 0005): an inventory tech sees only the Assets of
+ * their stockrooms, and a hot spare sits in the customer-site stockroom.
  */
 function shippable(orderId: string, siteId: string): { staged: string[]; hotSpares: string[]; refused: number; reason: string } {
     const asset = new GlideRecord('alm_hardware')
+    // Only tried, never saved, so the rules need not be turned back on.
+    asset.setWorkflow(false)
     asset.addEncodedQuery(stagesQuery(['staged', 'spare_pool'], `x_daas_ham_order_line.order=${orderId}`))
     asset.query()
     const found = { staged: [] as string[], hotSpares: [] as string[], refused: 0, reason: '' }
     while (asset.next()) {
-        if (readStage(asset) === 'spare_pool') {
-            found.hotSpares.push(asset.getUniqueValue())
-            continue
-        }
+        const hotSpare = readStage(asset) === 'spare_pool'
         placeAtSite(asset, siteId)
         const verdict = moveAsset(asset, 'shipped')
-        if (verdict.allowed) found.staged.push(asset.getUniqueValue())
+        if (verdict.allowed) (hotSpare ? found.hotSpares : found.staged).push(asset.getUniqueValue())
         else {
             found.refused++
             found.reason ||= verdict.reason
         }
     }
     return found
+}
+
+/**
+ * Whether `trackingNumber` is a label an earlier Ship of the Order bought, not one entered by hand: that
+ * label covers only the boxes it was bought for, so Assets staged since need one of their own.
+ */
+function labelBought(orderId: string, trackingNumber: string): boolean {
+    const shipment = new GlideRecord('x_daas_ham_shipment')
+    shipment.addQuery('order', orderId)
+    shipment.addQuery('direction', 'to_site')
+    shipment.addQuery('tracking_number', trackingNumber)
+    shipment.setLimit(1)
+    shipment.query()
+    return shipment.hasNext()
 }
 
 /** Put an Asset at the Order's Site (the caller saves). */

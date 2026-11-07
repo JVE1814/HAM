@@ -39,14 +39,41 @@ const LINE_FOR_PROGRESS: Record<number, LineStage> = {
     6: 'in_service',
 }
 
-export function lineStageFor(line: { quantity: number; assetStages: ReadonlyArray<Stage | null>; cancelled: boolean }): LineStage {
-    if (line.cancelled || line.quantity <= 0) return 'cancelled'
-    const progress = line.assetStages.map((stage) => (stage ? PROGRESS[stage] : undefined)).filter((p): p is number => p !== undefined)
-    if (progress.length < line.quantity) return 'awaiting_stock'
-    return LINE_FOR_PROGRESS[Math.min(...progress)]
+const LINE_ORDER: readonly LineStage[] = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped', 'installed', 'in_service']
+
+/** Line stages at which the line's equipment has left the Provider. */
+const DELIVERED: ReadonlySet<LineStage> = new Set(['shipped', 'installed', 'in_service'])
+
+/** What a line's stage is derived from. */
+export interface LineFacts {
+    /** The stage the line is in now. */
+    current: LineStage
+    quantity: number
+    assetStages: ReadonlyArray<Stage | null>
 }
 
-const LINE_ORDER: readonly LineStage[] = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped', 'installed', 'in_service']
+/**
+ * The stage a line at `current` takes from its Assets. Once delivered it only moves forward, following the Assets still
+ * on their way into service: one that leaves (a return, a swap-back of a dead-on-arrival unit, declared missing) neither
+ * sends the line back nor holds it up, as nothing re-sources a delivered line.
+ */
+export function lineStageFor(line: LineFacts): LineStage {
+    if (line.current === 'cancelled' || line.quantity <= 0) return 'cancelled'
+    const progress = line.assetStages.map((stage) => (stage ? PROGRESS[stage] : undefined)).filter((p): p is number => p !== undefined)
+    if (!DELIVERED.has(line.current)) {
+        return progress.length < line.quantity ? 'awaiting_stock' : LINE_FOR_PROGRESS[Math.min(...progress)]
+    }
+    const derived = progress.length > 0 ? LINE_FOR_PROGRESS[Math.min(...progress)] : line.current
+    return LINE_ORDER.indexOf(derived) > LINE_ORDER.indexOf(line.current) ? derived : line.current
+}
+
+/** Order stages its lines no longer move: before approval, and once rejected, cancelled or complete. */
+const SETTLED_ORDER_STAGES: readonly string[] = ['draft', 'awaiting_approval', 'rejected', 'cancelled', 'complete']
+
+/** Whether an Order's stage still follows its lines (a complete Order stays complete when its Assets leave service). */
+export function followsLines(orderStage: string): boolean {
+    return !SETTLED_ORDER_STAGES.includes(orderStage)
+}
 
 export function orderStageFor(lineStages: readonly LineStage[]): OrderStage {
     const live = lineStages.filter((s) => s !== 'cancelled')

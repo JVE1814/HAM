@@ -5,6 +5,7 @@ const order: ShipFacts = {
     orderType: 'site_rollout',
     installMode: 'fsm_engineer',
     hasTrackingNumber: false,
+    trackingNumberBought: false,
     hasWorkOrder: false,
     staged: 2,
     refused: 0,
@@ -14,6 +15,7 @@ const order: ShipFacts = {
 }
 
 const noSite = 'An asset must have a site before it can be shipped'
+const noAgreement = 'An asset must belong to an agreement before it can be shipped'
 
 function onSiteWork(facts: Partial<ShipFacts>) {
     const plan = planShipment({ ...order, ...facts })
@@ -32,14 +34,14 @@ describe('planShipment', () => {
     it('says why when every staged Asset is refused, instead of calling the Order empty', () => {
         expect(planShipment({ ...order, staged: 0, refused: 3, refusedReason: noSite, shippingEnabled: false })).toEqual({
             ok: false,
-            errors: [`3 staged asset(s) cannot ship: ${noSite}`],
+            errors: [`3 asset(s) cannot ship: ${noSite}`],
         })
     })
 
     it('ships the allowed staged Assets and reports the refused ones', () => {
         expect(planShipment({ ...order, staged: 2, refused: 1, refusedReason: noSite })).toEqual({
             ok: true,
-            errors: [`1 staged asset(s) cannot ship: ${noSite}`],
+            errors: [`1 asset(s) cannot ship: ${noSite}`],
             labelPackages: 2,
             onSiteWork: { changeType: 'normal', purpose: 'install', subcontracted: false },
         })
@@ -48,7 +50,7 @@ describe('planShipment', () => {
     it('links hot spares without a label when every staged Asset is refused', () => {
         expect(planShipment({ ...order, staged: 0, refused: 2, refusedReason: noSite, hotSpares: 1 })).toMatchObject({
             ok: true,
-            errors: [`2 staged asset(s) cannot ship: ${noSite}`],
+            errors: [`2 asset(s) cannot ship: ${noSite}`],
             labelPackages: null,
         })
     })
@@ -56,7 +58,7 @@ describe('planShipment', () => {
     it('reports refused Assets ahead of a missing tracking number', () => {
         expect(planShipment({ ...order, refused: 1, refusedReason: noSite, shippingEnabled: false })).toEqual({
             ok: false,
-            errors: [`1 staged asset(s) cannot ship: ${noSite}`, 'Enter the carrier and tracking number before shipping'],
+            errors: [`1 asset(s) cannot ship: ${noSite}`, 'Enter the carrier and tracking number before shipping'],
         })
     })
 
@@ -84,6 +86,30 @@ describe('planShipment', () => {
     it('buys no label once a tracking number was entered by hand', () => {
         const plan = planShipment({ ...order, hasTrackingNumber: true, shippingEnabled: false })
         expect(plan.ok && plan.labelPackages).toBeNull()
+    })
+
+    it("buys a new label for Assets staged after an earlier Ship, whose label covers only that Ship's boxes", () => {
+        const plan = planShipment({ ...order, staged: 1, hasTrackingNumber: true, trackingNumberBought: true })
+        expect(plan.ok && plan.labelPackages).toBe(1)
+    })
+
+    it('asks for a tracking number when a later Ship needs a label and the aggregator is now off', () => {
+        expect(planShipment({ ...order, hasTrackingNumber: true, trackingNumberBought: true, shippingEnabled: false })).toEqual({
+            ok: false,
+            errors: ['Enter the carrier and tracking number before shipping'],
+        })
+    })
+
+    it('hands over hot spares alone on a later Ship without another label', () => {
+        const plan = planShipment({ ...order, staged: 0, hotSpares: 1, hasTrackingNumber: true, trackingNumberBought: true })
+        expect(plan.ok && plan.labelPackages).toBeNull()
+    })
+
+    it('reports a refused hot spare like a refused staged Asset', () => {
+        expect(planShipment({ ...order, staged: 0, hotSpares: 0, refused: 1, refusedReason: noAgreement })).toEqual({
+            ok: false,
+            errors: [`1 asset(s) cannot ship: ${noAgreement}`],
+        })
     })
 
     it('buys no label for remote hands, whose work is subcontracted', () => {
