@@ -1,6 +1,6 @@
 import { GlideAggregate, gs } from '@servicenow/glide'
 import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
-import { freeStockOf, pickForSparePool, sparePoolShortfall } from '../domain/sourcing'
+import { freeStockOf, pickForSparePool, reservedSparesQuery, sparePoolShortfall } from '../domain/sourcing'
 import { runTableJob } from '../platform/chunked'
 import { openPurchaseQuantity, requestPurchase } from '../platform/procurement'
 import { boolProperty, PROPERTY, stagingStockroom } from '../platform/properties'
@@ -40,7 +40,7 @@ function canPurchase(): boolean {
 /** Move free central stock into the Customer's Spare pool, and buy what is still missing when `autoPurchase`. */
 function topUpAgreement(agreementId: string, customerId: string, ratio: number, autoPurchase: boolean): void {
     const deployed = countByModel(stagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}`))
-    const reserved = countByModel(stagesQuery(['spare_pool'], `company=${customerId}`))
+    const reserved = countByModel(reservedSparesQuery(customerId))
     for (const [modelId, deployedCount] of deployed) {
         const shortfall = sparePoolShortfall({ deployed: deployedCount, reserved: reserved.get(modelId) ?? 0, ratio })
         if (shortfall === 0) continue

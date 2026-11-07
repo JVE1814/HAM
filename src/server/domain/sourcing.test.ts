@@ -6,6 +6,7 @@ import {
     isFree,
     pickForSparePool,
     planSourcing,
+    reservedSparesQuery,
     shortfallOutcome,
     sparePoolShortfall,
     stockQueries,
@@ -193,6 +194,17 @@ describe('sparePoolShortfall', () => {
         expect(sparePoolShortfall({ deployed: 41, reserved: 1, ratio: 0.05 })).toBe(2)
         expect(sparePoolShortfall({ deployed: 40, reserved: 5, ratio: 0.05 })).toBe(0)
         expect(sparePoolShortfall({ deployed: 0, reserved: 0, ratio: 0.05 })).toBe(0)
+    })
+})
+
+describe('reservedSparesQuery', () => {
+    const lease = 'x_daas_ham_lease.end_action'
+
+    it("counts the Customer's spare-pool units, leaving out those bound for their Lessor as sourcing does", () => {
+        const notLessorBound = `${lease}!=return^OR${lease}ISEMPTY`
+        expect(reservedSparesQuery('acme')).toBe(stagesQuery(['spare_pool'], `company=acme^${notLessorBound}`))
+        const [pool] = stockQueries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose: 'new' })
+        expect(pool).toContain(`^${notLessorBound}`)
     })
 })
 

@@ -29,8 +29,9 @@ export function transitionFacts(asset: GlideRecord): TransitionFacts {
 
 /**
  * Move an Asset to `to` if the lifecycle allows it (set its fields; the caller saves the record). A move into staging
- * also clears the wipe evidence (domain/lifecycle `voidsWipeEvidence`), so every path that stages an Asset does.
- * `force` lets administrators correct assets in stages the app does not model.
+ * also clears the wipe evidence (domain/lifecycle `voidsWipeEvidence`); a save that sets the stage some other way has
+ * it cleared by the before-update rule (entry/assets `enforceLifecycle`). `force` lets administrators correct assets in
+ * stages the app does not model.
  */
 export function moveAsset(asset: GlideRecord, to: Stage, options: { force?: boolean } = {}): TransitionVerdict {
     const from = readStage(asset)
@@ -39,12 +40,15 @@ export function moveAsset(asset: GlideRecord, to: Stage, options: { force?: bool
         const fields = fieldsOf(to)
         asset.setValue('install_status', fields.installStatus)
         asset.setValue('substatus', fields.substatus ?? '')
-        if (voidsWipeEvidence(from, to)) {
-            asset.setValue('x_daas_ham_wiped_on', '')
-            asset.setValue('x_daas_ham_wipe_certificate', '')
-        }
+        if (voidsWipeEvidence(from, to)) clearWipeEvidence(asset)
     }
     return verdict
+}
+
+/** Clear the Asset's wipe evidence (the caller saves): a wipe recorded before no longer covers the unit. */
+export function clearWipeEvidence(asset: GlideRecord): void {
+    asset.setValue('x_daas_ham_wiped_on', '')
+    asset.setValue('x_daas_ham_wipe_certificate', '')
 }
 
 /**

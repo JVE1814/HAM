@@ -70,6 +70,14 @@ export function freeStockOf(modelId: string): StockScope {
 /** The end action of a lease whose units go back to its Lessor. */
 const RETURNING: LeaseEndAction = 'return'
 
+const LEASE_END = 'x_daas_ham_lease.end_action'
+
+/**
+ * Stock not bound for its Lessor, as an encoded alm_hardware condition (`isClaimable` on a query). Not left to how !=
+ * treats empty values: stock on no lease has no end action.
+ */
+const NOT_LESSOR_BOUND = `${LEASE_END}!=${RETURNING}^OR${LEASE_END}ISEMPTY`
+
 /** An in-stock Asset as a fresh read shows it, to decide whether it may still be claimed or withdrawn. */
 export interface StockUnit {
     stage: Stage | null
@@ -101,9 +109,7 @@ export function isClaimable(unit: StockUnit, from: readonly Stage[]): boolean {
  * decides each one.
  */
 export function stockQueries(scope: StockScope): string[] {
-    // Not left to how != treats empty values either: stock on no lease has no end action.
-    const lease = 'x_daas_ham_lease.end_action'
-    const base = `model=${scope.modelId}^x_daas_ham_order_lineISEMPTY^${lease}!=${RETURNING}^OR${lease}ISEMPTY`
+    const base = `model=${scope.modelId}^x_daas_ham_order_lineISEMPTY^${NOT_LESSOR_BOUND}`
     const type = 'stockroom.x_daas_ham_stockroom_type'
     // Not left to how != treats empty values: stock in a stockroom with no type, or in none, counts as a depot's.
     const provider = `${base}^${type}!=customer_site^OR${type}ISEMPTY`
@@ -195,6 +201,14 @@ function routedOutcome(route: ShortfallRoute, line: { planSummary: string; missi
     const purchased = purchase()
     if (!purchased.ok) return { ...sourced, stage: 'awaiting_stock', summary: `${line.planSummary} (no purchase order: ${purchased.reason})` }
     return { ...sourced, purchaseOrder: purchased.poId, quantityToPurchase: line.onOrder + line.missing }
+}
+
+/**
+ * An encoded alm_hardware query for the Customer's Spare pool as the top-up counts it. Units bound for their Lessor are
+ * left out: sourcing can no longer claim them (`isClaimable`), so counted they would keep the pool short.
+ */
+export function reservedSparesQuery(customerId: string): string {
+    return stagesQuery(['spare_pool'], `company=${customerId}^${NOT_LESSOR_BOUND}`)
 }
 
 /** Spares a Customer still needs to reach `ratio` × deployed Assets. */

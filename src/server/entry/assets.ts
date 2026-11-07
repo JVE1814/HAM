@@ -1,6 +1,6 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { billingChange, checkTransition } from '../domain/lifecycle'
-import { readStage, transitionFacts } from '../platform/assets'
+import { billingChange, checkTransition, voidsWipeEvidence } from '../domain/lifecycle'
+import { clearWipeEvidence, readStage, transitionFacts } from '../platform/assets'
 import { glideToIsoDate, todayIso } from '../platform/clock'
 import { recomputeLine } from '../platform/fulfilment'
 import { str } from '../platform/records'
@@ -12,12 +12,14 @@ import { ROLE } from '../domain/visibility'
 
 /**
  * Before-update rule on alm_hardware: people editing the stage on a form must follow the lifecycle
- * (ADR 0002). Background processes and administrators are not checked.
+ * (ADR 0002). Background processes and administrators are not checked, but every save into staging
+ * clears the wipe evidence, theirs too: one that sets the stage without moveAsset stages the Asset all the same.
  */
 export function enforceLifecycle(current: GlideRecord, previous: GlideRecord): void {
-    if (!gs.isInteractive() || gs.hasRole(ROLE.admin)) return
     const from = readStage(previous)
     const to = readStage(current)
+    if (to !== null && voidsWipeEvidence(from, to)) clearWipeEvidence(current)
+    if (!gs.isInteractive() || gs.hasRole(ROLE.admin)) return
     if (to === null) {
         gs.addErrorMessage('This install status / substatus combination is not used by NaaS asset management')
         current.setAbortAction(true)

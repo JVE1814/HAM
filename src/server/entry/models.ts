@@ -1,6 +1,6 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
 import { runTableJob } from '../platform/chunked'
 import { todayIso } from '../platform/clock'
@@ -38,23 +38,38 @@ export function normalizeRawModels(): void {
     })
 }
 
+/**
+ * Point the raw model's Assets at the canonical Model, then mark the raw model normalized. Marked, it leaves the job's
+ * query, so an Asset whose save is refused leaves it unmarked for the next run to repoint.
+ */
 function repointModel(rawModelId: string, canonicalModelId: string): void {
     const raw = new GlideRecord('cmdb_model')
     if (!raw.get(rawModelId)) return
-    raw.setValue('x_daas_ham_normalized_to', canonicalModelId)
-    raw.update()
+    let refused = 0
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery('model', rawModelId)
     asset.query()
     while (asset.next()) {
         asset.setValue('model', canonicalModelId)
-        asset.update()
+        if (asset.update()) continue
+        refused++
+        const reason = asset.getLastErrorMessage() || 'the save was refused'
+        gs.warn(`[x_daas_ham] Model normalization: ${str(asset, 'serial_number')} left on its raw model: ${reason}`)
     }
+    if (refused > 0) return
+    raw.setValue('x_daas_ham_normalized_to', canonicalModelId)
+    raw.update()
 }
 
-/** After-update rule on normalization exceptions given a resolved model: learn a rule from it. */
+/**
+ * After-update rule on normalization exceptions given a resolved model: learn a rule from it. One whose alias or rule
+ * is refused stays open, as nothing maps its raw pair yet.
+ */
 export function onNormalizationResolved(current: GlideRecord): void {
-    learnFromResolution(current, loadNormalizationData())
+    if (!learnFromResolution(current, loadNormalizationData())) {
+        const retry = 'clear its resolved model and set it again to retry'
+        return void gs.addErrorMessage(`No rule learned (see the system log), so the exception stays open: ${retry}`)
+    }
     current.setValue('status', 'resolved')
     current.update()
 }

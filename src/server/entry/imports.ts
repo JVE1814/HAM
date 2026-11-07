@@ -44,8 +44,8 @@ export function processAsnRow(current: GlideRecord): void {
     asset.setValue('x_daas_ham_mac_address', str(current, 'mac_address'))
     asset.setValue('x_daas_ham_claim_code', str(current, 'claim_code'))
     asset.setValue('x_daas_ham_staging_source', str(current, 'staging_source') === 'distributor' ? 'distributor' : 'in_house')
-    const assetId = asset.insert()
-    finish(current, assetId ? 'inserted' : 'error', assetId ? `Asset ${serial} in transit` : 'Asset insert failed')
+    if (!asset.insert()) return finish(current, 'error', `Asset insert failed: ${refusal(asset)}`)
+    finish(current, 'inserted', `Asset ${serial} in transit`)
 }
 
 function serialExists(serial: string): boolean {
@@ -83,7 +83,11 @@ export function processLifecycleRow(current: GlideRecord): void {
     lifecycle.setValue('source', 'csv')
     lifecycle.setValue('source_reference', str(current, 'source_reference'))
     lifecycle.setValue('last_refreshed', new GlideDateTime().getValue())
-    if (exists) lifecycle.update()
-    else lifecycle.insert()
+    const saved = exists ? lifecycle.update() : lifecycle.insert()
+    if (!saved) return finish(current, 'error', `Lifecycle for ${parsed.pid} not saved: ${refusal(lifecycle)}`)
     finish(current, exists ? 'updated' : 'inserted', `Lifecycle for ${parsed.pid}`)
+}
+
+function refusal(record: GlideRecord): string {
+    return record.getLastErrorMessage() || 'the save was refused'
 }

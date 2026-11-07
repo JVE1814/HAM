@@ -1,4 +1,4 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { normalizeModel, shouldLearnAlias, type ManufacturerAlias, type ModelMatchRule } from '../domain/normalization'
 import { bool, num, str } from './records'
 
@@ -83,19 +83,21 @@ export function recordNormalizationException(
 /**
  * Teach the rules: an exact rule for a resolved exception, and an alias when its manufacturer name was unknown. A blank
  * or punctuation-only name gets no alias, since none could ever match it; the exact rule still serves rows that name a
- * known manufacturer.
+ * known manufacturer. False (and a warning) when the platform refuses the alias or the rule, so the caller does not
+ * take the raw pair as mapped; a refused alias stops before the rule, so a retry learns each once.
  */
-export function learnFromResolution(exception: GlideRecord, data: NormalizationData): void {
+export function learnFromResolution(exception: GlideRecord, data: NormalizationData): boolean {
     const modelId = str(exception, 'resolved_model')
     const manufacturerId = str(exception, 'resolved_model.manufacturer')
-    if (!modelId || !manufacturerId) return
+    if (!modelId || !manufacturerId) return true
     const rawManufacturer = str(exception, 'raw_manufacturer')
+    const rawPair = `${rawManufacturer} / ${str(exception, 'raw_model')}`
     if (shouldLearnAlias(rawManufacturer, data.aliases)) {
         const alias = new GlideRecord('x_daas_ham_manufacturer_alias')
         alias.initialize()
         alias.setValue('alias', rawManufacturer)
         alias.setValue('manufacturer', manufacturerId)
-        alias.insert()
+        if (!learned(alias, 'alias', rawPair)) return false
     }
     const rule = new GlideRecord('x_daas_ham_model_match_rule')
     rule.initialize()
@@ -104,5 +106,11 @@ export function learnFromResolution(exception: GlideRecord, data: NormalizationD
     rule.setValue('match_type', 'exact')
     rule.setValue('pattern', str(exception, 'raw_model'))
     rule.setValue('model', modelId)
-    rule.insert()
+    return learned(rule, 'match rule', rawPair)
+}
+
+function learned(record: GlideRecord, what: string, rawPair: string): boolean {
+    if (record.insert()) return true
+    gs.warn(`[x_daas_ham] No ${what} learned for ${rawPair}: ${record.getLastErrorMessage() || 'the save was refused'}`)
+    return false
 }
