@@ -330,9 +330,11 @@ What remains can only be confirmed on an instance or behind a vendor login:
   (<tracking number>) dropped after 15 tries (...): check the Shipment with the carrier* (warning).
   With the row in place, *Mark label voided* says *Label <tracking number> not marked voided: a
   tracking update of it is being saved. Try again* and changes nothing. No lock row is left afterwards.
-  The queued update travels in the event's `parm1`, cut to fit 4000 characters (several events for a
-  long history): check that `sysevent.parm1` holds that many on the instance (its dictionary max
-  length), as the 4000 comes from community answers, not ServiceNow's documentation.
+  The queued update travels in the event's `parm1`, at most 4000 characters (a long history is shared
+  out over several events, never cut): check that `sysevent.parm1` holds that many on the instance
+  (its dictionary max length), as the 4000 comes from community answers, not ServiceNow's
+  documentation. A longer value would be cut on save and the retry dropped as *parm1 is not an
+  update*.
 - **Inventory tech access** (ADR 0005), also after upgrading an existing install: the ACLs that
   `security/acls*.now.ts` give `broadStaff` (agreements, subscription lines, catalog entries, site
   templates, fee events, attestations, leases, OEM coverage and cloud accounts, model data, device

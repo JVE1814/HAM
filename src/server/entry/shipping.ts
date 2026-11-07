@@ -11,6 +11,7 @@ import {
     parseTrackingRetry,
     parseTrackingWebhook,
     returnLabelRefusal,
+    statusOvertaken,
     tokenMatches,
     trackingEventKey,
     trackingRetryParams,
@@ -293,23 +294,25 @@ export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIRes
 
 /**
  * Script action on x_daas_ham.shipment.track (parm1: a tracking update `trackLater` queued, parm2: how many times it
- * was queued again): apply it to the Shipment as the webhook does, under its tracking lock. One held off again, or
- * whose Shipment or events the platform refused, is queued again a minute later, TRACKING_RETRIES times at most, then
- * dropped with a warning naming the Shipment; a retry repeats nothing, as stored events are skipped and a delivery is
- * noted once. Taking the lock throws only when an insert is refused with no lock row (platform/locks); that error
- * escapes.
+ * was queued again): apply it to the Shipment as the webhook does, under its tracking lock. Updates applied while it
+ * waited may be newer: one of them having stored a later event, its status is not taken, only its events (`track`).
+ * One held off again, or whose Shipment or events the platform refused, is queued again a minute later,
+ * TRACKING_RETRIES times at most, then dropped with a warning naming the Shipment; a retry repeats nothing, as stored
+ * events are skipped and a delivery is noted once. Taking the lock throws only when an insert is refused with no lock
+ * row (platform/locks); that error escapes.
  */
 export function retryTrackingUpdate(event: GlideRecord, current: GlideRecord): void {
     const shipmentId = current.getUniqueValue()
     // The Shipment is gone: nothing to apply.
     if (!shipmentId) return
     const param = str(event, 'parm1')
-    const update = parseTrackingRetry(param)
-    if (!update) {
+    const queued = parseTrackingRetry(param)
+    if (!queued) {
         return void gs.warn(`[x_daas_ham] Tracking retry of ${shipmentName(current)} dropped: parm1 is not an update`)
     }
+    const { update, newestAt } = queued
     const tries = Number(str(event, 'parm2')) || 0
-    const tracked = trackUnderLock(shipmentId, update)
+    const tracked = trackUnderLock(shipmentId, update, newestAt)
     if (tracked === 'busy') return trackAgain(current, param, tries, 'another update held its lock')
     if (!tracked) return
     if ('error' in tracked) return trackAgain(current, param, tries, 'the platform refused the Shipment')
@@ -324,17 +327,18 @@ function shipmentName(shipment: GlideRecord): string {
 
 /**
  * Apply `update` to the Shipment `shipmentId` under its tracking lock (`track`, on the Shipment read again there): what
- * it did, null when the Shipment is gone, or 'busy' when other holders kept the lock through every try. The lock is a
- * leaf (ADR 0013): taken holding no other lock, and none is taken under it, so the Order is noted after it is released
- * (`noteDelivery`). Taking it throws only when an insert is refused with no lock row (platform/locks `withLockTries`
- * tries again, and that error escapes only when every try threw).
+ * it did, null when the Shipment is gone, or 'busy' when other holders kept the lock through every try. `newestAt` is
+ * given for a queued update only (`track`). The lock is a leaf (ADR 0013): taken holding no other lock, and none is
+ * taken under it, so the Order is noted after it is released (`noteDelivery`). Taking it throws only when an insert is
+ * refused with no lock row (platform/locks `withLockTries` tries again, and that error escapes only when every try
+ * threw).
  */
-function trackUnderLock(shipmentId: string, update: TrackingUpdate): Tracked | null | 'busy' {
+function trackUnderLock(shipmentId: string, update: TrackingUpdate, newestAt?: string): Tracked | null | 'busy' {
     // Set inside the lock; left null when the Shipment is gone by then.
     let tracked = null as Tracked | null
     const ran = withLockTries(trackingLockName(shipmentId), TRACKING_LOCK_TRIES, () => {
         const shipment = findById('x_daas_ham_shipment', shipmentId)
-        if (shipment) tracked = track(shipment, update)
+        if (shipment) tracked = track(shipment, update, newestAt)
     })
     return ran ? tracked : 'busy'
 }
@@ -356,7 +360,7 @@ function noteDelivery(saved: Saved, trackingNumber: string): void {
  * `trackingRetryParams`); only an event too long for a parameter by itself leaves it unqueued.
  */
 function trackLater(shipment: GlideRecord, update: TrackingUpdate): boolean {
-    const params = trackingRetryParams(update, storedEventKeys(shipment.getUniqueValue()))
+    const params = trackingRetryParams(update, storedEvents(shipment.getUniqueValue()).keys)
     if (!params) {
         gs.warn(`[x_daas_ham] Tracking update of ${shipmentName(shipment)} not queued: an event is too long to queue`)
         return false
@@ -381,35 +385,46 @@ function trackAgain(shipment: GlideRecord, param: string, tries: number, why: st
 }
 
 /**
- * Apply `update` to `shipment`, read again under its tracking lock, save it and add the events not stored yet. A holder
- * does not check that it still holds the lock: its few writes take a moment, far inside the lock's ten minutes.
+ * Apply `update` to `shipment`, read again under its tracking lock, save it and add the events not stored yet. A queued
+ * update (`newestAt`: when its newest event happened) overtaken by an update applied while it waited (domain/shipping
+ * `statusOvertaken`) adds only its events, so its older status cannot move the Shipment back. A holder does not check
+ * that it still holds the lock: its few writes take a moment, far inside the lock's ten minutes.
  */
-function track(shipment: GlideRecord, update: TrackingUpdate): Tracked {
-    const { status, detail, deliveredNow } = applyTracking(str(shipment, 'status') as ShipmentStatus, update)
-    shipment.setValue('status', status)
-    if (detail !== undefined) shipment.setValue('status_detail', detail)
-    if (update.estimatedDelivery) shipment.setValue('estimated_delivery', update.estimatedDelivery)
-    if (deliveredNow) {
-        const deliveredMs = Date.parse(update.deliveredAt ?? '')
-        shipment.setValue('delivered_at', msToGlide(Number.isFinite(deliveredMs) ? deliveredMs : nowMs()))
+function track(shipment: GlideRecord, update: TrackingUpdate, newestAt?: string): Tracked {
+    const shipmentId = shipment.getUniqueValue()
+    // Read under the lock, so no other delivery inserts between this read and the inserts below.
+    const stored = storedEvents(shipmentId)
+    let status = str(shipment, 'status') as ShipmentStatus
+    let deliveredNow = false
+    if (newestAt === undefined || !statusOvertaken(update, newestAt, stored.times)) {
+        const applied = applyTracking(status, update)
+        status = applied.status
+        deliveredNow = applied.deliveredNow
+        shipment.setValue('status', status)
+        if (applied.detail !== undefined) shipment.setValue('status_detail', applied.detail)
+        if (update.estimatedDelivery) shipment.setValue('estimated_delivery', update.estimatedDelivery)
+        if (deliveredNow) {
+            const deliveredMs = Date.parse(update.deliveredAt ?? '')
+            shipment.setValue('delivered_at', msToGlide(Number.isFinite(deliveredMs) ? deliveredMs : nowMs()))
+        }
+        if (!shipment.update()) {
+            // Nothing below runs on a status that was not saved: the retry does it.
+            const reason = refusal(shipment)
+            gs.warn(`[x_daas_ham] Tracking update of ${update.trackingNumber} not saved: ${reason}`)
+            return { error: 'Shipment not saved; send the update again' }
+        }
     }
-    if (!shipment.update()) {
-        // Nothing below runs on a status that was not saved: the retry does it.
-        const reason = refusal(shipment)
-        gs.warn(`[x_daas_ham] Tracking update of ${update.trackingNumber} not saved: ${reason}`)
-        return { error: 'Shipment not saved; send the update again' }
-    }
-    const unrecorded = recordEvents(shipment.getUniqueValue(), update.trackingNumber, update.events)
+    const unrecorded = recordEvents(shipmentId, update.trackingNumber, newTrackingEvents(stored.keys, update.events))
     return { status, deliveredNow, orderId: str(shipment, 'order'), carrier: str(shipment, 'carrier'), unrecorded }
 }
 
 /**
- * Add the tracking events not stored yet (the aggregator resends the whole history); returns how many were refused. The
- * caller holds the Shipment's tracking lock, so no other delivery inserts between this read and these inserts.
+ * Add `fresh`, the tracking events not stored yet (the aggregator resends the whole history); returns how many were
+ * refused. The caller holds the Shipment's tracking lock and read the stored events under it.
  */
-function recordEvents(shipmentId: string, trackingNumber: string, events: readonly TrackingEvent[]): number {
+function recordEvents(shipmentId: string, trackingNumber: string, fresh: readonly TrackingEvent[]): number {
     let refused = 0
-    for (const event of newTrackingEvents(storedEventKeys(shipmentId), events)) {
+    for (const event of fresh) {
         const record = new GlideRecord('x_daas_ham_shipment_event')
         record.initialize()
         record.setValue('shipment', shipmentId)
@@ -425,15 +440,17 @@ function recordEvents(shipmentId: string, trackingNumber: string, events: readon
     return refused
 }
 
-/** The keys (domain/shipping `trackingEventKey`) of the tracking events stored for a Shipment. */
-function storedEventKeys(shipmentId: string): Set<string> {
-    const known = new Set<string>()
+/** The tracking events stored for a Shipment: their keys (domain/shipping `trackingEventKey`) and carrier times. */
+function storedEvents(shipmentId: string): { keys: Set<string>; times: string[] } {
+    const keys = new Set<string>()
+    const times: string[] = []
     const existing = new GlideRecord('x_daas_ham_shipment_event')
     existing.addQuery('shipment', shipmentId)
     existing.query()
     while (existing.next()) {
         const stored = { occurredAt: str(existing, 'occurred_at'), description: str(existing, 'description') }
-        known.add(trackingEventKey(stored))
+        keys.add(trackingEventKey(stored))
+        times.push(stored.occurredAt)
     }
-    return known
+    return { keys, times }
 }

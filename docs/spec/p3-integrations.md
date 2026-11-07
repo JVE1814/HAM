@@ -59,14 +59,19 @@
   aggregator: ShipEngine waits 10 seconds for a 2xx, then makes at most two more attempts, typically
   30 minutes apart, and drops the update (EasyPost up to 6). The delivery is answered HTTP 202
   `{"matched": true, "queued": true}` at once, and the update (status, detail, estimated delivery,
-  delivery time and the events not stored yet) is queued as the event `x_daas_ham.shipment.track` on
-  the Shipment, in its `parm1` (at most 4000 characters, the event parameter's size; events that do
-  not fit one are shared out over several events, each a whole update). Its script action applies it
-  as the webhook would, under the same lock, and while the lock is still held, or the Shipment or an
-  event is refused, queues it again about a minute later, at most 15 times (past the lock's ten-minute
-  abandonment), then drops it with a warning naming the Shipment and its tracking number. Only an
-  update that cannot be queued (one tracking event too long for a parameter by itself) is answered
-  HTTP 503 *Another update of this Shipment is being saved; send it again*.
+  delivery time, the time of its newest event and the events not stored yet) is queued as the event
+  `x_daas_ham.shipment.track` on the Shipment, in its `parm1` (at most 4000 characters, the event
+  parameter's size; events that do not fit one are shared out over several events, each a whole
+  update). Its script action applies it as the webhook would, under the same lock. Updates applied
+  while it waited may be newer: when an event stored meanwhile happened after its newest, only its
+  events are added, so its older status, latest update and estimate cannot move the Shipment back
+  (say from *Out for delivery* to *In transit*); a delivery or return is still taken, as it would
+  have stayed had the updates come in order. While the lock is still held, or the Shipment or an
+  event is refused, the script action queues it again about a minute later, at most 15 times (past
+  the lock's ten-minute abandonment), then drops it with a warning naming the Shipment and its
+  tracking number. Only an update that cannot be queued (one tracking event too long for a
+  parameter by itself) is answered HTTP 503 *Another update of this Shipment is being saved; send
+  it again*.
   If the platform refuses the Shipment or a tracking event, the refusal is logged and the reply is
   500, not 2xx. An aggregator that retries failed deliveries then sends the update again; the retry
   skips events already stored and does not repeat the delivered note.

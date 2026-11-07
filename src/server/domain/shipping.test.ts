@@ -9,12 +9,14 @@ import {
     labelRequestBody,
     labelVoidable,
     newTrackingEvents,
+    newestEventAt,
     nextShipmentStatus,
     OPEN_SHIPMENTS,
     packageCount,
     parseTrackingRetry,
     parseTrackingWebhook,
     returnLabelRefusal,
+    statusOvertaken,
     tokenMatches,
     trackingEventKey,
     TRACKING_RETRY_CHARS,
@@ -497,12 +499,12 @@ describe('trackingRetryParams and parseTrackingRetry', () => {
         expect(TRACKING_RETRY_CHARS).toBe(4000)
         const params = trackingRetryParams(update, new Set())
         expect(params).toHaveLength(1)
-        expect(parseTrackingRetry(params![0])).toEqual(update)
+        expect(parseTrackingRetry(params![0])).toEqual({ update, newestAt: delivered.occurredAt })
     })
 
-    it('leaves out the events already stored, keeping the status and dates', () => {
+    it('leaves out the events already stored, keeping the status, dates and newest event time', () => {
         const [param] = trackingRetryParams(update, new Set([trackingEventKey(departed), trackingEventKey(delivered)]))!
-        expect(parseTrackingRetry(param)).toEqual({ ...update, events: [] })
+        expect(parseTrackingRetry(param)).toEqual({ update: { ...update, events: [] }, newestAt: delivered.occurredAt })
     })
 
     it('shares the events out over parameters that fit, each a whole update', () => {
@@ -515,14 +517,15 @@ describe('trackingRetryParams and parseTrackingRetry', () => {
         expect(params.length).toBeGreaterThan(1)
         const parsed = params.map((param) => parseTrackingRetry(param)!)
         for (const param of params) expect(param.length).toBeLessThanOrEqual(TRACKING_RETRY_CHARS)
-        for (const part of parsed) expect({ ...part, events: [] }).toEqual({ ...update, events: [] })
-        expect(parsed.flatMap((part) => part.events)).toEqual(events)
+        for (const part of parsed) expect({ ...part.update, events: [] }).toEqual({ ...update, events: [] })
+        for (const part of parsed) expect(part.newestAt).toBe('2026-11-06T08:59:00Z')
+        expect(parsed.flatMap((part) => part.update.events)).toEqual(events)
     })
 
     it('carries the stored lengths, and the detail cut to 255 characters', () => {
         const long = { ...departed, description: 'd'.repeat(300), location: 'l'.repeat(150) }
         const [param] = trackingRetryParams({ ...update, description: 'x'.repeat(300), events: [long] }, new Set())!
-        const parsed = parseTrackingRetry(param)!
+        const parsed = parseTrackingRetry(param)!.update
         expect(parsed.description).toHaveLength(255)
         expect(parsed.events).toEqual(newTrackingEvents(new Set(), [long]))
     })
@@ -530,7 +533,7 @@ describe('trackingRetryParams and parseTrackingRetry', () => {
     it('keeps a stored description as written, so the retried event is skipped once stored', () => {
         const spaced = { ...departed, description: `${'d'.repeat(254)} trailing` }
         const [param] = trackingRetryParams({ ...update, events: [spaced] }, new Set())!
-        const [event] = parseTrackingRetry(param)!.events
+        const [event] = parseTrackingRetry(param)!.update.events
         expect(event.description).toBe(`${'d'.repeat(254)} `)
         expect(trackingEventKey(event)).toBe(trackingEventKey(spaced))
     })
@@ -545,12 +548,57 @@ describe('trackingRetryParams and parseTrackingRetry', () => {
         expect(parseTrackingRetry('{"status":"delivered","events":[]}')).toBeNull()
         expect(parseTrackingRetry('{"trackingNumber":"1Z999","status":"delivered"}')).toBeNull()
         const voided = '{"trackingNumber":"1Z999","status":"voided","events":[{"status":"toString"}]}'
-        const forged = parseTrackingRetry(voided)!
+        const forged = parseTrackingRetry(voided)!.update
         expect(forged.status).toBe('unknown')
         expect(forged.events[0]).toEqual({ occurredAt: '', status: 'unknown', description: '', location: '' })
         const undated = '{"trackingNumber":"1Z999","status":"returned","estimatedDelivery":"soon","events":[]}'
         const read = { trackingNumber: '1Z999', status: 'returned', description: '', events: [] }
-        expect(parseTrackingRetry(undated)).toEqual(read)
+        expect(parseTrackingRetry(undated)).toEqual({ update: read, newestAt: '' })
+    })
+})
+
+describe('newestEventAt', () => {
+    const at = (occurredAt: string) => ({ occurredAt })
+
+    it('is the latest dated event as written, whatever the order or offset', () => {
+        expect(newestEventAt([at('2026-11-06T08:00:00Z'), at('2026-11-06T05:30:00-05:00'), at('2026-11-06T09:00:00Z')]))
+            .toBe('2026-11-06T05:30:00-05:00')
+    })
+
+    it("is '' when no event is dated", () => {
+        expect(newestEventAt([])).toBe('')
+        expect(newestEventAt([at(''), at('soon')])).toBe('')
+    })
+})
+
+describe('statusOvertaken', () => {
+    const queued: TrackingUpdate = {
+        trackingNumber: '1Z999',
+        status: 'in_transit',
+        description: 'Departed hub',
+        events: [],
+    }
+
+    const asOf = '2026-11-06T08:00:00Z'
+
+    it('is true once an event stored while it waited happened after its newest', () => {
+        expect(statusOvertaken(queued, asOf, ['2026-11-06T07:00:00Z', '2026-11-06T09:00:00Z'])).toBe(true)
+        expect(statusOvertaken(queued, asOf, ['2026-11-06T05:00:00-05:00'])).toBe(true)
+    })
+
+    it('is false while no stored event is later, its own included', () => {
+        expect(statusOvertaken(queued, asOf, [asOf, '2026-11-06T07:00:00Z'])).toBe(false)
+        expect(statusOvertaken(queued, asOf, ['', 'garbled'])).toBe(false)
+    })
+
+    it('is false for an update with no dated event, which cannot be placed', () => {
+        expect(statusOvertaken(queued, '', ['2026-11-06T09:00:00Z'])).toBe(false)
+    })
+
+    it('never holds back a delivery or a return, which stay once true', () => {
+        for (const status of ['delivered', 'returned'] as const) {
+            expect(statusOvertaken({ ...queued, status }, asOf, ['2026-11-06T09:00:00Z'])).toBe(false)
+        }
     })
 })
 

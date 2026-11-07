@@ -368,12 +368,45 @@ function written(value: unknown): string {
 /** The most characters one queued tracking retry carries: its event's parm1, a 4000-character string on sysevent. */
 export const TRACKING_RETRY_CHARS = 4000
 
+/** A tracking update queued to be applied in the background, and when its newest event happened ('' if undated). */
+export interface QueuedTracking {
+    update: TrackingUpdate
+    newestAt: string
+}
+
+/** When the newest of `events` happened, as the carrier wrote it; '' when none is dated. */
+export function newestEventAt(events: readonly { occurredAt: string }[]): string {
+    let newest = ''
+    let newestMs = -Infinity
+    for (const event of events) {
+        const ms = Date.parse(event.occurredAt)
+        if (Number.isFinite(ms) && ms > newestMs) {
+            newest = event.occurredAt
+            newestMs = ms
+        }
+    }
+    return newest
+}
+
+/**
+ * Whether a queued update's status is older news than the Shipment's: an event stored while it waited (`storedTimes`)
+ * happened after its newest (`newestAt`), so an update applied meanwhile is newer, and this one's status, detail and
+ * estimate would move the Shipment back (say from Out for delivery to In transit). A delivery or return is never
+ * older news: final, it would have stayed had the updates come in order (`nextShipmentStatus`).
+ */
+export function statusOvertaken(update: TrackingUpdate, newestAt: string, storedTimes: Iterable<string>): boolean {
+    const asOf = Date.parse(newestAt)
+    if (FINAL.has(update.status) || !Number.isFinite(asOf)) return false
+    for (const time of storedTimes) if (Date.parse(time) > asOf) return true
+    return false
+}
+
 /**
  * A tracking update held off by its Shipment's lock, as the parm1 (JSON, at most `maxChars` long) of each event that
- * retries it. Each carries the update's status, detail, estimate and delivery time, and the events not in `known`
- * (stored already, so never needed again) are shared out among them. Applying them all, in any order, does what the
- * update would have: the status is the same in each, a delivery is noted by the first, and stored events are skipped.
- * Null when one event does not fit on its own.
+ * retries it. Each carries the update's status, detail, estimate, delivery time and newest event time, and the events
+ * not in `known` (stored already, so never needed again) are shared out among them. Applying them all, in any order,
+ * does what the update would have: the status is the same in each, a delivery is noted by the first, and stored events
+ * are skipped. Null when one event does not fit on its own.
  */
 export function trackingRetryParams(
     update: TrackingUpdate,
@@ -386,6 +419,8 @@ export function trackingRetryParams(
         description: update.description.slice(0, 255),
         estimatedDelivery: update.estimatedDelivery,
         deliveredAt: update.deliveredAt,
+        // Of the whole update, not only the events carried: those already stored are left out.
+        newestAt: newestEventAt(update.events),
     }
     const encode = (events: TrackingEvent[]) => JSON.stringify({ ...head, events })
     const fits = (events: TrackingEvent[]) => encode(events).length <= maxChars
@@ -401,12 +436,12 @@ export function trackingRetryParams(
 }
 
 /** A queued retry's parm1 back as the update it carries (`trackingRetryParams`), or null when it is not one. */
-export function parseTrackingRetry(param: string): TrackingUpdate | null {
+export function parseTrackingRetry(param: string): QueuedTracking | null {
     const json = parseJson(param)
     const trackingNumber = written(field(json, 'trackingNumber'))
     const events = field(json, 'events')
     if (!trackingNumber || !Array.isArray(events)) return null
-    return {
+    const update: TrackingUpdate = {
         trackingNumber,
         status: trackingStatus(field(json, 'status')),
         description: written(field(json, 'description')),
@@ -419,6 +454,7 @@ export function parseTrackingRetry(param: string): TrackingUpdate | null {
             location: written(field(event, 'location')),
         })),
     }
+    return { update, newestAt: written(field(json, 'newestAt')) }
 }
 
 /** The header the aggregators are registered to send the webhook token in (registered as X-NaaS-Webhook-Token; names are case-insensitive). */
