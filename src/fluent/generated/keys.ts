@@ -9224,6 +9224,24 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_user_role_contains'
+                        id: '5f4d033399bd4f6ba54fc649aeb4c983'
+                        key: {
+                            role: {
+                                id: 'c3ca08139644469a86cf680d968cad76'
+                                key: {
+                                    name: 'x_daas_ham.integration'
+                                }
+                            }
+                            contains: {
+                                id: '7f603cd9e43742b49031400a7ec43bae'
+                                key: {
+                                    name: 'asset'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: '5fd2bcf90a5b41aa86d666a0c9efdfcd'
                         key: {

@@ -64,6 +64,7 @@ export const siteContact = Role({
 export const integration = Role({
     name: 'x_daas_ham.integration',
     description: 'Machine role for the provider NMS that posts device events.',
+    containsRoles: ['asset'],
 })
 
 /** Every provider-staff role (read access to the installed base). */

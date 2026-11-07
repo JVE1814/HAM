@@ -1,8 +1,9 @@
-import { GlideDateTime, GlideRecord } from '@servicenow/glide'
+import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { parseDeviceEvents, type DeviceEvent } from '../domain/device-events'
 import { decideInService } from '../domain/in-service'
 import { stagesQuery } from '../domain/lifecycle'
+import { ROLE } from '../domain/visibility'
 import { findAssetByIdentifier, moveAndSave, readStage } from '../platform/assets'
 import { runTableJob } from '../platform/chunked'
 import { glideToMs, msToGlide } from '../platform/clock'
@@ -44,6 +45,11 @@ function goLiveIfSeen(asset: GlideRecord): void {
 
 /** POST /api/x_daas_ham/naas/v1/device_events - Seen signals from the Provider NMS. */
 export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIResponse): void {
+    if (!gs.hasRole(ROLE.integration) && !gs.hasRole(ROLE.assetManager)) {
+        response.setStatus(403)
+        response.setBody({ error: 'Requires the x_daas_ham.integration role' } as never)
+        return
+    }
     const parsed = parseDeviceEvents(request.body.data, intProperty(PROPERTY.eventsMaxBatch, 500))
     if ('error' in parsed) {
         response.setStatus(400)
