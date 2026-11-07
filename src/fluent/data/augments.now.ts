@@ -29,6 +29,7 @@ export const alm_hardware = Table({
             dropdown: 'dropdown_without_none',
         }),
         x_daas_ham_lessor: ReferenceColumn({ label: 'Lessor', referenceTable: 'core_company' }),
+        x_daas_ham_lease: ReferenceColumn({ label: 'Lease schedule', referenceTable: 'x_daas_ham_lease_schedule' }),
         x_daas_ham_agreement: ReferenceColumn({ label: 'Agreement', referenceTable: 'x_daas_ham_agreement' }),
         x_daas_ham_subscription_line: ReferenceColumn({
             label: 'Subscription line',
@@ -91,6 +92,7 @@ export const alm_hardware = Table({
         { name: 'x_daas_ham_hw_refresh_due', unique: false, element: 'x_daas_ham_refresh_due' },
         { name: 'x_daas_ham_hw_rack', unique: false, element: 'x_daas_ham_rack' },
         { name: 'x_daas_ham_hw_cov_checked', unique: false, element: 'x_daas_ham_coverage_checked' },
+        { name: 'x_daas_ham_hw_lease', unique: false, element: 'x_daas_ham_lease' },
     ],
 })
 

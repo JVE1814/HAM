@@ -212,6 +212,16 @@ export const agreement_form = Form({
             ],
         },
         {
+            caption: 'Renewal',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [{ field: 'renewal_lead_days', type: 'table_field' }, { field: 'renewal_term_months', type: 'table_field' }],
+                    rightElements: [{ field: 'renewal_notified', type: 'table_field' }, { field: 'end_return_raised', type: 'table_field' }],
+                },
+            ],
+        },
+        {
             caption: 'Related',
             content: [
                 {

@@ -117,4 +117,10 @@ describe('stagesQuery', () => {
     it('works without a base query', () => {
         expect(stagesQuery(['available'])).toBe('install_status=6^substatus=available')
     })
+
+    it('dot-walks to the asset from a related table', () => {
+        expect(stagesQuery(['in_service', 'available'], 'covered=true', 'asset.')).toBe(
+            'covered=true^asset.install_status=1^asset.substatusISEMPTY^NQcovered=true^asset.install_status=6^asset.substatus=available',
+        )
+    })
 })

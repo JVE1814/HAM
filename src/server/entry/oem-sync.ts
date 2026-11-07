@@ -140,6 +140,8 @@ function upsertCoverage(assetId: string, vendor: OemVendor, fact: CoverageFact, 
     coverage.setValue('service_level', fact.serviceLevel)
     coverage.setValue('covered', fact.covered)
     coverage.setValue('start_date', fact.startDate ?? '')
+    // A renewed contract (new end date) can expire again: warn about it afresh.
+    if (str(coverage, 'end_date') !== (fact.endDate ?? '')) coverage.setValue('expiry_notified', false)
     coverage.setValue('end_date', fact.endDate ?? '')
     coverage.setValue('source', source)
     coverage.setValue('last_checked', msToGlide(nowMs()))

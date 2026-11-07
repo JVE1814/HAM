@@ -37,6 +37,12 @@ describe('refreshDueDate', () => {
         expect(refreshDueDate({ basis: 'earliest', inServiceDate: '2026-03-31', refreshCycleMonths: 36, endOfSupport: '2028-01-31' })).toBe('2028-01-31')
     })
 
+    it('brings the date forward to a lease hand-back, whatever the basis', () => {
+        expect(refreshDueDate({ basis: 'cycle', inServiceDate: '2026-03-31', refreshCycleMonths: 36, returnBy: '2027-06-30' })).toBe('2027-06-30')
+        expect(refreshDueDate({ basis: 'cycle', inServiceDate: '2026-03-31', refreshCycleMonths: 0, returnBy: '2027-06-30' })).toBe('2027-06-30')
+        expect(refreshDueDate({ basis: 'cycle', inServiceDate: '2026-03-31', refreshCycleMonths: 12, returnBy: '2027-06-30' })).toBe('2027-03-31')
+    })
+
     it('has no due date for an asset not yet in service or without the needed data', () => {
         expect(refreshDueDate({ basis: 'cycle', refreshCycleMonths: 36 })).toBeNull()
         expect(refreshDueDate({ basis: 'end_of_support', inServiceDate: '2026-03-31', refreshCycleMonths: 36 })).toBeNull()

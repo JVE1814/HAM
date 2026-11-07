@@ -31,10 +31,12 @@ export const x_daas_ham_oem_coverage = Table({
             default: 'manual',
         }),
         last_checked: DateTimeColumn({ label: 'Last checked', readOnly: true }),
+        expiry_notified: BooleanColumn({ label: 'Expiry warning sent', default: false, readOnly: true }),
     },
     index: [
         { name: 'x_daas_ham_cov_serial', unique: false, element: 'serial_number' },
         { name: 'x_daas_ham_cov_asset', unique: false, element: 'asset' },
+        { name: 'x_daas_ham_cov_end', unique: false, element: 'end_date' },
     ],
 })
 

@@ -33,20 +33,26 @@ export interface RefreshInputs {
     inServiceDate?: string
     refreshCycleMonths: number
     endOfSupport?: string
+    /** The date the Asset must be off the network whatever the basis (its lease is being handed back). */
+    returnBy?: string
 }
 
 /** When an in-service Asset must be refreshed under its Agreement, or null if it cannot be determined. */
 export function refreshDueDate(inputs: RefreshInputs): string | null {
     if (!inputs.inServiceDate) return null
-    const byCycle = inputs.refreshCycleMonths > 0 ? addMonths(inputs.inServiceDate, inputs.refreshCycleMonths) : undefined
+    return earliest([byBasis(inputs, inputs.inServiceDate), inputs.returnBy || undefined]) ?? null
+}
+
+function byBasis(inputs: RefreshInputs, inServiceDate: string): string | undefined {
+    const byCycle = inputs.refreshCycleMonths > 0 ? addMonths(inServiceDate, inputs.refreshCycleMonths) : undefined
     const bySupport = inputs.endOfSupport || undefined
     switch (inputs.basis) {
         case 'cycle':
-            return byCycle ?? null
+            return byCycle
         case 'end_of_support':
-            return bySupport ?? null
+            return bySupport
         case 'earliest':
-            return earliest([byCycle, bySupport]) ?? null
+            return earliest([byCycle, bySupport])
     }
 }
 

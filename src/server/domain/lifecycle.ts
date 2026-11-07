@@ -191,13 +191,13 @@ export const DEPLOYED_STAGES: readonly Stage[] = [...AT_OR_TOWARDS_SITE]
 
 /**
  * An encoded query matching assets in any of `stages` (and `base`, repeated per clause because
- * ^NQ starts a new top-level OR group).
+ * ^NQ starts a new top-level OR group). `via` dot-walks to the asset from another table (`asset.`).
  */
-export function stagesQuery(stages: readonly Stage[], base = ''): string {
+export function stagesQuery(stages: readonly Stage[], base = '', via = ''): string {
     return stages
         .map((stage) => {
             const { installStatus, substatus } = STAGE_FIELDS[stage]
-            const clause = `install_status=${installStatus}^${substatus ? `substatus=${substatus}` : 'substatusISEMPTY'}`
+            const clause = `${via}install_status=${installStatus}^${via}${substatus ? `substatus=${substatus}` : 'substatusISEMPTY'}`
             return base ? `${base}^${clause}` : clause
         })
         .join('^NQ')

@@ -213,6 +213,12 @@ A disagreement between Assets and monitoring (seen but unknown, deployed but uns
 **Lease schedule**:
 A financing contract with a Lessor covering a set of Assets until an end date.
 
+**End-of-lease decision**:
+The choice, due ahead of a Lease schedule's end, to buy its Assets out, extend it, or return them to the Lessor.
+
+**Lease mismatch**:
+A Lease schedule that ends before an Agreement its deployed Assets serve.
+
 **Billing period**:
 A calendar month of prorated Subscription line charges and Fee events, locked once closed.
 _Avoid_: invoice (issued by finance, not here)

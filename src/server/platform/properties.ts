@@ -15,6 +15,8 @@ export const PROPERTY = {
     returnGraceDays: 'x_daas_ham.returns.grace_days',
     temporaryReturnLeadDays: 'x_daas_ham.returns.temporary_lead_days',
     refreshHorizonDays: 'x_daas_ham.refresh.horizon_days',
+    coverageWarningDays: 'x_daas_ham.oem.coverage_warning_days',
+    leaseDecisionGroup: 'x_daas_ham.leases.decision_group',
 } as const
 
 export function intProperty(name: string, fallback: number): number {

@@ -27,6 +27,7 @@ export function applyLifecycleDates(asset: GlideRecord, dates: LifecycleDates = 
             inServiceDate: inService === undefined ? undefined : toIsoDate(inService),
             refreshCycleMonths: num(asset, 'x_daas_ham_agreement.refresh_cycle_months'),
             endOfSupport: dates.endOfSupport,
+            returnBy: str(asset, 'x_daas_ham_lease.end_action') === 'return' ? str(asset, 'x_daas_ham_lease.ends') : undefined,
         }) ?? ''
     const changed = str(asset, 'x_daas_ham_lifecycle_phase') !== phase || str(asset, 'x_daas_ham_refresh_due') !== due
     asset.setValue('x_daas_ham_lifecycle_phase', phase)

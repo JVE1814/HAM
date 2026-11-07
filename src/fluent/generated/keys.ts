@@ -265,6 +265,38 @@ declare global {
                         table: 'sys_security_acl'
                         id: '06d51e6b0c9e42fa8d66ece13665d0d3'
                     }
+                    acl_lease_decision_create: {
+                        table: 'sys_security_acl'
+                        id: '804f4791a31e424e9d9e2914a6520037'
+                    }
+                    acl_lease_decision_delete: {
+                        table: 'sys_security_acl'
+                        id: '73b62810fb64401091e0620d0ace8074'
+                    }
+                    acl_lease_decision_read: {
+                        table: 'sys_security_acl'
+                        id: '7068c5dff620433c810498693e7e6517'
+                    }
+                    acl_lease_decision_write: {
+                        table: 'sys_security_acl'
+                        id: 'dc628bbd7f964f9a9185f514d956bb97'
+                    }
+                    acl_lease_schedule_create: {
+                        table: 'sys_security_acl'
+                        id: '5d18c770e3df4970bbe50346ddea73f8'
+                    }
+                    acl_lease_schedule_delete: {
+                        table: 'sys_security_acl'
+                        id: 'd6aa3623a8e443d3a9ef5c0aca37fb26'
+                    }
+                    acl_lease_schedule_read: {
+                        table: 'sys_security_acl'
+                        id: '18e65f277b72497fb3fc86cb9cbc68f2'
+                    }
+                    acl_lease_schedule_write: {
+                        table: 'sys_security_acl'
+                        id: '598120ca284d45258e3de3b825394060'
+                    }
                     acl_manufacturer_alias_create: {
                         table: 'sys_security_acl'
                         id: 'faf51285834e41d8b082301b2b47d218'
@@ -893,6 +925,10 @@ declare global {
                         table: 'sys_script'
                         id: 'ae9cbf9985044de48fc8e2da45c5ff4d'
                     }
+                    br_asset_lease: {
+                        table: 'sys_script'
+                        id: 'ba981185458d47608f9c4087e585b04d'
+                    }
                     br_asset_stage_to_order_line: {
                         table: 'sys_script'
                         id: 'f712caf500154d8ea81c399fe85d3247'
@@ -1077,9 +1113,25 @@ declare global {
                         table: 'par_dashboard_widget'
                         id: '27ba5d2f3e2947d4be67a93379a463d1'
                     }
+                    event_agreement_renewal: {
+                        table: 'sysevent_register'
+                        id: '85e97b31da1a4cbeb1efba0801881fa0'
+                    }
                     event_agreement_terms: {
                         table: 'sysevent_register'
                         id: '2ee72d8d68e345ec871e4689ef4a3bc5'
+                    }
+                    event_coverage_expiring: {
+                        table: 'sysevent_register'
+                        id: 'd36908fdca8b47f7b2a85b7e77f601c3'
+                    }
+                    event_lease_assets: {
+                        table: 'sysevent_register'
+                        id: '7637b1cb39d54044b770a07fe383c959'
+                    }
+                    event_lease_mismatch: {
+                        table: 'sysevent_register'
+                        id: '60256580d1c4438ab66fca9f72e3c158'
                     }
                     event_model_lifecycle: {
                         table: 'sysevent_register'
@@ -1141,6 +1193,10 @@ declare global {
                         table: 'sysauto_script'
                         id: 'f1d37333f4634f828924d8ab6d7b5910'
                     }
+                    job_review_leases: {
+                        table: 'sysauto_script'
+                        id: 'c37c709eec8f4372bb42ab580f19a7ec'
+                    }
                     job_roll_lifecycle_phases: {
                         table: 'sysauto_script'
                         id: '2ec9ea07a47040e4aeaddb2cff3b5bc2'
@@ -1152,6 +1208,22 @@ declare global {
                     job_spare_pool_top_up: {
                         table: 'sysauto_script'
                         id: '75bb2b23e13345cca1d5202d693f8b0c'
+                    }
+                    job_warn_renewals: {
+                        table: 'sysauto_script'
+                        id: 'f0406fc84bf44b66a09a96be8be5e542'
+                    }
+                    mail_agreement_renewal: {
+                        table: 'sysevent_email_action'
+                        id: '06574bc97785485faefa44876dbd6204'
+                    }
+                    mail_coverage_expiring: {
+                        table: 'sysevent_email_action'
+                        id: '55b321397bed42c29f9c90d2316e9b81'
+                    }
+                    mail_lease_mismatch: {
+                        table: 'sysevent_email_action'
+                        id: 'b79a56ecdaba4f7fb08a10834ca162b4'
                     }
                     mail_return_overdue: {
                         table: 'sysevent_email_action'
@@ -1357,6 +1429,10 @@ declare global {
                         table: 'sys_properties'
                         id: 'd1f10a97f63e46249f4b7371a0216566'
                     }
+                    prop_coverage_warning_days: {
+                        table: 'sys_properties'
+                        id: 'd922d266e7f84d959990ef70fbaf80d0'
+                    }
                     prop_events_max_batch: {
                         table: 'sys_properties'
                         id: '4c50c1db170e46449995461a795cfaf8'
@@ -1372,6 +1448,10 @@ declare global {
                     prop_job_budget_seconds: {
                         table: 'sys_properties'
                         id: 'a5c243aed8664adf9af7adb5940ca36e'
+                    }
+                    prop_lease_decision_group: {
+                        table: 'sys_properties'
+                        id: 'a33876ff6c594934b6b3909392b0af67'
                     }
                     prop_meraki_key: {
                         table: 'sys_properties'
@@ -1617,6 +1697,10 @@ declare global {
                         table: 'sysevent_script_action'
                         id: 'd9d7971bfd144538bf7bc09e295dbcd2'
                     }
+                    sa_lease_assets: {
+                        table: 'sysevent_script_action'
+                        id: '3159a22dccc642e2959d500f7283c75e'
+                    }
                     sa_model_lifecycle: {
                         table: 'sysevent_script_action'
                         id: '5f60634c8b984ee59951e980daa3add8'
@@ -1680,6 +1764,10 @@ declare global {
                     'src_server_domain_in-service_ts': {
                         table: 'sys_module'
                         id: '8564a8a9d7d14e39b995ef679e5a0c70'
+                    }
+                    src_server_domain_leases_ts: {
+                        table: 'sys_module'
+                        id: '92ba5888c25c45d3b1f678927c17bdb7'
                     }
                     src_server_domain_lifecycle_ts: {
                         table: 'sys_module'
@@ -1780,6 +1868,10 @@ declare global {
                     'src_server_entry_in-service_ts': {
                         table: 'sys_module'
                         id: 'ad6b24c3723f412c8adfe16a8f65005f'
+                    }
+                    src_server_entry_leases_ts: {
+                        table: 'sys_module'
+                        id: 'd5d5950d160e4d1d8a34a6513f6b61eb'
                     }
                     src_server_entry_models_ts: {
                         table: 'sys_module'
@@ -1921,6 +2013,10 @@ declare global {
                         table: 'sys_module'
                         id: '901d844c27ad469a80cd544e9e926b35'
                     }
+                    ua_agreement_renew: {
+                        table: 'sys_ui_action'
+                        id: '2671d1ec92b847fea0bc80656327a746'
+                    }
                     ua_audit_close: {
                         table: 'sys_ui_action'
                         id: '7215e61aa4c84959900ecfdb36ba7051'
@@ -1936,6 +2032,10 @@ declare global {
                     ua_disposal_submit: {
                         table: 'sys_ui_action'
                         id: 'b2f35dcebf9942fd88b13b8a0d8e73cb'
+                    }
+                    ua_lease_apply_decision: {
+                        table: 'sys_ui_action'
+                        id: '3ea8ee72c7e5483f896f5aad8b98fe11'
                     }
                     ua_order_cancel: {
                         table: 'sys_ui_action'
@@ -1992,6 +2092,14 @@ declare global {
                     ws_agreements_aud: {
                         table: 'sys_ux_applicability_m2m_list'
                         id: 'acc11777aaba450aa4250af34be09179'
+                    }
+                    ws_agreements_renewal: {
+                        table: 'sys_ux_list'
+                        id: '611ed9cc85624fa095e78b2f68476127'
+                    }
+                    ws_agreements_renewal_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '117eb3d645b543bc97e24af7bcdad444'
                     }
                     ws_assets_data_gaps: {
                         table: 'sys_ux_list'
@@ -2109,6 +2217,14 @@ declare global {
                         table: 'sys_ux_applicability_m2m_list'
                         id: '1268b27bfda644298f51a846689556c4'
                     }
+                    ws_coverage_expiring: {
+                        table: 'sys_ux_list'
+                        id: '3688e033bd7246ccbb0ee0cfb2d02056'
+                    }
+                    ws_coverage_expiring_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: 'bed9d0db981b4fe3b8771209047346a5'
+                    }
                     ws_disposals: {
                         table: 'sys_ux_list'
                         id: 'b2b9e86e7c5549bdb5b309ff546f7175'
@@ -2132,6 +2248,22 @@ declare global {
                     ws_fees_open_aud: {
                         table: 'sys_ux_applicability_m2m_list'
                         id: '3441992d7c8045d3a08f36c19ac6fa82'
+                    }
+                    ws_lease_decisions: {
+                        table: 'sys_ux_list'
+                        id: '93ea112761a944b59f72dccdd24e165d'
+                    }
+                    ws_lease_decisions_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: '56d5c34e1cb141f4bd5cd01a28e6d25b'
+                    }
+                    ws_lease_schedules: {
+                        table: 'sys_ux_list'
+                        id: 'c56ac7467c2b40d29fbd3e641f7689dc'
+                    }
+                    ws_lease_schedules_aud: {
+                        table: 'sys_ux_applicability_m2m_list'
+                        id: 'ee1ac7ca502b473c9bccc84514b1b7a2'
                     }
                     ws_lines_awaiting_stock: {
                         table: 'sys_ux_list'
@@ -2926,6 +3058,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '0154464ed8a7414f9a0da8ecc0dcdbef'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'decision_lead_days'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '015843e443f14e8a9aba0635213dcd75'
                         key: {
@@ -3188,6 +3328,41 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '033d972f0fb042aeb08eb7d66734f0de'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ce213be2d5534b9eabd3273b3ec219b1'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Money and end of lease'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: '035a54de092c45a185406f114e27b3c7'
+                        key: {
+                            sys_ui_action: '3ea8ee72c7e5483f896f5aad8b98fe11'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '035dad68d9fb4f09b5ec02f2d3150dd2'
                         key: {
@@ -3327,6 +3502,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_model_lifecycle'
                             element: 'end_of_support'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '0460159bff064617ab4de9da0b0a41b0'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd9ef4007f7724454a17f742cc182488b'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Lease schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'decision_lead_days'
+                            position: '9'
                         }
                     },
                     {
@@ -3559,6 +3756,44 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '0620e3bd06c54ff0b7c1586c04989092'
+                        key: {
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'assignment_group'
+                            position: '8'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '062aabeb1bf04fbb9a607e3454f162bf'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'mismatch'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '0633d62c701c4b03bb936065119879ff'
+                        key: {
+                            name: 'x_daas_ham_oem_coverage'
+                            element: 'expiry_notified'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '0639a0c4f6bd43c08c7434a082bf6e01'
                         key: {
@@ -3688,6 +3923,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '0707830c7df940c7b8666e97b99e96e7'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            element: 'renewal_term_months'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '0719f28d3fbd4c7d8b7db2265bd4ba73'
                         key: {
@@ -3812,6 +4055,28 @@ declare global {
                             value: 'returned_to_lessor'
                             language: 'en'
                             dependent_value: '7'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '07ce2b6ce7994909874327109c571d9a'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd9ef4007f7724454a17f742cc182488b'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Lease schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'starts'
+                            position: '7'
                         }
                     },
                     {
@@ -3949,6 +4214,28 @@ declare global {
                             value: 'confirmed'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '08bebf5c3c1643feb3b7aa3833f0a9b0'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ce213be2d5534b9eabd3273b3ec219b1'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Money and end of lease'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '6'
                         }
                     },
                     {
@@ -4320,6 +4607,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '0bda9bd12928491bbcce76179781bc4d'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '0bde5696532d45d69b6543ec45cc0751'
                         key: {
@@ -4355,6 +4650,39 @@ declare global {
                         id: '0c282c2eda924d48a5c2b0f454367ddd'
                         key: {
                             name: 'alm_hardware'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '0c588e9400484ce79a134b065da4770f'
+                        key: {
+                            sys_ui_form: {
+                                id: 'd3eb204804334adaae64b4339aa73f4a'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'c7c30dd844df491cb6aa3e1a02676120'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
                         }
                     },
                     {
@@ -4524,6 +4852,19 @@ declare global {
                                 id: '50893530c7b94924ba2610453d4ebd3e'
                                 key: {
                                     name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '0dffc5f893bf4cb2b98f056654402662'
+                        key: {
+                            sys_security_acl: '7068c5dff620433c810498693e7e6517'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
                                 }
                             }
                         }
@@ -4702,6 +5043,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: '0f43b4aa14b44a1f9a783e3b1f6d3b75'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            caption: 'Renewal'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'ua_table_licensing_config'
                         id: '0f4ad99ebce04078ad69ff7686045184'
                         key: {
@@ -4738,6 +5094,14 @@ declare global {
                             name: 'x_daas_ham_agreement'
                             element: 'customer'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_number'
+                        id: '0f8d8bc5a0364e8eaf7c74d259df21d6'
+                        key: {
+                            category: 'x_daas_ham_lease_decision'
+                            prefix: 'NLD'
                         }
                     },
                     {
@@ -4959,6 +5323,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '10debd7372ca4374882d2df5ab6539a3'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            element: 'renewal_lead_days'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '10f25c6045be482dbcf8e24ea9733636'
                         key: {
@@ -5064,6 +5436,28 @@ declare global {
                             }
                             element: '.split'
                             position: '5'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '11faf0c7b80141a5843724c464ba6bec'
+                        key: {
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '13'
                         }
                     },
                     {
@@ -5209,6 +5603,28 @@ declare global {
                                 }
                             }
                             element: 'number'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '127104af903043e88c02bb24b0654199'
+                        key: {
+                            sys_ui_section: {
+                                id: '0f43b4aa14b44a1f9a783e3b1f6d3b75'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Renewal'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'renewal_term_months'
+                            position: '2'
                         }
                     },
                     {
@@ -5492,6 +5908,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '143da9a5370f41feb509bc32e39eacb1'
+                        key: {
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'covered_assets'
+                            position: '10'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '146d07c77b104974aad2f2c78dd0f532'
                         key: {
@@ -5664,6 +6102,19 @@ declare global {
                             name: 'x_daas_ham_asn_import'
                             element: 'NULL'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '155f2ce864ac459483b4b99606c1fe11'
+                        key: {
+                            sys_security_acl: '7068c5dff620433c810498693e7e6517'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -6046,6 +6497,14 @@ declare global {
                     },
                     {
                         table: 'sys_dictionary'
+                        id: '18aa099dbd7c443bb0139c7c1a29d7a1'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'deployed_assets'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
                         id: '18aeb5cbd5ec42478493aeacfda8f4b0'
                         key: {
                             name: 'x_daas_ham_staging_tmpl_item'
@@ -6168,6 +6627,28 @@ declare global {
                             value: 'critical'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '19695fb587f14405a29b7e54a185d340'
+                        key: {
+                            sys_ui_section: {
+                                id: '0f43b4aa14b44a1f9a783e3b1f6d3b75'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Renewal'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -6695,6 +7176,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '1da98554aea24e36acf78dae16373269'
+                        key: {
+                            sys_security_acl: '18e65f277b72497fb3fc86cb9cbc68f2'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '1dc840e2656f4315a4f5811bad25a9cf'
                         key: {
@@ -7048,6 +7542,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: '20850c62db8144ea9391533aba7445c4'
+                        key: {
+                            sys_ui_form: {
+                                id: 'd3eb204804334adaae64b4339aa73f4a'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'd9ef4007f7724454a17f742cc182488b'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Lease schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'item_option_new'
                         id: '209de9f22a904f30af905dff53cb5dcb'
                         key: {
@@ -7158,6 +7685,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_index'
+                        id: '2135b7c50925425482b9597cf0c86867'
+                        key: {
+                            logical_table_name: 'x_daas_ham_lease_schedule'
+                            col_name_string: 'lessor'
+                        }
+                    },
+                    {
                         table: 'sys_user_role_contains'
                         id: '2135fa218b3c4512b5969c4d4a1c3590'
                         key: {
@@ -7194,6 +7729,28 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '217bb55a76164bdf9b84279f02f0bed0'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ce213be2d5534b9eabd3273b3ec219b1'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Money and end of lease'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'monthly_payment'
+                            position: '1'
                         }
                     },
                     {
@@ -7925,6 +8482,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_db_object'
+                        id: '265551e0de934c1ebebf74a86ee105a4'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                        }
+                    },
+                    {
                         table: 'sys_ui_form_section'
                         id: '2655719accd9409595b8e2d195e335b2'
                         key: {
@@ -8057,6 +8621,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_oem_rma'
                             element: 'order_line'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '275ee73092b64d36aaa0819f661dcfcb'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'NULL'
+                            language: 'en'
                         }
                     },
                     {
@@ -8194,6 +8767,17 @@ declare global {
                     },
                     {
                         table: 'sys_choice'
+                        id: '2898a207492647f494c5900e9ac667f7'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'end_action'
+                            value: 'return'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
                         id: '28a836d4c37746c58cb971aae25acc21'
                         key: {
                             name: 'wm_order'
@@ -8226,6 +8810,28 @@ declare global {
                             id: '40c22d1f395141f9894b994ea874e6b7'
                             table: 'var__m_atf_input_variable_14872288df60220062fe6c7a4df26319'
                             field: 'field_values'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '29474404fb1f486b85f5a9764c9f2366'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd9ef4007f7724454a17f742cc182488b'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Lease schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '5'
                         }
                     },
                     {
@@ -8815,6 +9421,28 @@ declare global {
                     },
                     {
                         table: 'sys_ui_element'
+                        id: '2c5a39a35df84f5ea2d3abceb1d352d5'
+                        key: {
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'assigned_to'
+                            position: '9'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
                         id: '2c99c31fb8c040b1a4026d80ac424234'
                         key: {
                             sys_ui_section: {
@@ -8841,6 +9469,14 @@ declare global {
                         key: {
                             name: 'x_daas_ham_oem_coverage'
                             element: 'last_checked'
+                        }
+                    },
+                    {
+                        table: 'sys_index'
+                        id: '2cace956a0524f7c94b3b000a5c0040a'
+                        key: {
+                            logical_table_name: 'alm_hardware'
+                            col_name_string: 'x_daas_ham_lease'
                         }
                     },
                     {
@@ -8954,6 +9590,28 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '2d9a8a77b01147c49bf50252e6a7bf7d'
+                        key: {
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'decision'
+                            position: '4'
                         }
                     },
                     {
@@ -9136,6 +9794,17 @@ declare global {
                         key: {
                             document_key: '4887a1f4ebdf40b2a49069e86df18bdd'
                             variable: '51547e3953212110248dddeeff7b126b'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '2efcedcacffd4f55bef92f7ec638eff5'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'end_action'
+                            value: 'extend'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -9409,6 +10078,19 @@ declare global {
                         key: {
                             name: 'x_daas_ham_catalog_entry'
                             element: 'valid_to'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '316433a598ee4d4c942094c1d14f32f4'
+                        key: {
+                            sys_security_acl: '18e65f277b72497fb3fc86cb9cbc68f2'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
                         }
                     },
                     {
@@ -10169,6 +10851,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '362cb0bceb1049e7bf30b6c48d1e55c0'
+                        key: {
+                            sys_security_acl: '7068c5dff620433c810498693e7e6517'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '3688d55cdb6341b28fe4a5393819078a'
                         key: {
@@ -10533,6 +11228,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_agreement'
                             element: 'attestation_interval_months'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '3969ba6feb8540ac9362c9b22e390d7f'
+                        key: {
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'state'
+                            position: '7'
                         }
                     },
                     {
@@ -11362,6 +12079,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '3f3e3a1f15c14089bfd42fc0293eb46d'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'lease_end'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sn_glider_source_artifact_m2m'
                         id: '3f4410fe1b28441b9ea9ded2b0985a6f'
                         key: {
@@ -11545,6 +12271,28 @@ declare global {
                                 }
                             }
                             element: 'reason'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '41bc4b9198674417908bdf06670f329d'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ce213be2d5534b9eabd3273b3ec219b1'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Money and end of lease'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'end_action'
+                            position: '4'
                         }
                     },
                     {
@@ -12197,6 +12945,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '46c99bd7a5a64049bfb0069a8422d5f8'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'decision'
+                            value: 'return'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '46d07171aa18490abf1f0f3361054fb6'
                         key: {
@@ -12379,6 +13138,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '47aa146f95f74aa7a92d3fab4cc5cdd2'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'mismatch'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '47b46257d7f7482b87da45f5e4a9975d'
                         key: {
@@ -12509,6 +13277,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '48b90d70fe964c868b3188f87ecc30c9'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c7c30dd844df491cb6aa3e1a02676120'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_lease_schedule.alm_hardware.x_daas_ham_lease'
+                            position: '0'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '48eeae99e99847d383588dd8b1dd93b6'
                         key: {
@@ -12553,6 +13343,28 @@ declare global {
                             name: 'x_daas_ham_oem_coverage'
                             element: 'end_date'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '497e54d882c64580ab3c078ce5528c67'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c7c30dd844df491cb6aa3e1a02676120'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Related'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '12M.x_daas_ham_lease_schedule.x_daas_ham_lease_decision.lease'
+                            position: '1'
                         }
                     },
                     {
@@ -12751,6 +13563,19 @@ declare global {
                             }
                             element: 'site_template'
                             position: '1'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '4ad7837dfa6f4b3fa5cd272ddbef1c76'
+                        key: {
+                            sys_security_acl: 'dc628bbd7f964f9a9185f514d956bb97'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -13039,6 +13864,15 @@ declare global {
                                     name: 'x_daas_ham.customer_admin'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '4dbeb2ea54744df19c8439145c83af8c'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'end_action'
+                            language: 'en'
                         }
                     },
                     {
@@ -13462,6 +14296,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '50d160197cdc4d229cbdd4a7eff54119'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            element: 'renewal_term_months'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '50fa3393f0f0423fab572585bf23b176'
                         key: {
@@ -13619,6 +14462,41 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '51f2ad1a7add44ed9daf454b3fc31860'
+                        key: {
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'new_end_date'
+                            position: '5'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '521cb78a6e694ac28b983a98f0b3023a'
+                        key: {
+                            sys_security_acl: 'd6aa3623a8e443d3a9ef5c0aca37fb26'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '5222579c675e4749a57dcb23bdaae29c'
                         key: {
@@ -13672,6 +14550,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '5281fbce4f0e47999b0b4d648c76bd04'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd9ef4007f7724454a17f742cc182488b'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Lease schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '10'
+                        }
+                    },
+                    {
                         table: 'sys_ui_action_role'
                         id: '52a70ce0343d40d7836921ffc1fa0025'
                         key: {
@@ -13682,6 +14582,15 @@ declare global {
                                     name: 'x_daas_ham.field_tech'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '52a7912820634c9fb3805ae2aef2aea7'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'buyout_price'
+                            language: 'en'
                         }
                     },
                     {
@@ -13975,6 +14884,17 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_choice'
+                        id: '5548d7a4f060441f8d2585da0c1f2b4d'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'decision'
+                            value: 'buyout'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list'
                         id: '5557f3940bf443098b2a511664dd9117'
                         key: {
@@ -14146,6 +15066,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '56dc906f7be44a37b46b600d4347ea6a'
+                        key: {
+                            sys_ui_section: {
+                                id: '0f43b4aa14b44a1f9a783e3b1f6d3b75'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Renewal'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '3'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '56eef6cffc8e4f06b3ac41a90e056940'
                         key: {
@@ -14177,6 +15119,13 @@ declare global {
                                     name: 'x_daas_ham.asset_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_db_object'
+                        id: '5734eff961e8465e952033df5e98b216'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
                         }
                     },
                     {
@@ -14525,6 +15474,28 @@ declare global {
                     },
                     {
                         table: 'sys_ui_element'
+                        id: '5a3412777d01409abc8097d54d4b1b20'
+                        key: {
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'lease'
+                            position: '2'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
                         id: '5a36b55caa3c43b69f2ade5666dd07b2'
                         key: {
                             sys_ui_section: {
@@ -14795,6 +15766,14 @@ declare global {
                         key: {
                             document_key: 'cacf66f6f8e946dd9377c7c34959d2d8'
                             variable: 'ad351a4e53a0220002c6435723dc34f0'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '5c2783f9fa50430cb93c53aaabf9e8a6'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'new_end_date'
                         }
                     },
                     {
@@ -15142,6 +16121,20 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: '5e58bb93cb894fad82f8ed1c23d4fa6f'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '5e59a3d69d90422eba088c2ca4da2fbc'
                         key: {
@@ -15168,6 +16161,17 @@ declare global {
                             name: 'x_daas_ham_catalog_entry'
                             element: 'valid_from'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '5e87d97dabf744ed930b00be2b0e3cf6'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'decision'
+                            value: 'extend'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -15290,6 +16294,15 @@ declare global {
                             }
                             element: 'status'
                             position: '6'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '5f48f353969b4e4fa8b9d912d55a8d56'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'schedule_number'
+                            language: 'en'
                         }
                     },
                     {
@@ -15599,6 +16612,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '61a8e6278a0148d4951f7b1129ed3b38'
+                        key: {
+                            sys_security_acl: '73b62810fb64401091e0620d0ace8074'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '61b98d5d10f84994b6cce46d0a411b9d'
                         key: {
@@ -15641,6 +16667,41 @@ declare global {
                                 id: '50893530c7b94924ba2610453d4ebd3e'
                                 key: {
                                     name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '61f3e656433949c9a71125d999781123'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd9ef4007f7724454a17f742cc182488b'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Lease schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'short_description'
+                            position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '620998d9d2254ebda2f4b3f8ab3a5472'
+                        key: {
+                            sys_security_acl: '804f4791a31e424e9d9e2914a6520037'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
                                 }
                             }
                         }
@@ -15788,6 +16849,14 @@ declare global {
                             name: 'x_daas_ham_agreement'
                             element: 'attestation_interval_months'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '637105b5d1d14e599a8c8bbee4022d03'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'end_action'
                         }
                     },
                     {
@@ -16119,6 +17188,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '65bf32dfe7bd45eea096b071d5b33c86'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'deployed_assets'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_action_role'
                         id: '65bf57b81f104da9a041c21413587390'
                         key: {
@@ -16423,6 +17501,39 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form_section'
+                        id: '6839fbac853243c99ee1cb50df35adcc'
+                        key: {
+                            sys_ui_form: {
+                                id: 'd3eb204804334adaae64b4339aa73f4a'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'ce213be2d5534b9eabd3273b3ec219b1'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Money and end of lease'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: '683b9d3cfeed49c0b8aeddb49531170e'
                         key: {
@@ -16637,6 +17748,15 @@ declare global {
                                     sys_domain: 'global'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '69112ca0b532441793d5ffdd1661c8c1'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'new_end_date'
+                            language: 'en'
                         }
                     },
                     {
@@ -17211,6 +18331,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '6d0ea74555ad4742a8e624ea40cebca8'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'lessor'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: '6d28162b5f6840ae80fb55fe2cb938c5'
                         key: {
@@ -17463,6 +18592,19 @@ declare global {
                                 id: '756e06fe791d4da28691694bb688b102'
                                 key: {
                                     name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: '6ea7b5d87dc740549ef378afb6181f8e'
+                        key: {
+                            sys_ui_action: '3ea8ee72c7e5483f896f5aad8b98fe11'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
                                 }
                             }
                         }
@@ -18411,6 +19553,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '74d33a0717344cc28ee8f5df71b41f3e'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd9ef4007f7724454a17f742cc182488b'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Lease schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'lessor'
+                            position: '2'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '74d51b60043e4233adba1d0aa6177719'
                         key: {
@@ -18896,6 +20060,41 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '77d3dd8a7b704f3a886df661c56823fb'
+                        key: {
+                            sys_security_acl: '5d18c770e3df4970bbe50346ddea73f8'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '77e7e3a8da8b4f85abc1c9c53dc2a9a6'
+                        key: {
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '6'
+                        }
+                    },
+                    {
                         table: 'sys_db_object'
                         id: '77f2d030798e4b68a4fad1a29c7f265a'
                         key: {
@@ -19139,6 +20338,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_number'
+                        id: '79004c63e56741d58250f5768d7e5e30'
+                        key: {
+                            category: 'x_daas_ham_lease_schedule'
+                            prefix: 'NLS'
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '790595baef8e4062b3e0e7202d6892d7'
                         key: {
@@ -19263,12 +20470,33 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '7a7f2daa96f945c3a1a34c4cc95fa6f7'
+                        key: {
+                            sys_security_acl: '5d18c770e3df4970bbe50346ddea73f8'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '7aae92b6338f4ca2862918d2d5d476d1'
                         key: {
                             name: 'x_daas_ham_staging_template'
                             element: 'name'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_choice_set'
+                        id: '7ae2fd30c07c425b8ef57b14ccad3f66'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'decision'
                         }
                     },
                     {
@@ -19531,6 +20759,19 @@ declare global {
                                 id: '50893530c7b94924ba2610453d4ebd3e'
                                 key: {
                                     name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '7d68fb015f6b472bbb832654977a99c9'
+                        key: {
+                            sys_security_acl: '18e65f277b72497fb3fc86cb9cbc68f2'
+                            sys_user_role: {
+                                id: 'b1a9a9832f01483a9c4e6fc55ca84188'
+                                key: {
+                                    name: 'x_daas_ham.field_tech'
                                 }
                             }
                         }
@@ -19910,6 +21151,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '807da2b61c19471694081902c2bca4d4'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ccf2baaad59e4f6299034f3fcb31ab72'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'Notes'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'work_notes'
+                            position: '1'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: '808f7727cd4c43bebe454d1d746e6606'
                         key: {
@@ -20082,6 +21345,14 @@ declare global {
                             element: 'NULL'
                             relationship: 'NULL'
                             parent: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '81bd6fa8df1b474980fbec56cfb1b567'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'lessor'
                         }
                     },
                     {
@@ -20850,6 +22121,17 @@ declare global {
                     },
                     {
                         table: 'sys_choice'
+                        id: '86f5fdfb793a4e348d9477b65d82ef89'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'end_action'
+                            value: 'undecided'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
                         id: '86fe79a3d4f14603b8dc2854da7ac5b4'
                         key: {
                             name: 'cmdb_model'
@@ -21267,6 +22549,15 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
+                        id: '89050d4c31be40ea81558ebb461d9463'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'decision_lead_days'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
                         id: '891f3d41b96e42f881d5b0d1f6543e24'
                         key: {
                             name: 'x_daas_ham_order'
@@ -21491,6 +22782,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '8a795a835bcc403ba01404004095b4cf'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'decision'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '8a9077d913924fa19f37a350bb191a10'
                         key: {
@@ -21510,6 +22809,19 @@ declare global {
                             }
                             element: 'blockers'
                             position: '8'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '8a98bd39f0e244e89634a2d1a6da93bf'
+                        key: {
+                            sys_security_acl: 'dc628bbd7f964f9a9185f514d956bb97'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
                         }
                     },
                     {
@@ -21756,6 +23068,15 @@ declare global {
                     },
                     {
                         table: 'sys_documentation'
+                        id: '8d133a5818b143a991e5aef76a1ae879'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'covered_assets'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
                         id: '8d1b58c1c8df4441b6d68c092f100749'
                         key: {
                             name: 'x_daas_ham_stockroom_member'
@@ -21853,6 +23174,19 @@ declare global {
                             value: 'earliest'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '8e3be818cdc848a7adb3c8d2aed6688b'
+                        key: {
+                            sys_security_acl: 'd6aa3623a8e443d3a9ef5c0aca37fb26'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -22020,6 +23354,15 @@ declare global {
                                 }
                             }
                             sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '8f1ded5d97064a3e83b27478d14ac571'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'lease'
+                            language: 'en'
                         }
                     },
                     {
@@ -22217,6 +23560,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'ua_table_licensing_config'
+                        id: '90ce6afa002747b492feaa482fae2585'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '90d0d22dd4af45a18eb6907dcb460e15'
                         key: {
@@ -22238,6 +23588,47 @@ declare global {
                                 id: '50893530c7b94924ba2610453d4ebd3e'
                                 key: {
                                     name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '90d6e33e3ffb4de5941e429d39812805'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'schedule_number'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: '90e8054d782841bd99b055efb1c7dd4b'
+                        key: {
+                            sys_ui_form: {
+                                id: '758511249a86429181731c6b6bbb7060'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: '0f43b4aa14b44a1f9a783e3b1f6d3b75'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Renewal'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
                                 }
                             }
                         }
@@ -22366,6 +23757,15 @@ declare global {
                                 }
                             }
                             element: 'quantity'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '918d29773ed84dc391370542a3f3d366'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            element: 'renewal_lead_days'
+                            language: 'en'
                         }
                     },
                     {
@@ -22501,6 +23901,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '922ff07a9ab54bc4b3147d3eda6036f5'
+                        key: {
+                            sys_security_acl: '18e65f277b72497fb3fc86cb9cbc68f2'
+                            sys_user_role: {
+                                id: '4e548db0cdee42dfb31bc76a4de6214d'
+                                key: {
+                                    name: 'x_daas_ham.inventory_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '925b63238fc34bc78dfe94786f32b376'
                         key: {
@@ -22577,6 +23990,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_return_order'
                             element: 'escalated'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '92b59e07a9b349459fc2025cdf6a098c'
+                        key: {
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'mismatch'
+                            position: '12'
                         }
                     },
                     {
@@ -23127,6 +24562,41 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '95a9c740fc8e42c6b709977768f2836e'
+                        key: {
+                            sys_ui_section: {
+                                id: '0f43b4aa14b44a1f9a783e3b1f6d3b75'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Renewal'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '6'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '95b513f3461c4cbaae6d300e363a744c'
+                        key: {
+                            sys_security_acl: '7068c5dff620433c810498693e7e6517'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: '95c3060b4ece4d6b996723f700bbffc6'
                         key: {
@@ -23643,6 +25113,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '997ea09a266849d3b85193db39070151'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'mismatch'
+                        }
+                    },
+                    {
                         table: 'ua_table_licensing_config'
                         id: '9997112f58ec47229ae25af2043fcfd1'
                         key: {
@@ -23755,6 +25233,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '9a1028898cae4f27bdeed1932a752ac3'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'monthly_payment'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '9a12ac21aea94800906fe9f8c698eedf'
                         key: {
@@ -23822,6 +25309,28 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '9a67828aea4a4928a2bd1a941d962f81'
+                        key: {
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -24362,6 +25871,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '9d6ef480d60649e784a2ebab8d3f6b9c'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ce213be2d5534b9eabd3273b3ec219b1'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Money and end of lease'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'mismatch'
+                            position: '5'
+                        }
+                    },
+                    {
                         table: 'item_option_new'
                         id: '9d97a575d7b640a2849cecd6841484e2'
                         key: {
@@ -24786,6 +26317,28 @@ declare global {
                             value: 'nms'
                             language: 'en'
                             dependent_value: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'a08e3eaa72764795a22f8638c709c51a'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ccf2baaad59e4f6299034f3fcb31ab72'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'Notes'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'short_description'
+                            position: '0'
                         }
                     },
                     {
@@ -25282,6 +26835,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_index'
+                        id: 'a3487110c4d547ce8ef74bd6cca01756'
+                        key: {
+                            logical_table_name: 'x_daas_ham_oem_coverage'
+                            col_name_string: 'end_date'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'a34d25b37bd146b99d5dd29ac2009751'
                         key: {
@@ -25513,6 +27074,22 @@ declare global {
                             name: 'x_daas_ham_norm_exception'
                             element: 'raw_manufacturer'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'a4880921860a484cb687f1b7cb1974aa'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'covered_assets'
+                        }
+                    },
+                    {
+                        table: 'sys_index'
+                        id: 'a49c411d2bb54f92bfe3038027cf7f52'
+                        key: {
+                            logical_table_name: 'x_daas_ham_lease_decision'
+                            col_name_string: 'lease'
                         }
                     },
                     {
@@ -25867,6 +27444,19 @@ declare global {
                             name: 'x_daas_ham_staging_task'
                             element: 'firmware_version'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: 'a73ca44b5888455e857880cf5eaee440'
+                        key: {
+                            sys_ui_action: '2671d1ec92b847fea0bc80656327a746'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
                         }
                     },
                     {
@@ -26251,6 +27841,19 @@ declare global {
                     },
                     {
                         table: 'sys_security_acl_role'
+                        id: 'aa8075e5f54a485d922849fec49c7223'
+                        key: {
+                            sys_security_acl: '804f4791a31e424e9d9e2914a6520037'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
                         id: 'aa988e181200471a895221183bf6b811'
                         key: {
                             sys_security_acl: '88262b53f0ef421384aee27ee17530a4'
@@ -26396,6 +27999,15 @@ declare global {
                         key: {
                             name: 'wm_order'
                             element: 'x_daas_ham_purpose'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'abb80c73274449fd8d563867d9154263'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'NULL'
+                            language: 'en'
                         }
                     },
                     {
@@ -26717,6 +28329,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'af5a3b6e343c426585ad7cf91b5d02f1'
+                        key: {
+                            sys_security_acl: '7068c5dff620433c810498693e7e6517'
+                            sys_user_role: {
+                                id: 'b1a9a9832f01483a9c4e6fc55ca84188'
+                                key: {
+                                    name: 'x_daas_ham.field_tech'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'ua_table_licensing_config'
                         id: 'af61cddf63164a26921368c9cfd13861'
                         key: {
@@ -26920,6 +28545,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'b0a4f4084d9349c791fd77ea764d054a'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            element: 'renewal_notified'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_form_section'
                         id: 'b0ab9d5eb6034770b22acdbdfe4fe031'
                         key: {
@@ -27096,12 +28730,44 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'b1d3f7a6ee5340d0aacaabf5481a3d6d'
+                        key: {
+                            sys_security_acl: '18e65f277b72497fb3fc86cb9cbc68f2'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'b1f006f7955c4cc39b89f09adee546e8'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'end_action'
+                            value: 'buyout'
+                            language: 'en'
+                            dependent_value: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'b21d0b1847d2405781940575dc9c9a2f'
                         key: {
                             name: 'x_daas_ham_recon_exception'
                             element: 'detected_at'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'b2384535fdc548548c11d390ffc3881b'
+                        key: {
+                            name: 'alm_hardware'
+                            element: 'x_daas_ham_lease'
                         }
                     },
                     {
@@ -27302,6 +28968,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'b3c045cc550b4ae2b122f41f9411f3f3'
+                        key: {
+                            sys_ui_section: {
+                                id: '0f43b4aa14b44a1f9a783e3b1f6d3b75'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Renewal'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'renewal_notified'
+                            position: '4'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'b3c158693f7748d1aa9d4e4b1aca0842'
                         key: {
@@ -27450,6 +29138,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'b4f5989aca234e3cb6247cbf0e3826b5'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ce213be2d5534b9eabd3273b3ec219b1'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Money and end of lease'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'buyout_price'
+                            position: '2'
+                        }
+                    },
+                    {
                         table: 'sys_number'
                         id: 'b523082b82d74167a3edeea1ee3a31fb'
                         key: {
@@ -27534,6 +29244,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'b594ae1633174ea5bb90558ffab95c02'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'mismatch'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'b5a54d164d824f0bb64b3a685fc27396'
+                        key: {
+                            sys_security_acl: '18e65f277b72497fb3fc86cb9cbc68f2'
+                            sys_user_role: {
+                                id: 'c5156577be814d2aa8bf557ddec8bf0e'
+                                key: {
+                                    name: 'x_daas_ham.noc'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: 'b5a8a42efaf64c168eb75a181498fe3c'
                         key: {
@@ -27551,6 +29283,28 @@ declare global {
                             name: 'x_daas_ham_norm_exception'
                             element: 'raw_model'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'b5d90ae6f07a4ac0adc2028684bac74e'
+                        key: {
+                            sys_ui_section: {
+                                id: '0f43b4aa14b44a1f9a783e3b1f6d3b75'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Renewal'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'end_return_raised'
+                            position: '5'
                         }
                     },
                     {
@@ -27731,6 +29485,39 @@ declare global {
                                 key: {
                                     name: 'x_daas_ham_fee_event'
                                     caption: 'Fee'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: 'b6f08825e5ca435d93f72ff785fb8892'
+                        key: {
+                            sys_ui_form: {
+                                id: '5e58bb93cb894fad82f8ed1c23d4fa6f'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'ccf2baaad59e4f6299034f3fcb31ab72'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'Notes'
                                     view: {
                                         id: 'Default view'
                                         key: {
@@ -28328,6 +30115,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: 'bb41a03bb79a4ae99488cc090a6a8dd6'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'lease'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: 'bb49d975aaab48ee9444cfcb7f029f07'
                         key: {
@@ -28788,6 +30583,28 @@ declare global {
                         key: {
                             document_key: 'f4f12e531f9b4c96a04eb2b4c0d9367e'
                             variable: '90144b535320220002c6435723dc3488'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'bfe79817e00e432cbe9e7be2d1483d59'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd9ef4007f7724454a17f742cc182488b'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Lease schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'number'
+                            position: '1'
                         }
                     },
                     {
@@ -29442,6 +31259,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'c48d5a21a71f48debe9daa31e6a8ef7c'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd9ef4007f7724454a17f742cc182488b'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Lease schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'ends'
+                            position: '8'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'c49672a23dac441d91a2a18a4ee9c33d'
                         key: {
@@ -29750,6 +31589,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_action_role'
+                        id: 'c6829c14cddc483cb4c78326378a0495'
+                        key: {
+                            sys_ui_action: '2671d1ec92b847fea0bc80656327a746'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: 'c683230b914d4efe8dba8bf4dc7da3c5'
                         key: {
@@ -29836,6 +31688,14 @@ declare global {
                             }
                             element: 'detail'
                             position: '8'
+                        }
+                    },
+                    {
+                        table: 'sys_choice_set'
+                        id: 'c6b96b1f313d4f72aa71266ad66dcdfd'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'end_action'
                         }
                     },
                     {
@@ -29996,6 +31856,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: 'c77c08890d7542739c57d944fe17c0f2'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'NULL'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: 'c784561cf58c4e388a9d4c56b3d68608'
                         key: {
@@ -30054,6 +31922,21 @@ declare global {
                         key: {
                             name: 'x_daas_ham_disposal_line'
                             element: 'method'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: 'c7c30dd844df491cb6aa3e1a02676120'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            caption: 'Related'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -30816,6 +32699,19 @@ declare global {
                     },
                     {
                         table: 'sys_security_acl_role'
+                        id: 'cc9595a134d44600a546e08a849eaa4d'
+                        key: {
+                            sys_security_acl: '598120ca284d45258e3de3b825394060'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
                         id: 'cc9cfcf30e2e4d8087f87da88b3a259d'
                         key: {
                             sys_security_acl: '9a4874d7be9e45da80ee084083663620'
@@ -30851,6 +32747,21 @@ declare global {
                                     name: 'x_daas_ham.finance'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: 'ccf2baaad59e4f6299034f3fcb31ab72'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            caption: 'Notes'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -31140,6 +33051,21 @@ declare global {
                         key: {
                             name: 'x_daas_ham_stockroom_member'
                             element: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_section'
+                        id: 'ce213be2d5534b9eabd3273b3ec219b1'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            caption: 'Money and end of lease'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
                         }
                     },
                     {
@@ -31518,6 +33444,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'd1122ee06c3e480ba9a2bf0b91fcd874'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'decision'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sn_glider_source_artifact'
                         id: 'd14e01995770495fbbcfb42749651b46'
                         key: {
@@ -31548,6 +33483,15 @@ declare global {
                         key: {
                             document_key: 'cacf66f6f8e946dd9377c7c34959d2d8'
                             variable: 'c2eb56e853422110248dddeeff7b1261'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'd1f156b5b6f04171b0ec6729d28a0906'
+                        key: {
+                            name: 'x_daas_ham_oem_coverage'
+                            element: 'expiry_notified'
+                            language: 'en'
                         }
                     },
                     {
@@ -31666,6 +33610,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: 'd2b53ddf155d4eada65ad2270af7d3bb'
+                        key: {
+                            name: 'alm_hardware'
+                            element: 'x_daas_ham_lease'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'd2cf36509be74bf1a1cecc192dc0fef1'
                         key: {
@@ -31712,6 +33665,28 @@ declare global {
                             name: 'x_daas_ham_attestation'
                             element: 'attested_at'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'd32657ea4a3541dcaa5a844271946dd9'
+                        key: {
+                            sys_ui_section: {
+                                id: 'ce213be2d5534b9eabd3273b3ec219b1'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Money and end of lease'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -31822,6 +33797,20 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_form'
+                        id: 'd3eb204804334adaae64b4339aa73f4a'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'd40b1970a4bd43e9b0f5ddb048bf96bd'
                         key: {
@@ -31881,6 +33870,14 @@ declare global {
                                     name: 'x_daas_ham.account_manager'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'd48dbab6797743f197d878f7ccbda8c0'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            element: 'lease_end'
                         }
                     },
                     {
@@ -32619,6 +34616,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: 'd9ef4007f7724454a17f742cc182488b'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            caption: 'Lease schedule'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: 'da12118306e04dc1a7091672a30b48b0'
                         key: {
@@ -33182,6 +35194,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'de7508eb572742b6b5558a50a8cac599'
+                        key: {
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'deployed_assets'
+                            position: '11'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list'
                         id: 'dea8313f1ca047c695aef30044c61f57'
                         key: {
@@ -33533,6 +35567,13 @@ declare global {
                         key: {
                             name: 'alm_stockroom'
                             element: 'x_daas_ham_stockroom_type'
+                        }
+                    },
+                    {
+                        table: 'ua_table_licensing_config'
+                        id: 'e1297d7f53d040e081ab430f2a2fc170'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
                         }
                     },
                     {
@@ -33950,6 +35991,21 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                        key: {
+                            name: 'x_daas_ham_lease_decision'
+                            caption: 'End-of-lease decision'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: 'e4628d6942114a23abdbb7307031ad6c'
                         key: {
@@ -33978,6 +36034,19 @@ declare global {
                         key: {
                             name: 'alm_stockroom'
                             element: 'x_daas_ham_stockroom_type'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'e4d8cc22646746fba65bb0c02c29637a'
+                        key: {
+                            sys_security_acl: '598120ca284d45258e3de3b825394060'
+                            sys_user_role: {
+                                id: '756e06fe791d4da28691694bb688b102'
+                                key: {
+                                    name: 'x_daas_ham.finance'
+                                }
+                            }
                         }
                     },
                     {
@@ -34748,11 +36817,41 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: 'eb62b99d3b67464abf296cd9233d26b4'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'monthly_payment'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: 'eb6487db25c849dfb7a2e3e8c926c02f'
                         key: {
                             document_key: '4bc22b9f0dd247cc95795636a568dff1'
                             variable: 'dd54cf535320220002c6435723dc34fd'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'eb73938cb63345dca8950d91e5295b70'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd9ef4007f7724454a17f742cc182488b'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Lease schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'state'
+                            position: '6'
                         }
                     },
                     {
@@ -34905,6 +37004,14 @@ declare global {
                                 }
                             }
                             element: 'scanned_code'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'ec810270a12e428db01b5f38c4639f73'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            element: 'renewal_notified'
                         }
                     },
                     {
@@ -35129,6 +37236,28 @@ declare global {
                                 }
                             }
                             element: 'stockroom'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'edd6bd0ed7884e21819725dce2add508'
+                        key: {
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'number'
+                            position: '1'
                         }
                     },
                     {
@@ -36186,6 +38315,28 @@ declare global {
                     },
                     {
                         table: 'sys_ui_element'
+                        id: 'f7ecb7e4bef549fc8a4413265d7bcbd4'
+                        key: {
+                            sys_ui_section: {
+                                id: '0f43b4aa14b44a1f9a783e3b1f6d3b75'
+                                key: {
+                                    name: 'x_daas_ham_agreement'
+                                    caption: 'Renewal'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'renewal_lead_days'
+                            position: '1'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
                         id: 'f80788ccd9a24abd84272718499f45ce'
                         key: {
                             sys_ui_section: {
@@ -36303,6 +38454,39 @@ declare global {
                                 }
                             }
                             element: 'raw_model'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_form_section'
+                        id: 'f95219a25af7453792fc18c1d9a6feb0'
+                        key: {
+                            sys_ui_form: {
+                                id: '5e58bb93cb894fad82f8ed1c23d4fa6f'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
                         }
                     },
                     {
@@ -36637,6 +38821,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'fbf364463bba44f98621c68b5f62eafe'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd9ef4007f7724454a17f742cc182488b'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Lease schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
+                        }
+                    },
+                    {
                         table: 'sys_security_acl_role'
                         id: 'fbfa62c101d247748cd9abeefd290f5e'
                         key: {
@@ -36716,6 +38922,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_staging_tmpl_item'
                             element: 'order'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'fcb96e2405bd4514a7a12e773945484a'
+                        key: {
+                            sys_ui_section: {
+                                id: 'e45c186fea9749d38f2ee1e3509ecc48'
+                                key: {
+                                    name: 'x_daas_ham_lease_decision'
+                                    caption: 'End-of-lease decision'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'lease_end'
+                            position: '3'
                         }
                     },
                     {
@@ -36816,6 +39044,28 @@ declare global {
                         key: {
                             name: 'x_daas_ham_norm_exception'
                             element: 'status'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'fd76d888821e450d82dd1cc64b5eaa62'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd9ef4007f7724454a17f742cc182488b'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Lease schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'schedule_number'
+                            position: '3'
                         }
                     },
                     {
@@ -37005,6 +39255,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'fef00851770d498ebe97c2041b7a1315'
+                        key: {
+                            sys_security_acl: '7068c5dff620433c810498693e7e6517'
+                            sys_user_role: {
+                                id: 'c5156577be814d2aa8bf557ddec8bf0e'
+                                key: {
+                                    name: 'x_daas_ham.noc'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'fef51dc5ab2449aba2806f2573e933e9'
                         key: {
@@ -37142,6 +39405,14 @@ declare global {
                                     name: 'sn_customerservice_agent'
                                 }
                             }
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'ffeefc1e204242cb9d0612497179bd1c'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'buyout_price'
                         }
                     },
                 ]
