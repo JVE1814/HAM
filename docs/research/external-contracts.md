@@ -737,7 +737,7 @@ Sources:
 | `GlideRecord.updateMultiple()` and clearing a field | Clears `billing_period` record by record (`billing.ts` unlinkFees) | `updateMultiple` does not clear values unless set to `'NULL'` | matches | N30 |
 | `RESTMessageV2(name, methodName)`, `setStringParameterNoEscape` | As used; app URL-encodes values itself (`rest-port.ts:8,26-28`) | Constructor documented; neither method URL-encodes | matches | N31, N32, N33 |
 | `GlideAggregate.groupBy` on date fields | Grouped `start_date`/`end_date` read as `YYYY-MM-DD` (`billing.ts` intervalsByLine) | Format of a grouped `glide_date` key not documented | unverifiable | N34 |
-| `setWorkflow(false)` on a global table from the scoped app | Skips the app's before-query rule on `alm_hardware` (`assets.ts:87,94`; `billing.ts:183`) | "This method can't be set for cross-scoped applications" | unverifiable | N30 |
+| `setWorkflow(false)` on a global table from the scoped app | Skips the app's before-query rule on `alm_hardware` (`assets.ts:87,94`; `billing.ts:183`; `returns.ts` endLineIfEmpty) | "This method can't be set for cross-scoped applications" | unverifiable | N30 |
 
 Notes:
 

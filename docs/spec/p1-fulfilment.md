@@ -30,10 +30,10 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   or a mandatory field is missing.
 - **Receiving** (warehouse app) confirms only in-transit / on-order Assets as available in the chosen
   stockroom (for an inventory tech, one of theirs). It assigns the next Provider tag (unless the Asset
-  has one) and allocates the Asset to an Order line awaiting that PO (reserved, then staging with a
-  task). An unknown serial with a PID is received without an ASN. Returned units (pending return or
-  missing) are received by the returns process (P2 after-sales spec); any other scanned Asset is
-  refused as not awaiting receipt.
+  has one) and allocates the Asset to an Order line awaiting that PO (reserved, then staging once its
+  Staging task is created; without one it stays reserved). An unknown serial with a PID is received
+  without an ASN. Returned units (pending return or missing) are received by the returns process (P2
+  after-sales spec); any other scanned Asset is refused as not awaiting receipt.
 - **Provider tags** come from one counter, advanced under a job lock so that no two Assets share a tag.
   A receipt that cannot take the lock after 5 tries is told to scan again (HTTP 503) and the unit is
   not received; one without an ASN stays on order, so the rescan finds it by serial.

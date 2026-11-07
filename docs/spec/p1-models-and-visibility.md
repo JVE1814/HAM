@@ -35,10 +35,13 @@
 |---|---|
 | asset manager, field tech, NOC, account manager, finance, admin | everything |
 | inventory tech only | Assets, stockrooms, transfer orders, staging tasks and audits (with their lines) of their stockrooms; plus, across all stockrooms and Customers, the ASN imports, staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and Disposal orders; no other app table |
-| customer admin | their Customer's Assets, Orders, lines, Agreements, subscription lines, catalog entries |
+| customer admin | their Customer's Assets, Orders, lines, Agreements, subscription lines, catalog entries; Site templates with their items, their Customer's and those offered to every Customer (checked by the read ACL, no before-query rule) |
 | site contact | Assets, Orders and lines of the Sites listing them as contacts |
 
 Before-query rules add the filter and customer ACLs re-check it. Users with no stockroom, Site or
-Customer see nothing in the restricted tables. The rules only narrow rows: tables a role may not read at
-all are closed by their read ACLs (for inventory techs, `INVENTORY_TECH_TABLES` in
-`domain/visibility.ts` lists what they read).
+Customer see nothing in the restricted tables. For inventory techs the rules only narrow rows: tables they
+may not read at all are closed by the read ACLs' role lists, not by a match-nothing filter, because a rule
+also applies to the server logic their actions set off (`INVENTORY_TECH_TABLES` in `domain/visibility.ts`
+lists what they read). For Customer contacts, a rule on a table with no Customer field (or no Site field,
+for Site contacts) matches nothing: Site contacts get no Stockrooms, Agreements, subscription lines,
+catalog entries or Fee events, and no Customer contact gets transfer orders or Staging tasks.

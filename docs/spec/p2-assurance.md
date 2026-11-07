@@ -7,8 +7,9 @@
   under a standard change.
 - Technicians scan in the warehouse app's **Audit** mode. Scans are blind: no unit details are shown.
 - An inventory tech sees, scans and closes only the blind counts of their Stockrooms; site audits are
-  for field techs. Other staff work on any open audit. An audit the user may not see answers *No open
-  audit with that number*.
+  for field techs. Field techs and asset managers scan and close any open audit; other staff (NOC,
+  account managers, finance) only read audits. An audit the user may not see answers *No open audit
+  with that number*.
 - **Close audit**:
   - scans are matched to expected Assets by serial, provider tag or customer tag (case-insensitive);
   - unmatched expected Assets become *missing in audit* exceptions;

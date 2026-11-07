@@ -214,6 +214,12 @@ What remains can only be confirmed on an instance or behind a vendor login:
   finds the lock held 5 times in a row answers HTTP 503 *Other receipts are taking Provider tags: scan
   again* and leaves the unit unreceived; each refused try logs two *Unique Key violation* errors (up to
   10 for one 503), and so does a try that meets the lock being released.
+- **Stock reservation lock** (Order sourcing): reserving an Asset for an Order line takes the job lock
+  `reserve_asset_<Asset sys_id>` in the same *Job lock* table and re-reads the Asset under it, so two
+  sourcing runs that pick the same Asset never both reserve it. The run that finds the lock held leaves
+  that Asset to the other (the unit counts in its line's shortfall) and logs two *Unique Key violation*
+  errors, or one when the other run lets go in between and the re-read finds the Asset taken; no
+  `reserve_asset_` lock row is left once sourcing ends.
 - **Inventory tech access** (ADR 0005), also after upgrading an existing install: the ACLs that
   `security/acls*.now.ts` give `broadStaff` (agreements, subscription lines, catalog entries, site
   templates, fee events, attestations, leases, OEM coverage and cloud accounts, model data, device
