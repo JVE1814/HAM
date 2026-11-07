@@ -244,7 +244,7 @@ export function raiseScheduledReturns(): void {
     while (agreement.next()) {
         const recover = `Agreement ${str(agreement, 'number')} ended ${str(agreement, 'ends')}: recover all equipment`
         // One Return per Site, each a field de-install with its own change and work order there. Units still shipped
-        // there go too (domain/returns `SITE_RECOVERY_STAGES`): the job does not look at this Agreement again.
+        // there go too (domain/returns `SITE_RECOVERY_STAGES`): once all are raised, the job leaves this Agreement.
         const bySite = installedAssetIdsBySite({ agreementId: agreement.getUniqueValue(), wholeSite: true })
         let refused = false
         for (const [siteId, assetIds] of bySite) {
@@ -261,7 +261,7 @@ export function raiseScheduledReturns(): void {
             })
             if (!returnId) refused = true
         }
-        // A refused Return is raised on the next run; the Sites raised now are pending return and not found again.
+        // A refused Return is raised on the next run. Units put on a Return now are pending return, so not found again.
         if (refused) continue
         agreement.setValue('end_return_raised', true)
         agreement.update()

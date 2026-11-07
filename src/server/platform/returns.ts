@@ -78,16 +78,21 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
             refused++
             continue
         }
-        lines++
         const stage = readStage(asset)
-        // Leaving service closes the Asset's service interval (entry/assets.ts onAssetServiceChange).
-        if (isDeployed(stage) && stage !== 'pending_return') moveAndSave(asset, 'pending_return', `return ${str(order, 'number')}`)
+        const moving = isDeployed(stage) && stage !== 'pending_return'
+        // Leaving service closes the Asset's service interval (entry/assets.ts onAssetServiceChange). A refused move
+        // (moveAndSave warns) takes the line off again: it would await a unit still in service, later declared missing.
+        if (moving && !moveAndSave(asset, 'pending_return', `return ${str(order, 'number')}`) && line.deleteRecord()) {
+            refused++
+            continue
+        }
+        lines++
     }
 
     if (lines === 0) {
-        // Nothing installed, everything already on another Return order, or every line refused: close straight away.
+        // Nothing installed, everything already on another Return order, or every unit refused: close straight away.
         order.setValue('state', 3)
-        const note = refused > 0 ? 'No return line could be saved (see the system log).' : 'No equipment to bring back.'
+        const note = refused > 0 ? 'No unit could be added (see the system log).' : 'No equipment to bring back.'
         order.setValue('work_notes', note)
     } else if (request.openFieldWork && request.method === 'fsm_deinstall') {
         const context = {
