@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
-import { accountManager, admin, assetManager, finance, providerStaff } from './roles.now'
+import { accountManager, admin, assetManager, broadStaff, finance } from './roles.now'
 
 /* Access controls for the contracts and money tables (P3): leases, billing, costs and margin. */
 
@@ -12,7 +12,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_lease_schedule',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -44,7 +44,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_lease_decision',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({

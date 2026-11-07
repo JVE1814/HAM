@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
-import { admin, assetManager, customerRoles, inventoryTech, providerStaff } from './roles.now'
+import { admin, assetManager, broadStaff, customerRoles, inventoryTech, providerStaff } from './roles.now'
 
 /* Access controls for shipping (P3.26) and OEM cloud accounts (P3.27). Customer contacts see their own shipments. */
 
@@ -93,7 +93,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_cloud_account',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({

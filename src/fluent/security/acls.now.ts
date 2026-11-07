@@ -5,6 +5,7 @@ import {
     finance,
     admin,
     assetManager,
+    broadStaff,
     customerAdmin,
     customerRoles,
     fieldTech,
@@ -17,6 +18,8 @@ import {
 /*
  * Access controls for app tables. Reads are also narrowed by the before-query rules in
  * visibility.now.ts (ADR 0005); customer ACLs re-check the customer so a direct link cannot leak data.
+ * Inventory techs read only the tables of their stockroom work (providerStaff or a list naming inventoryTech); other
+ * staff reads use broadStaff or a narrower list.
  */
 
 const commercialEditors = [accountManager, assetManager]
@@ -29,7 +32,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_agreement',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -61,7 +64,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_agreement_quantity',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -93,7 +96,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_subscription_line',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -125,7 +128,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_catalog_entry',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -157,7 +160,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_site_template',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -189,7 +192,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_site_template_item',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -249,6 +252,8 @@ Acl({
     table: 'x_daas_ham_site_template',
     operation: 'read',
     roles: [customerAdmin],
+    // A Site template with no Customer is offered to every Customer.
+    script: "answer = current.customer.nil() || current.getValue('customer') == gs.getUser().getCompanyID();",
 })
 
 Acl({
@@ -257,6 +262,7 @@ Acl({
     table: 'x_daas_ham_site_template_item',
     operation: 'read',
     roles: [customerAdmin],
+    script: "answer = current.site_template.customer.nil() || current.site_template.customer.toString() == gs.getUser().getCompanyID();",
 })
 
 Acl({
@@ -474,7 +480,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_manufacturer_alias',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -506,7 +512,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_model_match_rule',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -538,7 +544,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_model_lifecycle',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -570,7 +576,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_norm_exception',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -602,7 +608,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_stockroom_member',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -634,7 +640,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_device_event',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -778,7 +784,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_oem_coverage',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -842,7 +848,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_coverage_import',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -1002,7 +1008,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_recon_exception',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -1051,7 +1057,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_attestation',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -1068,7 +1074,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_fee_event',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({
@@ -1174,7 +1180,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_attestation_item',
     operation: 'read',
-    roles: providerStaff,
+    roles: broadStaff,
 })
 
 Acl({

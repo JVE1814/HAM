@@ -66,8 +66,11 @@ export const integration = Role({
     description: 'Machine role for the provider NMS that posts device events (server-side writes need no table roles).',
 })
 
-/** Every provider-staff role (read access to the installed base). */
+/** Every provider-staff role: reads the installed base and the tables of stockroom work (INVENTORY_TECH_TABLES in domain/visibility.ts). */
 export const providerStaff = [assetManager, inventoryTech, fieldTech, noc, accountManager, finance]
+
+/** Provider staff without inventory techs: the read list for customer, commercial and configuration tables. */
+export const broadStaff = [assetManager, fieldTech, noc, accountManager, finance]
 
 /** Roles that may change lifecycle data. */
 export const assetEditors = [assetManager, inventoryTech, fieldTech]

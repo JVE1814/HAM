@@ -1,5 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { resolveVisibility, visibilityFilter } from './visibility'
+import { INVENTORY_TECH_TABLES, resolveVisibility, STOCKROOM_SCOPED_TABLES, visibilityFilter } from './visibility'
 
 const roles = (...held: string[]) => (role: string) => held.includes(role)
 
@@ -28,7 +29,6 @@ describe('resolveVisibility', () => {
     })
 })
 
-
 describe('visibilityFilter', () => {
     const ids = {
         customerId: 'cust1',
@@ -55,7 +55,7 @@ describe('visibilityFilter', () => {
         expect(visibilityFilter('own_sites', assetFields, none)).toBe('sys_id=-1')
     })
 
-    it('leaves inventory techs unfiltered on tables without a stockroom', () => {
+    it('leaves inventory techs unfiltered on tables without a stockroom (read ACLs close the ones they may not read)', () => {
         expect(visibilityFilter('assigned_stockrooms', { customer: 'customer' }, ids)).toBeNull()
     })
 
@@ -68,5 +68,76 @@ describe('visibilityFilter', () => {
         expect(visibilityFilter('assigned_stockrooms', { stockroom: ['from_stockroom', 'to_stockroom'] }, ids)).toBe(
             'from_stockroomINsr1,sr2^ORto_stockroomINsr1,sr2',
         )
+    })
+})
+
+describe('read ACLs for inventory techs', () => {
+    const SECURITY = new URL('../../fluent/security/', import.meta.url)
+    const source = (file: string) => readFileSync(new URL(file, SECURITY), 'utf8')
+    const roles = source('roles.now.ts')
+    const items = (list: string) => list.split(',').map((item) => item.trim().replace(/"/g, "'")).filter(Boolean)
+    const namedLists = (text: string) => new Map([...text.matchAll(/const (\w+) = \[([^\]]*)\]/g)].map((m) => [m[1], items(m[2])]))
+    /** What an inventory tech with no other role holds: the role itself and the roles it contains. */
+    const heldByTech = new Set(['inventoryTech', "'x_daas_ham.inventory_tech'", ...items(/inventoryTech = Role\(\{[\s\S]*?containsRoles: \[([^\]]*)\]/.exec(roles)?.[1] ?? '')])
+
+    /** Every read ACL of the app as its table and the roles it grants, with named role lists expanded. */
+    const readAcls = readdirSync(SECURITY)
+        .filter((file) => /^acls.*\.now\.ts$/.test(file))
+        .flatMap((file) => {
+            const text = source(file)
+            const lists = new Map([...namedLists(roles), ...namedLists(text)])
+            const expand = (token: string): string[] => {
+                const name = token.replace(/^\.\.\./, '')
+                return lists.has(name) ? (lists.get(name) ?? []).flatMap(expand) : [token]
+            }
+            return text
+                .split('Acl({')
+                .slice(1)
+                .filter((acl) => acl.includes("operation: 'read'"))
+                .map((acl) => {
+                    const granted = /roles: (\[[^\]]*\]|\w+)/.exec(acl)?.[1] ?? ''
+                    const tokens = granted.startsWith('[') ? items(granted.slice(1, -1)) : [granted]
+                    return { table: /table: '([^']+)'/.exec(acl)?.[1] ?? '', roles: tokens.flatMap(expand) }
+                })
+        })
+    const readableByTech = [...new Set(readAcls.filter((acl) => acl.roles.some((role) => heldByTech.has(role))).map((acl) => acl.table))]
+    const closedToTech = [...new Set(readAcls.map((acl) => acl.table))].filter((table) => !readableByTech.includes(table))
+
+    it('let an inventory tech read exactly the tables of their stockroom work', () => {
+        expect(heldByTech).toContain("'inventory_user'")
+        expect(readableByTech.sort()).toEqual([...INVENTORY_TECH_TABLES].sort())
+    })
+
+    it('close customer, commercial and configuration tables to an inventory tech with no broader role', () => {
+        expect(closedToTech).toEqual(
+            expect.arrayContaining([
+                'x_daas_ham_agreement',
+                'x_daas_ham_subscription_line',
+                'x_daas_ham_catalog_entry',
+                'x_daas_ham_site_template',
+                'x_daas_ham_fee_event',
+                'x_daas_ham_attestation',
+                'x_daas_ham_lease_schedule',
+                'x_daas_ham_cloud_account',
+                'x_daas_ham_model_lifecycle',
+            ]),
+        )
+    })
+})
+
+describe('before-query rules for inventory techs', () => {
+    const rulesSource = readFileSync(new URL('../../fluent/security/visibility.now.ts', import.meta.url), 'utf8')
+    const entrySource = readFileSync(new URL('../entry/visibility.ts', import.meta.url), 'utf8')
+    /** The scoping fields each before-query entry point passes, by function name. */
+    const fieldsOf = new Map([...entrySource.matchAll(/export function (\w+)\(current: GlideRecord\): void \{\s*restrict\(current, (\{[^}]*\})\)/g)].map((m) => [m[1], m[2]]))
+    const rules = rulesSource
+        .split('BusinessRule({')
+        .slice(1)
+        .map((rule) => ({ table: /table: '([^']+)'/.exec(rule)?.[1] ?? '', fields: fieldsOf.get(/script: (\w+)/.exec(rule)?.[1] ?? '') ?? '' }))
+
+    it('narrow an inventory tech to their stockrooms on exactly the stock, transfer order, staging and audit tables', () => {
+        expect(rules.filter((rule) => !rule.fields)).toEqual([])
+        const narrowed = rules.filter((rule) => rule.fields.includes('stockroom:')).map((rule) => rule.table)
+        expect(narrowed.sort()).toEqual([...STOCKROOM_SCOPED_TABLES].sort())
     })
 })

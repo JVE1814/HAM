@@ -28,6 +28,46 @@ const BROAD_STAFF_ROLES = [
     ROLE.finance,
 ]
 
+/**
+ * The app tables an inventory tech with no broader role may read: the Assets, Staging tasks and Audits of their
+ * Stockrooms (STOCKROOM_SCOPED_TABLES), and the ASN imports, Staging steps and templates, Orders, Shipments, Return
+ * orders, OEM RMAs and Disposal orders they work on, which are not narrowed to their Stockrooms. Every other table's
+ * read ACL leaves inventory techs out (the security Fluent files are checked against this list).
+ */
+export const INVENTORY_TECH_TABLES: readonly string[] = [
+    'alm_hardware',
+    'x_daas_ham_asn_import',
+    'x_daas_ham_staging_task',
+    'x_daas_ham_staging_step',
+    'x_daas_ham_staging_template',
+    'x_daas_ham_staging_tmpl_item',
+    'x_daas_ham_order',
+    'x_daas_ham_order_line',
+    'x_daas_ham_shipment',
+    'x_daas_ham_shipment_event',
+    'x_daas_ham_return_order',
+    'x_daas_ham_return_order_line',
+    'x_daas_ham_audit',
+    'x_daas_ham_audit_line',
+    'x_daas_ham_oem_rma',
+    'x_daas_ham_disposal_order',
+    'x_daas_ham_disposal_line',
+]
+
+/**
+ * The tables an inventory tech sees only for their assigned Stockrooms: stock, transfer orders, Staging tasks and
+ * Audits with their lines. Each has a before-query rule that filters on a Stockroom field, and no other table does
+ * (the rules are checked against this list).
+ */
+export const STOCKROOM_SCOPED_TABLES: readonly string[] = [
+    'alm_hardware',
+    'alm_stockroom',
+    'alm_transfer_order',
+    'x_daas_ham_staging_task',
+    'x_daas_ham_audit',
+    'x_daas_ham_audit_line',
+]
+
 export function resolveVisibility(hasRole: (role: string) => boolean): VisibilityScope {
     if (BROAD_STAFF_ROLES.some(hasRole)) return 'everything'
     if (hasRole(ROLE.inventoryTech)) return 'assigned_stockrooms'
@@ -54,6 +94,12 @@ const NOTHING = 'sys_id=-1'
 /**
  * The encoded query that restricts a table to what `scope` may see, or null for no restriction.
  * Ids are fetched lazily so unrestricted users never pay for the lookups.
+ *
+ * Inventory techs are only filtered where `fields` names a Stockroom (STOCKROOM_SCOPED_TABLES). The other tables
+ * they work on (Orders, Return orders, Shipments) serve every Customer, and the tables they may not read at all are
+ * closed by their read ACLs, not here: this filter also applies to the server logic a tech sets off, such as
+ * receiving a returned Asset, which can end its Subscription line and record a late-return Fee event, so it must
+ * not hide those records.
  */
 export function visibilityFilter(scope: VisibilityScope, fields: ScopingFields, ids: ScopingIds): string | null {
     switch (scope) {

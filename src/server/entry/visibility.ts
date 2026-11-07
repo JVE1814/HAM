@@ -29,6 +29,15 @@ export function scopeStagingTasks(current: GlideRecord): void {
     restrict(current, { stockroom: 'asset.stockroom' })
 }
 
+/** An inventory tech sees the blind counts of their Stockrooms; a site audit has no Stockroom, so it drops out. */
+export function scopeAudits(current: GlideRecord): void {
+    restrict(current, { stockroom: 'stockroom', customer: 'customer', site: 'site' })
+}
+
+export function scopeAuditLines(current: GlideRecord): void {
+    restrict(current, { stockroom: 'audit.stockroom', customer: 'audit.customer', site: 'audit.site' })
+}
+
 export function scopeOrders(current: GlideRecord): void {
     restrict(current, { customer: 'customer', site: 'site' })
 }

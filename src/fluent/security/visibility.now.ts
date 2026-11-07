@@ -2,6 +2,8 @@ import '@servicenow/sdk/global'
 import { BusinessRule } from '@servicenow/sdk/core'
 import {
     scopeAssets,
+    scopeAuditLines,
+    scopeAudits,
     scopeCustomerRecords,
     scopeCustomerSiteRecords,
     scopeOrderLines,
@@ -51,6 +53,26 @@ BusinessRule({
     action: ['query'],
     order: 50,
     script: scopeStagingTasks,
+})
+
+BusinessRule({
+    $id: Now.ID['br_scope_audit'],
+    name: 'NaaS - scope audits',
+    table: 'x_daas_ham_audit',
+    when: 'before',
+    action: ['query'],
+    order: 50,
+    script: scopeAudits,
+})
+
+BusinessRule({
+    $id: Now.ID['br_scope_audit_line'],
+    name: 'NaaS - scope audit lines',
+    table: 'x_daas_ham_audit_line',
+    when: 'before',
+    action: ['query'],
+    order: 50,
+    script: scopeAuditLines,
 })
 
 BusinessRule({

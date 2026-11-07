@@ -4,10 +4,25 @@ import { accountManager, admin, assetManager, fieldTech, finance, inventoryTech,
 
 /* Lists of the NaaS asset workspace, grouped by the job they serve. */
 
+/** Every provider-staff role, for the lists of tables inventory techs also read (INVENTORY_TECH_TABLES in domain/visibility.ts). */
 export const staffAudience = Applicability({
     $id: Now.ID['ws_audience_staff'],
     name: 'NaaS provider staff',
     roles: [assetManager, inventoryTech, fieldTech, noc, accountManager, finance],
+})
+
+/** Provider staff without inventory techs, for the customer, commercial and configuration tables whose read ACLs leave inventory techs out (broadStaff). */
+export const broadStaffAudience = Applicability({
+    $id: Now.ID['ws_audience_broad_staff'],
+    name: 'NaaS provider staff except inventory techs',
+    roles: [assetManager, fieldTech, noc, accountManager, finance],
+})
+
+/** The roles that read billing and margin data (the money tables' read ACLs). */
+export const moneyAudience = Applicability({
+    $id: Now.ID['ws_audience_money'],
+    name: 'NaaS billing and margin readers',
+    roles: [finance, accountManager, assetManager],
 })
 
 export const adminAudience = Applicability({
@@ -243,7 +258,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_model_lifecycle',
                     condition: 'ORDERBYend_of_support^EQ',
                     columns: 'model,end_of_sale,end_of_support,end_of_extended_support,end_of_life,source,last_refreshed',
-                    applicabilities: [{ $id: Now.ID['ws_models_lifecycle_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_models_lifecycle_aud'], applicability: broadStaffAudience }],
                 },
                 {
                     $id: Now.ID['ws_models_exceptions'],
@@ -252,7 +267,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_norm_exception',
                     condition: 'status=open^ORDERBYDESCoccurrences^EQ',
                     columns: 'raw_manufacturer,raw_model,reason,occurrences,resolved_model',
-                    applicabilities: [{ $id: Now.ID['ws_models_exceptions_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_models_exceptions_aud'], applicability: broadStaffAudience }],
                 },
                 {
                     $id: Now.ID['ws_models_rules'],
@@ -261,7 +276,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_model_match_rule',
                     condition: 'ORDERBYorder^EQ',
                     columns: 'order,manufacturer,match_type,pattern,model,active',
-                    applicabilities: [{ $id: Now.ID['ws_models_rules_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_models_rules_aud'], applicability: broadStaffAudience }],
                 },
             ],
         },
@@ -277,7 +292,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_agreement',
                     condition: 'ORDERBYcustomer^EQ',
                     columns: 'number,customer,account_manager,state,starts,ends,replacement_tier,refresh_cycle_months',
-                    applicabilities: [{ $id: Now.ID['ws_agreements_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_agreements_aud'], applicability: broadStaffAudience }],
                 },
                 {
                     $id: Now.ID['ws_subscription_lines'],
@@ -286,7 +301,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_subscription_line',
                     condition: 'status!=ended^EQ',
                     columns: 'description,customer,agreement,line_type,site,device_class,monthly_rate,status,start_date',
-                    applicabilities: [{ $id: Now.ID['ws_subscription_lines_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_subscription_lines_aud'], applicability: broadStaffAudience }],
                 },
                 {
                     $id: Now.ID['ws_catalog_entries'],
@@ -295,7 +310,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_catalog_entry',
                     condition: 'active=true^EQ',
                     columns: 'customer,entry_type,model,site_template,monthly_rate,valid_to',
-                    applicabilities: [{ $id: Now.ID['ws_catalog_entries_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_catalog_entries_aud'], applicability: broadStaffAudience }],
                 },
                 {
                     $id: Now.ID['ws_site_templates'],
@@ -304,7 +319,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_site_template',
                     condition: 'active=true^EQ',
                     columns: 'name,customer,description',
-                    applicabilities: [{ $id: Now.ID['ws_site_templates_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_site_templates_aud'], applicability: broadStaffAudience }],
                 },
                 {
                     $id: Now.ID['ws_lease_schedules'],
@@ -313,7 +328,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_lease_schedule',
                     condition: 'ORDERBYends^EQ',
                     columns: 'number,lessor,schedule_number,ends,monthly_payment,buyout_price,end_action,mismatch',
-                    applicabilities: [{ $id: Now.ID['ws_lease_schedules_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_lease_schedules_aud'], applicability: broadStaffAudience }],
                 },
                 {
                     $id: Now.ID['ws_lease_decisions'],
@@ -322,7 +337,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_lease_decision',
                     condition: 'active=true^ORDERBYlease_end^EQ',
                     columns: 'number,lease,lease_end,decision,covered_assets,deployed_assets,mismatch,assigned_to',
-                    applicabilities: [{ $id: Now.ID['ws_lease_decisions_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_lease_decisions_aud'], applicability: broadStaffAudience }],
                 },
                 {
                     $id: Now.ID['ws_agreements_renewal'],
@@ -331,7 +346,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_agreement',
                     condition: 'renewal_notified=true^ends>=javascript:gs.beginningOfToday()^ORDERBYends^EQ',
                     columns: 'number,customer,account_manager,ends,renewal_term_months',
-                    applicabilities: [{ $id: Now.ID['ws_agreements_renewal_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_agreements_renewal_aud'], applicability: broadStaffAudience }],
                 },
             ],
         },
@@ -410,7 +425,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_fee_event',
                     condition: 'status=open^EQ',
                     columns: 'occurred_on,fee_type,customer,asset,amount,currency',
-                    applicabilities: [{ $id: Now.ID['ws_fees_open_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_fees_open_aud'], applicability: broadStaffAudience }],
                 },
             ],
         },
@@ -435,7 +450,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_recon_exception',
                     condition: 'status=open^ORDERBYDESCdetected_at^EQ',
                     columns: 'detected_at,exception_type,asset,ci,customer,detail',
-                    applicabilities: [{ $id: Now.ID['ws_exceptions_open_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_exceptions_open_aud'], applicability: broadStaffAudience }],
                 },
                 {
                     $id: Now.ID['ws_attestations_open'],
@@ -444,7 +459,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_attestation',
                     condition: 'active=true^EQ',
                     columns: 'number,customer,site,assigned_to,opened_at',
-                    applicabilities: [{ $id: Now.ID['ws_attestations_open_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_attestations_open_aud'], applicability: broadStaffAudience }],
                 },
                 {
                     $id: Now.ID['ws_risk_past_support'],
@@ -471,7 +486,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_oem_coverage',
                     condition: 'ORDERBYend_date^EQ',
                     columns: 'serial_number,asset,vendor,service_level,end_date,covered,source',
-                    applicabilities: [{ $id: Now.ID['ws_coverage_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_coverage_aud'], applicability: broadStaffAudience }],
                 },
                 {
                     $id: Now.ID['ws_coverage_expiring'],
@@ -480,7 +495,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_oem_coverage',
                     condition: 'covered=true^expiry_notified=true^end_date>=javascript:gs.beginningOfToday()^ORDERBYend_date^EQ',
                     columns: 'serial_number,asset,asset.company,vendor,service_level,end_date',
-                    applicabilities: [{ $id: Now.ID['ws_coverage_expiring_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_coverage_expiring_aud'], applicability: broadStaffAudience }],
                 },
             ],
         },
@@ -496,7 +511,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_billing_period',
                     condition: 'ORDERBYDESCperiod^EQ',
                     columns: 'period,status,line_count,total_amount,generated_at,closed_at,closed_by',
-                    applicabilities: [{ $id: Now.ID['ws_billing_periods_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_billing_periods_aud'], applicability: moneyAudience }],
                 },
                 {
                     $id: Now.ID['ws_billing_lines'],
@@ -505,7 +520,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_billing_line',
                     condition: 'ORDERBYDESCsys_created_on^EQ',
                     columns: 'billing_period,kind,customer,site,description,units,monthly_rate,amount,currency',
-                    applicabilities: [{ $id: Now.ID['ws_billing_lines_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_billing_lines_aud'], applicability: moneyAudience }],
                 },
                 {
                     $id: Now.ID['ws_fees_unbilled'],
@@ -514,7 +529,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_fee_event',
                     condition: 'status=open^ORDERBYoccurred_on^EQ',
                     columns: 'fee_type,customer,asset,return_order,amount,occurred_on,billing_period',
-                    applicabilities: [{ $id: Now.ID['ws_fees_unbilled_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_fees_unbilled_aud'], applicability: broadStaffAudience }],
                 },
                 {
                     $id: Now.ID['ws_service_intervals'],
@@ -523,7 +538,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_service_interval',
                     condition: 'end_dateISEMPTY^ORDERBYstart_date^EQ',
                     columns: 'asset,subscription_line,customer,site,start_date,end_date',
-                    applicabilities: [{ $id: Now.ID['ws_service_intervals_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_service_intervals_aud'], applicability: moneyAudience }],
                 },
                 {
                     $id: Now.ID['ws_margin'],
@@ -532,7 +547,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_margin',
                     condition: 'ORDERBYDESCbilling_period.period^ORDERBYmargin^EQ',
                     columns: 'billing_period,customer,site,revenue,cost,margin,margin_pct',
-                    applicabilities: [{ $id: Now.ID['ws_margin_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_margin_aud'], applicability: moneyAudience }],
                 },
                 {
                     $id: Now.ID['ws_cost_facts'],
@@ -541,7 +556,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_cost_fact',
                     condition: 'ORDERBYDESCbilling_period.period^EQ',
                     columns: 'billing_period,customer,site,cost_type,amount,currency',
-                    applicabilities: [{ $id: Now.ID['ws_cost_facts_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_cost_facts_aud'], applicability: moneyAudience }],
                 },
             ],
         },
@@ -557,7 +572,7 @@ export const naasListMenu = UxListMenuConfig({
                     table: 'x_daas_ham_cloud_account',
                     condition: 'ORDERBYcustomer^EQ',
                     columns: 'customer,vendor,purpose,account_id',
-                    applicabilities: [{ $id: Now.ID['ws_cloud_accounts_aud'], applicability: staffAudience }],
+                    applicabilities: [{ $id: Now.ID['ws_cloud_accounts_aud'], applicability: broadStaffAudience }],
                 },
                 {
                     $id: Now.ID['ws_admin_jobs'],

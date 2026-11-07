@@ -5,15 +5,16 @@ import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_in
 import { attestationDue, compareAudit, type ExpectedAsset } from '../domain/audit'
 import { stagesQuery, type Stage } from '../domain/lifecycle'
 import { reconcileAsset, type ExceptionType } from '../domain/reconciliation'
-import { ROLE } from '../domain/visibility'
+import { ROLE, visibilityFilter } from '../domain/visibility'
 import { customerAdminIds } from '../platform/approvals'
 import { runTableJob } from '../platform/chunked'
 import { glideToIsoDate, glideToMs, nowMs, todayIso } from '../platform/clock'
 import { openChange, openWorkOrder } from '../platform/field-work'
 import { openException, resolveExceptions } from '../platform/exceptions'
 import { intProperty, PROPERTY } from '../platform/properties'
-import { bool, num, str } from '../platform/records'
+import { exists, num, str } from '../platform/records'
 import { installedAssetIds } from '../platform/returns'
+import { currentSession } from '../platform/session'
 
 /** Audits, attestations and reconciliation (P2.7, D63). */
 
@@ -72,16 +73,16 @@ export function uiStartSiteAudit(current: GlideRecord): void {
     audit.update()
 }
 
-/** POST /audits/{id}/scan { code }: record one scan against an open audit. */
+/** POST /audits/{id}/scan { code }: record one scan against an open audit the user may see. */
 export function scanAudit(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!gs.hasRole(ROLE.inventoryTech) && !gs.hasRole(ROLE.fieldTech)) {
         response.setStatus(403)
         response.setBody({ error: 'Requires the inventory tech or field tech role' } as never)
         return
     }
-    const audit = findAuditByNumberOrId(String(request.pathParams.id ?? ''))
+    const audit = findOpenVisibleAudit(String(request.pathParams.id ?? ''))
     const code = String((request.body.data as { code?: string } | null)?.code ?? '').trim()
-    if (!audit || !bool(audit, 'active')) {
+    if (!audit) {
         response.setStatus(404)
         response.setBody({ error: 'No open audit with that number' } as never)
         return
@@ -102,14 +103,31 @@ export function scanAudit(request: RESTAPIRequest, response: RESTAPIResponse): v
     response.setBody({ audit: str(audit, 'number'), scanned: code } as never)
 }
 
-function findAuditByNumberOrId(key: string): GlideRecord | null {
+/**
+ * The open audit with this sys_id or number, if the user may work on it: an inventory tech only the blind counts
+ * of their stockrooms (a site audit has no stockroom), other staff every audit. The audit before-query rule
+ * (scopeAudits) already narrows this query the same way; the filter is repeated here because scanning and closing
+ * rely on it, and adding it twice changes nothing.
+ */
+function findOpenVisibleAudit(key: string): GlideRecord | null {
+    if (!key) return null
+    const session = currentSession()
     const audit = new GlideRecord('x_daas_ham_audit')
-    if (audit.get(key)) return audit
-    return audit.get('number', key) ? audit : null
+    audit.addQuery('sys_id', key).addOrCondition('number', key)
+    audit.addActiveQuery()
+    const filter = visibilityFilter(session.scope, { stockroom: 'stockroom', customer: 'customer', site: 'site' }, session)
+    if (filter) audit.addEncodedQuery(filter)
+    audit.setLimit(1)
+    audit.query()
+    return audit.next() ? audit : null
 }
 
 /** UI action "Close audit": compare scans with the expected list; missing assets become exceptions. */
 export function uiCloseAudit(current: GlideRecord): void {
+    if (!findOpenVisibleAudit(current.getUniqueValue())) {
+        gs.addErrorMessage('Only an open audit of one of your stockrooms can be closed')
+        return
+    }
     const expected: ExpectedAsset[] = []
     const scans: string[] = []
     const line = new GlideRecord('x_daas_ham_audit_line')
@@ -159,7 +177,12 @@ export function uiCloseAudit(current: GlideRecord): void {
     current.update()
 }
 
-/** Daily: open an attestation per Site whose Agreement interval has passed since the last one. */
+/**
+ * Daily: open an attestation for each Site with Assets of an attesting Agreement, once none is open there and the
+ * last one was attested longer ago than the Agreement's interval (or never). One attestation covers every Asset
+ * installed at the Site, so a Site that several Agreements serve follows the shortest of their intervals; the
+ * attestation records the Agreement whose interval raised it.
+ */
 export function raiseAttestations(): void {
     const today = todayIso()
     const agreement = new GlideRecord('x_daas_ham_agreement')
@@ -173,21 +196,12 @@ export function raiseAttestations(): void {
         asset.query()
         while (asset.next()) if (str(asset, 'x_daas_ham_site')) sites.add(str(asset, 'x_daas_ham_site'))
         for (const siteId of sites) {
-            if (openAttestationExists(siteId)) continue
+            if (exists('x_daas_ham_attestation', `site=${siteId}^active=true`)) continue
             const last = lastAttestedOn(siteId)
             if (!attestationDue({ lastAttestedOn: last, intervalMonths: num(agreement, 'attestation_interval_months'), today })) continue
             openAttestation(agreement, siteId)
         }
     }
-}
-
-function openAttestationExists(siteId: string): boolean {
-    const open = new GlideRecord('x_daas_ham_attestation')
-    open.addQuery('site', siteId)
-    open.addQuery('active', true)
-    open.setLimit(1)
-    open.query()
-    return open.hasNext()
 }
 
 function lastAttestedOn(siteId: string): string | undefined {
