@@ -4,7 +4,7 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { awaitsSelfInstallConfirmation } from '../domain/install-confirmation'
 import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
-import { ROLE } from '../domain/visibility'
+import { actsAsCustomerAdmin, ROLE } from '../domain/visibility'
 import { readStage } from '../platform/assets'
 import { currentSession } from '../platform/session'
 import { exists, findById, refusal, str } from '../platform/records'
@@ -17,10 +17,13 @@ import { reply } from '../platform/rest-api'
 /*
  * Customer self-service API (P2.9, D49). Every query runs as the signed-in customer contact, so the
  * before-query visibility rules (ADR 0005) limit it to their Customer (site contacts: their Sites).
+ * Asset managers may open the page as a preview, which shows every Customer; the Customer-admin
+ * actions stay with Customer admins.
  */
 
+/** A Customer admin of their own Customer only (`actsAsCustomerAdmin`); staff raise returns via the record producer. */
 function isCustomerAdmin(): boolean {
-    return gs.hasRole(ROLE.customerAdmin) || gs.hasRole(ROLE.assetManager)
+    return actsAsCustomerAdmin((role) => gs.hasRole(role))
 }
 
 function allowed(response: RESTAPIResponse): boolean {

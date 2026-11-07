@@ -1,6 +1,12 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { INVENTORY_TECH_TABLES, resolveVisibility, STOCKROOM_SCOPED_TABLES, visibilityFilter } from './visibility'
+import {
+    actsAsCustomerAdmin,
+    INVENTORY_TECH_TABLES,
+    resolveVisibility,
+    STOCKROOM_SCOPED_TABLES,
+    visibilityFilter,
+} from './visibility'
 
 const roles = (...held: string[]) => (role: string) => held.includes(role)
 
@@ -26,6 +32,20 @@ describe('resolveVisibility', () => {
 
     it('leaves everyone else to the platform ACLs', () => {
         expect(resolveVisibility(roles('itil'))).toBe('unscoped')
+    })
+})
+
+describe('actsAsCustomerAdmin', () => {
+    it('lets customer admins, also when they are site contacts, take the customer-admin actions', () => {
+        expect(actsAsCustomerAdmin(roles('x_daas_ham.customer_admin'))).toBe(true)
+        expect(actsAsCustomerAdmin(roles('x_daas_ham.site_contact', 'x_daas_ham.customer_admin'))).toBe(true)
+    })
+
+    it('leaves them out for site contacts and for staff who see every customer, even holding the role', () => {
+        expect(actsAsCustomerAdmin(roles('x_daas_ham.site_contact'))).toBe(false)
+        expect(actsAsCustomerAdmin(roles('x_daas_ham.asset_manager'))).toBe(false)
+        expect(actsAsCustomerAdmin(roles('x_daas_ham.asset_manager', 'x_daas_ham.customer_admin'))).toBe(false)
+        expect(actsAsCustomerAdmin(() => true)).toBe(false) // a platform admin holds every role
     })
 })
 

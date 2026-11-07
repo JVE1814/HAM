@@ -76,6 +76,16 @@ export function resolveVisibility(hasRole: (role: string) => boolean): Visibilit
     return 'unscoped'
 }
 
+/**
+ * Whether the user takes the Customer admin's part on the customer page (D49: request returns, answer attestations):
+ * a Customer admin who sees only their own Customer. Staff who see every Customer do not, even holding the role (as a
+ * platform admin holds every role) or previewing the page: an attestation is the Customer's own word, and staff raise
+ * returns through the record producer.
+ */
+export function actsAsCustomerAdmin(hasRole: (role: string) => boolean): boolean {
+    return resolveVisibility(hasRole) === 'own_customer'
+}
+
 /** Which field on a table carries each scoping key; omit a key the table has no field for. */
 export interface ScopingFields {
     stockroom?: string | readonly string[]
