@@ -33,22 +33,15 @@ const SETTINGS: Record<string, Array<{ variable: string; property: string; fallb
     'NaaS HPE Mist': [{ variable: 'mist_host', property: 'x_daas_ham.mist.api_host', fallback: 'api.mist.com' }],
 }
 
-/** Request params that fill a header rather than the URL: substituted as they are, not URL-encoded. */
-const HEADER_PARAMS: Record<string, readonly string[]> = {
-    'NaaS Check Point Zero Touch': ['sid'],
-}
-
 /** Calls functions of the REST message `message` (with its secrets and settings); failures come back as status 0. */
 export function restMessagePort(message: string): HttpPort {
     const secrets = SECRETS[message] ?? []
     const settings = SETTINGS[message] ?? []
-    const headerParams = HEADER_PARAMS[message] ?? []
     return (request) => {
         try {
             const rest = new RestMessage(message, request.fn)
-            for (const [name, value] of Object.entries(request.params)) {
-                rest.setStringParameterNoEscape(name, headerParams.includes(name) ? value : encodeURIComponent(value).replace(/%2C/g, ','))
-            }
+            for (const [name, value] of Object.entries(request.params)) rest.setStringParameterNoEscape(name, encodeURIComponent(value).replace(/%2C/g, ','))
+            for (const [name, value] of Object.entries(request.headers ?? {})) rest.setRequestHeader(name, value)
             for (const setting of settings) rest.setStringParameterNoEscape(setting.variable, (gs.getProperty(setting.property, setting.fallback) || '').trim() || setting.fallback)
             for (const secret of secrets) {
                 const value = gs.getPropertySecured(secret.property, '')

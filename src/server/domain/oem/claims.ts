@@ -1,3 +1,4 @@
+import { normalizeSerial } from '../asn'
 import { andEachClause } from '../encoded-query'
 import { errorText, isSuccess, type HttpPort, type HttpRequest, type HttpResponse } from '../http'
 import { asArray, chunks, field, parseJson, text } from '../json'
@@ -102,23 +103,17 @@ function unusable(
 function perDevice(request: (target: ClaimTarget) => HttpRequest, okMessage: (target: ClaimTarget) => string): ClaimAdapter {
     return (targets, http, maxCalls) => {
         const { usable, outcomes } = unusable(targets, 'serial')
-        let calls = 0
-        for (const t of usable) {
-            if (calls >= maxCalls) break
-            calls++
-            outcomes.push(outcome(t, http(request(t)), okMessage(t)))
-        }
-        return { outcomes, calls }
+        const sent = usable.slice(0, Math.max(0, maxCalls))
+        for (const t of sent) outcomes.push(outcome(t, http(request(t)), okMessage(t)))
+        return { outcomes, calls: sent.length }
     }
 }
 
 /** Meraki Dashboard: POST /organizations/{org}/inventory/claim { serials } (10 calls per 5 minutes). */
 const merakiClaim: ClaimAdapter = (targets, http, maxCalls) => {
     const { usable, outcomes } = unusable(targets, 'serial')
-    let calls = 0
-    for (const batch of batches(usable, MERAKI_CLAIM_BATCH)) {
-        if (calls >= maxCalls) break
-        calls++
+    const sent = batches(usable, MERAKI_CLAIM_BATCH).slice(0, Math.max(0, maxCalls))
+    for (const batch of sent) {
         const response = http({ fn: 'claim_inventory', params: { org_id: batch[0].account }, body: JSON.stringify({ serials: batch.map((t) => t.serial) }) })
         if (!isSuccess(response.status)) {
             outcomes.push(...fail(batch, errorText(response.status, response.body)))
@@ -126,13 +121,13 @@ const merakiClaim: ClaimAdapter = (targets, http, maxCalls) => {
         }
         // Only a missing serials field is unknown (counted as done); an explicit [] means nothing was claimed.
         const returned = field(parseJson(response.body), 'serials')
-        const claimed = new Set(asArray(returned).map((s) => text(s).toUpperCase()))
+        const claimed = new Set(asArray(returned).map((s) => normalizeSerial(text(s))))
         for (const t of batch) {
-            const done = !Array.isArray(returned) || claimed.has(t.serial.toUpperCase())
+            const done = !Array.isArray(returned) || claimed.has(normalizeSerial(t.serial))
             outcomes.push({ stepId: t.stepId, ok: done, message: done ? `claimed into Meraki org ${t.account}` : 'not in the claimed serials' })
         }
     }
-    return { outcomes, calls }
+    return { outcomes, calls: sent.length }
 }
 
 /** A Mist claim code without separators, upper case (inventory `magic` values carry no dashes). */
@@ -146,10 +141,8 @@ function claimCodeKey(code: unknown): string {
  */
 const mistClaim: ClaimAdapter = (targets, http, maxCalls) => {
     const { usable, outcomes } = unusable(targets, 'claimCode')
-    let calls = 0
-    for (const batch of batches(usable, MIST_CLAIM_BATCH)) {
-        if (calls >= maxCalls) break
-        calls++
+    const sent = batches(usable, MIST_CLAIM_BATCH).slice(0, Math.max(0, maxCalls))
+    for (const batch of sent) {
         const response = http({ fn: 'claim_inventory', params: { org_id: batch[0].account }, body: JSON.stringify(batch.map((t) => t.claimCode)) })
         const json = parseJson(response.body)
         const hasResult = ['added', 'duplicated', 'error'].some((k) => Array.isArray(field(json, k)))
@@ -169,21 +162,19 @@ const mistClaim: ClaimAdapter = (targets, http, maxCalls) => {
             else outcomes.push({ stepId: t.stepId, ok: false, message: reason || 'claim code not accepted' })
         }
     }
-    return { outcomes, calls }
+    return { outcomes, calls: sent.length }
 }
 
 /** HPE GreenLake: POST /devices/v1/devices { network: [{ serialNumber, macAddress }], compute: [], storage: [] } into the Provider's workspace (202), five devices per call. */
 const greenLakeAdd: ClaimAdapter = (targets, http, maxCalls) => {
     const { usable, outcomes } = unusable(targets, 'mac', false)
-    let calls = 0
-    for (const batch of batches(usable, GREENLAKE_ADD_BATCH)) {
-        if (calls >= maxCalls) break
-        calls++
+    const sent = batches(usable, GREENLAKE_ADD_BATCH).slice(0, Math.max(0, maxCalls))
+    for (const batch of sent) {
         const body = JSON.stringify({ network: batch.map((t) => ({ serialNumber: t.serial, macAddress: t.mac })), compute: [], storage: [] })
         const response = http({ fn: 'add_devices', params: {}, body })
         outcomes.push(...batch.map((t) => outcome(t, response, 'added to the GreenLake workspace')))
     }
-    return { outcomes, calls }
+    return { outcomes, calls: sent.length }
 }
 
 /**
@@ -219,10 +210,8 @@ const greenLakeSubscribe: ClaimAdapter = (targets, http, maxCalls) => {
 const fortiRegister: ClaimAdapter = (targets, http, maxCalls) => {
     // Registration goes to the Provider's own FortiCloud account: no per-customer account needed.
     const { usable, outcomes } = unusable(targets, 'serial', false)
-    let calls = 0
-    for (const batch of chunks(usable, FORTICLOUD_REGISTER_BATCH)) {
-        if (calls >= maxCalls) break
-        calls++
+    const sent = chunks(usable, FORTICLOUD_REGISTER_BATCH).slice(0, Math.max(0, maxCalls))
+    for (const batch of sent) {
         const body = JSON.stringify({ registrationUnits: batch.map((t) => ({ serialNumber: t.serial, description: 'NaaS staging', isGovernment: false })) })
         const response = http({ fn: 'register_products', params: {}, body })
         const json = parseJson(response.body)
@@ -230,7 +219,7 @@ const fortiRegister: ClaimAdapter = (targets, http, maxCalls) => {
         if (error === null) outcomes.push(...batch.map((t) => ({ stepId: t.stepId, ok: true, message: 'registered in FortiCloud' })))
         else outcomes.push(...fail(batch, error))
     }
-    return { outcomes, calls }
+    return { outcomes, calls: sent.length }
 }
 
 /** FortiZTP: PUT devices/{serial} provisioned to the customer's FortiManager. */
@@ -251,8 +240,8 @@ function zeroTouchAccount(account: string): { accountId: number; templateId: num
 
 /**
  * Check Point Zero Touch web API v2, one session per run: login (API client id and key) returns a sid sent
- * as X-chkp-sid; then claim-gateway { object-name: serial, account-id, template-id, mac } per gateway; then
- * logout. Login and logout count against the budget, so a run needs at least three calls.
+ * in the X-chkp-sid header; then claim-gateway { object-name: serial, account-id, template-id, mac } per
+ * gateway; then logout. Login and logout count against the budget, so a run needs at least three calls.
  */
 const checkPointZeroTouch: ClaimAdapter = (targets, http, maxCalls) => {
     const { usable, outcomes } = unusable(targets, 'mac')
@@ -271,11 +260,12 @@ const checkPointZeroTouch: ClaimAdapter = (targets, http, maxCalls) => {
         outcomes.push(...fail(reachable.map((c) => c.target), `Zero Touch login failed: ${reason}`))
         return { outcomes, calls: 1 }
     }
+    const headers = { 'X-chkp-sid': sid }
     for (const { target, accountId, templateId } of reachable) {
         const body = JSON.stringify({ 'object-name': target.serial, 'account-id': accountId, 'template-id': templateId, mac: target.mac })
-        outcomes.push(outcome(target, http({ fn: 'claim_gateway', params: { sid }, body }), `claimed with Zero Touch template ${templateId}`))
+        outcomes.push(outcome(target, http({ fn: 'claim_gateway', params: {}, headers, body }), `claimed with Zero Touch template ${templateId}`))
     }
-    http({ fn: 'logout', params: { sid } })
+    http({ fn: 'logout', params: {}, headers })
     return { outcomes, calls: reachable.length + ZERO_TOUCH_SESSION_CALLS }
 }
 
@@ -303,6 +293,12 @@ const CLAIM_ORDER = ['oem_claim', 'oem_licence', 'oem_ztp'] as const satisfies r
 const everyActionOrdered: [Exclude<ClaimAction, (typeof CLAIM_ORDER)[number]>] extends [never] ? true : never = true
 void everyActionOrdered
 
+/**
+ * The step a staging task must have done before an action's step on it is due: licensing and zero-touch
+ * need the device claimed first. Until then the step waits (not loaded, not attempted, not counted).
+ */
+export const CLAIM_PREREQUISITE: Partial<Record<ClaimAction, ClaimAction>> = { oem_licence: 'oem_claim', oem_ztp: 'oem_claim' }
+
 /** Steps loaded per action and run at most. */
 const MAX_STEPS_PER_LOAD = 200
 
@@ -316,8 +312,8 @@ const MESSAGE_LENGTH = 255
 export interface ClaimStore {
     /**
      * Up to `limit` of `vendor`'s steps due for `action` (dueStepsQuery), fewest attempts first, then
-     * oldest; each carries the Customer's OEM cloud account for `action` ('' when none). Licence and
-     * zero-touch steps whose staging task still has an open claim step are not returned (they wait).
+     * oldest; each carries the Customer's OEM cloud account for `action` ('' when none). Steps whose
+     * staging task still has an open CLAIM_PREREQUISITE step are not returned and do not use up `limit`.
      */
     due(vendor: OemVendor, action: ClaimAction, limit: number): ClaimTarget[]
     /** Record one attempted or refused step. ok: tick it (automation_status=done, done=true); otherwise automation_status=failed and one more attempt. outcome.message is at most 255 characters. */
@@ -352,10 +348,23 @@ export function runVendorClaims(vendor: OemVendor, store: ClaimStore, transport:
     return calls
 }
 
-/** Encoded query on x_daas_ham_staging_step: open automated `action` steps on `vendor` Assets (active task) that are pending, or failed over 30 minutes ago with fewer than 5 attempts; the vendor/action condition is in every OR group (andEachClause). */
+/** Encoded query on x_daas_ham_staging_step: open automated `action` steps on `vendor` Assets whose staging task is active. */
+export function openStepsQuery(vendor: OemVendor, action: ClaimAction): string {
+    return `automation=${action}^done=false^staging_task.active=true^staging_task.asset.model.x_daas_ham_oem_source=${vendor}`
+}
+
+/**
+ * Encoded query on x_daas_ham_staging_step: open `action` steps (openStepsQuery) that are pending, or failed
+ * over 30 minutes ago with fewer than 5 attempts; those conditions are in every OR group (andEachClause).
+ */
 export function dueStepsQuery(vendor: OemVendor, action: ClaimAction): string {
     return andEachClause(
         `automation_status=pending^NQautomation_status=failed^attempts<${MAX_CLAIM_ATTEMPTS}^sys_updated_on<javascript:gs.minutesAgoStart(30)`,
-        `automation=${action}^done=false^staging_task.active=true^staging_task.asset.model.x_daas_ham_oem_source=${vendor}`,
+        openStepsQuery(vendor, action),
     )
+}
+
+/** The candidates whose staging task is not waiting on a prerequisite step, at most `limit`, in order. */
+export function readyTargets<C extends { task: string }>(candidates: readonly C[], waitingTasks: ReadonlySet<string>, limit: number): C[] {
+    return candidates.filter((c) => !waitingTasks.has(c.task)).slice(0, Math.max(0, limit))
 }

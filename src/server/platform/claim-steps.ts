@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { dueStepsQuery, type ClaimAction, type ClaimOutcome, type ClaimStore, type ClaimTarget } from '../domain/oem/claims'
+import { CLAIM_PREREQUISITE, dueStepsQuery, openStepsQuery, readyTargets, type ClaimAction, type ClaimOutcome, type ClaimStore, type ClaimTarget } from '../domain/oem/claims'
 import type { OemVendor } from '../domain/oem/types'
 import { findById, num, pluck, str } from './records'
 
@@ -12,31 +12,52 @@ export function glideClaimStore(): ClaimStore {
     }
 }
 
+/** Candidate pages read past steps that wait on a prerequisite, so waiting steps cannot starve ready ones. */
+const CANDIDATE_PAGES = 5
+
+/**
+ * Up to `limit` due steps. For an action with a prerequisite, each page of candidates is checked
+ * against open prerequisite steps of the same tasks (one bounded query per page), and the limit counts
+ * only ready steps; waiting steps are not loaded as targets, so they use no attempts.
+ */
 function dueTargets(vendor: OemVendor, action: ClaimAction, limit: number, accounts: Map<string, string>): ClaimTarget[] {
+    const prerequisite = CLAIM_PREREQUISITE[action]
+    const targets: ClaimTarget[] = []
+    for (let page = 0; page < (prerequisite ? CANDIDATE_PAGES : 1) && targets.length < limit; page++) {
+        const candidates = candidatePage(vendor, action, page * limit, limit, accounts)
+        const tasks = [...new Set(candidates.map((c) => c.task))]
+        const waiting = new Set(
+            prerequisite && tasks.length > 0 ? pluck('x_daas_ham_staging_step', `${openStepsQuery(vendor, prerequisite)}^staging_taskIN${tasks.join(',')}`, 'staging_task') : [],
+        )
+        targets.push(...readyTargets(candidates, waiting, limit - targets.length).map((c) => c.target))
+        if (candidates.length < limit) break
+    }
+    return targets
+}
+
+function candidatePage(vendor: OemVendor, action: ClaimAction, from: number, size: number, accounts: Map<string, string>): Array<{ task: string; target: ClaimTarget }> {
     const step = new GlideRecord('x_daas_ham_staging_step')
     step.addEncodedQuery(dueStepsQuery(vendor, action))
     step.orderBy('attempts')
     step.orderBy('sys_created_on')
-    step.setLimit(limit)
+    step.orderBy('sys_id')
+    step.chooseWindow(from, from + size, false)
     step.query()
-    const targets: ClaimTarget[] = []
-    const tasks: string[] = []
+    const candidates: Array<{ task: string; target: ClaimTarget }> = []
     while (step.next()) {
         const customerId = str(step, 'staging_task.asset.company')
-        tasks.push(str(step, 'staging_task'))
-        targets.push({
-            stepId: step.getUniqueValue(),
-            serial: str(step, 'staging_task.asset.serial_number'),
-            mac: str(step, 'staging_task.asset.x_daas_ham_mac_address'),
-            claimCode: str(step, 'staging_task.asset.x_daas_ham_claim_code'),
-            account: cloudAccount(customerId, vendor, action, accounts),
+        candidates.push({
+            task: str(step, 'staging_task'),
+            target: {
+                stepId: step.getUniqueValue(),
+                serial: str(step, 'staging_task.asset.serial_number'),
+                mac: str(step, 'staging_task.asset.x_daas_ham_mac_address'),
+                claimCode: str(step, 'staging_task.asset.x_daas_ham_claim_code'),
+                account: cloudAccount(customerId, vendor, action, accounts),
+            },
         })
     }
-    if (action === 'oem_claim' || targets.length === 0) return targets
-    // Licensing and zero-touch need the device claimed first: steps whose task still has an open
-    // claim step wait (not attempted, not counted) until that step is done.
-    const waiting = new Set(pluck('x_daas_ham_staging_step', `staging_taskIN${[...new Set(tasks)].join(',')}^automation=oem_claim^done=false`, 'staging_task'))
-    return targets.filter((_, i) => !waiting.has(tasks[i]))
+    return candidates
 }
 
 /** The Customer's OEM cloud account for `action`, looked up once per customer and action. */

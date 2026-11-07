@@ -159,8 +159,8 @@ RestMessage({
  *   https://global.api.greenlake.hpe.com/authorization/v2/oauth2/<workspaceId>/token; the API client's
  *   user needs Devices and Subscription edit permission.
  * Check Point Zero Touch logs in per run with the password2 properties x_daas_ham.checkpoint.api_client_id
- * and x_daas_ham.checkpoint.api_key (substituted into the login body) and sends the returned sid as
- * X-chkp-sid until it logs out.
+ * and x_daas_ham.checkpoint.api_key (substituted into the login body); the claim adapter sends the returned
+ * sid as the X-chkp-sid request header until it logs out.
  */
 
 RestMessage({
@@ -232,20 +232,7 @@ RestMessage({
                 { $id: Now.ID['rm_checkpoint_login_key'], name: 'api_key' },
             ],
         },
-        {
-            name: 'claim_gateway',
-            httpMethod: 'POST',
-            endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/claim-gateway',
-            headers: [{ $id: Now.ID['rm_checkpoint_claim_sid_header'], name: 'X-chkp-sid', value: '${sid}' }],
-            variables: [{ $id: Now.ID['rm_checkpoint_claim_sid'], name: 'sid' }],
-        },
-        {
-            name: 'logout',
-            httpMethod: 'POST',
-            endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/logout',
-            content: '{}',
-            headers: [{ $id: Now.ID['rm_checkpoint_logout_sid_header'], name: 'X-chkp-sid', value: '${sid}' }],
-            variables: [{ $id: Now.ID['rm_checkpoint_logout_sid'], name: 'sid' }],
-        },
+        { name: 'claim_gateway', httpMethod: 'POST', endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/claim-gateway' },
+        { name: 'logout', httpMethod: 'POST', endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/logout', content: '{}' },
     ],
 })

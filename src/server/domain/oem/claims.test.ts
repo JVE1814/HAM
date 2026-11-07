@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HttpRequest, HttpResponse } from '../http'
-import { CLAIM_ROUTES, CLAIM_VENDORS, dueStepsQuery, runVendorClaims, type ClaimAction, type ClaimOutcome, type ClaimStore, type ClaimTarget } from './claims'
+import { CLAIM_PREREQUISITE, CLAIM_ROUTES, CLAIM_VENDORS, dueStepsQuery, openStepsQuery, readyTargets, runVendorClaims, type ClaimAction, type ClaimOutcome, type ClaimStore, type ClaimTarget } from './claims'
 
 function fake(responses: Array<HttpResponse | ((request: HttpRequest) => HttpResponse)>) {
     const calls: HttpRequest[] = []
@@ -39,6 +39,11 @@ describe('Meraki claim', () => {
             { stepId: 'A', ok: true, message: 'claimed into Meraki org org1' },
             { stepId: 'B', ok: false, message: 'not in the claimed serials' },
         ])
+    })
+
+    it('matches returned serials ignoring case and surrounding spaces', () => {
+        const { http } = fake([{ status: 200, body: JSON.stringify({ serials: [' q2xx-a '] }) }])
+        expect(run([target('A', { serial: 'Q2XX-A ' })], http, 10).outcomes).toEqual([{ stepId: 'A', ok: true, message: 'claimed into Meraki org org1' }])
     })
 
     it('reads an explicit empty serials list as nothing claimed', () => {
@@ -246,10 +251,11 @@ describe('Check Point Zero Touch', () => {
         const result = run([target('A', { account: '1234567/42' }), target('B', { account: ' 1234567 / 43 ' })], http, 5)
         expect(calls.map((c) => c.fn)).toEqual(['login', 'claim_gateway', 'claim_gateway', 'logout'])
         expect(calls[0]).toEqual({ fn: 'login', params: {} })
-        expect(calls[1]).toMatchObject({ params: { sid: 'aB3+x/9=' } })
+        expect(calls[1].params).toEqual({})
+        expect(calls[1].headers).toEqual({ 'X-chkp-sid': 'aB3+x/9=' })
         expect(JSON.parse(calls[1].body ?? '')).toEqual({ 'object-name': 'Q2XX-A', 'account-id': 1234567, 'template-id': 42, mac: '00:11:22:33:44:55' })
         expect(JSON.parse(calls[2].body ?? '')).toMatchObject({ 'account-id': 1234567, 'template-id': 43 })
-        expect(calls[3]).toEqual({ fn: 'logout', params: { sid: 'aB3+x/9=' } })
+        expect(calls[3]).toEqual({ fn: 'logout', params: {}, headers: { 'X-chkp-sid': 'aB3+x/9=' } })
         expect(result).toEqual({
             outcomes: [
                 { stepId: 'A', ok: true, message: 'claimed with Zero Touch template 42' },
@@ -466,5 +472,35 @@ describe('dueStepsQuery', () => {
         }
         expect(groups[0]).toContain('automation_status=pending')
         expect(groups[1]).toEqual(expect.arrayContaining(['automation_status=failed', 'attempts<5', 'sys_updated_on<javascript:gs.minutesAgoStart(30)']))
+    })
+})
+
+describe('readyTargets', () => {
+    it('drops candidates whose task waits on a prerequisite and keeps order up to the limit', () => {
+        const candidates = [
+            { task: 't1', id: 'a' },
+            { task: 't2', id: 'b' },
+            { task: 't3', id: 'c' },
+            { task: 't4', id: 'd' },
+        ]
+        expect(readyTargets(candidates, new Set(['t2']), 2).map((c) => c.id)).toEqual(['a', 'c'])
+        expect(readyTargets(candidates, new Set(), 10).map((c) => c.id)).toEqual(['a', 'b', 'c', 'd'])
+        expect(readyTargets(candidates, new Set(['t1', 't2', 't3', 't4']), 5)).toEqual([])
+    })
+})
+
+describe('CLAIM_PREREQUISITE', () => {
+    it('makes licensing and zero-touch wait for the claim; the claim waits for nothing', () => {
+        expect(CLAIM_PREREQUISITE).toEqual({ oem_licence: 'oem_claim', oem_ztp: 'oem_claim' })
+        expect(CLAIM_PREREQUISITE.oem_claim).toBeUndefined()
+    })
+
+    it('finds the open prerequisite steps of the vendor on active staging tasks', () => {
+        expect(openStepsQuery('aruba', 'oem_claim').split('^')).toEqual([
+            'automation=oem_claim',
+            'done=false',
+            'staging_task.active=true',
+            'staging_task.asset.model.x_daas_ham_oem_source=aruba',
+        ])
     })
 })
