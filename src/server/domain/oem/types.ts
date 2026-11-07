@@ -27,8 +27,12 @@ export interface RmaFact {
 export interface Fetched<T> {
     facts: T[]
     errors: string[]
-    /** Keys (serials) whose call failed, so nothing is known about them; the others were answered. */
-    failed?: string[]
-    /** Keys the vendor answered with an error of its own (e.g. not in the account): retry them only after the refresh interval. */
-    rejected?: string[]
+}
+
+/** A coverage answer, which also says which of the asked serials were not answered. */
+export interface CoverageFetched extends Fetched<CoverageFact> {
+    /** Serials whose call failed, so nothing is known about them; the others were answered. */
+    failed: string[]
+    /** Serials the vendor answered with an error of its own (e.g. not in the account): retry them only after the refresh interval. */
+    rejected: string[]
 }

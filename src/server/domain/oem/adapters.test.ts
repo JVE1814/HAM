@@ -110,6 +110,11 @@ describe('Cisco', () => {
         expect(result.facts).toEqual([{ rmaNumber: '8000000001', status: 'Shipped' }])
         expect(result.errors).toEqual(['rma_status {"rma":"8000000002"}: HTTP 500'])
     })
+
+    it("adds the vendor's own error text to a failed call's error", () => {
+        const http = () => ({ status: 401, body: JSON.stringify({ error: 'invalid_token', error_description: 'Token expired' }) })
+        expect(OEM_ADAPTERS.cisco.rmaStatus!.run(['8000000001'], { http, orgIds: [] }).errors).toEqual(['rma_status {"rma":"8000000001"}: HTTP 401: Token expired'])
+    })
 })
 
 describe('Meraki', () => {
@@ -234,6 +239,8 @@ describe('coverage failures', () => {
         expect(OEM_ADAPTERS.mist.coverage!.run(['A1'], { http, orgIds: ['up'] }).failed).toEqual([])
         // Found in a later org despite an earlier failure: answered.
         expect(OEM_ADAPTERS.mist.coverage!.run(['A1'], { http, orgIds: ['down', 'has'] })).toMatchObject({ failed: [], facts: [{ serial: 'A1', endDate: '2028-01-01' }] })
+        // No org to search: answered (no coverage); Mist never rejects.
+        expect(OEM_ADAPTERS.mist.coverage!.run(['A1'], { http, orgIds: [] })).toEqual({ facts: [], errors: [], failed: [], rejected: [] })
     })
 
     it('Cisco treats an answer without serial_numbers as rejected (asked again after the refresh interval)', () => {
@@ -271,6 +278,13 @@ describe('HPE Mist', () => {
             { serial: 'A4', covered: false, contractNumber: '', serviceLevel: '', startDate: undefined, endDate: undefined },
         ])
         expect(calls[0]).toEqual({ fn: 'jsi_by_serial', params: { org_id: 'org1', serial: 'A1' } })
+    })
+})
+
+describe('rate limits', () => {
+    it('ask FortiCloud (100 calls a minute, one serial per call) for at most 90 serials per run, the other coverage APIs without a cap', () => {
+        expect(OEM_ADAPTERS.fortinet.coverage?.maxKeysPerRun).toBe(90)
+        for (const vendor of ['cisco', 'meraki', 'mist'] as const) expect(OEM_ADAPTERS[vendor].coverage?.maxKeysPerRun).toBeUndefined()
     })
 })
 

@@ -1,6 +1,6 @@
-import type { HttpPort } from '../http'
+import { errorText, isSuccess, type HttpPort } from '../http'
 import { asArray, chunks, field, isoDate, parseJson, text } from '../json'
-import type { CoverageFact, Fetched, LifecycleFact, OemVendor, RmaFact } from './types'
+import type { CoverageFact, CoverageFetched, Fetched, LifecycleFact, OemVendor, RmaFact } from './types'
 import { fortiCloudError } from './forticloud'
 
 /*
@@ -15,12 +15,12 @@ export interface OemContext {
     orgIds: readonly string[]
 }
 
-type Capability<T> = (keys: readonly string[], context: OemContext) => Fetched<T>
+type Capability<Result> = (keys: readonly string[], context: OemContext) => Result
 
 function call(context: OemContext, fn: string, params: Record<string, string>, errors: string[]): unknown {
     const response = context.http({ fn, params })
-    if (response.status < 200 || response.status >= 300) {
-        errors.push(`${fn} ${JSON.stringify(params)}: HTTP ${response.status}`)
+    if (!isSuccess(response.status)) {
+        errors.push(`${fn} ${JSON.stringify(params)}: ${errorText(response.status, response.body)}`)
         return undefined
     }
     const json = parseJson(response.body)
@@ -45,7 +45,7 @@ function eoxBatches(pids: readonly string[]): string[][] {
     return out
 }
 
-const ciscoLifecycle: Capability<LifecycleFact> = (pids, context) => {
+const ciscoLifecycle: Capability<Fetched<LifecycleFact>> = (pids, context) => {
     const facts: LifecycleFact[] = []
     const errors: string[] = []
     for (const batch of eoxBatches(pids)) {
@@ -69,7 +69,7 @@ const ciscoLifecycle: Capability<LifecycleFact> = (pids, context) => {
     return { facts, errors }
 }
 
-const ciscoCoverage: Capability<CoverageFact> = (serials, context) => {
+const ciscoCoverage: Capability<CoverageFetched> = (serials, context) => {
     const facts: CoverageFact[] = []
     const errors: string[] = []
     const failed: string[] = []
@@ -83,12 +83,13 @@ const ciscoCoverage: Capability<CoverageFact> = (serials, context) => {
             failed.push(...batch)
             continue
         }
-        if (!Array.isArray(field(json, 'serial_numbers'))) {
+        const records = field(json, 'serial_numbers')
+        if (!Array.isArray(records)) {
             errors.push(`coverage_by_serial: no serial_numbers in the response`)
             rejected.push(...batch)
             continue
         }
-        for (const record of asArray(field(json, 'serial_numbers'))) {
+        for (const record of records as unknown[]) {
             const serial = text(field(record, 'sr_no'))
             if (!serial) continue
             facts.push({
@@ -109,7 +110,7 @@ const ciscoCoverage: Capability<CoverageFact> = (serials, context) => {
     return { facts, errors, failed, rejected }
 }
 
-const ciscoRmaStatus: Capability<RmaFact> = (rmaNumbers, context) => {
+const ciscoRmaStatus: Capability<Fetched<RmaFact>> = (rmaNumbers, context) => {
     const facts: RmaFact[] = []
     const errors: string[] = []
     for (const rma of rmaNumbers) {
@@ -130,7 +131,7 @@ function merakiModel(pid: string): string {
     return pid.replace(/-HW$/i, '')
 }
 
-const merakiLifecycle: Capability<LifecycleFact> = (pids, context) => {
+const merakiLifecycle: Capability<Fetched<LifecycleFact>> = (pids, context) => {
     const facts: LifecycleFact[] = []
     const errors: string[] = []
     for (const pid of pids) {
@@ -161,7 +162,7 @@ function fortinetContract(asset: unknown, end: string | undefined): unknown {
     return matching ?? contracts[0]
 }
 
-const fortinetCoverage: Capability<CoverageFact> = (serials, context) => {
+const fortinetCoverage: Capability<CoverageFetched> = (serials, context) => {
     const facts: CoverageFact[] = []
     const errors: string[] = []
     const failed: string[] = []
@@ -224,16 +225,12 @@ function mistLookup(context: OemContext, fn: 'jsi_by_model' | 'jsi_by_serial', p
     return { items: [], answered: !anyFailed }
 }
 
-function mistItems(context: OemContext, fn: 'jsi_by_model' | 'jsi_by_serial', params: Record<string, string>, errors: string[]): unknown[] {
-    return mistLookup(context, fn, params, errors).items
-}
-
-const mistLifecycle: Capability<LifecycleFact> = (pids, context) => {
+const mistLifecycle: Capability<Fetched<LifecycleFact>> = (pids, context) => {
     const facts: LifecycleFact[] = []
     const errors: string[] = []
     for (const pid of pids) {
         // JSI: end_of_sale_time is end of sale, eos_time is end of support (epoch seconds).
-        const item = mistItems(context, 'jsi_by_model', { model: pid }, errors).find((i) => field(i, 'end_of_sale_time') || field(i, 'eos_time'))
+        const item = mistLookup(context, 'jsi_by_model', { model: pid }, errors).items.find((i) => field(i, 'end_of_sale_time') || field(i, 'eos_time'))
         if (!item) continue
         facts.push({
             pid,
@@ -244,13 +241,13 @@ const mistLifecycle: Capability<LifecycleFact> = (pids, context) => {
     return { facts, errors }
 }
 
-const mistCoverage: Capability<CoverageFact> = (serials, context) => {
+const mistCoverage: Capability<CoverageFetched> = (serials, context) => {
     const facts: CoverageFact[] = []
     const errors: string[] = []
     const failed: string[] = []
     for (const serial of serials) {
         const { items, answered } = mistLookup(context, 'jsi_by_serial', { serial }, errors)
-        if (!answered && context.orgIds.length > 0) failed.push(serial)
+        if (!answered) failed.push(serial)
         const item = items[0]
         if (!item) continue
         // JSI dates are YYYY-MM-DD strings; has_support means an active support contract.
@@ -264,19 +261,24 @@ const mistCoverage: Capability<CoverageFact> = (serials, context) => {
             endDate: end,
         })
     }
-    return { facts, errors, failed }
+    return { facts, errors, failed, rejected: [] }
 }
 
-interface Route<T> {
+interface Route<Result> {
     /** Vendor whose REST message serves the call (Meraki hardware coverage comes from Cisco SN2INFO). */
     via: OemVendor
-    run: Capability<T>
+    run: Capability<Result>
+}
+
+interface CoverageRoute extends Route<CoverageFetched> {
+    /** Serials asked per sync run, as one batch, for a rate-limited API; unset: batches until the job's time budget is spent. */
+    maxKeysPerRun?: number
 }
 
 /** What each vendor's API can do; missing capabilities fall back to CSV import. */
 export const OEM_ADAPTERS: Record<
     OemVendor,
-    { lifecycle?: Route<LifecycleFact>; coverage?: Route<CoverageFact>; rmaStatus?: Route<RmaFact> }
+    { lifecycle?: Route<Fetched<LifecycleFact>>; coverage?: CoverageRoute; rmaStatus?: Route<Fetched<RmaFact>> }
 > = {
     cisco: {
         lifecycle: { via: 'cisco', run: ciscoLifecycle },
@@ -284,7 +286,11 @@ export const OEM_ADAPTERS: Record<
         rmaStatus: { via: 'cisco', run: ciscoRmaStatus },
     },
     meraki: { lifecycle: { via: 'meraki', run: merakiLifecycle }, coverage: { via: 'cisco', run: ciscoCoverage } },
-    fortinet: { coverage: { via: 'fortinet', run: fortinetCoverage } },
+    fortinet: {
+        // FortiCloud allows 100 calls per minute and 1000 per hour, and products/list takes one serial
+        // per call: at most 90 serials per run (every 4 hours).
+        coverage: { via: 'fortinet', run: fortinetCoverage, maxKeysPerRun: 90 },
+    },
     mist: { lifecycle: { via: 'mist', run: mistLifecycle }, coverage: { via: 'mist', run: mistCoverage } },
     aruba: {},
     checkpoint: {},

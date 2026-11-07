@@ -2,7 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import { isIsoDate } from '../domain/calendar'
-import { annualSupportCost, coverageSummary, type CoverageView } from '../domain/coverage'
+import { annualSupportCost, coverageDisposition, coverageSummary, mergeCoverage, type CoverageView } from '../domain/coverage'
 import { mergeLifecycle, type LifecycleDates } from '../domain/model-lifecycle'
 import { OEM_ADAPTERS } from '../domain/oem/adapters'
 import type { CoverageFact, OemVendor } from '../domain/oem/types'
@@ -10,7 +10,7 @@ import { normalizeSerial } from '../domain/asn'
 import { msToGlide, nowMs, todayIso } from '../platform/clock'
 import { oemContext, oemEnabled } from '../platform/oem-http'
 import { intProperty } from '../platform/properties'
-import { bool, num, str } from '../platform/records'
+import { bool, findById, num, str } from '../platform/records'
 
 /** OEM lifecycle, coverage and RMA-status synchronisation (P2.1, ADR 0008). */
 
@@ -18,12 +18,6 @@ const VENDORS: readonly OemVendor[] = ['cisco', 'meraki', 'fortinet', 'mist', 'a
 
 /** Assets per coverage batch. */
 const COVERAGE_BATCH = 200
-
-/**
- * FortiCloud allows 100 calls per minute and 1000 per hour, and products/list takes one serial per
- * call: one batch of at most 90 serials per run (every 4 hours).
- */
-const FORTINET_SERIALS_PER_RUN = 90
 
 function report(job: string, errors: readonly string[]): void {
     for (const error of errors.slice(0, 20)) gs.warn(`[x_daas_ham] ${job}: ${error}`)
@@ -80,8 +74,8 @@ function upsertLifecycle(modelId: string, incoming: LifecycleDates, vendor: OemV
 
 /**
  * Every 4 hours: OEM coverage of assets not checked for x_daas_ham.oem.coverage_refresh_days, oldest
- * first, until the time budget is spent (FortiCloud: one rate-limited batch). Checked assets drop out
- * of the query, so no cursor is needed.
+ * first, until the time budget is spent (a rate-limited vendor: one batch of its maxKeysPerRun). Checked
+ * assets drop out of the query, so no cursor is needed.
  */
 export function syncOemCoverage(): void {
     const started = nowMs()
@@ -91,38 +85,27 @@ export function syncOemCoverage(): void {
     for (const vendor of VENDORS) {
         const route = OEM_ADAPTERS[vendor].coverage
         if (!route || !oemEnabled(route.via)) continue
-        const rateLimited = route.via === 'fortinet'
         for (;;) {
             if (nowMs() - started > budgetMs) return
-            const assets = staleAssets(vendor, staleBefore.getValue(), rateLimited ? FORTINET_SERIALS_PER_RUN : COVERAGE_BATCH)
+            const assets = staleAssets(vendor, staleBefore.getValue(), route.maxKeysPerRun ?? COVERAGE_BATCH)
             if (assets.size === 0) break
             const result = route.run([...assets.keys()], oemContext(route.via))
             report(`coverage ${vendor}`, result.errors)
-            const factsBySerial = new Map<string, CoverageFact[]>()
-            for (const fact of result.facts) {
-                const key = normalizeSerial(fact.serial)
-                factsBySerial.set(key, [...(factsBySerial.get(key) ?? []), fact])
-            }
-            // A failed call says nothing about its serials: leave them stale for the next run, and
-            // stamp the ones that were answered. Adapters that do not say which serials failed hold
-            // back every unanswered serial of a batch with errors.
-            const failed = result.errors.length > 0
-            const failedSerials = result.failed ? new Set(result.failed.map(normalizeSerial)) : undefined
-            const rejectedSerials = new Set((result.rejected ?? []).map(normalizeSerial))
+            const dispositionOf = coverageDisposition(result)
             for (const [serial, assetIds] of assets) {
-                const facts = factsBySerial.get(serial) ?? []
-                if (failedSerials ? failedSerials.has(serial) : failed && facts.length === 0) continue
-                if (rejectedSerials.has(serial)) {
-                    // Answered with an error: keep the coverage, ask again after the refresh interval.
-                    for (const assetId of assetIds) stampCoverageChecked(assetId)
-                    continue
-                }
+                const disposition = dispositionOf(serial)
+                if (disposition.kind === 'skip') continue
                 for (const assetId of assetIds) {
-                    for (const fact of facts) upsertCoverage(assetId, vendor, fact, 'api')
-                    refreshAssetCoverage(assetId)
+                    if (disposition.kind === 'stamp') {
+                        stampCoverageChecked(assetId)
+                    } else {
+                        for (const fact of disposition.facts) upsertCoverage(assetId, vendor, fact, 'api')
+                        refreshAssetCoverage(assetId)
+                    }
                 }
             }
-            if (failed || rateLimited) break
+            // A batch with errors ends the vendor's run; a rate-limited vendor gets one batch per run.
+            if (result.errors.length > 0 || route.maxKeysPerRun !== undefined) break
         }
     }
 }
@@ -146,26 +129,29 @@ function staleAssets(vendor: OemVendor, staleBefore: string, limit: number): Map
 }
 
 function upsertCoverage(assetId: string, vendor: OemVendor, fact: CoverageFact, source: 'api' | 'csv', annualCost?: number): void {
+    const serial = normalizeSerial(fact.serial)
     const coverage = new GlideRecord('x_daas_ham_oem_coverage')
-    coverage.addQuery('serial_number', normalizeSerial(fact.serial))
+    coverage.addQuery('serial_number', serial)
     coverage.addQuery('contract_number', fact.contractNumber)
     coverage.setLimit(1)
     coverage.query()
     const exists = coverage.next()
     if (!exists) coverage.initialize()
+    const merged = mergeCoverage(
+        { startDate: str(coverage, 'start_date') || undefined, endDate: str(coverage, 'end_date') || undefined },
+        { startDate: fact.startDate, endDate: fact.endDate, annualCost },
+    )
     coverage.setValue('asset', assetId)
-    coverage.setValue('serial_number', normalizeSerial(fact.serial))
+    coverage.setValue('serial_number', serial)
     coverage.setValue('vendor', vendor)
     coverage.setValue('contract_number', fact.contractNumber)
     coverage.setValue('service_level', fact.serviceLevel)
     coverage.setValue('covered', fact.covered)
-    // A response without a start date (SN2INFO v2) keeps the one stored earlier.
-    if (fact.startDate !== undefined || !exists) coverage.setValue('start_date', fact.startDate ?? '')
-    // A renewed contract (new end date) can expire again: warn about it afresh.
-    if (str(coverage, 'end_date') !== (fact.endDate ?? '')) coverage.setValue('expiry_notified', false)
-    coverage.setValue('end_date', fact.endDate ?? '')
+    coverage.setValue('start_date', merged.startDate ?? '')
+    coverage.setValue('end_date', merged.endDate ?? '')
+    if (merged.resetExpiryNotified) coverage.setValue('expiry_notified', false)
     coverage.setValue('source', source)
-    if (annualCost !== undefined) coverage.setValue('annual_cost', annualCost)
+    if (merged.annualCost !== undefined) coverage.setValue('annual_cost', merged.annualCost)
     coverage.setValue('last_checked', msToGlide(nowMs()))
     if (exists) coverage.update()
     else coverage.insert()
@@ -173,16 +159,16 @@ function upsertCoverage(assetId: string, vendor: OemVendor, fact: CoverageFact, 
 
 /** Stamp an asset's coverage as checked without changing it (the vendor answered with an error). */
 function stampCoverageChecked(assetId: string): void {
-    const asset = new GlideRecord('alm_hardware')
-    if (!asset.get(assetId)) return
+    const asset = findById('alm_hardware', assetId)
+    if (!asset) return
     asset.setValue('x_daas_ham_coverage_checked', msToGlide(nowMs()))
     asset.update()
 }
 
 /** Re-summarise an asset's coverage contracts onto the asset and stamp it checked. */
-export function refreshAssetCoverage(assetId: string): void {
-    const asset = new GlideRecord('alm_hardware')
-    if (!asset.get(assetId)) return
+function refreshAssetCoverage(assetId: string): void {
+    const asset = findById('alm_hardware', assetId)
+    if (!asset) return
     const contracts: CoverageView[] = []
     const coverage = new GlideRecord('x_daas_ham_oem_coverage')
     coverage.addQuery('asset', assetId)
