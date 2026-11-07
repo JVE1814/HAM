@@ -1,4 +1,4 @@
-/** Tolerant readers for vendor JSON (shapes vary between API versions). */
+/** Tolerant readers for third-party JSON (vendor and aggregator shapes vary between API versions). */
 
 export function parseJson(body: string): unknown {
     try {

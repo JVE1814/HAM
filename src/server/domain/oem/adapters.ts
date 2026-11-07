@@ -1,4 +1,4 @@
-import { asArray, chunks, field, isoDate, parseJson, text } from './json'
+import { asArray, chunks, field, isoDate, parseJson, text } from '../json'
 import type { CoverageFact, Fetched, HttpPort, LifecycleFact, OemVendor, RmaFact } from './types'
 
 /*
