@@ -14,12 +14,13 @@ import {
     type ServiceInterval,
     type SubscriptionLineTerms,
 } from '../domain/billing'
-import { ROLE } from '../domain/visibility'
+import { appendTo } from '../domain/collections'
 import { memoized } from '../domain/memo'
+import { ROLE } from '../domain/visibility'
 import { runEventTableJob } from '../platform/chunked'
 import { msToGlide, nowMs, todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
-import { exists, findById, num, pluck, str } from '../platform/records'
+import { deleteWhere, exists, findById, num, str } from '../platform/records'
 import { queryInt, reply } from '../platform/rest-api'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
@@ -40,26 +41,29 @@ export function openMonthlyBillingPeriod(): void {
     fire(EVENT.billingGenerate, period, period.getUniqueValue())
 }
 
-/** Script action on x_daas_ham.billing.generate: one pass over the Subscription lines active in the month. */
+/**
+ * Script action on x_daas_ham.billing.generate: one pass over the Subscription lines active in the month.
+ * A chunk that cannot run (e.g. a month saved past the month rule) stops the pass and holds the period for review.
+ */
 export function generateBillingLines(event: GlideRecord, current: GlideRecord): void {
     const period = findById('x_daas_ham_billing_period', str(event, 'parm1'))
     if (!period || str(period, 'status') !== 'generating') return
-    const month = str(period, 'period')
-    if (!isMonth(month)) {
-        // Saved past the month rule (an import without rules): stop for review with nothing billed, so
-        // Close refuses and Regenerate can run once the month is corrected.
-        addFailedLines(period, 1, `the month '${month}' is not YYYY-MM: correct it, then Regenerate`)
-        period.setValue('status', 'ready')
-        period.update()
-        return
+    try {
+        generateChunk(period, str(event, 'parm2'), current)
+    } catch (error) {
+        stopGeneration(period, error instanceof Error ? error.message : String(error))
     }
-    const bounds = monthBounds(month)
+}
+
+/** Bill the next chunk of the period's Subscription lines after `cursor`, then finish the period once the last one is billed. */
+function generateChunk(period: GlideRecord, cursor: string, current: GlideRecord): void {
+    const bounds = monthBounds(str(period, 'period'))
     const siteName = memoized(siteNameOf)
     const result = runEventTableJob({
         eventName: EVENT.billingGenerate,
         record: current,
         parm1: period.getUniqueValue(),
-        cursor: str(event, 'parm2'),
+        cursor,
         table: 'x_daas_ham_subscription_line',
         query: `status!=pending^${overlapsMonth(bounds)}`,
         read: (line) => ({
@@ -78,8 +82,7 @@ export function generateBillingLines(event: GlideRecord, current: GlideRecord): 
         }),
         prepare: (lines: readonly LineRow[]) => withIntervals(lines, bounds),
         handle: (line, lineId) => {
-            const sources = { intervals: line.intervals, siteName }
-            for (const charge of subscriptionCharges(line.terms, bounds, sources)) {
+            for (const charge of subscriptionCharges(line.terms, bounds, { intervals: line.intervals, siteName })) {
                 insertLine(period, {
                     kind: 'subscription',
                     customer: line.customerId,
@@ -103,7 +106,20 @@ export function generateBillingLines(event: GlideRecord, current: GlideRecord): 
     if (result.done) finishGeneration(period, bounds)
 }
 
-/** A Site's name ('' without a Site); generateBillingLines reads each once per chunk. */
+/**
+ * Hold a period whose generation stopped for review, recording why and totalling the lines written so far (saves it):
+ * Close period refuses until a Regenerate completes.
+ */
+function stopGeneration(period: GlideRecord, error: string): void {
+    gs.error(`[x_daas_ham] Billing period ${str(period, 'period')}: generation stopped: ${error}`)
+    period.setValue('last_error', error.slice(0, 255))
+    // A Regenerate keeps the previous totals until the end, so a held period must not show them against its new lines.
+    setTotals(period)
+    period.setValue('status', 'ready')
+    period.update()
+}
+
+/** A Site's name ('' without a Site); a generation chunk reads each once. */
 function siteNameOf(siteId: string): string {
     const site = findById('cmn_location', siteId)
     return site ? str(site, 'name') : ''
@@ -119,29 +135,12 @@ interface LineRow {
 }
 
 /** A Subscription line ready to bill: its row, and its Service intervals in the month. */
-type BillableLine = LineRow & { intervals(): readonly ServiceInterval[] }
+type BillableLine = LineRow & { intervals: readonly ServiceInterval[] }
 
-/**
- * The batch's lines with their Service intervals in the month (none for a line not billed from them),
- * read with one aggregate for the whole batch. If that read fails, each line billed from intervals fails
- * when it is billed, as if it had read them itself: the period still reaches review, and Regenerate retries it.
- */
+/** The batch's lines with their Service intervals in the month (none for a line not billed from them), read with one aggregate for the whole batch. */
 function withIntervals(lines: readonly LineRow[], bounds: MonthBounds): BillableLine[] {
-    const perDevice = lines.filter((line) => billsFromIntervals(line.terms)).map((line) => line.lineId)
-    let byLine: Map<string, ServiceInterval[]>
-    try {
-        byLine = intervalsByLine(perDevice, bounds)
-    } catch (error) {
-        const needsIntervals = new Set(perDevice)
-        const unreadable = (): never => {
-            throw error
-        }
-        return lines.map((line) => ({ ...line, intervals: needsIntervals.has(line.lineId) ? unreadable : () => [] }))
-    }
-    return lines.map((line) => {
-        const intervals = byLine.get(line.lineId) ?? []
-        return { ...line, intervals: () => intervals }
-    })
+    const byLine = intervalsByLine(lines.filter((line) => billsFromIntervals(line.terms)).map((line) => line.lineId), bounds)
+    return lines.map((line) => ({ ...line, intervals: byLine.get(line.lineId) ?? [] }))
 }
 
 /** The Service intervals in the month of each of these lines: one per Site and dates, with the number of Assets sharing them. */
@@ -157,15 +156,12 @@ function intervalsByLine(lineIds: readonly string[], bounds: MonthBounds): Map<s
     ga.groupBy('end_date')
     ga.query()
     while (ga.next()) {
-        const lineId = String(ga.getValue('subscription_line') ?? '')
-        const intervals = byLine.get(lineId) ?? []
-        intervals.push({
+        appendTo(byLine, String(ga.getValue('subscription_line') ?? ''), {
             siteId: String(ga.getValue('site') ?? ''),
             start: String(ga.getValue('start_date') ?? ''),
             end: String(ga.getValue('end_date') ?? '') || undefined,
             count: Number(ga.getAggregate('COUNT', '')),
         })
-        byLine.set(lineId, intervals)
     }
     return byLine
 }
@@ -236,32 +232,29 @@ function setTotals(period: GlideRecord): void {
 }
 
 /**
- * Fee lines whose fee was waived after generation (e.g. a missing unit turned up) are not billed.
- * Only called while the period is still ready for review, so the closed-line guard lets the lines go.
+ * Fee lines whose fee was waived after generation (e.g. a missing unit turned up) are not billed: the fees
+ * leave the period and their lines are deleted (does not redo the totals). Only called while the period is
+ * still ready for review, so the closed-line guard lets the lines go.
  */
 function dropWaivedFeeLines(period: GlideRecord): void {
-    const waived = `billing_period=${period.getUniqueValue()}^status=waived`
-    const fees = pluck('x_daas_ham_fee_event', waived, 'sys_id')
-    if (fees.length > 0) {
-        // The fees are listed first: a set-based delete is not relied on to follow a dot-walked condition.
-        const lines = new GlideRecord('x_daas_ham_billing_line')
-        lines.addEncodedQuery(`billing_period=${period.getUniqueValue()}^kind=fee^fee_eventIN${fees.join(',')}`)
-        lines.deleteMultiple()
-        unlinkFees(waived)
-    }
-    setTotals(period)
+    const waived = unlinkFees(`billing_period=${period.getUniqueValue()}^status=waived`)
+    // By the fees' ids: a set-based delete is not relied on to follow a dot-walked condition.
+    if (waived.length > 0) deleteWhere('x_daas_ham_billing_line', `billing_period=${period.getUniqueValue()}^kind=fee^fee_eventIN${waived.join(',')}`)
 }
 
-/** Unlink the Fee events matching an encoded query from their Billing period (an open one is billed again by the next generation). */
-function unlinkFees(encodedQuery: string): void {
+/** Unlink the Fee events matching an encoded query from their Billing period and return their ids (an open one is billed again by the next generation). */
+function unlinkFees(encodedQuery: string): string[] {
     // Per record: updateMultiple does not reliably clear a reference to empty.
     const fee = new GlideRecord('x_daas_ham_fee_event')
     fee.addEncodedQuery(encodedQuery)
     fee.query()
+    const unlinked: string[] = []
     while (fee.next()) {
+        unlinked.push(fee.getUniqueValue())
         fee.setValue('billing_period', '')
         fee.update()
     }
+    return unlinked
 }
 
 /** UI action "Regenerate" on a period ready for review: rebuild its lines from current data. */
@@ -286,10 +279,16 @@ const CSV_HEADER = ['period', 'kind', 'customer', 'agreement', 'subscription_lin
 /** UI action "Close period": mark its fees billed, lock it, then export its CSV and compute its margin in the background. */
 export function uiCloseBillingPeriod(current: GlideRecord): void {
     if (str(current, 'status') !== 'ready') return void gs.addErrorMessage('Only a period ready for review can be closed')
-    if (num(current, 'failed_lines') > 0) {
-        return void gs.addErrorMessage(`${num(current, 'failed_lines')} billing line(s) failed to bill (${str(current, 'last_error')}); fix them and Regenerate before closing`)
+    const failed = num(current, 'failed_lines')
+    const lastError = str(current, 'last_error')
+    if (failed > 0 || lastError) {
+        return void gs.addErrorMessage(
+            `${str(current, 'period')} did not generate cleanly (${failed} line(s) failed to bill; last error: ${lastError || 'none'}); fix the cause and Regenerate before closing`,
+        )
     }
     dropWaivedFeeLines(current)
+    // Always: finance may have adjusted lines during review, and the locked total must match the locked lines.
+    setTotals(current)
     const fees = new GlideRecord('x_daas_ham_fee_event')
     fees.addQuery('billing_period', current.getUniqueValue())
     fees.addQuery('status', 'open')

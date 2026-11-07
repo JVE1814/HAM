@@ -107,10 +107,10 @@ export interface Charge {
     amount: number
 }
 
-/** What a charge is drafted from beyond the line itself, read only when the line's type needs it. */
+/** What a charge is drafted from beyond the line itself, used only when the line's type needs it. */
 export interface ChargeSources {
-    /** The line's Service intervals overlapping the month. Called at most once, and only for a line billsFromIntervals accepts. */
-    intervals(): readonly ServiceInterval[]
+    /** The line's Service intervals overlapping the month: billed only for a line billsFromIntervals accepts, so any other line can pass none. */
+    intervals: readonly ServiceInterval[]
     /** A Site's name; '' for '' or an unknown Site. */
     siteName(siteId: string): string
 }
@@ -138,7 +138,7 @@ function unitsBySite(line: SubscriptionLineTerms, bounds: MonthBounds, sources: 
         const units = line.start ? activeDays(bounds, line.start, line.end) : 0
         if (units > 0) bySite.set(line.siteId, units)
     } else if (billsFromIntervals(line)) {
-        for (const interval of sources.intervals()) {
+        for (const interval of sources.intervals) {
             const units = activeDays(bounds, interval.start, interval.end) * (interval.count ?? 1)
             if (units > 0) bySite.set(interval.siteId, (bySite.get(interval.siteId) ?? 0) + units)
         }

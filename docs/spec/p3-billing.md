@@ -21,11 +21,11 @@
 
 | Status | How it gets there | What can happen |
 |---|---|---|
-| Generating | Monthly job on day 1 (previous month), or *Regenerate* | Lines are written in time-boxed chunks (event-driven); a subscription line or fee event that fails to bill is counted on the period (*Lines that failed to bill*) with the last error, and *Close period* refuses until a *Regenerate* bills every line |
-| Ready for review | Generation finished; totals are set | *Regenerate* (rebuild from current data); *Close period* |
+| Generating | Monthly job on day 1 (previous month), or *Regenerate* | Lines are written in time-boxed chunks (event-driven); a subscription line or fee event that fails to bill is counted on the period (*Lines that failed to bill*) with the last error (*Last generation error*). A chunk that cannot run at all (e.g. a month saved past the month rule) stops generation: its error is recorded and the period is held as *Ready for review*. *Close period* refuses while a line failed to bill or an error is recorded, until a *Regenerate* bills every line |
+| Ready for review | Generation finished and totals are set, or generation stopped on an error (held for review) | *Regenerate* (rebuild from current data); *Close period* |
 | Closed (locked) | *Close period* (finance) | Lines of fees waived since generation are dropped and the totals redone, and the fees become *billed*. The period and its lines can no longer change or be deleted. The CSV export is attached in the background shortly after closing; *Re-export CSV* attaches it again if it is missing |
 
-- A period's month is entered as YYYY-MM (e.g. 2026-11); a business rule refuses a period saved with any other month.
+- A period's month is entered as YYYY-MM (e.g. 2026-11); a business rule refuses a period saved with any other month. A period saved past the rule (e.g. by an import without business rules) bills nothing: its generation stops with the error recorded, and *Close period* refuses until the month is corrected and *Regenerate* run.
 
 ## Export
 

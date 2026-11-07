@@ -93,15 +93,11 @@ describe('prorate', () => {
 
 const SITE_NAMES: { [siteId: string]: string } = { hq: 'Head office', store: 'Store 12' }
 
-/** Sources with these Service intervals and the Site names above, counting the intervals reads. */
-function sources(intervals: readonly ServiceInterval[] = []): ChargeSources & { intervalReads: number; siteReads: number } {
+/** Sources with these Service intervals and the Site names above, counting the Site name reads. */
+function sources(intervals: readonly ServiceInterval[] = []): ChargeSources & { siteReads: number } {
     return {
-        intervalReads: 0,
+        intervals,
         siteReads: 0,
-        intervals() {
-            this.intervalReads++
-            return intervals
-        },
         siteName(siteId) {
             this.siteReads++
             return SITE_NAMES[siteId] ?? ''
@@ -138,11 +134,12 @@ describe('subscriptionCharges', () => {
         ])
     })
 
-    it('never reads Service intervals for a site package', () => {
+    it('bills a site package by its own dates, whatever Service intervals it is given', () => {
         const read = sources([{ siteId: 'store', start: '2026-11-01' }])
-        subscriptionCharges({ ...sitePackage, start: '2026-11-16' }, nov, read)
-        subscriptionCharges({ ...sitePackage, start: '2026-12-01' }, nov, read)
-        expect(read.intervalReads).toBe(0)
+        expect(subscriptionCharges({ ...sitePackage, start: '2026-11-16' }, nov, read)).toEqual([
+            { siteId: 'hq', description: 'Site package - Head office', units: 15, amount: 2250 },
+        ])
+        expect(subscriptionCharges({ ...sitePackage, start: '2026-12-01' }, nov, read)).toEqual([])
     })
 
     it('charges a per-device line by device-days, per site', () => {
@@ -156,7 +153,10 @@ describe('subscriptionCharges', () => {
             { siteId: 'hq', description: 'Laptop - Head office', units: 40, amount: 60 },
             { siteId: 'store', description: 'Laptop - Store 12', units: 15, amount: 22.5 },
         ])
-        expect(read.intervalReads).toBe(1)
+    })
+
+    it('bills nothing for a per-device line without Service intervals', () => {
+        expect(subscriptionCharges(perDevice, nov, sources())).toEqual([])
     })
 
     it('lists Sites in order of first appearance and leaves out Sites without device-days', () => {
@@ -211,10 +211,9 @@ describe('subscriptionCharges', () => {
         ])
     })
 
-    it('bills nothing for an unknown line type, reading neither source', () => {
+    it('bills nothing for an unknown line type, whatever Service intervals it is given, and reads no Site name', () => {
         const read = sources([{ siteId: 'hq', start: '2026-11-01' }])
         expect(subscriptionCharges({ ...perDevice, lineType: 'per_seat', siteId: 'hq', start: '2026-11-01' }, nov, read)).toEqual([])
-        expect(read.intervalReads).toBe(0)
         expect(read.siteReads).toBe(0)
     })
 })
