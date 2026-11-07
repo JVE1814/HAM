@@ -4,7 +4,7 @@ import { runChunked, type ChunkedJobPorts } from './chunked-job'
 function fakePorts(keys: string[], opts: { cursor?: string; tickMs?: number; failOn?: string[] } = {}) {
     let clock = 0
     const handled: string[] = []
-    const saved: Array<{ cursor: string; processed: number; done: boolean }> = []
+    const saved: Array<{ cursor: string; processed: number; done: boolean; failed?: number }> = []
     const ports: ChunkedJobPorts<string> = {
         loadCursor: () => opts.cursor ?? '',
         fetchBatch: (after, size) => keys.filter((k) => k > after).slice(0, size),
@@ -14,7 +14,7 @@ function fakePorts(keys: string[], opts: { cursor?: string; tickMs?: number; fai
             if (opts.failOn?.includes(k)) throw new Error(`boom ${k}`)
             handled.push(k)
         },
-        saveCursor: (cursor, processed, done) => saved.push({ cursor, processed, done }),
+        saveCursor: (cursor, processed, done, failures) => saved.push({ cursor, processed, done, ...(failures.failed > 0 ? { failed: failures.failed } : {}) }),
         now: () => clock,
     }
     return { ports, handled, saved }
@@ -56,6 +56,13 @@ describe('runChunked', () => {
         const result = runChunked(ports, { batchSize: 2, budgetMs: 100 })
         expect(handled).toEqual(['c', 'd'])
         expect(result).toEqual({ processed: 2, failed: 2, done: true, cursor: '', lastError: 'b: boom b' })
-        expect(saved).toEqual([{ cursor: '', processed: 2, done: true }])
+        expect(saved).toEqual([{ cursor: '', processed: 2, done: true, failed: 2 }])
+    })
+
+    it('tells saveCursor how many records of the run failed and the last error', () => {
+        const failures: Array<{ failed: number; lastError: string }> = []
+        const { ports } = fakePorts(['a', 'b', 'c'], { failOn: ['a', 'c'] })
+        runChunked({ ...ports, saveCursor: (_cursor, _processed, _done, f) => failures.push(f) }, { batchSize: 10, budgetMs: 100 })
+        expect(failures).toEqual([{ failed: 2, lastError: 'c: boom c' }])
     })
 })

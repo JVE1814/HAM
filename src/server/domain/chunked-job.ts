@@ -11,7 +11,8 @@ export interface ChunkedJobPorts<T> {
     fetchBatch(after: string, size: number): T[]
     keyOf(record: T): string
     handle(record: T): void
-    saveCursor(cursor: string, processed: number, done: boolean): void
+    /** Save where the run got to; `failures` are the records of this run that failed and the last error. */
+    saveCursor(cursor: string, processed: number, done: boolean, failures: { failed: number; lastError: string }): void
     now(): number
 }
 
@@ -48,12 +49,12 @@ export function runChunked<T>(ports: ChunkedJobPorts<T>, options: ChunkedJobOpti
             }
             cursor = key
             if (ports.now() - started >= options.budgetMs) {
-                ports.saveCursor(cursor, processed, false)
+                ports.saveCursor(cursor, processed, false, { failed, lastError })
                 return { processed, failed, done: false, cursor, lastError }
             }
         }
         if (batch.length < options.batchSize) {
-            ports.saveCursor('', processed, true)
+            ports.saveCursor('', processed, true, { failed, lastError })
             return { processed, failed, done: true, cursor: '', lastError }
         }
     }
