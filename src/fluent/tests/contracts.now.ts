@@ -1,6 +1,7 @@
 import '@servicenow/sdk/global'
 import { Test, TestSuite } from '@servicenow/sdk/core'
 import { assetManager, finance } from '../security/roles.now'
+import { trackingWebhookTest } from './tracking-webhook.now'
 
 /*
  * ATF: lessor ownership and lease extension (D65), billing period lock (D66), rack power budget (P3.29). The lease and
@@ -127,10 +128,25 @@ export const closedBillingPeriodLockedTest = Test(
             table: 'x_daas_ham_billing_period',
             fieldValues: { period: '1999-01', status: 'closed' },
         })
+        // A line as the generation writes it: its Agreement's currency (mandatory, no default; owner decision (b)), so
+        // the update below is refused by the closed period's lock alone.
+        const agreement = atf.server.recordInsert({
+            $id: Now.ID['atf_bl_agreement'],
+            table: 'x_daas_ham_agreement',
+            fieldValues: { customer: customer.record_id, short_description: 'ATF billing agreement', state: 'active', currency: 'EUR' },
+        })
         const line = atf.server.recordInsert({
             $id: Now.ID['atf_bl_line'],
             table: 'x_daas_ham_billing_line',
-            fieldValues: { billing_period: period.record_id, kind: 'subscription', customer: customer.record_id, description: 'ATF line', amount: 100 },
+            fieldValues: {
+                billing_period: period.record_id,
+                kind: 'subscription',
+                customer: customer.record_id,
+                agreement: agreement.record_id,
+                description: 'ATF line',
+                amount: 100,
+                currency: 'EUR',
+            },
         })
         atf.server.createUser({ $id: Now.ID['atf_bl_user'], firstName: 'ATF', lastName: 'Finance', roles: [finance] })
         atf.server.recordUpdate({
@@ -203,5 +219,5 @@ export const rackPowerBudgetTest = Test(
 export const phase3Suite = TestSuite({
     $id: Now.ID['atf_suite_p3'],
     name: 'NaaS - P3',
-    tests: [leasedAssetOwnershipTest, leaseExtensionTest, closedBillingPeriodLockedTest, rackPowerBudgetTest],
+    tests: [leasedAssetOwnershipTest, leaseExtensionTest, closedBillingPeriodLockedTest, rackPowerBudgetTest, trackingWebhookTest],
 })

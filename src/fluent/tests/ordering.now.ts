@@ -1,10 +1,12 @@
 import '@servicenow/sdk/global'
 import { Test, TestSuite } from '@servicenow/sdk/core'
 import { assetManager } from '../security/roles.now'
-import { inventoryTechAuditVisibilityTest } from './audit-visibility.now'
+import { inventoryTechAuditScanTest, inventoryTechAuditVisibilityTest } from './audit-visibility.now'
 import { addToFleetTest } from './fleet.now'
+import { cancelRefusedOnceShippedTest } from './order-lifecycle.now'
 import { transferStageTest } from './transfers.now'
 import { customerAdminVisibilityTest, inventoryTechVisibilityTest } from './visibility.now'
+import { warehouseScanRulesTest } from './warehouse.now'
 
 /* ATF: order entitlement routing (D35). */
 
@@ -35,7 +37,7 @@ export const withinAgreementOrderTest = Test(
         const agreement = atf.server.recordInsert({
             $id: Now.ID['atf_owa_agreement'],
             table: 'x_daas_ham_agreement',
-            fieldValues: { customer: customer.record_id, short_description: 'ATF agreement', state: 'active' },
+            fieldValues: { customer: customer.record_id, short_description: 'ATF agreement', state: 'active', currency: 'EUR' },
         })
         atf.server.recordInsert({
             $id: Now.ID['atf_owa_quantity'],
@@ -118,7 +120,7 @@ export const offCatalogOrderTest = Test(
         const agreement = atf.server.recordInsert({
             $id: Now.ID['atf_ooc_agreement'],
             table: 'x_daas_ham_agreement',
-            fieldValues: { customer: customer.record_id, short_description: 'ATF agreement', state: 'active' },
+            fieldValues: { customer: customer.record_id, short_description: 'ATF agreement', state: 'active', currency: 'EUR' },
         })
         const order = atf.server.recordInsert({
             $id: Now.ID['atf_ooc_order'],
@@ -175,5 +177,8 @@ export const phase1Suite = TestSuite({
         offCatalogOrderTest,
         transferStageTest,
         addToFleetTest,
+        warehouseScanRulesTest,
+        inventoryTechAuditScanTest,
+        cancelRefusedOnceShippedTest,
     ],
 })

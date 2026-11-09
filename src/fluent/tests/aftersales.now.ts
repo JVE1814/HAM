@@ -1,6 +1,8 @@
 import '@servicenow/sdk/global'
 import { Test, TestSuite } from '@servicenow/sdk/core'
 import { assetManager, inventoryTech } from '../security/roles.now'
+import { customerReturnRequestTest } from './customer-returns.now'
+import { lostInTransitResourcingTest } from './order-lifecycle.now'
 
 /*
  * ATF: break-fix entitlement neutrality (D46) and depot evaluation routing (D60), on fleet assets: the app counts and
@@ -35,7 +37,7 @@ export const replacementWithinAgreementTest = Test(
         const agreement = atf.server.recordInsert({
             $id: Now.ID['atf_rwa_agreement'],
             table: 'x_daas_ham_agreement',
-            fieldValues: { customer: customer.record_id, short_description: 'ATF agreement', state: 'active' },
+            fieldValues: { customer: customer.record_id, short_description: 'ATF agreement', state: 'active', currency: 'EUR' },
         })
         atf.server.recordInsert({
             $id: Now.ID['atf_rwa_quantity'],
@@ -178,5 +180,5 @@ export const returnEvaluationTest = Test(
 export const phase2Suite = TestSuite({
     $id: Now.ID['atf_suite_p2'],
     name: 'NaaS - P2',
-    tests: [replacementWithinAgreementTest, returnEvaluationTest],
+    tests: [replacementWithinAgreementTest, returnEvaluationTest, customerReturnRequestTest, lostInTransitResourcingTest],
 })
