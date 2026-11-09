@@ -100,6 +100,11 @@ contacts: their Sites).
 | Everyone | see installed equipment by Site; report a faulty device (CSM case with the failed asset); see open orders and returns; confirm self-installed orders, including the units already shipped of an Order back in preparing after a unit was lost in transit |
 | Customer admins | request returns of selected devices or a site decommission; answer attestations |
 
+The equipment listed is the NaaS Assets, those on an Agreement (`domain/visibility.ts`
+`customerEquipmentQuery`), from shipped to a Site to awaiting return, grouped by Site; one with no
+Site (a data gap) is listed under *No site*. The platform's other hardware, such as out-of-box
+laptops, has no Agreement and is not listed, in the staff preview either.
+
 The page calls the app's REST API under `/api/x_daas_ham/naas`. A call the platform refuses answers
 HTTP 422, so it can be sent again:
 

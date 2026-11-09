@@ -1,7 +1,9 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { DEPLOYED_STAGES } from './lifecycle'
 import {
     actsAsCustomerAdmin,
+    customerEquipmentQuery,
     INVENTORY_TECH_TABLES,
     resolveVisibility,
     STOCKROOM_SCOPED_TABLES,
@@ -46,6 +48,20 @@ describe('actsAsCustomerAdmin', () => {
         expect(actsAsCustomerAdmin(roles('x_daas_ham.asset_manager'))).toBe(false)
         expect(actsAsCustomerAdmin(roles('x_daas_ham.asset_manager', 'x_daas_ham.customer_admin'))).toBe(false)
         expect(actsAsCustomerAdmin(() => true)).toBe(false) // a platform admin holds every role
+    })
+})
+
+describe('customerEquipmentQuery', () => {
+    const clauses = customerEquipmentQuery().split('^NQ')
+
+    it('lists every deployed stage, from shipped to awaiting return', () => {
+        expect(clauses).toHaveLength(DEPLOYED_STAGES.length)
+        expect(clauses[0]).toContain('install_status=9^substatus=shipped_to_site')
+        expect(clauses.at(-1)).toContain('install_status=1^substatus=pending_return')
+    })
+
+    it('keeps only NaaS Assets, on an Agreement, in each stage: hardware with none, such as laptops, is left out', () => {
+        for (const clause of clauses) expect(clause).toMatch(/\^x_daas_ham_agreementISNOTEMPTY$/)
     })
 })
 

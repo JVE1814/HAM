@@ -1,3 +1,5 @@
+import { DEPLOYED_STAGES, stagesQuery } from './lifecycle.ts'
+
 /**
  * Which slice of the installed base a user may see (ADR 0005).
  *
@@ -84,6 +86,17 @@ export function resolveVisibility(hasRole: (role: string) => boolean): Visibilit
  */
 export function actsAsCustomerAdmin(hasRole: (role: string) => boolean): boolean {
     return resolveVisibility(hasRole) === 'own_customer'
+}
+
+/**
+ * The equipment the customer page lists (D49), as an encoded alm_hardware query: Customers' NaaS Assets, which are
+ * those on an Agreement (going to a Site needs one, as the entitlement and attestation queries count them), shipped
+ * to a Site, serving there or awaiting return. The platform's other hardware, such as out-of-box laptops, has no
+ * Agreement, so a staff preview of every Customer leaves it out; for Customer contacts the before-query rules
+ * narrow it further.
+ */
+export function customerEquipmentQuery(): string {
+    return stagesQuery(DEPLOYED_STAGES, 'x_daas_ham_agreementISNOTEMPTY')
 }
 
 /** Which field on a table carries each scoping key; omit a key the table has no field for. */

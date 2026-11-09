@@ -73,7 +73,7 @@ function Equipment({ overview, run }: { overview: Overview; run: Runner }) {
                 const chosen = assets.filter((a) => selected.has(a.id)).map((a) => a.id)
                 return (
                     <section key={siteId} className="card">
-                        <h2>{assets[0].site || 'In transit'}</h2>
+                        <h2>{assets[0].site || 'No site'}</h2>
                         <table>
                             <thead>
                                 <tr>

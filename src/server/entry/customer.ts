@@ -3,9 +3,8 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { awaitsSelfInstallConfirmation } from '../domain/install-confirmation.ts'
-import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle.ts'
 import { returnRequesterRefusal, returnRequestFindings, type RequestedReturn } from '../domain/returns.ts'
-import { actsAsCustomerAdmin, ROLE } from '../domain/visibility.ts'
+import { actsAsCustomerAdmin, customerEquipmentQuery, ROLE } from '../domain/visibility.ts'
 import { readStage } from '../platform/assets.ts'
 import { currentSession } from '../platform/session.ts'
 import { bool, exists, findById, refusal, str } from '../platform/records.ts'
@@ -44,7 +43,7 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
 
     const assets: object[] = []
     const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(stagesQuery(DEPLOYED_STAGES))
+    asset.addEncodedQuery(customerEquipmentQuery())
     asset.orderBy('x_daas_ham_site')
     asset.setLimit(5000)
     asset.query()
