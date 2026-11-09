@@ -60,7 +60,7 @@ BusinessRule({
 
 BusinessRule({
     $id: Now.ID['br_disposal_line_frozen'],
-    name: 'NaaS - submitted disposal lines are frozen',
+    name: 'NaaS - freeze submitted disposal lines',
     table: 'x_daas_ham_disposal_line',
     when: 'before',
     action: ['insert', 'update', 'delete'],
@@ -70,7 +70,7 @@ BusinessRule({
 
 BusinessRule({
     $id: Now.ID['br_disposal_order_frozen'],
-    name: 'NaaS - submitted disposal method and customer are frozen',
+    name: 'NaaS - freeze submitted disposal terms',
     table: 'x_daas_ham_disposal_order',
     when: 'before',
     action: ['update'],

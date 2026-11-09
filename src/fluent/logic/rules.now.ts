@@ -27,7 +27,7 @@ import { guardStagingClosure, onStagingClosed, releaseWaitingSteps, stampStaging
 // Ahead of the lifecycle rule, so that it checks the stage the Asset takes back, not Inventory's In stock / Available.
 BusinessRule({
     $id: Now.ID['br_asset_transfer_released'],
-    name: 'NaaS - asset back to its stage after a transfer',
+    name: 'NaaS - asset stage back after transfer',
     table: 'alm_hardware',
     when: 'before',
     action: ['update'],
@@ -65,7 +65,7 @@ BusinessRule({
 // Also takes a unit that left its line in transit off it.
 BusinessRule({
     $id: Now.ID['br_asset_stage_to_order_line'],
-    name: 'NaaS - advance order line on asset stage change',
+    name: 'NaaS - asset stage advances order line',
     table: 'alm_hardware',
     when: 'after',
     action: ['update'],
@@ -77,7 +77,7 @@ BusinessRule({
 
 BusinessRule({
     $id: Now.ID['br_asset_left_service'],
-    name: 'NaaS - start or stop billing on service changes',
+    name: 'NaaS - start or stop billing on service',
     table: 'alm_hardware',
     when: 'after',
     action: ['update'],
@@ -110,7 +110,7 @@ BusinessRule({
 
 BusinessRule({
     $id: Now.ID['br_staging_step_release'],
-    name: 'NaaS - release OEM steps waiting on a done step',
+    name: 'NaaS - release waiting OEM steps',
     table: 'x_daas_ham_staging_step',
     when: 'after',
     action: ['update'],
@@ -121,7 +121,7 @@ BusinessRule({
 
 BusinessRule({
     $id: Now.ID['br_staging_guard_closure'],
-    name: 'NaaS - require staging steps before closing',
+    name: 'NaaS - staging steps done before close',
     table: 'x_daas_ham_staging_task',
     when: 'before',
     action: ['update'],
@@ -143,7 +143,7 @@ BusinessRule({
 
 BusinessRule({
     $id: Now.ID['br_work_order_window'],
-    name: 'NaaS - work inside change and maintenance window',
+    name: 'NaaS - work inside the change window',
     table: 'wm_order',
     when: 'before',
     action: ['insert', 'update'],
@@ -156,7 +156,7 @@ BusinessRule({
 
 BusinessRule({
     $id: Now.ID['br_work_order_closed'],
-    name: 'NaaS - complete install on work order closure',
+    name: 'NaaS - install done on work order close',
     table: 'wm_order',
     when: 'after',
     action: ['update'],

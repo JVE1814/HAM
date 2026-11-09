@@ -64,7 +64,7 @@ export const agreementTermsEvent = Record({
 
 ScriptAction({
     $id: Now.ID['sa_agreement_terms'],
-    name: 'NaaS - refresh agreement assets lifecycle',
+    name: 'NaaS - refresh due of agreement assets',
     eventName: 'x_daas_ham.agreement.terms',
     active: true,
     script: refreshAgreementAssets,

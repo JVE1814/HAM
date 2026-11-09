@@ -1245,7 +1245,7 @@ recommended hardening are described in the notes of their area.
   placement rule (`assurance.now.ts`, `racks.ts` refusesRackPlacement), `NaaS - enforce asset
   lifecycle` (`alm_hardware`, `assets.ts` refusesLifecycleChange; the wipe evidence a save into
   staging voids is cleared by a rule of its own, `assets.ts` clearVoidedWipeEvidence) and `NaaS -
-  work inside change and maintenance window` (`wm_order`, `delivery.ts` refusesWorkWindow). No other
+  work inside the change window` (`wm_order`, `delivery.ts` refusesWorkWindow). No other
   rule refuses a save on another scope's table: the before rule on `sn_customerservice_case`
   (`breakfix.ts` onCaseFailedAsset) and the lease rule and transfer release rule on `alm_hardware`
   (`leases.ts` onAssetLeaseChanged, `entry/assets.ts` onTransferReleased) only set fields, and the

@@ -58,7 +58,7 @@ UiAction({
 // checked, and refused, once.
 BusinessRule({
     $id: Now.ID['br_rack_placement'],
-    name: 'NaaS - rack placement must be free and within power',
+    name: 'NaaS - check rack placement and power',
     table: 'alm_hardware',
     when: 'before',
     action: ['insert', 'update'],
@@ -91,7 +91,7 @@ BusinessRule({
 // to fit the 254 characters.
 BusinessRule({
     $id: Now.ID['br_rack_recheck'],
-    name: 'NaaS - re-check rack for overlaps and power',
+    name: 'NaaS - re-check rack overlaps and power',
     table: 'alm_hardware',
     when: 'after',
     action: ['insert', 'update'],

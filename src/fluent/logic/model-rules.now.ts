@@ -29,7 +29,7 @@ BusinessRule({
 
 BusinessRule({
     $id: Now.ID['br_norm_exception_resolved'],
-    name: 'NaaS - learn from resolved normalization exception',
+    name: 'NaaS - learn from resolved exceptions',
     table: 'x_daas_ham_norm_exception',
     when: 'after',
     action: ['update'],

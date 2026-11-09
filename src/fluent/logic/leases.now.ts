@@ -45,7 +45,7 @@ UiAction({
 
 BusinessRule({
     $id: Now.ID['br_returned_lease_end_changed'],
-    name: 'NaaS - refresh due dates follow a returned lease end',
+    name: 'NaaS - refresh due follows lease end',
     table: 'x_daas_ham_lease_schedule',
     when: 'after',
     action: ['update'],
@@ -56,7 +56,7 @@ BusinessRule({
 
 BusinessRule({
     $id: Now.ID['br_agreement_end_changed'],
-    name: 'NaaS - re-arm renewal warning when the agreement end changes',
+    name: 'NaaS - re-arm renewal warning on new end',
     table: 'x_daas_ham_agreement',
     when: 'before',
     action: ['update'],
@@ -113,7 +113,7 @@ export const leaseAssetsEvent = Record({
 
 ScriptAction({
     $id: Now.ID['sa_lease_assets'],
-    name: 'NaaS - refresh due dates of a returned lease',
+    name: 'NaaS - refresh due of a returned lease',
     eventName: 'x_daas_ham.lease.assets',
     active: true,
     script: refreshLeaseAssets,
@@ -135,7 +135,7 @@ export const leaseBuyoutEvent = Record({
 
 ScriptAction({
     $id: Now.ID['sa_lease_buyout'],
-    name: 'NaaS - transfer a bought-out lease to the Provider',
+    name: 'NaaS - transfer a bought-out lease',
     eventName: 'x_daas_ham.lease.buyout',
     active: true,
     script: transferLeaseAssets,
