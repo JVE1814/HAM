@@ -2837,6 +2837,10 @@ declare global {
                         table: 'sys_module'
                         id: '70901aff85264a03b64caaaaf627143d'
                     }
+                    src_server_domain_serials_ts: {
+                        table: 'sys_module'
+                        id: '9fc8d6b6a37a4b2f9c2611f4cd4cef45'
+                    }
                     src_server_domain_shipping_ts: {
                         table: 'sys_module'
                         id: '9eb74e4a9af34c82be439f7e6c9a91e5'
@@ -2982,6 +2986,14 @@ declare global {
                         table: 'sys_module'
                         id: '64007da49c55498eac75188cbad4c7bc'
                     }
+                    src_server_platform_attestations_ts: {
+                        table: 'sys_module'
+                        id: 'cb64526cdb5f411d982ad5dfbf40f4cb'
+                    }
+                    src_server_platform_audits_ts: {
+                        table: 'sys_module'
+                        id: '9b36897dd7bb49b1bd577ccc6ff5d2dd'
+                    }
                     'src_server_platform_beyond-visibility_ts': {
                         table: 'sys_module'
                         id: 'cbc9d7b35b924e71bcccd48019541a91'
@@ -3073,6 +3085,14 @@ declare global {
                     src_server_platform_properties_ts: {
                         table: 'sys_module'
                         id: '90f4209ae2a64e0cb258a8f62fdb940b'
+                    }
+                    src_server_platform_racks_ts: {
+                        table: 'sys_module'
+                        id: '58e9b082ffb34d6da952c53e677927f8'
+                    }
+                    src_server_platform_reconciliation_ts: {
+                        table: 'sys_module'
+                        id: '23455b415f1547a0a67fd957671a68af'
                     }
                     src_server_platform_records_ts: {
                         table: 'sys_module'

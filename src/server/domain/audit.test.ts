@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { attestationDue, compareAudit } from './audit'
+import { attestationDue, closedLineResult, compareAudit, onTheShelfQuery } from './audit'
+import { fleetCondition } from './fleet'
 
 describe('compareAudit', () => {
     const expected = [
@@ -29,5 +30,36 @@ describe('attestationDue', () => {
 
     it('is never due when the agreement asks for none', () => {
         expect(attestationDue({ lastAttestedOn: undefined, intervalMonths: 0, today: '2026-11-07' })).toBe(false)
+    })
+})
+
+describe('closedLineResult', () => {
+    const comparison = { matched: ['a1'], missing: ['a3'], unexpected: ['XYZ'] }
+
+    it('marks a line of the expected list found or missing', () => {
+        expect(closedLineResult({ assetId: 'a1', scannedCode: '' }, comparison)).toBe('found')
+        expect(closedLineResult({ assetId: 'a3', scannedCode: '' }, comparison)).toBe('missing')
+    })
+
+    it('marks a scan that matched nothing unexpected, and leaves one that matched as it was recorded', () => {
+        expect(closedLineResult({ assetId: '', scannedCode: 'XYZ' }, comparison)).toBe('unexpected')
+        expect(closedLineResult({ assetId: '', scannedCode: 'FOC111' }, comparison)).toBeNull()
+    })
+})
+
+describe('onTheShelfQuery', () => {
+    const clauses = onTheShelfQuery('sr1').split('^NQ')
+
+    it('keeps every stage to fleet assets In stock in the stockroom', () => {
+        expect(clauses.length).toBeGreaterThan(1)
+        for (const clause of clauses) {
+            expect(clause).toContain('stockroom=sr1')
+            expect(clause).toContain('install_status=6')
+            expect(clause).toContain(fleetCondition())
+        }
+    })
+
+    it('counts a unit pending transfer, still on the shelf it is sent from', () => {
+        expect(clauses.some((clause) => clause.includes('substatus=pending_transfer'))).toBe(true)
     })
 })

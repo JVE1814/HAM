@@ -14,7 +14,7 @@ import {
 import { fleetCondition, naasModelCondition } from '../domain/fleet.ts'
 import { enabledRoute, type CoverageRoute } from '../domain/oem/adapters.ts'
 import type { CoverageFact } from '../domain/oem/types.ts'
-import { normalizeSerial } from '../domain/asn.ts'
+import { normalizeSerial } from '../domain/serials.ts'
 import type { CoverageSource, OemVendor } from '../domain/vocabulary.ts'
 import { msToGlide, nowMs, todayIso } from '../platform/clock.ts'
 import { writeModelLifecycle } from '../platform/model-lifecycle.ts'

@@ -1,3 +1,5 @@
+import { normalizeSerial } from './serials.ts'
+
 /** ASN rows: a distributor's list of serials in transit against a purchase order. */
 
 export interface AsnRow {
@@ -7,10 +9,6 @@ export interface AsnRow {
 }
 
 export type AsnRowCheck = { row: number; ok: true } | { row: number; ok: false; reason: string }
-
-export function normalizeSerial(serial: string): string {
-    return serial.trim().toUpperCase()
-}
 
 /** Check each row; `knownSerials` holds normalized serials that already exist as Assets. */
 export function validateAsnRows(rows: readonly AsnRow[], knownSerials: ReadonlySet<string>): AsnRowCheck[] {

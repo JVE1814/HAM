@@ -1,4 +1,4 @@
-import { normalizeSerial } from '../asn.ts'
+import { normalizeSerial } from '../serials.ts'
 import { andEachClause } from '../encoded-query.ts'
 import { fleetCondition } from '../fleet.ts'
 import { errorText, isSuccess, type HttpPort, type HttpRequest, type HttpResponse } from '../http.ts'

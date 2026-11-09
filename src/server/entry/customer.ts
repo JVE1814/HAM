@@ -15,14 +15,19 @@ import type {
 } from '../domain/rest-contracts.ts'
 import { returnRequesterRefusal, returnRequestFindings, type RequestedReturn } from '../domain/returns.ts'
 import { actsAsCustomerAdmin, customerEquipmentQuery, ROLE, SCOPED_TABLES, visibilityFilter } from '../domain/visibility.ts'
-import { ATTESTATION_RESPONSE_CHOICES } from '../domain/vocabulary.ts'
 import { isFleetAsset, readStage } from '../platform/assets.ts'
+import {
+    completeAttestation,
+    findUnclosedAttestation,
+    hasUnansweredItems,
+    saveAttestationAnswers,
+    type AttestationAnswer,
+} from '../platform/attestations.ts'
 import { currentSession } from '../platform/session.ts'
 import { bool, exists, findById, refusal, str } from '../platform/records.ts'
 import { installedAssetIds, raiseReturn } from '../platform/returns.ts'
 import { returnLabels } from '../platform/shipments.ts'
 import { completeInstall, installState } from '../platform/delivery.ts'
-import { completeAttestation } from './assurance.ts'
 import { reply } from '../platform/rest-api.ts'
 
 /*
@@ -184,30 +189,14 @@ export function confirmInstalled(request: RESTAPIRequest, response: RESTAPIRespo
 export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     if (!isCustomerAdmin()) return reply(response, 403, { error: 'Only customer admins attest equipment' })
-    const attestation = findById('x_daas_ham_attestation', String(request.pathParams.id ?? ''))
-    if (!attestation || str(attestation, 'state') === '3') return reply(response, 404, { error: 'No open attestation' })
+    const attestation = findUnclosedAttestation(String(request.pathParams.id ?? ''))
+    if (!attestation) return reply(response, 404, { error: 'No open attestation' })
     const input = data(request)
-    const answers = Array.isArray(input.items) ? (input.items as Array<{ id?: string; response?: string }>) : []
-    let refused = 0
-    for (const answer of answers) {
-        if (!Object.keys(ATTESTATION_RESPONSE_CHOICES).includes(String(answer.response))) continue
-        const item = findById('x_daas_ham_attestation_item', String(answer.id ?? ''))
-        if (!item || str(item, 'attestation') !== attestation.getUniqueValue()) continue
-        item.setValue('response', String(answer.response))
-        if (item.update()) continue
-        refused++
-        const device = str(item, 'asset.serial_number')
-        gs.warn(`[x_daas_ham] ${str(attestation, 'number')}: answer for ${device} not saved: ${refusal(item)}`)
-    }
+    const refused = saveAttestationAnswers(attestation, Array.isArray(input.items) ? (input.items as AttestationAnswer[]) : [])
     // Submitted, the attestation would complete on the earlier answer, or none.
     if (refused > 0) return reply(response, 422, { error: `${refused} answer(s) not saved: the platform refused them` })
     if (input.submit === true) {
-        const open = new GlideRecord('x_daas_ham_attestation_item')
-        open.addQuery('attestation', attestation.getUniqueValue())
-        open.addNullQuery('response')
-        open.setLimit(1)
-        open.query()
-        if (open.hasNext()) return reply(response, 409, { error: 'Answer every device before submitting' })
+        if (hasUnansweredItems(attestation)) return reply(response, 409, { error: 'Answer every device before submitting' })
         // Refused: it stays open, so the answers can be submitted again.
         if (completeAttestation(attestation)) {
             return reply(response, 422, { error: 'Attestation not submitted: the platform refused it' })

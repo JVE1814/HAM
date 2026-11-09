@@ -1,8 +1,12 @@
 import { outsideFleetCondition } from './fleet.ts'
 import { overlaps, powerBudget, type Placement, type RackSpec } from './rack.ts'
+import { normalizeSerial } from './serials.ts'
 import type { ExceptionType } from './vocabulary.ts'
 
 /** Reconciliation exceptions between installed Assets and monitoring (P2.7), and in racks (D67). */
+
+/** The types the daily comparison of an installed Asset with monitoring raises and resolves (`reconcileAsset`). */
+export const MONITORING_EXCEPTION_TYPES = ['unseen', 'serial_mismatch', 'location_mismatch'] as const satisfies readonly ExceptionType[]
 
 /** The types a rack check raises and resolves: each is the rack's, open once per rack. */
 export const RACK_EXCEPTION_TYPES = ['rack_overlap', 'rack_over_power'] as const satisfies readonly ExceptionType[]
@@ -65,7 +69,7 @@ export function reconcileAsset(asset: InstalledAssetView, now: number, unseenDay
     const exceptions: ExceptionType[] = []
     if (asset.lastSeenAt === undefined || now - asset.lastSeenAt > unseenDays * 86_400_000) exceptions.push('unseen')
     if (asset.ci) {
-        if (asset.ci.serial && asset.ci.serial.trim().toUpperCase() !== asset.serial.trim().toUpperCase()) exceptions.push('serial_mismatch')
+        if (asset.ci.serial && normalizeSerial(asset.ci.serial) !== normalizeSerial(asset.serial)) exceptions.push('serial_mismatch')
         const located = asset.ci.locationIds.filter(Boolean)
         if (located.length > 0 && asset.siteId && !located.includes(asset.siteId)) exceptions.push('location_mismatch')
     }

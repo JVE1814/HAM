@@ -1,4 +1,4 @@
-import { normalizeSerial } from './asn.ts'
+import { normalizeSerial } from './serials.ts'
 import type { ExceptionType } from './vocabulary.ts'
 import type { FeeIdentity } from './returns.ts'
 

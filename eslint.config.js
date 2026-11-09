@@ -9,13 +9,11 @@ const EXTENSIONLESS = {
 
 /*
  * Entry modules that still import a sibling entry module, each for an operation that has yet to move to a platform
- * service: delivery (the outbound label, entry/shipping), warehouse (the receipt of a returned unit, entry/returns),
- * customer and racks (attestation and reconciliation, entry/assurance). Remove a file from this list as its import goes.
+ * service: delivery (the outbound label, entry/shipping), warehouse (the receipt of a returned unit, entry/returns).
+ * Remove a file from this list as its import goes.
  */
 const ENTRY_STILL_IMPORTING_ENTRY = [
-    'src/server/entry/customer.ts',
     'src/server/entry/delivery.ts',
-    'src/server/entry/racks.ts',
     'src/server/entry/warehouse.ts',
 ]
 

@@ -1,5 +1,5 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { normalizeSerial } from '../domain/asn.ts'
+import { normalizeSerial } from '../domain/serials.ts'
 import { FLEET_FIELD, fleetCondition, OEM_PID_FIELD, STOCKROOM_TYPE_FIELD, type FleetCandidate } from '../domain/fleet.ts'
 import {
     checkTransition,
@@ -10,6 +10,7 @@ import {
     type TransitionVerdict,
     voidsWipeEvidence,
 } from '../domain/lifecycle.ts'
+import { PLACEMENT_FIELDS } from '../domain/rack.ts'
 import type { LegalOwner } from '../domain/vocabulary.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { PROPERTY, stringProperty } from './properties.ts'
@@ -72,9 +73,7 @@ export function moveAndSave(asset: GlideRecord, to: Stage, context: string): boo
 
 /** The Asset left its Site: free its Rack units (the caller saves). */
 export function clearRackPlacement(asset: GlideRecord): void {
-    asset.setValue('x_daas_ham_rack', '')
-    asset.setValue('x_daas_ham_ru_start', '')
-    asset.setValue('x_daas_ham_rack_face', '')
+    for (const field of Object.values(PLACEMENT_FIELDS)) asset.setValue(field, '')
 }
 
 /**

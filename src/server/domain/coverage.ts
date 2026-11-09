@@ -1,4 +1,4 @@
-import { normalizeSerial } from './asn.ts'
+import { normalizeSerial } from './serials.ts'
 import { appendTo } from './collections.ts'
 import type { CoverageFact, CoverageFetched } from './oem/types.ts'
 

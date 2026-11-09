@@ -1,6 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { normalizeSerial } from '../domain/asn.ts'
+import { normalizeSerial } from '../domain/serials.ts'
 import { naasStockroomType, receiptProblem, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
