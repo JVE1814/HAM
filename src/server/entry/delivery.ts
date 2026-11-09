@@ -5,7 +5,6 @@ import { glideToMs } from '../platform/clock.ts'
 import { completeInstall, installState, shipOrder } from '../platform/delivery.ts'
 import { findById, str } from '../platform/records.ts'
 import { currentSession } from '../platform/session.ts'
-import { labelOrder, shippingEnabled } from './shipping.ts'
 
 /*
  * Shipping Orders to their Site, on-site work and install completion (P1.7). The form buttons save the form before
@@ -18,7 +17,7 @@ export function uiShipOrder(current: GlideRecord): void {
     // A refused form save (the platform says why) ships nothing: Ship reads the Order afresh, so a tracking number
     // typed but not saved would go unused.
     if (!current.update()) return
-    const outcome = shipOrder(current.getUniqueValue(), { enabled: shippingEnabled, buy: labelOrder })
+    const outcome = shipOrder(current.getUniqueValue())
     for (const problem of outcome.problems) gs.addErrorMessage(problem)
     if (outcome.shipped) gs.addInfoMessage(`${outcome.shipped.units} asset(s) shipped to ${outcome.shipped.siteName}`)
 }

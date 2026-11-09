@@ -7,12 +7,6 @@ const EXTENSIONLESS = {
     message: 'Name the .ts file: the instance resolves a server module import by its exact path.',
 }
 
-/*
- * Entry modules that still import a sibling entry module, each for an operation that has yet to move to a platform
- * service: delivery (the outbound label, entry/shipping). Remove a file from this list as its import goes.
- */
-const ENTRY_STILL_IMPORTING_ENTRY = ['src/server/entry/delivery.ts']
-
 export default tseslint.config(
     {
         ignores: [
@@ -76,7 +70,7 @@ export default tseslint.config(
     // ADR 0003: an entry module wires triggers to services and is no other entry module's library.
     {
         files: ['src/server/entry/**/*.ts'],
-        ignores: ['**/*.test.ts', ...ENTRY_STILL_IMPORTING_ENTRY],
+        ignores: ['**/*.test.ts'],
         rules: {
             'no-restricted-imports': [
                 'error',

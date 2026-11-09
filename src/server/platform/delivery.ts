@@ -13,6 +13,7 @@ import { lineAssetStages, recomputeOrder } from './fulfilment.ts'
 import { withLock } from './locks.ts'
 import { findById, num, refusal, str } from './records.ts'
 import { raiseReturn } from './returns.ts'
+import { labelOrder, shippingEnabled } from './shipping.ts'
 
 /**
  * Shipping Orders to their Site, the on-site work, and install completion (P1.7). None of it tells the user anything:
@@ -51,20 +52,6 @@ function countShipped(orderId: string): number {
     return count
 }
 
-/**
- * Buying an Order's outbound label from the shipping aggregator, as Ship needs it. A port, filled by the trigger that
- * asks for the Ship, while the aggregator's adapter is not a platform service.
- */
-export interface OutboundLabels {
-    /** Whether the aggregator is on: Ship then buys the label rather than ask for a tracking number entered by hand. */
-    enabled(): boolean
-    /**
-     * Buy the label for `packages` boxes of the Order and put its carrier and tracking number on `order` (not saved),
-     * holding the Order's Ship `lock`.
-     */
-    buy(order: GlideRecord, packages: number, lock: HeldLock): { ok: true } | { ok: false; error: string }
-}
-
 /** What came of a Ship: what went wrong, in the order it did, and what was sent (null when nothing was). */
 export interface ShipOutcome {
     problems: string[]
@@ -77,7 +64,7 @@ function notShipped(problem: string): ShipOutcome {
 
 /**
  * Ship an Order: send every staged Asset the lifecycle lets ship to the Site (buying the label for those when the
- * aggregator is on) and open the on-site work. Hot spares already at the Site are handed over as shipped, without a
+ * aggregator is on, platform/shipping, rather than ask for a tracking number entered by hand) and open the on-site work. Hot spares already at the Site are handed over as shipped, without a
  * package. Which Assets may ship is checked before a label is bought.
  *
  * Two users pressing Ship while the first label purchase is in flight would both find the Order unshipped, and both
@@ -85,17 +72,17 @@ function notShipped(problem: string): ShipOutcome {
  * there; one that finds the lock held ships nothing and says another Ship is running. Taking the lock throws only
  * when an insert is refused with no lock row (platform/locks); that error escapes.
  */
-export function shipOrder(orderId: string, labels: OutboundLabels): ShipOutcome {
+export function shipOrder(orderId: string): ShipOutcome {
     const ship = withLock(LOCK.shipOrder(orderId), (lock) => {
         // A Ship that ran meanwhile has put its tracking number and work order on the Order, and shipped its units.
         const fresh = findById('x_daas_ham_order', orderId)
-        return fresh ? shipHolding(lock, fresh, labels) : notShipped('Order not found')
+        return fresh ? shipHolding(lock, fresh) : notShipped('Order not found')
     })
     return ship.ran ? ship.value : notShipped('Another Ship of this Order is running: reload the Order to see what it shipped')
 }
 
 /** Ship, holding the Order's `lock` (the label is bought only while it is held). */
-function shipHolding(lock: HeldLock, order: GlideRecord, labels: OutboundLabels): ShipOutcome {
+function shipHolding(lock: HeldLock, order: GlideRecord): ShipOutcome {
     const siteId = str(order, 'site')
     const found = shippable(order.getUniqueValue(), siteId)
     const trackingNumber = str(order, 'tracking_number')
@@ -109,12 +96,12 @@ function shipHolding(lock: HeldLock, order: GlideRecord, labels: OutboundLabels)
         refused: found.refused,
         refusedReason: found.reason,
         hotSpares: found.hotSpares.length,
-        shippingEnabled: labels.enabled(),
+        shippingEnabled: shippingEnabled(),
     })
     const problems = [...plan.errors]
     if (!plan.ok) return { problems, shipped: null }
     if (plan.labelPackages !== null) {
-        const label = labels.buy(order, plan.labelPackages, lock)
+        const label = labelOrder(order, plan.labelPackages, lock)
         if (!label.ok) return { problems: [...problems, `No shipping label: ${label.error}`], shipped: null }
         // The label is paid for and its Shipment saved, so the units still ship; only the Order lacks its tracking.
         if (!order.update()) {

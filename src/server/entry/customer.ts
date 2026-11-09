@@ -25,7 +25,7 @@ import {
 import { currentSession } from '../platform/session.ts'
 import { findById, refusal, str } from '../platform/records.ts'
 import { requestReturn } from '../platform/returns.ts'
-import { returnLabels } from '../platform/shipments.ts'
+import { returnLabels } from '../platform/shipping.ts'
 import { completeInstall, installState } from '../platform/delivery.ts'
 import { reply } from '../platform/rest-api.ts'
 
@@ -112,7 +112,10 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
         })
     }
     const labels = returnLabels(openReturns.map(({ id }) => id))
-    const returns: CustomerReturn[] = openReturns.map(({ id, listed }) => ({ ...listed, ...(labels.get(id) ?? { labelUrl: '', trackingNumber: '' }) }))
+    const returns: CustomerReturn[] = openReturns.map(({ id, listed }) => {
+        const label = labels.get(id)
+        return { ...listed, labelUrl: label?.labelUrl ?? '', trackingNumber: label?.trackingNumber ?? '' }
+    })
 
     const attestations: Attestation[] = []
     const attestation = new GlideRecord('x_daas_ham_attestation')

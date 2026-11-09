@@ -3149,6 +3149,11 @@ declare global {
                     src_server_platform_shipments_ts: {
                         table: 'sys_module'
                         id: '058c226bc486401194ca3a43c67c9037'
+                        deleted: true
+                    }
+                    src_server_platform_shipping_ts: {
+                        table: 'sys_module'
+                        id: '3f189a9704a84f17b3d5ebd25b0a5a5c'
                     }
                     src_server_platform_sourcing_ts: {
                         table: 'sys_module'
