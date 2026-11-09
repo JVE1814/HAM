@@ -2,10 +2,16 @@ import js from '@eslint/js'
 import tseslint from 'typescript-eslint'
 import globals from 'globals'
 
+const EXTENSIONLESS = {
+    regex: '^\\.{1,2}/.*(?<!\\.ts|\\.json)$',
+    message: 'Name the .ts file: the instance resolves a server module import by its exact path.',
+}
+
 export default tseslint.config(
     {
         ignores: [
             'node_modules/**',
+            '.claude/**',
             'dist/**',
             'target/**',
             '.now/**',
@@ -26,5 +32,39 @@ export default tseslint.config(
     {
         files: ['src/client/**/*.{ts,tsx}'],
         languageOptions: { globals: { ...globals.browser } },
+    },
+    // The instance stores each server module as a sys_module whose path ends in ".ts" and resolves an import by that
+    // exact path, so a relative import without the extension builds and passes every unit test, then fails on the
+    // instance the first time its module loads.
+    {
+        files: ['src/server/**/*.ts'],
+        ignores: ['**/*.test.ts'],
+        rules: { 'no-restricted-imports': ['error', { patterns: [EXTENSIONLESS] }] },
+    },
+    // ADR 0003: the domain core never reaches Glide or the layers above it, and platform never reaches entry.
+    {
+        files: ['src/server/domain/**/*.ts'],
+        ignores: ['**/*.test.ts'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        EXTENSIONLESS,
+                        { regex: '^@servicenow/glide', message: 'The domain core never imports Glide (ADR 0003).' },
+                        { regex: '/(platform|entry)/', message: 'The domain core imports nothing above it (ADR 0003).' },
+                    ],
+                },
+            ],
+        },
+    },
+    {
+        files: ['src/server/platform/**/*.ts'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                { patterns: [EXTENSIONLESS, { regex: '/entry/', message: 'Platform never imports entry points (ADR 0003).' }] },
+            ],
+        },
     },
 )
