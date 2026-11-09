@@ -1,9 +1,14 @@
 # Break-fix, returns, refresh and disposal (P2.2–P2.6)
 
+All of these act on fleet assets only (ADR 0016). The Provider IT's equipment shares the asset table and
+is never replaced, returned, refreshed, declared missing, charged for or disposed of here.
+
 ## Break-fix (D46, D58)
 
-- A CSM case names the **failed asset**. The case takes the Agreement's replacement service level
-  and the Asset's Customer.
+- A CSM case names the **failed asset**, a fleet asset (the field offers fleet assets only). The case
+  takes the Agreement's replacement service level and the Asset's Customer. A failed asset outside the
+  fleet, set past the field's qualifier by a script, gives the case neither, and **Raise replacement**
+  refuses it (*Only a fleet asset is replaced*).
 - **Raise replacement** (NOC, asset manager, CSM agent) creates a *device replace* Order: one line,
   same Model, *replaces asset* = the failed unit. The Order is submitted at once; one that Submit
   refuses (ordering spec) stays a draft, linked to the case, to correct and submit. If the Order or
@@ -44,7 +49,8 @@
   names it (*RMA <number> already open for <serial>*, adding *its replacement was received, ask the
   vendor for another* when it was reopened). If the platform refuses the reuse, a warning is logged
   and the summary says to do it by hand; no second RMA is opened.
-- **Defective returned to OEM** on the RMA retires the unit as *returned to OEM*. This needs wipe
+- **Defective returned to OEM** on the RMA retires the unit as *returned to OEM*; a defective asset
+  outside the fleet is refused and left as it is. This needs wipe
   evidence recorded since the unit was last received back at the depot (receipt clears earlier
   evidence). When the unit cannot be retired, the user is told why and the RMA is left as it was.
   When the unit is retired but the RMA's save is refused, the user is told the serial and why, and
@@ -70,6 +76,10 @@
   leaves the caller out, and HTTP 400 when the Site is not one of their Customer's Sites. The Return
   is raised for the caller's own Customer. Provider staff and platform admins get HTTP 403 there and
   use the record producer.
+- Only fleet assets go on a Return: one of the Provider IT's that a request or a job lists is left off,
+  logged (*... left off return ...: it is not a fleet asset*), and a Return left with no unit closes at
+  once. The units a site decommission, an agreement end or a temporary end returns are the fleet assets
+  there.
 - Installed and shipped Assets on a return become *pending return*. The due date is the Agreement's
   return allowance. A unit still shipped that goes on a device removal, or is declared missing while
   still shipped, leaves its Order line, which is filled again (P1 fulfilment spec). On a site
@@ -81,7 +91,7 @@
   service), whatever devices the request lists. From the record producer and the customer page it
   also returns units still shipped to the Site (`domain/returns.ts` `SITE_RECOVERY_STAGES`), so none
   is left holding the site package open.
-- Devices chosen for a device removal must be at the chosen Site; others are ignored.
+- Devices chosen for a device removal must be fleet assets at the chosen Site; others are ignored.
 - Field de-install opens a normal change and a de-install work order. Ship-back relies on the Site
   contact.
 - **Receipt** at the depot (warehouse app, Receive), for units pending return (or missing), only into a
@@ -89,9 +99,9 @@
   - the unit goes to *pending evaluation* and leaves its Site, Rack position and subscription line;
     its wipe evidence is cleared (a wipe recorded before it went out does not cover what it picked
     up at the Site), so it must be wiped again before it leaves the Provider;
-  - the active site package of the Site and Agreement the unit leaves ends that day once nothing is
-    left there under that Agreement (shipped, pending in service, in service, temporary or pending
-    return). Units received or declared missing no longer count. A swap's new units count before
+  - the active site package of the Site and Agreement the unit leaves ends that day once no fleet
+    asset is left there under that Agreement (shipped, pending in service, in service, temporary or
+    pending return). Units received or declared missing no longer count. A swap's new units count before
     monitoring first sees them, so a swap-back that reaches the depot first leaves the package open,
     and a new unit that leaves before it was seen still ends it. All units count, not only those the
     receiving tech can see. A pending package waiting for its rollout is not ended
@@ -134,8 +144,8 @@
     day's run, so a unit scanned in that day is never also declared missing or charged a lost-asset
     fee;
   - a line whose unit is neither at nor on its way to the Site nor missing (for example received at
-    the depot while its line could not be saved) is not declared missing. It is logged on each run,
-    to settle by hand.
+    the depot while its line could not be saved), or is not a fleet asset (a line raised before the
+    Fleet flag), is not declared missing. It is logged on each run, to settle by hand.
 - Fees use the Agreement's lost / late / damage amounts. A zero amount records nothing. Each fee type
   is charged at most once per Asset and Return order (a waived fee aside), so a step retried after a
   refused save never charges twice. Two steps charging the same fee at once (two users saving one
@@ -146,9 +156,9 @@
 
 ## Refresh (D48)
 
-- Daily, fully automatic. It covers in-service Assets with a refresh due date within
-  `x_daas_ham.refresh.horizon_days` that are not already on an open replacing line, grouped per
-  Agreement and Site.
+- Daily, fully automatic. It covers in-service fleet assets of an Agreement with a refresh due date
+  within `x_daas_ham.refresh.horizon_days` that are not already on an open replacing line, grouped
+  per Agreement and Site.
 - **Successor model**: the same Model while it is a current catalog entry and not past end of sale.
   Otherwise, the catalogued Model of the same device class with the latest end of support.
 - Waves where some Asset has no successor stay **draft** with a work note for review. All others are
@@ -180,10 +190,10 @@
     blockers. An administrator may still remove a line from a submitted order (removing retires
     nothing), so an order whose line can never be retired can still be completed, and deleting an
     order takes its lines with it.
-- **Complete disposal** retires each line whose Asset is pending wipe or disposal, has wipe evidence
-  recorded since it was last received back at the depot or last entered staging (both clear earlier
-  evidence), uses a method allowed for its legal owner and, when customer-owned, belongs to the
-  order's Customer (an order with no Customer returns no customer-owned Asset):
+- **Complete disposal** retires each line whose Asset is a fleet asset, is pending wipe or disposal,
+  has wipe evidence recorded since it was last received back at the depot or last entered staging
+  (both clear earlier evidence), uses a method allowed for its legal owner and, when customer-owned,
+  belongs to the order's Customer (an order with no Customer returns no customer-owned Asset):
 
   | Legal owner | Allowed methods |
   |---|---|

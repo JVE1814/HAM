@@ -20,6 +20,7 @@ describe('disposalStage', () => {
 
 describe('disposalLineBlockers', () => {
     const ready: DisposalLine = {
+        fleet: true,
         legalOwner: 'provider',
         method: 'itad_recycle',
         wipeComplete: true,
@@ -38,6 +39,10 @@ describe('disposalLineBlockers', () => {
         expect(disposalLineBlockers({ ...ready, legalOwner: 'lessor' })).toEqual(['a lessor-owned asset can only be return to lessor'])
         const returned: DisposalLine = { ...ready, legalOwner: 'customer', method: 'return_to_customer' }
         expect(disposalLineBlockers({ ...returned, customerId: 'acme', orderCustomerId: 'acme' })).toEqual([])
+    })
+
+    it("retires no asset outside the fleet, the Provider IT's (ADR 0016)", () => {
+        expect(disposalLineBlockers({ ...ready, fleet: false })).toEqual(['asset is not a fleet asset'])
     })
 
     it("returns a customer-owned asset only on its own customer's order", () => {

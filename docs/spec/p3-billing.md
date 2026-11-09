@@ -25,9 +25,12 @@
   billing line per Site. Its Assets' days count only within the line's own start and end date (the
   end date is billed; no end date means still open), and a line without a start date bills nothing.
   A unit still in service after its line ended is not billed past the end date. It is counted on the
-  workspace dashboard's *Billing integrity* tab, tile *In service on an ended line* (units in service
-  or on a temporary deployment whose line is set ended or past its end date), and is never moved to
-  another line.
+  workspace dashboard's *Billing integrity* tab, tile *In service on an ended line* (fleet assets in
+  service or on a temporary deployment whose line is set ended or past its end date), and is never
+  moved to another line.
+- The *Billing integrity* tab counts fleet assets only (ADR 0016): the Provider IT's equipment in use
+  shares `alm_hardware` and is never billed. Its tile *In service without a subscription line*
+  counts fleet assets in service with no Subscription line, which bill nothing.
 - Open **Fee events** up to the month end (lost, damaged, late return) are added once, each as its
   own line.
 - Amounts are rounded to the cent per billing line.
@@ -90,7 +93,7 @@ Closing a period (or **Recompute margin** on a closed one) rebuilds its **Cost f
 | Cost type | Source | Attributed by |
 |---|---|---|
 | Purchase | The Asset's cost, written off over `x_daas_ham.margin.amortisation_months` from its purchase date (else its in-service date) through the day before the same date that many months later, then no more. A write-off that starts mid-month ends mid-month, and its last month carries what its first month left of a monthly write-off, so an Asset in service throughout is costed exactly its cost (Provider-owned only; a buyout sets the cost to the Asset's share of the buyout price and the purchase date to the buyout day) | Service-interval days in the month from the write-off start through its last day |
-| Lease | The lease's monthly payment split evenly over the Assets it covers (retired units, which the Lessor or the OEM holds, are not covered), in months the lease runs (lessor-owned) | Service-interval days |
+| Lease | The lease's monthly payment split evenly over the fleet assets it covers (retired units, which the Lessor or the OEM holds, are not covered, nor is equipment of the Provider IT's, ADR 0016), in months the lease runs (lessor-owned) | Service-interval days |
 | OEM support | Annual cost of the coverage contracts covering the Asset today (`annual_cost`, from the coverage CSV or entered on the contract) ÷ 12 | Service-interval days |
 | Field labour | NaaS work orders closed in the month: their *NaaS field labour cost*, else `x_daas_ham.margin.visit_cost` | The work order's company and location |
 

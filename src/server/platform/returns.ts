@@ -1,6 +1,7 @@
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
-import { isDeployed, stagesQuery } from '../domain/lifecycle.ts'
+import { fleetStagesQuery } from '../domain/fleet.ts'
+import { isDeployed } from '../domain/lifecycle.ts'
 import {
     chargedFeeQuery,
     feeAmount,
@@ -11,7 +12,7 @@ import {
     type FeeIdentity,
     type FeeType,
 } from '../domain/returns.ts'
-import { moveAndSave, readStage } from './assets.ts'
+import { isFleetAsset, moveAndSave, readStage } from './assets.ts'
 import { todayIso } from './clock.ts'
 import { openFieldWork } from './field-work.ts'
 import { withLockTries, type HeldLock } from './locks.ts'
@@ -64,7 +65,10 @@ export function raiseReturn(request: ReturnRequest): string | null {
     return orderId
 }
 
-/** Fill in a saved Return order header: due date, lines, de-install work. */
+/**
+ * Fill in a saved Return order header: due date, lines, de-install work. Only fleet assets (ADR 0016) get a line: one
+ * of the Provider IT's that a caller lists is left off (logged), so no app job ever chases, declares or charges it.
+ */
 export function completeReturn(order: GlideRecord, request: ReturnRequest): void {
     const agreement = findById('x_daas_ham_agreement', request.agreementId)
     const allowance = agreement ? num(agreement, 'overdue_return_days') || 30 : 30
@@ -77,6 +81,11 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
     for (const assetId of request.assetIds) {
         const asset = findById('alm_hardware', assetId)
         if (!asset || latestReturnLine(assetId, 'awaiting')) continue
+        if (!isFleetAsset(asset)) {
+            gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left off return ${str(order, 'number')}: it is not a fleet asset`)
+            refused++
+            continue
+        }
         // The line first: an Asset whose line is refused stays as it is, off this Return order.
         const line = new GlideRecord('x_daas_ham_return_order_line')
         line.initialize()
@@ -139,8 +148,8 @@ export interface InstalledFilter {
 }
 
 /**
- * Assets installed at a Site (in service, temporary or awaiting first sighting, and shipped there for a whole-Site
- * recovery), by Agreement, Site or Order.
+ * Fleet assets installed at a Site (in service, temporary or awaiting first sighting, and shipped there for a
+ * whole-Site recovery), by Agreement, Site or Order. The Provider IT's equipment is never listed (ADR 0016).
  */
 export function installedAssetIds(filter: InstalledFilter): string[] {
     const asset = queryInstalled(filter)
@@ -166,7 +175,7 @@ function queryInstalled(filter: InstalledFilter): GlideRecord {
         .filter(Boolean)
         .join('^')
     const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(stagesQuery(filter.wholeSite ? SITE_RECOVERY_STAGES : INSTALLED_STAGES, base))
+    asset.addEncodedQuery(fleetStagesQuery(filter.wholeSite ? SITE_RECOVERY_STAGES : INSTALLED_STAGES, base))
     asset.query()
     return asset
 }

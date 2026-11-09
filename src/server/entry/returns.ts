@@ -13,7 +13,7 @@ import {
     type RequestedReturn,
     type ReturnRequester,
 } from '../domain/returns.ts'
-import { clearRackPlacement, moveAndSave, moveAsset, readStage } from '../platform/assets.ts'
+import { clearRackPlacement, isFleetAsset, moveAndSave, moveAsset, readStage } from '../platform/assets.ts'
 import { customerAdminIds } from '../platform/approvals.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { runTableJob } from '../platform/chunked.ts'
@@ -55,13 +55,13 @@ export function afterReturnProduced(producer: Record<string, unknown>, current: 
     }
     const decommission = str(order, 'trigger') === 'site_decommission'
     const siteId = str(order, 'site')
-    // Only devices actually at the chosen Site: the list collector's Site qualifier holds only in the browser.
+    // Only fleet assets actually at the chosen Site: the list collector's Site qualifier holds only in the browser.
     const chosen = String(producer.assets ?? '')
         .split(',')
         .map((id) => id.trim())
         .filter((id) => {
             const asset = id ? findById('alm_hardware', id) : null
-            return !!asset && str(asset, 'x_daas_ham_site') === siteId
+            return !!asset && isFleetAsset(asset) && str(asset, 'x_daas_ham_site') === siteId
         })
     const assetIds = decommission ? installedAssetIds({ siteId, wholeSite: true }) : chosen
     completeReturn(order, {
@@ -274,12 +274,18 @@ function declareMissing(overdue: OverdueLine): void {
 /**
  * The declaration, made holding the unit's receive `lock`: only while its line still awaits it and the Asset is still
  * at or towards the Site, or missing already (an earlier run whose line was refused). True once the line is missing.
- * A unit anywhere else (received, its line refused) is logged each run: no run settles that line.
+ * A unit anywhere else (received, its line refused), or outside the fleet (a line raised before the Fleet flag, ADR
+ * 0016), is logged each run: no run settles that line.
  */
 function declareHolding(lock: HeldLock, overdue: OverdueLine): boolean {
     const record = findById('x_daas_ham_return_order_line', overdue.lineId)
     if (!record || str(record, 'status') !== 'awaiting') return false
     const asset = findById('alm_hardware', overdue.assetId)
+    if (asset && !isFleetAsset(asset)) {
+        const unit = `Line of ${str(asset, 'serial_number')} on ${overdue.number}`
+        gs.warn(`[x_daas_ham] ${unit} not declared missing: it is not a fleet asset; settle the line by hand`)
+        return false
+    }
     const stage = asset ? readStage(asset) : null
     if (asset && stage !== 'missing' && !isDeployed(stage)) {
         const unit = `Line of ${str(asset, 'serial_number')} on ${overdue.number}`

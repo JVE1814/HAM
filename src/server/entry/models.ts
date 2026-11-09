@@ -1,12 +1,20 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
+import { fleetCondition } from '../domain/fleet.ts'
 import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle.ts'
+import {
+    fleetOnRawModelQuery,
+    RAW_MODEL_TABLE,
+    rawModelsToNormalizeQuery,
+    siteCiOnRawModelQuery,
+} from '../domain/normalization.ts'
 import { runTableJob } from '../platform/chunked.ts'
 import { todayIso } from '../platform/clock.ts'
 import { EVENT, fire } from '../platform/events.ts'
 import { refreshLifecycleDates } from '../platform/lifecycle-dates.ts'
 import {
+    closeNonNaasExceptions,
     learnFromResolution,
     loadNormalizationData,
     recordNormalizationException,
@@ -14,21 +22,35 @@ import {
 } from '../platform/normalization.ts'
 import { refusal, str } from '../platform/records.ts'
 
-/** Model normalization and Lifecycle phase / Refresh due date upkeep (P1.2). */
+/** Model normalization and Lifecycle phase / Refresh due date upkeep (P1.2), for fleet assets only (ADR 0016). */
 
-/** Scheduled job: map raw hardware models created by Discovery and connectors onto canonical Models. */
+/**
+ * Scheduled job: map onto canonical Models the raw hardware models that are NaaS's (ADR 0016): those Discovery and
+ * connectors put fleet assets on, and those of the network gear reconciliation reports *seen without asset* at a
+ * customer Site, whose Asset joins the fleet on the canonical Model. A raw model only the Provider IT's equipment is on
+ * (its laptops, printers, servers) is not NaaS's to map, so it is neither mapped nor raised as a normalization
+ * exception, and an exception an earlier run raised for one is closed.
+ */
 export function normalizeRawModels(): void {
+    const naas = [
+        ...distinctValues('alm_hardware', fleetOnRawModelQuery(), 'model'),
+        ...distinctValues('cmdb_ci_netgear', siteCiOnRawModelQuery(), 'model_id'),
+    ]
+    closeNonNaasExceptions(naas)
+    const query = rawModelsToNormalizeQuery(naas)
+    // No raw model is NaaS's: nothing to map.
+    if (!query) return
     const data = loadNormalizationData()
     runTableJob({
         job: 'normalize_raw_models',
-        table: 'cmdb_hardware_product_model',
-        query: 'x_daas_ham_oem_pidISEMPTY^x_daas_ham_normalized_toISEMPTY',
+        table: RAW_MODEL_TABLE,
+        query,
         read: (model) => ({ manufacturer: str(model, 'manufacturer.name'), model: str(model, 'name') }),
         handle: (raw, rawModelId) => {
             const resolution = resolveModel(raw, data)
             if (!resolution.modelId) {
                 recordNormalizationException(raw, 'reason' in resolution ? resolution.reason : '', {
-                    table: 'cmdb_hardware_product_model',
+                    table: RAW_MODEL_TABLE,
                     id: rawModelId,
                 })
                 return
@@ -38,9 +60,22 @@ export function normalizeRawModels(): void {
     })
 }
 
+/** The distinct values of `field` among the rows of `table` that `query` matches, read with one aggregate query. */
+function distinctValues(table: string, query: string, field: string): string[] {
+    const ga = new GlideAggregate(table)
+    ga.addEncodedQuery(query)
+    ga.addAggregate('COUNT', '')
+    ga.groupBy(field)
+    ga.query()
+    const values: string[] = []
+    while (ga.next()) values.push(String(ga.getValue(field) ?? ''))
+    return values
+}
+
 /**
- * Point the raw model's Assets at the canonical Model, then mark the raw model normalized. Marked, it leaves the job's
- * query, so an Asset whose save is refused leaves it unmarked for the next run to repoint.
+ * Point the raw model's fleet assets at the canonical Model, then mark the raw model normalized. Marked, it leaves the
+ * job's query, so an Asset whose save is refused leaves it unmarked for the next run to repoint. The Provider IT's
+ * Assets on the raw model are left on it (ADR 0016).
  */
 function repointModel(rawModelId: string, canonicalModelId: string): void {
     const raw = new GlideRecord('cmdb_model')
@@ -48,6 +83,7 @@ function repointModel(rawModelId: string, canonicalModelId: string): void {
     let refused = 0
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery('model', rawModelId)
+    asset.addEncodedQuery(fleetCondition())
     asset.query()
     while (asset.next()) {
         asset.setValue('model', canonicalModelId)
@@ -74,12 +110,15 @@ export function onNormalizationResolved(current: GlideRecord): void {
     current.update()
 }
 
-/** After insert/update rule on Model lifecycle: recompute that model's assets in the background. */
+/** After insert/update rule on Model lifecycle: recompute that model's fleet assets in the background. */
 export function onModelLifecycleChanged(current: GlideRecord): void {
     fire(EVENT.lifecycleChanged, current, str(current, 'model'), '')
 }
 
-/** Script action on x_daas_ham.model.lifecycle (parm1 = model, parm2 = cursor). */
+/**
+ * Script action on x_daas_ham.model.lifecycle (parm1 = model, parm2 = cursor): the Model's fleet assets not retired
+ * (platform/lifecycle-dates keeps the pass to the fleet, so the Provider IT's units of the Model are not stamped).
+ */
 export function refreshModelAssets(event: GlideRecord, current: GlideRecord): void {
     const modelId = str(event, 'parm1')
     refreshLifecycleDates({
@@ -107,7 +146,7 @@ export function onAgreementTermsChanged(current: GlideRecord): void {
     fire(EVENT.agreementTermsChanged, current, current.getUniqueValue(), '')
 }
 
-/** Script action on x_daas_ham.agreement.terms (parm1 = agreement, parm2 = cursor). */
+/** Script action on x_daas_ham.agreement.terms (parm1 = agreement, parm2 = cursor): its deployed fleet assets. */
 export function refreshAgreementAssets(event: GlideRecord, current: GlideRecord): void {
     const agreementId = str(event, 'parm1')
     refreshLifecycleDates({

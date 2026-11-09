@@ -108,6 +108,10 @@ describe('sitePackageHoldersQuery', () => {
         }
     })
 
+    it('counts fleet assets only, in every clause (ADR 0016)', () => {
+        for (const clause of query.split('^NQ')) expect(clause.split('^')).toContain('x_daas_ham_fleet=true')
+    })
+
     // A swap's new units before monitoring sees them, units serving there and units still to come back.
     it.each<Stage>(['shipped', 'pending_in_service', 'in_service', 'temporary_deployment', 'pending_return'])(
         'is held open by a unit %s',

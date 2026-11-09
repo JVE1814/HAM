@@ -20,7 +20,7 @@ import {
     providerApproverIds,
     requestApprovals,
 } from '../platform/approvals.ts'
-import { moveAsset, readStage, transitionFacts } from '../platform/assets.ts'
+import { isFleetAsset, moveAsset, readStage, transitionFacts } from '../platform/assets.ts'
 import { findById, refusal, str } from '../platform/records.ts'
 
 /** Disposal orders: approve, then retire each wiped Asset by its method (P2.5, D61). */
@@ -143,6 +143,7 @@ function retire(line: GlideRecord, order: GlideRecord): string {
     const facts = transitionFacts(asset)
     const stage = readStage(asset)
     const blockers = disposalLineBlockers({
+        fleet: isFleetAsset(asset),
         legalOwner: facts.legalOwner,
         method,
         wipeComplete: facts.wipeEvidenceComplete,

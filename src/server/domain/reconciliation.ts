@@ -1,3 +1,4 @@
+import { outsideFleetCondition } from './fleet.ts'
 import { overlaps, powerBudget, type Placement, type RackSpec } from './rack.ts'
 
 /** Reconciliation exceptions between installed Assets and monitoring (P2.7), and in racks (D67). */
@@ -25,6 +26,46 @@ export interface InstalledAssetView {
      * locations that contain it (room, building, site), nearest first.
      */
     ci?: { serial: string; locationIds: readonly string[] }
+}
+
+/**
+ * A CI's Asset as alm_hardware, to dot-walk to its fields: a CI's `asset` references alm_asset, which has no Fleet
+ * flag, and the platform ignores a condition on a field the table lacks rather than refusing it (it would match every
+ * CI).
+ */
+const CI_HARDWARE = 'asset.ref_alm_hardware.'
+
+/**
+ * Encoded query on network-gear CIs for *seen without asset*: at a customer Site (the CI's location, or the location
+ * one or two levels up, as for a location mismatch) and pointing at no fleet asset (ADR 0016): at none, or at one of
+ * the Provider IT's, which an asset manager adds to the fleet. The Provider IT's own network gear elsewhere is not
+ * NaaS's to report. The caller adds how recently it was discovered.
+ */
+export function seenWithoutFleetAssetQuery(): string {
+    const atSite = ['location.', 'location.parent.', 'location.parent.parent.'].map((via) => `${via}x_daas_ham_is_site=true`)
+    return `assetISEMPTY^OR${outsideFleetCondition(CI_HARDWARE)}^${atSite.join('^OR')}`
+}
+
+/**
+ * Encoded query on network-gear CIs: those of `ciIds` that `seenWithoutFleetAssetQuery` still matches, however long
+ * ago they were discovered. A *seen without asset* exception whose CI it leaves out has cleared: the CI points at a
+ * fleet asset now (an asset manager added its Asset to the fleet), is no longer at a customer Site, or is gone. That
+ * includes one raised before the Fleet flag on the Provider IT's own network gear, which is not NaaS's to report. Null
+ * for no CI, as an empty id list would not narrow the query.
+ */
+export function stillSeenWithoutFleetAssetQuery(ciIds: readonly string[]): string | null {
+    const ids = [...new Set(ciIds.filter(Boolean))]
+    return ids.length > 0 ? `sys_idIN${ids.join(',')}^${seenWithoutFleetAssetQuery()}` : null
+}
+
+/**
+ * Encoded query on reconciliation exceptions: the open ones of `types` on an Asset outside the fleet (ADR 0016). The
+ * daily reconciliation checks fleet assets only, so it would never find these cleared: raised before the Fleet flag on
+ * the Provider IT's equipment in use, they are resolved. A blank flag (a row from before the column, or an Asset since
+ * deleted) counts as outside.
+ */
+export function outsideFleetExceptionsQuery(types: readonly ExceptionType[]): string {
+    return `status=open^exception_typeIN${types.join(',')}^assetISNOTEMPTY^${outsideFleetCondition('asset.')}`
 }
 
 /** Disagreements between an installed Asset and what monitoring reports. */

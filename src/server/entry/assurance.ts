@@ -3,22 +3,52 @@
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { attestationDue, compareAudit, type ExpectedAsset } from '../domain/audit.ts'
-import { stagesQuery, type Stage } from '../domain/lifecycle.ts'
-import { reconcileAsset, type ExceptionType } from '../domain/reconciliation.ts'
+import { fleetStagesQuery, naasStockroomType, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
+import { INSTALL_STATUS, type Stage } from '../domain/lifecycle.ts'
+import {
+    outsideFleetExceptionsQuery,
+    reconcileAsset,
+    seenWithoutFleetAssetQuery,
+    stillSeenWithoutFleetAssetQuery,
+    type ExceptionType,
+} from '../domain/reconciliation.ts'
 import { ROLE, visibilityFilter } from '../domain/visibility.ts'
 import { customerAdminIds } from '../platform/approvals.ts'
 import { runTableJob } from '../platform/chunked.ts'
 import { glideToIsoDate, glideToMs, nowMs, todayIso } from '../platform/clock.ts'
 import { openFieldWork } from '../platform/field-work.ts'
-import { openException, resolveExceptions } from '../platform/exceptions.ts'
+import { openException, resolveCiExceptions, resolveExceptions, resolveExceptionsWhere } from '../platform/exceptions.ts'
 import { intProperty, PROPERTY } from '../platform/properties.ts'
-import { bool, exists, num, refusal, str } from '../platform/records.ts'
+import { bool, exists, num, pluck, refusal, str } from '../platform/records.ts'
 import { installedAssetIds } from '../platform/returns.ts'
 import { currentSession } from '../platform/session.ts'
 
 /** Audits, attestations and reconciliation (P2.7, D63). */
 
-const IN_STOCK_STAGES: readonly Stage[] = ['available', 'reserved', 'spare_pool', 'staging', 'staged', 'pending_evaluation', 'pending_wipe', 'pending_disposal']
+/**
+ * The stages of the units on a stockroom's shelves, which its blind count expects there. A unit in transfer is one of
+ * them until its transfer order line is In Transit: from Draft to Shipment Preparation Inventory keeps it In stock
+ * (Pending transfer) in the stockroom it is sent from, and sets the stockroom it is sent to only once the line is
+ * received (ADR 0002, external-contracts N38), so the Asset's stockroom says which shelf it is on. At In Transit it is
+ * In transit by install status, on its way and on no shelf, so `onTheShelf` keeps to units In stock by install status,
+ * which every other stage here is too.
+ */
+const ON_THE_SHELF: readonly Stage[] = [
+    'available',
+    'reserved',
+    'spare_pool',
+    'staging',
+    'staged',
+    'pending_evaluation',
+    'pending_wipe',
+    'pending_disposal',
+    'in_transfer',
+]
+
+/** The fleet assets on the shelves of the stockroom: In stock by install status, in one of the ON_THE_SHELF stages. */
+function onTheShelf(stockroomId: string): string {
+    return fleetStagesQuery(ON_THE_SHELF, `stockroom=${stockroomId}^install_status=${INSTALL_STATUS.inStock}`)
+}
 
 /**
  * List the Assets a saved audit expects; how many were listed. Close compares scans with the listed ones only, so a
@@ -40,8 +70,16 @@ function listExpected(audit: GlideRecord, assetIds: readonly string[]): number {
     return listed
 }
 
-/** UI action "Start blind count" on a stockroom: the expected list is everything in stock there. */
+/**
+ * UI action "Start blind count" on a stockroom: the expected list is every fleet asset on its shelves (`onTheShelf`),
+ * a unit on a transfer order line short of In Transit included. A stockroom with no NaaS stockroom type is the
+ * Provider IT's (ADR 0016), and is not counted: the action is offered on NaaS stockrooms only, and this refuses one
+ * whose type was cleared on a form opened before.
+ */
 export function uiStartStockroomAudit(current: GlideRecord): void {
+    if (!naasStockroomType(str(current, STOCKROOM_TYPE_FIELD))) {
+        return void gs.addErrorMessage('Blind count not started: this is not a NaaS stockroom (it has no stockroom type)')
+    }
     const audit = new GlideRecord('x_daas_ham_audit')
     audit.initialize()
     audit.setValue('audit_type', 'stockroom')
@@ -50,7 +88,7 @@ export function uiStartStockroomAudit(current: GlideRecord): void {
     audit.setValue('state', 2)
     if (!audit.insert()) return void gs.addErrorMessage(`Blind count not started: ${refusal(audit)}`)
     const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(stagesQuery(IN_STOCK_STAGES, `stockroom=${current.getUniqueValue()}`))
+    asset.addEncodedQuery(onTheShelf(current.getUniqueValue()))
     asset.query()
     const inStock: string[] = []
     while (asset.next()) inStock.push(asset.getUniqueValue())
@@ -60,7 +98,7 @@ export function uiStartStockroomAudit(current: GlideRecord): void {
     gs.addInfoMessage(`Audit ${str(audit, 'number')} started with ${expected} expected asset(s); scan them in the warehouse app (Audit mode)`)
 }
 
-/** UI action "Start site audit" on a site: expected = installed assets; an FSM work order sends an engineer. */
+/** UI action "Start site audit" on a site: expected = installed fleet assets; an FSM work order sends an engineer. */
 export function uiStartSiteAudit(current: GlideRecord): void {
     const audit = new GlideRecord('x_daas_ham_audit')
     audit.initialize()
@@ -195,9 +233,9 @@ export function uiCloseAudit(current: GlideRecord): void {
 }
 
 /**
- * Daily: open an attestation for each Site with Assets of an attesting Agreement, once none is open there and the
- * last one was attested longer ago than the Agreement's interval (or never). One attestation covers every Asset
- * installed at the Site, so a Site that several Agreements serve follows the shortest of their intervals; the
+ * Daily: open an attestation for each Site with fleet assets of an attesting Agreement, once none is open there and
+ * the last one was attested longer ago than the Agreement's interval (or never). One attestation covers every fleet
+ * asset installed at the Site, so a Site that several Agreements serve follows the shortest of their intervals; the
  * attestation records the Agreement whose interval raised it.
  */
 export function raiseAttestations(): void {
@@ -209,7 +247,7 @@ export function raiseAttestations(): void {
     while (agreement.next()) {
         const sites = new Set<string>()
         const asset = new GlideRecord('alm_hardware')
-        asset.addEncodedQuery(stagesQuery(['in_service', 'temporary_deployment'], `x_daas_ham_agreement=${agreement.getUniqueValue()}`))
+        asset.addEncodedQuery(fleetStagesQuery(['in_service', 'temporary_deployment'], `x_daas_ham_agreement=${agreement.getUniqueValue()}`))
         asset.query()
         while (asset.next()) if (str(asset, 'x_daas_ham_site')) sites.add(str(asset, 'x_daas_ham_site'))
         for (const siteId of sites) {
@@ -308,14 +346,19 @@ function notClosed(number: string, reason: string): string {
 
 const MONITORING_TYPES: readonly ExceptionType[] = ['unseen', 'serial_mismatch', 'location_mismatch']
 
-/** Daily: compare installed assets with monitoring; open new exceptions and resolve cleared ones. */
+/**
+ * Daily: compare installed fleet assets with monitoring; open new exceptions and resolve cleared ones. The Provider
+ * IT's equipment in use (laptops, printers) is in service by its install status too, and is left out (ADR 0016): a
+ * monitoring exception open on an Asset outside the fleet (raised before the Fleet flag) is resolved, as is a *seen
+ * without asset* one whose CI no longer matches.
+ */
 export function reconcileInstalledBase(): void {
     const unseenDays = intProperty(PROPERTY.unseenDays, 7)
     const now = nowMs()
     runTableJob({
         job: 'reconcile_installed_base',
         table: 'alm_hardware',
-        query: stagesQuery(['in_service', 'temporary_deployment']),
+        query: fleetStagesQuery(['in_service', 'temporary_deployment']),
         read: (asset) => ({
             customerId: str(asset, 'company'),
             view: {
@@ -336,23 +379,37 @@ export function reconcileInstalledBase(): void {
             resolveExceptions(assetId, MONITORING_TYPES.filter((type) => !found.includes(type)))
         },
     })
+    resolveExceptionsWhere(outsideFleetExceptionsQuery(MONITORING_TYPES))
+    resolveClearedSeenWithoutAsset()
     reportSeenWithoutAsset(unseenDays)
 }
 
-/** Network CIs recently discovered that no asset points at. */
+/**
+ * Resolve the open *seen without asset* exceptions whose CI `stillSeenWithoutFleetAssetQuery` leaves out: it points at a
+ * fleet asset now, is not at a customer Site (the Provider IT's own gear, reported before the Fleet flag), or is gone.
+ */
+function resolveClearedSeenWithoutAsset(): void {
+    const reported = pluck('x_daas_ham_recon_exception', 'status=open^exception_type=seen_without_asset^ciISNOTEMPTY', 'ci')
+    const query = stillSeenWithoutFleetAssetQuery(reported)
+    if (!query) return
+    const still = new Set(pluck('cmdb_ci_netgear', query, 'sys_id'))
+    for (const ciId of new Set(reported)) if (!still.has(ciId)) resolveCiExceptions(ciId, ['seen_without_asset'])
+}
+
+/** Network CIs recently discovered at a customer Site that no fleet asset points at (`seenWithoutFleetAssetQuery`). */
 function reportSeenWithoutAsset(days: number): void {
     const since = new GlideDateTime()
     since.addDaysUTC(-days)
     const ci = new GlideRecord('cmdb_ci_netgear')
     ci.addQuery('last_discovered', '>=', since.getValue())
-    ci.addNullQuery('asset')
+    ci.addEncodedQuery(seenWithoutFleetAssetQuery())
     ci.setLimit(1000)
     ci.query()
     while (ci.next()) {
         openException('seen_without_asset', {
             ciId: ci.getUniqueValue(),
             customerId: str(ci, 'company'),
-            detail: `${str(ci, 'name')} (${str(ci, 'serial_number')}) is monitored but has no asset`,
+            detail: `${str(ci, 'name')} (${str(ci, 'serial_number')}) is monitored at a Site but is no fleet asset`,
         })
     }
 }

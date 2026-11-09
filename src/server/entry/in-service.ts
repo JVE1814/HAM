@@ -2,7 +2,7 @@ import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { parseDeviceEvents, type DeviceEvent } from '../domain/device-events.ts'
 import { decideInService } from '../domain/in-service.ts'
-import { stagesQuery } from '../domain/lifecycle.ts'
+import { fleetStagesQuery } from '../domain/fleet.ts'
 import { ROLE } from '../domain/visibility.ts'
 import { findAssetByIdentifier, moveAndSave, readStage } from '../platform/assets.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
@@ -90,7 +90,11 @@ function freshAsset(assetId: string): GlideRecord | null {
     return beyondVisibility(asset, () => asset.get(assetId)) ? asset : null
 }
 
-/** POST /api/x_daas_ham/naas/v1/device_events - Seen signals from the Provider NMS. */
+/**
+ * POST /api/x_daas_ham/naas/v1/device_events - Seen signals from the Provider NMS. An identifier is matched to a fleet
+ * asset only (platform/assets `findAssetByIdentifier`, ADR 0016): one the Provider IT's equipment carries, like one no
+ * Asset carries, is reported in `unknown_identifiers` and stored as no event.
+ */
 export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!gs.hasRole(ROLE.integration) && !gs.hasRole(ROLE.assetManager)) return reply(response, 403, { error: 'Requires the x_daas_ham.integration role' })
     const parsed = parseDeviceEvents(request.body.data, intProperty(PROPERTY.eventsMaxBatch, 500), nowMs())
@@ -146,13 +150,15 @@ function storeEvent(assetId: string, event: DeviceEvent): void {
     gr.insert()
 }
 
-/** Scheduled job: pick up Discovery / connector sightings of pending Assets and put them in service. */
+/**
+ * Scheduled job: pick up Discovery / connector sightings of pending fleet assets (ADR 0016) and put them in service.
+ */
 export function evaluatePendingInService(): void {
     const readers = lifecycleReaders()
     runTableJob({
         job: 'in_service_detection',
         table: 'alm_hardware',
-        query: stagesQuery(['pending_in_service']),
+        query: fleetStagesQuery(['pending_in_service']),
         read: (asset) => asset.getUniqueValue(),
         // An Asset whose lock an NMS event holds, or whose save is refused, is left to the next run, which reads its CI
         // again.

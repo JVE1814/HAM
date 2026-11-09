@@ -1,13 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
+import { naasStockroomType, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import type { Stage } from '../domain/lifecycle.ts'
-import {
-    isClaimable,
-    stockQueries,
-    type StockCandidate,
-    type StockroomType,
-    type StockScope,
-    type StockUnit,
-} from '../domain/sourcing.ts'
+import { isClaimable, stockQueries, type StockCandidate, type StockScope, type StockUnit } from '../domain/sourcing.ts'
 import { moveAsset, readStage } from './assets.ts'
 import { withLockTries, type HeldLock } from './locks.ts'
 import { bool, str } from './records.ts'
@@ -36,10 +30,15 @@ export function stockCandidates(scope: StockScope, limit: number): StockCandidat
     return candidates
 }
 
+/**
+ * The Asset as sourcing weighs it, or null when it is no stock: not available or in a spare pool, or in a stockroom
+ * with no NaaS stockroom type (ADR 0016), which the queries leave out too.
+ */
 function candidateOf(asset: GlideRecord, modelId: string): StockCandidate | null {
     const stage = readStage(asset)
     if (stage !== 'available' && stage !== 'spare_pool') return null
-    const stockroomType = (str(asset, 'stockroom.x_daas_ham_stockroom_type') || 'central_depot') as StockroomType
+    const stockroomType = naasStockroomType(str(asset, `stockroom.${STOCKROOM_TYPE_FIELD}`))
+    if (!stockroomType) return null
     const atCustomerSite = stockroomType === 'customer_site'
     const pooledFor = stage === 'spare_pool' ? str(asset, 'company') : ''
     return {

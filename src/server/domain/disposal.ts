@@ -25,6 +25,8 @@ export function disposalStage(method: DisposalMethod): Stage {
 
 /** A line's Asset as Complete disposal finds it; `customerId` is its company: the Customer it belongs to (ADR 0006). */
 export interface DisposalLine {
+    /** It is a fleet asset (ADR 0016): the app retires no equipment of the Provider IT's. */
+    fleet: boolean
     legalOwner: LegalOwner
     method: DisposalMethod
     wipeComplete: boolean
@@ -38,6 +40,7 @@ export interface DisposalLine {
 export function disposalLineBlockers(line: DisposalLine): string[] {
     const owner = line.legalOwner || 'provider'
     const blockers: string[] = []
+    if (!line.fleet) blockers.push('asset is not a fleet asset')
     if (line.stage !== 'pending_wipe' && line.stage !== 'pending_disposal') {
         blockers.push(`asset is ${line.stage ?? 'in an unmodelled stage'}, not awaiting wipe or disposal`)
     }

@@ -1,7 +1,8 @@
 import { addDays } from './calendar.ts'
 import type { NamedRecord } from './entitlement.ts'
 import type { LeaseEndAction } from './leases.ts'
-import { DEPLOYED_STAGES, SERVING_STAGES, stagesQuery, type LegalOwner, type Stage } from './lifecycle.ts'
+import { fleetStagesQuery } from './fleet.ts'
+import { DEPLOYED_STAGES, SERVING_STAGES, type LegalOwner, type Stage } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
 
 /** Returns, depot evaluation, Fee events and break-fix shortfalls (P2.3–P2.4). */
@@ -59,13 +60,13 @@ export function overdueStep(input: { dueDate: string; today: string; graceDays: 
 }
 
 /**
- * The Assets that keep a site package open, as an encoded alm_hardware query: those at its Site under its Agreement
- * on their way there, serving there or on their way back. A unit received at the depot or declared missing no longer
- * counts. A swap's new units do, before monitoring first sees them and attaches them to the package, so a swap-back
- * that reaches the depot first does not end it (D60).
+ * The Assets that keep a site package open, as an encoded alm_hardware query: the fleet assets (ADR 0016) at its Site
+ * under its Agreement on their way there, serving there or on their way back. A unit received at the depot or declared
+ * missing no longer counts. A swap's new units do, before monitoring first sees them and attaches them to the package,
+ * so a swap-back that reaches the depot first does not end it (D60).
  */
 export function sitePackageHoldersQuery(line: { siteId: string; agreementId: string }): string {
-    return stagesQuery(DEPLOYED_STAGES, `x_daas_ham_site=${line.siteId}^x_daas_ham_agreement=${line.agreementId}`)
+    return fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_site=${line.siteId}^x_daas_ham_agreement=${line.agreementId}`)
 }
 
 /** Installed at a Site: in service, temporary or awaiting first sighting (temporary ends, audits, attestations). */

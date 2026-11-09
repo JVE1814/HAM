@@ -2,6 +2,7 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import { refreshWaves, replacementModel, type RefreshCandidate, type RefreshWave } from '../domain/refresh.ts'
 import type { LifecycleDates } from '../domain/model-lifecycle.ts'
 import { toIsoDate } from '../domain/calendar.ts'
+import { fleetStagesQuery } from '../domain/fleet.ts'
 import { nowMs, todayIso } from '../platform/clock.ts'
 import { modelLifecycle } from '../platform/lifecycle-dates.ts'
 import { withLock, type HeldLock } from '../platform/locks.ts'
@@ -38,7 +39,10 @@ function raiseHolding(lock: HeldLock): void {
     }
 }
 
-/** In-service Assets due within the horizon and on no open replacing line, earliest due first. */
+/**
+ * In-service fleet assets (ADR 0016) of an Agreement due within the horizon and on no open replacing line, earliest
+ * due first. The Provider IT's equipment in use is in service by its install status too, and is left out.
+ */
 function dueCandidates(): RefreshCandidate[] {
     const horizon = toIsoDate(nowMs() + intProperty(PROPERTY.refreshHorizonDays, 90) * 86_400_000)
     const onOrder = new Set(
@@ -46,7 +50,7 @@ function dueCandidates(): RefreshCandidate[] {
     )
     const candidates: RefreshCandidate[] = []
     const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(`install_status=1^substatusISEMPTY^x_daas_ham_refresh_due<=${horizon}^x_daas_ham_agreementISNOTEMPTY`)
+    asset.addEncodedQuery(fleetStagesQuery(['in_service'], `x_daas_ham_refresh_due<=${horizon}^x_daas_ham_agreementISNOTEMPTY`))
     asset.orderBy('x_daas_ham_refresh_due')
     asset.setLimit(2000)
     asset.query()

@@ -15,6 +15,7 @@ import {
     type ExpiringCoverage,
     type LeaseEndAction,
 } from '../domain/leases.ts'
+import { fleetStagesQuery } from '../domain/fleet.ts'
 import { isRetired, SERVING_STAGES, stagesQuery, type Stage } from '../domain/lifecycle.ts'
 import { isFree } from '../domain/sourcing.ts'
 import { providerApproverIds } from '../platform/approvals.ts'
@@ -28,12 +29,18 @@ import { intProperty, PROPERTY, stringProperty } from '../platform/properties.ts
 import { bool, count, exists, findById, num, refusal, str } from '../platform/records.ts'
 import { changeStock, stockUnit } from '../platform/stock.ts'
 
-/** Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
+/** Leases, end-of-lease decisions and renewals (P3.23–P3.24), over fleet assets only (ADR 0016). */
 
 /** Healthy stock that can go straight back to the Lessor. */
 const IN_STOCK: readonly Stage[] = ['available', 'spare_pool']
 
-/** Before rule on alm_hardware: an Asset on a lease schedule is owned by that schedule's Lessor. */
+/**
+ * Before rule on alm_hardware (br_asset_lease): a fleet asset on a lease schedule is owned by that schedule's Lessor,
+ * whether its lease is set or it joins the fleet with one already set (adoption and the warehouse receipt set a blank
+ * Legal owner to the Provider, which this replaces in the same save). The rule's condition runs it on a fleet asset
+ * only, once its Lease schedule or its Fleet flag changes: one of the Provider IT's is left as it is (ADR 0016). It
+ * reads no previous value, so either change runs it the same way.
+ */
 export function onAssetLeaseChanged(current: GlideRecord): void {
     const lease = findById('x_daas_ham_lease_schedule', str(current, 'x_daas_ham_lease'))
     if (!lease) return
@@ -81,11 +88,11 @@ function resumeBuyouts(): void {
     }
 }
 
-/** Agreement end dates of the Assets a lease covers that are serving customers ('' = open-ended). */
+/** Agreement end dates of the fleet assets a lease covers that are serving customers ('' = open-ended). */
 function serviceEnds(leaseId: string): string[] {
     // One row per Agreement, its end read as a stored date (a grouped dot-walked date's format is undocumented).
     const ga = new GlideAggregate('alm_hardware')
-    ga.addEncodedQuery(stagesQuery(SERVING_STAGES, `x_daas_ham_lease=${leaseId}`))
+    ga.addEncodedQuery(fleetStagesQuery(SERVING_STAGES, `x_daas_ham_lease=${leaseId}`))
     ga.addAggregate('COUNT', '')
     ga.groupBy('x_daas_ham_agreement')
     ga.query()
@@ -101,10 +108,10 @@ function openDecision(leaseId: string): boolean {
     return exists('x_daas_ham_lease_decision', `lease=${leaseId}^active=true`)
 }
 
-/** The Assets the lease covers (those in `stages`, when given). */
+/** The fleet assets the lease covers (those in `stages`, when given). */
 function countAssets(leaseId: string, stages?: readonly Stage[]): number {
     const ofLease = `x_daas_ham_lease=${leaseId}`
-    return count('alm_hardware', stages ? stagesQuery(stages, ofLease) : stillCovered(ofLease))
+    return count('alm_hardware', stages ? fleetStagesQuery(stages, ofLease) : stillCovered(ofLease))
 }
 
 function raiseDecision(lease: GlideRecord, mismatch: boolean): void {
@@ -225,7 +232,7 @@ interface StockReturn {
 function disposeStockToLessor(lease: GlideRecord): StockReturn {
     const found = new GlideRecord('alm_hardware')
     const unclaimed = `x_daas_ham_lease=${lease.getUniqueValue()}^x_daas_ham_order_lineISEMPTY`
-    found.addEncodedQuery(stagesQuery(IN_STOCK, unclaimed))
+    found.addEncodedQuery(fleetStagesQuery(IN_STOCK, unclaimed))
     found.query()
     // Undefined until the first unit is withdrawn; null once refused, so it is not tried again for every unit.
     let order: GlideRecord | null | undefined
@@ -315,7 +322,10 @@ export function onReturnedLeaseEndChanged(current: GlideRecord): void {
     fire(EVENT.leaseAssets, current, current.getUniqueValue())
 }
 
-/** Script action on x_daas_ham.lease.assets: recompute Refresh due dates of the lease's Assets. */
+/**
+ * Script action on x_daas_ham.lease.assets: recompute Refresh due dates of the lease's serving fleet assets
+ * (platform/lifecycle-dates keeps the pass to the fleet).
+ */
 export function refreshLeaseAssets(event: GlideRecord, current: GlideRecord): void {
     const leaseId = str(event, 'parm1')
     refreshLifecycleDates({
@@ -392,14 +402,14 @@ export function warnRenewals(): void {
 }
 
 /**
- * One warning per Customer for covered, deployed Assets whose OEM coverage ends soon; each contract is
+ * One warning per Customer for covered, deployed fleet assets whose OEM coverage ends soon; each contract is
  * warned about once. Exactly the rows counted are marked (a daily job, at most 5000 contracts a run); a row
  * whose mark is refused is logged and counted again the next day, which beats not warning at all.
  */
 function warnExpiringCoverage(today: string): void {
     const horizon = addDays(today, intProperty(PROPERTY.coverageWarningDays, 60))
     const coverage = new GlideRecord('x_daas_ham_oem_coverage')
-    coverage.addEncodedQuery(stagesQuery(SERVING_STAGES, `covered=true^expiry_notified=false^end_date>=${today}^end_date<=${horizon}`, 'asset.'))
+    coverage.addEncodedQuery(fleetStagesQuery(SERVING_STAGES, `covered=true^expiry_notified=false^end_date>=${today}^end_date<=${horizon}`, 'asset.'))
     coverage.setLimit(5000)
     coverage.query()
     const rows: ExpiringCoverage[] = []

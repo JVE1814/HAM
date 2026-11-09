@@ -75,9 +75,13 @@ describe('leaseDecisionProblem', () => {
 
 describe('stillCovered', () => {
     it('leaves retired units, which keep their lease as history, out of what the lease covers', () => {
-        expect(stillCovered('x_daas_ham_lease=L1')).toBe('x_daas_ham_lease=L1^install_status!=7')
+        expect(stillCovered('x_daas_ham_lease=L1')).toBe('x_daas_ham_lease=L1^install_status!=7^x_daas_ham_fleet=true')
         const bought = 'x_daas_ham_lease.end_action=buyout'
-        expect(stillCovered(bought)).toBe(`${bought}^install_status!=7`)
+        expect(stillCovered(bought)).toBe(`${bought}^install_status!=7^x_daas_ham_fleet=true`)
+    })
+
+    it('covers fleet assets only (ADR 0016)', () => {
+        expect(stillCovered('x_daas_ham_lease=L1').split('^')).toContain('x_daas_ham_fleet=true')
     })
 })
 

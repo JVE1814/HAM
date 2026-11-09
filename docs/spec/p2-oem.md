@@ -27,13 +27,17 @@
 
 ## Synchronisation
 
-- **Lifecycle (daily)**: every canonical Model with a PID and an OEM data source.
+Only NaaS Models and fleet assets are synchronised (ADR 0016): the Provider IT's equipment shares the asset table,
+and none of its serials is sent to an OEM, even a unit of a NaaS Model.
+
+- **Lifecycle (daily)**: every NaaS Model (one with an OEM PID) with an OEM data source.
   - API milestones fill in or replace stored ones but never erase them.
   - The record's source becomes that vendor.
-  - The lifecycle-change event recalculates the Model's Assets.
+  - The lifecycle-change event recalculates the Model's fleet assets (their Lifecycle phase and
+    Refresh due date); the Provider IT's units of the Model are not stamped.
 - **Coverage (every 4 h, time-boxed)**:
-  - Covers Assets not retired and not checked for `x_daas_ham.oem.coverage_refresh_days`, oldest
-    first.
+  - Covers fleet assets not retired and not checked for `x_daas_ham.oem.coverage_refresh_days`,
+    oldest first.
   - A vendor's coverage runs only when that vendor is enabled and so is the vendor whose REST message
     serves it (`enabledRoute`): Meraki coverage needs both `x_daas_ham.oem.meraki.enabled` and
     `x_daas_ham.oem.cisco.enabled`. With Cisco enabled alone, SN2INFO is not asked about Meraki
@@ -69,6 +73,7 @@
   call failed (failures are logged). An RMA whose save is refused is logged (it keeps its place at
   the front).
 - **CSV**: rows loaded into *OEM coverage import rows* (vendor, serial, contract, service level,
-  start, end) and *Lifecycle import rows* are processed on insert. A row whose coverage or Model
-  lifecycle the platform refuses is marked error with the reason, to load again once the cause is
-  fixed.
+  start, end) and *Lifecycle import rows* are processed on insert. A coverage row applies to the fleet
+  asset with its serial; one whose serial no fleet asset carries (none, or only the Provider IT's) is
+  marked error *no fleet asset with serial ...*. A row whose coverage or Model lifecycle the platform
+  refuses is marked error with the reason, to load again once the cause is fixed.

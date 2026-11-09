@@ -1,5 +1,6 @@
+import { fleetStagesQuery } from './fleet.ts'
 import type { LineStage } from './fulfilment.ts'
-import { DEPLOYED_STAGES, stagesQuery } from './lifecycle.ts'
+import { DEPLOYED_STAGES } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
 
 /**
@@ -183,12 +184,12 @@ export function approversFor(verdict: EntitlementVerdict | ''): Approver[] {
 export const OPEN_LINE_STAGES: readonly LineStage[] = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship']
 
 /**
- * Encoded query on alm_hardware: the Agreement's Assets counted as deployed usage. One still on an open Order line is
- * left out, as that line's quantity counts it in flight: a unit a partial Ship sent counts once.
+ * Encoded query on alm_hardware: the Agreement's fleet assets (ADR 0016) counted as deployed usage. One still on an
+ * open Order line is left out, as that line's quantity counts it in flight: a unit a partial Ship sent counts once.
  */
 export function deployedUsageQuery(agreementId: string): string {
     const notInFlight = `x_daas_ham_order_lineISEMPTY^ORx_daas_ham_order_line.line_stageNOT IN${OPEN_LINE_STAGES.join(',')}`
-    return stagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}^${notInFlight}`)
+    return fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}^${notInFlight}`)
 }
 
 /** Encoded query on x_daas_ham_order_line: the Agreement's open lines on live Orders other than `excludeOrderId`. */

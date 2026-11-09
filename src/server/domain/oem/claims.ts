@@ -1,5 +1,6 @@
 import { normalizeSerial } from '../asn.ts'
 import { andEachClause } from '../encoded-query.ts'
+import { fleetCondition } from '../fleet.ts'
 import { errorText, isSuccess, type HttpPort, type HttpRequest, type HttpResponse } from '../http.ts'
 import { asArray, chunks, field, parseJson, text } from '../json.ts'
 import type { OemVendor } from './types.ts'
@@ -362,9 +363,13 @@ export function runVendorClaims(vendor: OemVendor, store: ClaimStore, transport:
     return calls
 }
 
-/** Encoded query on x_daas_ham_staging_step: open automated `action` steps on `vendor` Assets whose staging task is active. */
+/**
+ * Encoded query on x_daas_ham_staging_step: open automated `action` steps on `vendor` fleet assets (ADR 0016) whose
+ * staging task is active. Only a fleet asset's serial is sent to an OEM cloud.
+ */
 function openStepsQuery(vendor: OemVendor, action: ClaimAction): string {
-    return `automation=${action}^done=false^staging_task.active=true^staging_task.asset.model.x_daas_ham_oem_source=${vendor}`
+    const asset = 'staging_task.asset.'
+    return `automation=${action}^done=false^staging_task.active=true^${asset}model.x_daas_ham_oem_source=${vendor}^${fleetCondition(asset)}`
 }
 
 /**

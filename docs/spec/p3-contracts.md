@@ -4,11 +4,17 @@
 
 - A **Lease schedule** extends `ast_contract`: Lessor, schedule number, monthly payment (all its
   Assets), buyout price, end date, and how many days ahead the decision is due (default 120).
-- An Asset is covered by setting its *Lease schedule*, while it is not retired. Its Legal owner
+- A fleet asset is covered by setting its *Lease schedule*, while it is not retired. Its Legal owner
   becomes *lessor* and its Lessor the schedule's Lessor. A unit returned to the Lessor or the OEM (or
   disposed of) keeps its Lease schedule as history, but is no longer counted (*Covered assets* on the
   decision, *Assets covered at buyout*, Margin's lease share), transferred by a buyout or re-queued
   by the daily review.
+- Leases are over fleet assets only (ADR 0016). A unit of the Provider IT's given a Lease schedule
+  keeps its Legal owner and Lessor, and is neither counted, flagged for a mismatch, bought out,
+  returned to the Lessor, given a Refresh due date nor warned about for its coverage. When such a
+  unit joins the fleet (*Add to fleet*, or a warehouse receipt of a unit awaiting receipt) with its
+  Lease schedule already set, its Legal owner becomes *lessor* and its Lessor the schedule's Lessor
+  in the save that adds it, as if the schedule had just been set.
 - **Mismatch** (daily): a lease whose Assets serve Customers (shipped, pending in service, in
   service, temporary) under an Agreement that ends after the lease, or has no end date, is flagged
   and the asset managers are emailed once. If the flag cannot be saved, it is logged and the alert
@@ -40,7 +46,7 @@ applied again, even from a form opened before it closed.
   renewal term; an end on the last day of a month stays on the last day of a month (28 Feb 2027 plus 3
   months is 31 May, plus 12 months is 29 Feb 2028). Any change of the end date (by the action or by
   hand) re-arms the warning, and a future end re-arms the end-of-agreement return.
-- **OEM coverage** (daily): covered contracts of deployed Assets ending within
+- **OEM coverage** (daily): covered contracts of deployed fleet assets ending within
   `x_daas_ham.oem.coverage_warning_days` are warned about once, one email per Customer. Renewing
   with the manufacturer changes the end date at the next sync or CSV import, which re-arms the
   warning.

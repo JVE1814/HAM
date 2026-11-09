@@ -79,10 +79,27 @@ function resolveOpen(field: 'asset' | 'ci', subjectId: string, types: readonly E
     exception.addQuery(field, subjectId)
     exception.addQuery('status', 'open')
     exception.addQuery('exception_type', 'IN', types.join(','))
+    resolveEach(exception)
+}
+
+/**
+ * Resolve the open exceptions an encoded query matches (domain/reconciliation builds it), such as those on Assets the
+ * reconciliation no longer checks. A blank query would resolve every exception, so it resolves nothing. One the
+ * platform refuses to resolve stays open and is logged.
+ */
+export function resolveExceptionsWhere(encodedQuery: string): void {
+    if (!encodedQuery) return
+    const exception = new GlideRecord('x_daas_ham_recon_exception')
+    exception.addEncodedQuery(encodedQuery)
+    resolveEach(exception)
+}
+
+function resolveEach(exception: GlideRecord): void {
     exception.query()
     while (exception.next()) {
         exception.setValue('status', 'resolved')
         if (exception.update()) continue
+        const subjectId = str(exception, 'asset') || str(exception, 'ci')
         gs.warn(`[x_daas_ham] ${str(exception, 'exception_type')} exception for ${subjectId} not resolved: ${refusal(exception)}`)
     }
 }

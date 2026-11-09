@@ -1,5 +1,6 @@
 import { addDays, addMonths, daysBetween } from './calendar.ts'
-import { ALL_STAGES, isBillable, stagesQuery, type Stage } from './lifecycle.ts'
+import { fleetStagesQuery } from './fleet.ts'
+import { ALL_STAGES, isBillable, type Stage } from './lifecycle.ts'
 
 /** Billing periods: daily proration of Subscription lines and Fee events (P3.25, D52, D66). */
 
@@ -134,11 +135,11 @@ export function withinLine(interval: DayRange, line: Partial<DayRange>): DayRang
 export const BILLED_STAGES: readonly Stage[] = ALL_STAGES.filter((stage) => isBillable(stage))
 
 /**
- * Encoded query on alm_hardware for the Billing integrity dashboard: Assets billed from a Service interval whose
- * Subscription line has ended (set ended, or past its end date; the end date itself is billed). Their days after the
- * line's end are not billed (withinLine), so they are flagged; nothing moves them to another line.
+ * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets (ADR 0016) billed from a Service
+ * interval whose Subscription line has ended (set ended, or past its end date; the end date itself is billed). Their
+ * days after the line's end are not billed (withinLine), so they are flagged; nothing moves them to another line.
  */
-export const IN_SERVICE_ON_ENDED_LINE = stagesQuery(
+export const IN_SERVICE_ON_ENDED_LINE = fleetStagesQuery(
     BILLED_STAGES,
     'x_daas_ham_subscription_line.status=ended' +
         '^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()',

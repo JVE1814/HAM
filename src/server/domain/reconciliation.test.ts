@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { reconcileAsset, reconcileRack } from './reconciliation'
+import {
+    outsideFleetExceptionsQuery,
+    reconcileAsset,
+    reconcileRack,
+    seenWithoutFleetAssetQuery,
+    stillSeenWithoutFleetAssetQuery,
+} from './reconciliation'
 
 const DAY = 86_400_000
 const now = Date.parse('2026-11-07T12:00:00Z')
@@ -81,5 +87,42 @@ describe('reconcileRack', () => {
 
     it('finds nothing in an empty rack', () => {
         expect(reconcileRack(rack, [])).toEqual([])
+    })
+})
+
+describe('seenWithoutFleetAssetQuery', () => {
+    const query = seenWithoutFleetAssetQuery()
+
+    it('finds CIs pointing at no Asset or at one outside the fleet, through the hardware table (ADR 0016)', () => {
+        const hardware = 'asset.ref_alm_hardware.x_daas_ham_fleet'
+        expect(query.startsWith(`assetISEMPTY^OR${hardware}=false^OR${hardware}ISEMPTY^`)).toBe(true)
+        // A CI's asset is an alm_asset reference: a condition on asset.x_daas_ham_fleet would be ignored.
+        expect(query).not.toMatch(/(^|\^|OR)asset\.x_daas_ham_fleet/)
+    })
+
+    it('keeps to CIs at a customer Site, or in a room or building of one', () => {
+        expect(query.endsWith('^location.x_daas_ham_is_site=true^ORlocation.parent.x_daas_ham_is_site=true^ORlocation.parent.parent.x_daas_ham_is_site=true')).toBe(true)
+        expect(query).not.toContain('^NQ')
+    })
+})
+
+describe('stillSeenWithoutFleetAssetQuery', () => {
+    it('keeps the reported CIs the seen-without-asset condition still matches, discovered recently or not', () => {
+        expect(stillSeenWithoutFleetAssetQuery(['ci1', 'ci2', 'ci1'])).toBe(`sys_idINci1,ci2^${seenWithoutFleetAssetQuery()}`)
+        expect(stillSeenWithoutFleetAssetQuery(['ci1'])).not.toContain('last_discovered')
+    })
+
+    it('gives no query for no CI, which would match every CI at a Site', () => {
+        expect(stillSeenWithoutFleetAssetQuery([])).toBeNull()
+        expect(stillSeenWithoutFleetAssetQuery([''])).toBeNull()
+    })
+})
+
+describe('outsideFleetExceptionsQuery', () => {
+    it('finds open exceptions of the types on an Asset outside the fleet, flag false or blank', () => {
+        expect(outsideFleetExceptionsQuery(['unseen', 'serial_mismatch'])).toBe(
+            'status=open^exception_typeINunseen,serial_mismatch^assetISNOTEMPTY^asset.x_daas_ham_fleet=false^ORasset.x_daas_ham_fleetISEMPTY',
+        )
+        expect(outsideFleetExceptionsQuery(['unseen'])).not.toContain('^NQ')
     })
 })

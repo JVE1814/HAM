@@ -204,9 +204,9 @@ describe('siteTemplateOffered', () => {
 describe('usage queries', () => {
     const open = 'new,awaiting_stock,sourced,staging,ready_to_ship'
 
-    it("counts the Agreement's deployed Assets except those on an open Order line, in every stage clause", () => {
+    it("counts the Agreement's deployed fleet assets except those on an open Order line, in every stage clause", () => {
         const clauses = deployedUsageQuery('a1').split('^NQ')
-        const base = `^x_daas_ham_agreement=a1^x_daas_ham_order_lineISEMPTY^ORx_daas_ham_order_line.line_stageNOT IN${open}`
+        const base = `^x_daas_ham_agreement=a1^x_daas_ham_order_lineISEMPTY^ORx_daas_ham_order_line.line_stageNOT IN${open}^x_daas_ham_fleet=true`
         expect(clauses).toHaveLength(DEPLOYED_STAGES.length)
         for (const clause of clauses) expect(clause.endsWith(base)).toBe(true)
     })

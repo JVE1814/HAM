@@ -1,6 +1,15 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { normalizeModel, shouldLearnAlias, type ManufacturerAlias, type ModelMatchRule } from '../domain/normalization.ts'
-import { bool, num, refusal, str } from './records.ts'
+import {
+    normalizeModel,
+    NOT_NAAS_REASON,
+    notNaasRawModelsQuery,
+    RAW_MODEL_EXCEPTIONS_QUERY,
+    RAW_MODEL_TABLE,
+    shouldLearnAlias,
+    type ManufacturerAlias,
+    type ModelMatchRule,
+} from '../domain/normalization.ts'
+import { bool, num, pluck, refusal, str } from './records.ts'
 
 /** Resolving raw manufacturer/model strings to canonical Models (domain/normalization). */
 
@@ -78,6 +87,28 @@ export function recordNormalizationException(
     exception.setValue('source_table', source.table)
     exception.setValue('source_record', source.id)
     exception.insert()
+}
+
+/**
+ * Close the open exceptions the hourly normalization raised for raw models that are not NaaS's to map: unmapped and
+ * none of `naasRawModelIds` (domain/normalization `notNaasRawModelsQuery`). Each is resolved with no Model, its reason
+ * `not_naas`. One the platform refuses to close is logged and stays open for the next run.
+ */
+export function closeNonNaasExceptions(naasRawModelIds: readonly string[]): void {
+    const query = notNaasRawModelsQuery(pluck('x_daas_ham_norm_exception', RAW_MODEL_EXCEPTIONS_QUERY, 'source_record'), naasRawModelIds)
+    const notNaas = query ? pluck(RAW_MODEL_TABLE, query, 'sys_id') : []
+    if (notNaas.length === 0) return
+    const exception = new GlideRecord('x_daas_ham_norm_exception')
+    exception.addEncodedQuery(RAW_MODEL_EXCEPTIONS_QUERY)
+    exception.addQuery('source_record', 'IN', notNaas.join(','))
+    exception.query()
+    while (exception.next()) {
+        exception.setValue('status', 'resolved')
+        exception.setValue('reason', NOT_NAAS_REASON)
+        if (exception.update()) continue
+        const rawPair = `${str(exception, 'raw_manufacturer')} / ${str(exception, 'raw_model')}`
+        gs.warn(`[x_daas_ham] Normalization exception ${rawPair} not closed as not NaaS: ${refusal(exception)}`)
+    }
 }
 
 /**

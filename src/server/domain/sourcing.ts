@@ -1,7 +1,8 @@
 import { OPEN_LINE_STAGES } from './entitlement.ts'
 import type { LineStage } from './fulfilment.ts'
 import type { LeaseEndAction } from './leases.ts'
-import { stagesQuery, type Stage } from './lifecycle.ts'
+import { fleetStagesQuery, naasStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
+import type { Stage } from './lifecycle.ts'
 import type { ShortfallRoute } from './returns.ts'
 
 /**
@@ -105,21 +106,23 @@ export function isClaimable(unit: StockUnit, from: readonly Stage[]): boolean {
 /**
  * Encoded alm_hardware queries for the stock that may serve `scope`, one per Source in priority order, so a limit on
  * each cuts within its Source only and other Customers' spares never crowd it out: the Customer's site stockroom
- * stock at the Site or one of its Rooms (replacements), its Spare pool, and free stock outside customer-site
- * stockrooms. Stock on an Order line or bound for its Lessor (`isClaimable`) is never a candidate. `sourceOf` still
- * decides each one.
+ * stock at the Site or one of its Rooms (replacements), its Spare pool, and free stock in the Provider's NaaS
+ * stockrooms (central depots and staging centres). Only fleet assets in NaaS stockrooms are stock (ADR 0016): every
+ * clause carries the Fleet flag, and stock in a stockroom with no NaaS stockroom type, or in none, is the Provider
+ * IT's. Stock on an Order line or bound for its Lessor (`isClaimable`) is never a candidate. `sourceOf` still decides
+ * each one.
  */
 export function stockQueries(scope: StockScope): string[] {
     const base = `model=${scope.modelId}^x_daas_ham_order_lineISEMPTY^${NOT_LESSOR_BOUND}`
-    const type = 'stockroom.x_daas_ham_stockroom_type'
-    // Not left to how != treats empty values: stock in a stockroom with no type, or in none, counts as a depot's.
-    const provider = `${base}^${type}!=customer_site^OR${type}ISEMPTY`
+    const type = `stockroom.${STOCKROOM_TYPE_FIELD}`
+    // A NaaS stockroom type rules out a blank one, so != needs no ISEMPTY beside it.
+    const provider = `${base}^${naasStockroomCondition('stockroom.')}^${type}!=customer_site`
     const customerSite = `${base}^${type}=customer_site^stockroom.x_daas_ham_customer=${scope.customerId}`
     const atSite = `stockroom.location=${scope.siteId}^ORstockroom.location.parent=${scope.siteId}`
     const bySource: Record<Source, string> = {
-        customer_site_stock: stagesQuery(['available', 'spare_pool'], `${customerSite}^${atSite}`),
-        spare_pool: stagesQuery(['spare_pool'], `${provider}^company=${scope.customerId}`),
-        central_stock: stagesQuery(['available'], provider),
+        customer_site_stock: fleetStagesQuery(['available', 'spare_pool'], `${customerSite}^${atSite}`),
+        spare_pool: fleetStagesQuery(['spare_pool'], `${provider}^company=${scope.customerId}`),
+        central_stock: fleetStagesQuery(['available'], provider),
     }
     const sources: readonly Source[] = scope.customerId ? PRIORITY[scope.purpose] : ['central_stock']
     return sources.map((source) => bySource[source])
@@ -281,11 +284,17 @@ export function orderLineLockName(lineId: string): string {
 }
 
 /**
- * An encoded alm_hardware query for the Customer's Spare pool as the top-up counts it. Units bound for their Lessor are
- * left out: sourcing can no longer claim them (`isClaimable`), so counted they would keep the pool short.
+ * An encoded alm_hardware query for the Customer's Spare pool as the top-up counts it: its fleet assets (ADR 0016) in
+ * the pool, and those of its spares on a transfer order line. In transfer and on no Order line, a unit held for the
+ * Customer (its company) goes back to the pool once Inventory lets it go, received or not (domain/lifecycle
+ * `stageAfterTransfer`, ADR 0002): it is still the Customer's spare, and left out the top-up would fill the pool again
+ * meanwhile. One in transfer on an Order line is sourcing's, on its way to staging for that line, and no spare. Units
+ * bound for their Lessor are left out: sourcing can no longer claim them (`isClaimable`), so counted they would keep
+ * the pool short.
  */
 export function reservedSparesQuery(customerId: string): string {
-    return stagesQuery(['spare_pool'], `company=${customerId}^${NOT_LESSOR_BOUND}`)
+    const held = `company=${customerId}^${NOT_LESSOR_BOUND}`
+    return [fleetStagesQuery(['spare_pool'], held), fleetStagesQuery(['in_transfer'], `${held}^x_daas_ham_order_lineISEMPTY`)].join('^NQ')
 }
 
 /** Spares a Customer still needs to reach `ratio` × deployed Assets. */

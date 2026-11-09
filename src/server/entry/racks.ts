@@ -3,9 +3,10 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { placementProblem, powerBudget, type Placement, type RackFace, type RackSpec } from '../domain/rack.ts'
+import { fleetCondition } from '../domain/fleet.ts'
 import { RACK_EXCEPTION_TYPES, reconcileRack } from '../domain/reconciliation.ts'
 import { visibilityFilter } from '../domain/visibility.ts'
-import { readStage } from '../platform/assets.ts'
+import { isFleetAsset, readStage } from '../platform/assets.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { openException, resolveCiExceptions } from '../platform/exceptions.ts'
 import { currentSession } from '../platform/session.ts'
@@ -57,13 +58,16 @@ function placementOf(slot: Slot, models: ReadonlyMap<string, RackModel>): Placem
 }
 
 /**
- * Every device placed in the rack but `exceptAssetId`, past the visibility rules (ADR 0005): an inventory tech sees
- * only their Stockrooms' Assets, and a device they cannot see still fills its units and draws power
- * (platform/beyond-visibility). Only read, never saved.
+ * Every fleet asset placed in the rack but `exceptAssetId`, past the visibility rules (ADR 0005): an inventory tech
+ * sees only their Stockrooms' Assets, and a device they cannot see still fills its units and draws power
+ * (platform/beyond-visibility). The Provider IT's equipment is left out (ADR 0016): the rules check no placement of
+ * it, so a rack placement it carries is not known to hold until it joins the fleet, which is checked as placing it
+ * (refusesKeptPlacement). Only read, never saved.
  */
 function slotsIn(rackId: string, exceptAssetId = ''): Slot[] {
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery('x_daas_ham_rack', rackId)
+    asset.addEncodedQuery(fleetCondition())
     if (exceptAssetId) asset.addQuery('sys_id', '!=', exceptAssetId)
     asset.addNotNullQuery('x_daas_ham_ru_start')
     beyondVisibility(asset, () => asset.query())
@@ -78,7 +82,8 @@ function slotsIn(rackId: string, exceptAssetId = ''): Slot[] {
  * lock: one taken here is released before the platform writes the record, so two saves into the same units at the
  * same moment could still both pass. Placements are entered by hand, one Asset per save, and no app logic places one,
  * so what slips through is reported, not refused: the after rule (recheckRackPlacement) re-checks the rack once the
- * save is written. A rack no longer there holds nothing, as for the re-check.
+ * save is written. A rack no longer there holds nothing, as for the re-check. A unit joining the fleet with its
+ * placement is new to the rack as the checks count it (slotsIn counts fleet assets only), so its whole draw is added.
  */
 function placementRefusal(current: GlideRecord, previous: GlideRecord | null): string | null {
     const rackId = str(current, 'x_daas_ham_rack')
@@ -87,9 +92,12 @@ function placementRefusal(current: GlideRecord, previous: GlideRecord | null): s
     if (!rack) return null
     const others = slotsIn(rackId, current.getUniqueValue())
     const candidate = { ...slotOf(current), assetId: current.getUniqueValue() }
-    // The Model this device already had in this rack; undefined when it is new to the rack.
+    // The Model this device already had in this rack, as a fleet asset; undefined when it is new to the rack or to
+    // the fleet.
     const previousModelId =
-        previous && str(previous, 'x_daas_ham_rack') === rackId && str(previous, 'x_daas_ham_ru_start') ? str(previous, 'model') : undefined
+        previous && isFleetAsset(previous) && str(previous, 'x_daas_ham_rack') === rackId && str(previous, 'x_daas_ham_ru_start')
+            ? str(previous, 'model')
+            : undefined
     // Every Model involved in one query; an unchanged Model is the candidate's own entry.
     const models = rackModels([candidate.modelId, previousModelId ?? '', ...others.map((slot) => slot.modelId)])
     const previousPowerW = previousModelId === undefined ? undefined : (models.get(previousModelId) ?? NO_MODEL).powerW
@@ -107,7 +115,23 @@ export function refusesRackPlacement(current: GlideRecord, previous: GlideRecord
     return placementRefusal(current, previous) !== null
 }
 
-/** Script of that rule, run only when its condition refuses the save: why, as the error message. */
+/** The fields that place an Asset in its rack, which br_rack_placement's condition tests for a change. */
+const PLACEMENT_FIELDS = ['x_daas_ham_rack', 'x_daas_ham_ru_start', 'x_daas_ham_rack_face'] as const
+
+/**
+ * Condition of the before rule on a racked Asset that gets a new Model or joins the fleet (br_rack_placement_model):
+ * whether the save must be refused, as `refusesRackPlacement`, for a save that keeps the Asset's placement. A new
+ * Model changes its height and draw. Joining the fleet ("Add to fleet" saves the form first, outside the fleet, then
+ * only the flag) puts a placement no check counted into the rack, so it is checked as a device new to the rack. A
+ * save that also sets the placement (an insert, or a new rack, lowest unit or face) is br_rack_placement's, which
+ * checks it with the new Model and the flag as saved, so each save is checked, and refused with its message, once.
+ */
+export function refusesKeptPlacement(current: GlideRecord, previous: GlideRecord | null): boolean {
+    const placementSet = !previous || PLACEMENT_FIELDS.some((field) => str(current, field) !== str(previous, field))
+    return !placementSet && refusesRackPlacement(current, previous)
+}
+
+/** Script of those rules, run only when a condition refuses the save: why, as the error message. */
 export function explainRackRefusal(current: GlideRecord, previous: GlideRecord | null): void {
     gs.addErrorMessage(placementRefusal(current, previous) ?? 'This rack placement is refused')
 }
@@ -170,26 +194,31 @@ function forbidden(response: RESTAPIResponse): boolean {
 /** The fields of a Location that carry the Customer and the Site for the visibility rules. */
 const LOCATION_FIELDS = { customer: 'company', site: 'sys_id' }
 
+/** A Location that is a customer Site, the app's discriminator on cmn_location (ADR 0016). */
+const SITE = 'x_daas_ham_is_site=true'
+
 /**
- * Whether the user may see any of `locationIds` (a Site, or a Room in it): staff see every Site, customer admins
- * their Customer's and site contacts their own. Locations have no before-query rule, so the rack endpoints check
- * this before reading a rack. The ids go into an encoded query, so they must be sys_ids read from records, never
- * values taken from the request.
+ * Whether one of `locationIds` (a Site, or a Room in it, and the Room's parent) is a Site the user may see: staff see
+ * every Site, customer admins their Customer's and site contacts their own. A location that is no Site, such as a
+ * data-centre room of the Provider IT's, holds no rack the app places fleet assets in (ADR 0016), and its racks are
+ * shown to no one, staff included. Locations have no before-query rule, so the rack endpoints check this before
+ * reading a rack. The ids go into an encoded query, so they must be sys_ids read from records, never values taken
+ * from the request.
  */
-function seesLocation(locationIds: readonly string[]): boolean {
+function seesSite(locationIds: readonly string[]): boolean {
+    const ids = locationIds.filter(Boolean)
+    if (ids.length === 0) return false
     const session = currentSession()
     const filter = visibilityFilter(session.scope, LOCATION_FIELDS, session)
-    if (!filter) return true
-    const ids = locationIds.filter(Boolean)
-    return ids.length > 0 && exists('cmn_location', `sys_idIN${ids.join(',')}^${filter}`)
+    return exists('cmn_location', [`sys_idIN${ids.join(',')}`, SITE, ...(filter ? [filter] : [])].join('^'))
 }
 
-/** GET /racks?site={sys_id}: racks in the Site's rooms. */
+/** GET /racks?site={sys_id}: racks at the Site and in its rooms. */
 export function listRacks(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (forbidden(response)) return
     // The Site is read first so the visibility check and the rack query below use the same sys_id.
     const site = findById('cmn_location', queryParam(request, 'site'))
-    if (!site || !seesLocation([site.getUniqueValue()])) {
+    if (!site || !seesSite([site.getUniqueValue()])) {
         reply(response, 404, { error: 'No such site' })
         return
     }
@@ -206,17 +235,18 @@ export function listRacks(request: RESTAPIRequest, response: RESTAPIResponse): v
     reply(response, 200, { racks })
 }
 
-/** GET /racks/{id}: the rack and the devices placed in it (visibility rules apply to devices). */
+/** GET /racks/{id}: the rack and the fleet assets placed in it (visibility rules apply to devices). */
 export function getRack(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (forbidden(response)) return
     const rack = new GlideRecord('cmdb_ci_rack')
     // A rack stands in a Room of the Site (or at the Site itself), as GET /racks lists it.
-    if (!rack.get(String(request.pathParams.id ?? '')) || !seesLocation([str(rack, 'location'), str(rack, 'location.parent')])) {
+    if (!rack.get(String(request.pathParams.id ?? '')) || !seesSite([str(rack, 'location'), str(rack, 'location.parent')])) {
         reply(response, 404, { error: 'No such rack' })
         return
     }
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery('x_daas_ham_rack', rack.getUniqueValue())
+    asset.addEncodedQuery(fleetCondition())
     asset.addNotNullQuery('x_daas_ham_ru_start')
     asset.query()
     const found: Array<{ slot: Slot; companyId: string; device: Record<string, unknown> }> = []
@@ -257,7 +287,7 @@ export function listSites(request: RESTAPIRequest, response: RESTAPIResponse): v
     if (forbidden(response)) return
     const session = currentSession()
     const site = new GlideRecord('cmn_location')
-    site.addQuery('x_daas_ham_is_site', true)
+    site.addEncodedQuery(SITE)
     const filter = visibilityFilter(session.scope, LOCATION_FIELDS, session)
     if (filter) site.addEncodedQuery(filter)
     site.orderBy('name')

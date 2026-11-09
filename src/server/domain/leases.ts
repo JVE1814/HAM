@@ -1,4 +1,5 @@
 import { addDays, addMonths, endOfMonth, isMonthEnd } from './calendar.ts'
+import { inFleet } from './fleet.ts'
 import { INSTALL_STATUS, type Stage } from './lifecycle.ts'
 
 /** Lease schedules, end-of-lease decisions and renewals (P3.23–P3.24). */
@@ -6,12 +7,12 @@ import { INSTALL_STATUS, type Stage } from './lifecycle.ts'
 export type LeaseEndAction = 'undecided' | 'buyout' | 'extend' | 'return'
 
 /**
- * `leaseCondition` (an encoded query on the Asset's lease) narrowed to the Assets the lease still covers. A retired
- * unit (returned to the Lessor or the OEM, disposed of) keeps its lease as history, but is no longer counted, bought
- * out, transferred or paid for.
+ * `leaseCondition` (an encoded query on the Asset's lease) narrowed to the fleet assets (ADR 0016) the lease still
+ * covers. A retired unit (returned to the Lessor or the OEM, disposed of) keeps its lease as history, but is no longer
+ * counted, bought out, transferred or paid for; a unit of the Provider IT's is none of the app's to count.
  */
 export function stillCovered(leaseCondition: string): string {
-    return `${leaseCondition}^install_status!=${INSTALL_STATUS.retired}`
+    return inFleet(`${leaseCondition}^install_status!=${INSTALL_STATUS.retired}`)
 }
 
 /** True once `today` is within `leadDays` of `endDate` (or past it). */

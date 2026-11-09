@@ -15,6 +15,9 @@ import { accountManager, admin, assetManager, finance } from '../security/roles.
 
 /* Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
 
+// Fleet assets only (ADR 0016): the condition tests the Fleet flag right after its change test, as the rules.now.ts
+// header has it. A unit of the Provider IT's that joins the fleet with its Lease schedule already set (Add to fleet, a
+// warehouse receipt) changes only its flag, so that change runs the rule too, in the save that adds it.
 BusinessRule({
     $id: Now.ID['br_asset_lease'],
     name: 'NaaS - leased asset owned by the lessor',
@@ -22,7 +25,8 @@ BusinessRule({
     when: 'before',
     action: ['insert', 'update'],
     order: 90,
-    condition: "current.x_daas_ham_lease.changes() && current.x_daas_ham_lease != ''",
+    condition:
+        "(current.x_daas_ham_lease.changes() || current.x_daas_ham_fleet.changes()) && current.x_daas_ham_fleet == true && current.x_daas_ham_lease != ''",
     script: onAssetLeaseChanged,
 })
 

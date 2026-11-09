@@ -329,12 +329,13 @@ describe('withinLine', () => {
 })
 
 describe('IN_SERVICE_ON_ENDED_LINE', () => {
-    it('flags billed Assets whose line was set ended or is past its end date', () => {
+    it('flags billed fleet assets whose line was set ended or is past its end date', () => {
         expect(BILLED_STAGES).toEqual(ALL_STAGES.filter((stage) => isBillable(stage)))
         expect(BILLED_STAGES.length).toBeGreaterThan(0)
         const ended = 'x_daas_ham_subscription_line.status=ended^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()'
+        const fleet = 'x_daas_ham_fleet=true'
         expect(IN_SERVICE_ON_ENDED_LINE).toBe(
-            `install_status=1^substatusISEMPTY^${ended}^NQinstall_status=1^substatus=temporary_deployment^${ended}`,
+            `install_status=1^substatusISEMPTY^${ended}^${fleet}^NQinstall_status=1^substatus=temporary_deployment^${ended}^${fleet}`,
         )
     })
 

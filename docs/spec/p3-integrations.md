@@ -129,6 +129,8 @@
 - A job every 5 minutes works through pending steps, and failed ones last tried over 30 minutes
   ago, per enabled vendor (`x_daas_ham.oem.claim.<vendor>.enabled`), within
   `x_daas_ham.oem.claim.max_calls` calls per vendor per run (Meraki allows 10 claims per 5 minutes).
+  Only the steps of fleet assets are sent (ADR 0016): no serial of the Provider IT's reaches an OEM
+  cloud. A step whose staging task names another Asset is never sent, and is left to do by hand.
 - A failure records the reason and counts an attempt; after 5 attempts the step is left for a
   person (*OEM claims to do by hand* in the workspace). Licence and zero-touch steps start as
   *Waiting for the OEM claim step* when their staging task also has a claim step: they are not

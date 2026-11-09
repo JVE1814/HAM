@@ -13,6 +13,7 @@ import {
     type CoverageAnswer,
     type SerialCoverage,
 } from '../domain/coverage.ts'
+import { fleetCondition, naasModelCondition } from '../domain/fleet.ts'
 import { mergeLifecycle, type LifecycleDates } from '../domain/model-lifecycle.ts'
 import { enabledRoute, type CoverageRoute } from '../domain/oem/adapters.ts'
 import type { CoverageFact, OemVendor } from '../domain/oem/types.ts'
@@ -22,7 +23,10 @@ import { oemContext, oemEnabled } from '../platform/oem-http.ts'
 import { intProperty } from '../platform/properties.ts'
 import { addAnyOf, bool, num, refusal, str } from '../platform/records.ts'
 
-/** OEM lifecycle, coverage and RMA-status synchronisation (P2.1, ADR 0008). */
+/**
+ * OEM lifecycle, coverage and RMA-status synchronisation (P2.1, ADR 0008), of NaaS Models and the serials of fleet
+ * assets only (ADR 0016): the Provider IT's equipment is never sent to an OEM.
+ */
 
 const VENDORS: readonly OemVendor[] = ['cisco', 'meraki', 'fortinet', 'mist', 'aruba', 'checkpoint']
 
@@ -33,7 +37,7 @@ function report(job: string, errors: readonly string[]): void {
     for (const error of errors.slice(0, 20)) gs.warn(`[x_daas_ham] ${job}: ${error}`)
 }
 
-/** Daily: EoX milestones for canonical models of every vendor with a lifecycle API. */
+/** Daily: EoX milestones for NaaS Models (those with an OEM PID) of every vendor with a lifecycle API. */
 export function syncOemLifecycle(): void {
     for (const vendor of VENDORS) {
         const route = enabledRoute(vendor, 'lifecycle', oemEnabled)
@@ -41,7 +45,7 @@ export function syncOemLifecycle(): void {
         const models = new Map<string, string>()
         const model = new GlideRecord('cmdb_model')
         model.addQuery('x_daas_ham_oem_source', vendor)
-        model.addNotNullQuery('x_daas_ham_oem_pid')
+        model.addEncodedQuery(naasModelCondition())
         model.query()
         while (model.next()) models.set(str(model, 'x_daas_ham_oem_pid'), model.getUniqueValue())
 
@@ -137,9 +141,10 @@ function syncCoverageBatch(vendor: OemVendor, route: CoverageRoute, staleBefore:
     return result.errors.length === 0 && refused.length === 0 && route.maxKeysPerRun === undefined
 }
 
-/** Stale Assets by normalized serial (a serial can be shared by duplicate records). */
+/** Stale fleet assets by normalized serial (a serial can be shared by duplicate records). */
 function staleAssets(vendor: OemVendor, staleBefore: string, limit: number): Map<string, string[]> {
     const asset = new GlideRecord('alm_hardware')
+    asset.addEncodedQuery(fleetCondition())
     asset.addQuery('model.x_daas_ham_oem_source', vendor)
     asset.addQuery('install_status', '!=', 7)
     asset.addNotNullQuery('serial_number')
@@ -311,7 +316,7 @@ export function syncOemRmaStatus(): void {
     }
 }
 
-/** After-insert rule on coverage import rows (vendors without an API). */
+/** After-insert rule on coverage import rows (vendors without an API): coverage of a fleet asset's serial only. */
 export function processCoverageRow(current: GlideRecord): void {
     const finish = (state: string, comment: string) => {
         current.setValue('sys_import_state', state)
@@ -327,8 +332,8 @@ export function processCoverageRow(current: GlideRecord): void {
     if (!serial) return finish('error', 'serial number is required')
     if ((start && !isIsoDate(start)) || (end && !isIsoDate(end))) return finish('error', 'dates must be real calendar dates (YYYY-MM-DD)')
     if (cost && !Number.isFinite(Number(cost))) return finish('error', 'annual cost must be a number')
-    const asset = new GlideRecord('alm_hardware')
-    if (!asset.get('serial_number', serial)) return finish('error', `no asset with serial ${serial}`)
+    const asset = fleetAssetWithSerial(serial)
+    if (!asset) return finish('error', `no fleet asset with serial ${serial}`)
     const assetId = asset.getUniqueValue()
     const fact: CoverageFact = {
         serial,
@@ -343,4 +348,14 @@ export function processCoverageRow(current: GlideRecord): void {
     // Refused, the row is not imported: load it again once the cause is fixed.
     if (refused.length > 0) return finish('error', refused.join('; '))
     finish('inserted', `Coverage for ${serial}`)
+}
+
+/** The first fleet asset (ADR 0016) with this serial: one of the Provider IT's that carries it is not covered here. */
+function fleetAssetWithSerial(serial: string): GlideRecord | null {
+    const asset = new GlideRecord('alm_hardware')
+    asset.addQuery('serial_number', serial)
+    asset.addEncodedQuery(fleetCondition())
+    asset.setLimit(1)
+    asset.query()
+    return asset.next() ? asset : null
 }

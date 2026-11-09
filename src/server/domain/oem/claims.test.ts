@@ -479,14 +479,20 @@ describe('runVendorClaims', () => {
 })
 
 describe('dueStepsQuery', () => {
-    it('finds open pending steps, and failed ones to retry, of the vendor and action in each OR group', () => {
+    it("finds open pending steps, and failed ones to retry, of the vendor's fleet assets and the action in each OR group", () => {
         const groups = dueStepsQuery('aruba', 'oem_licence')
             .split('^NQ')
             .map((group) => group.split('^'))
         expect(groups).toHaveLength(2)
         for (const group of groups) {
             expect(group).toEqual(
-                expect.arrayContaining(['automation=oem_licence', 'done=false', 'staging_task.active=true', 'staging_task.asset.model.x_daas_ham_oem_source=aruba']),
+                expect.arrayContaining([
+                    'automation=oem_licence',
+                    'done=false',
+                    'staging_task.active=true',
+                    'staging_task.asset.model.x_daas_ham_oem_source=aruba',
+                    'staging_task.asset.x_daas_ham_fleet=true',
+                ]),
             )
         }
         expect(groups[0]).toContain('automation_status=pending')

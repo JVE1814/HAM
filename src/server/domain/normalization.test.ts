@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { manufacturerKey, normalizeModel, shouldLearnAlias, type ModelMatchRule } from './normalization'
+import {
+    fleetOnRawModelQuery,
+    manufacturerKey,
+    normalizeModel,
+    notNaasRawModelsQuery,
+    RAW_MODEL_EXCEPTIONS_QUERY,
+    rawModelsToNormalizeQuery,
+    siteCiOnRawModelQuery,
+    shouldLearnAlias,
+    type ModelMatchRule,
+} from './normalization'
+import { seenWithoutFleetAssetQuery } from './reconciliation'
 
 const aliases = [
     { alias: 'Cisco Systems, Inc.', manufacturerId: 'cisco' },
@@ -77,5 +88,59 @@ describe('shouldLearnAlias', () => {
         expect(shouldLearnAlias('   ', aliases)).toBe(false)
         expect(shouldLearnAlias('-', [])).toBe(false)
         expect(shouldLearnAlias('?*', [])).toBe(false)
+    })
+})
+
+describe('fleetOnRawModelQuery', () => {
+    it('finds fleet assets only, on a Model with no OEM PID not yet normalized (ADR 0016)', () => {
+        const conditions = fleetOnRawModelQuery().split('^')
+        expect(conditions).toEqual([
+            'modelISNOTEMPTY',
+            'model.x_daas_ham_oem_pidISEMPTY',
+            'model.x_daas_ham_normalized_toISEMPTY',
+            'x_daas_ham_fleet=true',
+        ])
+        expect(fleetOnRawModelQuery()).not.toContain('^NQ')
+    })
+})
+
+describe('rawModelsToNormalizeQuery', () => {
+    it('keeps the raw models to those fleet assets are on, each once', () => {
+        expect(rawModelsToNormalizeQuery(['m1', 'm2', 'm1', ''])).toBe('x_daas_ham_oem_pidISEMPTY^x_daas_ham_normalized_toISEMPTY^sys_idINm1,m2')
+    })
+
+    it('gives no query without one, which would map every raw model', () => {
+        expect(rawModelsToNormalizeQuery([])).toBeNull()
+        expect(rawModelsToNormalizeQuery([''])).toBeNull()
+    })
+})
+
+describe('siteCiOnRawModelQuery', () => {
+    it('finds the devices reported seen without a fleet asset, on a raw model not yet normalized', () => {
+        const query = siteCiOnRawModelQuery()
+        expect(query.startsWith(`${seenWithoutFleetAssetQuery()}^`)).toBe(true)
+        expect(query.endsWith('^model_idISNOTEMPTY^model_id.x_daas_ham_oem_pidISEMPTY^model_id.x_daas_ham_normalized_toISEMPTY')).toBe(true)
+        expect(query).not.toContain('^NQ')
+    })
+})
+
+describe('notNaasRawModelsQuery', () => {
+    it('keeps the raw models open exceptions name that are unmapped and not mapped by the job, each id once', () => {
+        expect(notNaasRawModelsQuery(['it1', 'naas1', 'it1', ''], ['naas1', 'naas2', 'naas1'])).toBe(
+            'x_daas_ham_oem_pidISEMPTY^x_daas_ham_normalized_toISEMPTY^sys_idINit1,naas1^sys_idNOT INnaas1,naas2',
+        )
+    })
+
+    it('takes every unmapped raw model named when no raw model is NaaS', () => {
+        expect(notNaasRawModelsQuery(['it1'], [])).toBe('x_daas_ham_oem_pidISEMPTY^x_daas_ham_normalized_toISEMPTY^sys_idINit1')
+    })
+
+    it('gives no query when no open exception names a raw model, which would match every raw model', () => {
+        expect(notNaasRawModelsQuery([], ['naas1'])).toBeNull()
+        expect(notNaasRawModelsQuery([''], [])).toBeNull()
+    })
+
+    it('reads the exceptions the hourly job raised only, not those of ASN rows', () => {
+        expect(RAW_MODEL_EXCEPTIONS_QUERY).toBe('status=open^source_table=cmdb_hardware_product_model')
     })
 })

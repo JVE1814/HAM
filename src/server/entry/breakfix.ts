@@ -2,16 +2,19 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import { replacementStep } from '../domain/breakfix.ts'
-import { moveAsset, readStage } from '../platform/assets.ts'
+import { isFleetAsset, moveAsset, readStage } from '../platform/assets.ts'
 import { findById, refusal, str } from '../platform/records.ts'
 import { submitOrder } from './orders.ts'
 
 /** Break-fix: a CSM case about a failed Asset drives a device-replace Order (P2.3, D58). */
 
-/** Before insert/update rule on cases naming a failed Asset: take the customer and service level from it. */
+/**
+ * Before insert/update rule on cases naming a failed Asset: take the customer and service level from it. A failed
+ * asset outside the fleet (ADR 0016), set by a script past the field's reference qualifier, gives the case nothing.
+ */
 export function onCaseFailedAsset(current: GlideRecord): void {
     const asset = findById('alm_hardware', str(current, 'x_daas_ham_failed_asset'))
-    if (!asset) return
+    if (!asset || !isFleetAsset(asset)) return
     current.setValue('x_daas_ham_replacement_tier', str(asset, 'x_daas_ham_agreement.replacement_tier'))
     if (!str(current, 'account')) current.setValue('account', str(asset, 'company'))
 }
@@ -36,6 +39,10 @@ export function uiRaiseReplacement(current: GlideRecord): void {
     const failed = findById('alm_hardware', str(current, 'x_daas_ham_failed_asset'))
     if (!failed) {
         gs.addErrorMessage('Set the failed asset on the case first')
+        return
+    }
+    if (!isFleetAsset(failed)) {
+        gs.addErrorMessage('Only a fleet asset is replaced: the failed asset is not one')
         return
     }
     if (!['in_service', 'temporary_deployment', 'pending_in_service'].includes(readStage(failed) ?? '')) {
@@ -79,10 +86,11 @@ function submitReplacement(order: GlideRecord): void {
     else gs.addInfoMessage(`Replacement order ${str(order, 'number')} is left as a draft: correct it and submit it`)
 }
 
-/** UI action on an OEM RMA: the defective unit went back to the manufacturer. */
+/** UI action on an OEM RMA: the defective unit went back to the manufacturer (a fleet asset only, ADR 0016). */
 export function uiDefectiveReturnedToOem(current: GlideRecord): void {
     const asset = findById('alm_hardware', str(current, 'defective_asset'))
     if (!asset) return
+    if (!isFleetAsset(asset)) return void gs.addErrorMessage('The defective asset is not a fleet asset: it is not retired here')
     const verdict = moveAsset(asset, 'returned_to_oem')
     if (!verdict.allowed) {
         gs.addErrorMessage(verdict.reason)

@@ -1,6 +1,7 @@
 import { GlideAggregate, gs } from '@servicenow/glide'
 import { andEachClause } from '../domain/encoded-query.ts'
-import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle.ts'
+import { fleetStagesQuery } from '../domain/fleet.ts'
+import { DEPLOYED_STAGES } from '../domain/lifecycle.ts'
 import { freeStockOf, pickForSparePool, reservedSparesQuery, sparePoolShortfall } from '../domain/sourcing.ts'
 import { runTableJob } from '../platform/chunked.ts'
 import { withLockTries, type HeldLock } from '../platform/locks.ts'
@@ -9,7 +10,10 @@ import { boolProperty, PROPERTY, stagingStockroom } from '../platform/properties
 import { num, str } from '../platform/records.ts'
 import { moveToSparePool, stockCandidates } from '../platform/stock.ts'
 
-/** Daily job: keep every Customer's Spare pool at its Agreement's spare-pool ratio (P1.4). */
+/**
+ * Daily job: keep every Customer's Spare pool at its Agreement's spare-pool ratio (P1.4), counting and moving fleet
+ * assets only (ADR 0016): the pool, the deployed units it is sized by, and the free stock it is filled from.
+ */
 export function topUpSparePools(): void {
     const autoPurchase = boolProperty(PROPERTY.autoPurchaseSpares, false) && canPurchase()
     runTableJob({
@@ -53,7 +57,7 @@ const POOL_LOCK_TRIES = 5
  * that error escapes, and the Agreement fails as a record of the run.
  */
 function topUpAgreement(agreementId: string, customerId: string, ratio: number, autoPurchase: boolean): void {
-    const deployed = countByModel(stagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}`))
+    const deployed = countByModel(fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}`))
     const reserved = countByModel(reservedSparesQuery(customerId))
     for (const [modelId, deployedCount] of deployed) {
         // A pool these counts show full is left without its lock: another run's top-up meanwhile only fills it.
