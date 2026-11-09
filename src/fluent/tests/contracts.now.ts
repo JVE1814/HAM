@@ -91,11 +91,15 @@ export const leaseExtensionTest = Test(
             uiAction: Now.ref('sys_ui_action', 'ua_lease_apply_decision'),
             assert: 'form_submitted_to_server',
         })
+        // "on", as the condition builder writes it: Record Validation matches the loaded record against the condition,
+        // and there a date `=` a literal day shifts by the session's time zone (west of UTC it matches the day after,
+        // so `ends=2028-01-31` fails on an instance in America/Los_Angeles). "on" matches the day in every time zone.
         atf.server.recordValidation({
             $id: Now.ID['atf_lext_validate_lease'],
             table: 'x_daas_ham_lease_schedule',
             recordId: lease.record_id,
-            fieldValues: 'ends=2028-01-31^end_action=undecided',
+            fieldValues:
+                "endsON2028-01-31@javascript:gs.dateGenerate('2028-01-31','start')@javascript:gs.dateGenerate('2028-01-31','end')^end_action=undecided",
             assert: 'record_validated',
         })
         atf.server.recordValidation({
