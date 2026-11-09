@@ -247,7 +247,8 @@ Conventions that the build or tests enforce:
 - Entry-point parameters must be named after the platform globals (`current`, `previous`, `event`,
   `producer`, `request`, `response`): the SDK wrapper passes them by name (`built-metadata.test.ts`).
 - A business rule condition fits the 254-character field and loads a module by its installed path,
-  `x_daas_ham/<package name>/<version>/src/...`, calling a function it exports
+  `x_daas_ham/<package name>/<version>/src/...` (`fluent/logic/server-modules.now.ts` builds it from
+  `package.json` and `now.config.json`), calling a function it exports
   (`built-metadata.test.ts`). A before rule on a table of another scope (`alm_hardware`, `wm_order`)
   refuses that way, with its Abort action, and its script only adds the reason: the platform ignores
   `current.setAbortAction` and `setWorkflow` called from this scope on such a table. So no entry
@@ -264,6 +265,13 @@ Conventions that the build or tests enforce:
   A query or condition the metadata needs is a constant written out beside the set, which a unit test
   holds to it; a UI action condition that restates a server rule is run as built against every value
   (`built-metadata.test.ts`).
+- The names the metadata and the server code must agree on each have one list, which both import:
+  role names and the platform roles the app needs (`domain/visibility.ts` `ROLE`, `PLATFORM_ROLE`;
+  the role groups are in `fluent/security/roles.now.ts`), events (`platform/events.ts` `EVENT`),
+  system properties with their shipped values (`platform/properties.ts` `PROPERTY`: a reader takes
+  the entry and falls back to that value) and REST messages with their functions
+  (`domain/rest-message-names.ts` `REST_MESSAGE`). `built-metadata.test.ts` holds what was built to
+  each list.
 - Substatus values added to `alm_asset` are the `choice` entries of `STAGE_FIELDS` there, which
   `fluent/data/substatus-choices.now.ts` ships one Record each (`built-metadata.test.ts` compares
   the built choice set with them).
