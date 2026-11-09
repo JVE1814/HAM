@@ -198,3 +198,29 @@ export function lineChangeRefusal(current: GlideRecord, previous: GlideRecord): 
 export function orderChangeRefusal(previous: GlideRecord): string {
     return disposalScopeRefusal([str(previous, 'stage')])
 }
+
+/**
+ * A draft return-to-lessor Disposal order for the stock of a lease being returned (platform/leases); null when the
+ * platform refuses it (logged).
+ */
+export function draftLessorDisposal(lease: GlideRecord): GlideRecord | null {
+    const order = new GlideRecord('x_daas_ham_disposal_order')
+    order.initialize()
+    order.setValue('method', 'return_to_lessor')
+    order.setValue('disposal_vendor', str(lease, 'vendor'))
+    order.setValue('short_description', `Return stock to the lessor at the end of lease ${str(lease, 'number')}`)
+    if (order.insert()) return order
+    warnRefused(order, `Lease return: no disposal order for ${str(lease, 'number')}`)
+    return null
+}
+
+/** Put a returned lease's Asset on its draft Disposal order; false (logged) when the platform refuses the line. */
+export function addDisposalLine(order: GlideRecord, asset: GlideRecord): boolean {
+    const line = new GlideRecord('x_daas_ham_disposal_line')
+    line.initialize()
+    line.setValue('disposal_order', order.getUniqueValue())
+    line.setValue('asset', asset.getUniqueValue())
+    if (line.insert()) return true
+    warnRefused(line, `Lease return: ${str(asset, 'serial_number')} left off ${str(order, 'number')}`)
+    return false
+}

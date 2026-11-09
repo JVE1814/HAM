@@ -29,6 +29,14 @@ export function leaseMismatch(leaseEnd: string, serviceEnds: readonly string[]):
     return serviceEnds.some((end) => end === '' || end > leaseEnd)
 }
 
+/** How long after its end an undecided lease is still reviewed: its mismatch flagged, a decision raised for it. */
+const REVIEWED_DAYS_PAST_END = 30
+
+/** The earliest end date of the undecided leases the daily review on `today` still looks at. */
+export function earliestReviewedEnd(today: string): string {
+    return addDays(today, -REVIEWED_DAYS_PAST_END)
+}
+
 export interface LeaseDecisionInput {
     decision: LeaseEndAction | ''
     /** The lease's end action now ('' is undecided). */
@@ -52,6 +60,47 @@ export function leaseDecisionProblem(input: LeaseDecisionInput): string | null {
     if (!input.decision || input.decision === 'undecided') return 'Choose buy out, extend or return'
     if (input.decision === 'extend' && !(input.newEndDate > input.leaseEnd)) return 'An extension needs a new end date after the current lease end'
     return null
+}
+
+/** What an applied end-of-lease decision writes on its lease; a field left out keeps its value. */
+export interface DecidedLease {
+    endAction: LeaseEndAction
+    ends?: string
+    mismatch?: false
+}
+
+/**
+ * The lease after `decision` (one `leaseDecisionProblem` lets through) is applied. A buy out or a return is the
+ * lease's end action from then on. An extension moves its end to `newEndDate` and leaves it undecided, so a new
+ * decision comes due before the new end, with its mismatch to be judged again against that end by the daily review.
+ */
+export function decidedLease(decision: LeaseEndAction, newEndDate: string): DecidedLease {
+    if (decision === 'extend') return { endAction: 'undecided', ends: newEndDate, mismatch: false }
+    return { endAction: decision }
+}
+
+/**
+ * The buyout's terms to fix on a lease as `decision` is applied, or null when it fixes none: how many Assets it covers
+ * (`covered`) and what each costs, its even share of `price`. They are fixed once, while every Asset is still covered
+ * (`fixedAssets` is 0 until then): Margin keeps splitting the lease payment over that many while the transfer runs.
+ */
+export function buyoutTerms(
+    decision: LeaseEndAction,
+    lease: { fixedAssets: number; price: number },
+    covered: () => number,
+): { assets: number; share: number } | null {
+    if (decision !== 'buyout' || lease.fixedAssets) return null
+    const assets = covered()
+    return { assets, share: evenShare(lease.price, assets) }
+}
+
+/**
+ * Whether an Agreement whose end date changed to `ends` has its equipment recovered again at that end: one that ends
+ * today or later has not ended, so its agreement-end Return is raised (again) once the day has passed. One moved to a
+ * past day ended before, and what was installed then has been recovered.
+ */
+export function recoversAgainAt(ends: string, today: string): boolean {
+    return ends >= today
 }
 
 /** One share of `amount` split evenly over `count` Assets (0 without any): a lease payment's or a buyout price's. */

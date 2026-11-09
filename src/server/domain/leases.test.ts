@@ -1,16 +1,69 @@
 import { describe, expect, it } from 'vitest'
 import {
     buyoutPurchase,
+    buyoutTerms,
+    decidedLease,
+    earliestReviewedEnd,
     evenShare,
     groupExpiringCoverage,
     leaseDecisionProblem,
     leaseMismatch,
+    recoversAgainAt,
     renewedEnd,
     stillCovered,
     stockReturnMoves,
     withinLead,
 } from './leases'
 import { ALL_STAGES, checkTransition, type TransitionFacts } from './lifecycle'
+
+describe('earliestReviewedEnd', () => {
+    it('keeps reviewing an undecided lease for 30 days past its end', () => {
+        expect(earliestReviewedEnd('2026-11-09')).toBe('2026-10-10')
+    })
+})
+
+describe('decidedLease', () => {
+    it('records a buy out or a return as the end action, and nothing else', () => {
+        expect(decidedLease('buyout', '')).toEqual({ endAction: 'buyout' })
+        expect(decidedLease('return', '2027-01-01')).toEqual({ endAction: 'return' })
+    })
+
+    it('moves an extended lease to its new end, undecided and with its mismatch cleared', () => {
+        expect(decidedLease('extend', '2027-06-30')).toEqual({ endAction: 'undecided', ends: '2027-06-30', mismatch: false })
+    })
+})
+
+describe('buyoutTerms', () => {
+    it('fixes the covered count and the even share of the price when a buyout is first applied', () => {
+        expect(buyoutTerms('buyout', { fixedAssets: 0, price: 1000 }, () => 4)).toEqual({ assets: 4, share: 250 })
+        expect(buyoutTerms('buyout', { fixedAssets: 0, price: 0 }, () => 4)).toEqual({ assets: 4, share: 0 })
+        expect(buyoutTerms('buyout', { fixedAssets: 0, price: 1000 }, () => 0)).toEqual({ assets: 0, share: 0 })
+    })
+
+    it('keeps terms already fixed, without counting the Assets again', () => {
+        const counted = () => {
+            throw new Error('counted')
+        }
+        expect(buyoutTerms('buyout', { fixedAssets: 4, price: 1000 }, counted)).toBeNull()
+    })
+
+    it('fixes none for any other decision', () => {
+        expect(buyoutTerms('return', { fixedAssets: 0, price: 1000 }, () => 4)).toBeNull()
+        expect(buyoutTerms('extend', { fixedAssets: 0, price: 1000 }, () => 4)).toBeNull()
+    })
+})
+
+describe('recoversAgainAt', () => {
+    it('recovers the equipment again when the Agreement now ends today or later', () => {
+        expect(recoversAgainAt('2026-11-09', '2026-11-09')).toBe(true)
+        expect(recoversAgainAt('2027-01-31', '2026-11-09')).toBe(true)
+    })
+
+    it('does not when the end only moved to another past day, or was cleared', () => {
+        expect(recoversAgainAt('2026-11-08', '2026-11-09')).toBe(false)
+        expect(recoversAgainAt('', '2026-11-09')).toBe(false)
+    })
+})
 
 describe('withinLead', () => {
     it('is due from lead days before the end date onwards', () => {
