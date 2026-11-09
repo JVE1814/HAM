@@ -81,8 +81,8 @@ rack exception are re-checked as well (see Racks), and their rack exceptions ope
   - *high*: past end of support, or no current coverage;
   - *medium*: end of sale, or refresh due within 180 days.
 - The page and its endpoints show Customer contacts only the racks at Sites they can see (their
-  Customer's; a Site contact's own Sites). Other Sites and racks answer *not found*. Staff see every
-  Site.
+  Customer's; a Site contact's own Sites of their Customer). Other Sites and racks answer *not
+  found*. Staff see every Site.
 
 ## Customer self-service (D49)
 

@@ -127,9 +127,11 @@ export function visibilityFilter(scope: VisibilityScope, fields: ScopingFields, 
             if (!fields.customer || !ids.customerId) return NOTHING
             return `${fields.customer}=${ids.customerId}`
         case 'own_sites': {
-            if (!fields.site) return NOTHING
+            // The Customer as well as the Site, as the read ACLs check: a Site of another Customer listing the
+            // contact shows them nothing.
+            if (!fields.customer || !fields.site || !ids.customerId) return NOTHING
             const sites = ids.siteIds()
-            return sites.length === 0 ? NOTHING : `${fields.site}IN${sites.join(',')}`
+            return sites.length === 0 ? NOTHING : `${fields.customer}=${ids.customerId}^${fields.site}IN${sites.join(',')}`
         }
     }
 }

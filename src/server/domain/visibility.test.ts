@@ -65,7 +65,15 @@ describe('visibilityFilter', () => {
     it('filters by the scoping field for each restricted scope', () => {
         expect(visibilityFilter('assigned_stockrooms', assetFields, ids)).toBe('stockroomINsr1,sr2')
         expect(visibilityFilter('own_customer', assetFields, ids)).toBe('company=cust1')
-        expect(visibilityFilter('own_sites', assetFields, ids)).toBe('x_daas_ham_siteINsite1')
+        expect(visibilityFilter('own_sites', assetFields, ids)).toBe('company=cust1^x_daas_ham_siteINsite1')
+    })
+
+    it("keeps site contacts to their own Customer, as the read ACLs do, so another Customer's Site listing them shows nothing", () => {
+        const locationFields = { customer: 'company', site: 'sys_id' }
+        expect(visibilityFilter('own_sites', locationFields, { ...ids, siteIds: () => ['site1', 'other_customer_site'] })).toBe(
+            'company=cust1^sys_idINsite1,other_customer_site',
+        )
+        expect(visibilityFilter('own_sites', locationFields, { ...ids, customerId: '' })).toBe('sys_id=-1')
     })
 
     it('shows nothing when the user has no stockrooms, sites or customer', () => {
@@ -82,6 +90,7 @@ describe('visibilityFilter', () => {
     it('hides tables without a customer field from external users', () => {
         expect(visibilityFilter('own_customer', { stockroom: 'stockroom' }, ids)).toBe('sys_id=-1')
         expect(visibilityFilter('own_sites', { customer: 'customer' }, ids)).toBe('sys_id=-1')
+        expect(visibilityFilter('own_sites', { site: 'site' }, ids)).toBe('sys_id=-1')
     })
 
     it('supports an either-or stockroom filter for transfers between stockrooms', () => {
