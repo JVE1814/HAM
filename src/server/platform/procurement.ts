@@ -1,18 +1,24 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { PurchaseResult } from '../domain/sourcing.ts'
 import { PROPERTY, stagingStockroom } from './properties.ts'
-import { str } from './records.ts'
+import { findById, refusal, str } from './records.ts'
 
 /**
  * Purchase orders through the Procurement plugin (proc_po / proc_po_item), shipped to the staging
  * stockroom. Created in the "requested" status for a buyer to complete; field names follow the base
  * Procurement data model. Ship to is mandatory on a purchase order, so none is requested while no
- * staging stockroom is set; then, or when the PO or its line item is not inserted, a warning is logged and the
- * result says why. A PO without its line item is removed (or, if it cannot be, named in the reason for cancelling).
+ * staging stockroom is set; nor for a Model without a Model category, whose line item Procurement refuses (its rule
+ * "Model Category of Model not empty"). Then, or when the PO or its line item is not inserted, a warning is logged and
+ * the result says why. Procurement lets no other scope delete a PO (its table's application access), so a PO saved
+ * without its line item is cancelled, or, if it cannot be, named in the reason for cancelling it by hand.
  */
 export function requestPurchase(input: { modelId: string; quantity: number; description: string }): PurchaseResult {
     const shipTo = stagingStockroom()
     if (!shipTo) return noPurchase(input.description, `set ${PROPERTY.stagingStockroom}`)
+    const model = findById('cmdb_model', input.modelId)
+    if (model && !str(model, 'cmdb_model_category')) {
+        return noPurchase(input.description, `give Model ${str(model, 'name')} a Model category: Procurement refuses a line item without one`)
+    }
     const po = new GlideRecord('proc_po')
     po.initialize()
     po.setValue('short_description', input.description)
@@ -28,8 +34,9 @@ export function requestPurchase(input: { modelId: string; quantity: number; desc
     item.setValue('ordered_quantity', input.quantity)
     item.setValue('status', 'requested')
     if (item.insert()) return { ok: true, poId }
-    const removed = po.deleteRecord()
-    return noPurchase(input.description, removed ? 'Procurement did not create its line item' : `Procurement created ${str(po, 'number')} without its line item; cancel it`)
+    const why = `Procurement created ${str(po, 'number')} without its line item (${refusal(item)})`
+    po.setValue('status', 'canceled')
+    return noPurchase(input.description, po.update() ? `${why}; it is cancelled` : `${why}; cancel it`)
 }
 
 /** The sys_id of the purchase order numbered `number` (as an ASN or a received unit names it), or ''. */
