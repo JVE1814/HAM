@@ -1,7 +1,8 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { addDays } from '../domain/calendar'
+import { lineStillOpen, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse, type RmaState } from '../domain/sourcing'
 import { todayIso } from './clock'
-import { refusal, str } from './records'
+import { findById, refusal, str } from './records'
 
 /** OEM RMA records (opening the RMA with the vendor is manual, ADR 0008). */
 
@@ -23,11 +24,49 @@ export function openOemRma(input: { defectiveAsset: GlideRecord; orderLineId: st
     return ''
 }
 
+/** The RMAs still open for a defective Asset (domain/sourcing `RMA_OPEN`), oldest first, with the line each serves. */
+export function openRmasFor(defectiveAssetId: string): OpenRma[] {
+    const rma = new GlideRecord('x_daas_ham_oem_rma')
+    rma.addQuery('defective_asset', defectiveAssetId)
+    rma.addQuery('state', 'IN', RMA_OPEN.join(','))
+    rma.orderBy('sys_created_on')
+    rma.query()
+    const open: OpenRma[] = []
+    while (rma.next()) {
+        const line = { lineStage: str(rma, 'order_line.line_stage'), orderStage: str(rma, 'order_line.order.stage') }
+        open.push({
+            rmaId: rma.getUniqueValue(),
+            rmaNumber: str(rma, 'rma_number'),
+            state: str(rma, 'state') as RmaState,
+            lineId: str(rma, 'order_line'),
+            // With no line both stages read '', which is no open line.
+            lineOpen: lineStillOpen(line),
+        })
+    }
+    return open
+}
+
+/**
+ * Put the RMA `reuse` names (domain/sourcing `advanceReplacementRma`) under the Order line, in the state it takes, so
+ * the line counts its replacement as on its way; false (logged) when the platform refuses.
+ */
+export function reuseOemRma(reuse: RmaReuse, orderLineId: string): boolean {
+    const rma = findById('x_daas_ham_oem_rma', reuse.rma.rmaId)
+    if (rma) {
+        rma.setValue('order_line', orderLineId)
+        rma.setValue('state', reuse.state)
+        if (rma.update()) return true
+    }
+    const reason = rma ? refusal(rma) : 'not found'
+    gs.warn(`[x_daas_ham] OEM RMA ${reuse.rma.rmaNumber || reuse.rma.rmaId} not reused: ${reason}`)
+    return false
+}
+
 /** OEM advance replacements still expected for an Order line. */
 export function openRmaCount(orderLineId: string): number {
     const rma = new GlideRecord('x_daas_ham_oem_rma')
     rma.addQuery('order_line', orderLineId)
-    rma.addQuery('state', 'IN', 'to_open,open')
+    rma.addQuery('state', 'IN', RMA_AWAITED.join(','))
     rma.query()
     return rma.getRowCount()
 }

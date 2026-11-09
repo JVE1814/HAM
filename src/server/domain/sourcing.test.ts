@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { stagesQuery } from './lifecycle'
 import {
+    advanceReplacementRma,
     freeStockOf,
     isClaimable,
     isFree,
+    lineStillOpen,
     orderLineLockName,
     pickForSparePool,
     planSourcing,
@@ -12,6 +14,7 @@ import {
     sourcingLockName,
     sparePoolShortfall,
     stockQueries,
+    type OpenRma,
     type PurchaseResult,
     type SourcingRequest,
     type StockCandidate,
@@ -188,6 +191,74 @@ describe('shortfallOutcome', () => {
         const outcome = shortfallOutcome('purchase', { ...line, unmoved: [{ units: 1, from: 'Depot North', reason: 'Inventory did not create it' }] }, buy)
         expect(outcome).toMatchObject({ stage: 'awaiting_stock', purchaseOrder: 'po1', purchased: 2 })
         expect(buy).toHaveBeenCalledOnce()
+    })
+})
+
+describe('lineStillOpen', () => {
+    it('is a line not yet shipped, cancelled or rejected, on an Order neither cancelled nor rejected', () => {
+        expect(lineStillOpen({ lineStage: 'awaiting_stock', orderStage: 'sourcing' })).toBe(true)
+        expect(lineStillOpen({ lineStage: 'ready_to_ship', orderStage: 'preparing' })).toBe(true)
+        for (const lineStage of ['shipped', 'installed', 'in_service', 'cancelled']) {
+            expect(lineStillOpen({ lineStage, orderStage: 'sourcing' })).toBe(false)
+        }
+        // A line whose cancel was refused stays open on its cancelled Order.
+        for (const orderStage of ['cancelled', 'rejected']) {
+            expect(lineStillOpen({ lineStage: 'awaiting_stock', orderStage })).toBe(false)
+        }
+    })
+})
+
+describe('advanceReplacementRma', () => {
+    const rma = (rma: Partial<OpenRma> & Pick<OpenRma, 'rmaId'>): OpenRma => ({
+        rmaNumber: '',
+        state: 'to_open',
+        lineId: '',
+        lineOpen: false,
+        ...rma,
+    })
+
+    it('opens a new RMA when none is open for the unit the line replaces', () => {
+        expect(advanceReplacementRma('line-1', [])).toBeNull()
+        const returned = rma({ rmaId: 'r1', state: 'defective_returned', lineId: 'line-1', lineOpen: true })
+        const done = [returned, rma({ rmaId: 'r2', state: 'closed' })]
+        expect(advanceReplacementRma('line-1', done)).toBeNull()
+    })
+
+    it("reuses the line's own RMA whose replacement was lost in transit, open again to ask for another", () => {
+        const received = rma({ rmaId: 'r1', state: 'replacement_received', lineId: 'line-1', lineOpen: true })
+        expect(advanceReplacementRma('line-1', [received])).toEqual({ rma: received, state: 'open', askAgain: true })
+    })
+
+    it('reuses an RMA whose replacement is still to come as it is, the line waiting for that replacement', () => {
+        for (const state of ['to_open', 'open'] as const) {
+            const awaited = rma({ rmaId: 'r1', state })
+            expect(advanceReplacementRma('line-1', [awaited])).toEqual({ rma: awaited, state, askAgain: false })
+        }
+    })
+
+    it('reuses one left by a line no longer waiting for it, such as a cancelled Order', () => {
+        const left = rma({ rmaId: 'r1', state: 'open', lineId: 'line-0', lineOpen: false })
+        expect(advanceReplacementRma('line-1', [left])?.rma).toBe(left)
+    })
+
+    it('leaves an RMA another open line waits for to that line', () => {
+        const theirs = rma({ rmaId: 'r1', state: 'open', lineId: 'line-2', lineOpen: true })
+        expect(advanceReplacementRma('line-1', [theirs])).toBeNull()
+    })
+
+    it("prefers the line's own RMA, then one whose replacement is still to come", () => {
+        const stray = rma({ rmaId: 'stray', state: 'replacement_received' })
+        const awaited = rma({ rmaId: 'awaited', state: 'to_open' })
+        const own = rma({ rmaId: 'own', state: 'replacement_received', lineId: 'line-1', lineOpen: true })
+        expect(advanceReplacementRma('line-1', [stray, awaited, own])?.rma).toBe(own)
+        expect(advanceReplacementRma('line-1', [stray, awaited])?.rma).toBe(awaited)
+    })
+
+    it('takes the oldest of RMAs ranked alike (the platform lists them oldest first)', () => {
+        const older = rma({ rmaId: 'older', state: 'open' })
+        const newer = rma({ rmaId: 'newer', state: 'to_open' })
+        expect(advanceReplacementRma('line-1', [older, newer])?.rma).toBe(older)
+        expect(advanceReplacementRma('line-1', [newer, older])?.rma).toBe(newer)
     })
 })
 

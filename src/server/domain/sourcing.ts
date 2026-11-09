@@ -1,3 +1,4 @@
+import { OPEN_LINE_STAGES } from './entitlement'
 import type { LineStage } from './fulfilment'
 import type { LeaseEndAction } from './leases'
 import { stagesQuery, type Stage } from './lifecycle'
@@ -204,6 +205,62 @@ function routedOutcome(route: ShortfallRoute, line: { planSummary: string; missi
     const bought = purchase()
     if (!bought.ok) return { ...sourced, stage: 'awaiting_stock', summary: `${line.planSummary} (no purchase order: ${bought.reason})` }
     return { ...sourced, purchaseOrder: bought.poId, purchased: line.missing }
+}
+
+/** Order stages in which nothing is sourced, even for a line a refused save left open. */
+const ENDED_ORDER_STAGES: readonly string[] = ['cancelled', 'rejected']
+
+/** Whether an Order line still waits to be filled: not shipped or cancelled, its Order not cancelled or rejected. */
+export function lineStillOpen(line: { lineStage: string; orderStage: string }): boolean {
+    return OPEN_LINE_STAGES.includes(line.lineStage as LineStage) && !ENDED_ORDER_STAGES.includes(line.orderStage)
+}
+
+/** The states of an OEM RMA (x_daas_ham_oem_rma.state). */
+export type RmaState = 'to_open' | 'open' | 'replacement_received' | 'defective_returned' | 'closed'
+
+/** RMAs whose replacement is still to come: their line counts each as a unit on its way. */
+export const RMA_AWAITED: readonly RmaState[] = ['to_open', 'open']
+
+/** RMAs still open, the defective unit not yet back with the OEM (as the workspace's Open OEM RMAs list them). */
+export const RMA_OPEN: readonly RmaState[] = ['to_open', 'open', 'replacement_received']
+
+/** An RMA for the Asset a break-fix line replaces, as `advanceReplacementRma` weighs it. */
+export interface OpenRma {
+    rmaId: string
+    rmaNumber: string
+    state: RmaState
+    /** The Order line it serves; '' for none. */
+    lineId: string
+    /** Whether that line still waits to be filled (`lineStillOpen`); false for none. */
+    lineOpen: boolean
+}
+
+/** An open RMA a line's advance replacement goes under, and the state it is saved in. */
+export interface RmaReuse {
+    rma: OpenRma
+    state: RmaState
+    /** Its replacement was received (then lost in transit or failed staging): the vendor is asked for another. */
+    askAgain: boolean
+}
+
+/**
+ * Whether a break-fix line whose shortfall goes to an OEM advance replacement reuses an RMA already open for the unit
+ * it replaces, or (null) opens one: the OEM is not asked twice for one defective unit. Reused, the RMA serves the line
+ * and its replacement is awaited, so the line waits for it; one whose replacement was received goes back to open. The
+ * line's own RMA comes first, then one still awaited, then the first given (`rmas` oldest first). One that another
+ * open line waits for is that line's.
+ */
+export function advanceReplacementRma(lineId: string, rmas: readonly OpenRma[]): RmaReuse | null {
+    const rank = (rma: OpenRma) => (rma.lineId === lineId ? 0 : 2) + (RMA_AWAITED.includes(rma.state) ? 0 : 1)
+    // A scan, not a sort: the platform's Array sort need not keep equals in the order given.
+    let best: OpenRma | null = null
+    for (const rma of rmas) {
+        const reusable = RMA_OPEN.includes(rma.state) && (rma.lineId === lineId || !rma.lineOpen)
+        if (reusable && (!best || rank(rma) < rank(best))) best = rma
+    }
+    if (!best) return null
+    const askAgain = !RMA_AWAITED.includes(best.state)
+    return { rma: best, state: askAgain ? 'open' : best.state, askAgain }
 }
 
 /**

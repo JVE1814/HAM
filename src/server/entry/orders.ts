@@ -15,9 +15,11 @@ import {
     type OrderParties,
     type RequestedLine,
 } from '../domain/entitlement'
-import { anythingShipped, approvalAwaited, type LineStage } from '../domain/fulfilment'
+import { anythingShipped, approvalAwaited } from '../domain/fulfilment'
 import { shortfallRoute, type ShortfallRoute } from '../domain/returns'
 import {
+    advanceReplacementRma,
+    lineStillOpen,
     orderLineLockName,
     planSourcing,
     shortfallOutcome,
@@ -39,7 +41,7 @@ import { EVENT, fire } from '../platform/events'
 import { orderShipment, recomputeLine, recomputeOrder } from '../platform/fulfilment'
 import { todayIso } from '../platform/clock'
 import { withLock, withLockTries, type HeldLock } from '../platform/locks'
-import { openOemRma, openRmaCount } from '../platform/oem-rma'
+import { openOemRma, openRmaCount, openRmasFor, reuseOemRma } from '../platform/oem-rma'
 import { requestPurchase } from '../platform/procurement'
 import { PROPERTY, stagingStockroom, stringProperty } from '../platform/properties'
 import { bool, count, findById, num, refusal, str } from '../platform/records'
@@ -524,11 +526,8 @@ function stillToBuy(toPurchase: number, shortfall: number, putBack: number): num
     return Math.max(0, Math.min(toPurchase, shortfall - putBack))
 }
 
-/** Order stages in which nothing is sourced, even for a line a refused save left open. */
-const ENDED_ORDER_STAGES: readonly string[] = ['cancelled', 'rejected']
-
 /**
- * The line read afresh while it and its Order are still open (not shipped, cancelled or rejected), else null. Cancel
+ * The line read afresh while it and its Order are still open (domain/sourcing `lineStillOpen`), else null. Cancel
  * order takes turns with sourcing under the Order's lock, but a rejected Order's lines are cancelled without that lock,
  * a cancel may overlap a pass that outlasted it (ADR 0013), and a line whose cancel was refused stays open on its
  * cancelled Order; so sourcing checks the line here before it reserves, buys or saves. The Order is saved as cancelled
@@ -536,8 +535,8 @@ const ENDED_ORDER_STAGES: readonly string[] = ['cancelled', 'rejected']
  */
 function openLine(lineId: string): GlideRecord | null {
     const line = findById('x_daas_ham_order_line', lineId)
-    if (!line || ENDED_ORDER_STAGES.includes(str(line, 'order.stage'))) return null
-    return OPEN_LINE_STAGES.includes(str(line, 'line_stage') as LineStage) ? line : null
+    const open = line && lineStillOpen({ lineStage: str(line, 'line_stage'), orderStage: str(line, 'order.stage') })
+    return open ? line : null
 }
 
 /**
@@ -560,15 +559,8 @@ function settleHolding(
     const allocated = countAllocated(sourced.lineId)
     const missing = stillToBuy(sourced.toPurchase, shortfallOf(line, allocated), sourced.putBack)
     const route = sourced.route(missing)
-    let rmaRefused = false
-    if (route === 'oem_advance_replacement' && sourced.replaced) {
-        // Unrecorded, the line would wait for a replacement nobody asked the OEM for: logged and in its summary.
-        const rma = { defectiveAsset: sourced.replaced, orderLineId: sourced.lineId, caseId: str(order, 'case') }
-        if (!openOemRma(rma)) {
-            rmaRefused = true
-            gs.warn(`[x_daas_ham] ${number}: no OEM RMA saved for ${str(sourced.replaced, 'serial_number')}`)
-        }
-    }
+    const advance = route === 'oem_advance_replacement' && sourced.replaced
+    const rmaNote = advance ? putUnderRma(order, line, advance) : ''
     const { toPurchase, unmoved, transfers } = sourced
     // The plan's summary counts what the pass would buy by its own read.
     const met = toPurchase - missing
@@ -593,7 +585,7 @@ function settleHolding(
     // Counted again: a receipt may have allocated a unit to the line since this pass read it.
     line.setValue('quantity_allocated', allocated)
     line.setValue('quantity_to_purchase', num(line, 'quantity_to_purchase') + outcome.purchased)
-    line.setValue('sourcing_summary', rmaRefused ? `${outcome.summary} (none saved: open it by hand)` : outcome.summary)
+    line.setValue('sourcing_summary', `${outcome.summary}${rmaNote}`)
     line.setValue('line_stage', outcome.stage)
     if (!line.update()) {
         // Unlisted, a purchase order's units are not allocated on receipt, and the next run buys the shortfall again.
@@ -605,6 +597,25 @@ function settleHolding(
     // A holder that outlasted the line's lock (ADR 0013) may have saved beside a receipt that took it over.
     if (!lineLock.held()) gs.warn(`[x_daas_ham] ${number} saved after its lock was lost: check its On order count`)
     return 'saved'
+}
+
+/**
+ * Put the line's shortfall under an OEM advance replacement for the Asset it `replaced`: the RMA already open for that
+ * unit when there is one to reuse (domain/sourcing `advanceReplacementRma`), else a new one. What the line's sourcing
+ * summary adds. Unrecorded, the line would wait for a replacement nobody asked the OEM for: logged and in its summary.
+ */
+function putUnderRma(order: GlideRecord, line: GlideRecord, replaced: GlideRecord): string {
+    const lineId = line.getUniqueValue()
+    const serial = str(replaced, 'serial_number')
+    const reuse = advanceReplacementRma(lineId, openRmasFor(replaced.getUniqueValue()))
+    if (reuse) {
+        const which = `RMA ${reuse.rma.rmaNumber || '(no number yet)'} already open for ${serial}`
+        if (!reuseOemRma(reuse, lineId)) return ` (${which} not put under the line: do it by hand)`
+        return reuse.askAgain ? ` (${which}: its replacement was received, ask the vendor for another)` : ` (${which})`
+    }
+    if (openOemRma({ defectiveAsset: replaced, orderLineId: lineId, caseId: str(order, 'case') })) return ''
+    gs.warn(`[x_daas_ham] ${str(line, 'number')}: no OEM RMA saved for ${serial}`)
+    return ' (none saved: open it by hand)'
 }
 
 /**
@@ -721,19 +732,28 @@ function cancelOpenLines(orderId: string): boolean {
  *
  * A sourcing pass running meanwhile would reserve stock for, or buy for, lines just cancelled, and its purchase orders
  * would not be listed to cancel. So the cancel holds the Order's sourcing lock (`sourceOrder`) and the two take turns;
- * a cancel that finds it held changes nothing and tells the user to try again. Taking the lock throws only when an
- * insert is refused with no lock row (platform/locks): that error escapes.
+ * a cancel that finds it held changes nothing and tells the user to try again. A Ship running between the cancel's
+ * shipped check and its release of the lines would send units of lines being cancelled, so the cancel holds the
+ * Order's Ship lock too (`ship_order_<sys_id>`, entry/delivery `shipOrder`), taken under the sourcing lock as in ADR
+ * 0013's order (Ship never takes the sourcing lock); one that finds it held changes nothing and says a Ship is running.
+ * Taking either lock throws only when an insert is refused with no lock row (platform/locks): that error escapes.
  */
 export function cancelOrder(order: GlideRecord): void {
-    const taken = withLock(sourcingLockName(order.getUniqueValue()), (lock) => cancelHolding(lock, order))
-    if (!taken) gs.addErrorMessage('Order not cancelled: sourcing is running on it. Try again in a minute')
+    const orderId = order.getUniqueValue()
+    // Set inside the sourcing lock.
+    let shipping = false as boolean
+    const taken = withLock(sourcingLockName(orderId), (sourcing) => {
+        shipping = !withLock(`ship_order_${orderId}`, (ship) => cancelHolding({ sourcing, ship }, order))
+    })
+    if (!taken) return void gs.addErrorMessage('Order not cancelled: sourcing is running on it. Try again in a minute')
+    if (shipping) gs.addErrorMessage('Order not cancelled: a Ship of the Order is running. Try again once it is done')
 }
 
 /**
- * The cancel, holding the Order's sourcing `lock`. It is refused once anything of the Order has shipped
+ * The cancel, holding the Order's sourcing and Ship `locks`. It is refused once anything of the Order has shipped
  * (domain/fulfilment `anythingShipped`), a unit of a line not delivered whole included, whoever presses it.
  */
-function cancelHolding(lock: HeldLock, order: GlideRecord): void {
+function cancelHolding(locks: { sourcing: HeldLock; ship: HeldLock }, order: GlideRecord): void {
     if (anythingShipped(orderShipment(order.getUniqueValue()))) {
         return void gs.addErrorMessage('Order not cancelled: equipment has already shipped. Use a Return order instead')
     }
@@ -748,11 +768,16 @@ function cancelHolding(lock: HeldLock, order: GlideRecord): void {
     if (!cancelOpenLines(order.getUniqueValue())) {
         gs.addErrorMessage('Order cancelled; some lines, stock or staging tasks were left as they were (see the log)')
     }
-    // A cancel that outlasted the lock (ADR 0013) may have overlapped a pass that took it over; that pass skips the
-    // lines it reads after the Order was saved cancelled (`openLine`), not those it reached first.
-    if (!lock.held()) {
+    // A cancel that outlasted a lock (ADR 0013) may have overlapped the pass or Ship that took it over. A pass skips
+    // the lines it reads after the Order was saved cancelled (`openLine`), not those it reached first; a Ship may have
+    // sent units before the cancel released them.
+    const number = str(order, 'number')
+    if (!locks.sourcing.held()) {
         const check = 'check its lines for stock reserved or bought meanwhile'
-        gs.warn(`[x_daas_ham] ${str(order, 'number')} cancelled after its sourcing lock was lost: ${check}`)
+        gs.warn(`[x_daas_ham] ${number} cancelled after its sourcing lock was lost: ${check}`)
+    }
+    if (!locks.ship.held()) {
+        gs.warn(`[x_daas_ham] ${number} cancelled after its Ship lock was lost: check for units shipped meanwhile`)
     }
     // After the save, so the approval rule each cancellation runs finds the Order no longer awaiting approval.
     cancelPendingApprovals(order.getUniqueValue())
