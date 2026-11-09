@@ -14,6 +14,7 @@ import {
     type ReceivingLine,
 } from '../domain/warehouse.ts'
 import { findAssetByIdentifier, moveAndSave, moveAsset, newAsset, readStage } from '../platform/assets.ts'
+import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { lineAssetStages } from '../platform/fulfilment.ts'
 import { withLock, type HeldLock } from '../platform/locks.ts'
 import { loadNormalizationData, resolveModel } from '../platform/normalization.ts'
@@ -206,14 +207,14 @@ function saveReceipt(lock: HeldLock, asset: GlideRecord): Unsaved | null {
     return asset.update() ? null : { status: 422, error: `Not received: ${refusal(asset)}` }
 }
 
-/** The Asset read again by sys_id, past the stockroom rule as the scan's lookup was (see `receiveAsset`). */
+/**
+ * The Asset read again by sys_id, past the stockroom rule as the scan's lookup was (see `receiveAsset`). The receipt's
+ * saves run the lifecycle, billing and asset-CI rules.
+ */
 function arrivingAsset(assetId: string): GlideRecord | null {
     const asset = new GlideRecord('alm_hardware')
-    asset.setWorkflow(false)
     asset.addQuery('sys_id', assetId)
-    asset.query()
-    // Rules back on, so the receipt's saves run the lifecycle, billing and asset-CI rules.
-    asset.setWorkflow(true)
+    beyondVisibility(asset, () => asset.query())
     return asset.next() ? asset : null
 }
 

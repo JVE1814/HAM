@@ -4,6 +4,7 @@ import { awaitsInstall, type InstallState } from '../domain/install-confirmation
 import { isDeployed, stagesQuery } from '../domain/lifecycle.ts'
 import { checkJobWindow } from '../domain/scheduling.ts'
 import { moveAndSave, moveAsset, readStage } from '../platform/assets.ts'
+import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { glideToMs } from '../platform/clock.ts'
 import { openFieldWork, type WorkContext } from '../platform/field-work.ts'
 import { lineAssetStages, recomputeOrder } from '../platform/fulfilment.ts'
@@ -99,11 +100,9 @@ function shipHolding(lock: HeldLock, order: GlideRecord): void {
     }
     const hotSpares = new Set(found.hotSpares)
     const asset = new GlideRecord('alm_hardware')
-    // Found past the user's rules as shippable() found them, then saved with the rules on so the line moves on.
-    asset.setWorkflow(false)
+    // Found past the visibility rules as shippable() found them; saved with every rule, so the line moves on.
     asset.addQuery('sys_id', 'IN', [...found.staged, ...found.hotSpares].join(','))
-    asset.query()
-    asset.setWorkflow(true)
+    beyondVisibility(asset, () => asset.query())
     let shipped = 0
     while (asset.next()) {
         // The label purchase takes time: an Asset moved on meanwhile is left alone.
@@ -125,10 +124,9 @@ function shipHolding(lock: HeldLock, order: GlideRecord): void {
  */
 function shippable(orderId: string, siteId: string): { staged: string[]; hotSpares: string[]; refused: number; reason: string } {
     const asset = new GlideRecord('alm_hardware')
-    // Only tried, never saved, so the rules need not be turned back on.
-    asset.setWorkflow(false)
+    // Only tried, never saved.
     asset.addEncodedQuery(stagesQuery(['staged', 'spare_pool'], `x_daas_ham_order_line.order=${orderId}`))
-    asset.query()
+    beyondVisibility(asset, () => asset.query())
     const found = { staged: [] as string[], hotSpares: [] as string[], refused: 0, reason: '' }
     while (asset.next()) {
         const hotSpare = readStage(asset) === 'spare_pool'

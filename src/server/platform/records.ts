@@ -1,4 +1,5 @@
 import { GlideAggregate, type GlideElement, GlideRecord } from '@servicenow/glide'
+import { beyondVisibility } from './beyond-visibility.ts'
 
 /** Small Glide helpers shared by repositories and gateways. Keep this module free of business rules. */
 
@@ -46,7 +47,8 @@ export function addAnyOf(gr: GlideRecord, field: string, values: readonly string
  * Delete every record matching an encoded query with one set-based delete (business rules run unless `businessRules`
  * is false), and return whether none is left. deleteMultiple reports nothing and a rule can keep a record, so a
  * caller that must not go on past one checks this. It looks past before-query rules, so a record hidden from the user
- * still counts as left.
+ * still counts as left: past every rule on an app table, and past the app's visibility rules on a table of another
+ * scope, where the platform refuses setWorkflow from this scope (platform/beyond-visibility).
  */
 export function deleteWhere(table: string, encodedQuery: string, options: { businessRules?: boolean } = {}): boolean {
     const gr = new GlideRecord(table)
@@ -58,7 +60,7 @@ export function deleteWhere(table: string, encodedQuery: string, options: { busi
     left.setWorkflow(false)
     // One survivor is enough to tell; a full count would read every one (e.g. of a purge).
     left.setLimit(1)
-    left.query()
+    beyondVisibility(left, () => left.query())
     return !left.hasNext()
 }
 

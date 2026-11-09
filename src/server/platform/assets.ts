@@ -10,6 +10,7 @@ import {
     type TransitionVerdict,
     voidsWipeEvidence,
 } from '../domain/lifecycle.ts'
+import { beyondVisibility } from './beyond-visibility.ts'
 import { refusal, str } from './records.ts'
 
 /** Reading and moving Assets (alm_hardware) through their Lifecycle stage (ADR 0002). */
@@ -89,21 +90,19 @@ export function newAsset(modelId: string, stage: Stage): GlideRecord {
 }
 
 /**
- * The Asset with this serial number, Provider tag or Customer tag. `beyondVisibility` skips the
- * before-query visibility rules (ADR 0005): receiving must find incoming units that belong to no
- * stockroom yet, and the device-events API must find any asset.
+ * The Asset with this serial number, Provider tag or Customer tag. `beyondVisibility` reads it past the app's
+ * before-query visibility rules (ADR 0005, platform/beyond-visibility): receiving must find incoming units that belong
+ * to no stockroom yet, and the device-events API must find any asset. Its later saves run every rule.
  */
 export function findAssetByIdentifier(identifier: string, options: { beyondVisibility?: boolean } = {}): GlideRecord | null {
     const code = identifier.trim()
     if (!code) return null
     const asset = new GlideRecord('alm_hardware')
-    if (options.beyondVisibility) asset.setWorkflow(false)
     const byIdentifier = asset.addQuery('serial_number', normalizeSerial(code))
     byIdentifier.addOrCondition('asset_tag', code)
     byIdentifier.addOrCondition('x_daas_ham_customer_tag', code)
     asset.setLimit(1)
-    asset.query()
-    // Re-enable rules so later updates of this record run asset-CI sync and the app's own rules.
-    asset.setWorkflow(true)
+    if (options.beyondVisibility) beyondVisibility(asset, () => asset.query())
+    else asset.query()
     return asset.next() ? asset : null
 }

@@ -25,13 +25,13 @@ export function providerApproverIds(accountManagerId: string): string[] {
 }
 
 /**
- * Whether the user is active, read past the before-query rules: a customer admin raising an Order may not be shown
- * the Provider's users, which would make every account manager count as none.
+ * Whether the user is active. sys_user is a table of another scope, so its rules run (the platform refuses setWorkflow
+ * from this scope) and the app has none there: the platform's *user query* rule hides inactive users from an
+ * interactive user without admin or user_admin, and this query asks for an active one anyway, so a customer admin
+ * raising an Order still finds an active account manager.
  */
 function isActiveUser(userId: string): boolean {
     const user = new GlideRecord('sys_user')
-    // Only read, never saved, so the rules need not be turned back on.
-    user.setWorkflow(false)
     user.addQuery('sys_id', userId)
     user.addQuery('active', true)
     user.setLimit(1)

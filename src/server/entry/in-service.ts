@@ -5,6 +5,7 @@ import { decideInService } from '../domain/in-service.ts'
 import { stagesQuery } from '../domain/lifecycle.ts'
 import { ROLE } from '../domain/visibility.ts'
 import { findAssetByIdentifier, moveAndSave, readStage } from '../platform/assets.ts'
+import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { runTableJob } from '../platform/chunked.ts'
 import { glideToMs, msToGlide, nowMs } from '../platform/clock.ts'
 import { applyLifecycleDates, lifecycleReaders, type LifecycleReaders } from '../platform/lifecycle-dates.ts'
@@ -83,13 +84,10 @@ function underSeenLock(assetId: string, see: (lock: HeldLock, asset: GlideRecord
     return ran && applied
 }
 
-/** The Asset read past the before-query rules, as the identifier lookup finds it; rules back on for its save. */
+/** The Asset read past the visibility rules, as the identifier lookup finds it; its save runs every rule. */
 function freshAsset(assetId: string): GlideRecord | null {
     const asset = new GlideRecord('alm_hardware')
-    asset.setWorkflow(false)
-    const found = asset.get(assetId)
-    asset.setWorkflow(true)
-    return found ? asset : null
+    return beyondVisibility(asset, () => asset.get(assetId)) ? asset : null
 }
 
 /** POST /api/x_daas_ham/naas/v1/device_events - Seen signals from the Provider NMS. */

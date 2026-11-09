@@ -15,6 +15,7 @@ import {
 } from '../domain/returns.ts'
 import { clearRackPlacement, moveAndSave, moveAsset, readStage } from '../platform/assets.ts'
 import { customerAdminIds } from '../platform/approvals.ts'
+import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { runTableJob } from '../platform/chunked.ts'
 import { EVENT } from '../platform/events.ts'
 import { withLock, type HeldLock } from '../platform/locks.ts'
@@ -156,11 +157,9 @@ function endSitePackageIfEmpty(siteId: string, agreementId: string): void {
     line.query()
     if (!line.hasNext()) return
     const remaining = new GlideRecord('alm_hardware')
-    // Only counted, never updated, so the rules need not be turned back on.
-    remaining.setWorkflow(false)
     remaining.addEncodedQuery(sitePackageHoldersQuery({ siteId, agreementId }))
     remaining.setLimit(1)
-    remaining.query()
+    beyondVisibility(remaining, () => remaining.query())
     if (remaining.hasNext()) return
     while (line.next()) {
         line.setValue('status', 'ended')

@@ -2,6 +2,7 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import { intervalEnd, restartInterval } from '../domain/billing.ts'
 import { isBillable } from '../domain/lifecycle.ts'
 import { readStage } from './assets.ts'
+import { beyondVisibility } from './beyond-visibility.ts'
 import { todayIso } from './clock.ts'
 import { withLockTries, type HeldLock } from './locks.ts'
 import { exists, refusal, str } from './records.ts'
@@ -129,9 +130,8 @@ function latestClosedInterval(assetId: string): GlideRecord | null {
  */
 function inServiceNow(assetId: string): boolean {
     const asset = new GlideRecord('alm_hardware')
-    asset.setWorkflow(false)
     asset.addQuery('sys_id', assetId)
-    asset.query()
+    beyondVisibility(asset, () => asset.query())
     return asset.next() && isBillable(readStage(asset))
 }
 

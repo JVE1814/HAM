@@ -11,6 +11,7 @@ import {
 } from '../domain/fulfilment.ts'
 import type { Stage } from '../domain/lifecycle.ts'
 import { readStage } from './assets.ts'
+import { beyondVisibility } from './beyond-visibility.ts'
 import { exists, findById, num, refusal, str } from './records.ts'
 
 /** Keeps Order-line and Order stages in step with their Assets (derived, see domain/fulfilment). */
@@ -37,10 +38,8 @@ export function orderShipment(orderId: string): OrderShipment {
 
 function assetStages(field: string, id: string): Array<Stage | null> {
     const asset = new GlideRecord('alm_hardware')
-    // Only read, never saved, so the rules need not be turned back on.
-    asset.setWorkflow(false)
     asset.addQuery(field, id)
-    asset.query()
+    beyondVisibility(asset, () => asset.query())
     const stages: Array<Stage | null> = []
     while (asset.next()) stages.push(readStage(asset))
     return stages
@@ -81,13 +80,13 @@ export function onLineAssetMoved(asset: GlideRecord, lineId: string, from: Stage
     return next === 'awaiting_stock' ? str(line, 'order') : ''
 }
 
-/** The record, read past the user's before-query rules and then saved with them on (null when not found). */
+/**
+ * The record, read past the app's before-query visibility rules (platform/beyond-visibility), the only before-query
+ * rules on an app table (the platform refuses another scope's); its saves run every rule (null when not found).
+ */
 function readPastRules(table: string, sysId: string): GlideRecord | null {
     const record = new GlideRecord(table)
-    record.setWorkflow(false)
-    const found = record.get(sysId)
-    record.setWorkflow(true)
-    return found ? record : null
+    return beyondVisibility(record, () => record.get(sysId)) ? record : null
 }
 
 /** Take a unit that left `line` in transit off it (logged); false when the platform refuses (logged): it stays on. */

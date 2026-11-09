@@ -1,13 +1,18 @@
 import type { GlideRecord } from '@servicenow/glide'
 import { visibilityFilter, type ScopingFields } from '../domain/visibility.ts'
+import { readsBeyondVisibility } from '../platform/beyond-visibility.ts'
 import { currentSession } from '../platform/session.ts'
 
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 
-/** Before-query business rules that restrict lists and lookups to what the user may see (ADR 0005). */
+/**
+ * Before-query business rules that restrict lists and lookups to what the user may see (ADR 0005). A query the app's
+ * own logic runs past them (platform/beyond-visibility) is left as it is.
+ */
 
 function restrict(current: GlideRecord, fields: ScopingFields): void {
+    if (readsBeyondVisibility(current)) return
     const session = currentSession()
     const filter = visibilityFilter(session.scope, fields, session)
     if (filter) current.addEncodedQuery(filter)

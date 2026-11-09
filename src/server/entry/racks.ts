@@ -6,6 +6,7 @@ import { placementProblem, powerBudget, type Placement, type RackFace, type Rack
 import { RACK_EXCEPTION_TYPES, reconcileRack } from '../domain/reconciliation.ts'
 import { visibilityFilter } from '../domain/visibility.ts'
 import { readStage } from '../platform/assets.ts'
+import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { openException, resolveCiExceptions } from '../platform/exceptions.ts'
 import { currentSession } from '../platform/session.ts'
 import { exists, findById, num, pluck, recordsById, str } from '../platform/records.ts'
@@ -57,17 +58,15 @@ function placementOf(slot: Slot, models: ReadonlyMap<string, RackModel>): Placem
 
 /**
  * Every device placed in the rack but `exceptAssetId`, past the visibility rules (ADR 0005): an inventory tech sees
- * only their Stockrooms' Assets, and a device they cannot see still fills its units and draws power. Only read, never
- * saved. The platform refuses setWorkflow from this scope on alm_hardware, so for now the rules still narrow the read
- * (docs/research/external-contracts.md, "Refusing a save, or skipping the rules, on a global table").
+ * only their Stockrooms' Assets, and a device they cannot see still fills its units and draws power
+ * (platform/beyond-visibility). Only read, never saved.
  */
 function slotsIn(rackId: string, exceptAssetId = ''): Slot[] {
     const asset = new GlideRecord('alm_hardware')
-    asset.setWorkflow(false)
     asset.addQuery('x_daas_ham_rack', rackId)
     if (exceptAssetId) asset.addQuery('sys_id', '!=', exceptAssetId)
     asset.addNotNullQuery('x_daas_ham_ru_start')
-    asset.query()
+    beyondVisibility(asset, () => asset.query())
     const slots: Slot[] = []
     while (asset.next()) slots.push(slotOf(asset))
     return slots

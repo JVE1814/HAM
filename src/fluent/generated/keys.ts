@@ -2531,6 +2531,10 @@ declare global {
                         table: 'sys_module'
                         id: '1117c5ce1de44237a43fe486ffaef0e7'
                     }
+                    src_server_domain_marks_ts: {
+                        table: 'sys_module'
+                        id: 'ea5d43fc474941e9b1b9e73a646b924b'
+                    }
                     src_server_domain_memo_ts: {
                         table: 'sys_module'
                         id: '99a48153ebd94b9f9c543356cd334da5'
@@ -2727,6 +2731,10 @@ declare global {
                     src_server_platform_assets_ts: {
                         table: 'sys_module'
                         id: '64007da49c55498eac75188cbad4c7bc'
+                    }
+                    'src_server_platform_beyond-visibility_ts': {
+                        table: 'sys_module'
+                        id: 'cbc9d7b35b924e71bcccd48019541a91'
                     }
                     src_server_platform_chunked_ts: {
                         table: 'sys_module'

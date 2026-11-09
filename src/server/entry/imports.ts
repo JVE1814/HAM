@@ -4,6 +4,7 @@ import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import { normalizeSerial, receiveSerialLockName, validateAsnRows, type AsnRowCheck } from '../domain/asn.ts'
 import { parseLifecycleRow } from '../domain/model-lifecycle.ts'
 import { newAsset } from '../platform/assets.ts'
+import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { withLockTries, type HeldLock } from '../platform/locks.ts'
 import { loadNormalizationData, recordNormalizationException, resolveModel } from '../platform/normalization.ts'
 import { PROPERTY, stringProperty } from '../platform/properties.ts'
@@ -110,10 +111,9 @@ function insertHolding(lock: HeldLock, row: GlideRecord, serial: string, modelId
  */
 function serialExists(serial: string): boolean {
     const asset = new GlideRecord('alm_hardware')
-    asset.setWorkflow(false)
     asset.addQuery('serial_number', serial)
     asset.setLimit(1)
-    asset.query()
+    beyondVisibility(asset, () => asset.query())
     return asset.hasNext()
 }
 
