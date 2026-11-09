@@ -3,7 +3,17 @@ import type { NamedRecord } from './entitlement.ts'
 import { fleetStagesQuery } from './fleet.ts'
 import { DEPLOYED_STAGES, SERVING_STAGES, type Stage } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
-import type { EvaluationOutcome, FeeType, LeaseEndAction, LegalOwner } from './vocabulary.ts'
+import type {
+    EvaluationOutcome,
+    FeeStatus,
+    FeeType,
+    InstallMode,
+    LeaseEndAction,
+    LegalOwner,
+    ReturnLineStatus,
+    ReturnMethod,
+    ReturnTrigger,
+} from './vocabulary.ts'
 
 /** Returns, depot evaluation, Fee events and break-fix shortfalls (P2.3–P2.4). */
 
@@ -33,21 +43,69 @@ export function returnRequesterRefusal(customerId: string, requester: ReturnRequ
     return null
 }
 
+/** Why a requested Return cannot be raised, and what it is about: who asks for it, or the Customer and Site it names. */
+export interface ReturnRequestFinding {
+    about: 'requester' | 'site'
+    message: string
+}
+
 /**
  * Why a requested Return cannot be raised; empty when it can: the person must be allowed to request it for its Customer
  * (`returnRequesterRefusal`), and the Site must be one of the Customer's sites.
  */
-export function returnRequestFindings(request: RequestedReturn, requester: ReturnRequester): string[] {
+export function returnRequestFindings(request: RequestedReturn, requester: ReturnRequester): ReturnRequestFinding[] {
     const refusal = returnRequesterRefusal(request.customerId, requester)
-    if (refusal) return [refusal]
-    if (!request.customerId) return ['Choose the customer']
-    if (!request.site) return ["Choose one of the customer's sites"]
-    if (!request.site.isSite || request.site.customerId !== request.customerId) return ["The site is not one of the customer's sites"]
-    return []
+    if (refusal) return [{ about: 'requester', message: refusal }]
+    const misplaced = siteFinding(request)
+    return misplaced ? [{ about: 'site', message: misplaced }] : []
 }
 
+function siteFinding(request: RequestedReturn): string | null {
+    if (!request.customerId) return 'Choose the customer'
+    if (!request.site) return "Choose one of the customer's sites"
+    if (!request.site.isSite || request.site.customerId !== request.customerId) return "The site is not one of the customer's sites"
+    return null
+}
+
+/**
+ * The platform's task states a Return order takes: Work in Progress while units are awaited or evaluated, Closed
+ * Complete once every line is settled (or it has none).
+ */
+export const RETURN_TASK_STATE = { inProgress: 2, closed: 3 } as const
+
+/** The status of a Return line whose unit is still expected back: not at the depot yet, nor declared missing. */
+export const AWAITED: ReturnLineStatus = 'awaiting'
+
+/** The lines an arriving unit settles: awaited, or declared missing and now turning up late. */
+export const SETTLED_BY_RECEIPT: readonly ReturnLineStatus[] = ['awaiting', 'missing']
+
+/** The lines that keep their Return order open: every other is evaluated or declared missing. */
+export const KEEPS_RETURN_OPEN: readonly ReturnLineStatus[] = ['awaiting', 'received']
+
+/** Returns whose unit the swap's own work order collects, so they open no de-install work of their own. */
+const COLLECTED_BY_SWAP: readonly ReturnTrigger[] = ['refresh_swap_back', 'defective_return']
+
+/** Whether a Return opens a de-install change and work order: a field de-install no swap work order already covers. */
+export function opensDeinstallWork(trigger: ReturnTrigger, method: ReturnMethod): boolean {
+    return method === 'fsm_deinstall' && !COLLECTED_BY_SWAP.includes(trigger)
+}
+
+/** How the units of an Order come back: the Site ships back what it installed itself, a field engineer collects the rest. */
+export function collectionMethod(installMode: InstallMode | ''): ReturnMethod {
+    return installMode === 'self_install' ? 'ship_back' : 'fsm_deinstall'
+}
+
+/** Whether a unit received `today` came back after its Return order's due date ('' = none set, never late). */
+export function receivedLate(dueBack: string, today: string): boolean {
+    return !!dueBack && today > dueBack
+}
+
+/** The days a Customer has to hand equipment back when its Agreement names no allowance. */
+const DEFAULT_RETURN_ALLOWANCE_DAYS = 30
+
+/** The day a Return raised on `raisedOn` is due back: after its Agreement's allowance (0 when it names none). */
 export function returnDueDate(raisedOn: string, allowanceDays: number): string {
-    return addDays(raisedOn, allowanceDays)
+    return addDays(raisedOn, allowanceDays || DEFAULT_RETURN_ALLOWANCE_DAYS)
 }
 
 export type OverdueStep = 'none' | 'escalate' | 'declare_missing'
@@ -117,9 +175,15 @@ export interface FeeIdentity {
     returnOrderId: string
 }
 
+/**
+ * A Fee event's statuses: open until a closed Billing period bills it, or waived (a missing unit turned up), which is
+ * never billed.
+ */
+export const FEE_STATUS = { open: 'open', billed: 'billed', waived: 'waived' } as const satisfies { [S in FeeStatus]: S }
+
 /** The x_daas_ham_fee_event query for the charges of `fee` that count, any not waived: it is charged at most once. */
 export function chargedFeeQuery(fee: FeeIdentity): string {
-    return `fee_type=${fee.type}^asset=${fee.assetId}^return_order=${fee.returnOrderId}^status!=waived`
+    return `fee_type=${fee.type}^asset=${fee.assetId}^return_order=${fee.returnOrderId}^status!=${FEE_STATUS.waived}`
 }
 
 export type ShortfallRoute = 'none' | 'purchase' | 'oem_advance_replacement'

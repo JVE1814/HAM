@@ -7,7 +7,7 @@ import { nowGlide } from './clock.ts'
 import { openException } from './exceptions.ts'
 import { openFieldWork } from './field-work.ts'
 import { refusal, str, warnRefused } from './records.ts'
-import { installedAssetIds } from './returns.ts'
+import { installedAssetIds } from './installed-assets.ts'
 import { currentSession } from './session.ts'
 
 /**

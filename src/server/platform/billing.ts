@@ -20,9 +20,10 @@ import {
 import { appendTo } from '../domain/collections.ts'
 import { messageOf } from '../domain/errors.ts'
 import { memoized } from '../domain/memo.ts'
-import { inCurrentPass, queuePass, runEventTableJob, visitInKeyOrder, type EventJobResult } from './chunked.ts'
+import { inCurrentPass, queuePass, runEventTableJob, type EventJobResult } from './chunked.ts'
 import { glideToMs, nowGlide, nowMs } from './clock.ts'
 import { EVENT, fire, type JobEvent } from './events.ts'
+import { billableFees, markBilled, putOnPeriod, takeOffPeriod, visitWaivedFees } from './fees.ts'
 import { findJobCursor, retirePass } from './job-cursor.ts'
 import { deleteWhere, exists, findById, num, refusal, str } from './records.ts'
 
@@ -30,7 +31,6 @@ import { deleteWhere, exists, findById, num, refusal, str } from './records.ts'
 
 const PERIOD = 'x_daas_ham_billing_period'
 const LINE = 'x_daas_ham_billing_line'
-const FEE = 'x_daas_ham_fee_event'
 
 /**
  * What became of an action on a period: done, or not done and why. `why` is '' when the platform has told the user
@@ -286,12 +286,7 @@ function addFailedLines(period: GlideRecord, failed: number, lastError: string):
 
 /** Add the open Fee events up to the month end, then total the period for review. */
 function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
-    const fee = new GlideRecord(FEE)
-    fee.addQuery('status', 'open')
-    // Not yet billed, or already linked to this period by a generation its Regenerate rebuilds.
-    fee.addEncodedQuery(`billing_periodISEMPTY^ORbilling_period=${period.getUniqueValue()}`)
-    fee.addQuery('occurred_on', '<=', bounds.last)
-    fee.query()
+    const fee = billableFees(period.getUniqueValue(), bounds.last)
     let failed = 0
     let lastError = ''
     while (fee.next()) {
@@ -312,11 +307,11 @@ function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
             lastError = `${fee.getUniqueValue()}: ${messageOf(error)}`
             continue
         }
-        fee.setValue('billing_period', period.getUniqueValue())
-        if (fee.update()) continue
+        const unlinked = putOnPeriod(fee, period.getUniqueValue())
+        if (!unlinked) continue
         // Unlinked, Close would not mark it billed and a later month would bill it again: Regenerate links it.
         failed++
-        lastError = `${fee.getUniqueValue()}: fee not linked to the period: ${refusal(fee)}`
+        lastError = `${fee.getUniqueValue()}: fee not linked to the period: ${unlinked}`
     }
     if (failed > 0) addFailedLines(period, failed, lastError)
     period.setValue('generated_at', nowGlide())
@@ -405,15 +400,14 @@ export function resetGeneration(period: GlideRecord): PeriodOutcome {
 function dropWaivedFeeLines(period: GlideRecord): string[] {
     const stuck: string[] = []
     const periodId = period.getUniqueValue()
-    visitInKeyOrder(FEE, `billing_period=${periodId}^status=waived`, (fee) => {
+    visitWaivedFees(periodId, (fee) => {
         // Lines first, by the fee's id (a set-based delete is not relied on to follow a dot-walked condition).
         // A fee whose line survives stays on the period: unlinked, the closed period would keep a line it no
         // longer bills.
         const lines = `billing_period=${periodId}^kind=fee^fee_event=${fee.getUniqueValue()}`
         if (!deleteWhere(LINE, lines)) return void stuck.push(`${feeLabel(fee)}: its billing line could not be removed`)
-        // Per record: updateMultiple does not reliably clear a reference to empty.
-        fee.setValue('billing_period', '')
-        if (!fee.update()) stuck.push(`${feeLabel(fee)}: ${refusal(fee)}`)
+        const kept = takeOffPeriod(fee)
+        if (kept) stuck.push(`${feeLabel(fee)}: ${kept}`)
     })
     return stuck
 }
@@ -441,11 +435,7 @@ export function closePeriod(period: GlideRecord): PeriodOutcome {
     period.setValue('closed_by', gs.getUserID())
     // Closed first: a refused form save (the platform says why) leaves its fees open, so a Regenerate still bills them.
     if (!period.update()) return notDone('')
-    const fees = new GlideRecord(FEE)
-    fees.addQuery('billing_period', period.getUniqueValue())
-    fees.addQuery('status', 'open')
-    fees.setValue('status', 'billed')
-    fees.updateMultiple()
+    markBilled(period.getUniqueValue())
     return DONE
 }
 

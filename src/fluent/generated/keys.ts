@@ -3030,6 +3030,10 @@ declare global {
                         table: 'sys_module'
                         id: '6845bb98bc084a2e9d04be96bcf74534'
                     }
+                    src_server_platform_fees_ts: {
+                        table: 'sys_module'
+                        id: '22e93b77fe1445d39c6051b7f4a1a273'
+                    }
                     'src_server_platform_field-work_ts': {
                         table: 'sys_module'
                         id: '548ae34d646d4099a4ccb4d9276df243'
@@ -3045,6 +3049,10 @@ declare global {
                     'src_server_platform_in-service_ts': {
                         table: 'sys_module'
                         id: 'ea05cb2578bd491ebdd441888d41161f'
+                    }
+                    'src_server_platform_installed-assets_ts': {
+                        table: 'sys_module'
+                        id: '9599e0277aac4627a0f306e109c7a4b3'
                     }
                     'src_server_platform_job-cursor_ts': {
                         table: 'sys_module'
@@ -3125,6 +3133,10 @@ declare global {
                     src_server_platform_returns_ts: {
                         table: 'sys_module'
                         id: 'd236066f0a2640a4ae36f40a2e385776'
+                    }
+                    'src_server_platform_scheduled-returns_ts': {
+                        table: 'sys_module'
+                        id: 'edb6ce637e6f495caecd560dafe8076f'
                     }
                     'src_server_platform_service-intervals_ts': {
                         table: 'sys_module'

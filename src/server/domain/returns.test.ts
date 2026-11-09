@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { checkTransition, DEPLOYED_STAGES, stagesQuery, type Stage } from './lifecycle'
 import {
     chargedFeeQuery,
+    collectionMethod,
     evaluationTarget,
     feeAmount,
     INSTALLED_STAGES,
+    opensDeinstallWork,
     overdueStep,
+    receivedLate,
     returnDueDate,
     returnRequestFindings,
     returnRequesterRefusal,
@@ -35,31 +38,31 @@ describe('returnRequestFindings', () => {
 
     it("refuses a customer admin a return for another customer, even from that customer's own site", () => {
         const globexSite: RequestedReturn = { customerId: 'globex', site: { id: 'globex-hq', customerId: 'globex', isSite: true } }
-        expect(returnRequestFindings(globexSite, acmeAdmin)).toEqual(['You can only request returns for your own customer'])
-        expect(returnRequestFindings({ customerId: '' }, acmeAdmin)).toEqual(['You can only request returns for your own customer'])
+        expect(returnRequestFindings(globexSite, acmeAdmin)).toEqual([{ about: 'requester', message: 'You can only request returns for your own customer' }])
+        expect(returnRequestFindings({ customerId: '' }, acmeAdmin)).toEqual([{ about: 'requester', message: 'You can only request returns for your own customer' }])
     })
 
     it("refuses a site that is not one of the customer's sites, whoever asks", () => {
         const globexSite = { id: 'globex-hq', customerId: 'globex', isSite: true }
-        expect(returnRequestFindings({ customerId: 'acme', site: globexSite }, acmeAdmin)).toEqual(["The site is not one of the customer's sites"])
-        expect(returnRequestFindings({ customerId: 'acme', site: globexSite }, staff)).toEqual(["The site is not one of the customer's sites"])
+        expect(returnRequestFindings({ customerId: 'acme', site: globexSite }, acmeAdmin)).toEqual([{ about: 'site', message: "The site is not one of the customer's sites" }])
+        expect(returnRequestFindings({ customerId: 'acme', site: globexSite }, staff)).toEqual([{ about: 'site', message: "The site is not one of the customer's sites" }])
         expect(returnRequestFindings({ customerId: 'acme', site: { id: 'acme-office', customerId: 'acme', isSite: false } }, staff)).toEqual([
-            "The site is not one of the customer's sites",
+            { about: 'site', message: "The site is not one of the customer's sites" },
         ])
         expect(returnRequestFindings({ customerId: 'acme', site: { id: 'unread', customerId: null, isSite: true } }, staff)).toEqual([
-            "The site is not one of the customer's sites",
+            { about: 'site', message: "The site is not one of the customer's sites" },
         ])
     })
 
     it('asks for the customer and the site when they are missing', () => {
-        expect(returnRequestFindings({ customerId: '' }, staff)).toEqual(['Choose the customer'])
-        expect(returnRequestFindings({ customerId: 'acme' }, staff)).toEqual(["Choose one of the customer's sites"])
+        expect(returnRequestFindings({ customerId: '' }, staff)).toEqual([{ about: 'site', message: 'Choose the customer' }])
+        expect(returnRequestFindings({ customerId: 'acme' }, staff)).toEqual([{ about: 'site', message: "Choose one of the customer's sites" }])
     })
 
     it('refuses site contacts and anyone the Return create rule leaves out', () => {
-        expect(returnRequestFindings(acmeSite, { mayRequest: true, scope: 'own_sites', customerId: 'acme' })).toEqual(['You may not request returns'])
-        expect(returnRequestFindings(acmeSite, { mayRequest: false, scope: 'unscoped', customerId: '' })).toEqual(['You may not request returns'])
-        expect(returnRequestFindings(acmeSite, { ...acmeAdmin, mayRequest: false })).toEqual(['You may not request returns'])
+        expect(returnRequestFindings(acmeSite, { mayRequest: true, scope: 'own_sites', customerId: 'acme' })).toEqual([{ about: 'requester', message: 'You may not request returns' }])
+        expect(returnRequestFindings(acmeSite, { mayRequest: false, scope: 'unscoped', customerId: '' })).toEqual([{ about: 'requester', message: 'You may not request returns' }])
+        expect(returnRequestFindings(acmeSite, { ...acmeAdmin, mayRequest: false })).toEqual([{ about: 'requester', message: 'You may not request returns' }])
     })
 })
 
@@ -78,6 +81,48 @@ describe('returnRequesterRefusal', () => {
 describe('returnDueDate', () => {
     it('is the agreement allowance after the return was raised', () => {
         expect(returnDueDate('2026-11-07', 30)).toBe('2026-12-07')
+    })
+
+    it("allows 30 days when the Agreement names no allowance", () => {
+        expect(returnDueDate('2026-11-07', 0)).toBe('2026-12-07')
+    })
+})
+
+describe('opensDeinstallWork', () => {
+    it('opens de-install work for a field de-install', () => {
+        expect(opensDeinstallWork('site_decommission', 'fsm_deinstall')).toBe(true)
+        expect(opensDeinstallWork('device_removal', 'fsm_deinstall')).toBe(true)
+        expect(opensDeinstallWork('agreement_end', 'fsm_deinstall')).toBe(true)
+        expect(opensDeinstallWork('temporary_end', 'fsm_deinstall')).toBe(true)
+    })
+
+    it('opens none when the Site contact ships the units back', () => {
+        expect(opensDeinstallWork('device_removal', 'ship_back')).toBe(false)
+        expect(opensDeinstallWork('temporary_end', 'ship_back')).toBe(false)
+    })
+
+    it("opens none for a swapped-out unit, which the swap's own work order collects", () => {
+        expect(opensDeinstallWork('refresh_swap_back', 'fsm_deinstall')).toBe(false)
+        expect(opensDeinstallWork('defective_return', 'fsm_deinstall')).toBe(false)
+    })
+})
+
+describe('collectionMethod', () => {
+    it('has the Site ship back what it installed itself, and a field engineer collect the rest', () => {
+        expect(collectionMethod('self_install')).toBe('ship_back')
+        expect(collectionMethod('fsm_engineer')).toBe('fsm_deinstall')
+        expect(collectionMethod('')).toBe('fsm_deinstall')
+    })
+})
+
+describe('receivedLate', () => {
+    it('is late only after the due date', () => {
+        expect(receivedLate('2026-11-07', '2026-11-07')).toBe(false)
+        expect(receivedLate('2026-11-07', '2026-11-08')).toBe(true)
+    })
+
+    it('is never late on a Return order without a due date', () => {
+        expect(receivedLate('', '2026-11-08')).toBe(false)
     })
 })
 

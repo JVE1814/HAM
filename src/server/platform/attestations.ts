@@ -6,7 +6,7 @@ import { customerAdminIds } from './approvals.ts'
 import { glideToIsoDate, nowGlide, todayIso } from './clock.ts'
 import { openException } from './exceptions.ts'
 import { bool, exists, findById, num, refusal, str } from './records.ts'
-import { installedAssetIds } from './returns.ts'
+import { installedAssetIds } from './installed-assets.ts'
 
 /**
  * Attestations: a Customer admin confirms the equipment installed at a Site (P2.7, D63). The daily job raises them,

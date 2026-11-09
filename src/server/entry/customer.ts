@@ -13,7 +13,6 @@ import type {
     InstallConfirmation,
     ReturnRequestReceipt,
 } from '../domain/rest-contracts.ts'
-import { returnRequesterRefusal, returnRequestFindings, type RequestedReturn } from '../domain/returns.ts'
 import { actsAsCustomerAdmin, customerEquipmentQuery, ROLE, SCOPED_TABLES, visibilityFilter } from '../domain/visibility.ts'
 import { isFleetAsset, readStage } from '../platform/assets.ts'
 import {
@@ -24,8 +23,8 @@ import {
     type AttestationAnswer,
 } from '../platform/attestations.ts'
 import { currentSession } from '../platform/session.ts'
-import { bool, exists, findById, refusal, str } from '../platform/records.ts'
-import { installedAssetIds, raiseReturn } from '../platform/returns.ts'
+import { findById, refusal, str } from '../platform/records.ts'
+import { requestReturn } from '../platform/returns.ts'
 import { returnLabels } from '../platform/shipments.ts'
 import { completeInstall, installState } from '../platform/delivery.ts'
 import { reply } from '../platform/rest-api.ts'
@@ -206,63 +205,32 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
 }
 
 /**
- * The Assets a return request covers (visibility rules apply): for a decommission everything installed or shipped at
- * the Site (domain/returns `SITE_RECOVERY_STAGES`), as the record producer does, whatever the request lists; otherwise
- * the listed fleet assets (ADR 0016) that are at the Site.
- */
-function returnedAssetIds(siteId: string, decommission: boolean, listed: unknown): string[] {
-    if (decommission) return installedAssetIds({ siteId, wholeSite: true })
-    return (Array.isArray(listed) ? (listed as unknown[]) : []).map(String).filter((id) => {
-        const asset = findById('alm_hardware', id)
-        return !!asset && isFleetAsset(asset) && str(asset, 'x_daas_ham_site') === siteId
-    })
-}
-
-/** A location named by a return request, as domain/returns reads it: whose it is and whether it is a Site at all. */
-function requestedSite(site: GlideRecord): NonNullable<RequestedReturn['site']> {
-    return { id: site.getUniqueValue(), customerId: str(site, 'company'), isSite: bool(site, 'x_daas_ham_is_site') }
-}
-
-/**
  * POST /customer/returns { site, assets: [ids], decommission, method }: request equipment to be taken back, under the
- * record producer's rule (domain/returns `returnRequestFindings`) for the caller's own Customer: 403 when the Return
- * create rule leaves them out, 400 when the Site is not one of their Customer's Sites. Locations have no visibility
- * rule (ADR 0005), so any location's sys_id is found: the Site is checked here, before its devices are read.
+ * record producer's rule (platform/returns `requestReturn`) for the caller's own Customer: 403 when the Return create
+ * rule leaves them out, 400 when the Site is not one of their Customer's Sites or the request names no device there.
  */
 export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     if (!isCustomerAdmin()) return reply(response, 403, { error: 'Only customer admins can request returns' })
     const input = data(request)
-    const { scope, customerId } = currentSession()
-    const requester = { mayRequest: new GlideRecord('x_daas_ham_return_order').canCreate(), scope, customerId }
-    const refused = returnRequesterRefusal(customerId, requester)
-    if (refused) return reply(response, 403, { error: refused })
-    const site = findById('cmn_location', String(input.site ?? ''))
-    const findings = returnRequestFindings({ customerId, site: site ? requestedSite(site) : undefined }, requester)
-    if (!site || findings.length > 0) return reply(response, 400, { error: findings.join('. ') })
-    const decommission = input.decommission === true
-    const assetIds = returnedAssetIds(site.getUniqueValue(), decommission, input.assets)
-    if (assetIds.length === 0) {
-        const error = decommission ? 'The site has no installed devices' : "Choose at least one of the site's devices"
-        return reply(response, 400, { error })
-    }
-    const firstAsset = findById('alm_hardware', assetIds[0])
-    const returnId = raiseReturn({
-        trigger: decommission ? 'site_decommission' : 'device_removal',
-        customerId,
-        siteId: site.getUniqueValue(),
-        agreementId: firstAsset ? str(firstAsset, 'x_daas_ham_agreement') : '',
+    const outcome = requestReturn({
+        customerId: currentSession().customerId,
+        siteId: String(input.site ?? ''),
+        decommission: input.decommission === true,
+        listedAssetIds: (Array.isArray(input.assets) ? (input.assets as unknown[]) : []).map(String),
         method: input.method === 'fsm_deinstall' ? 'fsm_deinstall' : 'ship_back',
-        assetIds,
-        openFieldWork: true,
-        description: `Customer return request from ${str(site, 'name')}`,
+        describe: (siteName) => `Customer return request from ${siteName}`,
     })
-    // Refused: nothing was moved, so the request can be sent again.
-    if (!returnId) return reply(response, 422, { error: 'Return not raised: the platform refused it' })
+    if (!outcome.raised) {
+        if (outcome.reason === 'forbidden') return reply(response, 403, { error: outcome.why })
+        if (outcome.reason !== 'refused') return reply(response, 400, { error: outcome.why })
+        // Refused: nothing was moved, so the request can be sent again.
+        return reply(response, 422, { error: 'Return not raised: the platform refused it' })
+    }
     // A Return no device could be added to (each refused, logged, or already awaiting a return) is closed at once.
-    if (!exists('x_daas_ham_return_order_line', `return_order=${returnId}`)) {
+    if (outcome.lines === 0) {
         return reply(response, 422, { error: 'No device could be added: each is already on a return or was refused' })
     }
-    const returnOrder = findById('x_daas_ham_return_order', returnId)?.getDisplayValue('number') ?? returnId
+    const returnOrder = findById('x_daas_ham_return_order', outcome.returnOrderId)?.getDisplayValue('number') ?? outcome.returnOrderId
     reply(response, 201, { returnOrder } satisfies ReturnRequestReceipt)
 }

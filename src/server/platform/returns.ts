@@ -1,27 +1,54 @@
-import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
-import { appendTo } from '../domain/collections.ts'
-import { messageOf } from '../domain/errors.ts'
-import { fleetStagesQuery } from '../domain/fleet.ts'
+import { GlideRecord, gs } from '@servicenow/glide'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { isDeployed } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import {
-    chargedFeeQuery,
-    feeAmount,
-    INSTALLED_STAGES,
+    AWAITED,
+    evaluationTarget,
+    KEEPS_RETURN_OPEN,
+    opensDeinstallWork,
+    overdueStep,
+    receivedLate,
+    RETURN_TASK_STATE,
     returnDueDate,
-    SITE_RECOVERY_STAGES,
-    type FeeIdentity,
+    returnRequestFindings,
+    SETTLED_BY_RECEIPT,
+    type RequestedReturn,
+    type ReturnRequester,
 } from '../domain/returns.ts'
-import type { FeeType, ReturnMethod, ReturnTrigger } from '../domain/vocabulary.ts'
-import { isFleetAsset, moveAndSave, readStage } from './assets.ts'
-import { todayIso } from './clock.ts'
+import type {
+    EvaluationOutcome,
+    LeaseEndAction,
+    LegalOwner,
+    ReturnLineStatus,
+    ReturnMethod,
+    ReturnTrigger,
+} from '../domain/vocabulary.ts'
+import { customerAdminIds } from './approvals.ts'
+import { clearRackPlacement, clearWipeEvidence, isFleetAsset, moveAndSave, moveAsset, readStage } from './assets.ts'
+import { runTableJob } from './chunked.ts'
+import { nowGlide, todayIso } from './clock.ts'
+import { EVENT, fire } from './events.ts'
+import { recordFee, waiveOpenFees } from './fees.ts'
 import { openFieldWork } from './field-work.ts'
-import { attemptLock } from './locks.ts'
-import { exists, findById, num, refusal, str } from './records.ts'
+import { installedAssetIds } from './installed-assets.ts'
+import { withLock } from './locks.ts'
+import { intProperty, PROPERTY } from './properties.ts'
+import { bool, exists, findById, num, refusal, str, warnRefused } from './records.ts'
+import { currentSession } from './session.ts'
+import { releaseToProviderStock } from './stock.ts'
+import { endSitePackageIfEmpty } from './subscriptions.ts'
 
-/** Return orders, their lines and Fee events (P2.4). */
+/**
+ * Return orders and their lines (P2.4): raising one, by request or for a job, and what each line then goes through.
+ * A line awaits its unit, which is received at the depot and evaluated, or declared missing once it is overdue; its
+ * Return order closes when every line is evaluated or missing. Every write of a line's status is made here.
+ */
 
+const RETURN = 'x_daas_ham_return_order'
+const RETURN_LINE = 'x_daas_ham_return_order_line'
+
+/** A Return to raise: why, for whom and from where, how its units come back, and the Assets to bring back. */
 export interface ReturnRequest {
     trigger: ReturnTrigger
     customerId: string
@@ -30,17 +57,21 @@ export interface ReturnRequest {
     method: ReturnMethod
     assetIds: readonly string[]
     sourceOrderId?: string
-    /** Open a de-install change + work order (not when an existing swap work order collects the unit). */
-    openFieldWork: boolean
     description: string
+}
+
+/** A Return order raised, with how many of its Assets got a line. */
+export interface RaisedReturn {
+    returnOrderId: string
+    lines: number
 }
 
 /**
  * Create a Return order with one line per Asset; installed or shipped Assets become pending return. Null, with a
  * warning, when the platform refuses the Return order: no Asset is touched, so the caller can raise it again.
  */
-export function raiseReturn(request: ReturnRequest): string | null {
-    const order = new GlideRecord('x_daas_ham_return_order')
+export function raiseReturn(request: ReturnRequest): RaisedReturn | null {
+    const order = new GlideRecord(RETURN)
     order.initialize()
     order.setValue('trigger', request.trigger)
     order.setValue('customer', request.customerId)
@@ -49,45 +80,41 @@ export function raiseReturn(request: ReturnRequest): string | null {
     order.setValue('method', request.method)
     order.setValue('source_order', request.sourceOrderId ?? '')
     order.setValue('short_description', request.description)
-    const orderId = order.insert()
-    if (!orderId) {
-        const reason = refusal(order)
-        gs.warn(`[x_daas_ham] Return not raised (${request.description}): ${reason}`)
+    if (!order.insert()) {
+        warnRefused(order, `Return not raised (${request.description})`)
         return null
     }
-    completeReturn(order, request)
-    return orderId
+    return fillReturn(order, request)
 }
 
 /**
- * Fill in a saved Return order header: due date, lines, de-install work. Only fleet assets (ADR 0016) get a line: one
- * of the Provider IT's that a caller lists is left off (logged), so no app job ever chases, declares or charges it.
+ * Fill in a saved Return order header: due date, lines, de-install work (unless a swap's work order collects the units,
+ * domain/returns `opensDeinstallWork`). Only fleet assets (ADR 0016) get a line: one of the Provider IT's that a caller
+ * lists is left off (logged), so no app job ever chases, declares or charges it.
  */
-export function completeReturn(order: GlideRecord, request: ReturnRequest): void {
+function fillReturn(order: GlideRecord, request: ReturnRequest): RaisedReturn {
     const agreement = findById('x_daas_ham_agreement', request.agreementId)
-    const allowance = agreement ? num(agreement, 'overdue_return_days') || 30 : 30
     order.setValue('agreement', request.agreementId)
-    order.setValue('due_back', returnDueDate(todayIso(), allowance))
-    order.setValue('state', 2)
+    order.setValue('due_back', returnDueDate(todayIso(), agreement ? num(agreement, 'overdue_return_days') : 0))
+    order.setValue('state', RETURN_TASK_STATE.inProgress)
 
     let lines = 0
     let refused = 0
     for (const assetId of request.assetIds) {
         const asset = findById('alm_hardware', assetId)
-        if (!asset || latestReturnLine(assetId, 'awaiting')) continue
+        if (!asset || latestReturnLine(assetId, [AWAITED])) continue
         if (!isFleetAsset(asset)) {
             gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left off return ${str(order, 'number')}: it is not a fleet asset`)
             refused++
             continue
         }
         // The line first: an Asset whose line is refused stays as it is, off this Return order.
-        const line = new GlideRecord('x_daas_ham_return_order_line')
+        const line = new GlideRecord(RETURN_LINE)
         line.initialize()
         line.setValue('return_order', order.getUniqueValue())
         line.setValue('asset', assetId)
         if (!line.insert()) {
-            const reason = refusal(line)
-            gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left off return ${str(order, 'number')}: ${reason}`)
+            warnRefused(line, `${str(asset, 'serial_number')} left off return ${str(order, 'number')}`)
             refused++
             continue
         }
@@ -109,10 +136,10 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
 
     if (lines === 0) {
         // Nothing installed, everything already on another Return order, or every unit refused: close straight away.
-        order.setValue('state', 3)
+        order.setValue('state', RETURN_TASK_STATE.closed)
         const note = refused > 0 ? 'No unit could be added (see the system log).' : 'No equipment to bring back.'
         order.setValue('work_notes', note)
-    } else if (request.openFieldWork && request.method === 'fsm_deinstall') {
+    } else if (opensDeinstallWork(request.trigger, request.method)) {
         const context = {
             customerId: request.customerId,
             siteId: request.siteId,
@@ -128,153 +155,293 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
         }
     }
     // Its lines and moves are saved, but a Return without its due date is never chased: logged to set it by hand.
-    if (!order.update()) {
-        gs.warn(`[x_daas_ham] Return ${str(order, 'number')} due date, state and links not saved: ${refusal(order)}`)
-    }
+    if (!order.update()) warnRefused(order, `Return ${str(order, 'number')} due date, state and links not saved`)
+    return { returnOrderId: order.getUniqueValue(), lines }
 }
 
-export interface InstalledFilter {
-    agreementId?: string
-    siteId?: string
-    orderId?: string
-    /** A whole-Site recovery: also the units still shipped there (domain/returns `SITE_RECOVERY_STAGES`). */
-    wholeSite?: boolean
+/** A request to take equipment back from a Site, as the record producer and the customer page make it. */
+export interface RequestedEquipment {
+    /**
+     * The Return order the record producer saved for the request, which names its Customer, Site and method; none
+     * when the request has saved nothing yet.
+     */
+    produced?: GlideRecord
+    customerId: string
+    siteId: string
+    /** A site decommission: everything installed or shipped at the Site comes back, whatever `listedAssetIds` names. */
+    decommission: boolean
+    listedAssetIds: readonly string[]
+    /** How the units come back; '' leaves it to the Site contact to ship them. */
+    method: ReturnMethod | ''
+    /** The Return's short description, given the Site's name. */
+    describe(siteName: string): string
 }
 
 /**
- * Fleet assets installed at a Site (in service, temporary or awaiting first sighting, and shipped there for a
- * whole-Site recovery), by Agreement, Site or Order. The Provider IT's equipment is never listed (ADR 0016).
+ * What came of a return request: the Return raised (it may have no line: each Asset already awaits another return, or
+ * was refused), or why none was. `forbidden`: the requester may not ask; `invalid`: the Customer or Site it names;
+ * `nothing`: it names nothing to bring back; `refused`: the platform refused the Return order (logged).
  */
-export function installedAssetIds(filter: InstalledFilter): string[] {
-    const asset = queryInstalled(filter)
-    const ids: string[] = []
-    while (asset.next()) ids.push(asset.getUniqueValue())
-    return ids
+export type RequestOutcome =
+    | ({ raised: true } & RaisedReturn)
+    | { raised: false; reason: 'forbidden' | 'invalid' | 'nothing' | 'refused'; why: string }
+
+function notRaised(reason: 'forbidden' | 'invalid' | 'nothing' | 'refused', why: string): RequestOutcome {
+    return { raised: false, reason, why }
 }
 
-/** The installed Assets (as installedAssetIds) under the Site each is at. */
-export function installedAssetIdsBySite(filter: InstalledFilter): Map<string, string[]> {
-    const asset = queryInstalled(filter)
-    const bySite = new Map<string, string[]>()
-    while (asset.next()) appendTo(bySite, str(asset, 'x_daas_ham_site'), asset.getUniqueValue())
-    return bySite
+/**
+ * Raise the Return the signed-in user requests, from the record producer or the customer page. The Return create rule
+ * must let them request it for its Customer, and the Site must be one of the Customer's Sites (domain/returns
+ * `returnRequestFindings`): the producer does not apply that rule and its Customer and Site are only qualified in the
+ * browser, and locations have no visibility rule (ADR 0005), so any location's sys_id is found. All of that is checked
+ * before the Site's devices are read. A site decommission returns everything installed or shipped at the Site
+ * (domain/returns `SITE_RECOVERY_STAGES`); a device removal the listed fleet assets (ADR 0016) that are at the Site,
+ * as a list qualified in the browser, or sent to the API, may name any Asset. The Return runs under the Agreement of
+ * its first Asset unless the produced Return order names one.
+ *
+ * A request that names nothing to bring back is refused when it has saved nothing yet, so the customer page leaves no
+ * empty Return behind. The producer's Return order is saved already: it is filled in and, with no line, closes at once
+ * like any Return with nothing to bring back.
+ */
+export function requestReturn(request: RequestedEquipment): RequestOutcome {
+    const { produced, customerId, siteId } = request
+    const site = findById('cmn_location', siteId)
+    const [finding] = returnRequestFindings({ customerId, site: requestedSite(siteId, site) }, returnRequester(produced))
+    if (finding) return notRaised(finding.about === 'requester' ? 'forbidden' : 'invalid', finding.message)
+    const assetIds = request.decommission ? installedAssetIds({ siteId, wholeSite: true }) : fleetAssetsAt(siteId, request.listedAssetIds)
+    if (!produced && assetIds.length === 0) {
+        return notRaised('nothing', request.decommission ? 'The site has no installed devices' : "Choose at least one of the site's devices")
+    }
+    const firstAsset = findById('alm_hardware', assetIds[0] ?? '')
+    const details: ReturnRequest = {
+        trigger: request.decommission ? 'site_decommission' : 'device_removal',
+        customerId,
+        siteId,
+        agreementId: (produced ? str(produced, 'agreement') : '') || (firstAsset ? str(firstAsset, 'x_daas_ham_agreement') : ''),
+        method: request.method || 'ship_back',
+        assetIds,
+        description: request.describe(site ? str(site, 'name') : ''),
+    }
+    const raised = produced ? fillReturn(produced, details) : raiseReturn(details)
+    return raised ? { raised: true, ...raised } : notRaised('refused', 'the platform refused it')
 }
 
-function queryInstalled(filter: InstalledFilter): GlideRecord {
-    const base = [
-        filter.agreementId ? `x_daas_ham_agreement=${filter.agreementId}` : '',
-        filter.siteId ? `x_daas_ham_site=${filter.siteId}` : '',
-        filter.orderId ? `x_daas_ham_order_line.order=${filter.orderId}` : '',
-    ]
-        .filter(Boolean)
-        .join('^')
-    const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(fleetStagesQuery(filter.wholeSite ? SITE_RECOVERY_STAGES : INSTALLED_STAGES, base))
-    asset.query()
-    return asset
+/** The location a request names, as domain/returns reads it: whose it is and whether it is a Site at all. */
+function requestedSite(siteId: string, site: GlideRecord | null): RequestedReturn['site'] {
+    if (!siteId) return undefined
+    return { id: siteId, customerId: site ? str(site, 'company') : null, isSite: !!site && bool(site, 'x_daas_ham_is_site') }
 }
 
-/** The return line an arriving Asset settles: awaiting, or declared missing and now turning up late. */
-export function expectedReturnLine(assetId: string): GlideRecord | null {
-    return latestReturnLine(assetId, 'awaiting,missing')
+/** The signed-in user as a Return requester: one the Return create rule lets create a Return order. */
+function returnRequester(produced: GlideRecord | undefined): ReturnRequester {
+    const { scope, customerId } = currentSession()
+    return { mayRequest: (produced ?? new GlideRecord(RETURN)).canCreate(), scope, customerId }
 }
 
-function latestReturnLine(assetId: string, statuses: string): GlideRecord | null {
-    const line = new GlideRecord('x_daas_ham_return_order_line')
+/** Those of `listed` that are fleet assets at the Site (visibility rules apply). */
+function fleetAssetsAt(siteId: string, listed: readonly string[]): string[] {
+    return listed.filter((id) => {
+        const asset = findById('alm_hardware', id)
+        return !!asset && isFleetAsset(asset) && str(asset, 'x_daas_ham_site') === siteId
+    })
+}
+
+function latestReturnLine(assetId: string, statuses: readonly ReturnLineStatus[]): GlideRecord | null {
+    const line = new GlideRecord(RETURN_LINE)
     line.addQuery('asset', assetId)
-    line.addQuery('status', 'IN', statuses)
+    line.addQuery('status', 'IN', statuses.join(','))
     line.orderByDesc('sys_created_on')
     line.setLimit(1)
     line.query()
     return line.next() ? line : null
 }
 
-/** Waive the not-yet-billed fees of one type charged for an Asset on a Return order. */
-export function waiveOpenFees(type: FeeType, assetId: string, returnOrderId: string): void {
-    const fee = new GlideRecord('x_daas_ham_fee_event')
-    fee.addQuery('fee_type', type)
-    fee.addQuery('asset', assetId)
-    fee.addQuery('return_order', returnOrderId)
-    fee.addQuery('status', 'open')
-    fee.query()
-    while (fee.next()) {
-        fee.setValue('status', 'waived')
-        // Left open, it is billed for a unit that came back.
-        if (!fee.update()) gs.warn(`[x_daas_ham] ${type} fee ${fee.getUniqueValue()} not waived: ${refusal(fee)}`)
+/**
+ * What came of receiving a unit at the depot as a return: it is not coming back from a Site (it is received as stock
+ * instead), it is received, or the lifecycle or the platform refused the receipt and why.
+ */
+export type ReturnReceipt = 'not_returning' | 'received' | { refused: string }
+
+/**
+ * A returned Asset arrived at the depot: it awaits evaluation, its subscription line no longer includes it, its earlier
+ * wipe evidence no longer counts, and a late return is charged. A refused unit stays pending return (or missing), with
+ * nothing settled, to scan again. The caller holds the unit's receive lock (platform/receiving), which the overdue
+ * job's declaration takes too, so a unit is never received and declared at once.
+ */
+export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): ReturnReceipt {
+    if (readStage(asset) !== 'pending_return' && readStage(asset) !== 'missing') return 'not_returning'
+    const line = latestReturnLine(asset.getUniqueValue(), SETTLED_BY_RECEIPT)
+    const siteId = str(asset, 'x_daas_ham_site')
+    asset.setValue('stockroom', stockroomId)
+    asset.setValue('x_daas_ham_site', '')
+    asset.setValue('x_daas_ham_subscription_line', '')
+    // A wipe recorded before this receipt does not cover what it picked up at the Site, so it must be wiped again.
+    clearWipeEvidence(asset)
+    clearRackPlacement(asset)
+    const verdict = moveAsset(asset, 'pending_evaluation')
+    if (!verdict.allowed) return { refused: verdict.reason }
+    if (!asset.update()) return { refused: refusal(asset) }
+    endSitePackageIfEmpty(siteId, str(asset, 'x_daas_ham_agreement'))
+    if (line) settleReceivedLine(line, asset)
+    return 'received'
+}
+
+/** Mark the line of a unit just received, and charge or waive what its arrival settles. */
+function settleReceivedLine(line: GlideRecord, asset: GlideRecord): void {
+    const turnedUp = str(line, 'status') === 'missing'
+    line.setValue('status', 'received')
+    line.setValue('received_at', nowGlide())
+    // The unit is received all the same; a line left unreceived cannot be evaluated, so it is logged to fix by hand.
+    const serial = str(asset, 'serial_number')
+    const lineOf = `Line of ${serial} on ${line.getDisplayValue('return_order')}`
+    if (!line.update()) warnRefused(line, `${lineOf} not marked received`)
+    const returnOrder = findById(RETURN, str(line, 'return_order'))
+    if (!returnOrder) return
+    if (turnedUp) {
+        // Declared missing, then found: it is late, not lost, and its line needs evaluating again.
+        waiveOpenFees('lost', asset.getUniqueValue(), returnOrder.getUniqueValue())
+        returnOrder.setValue('state', RETURN_TASK_STATE.inProgress)
+        if (!returnOrder.update()) warnRefused(returnOrder, `${str(returnOrder, 'number')} not reopened for ${serial}`)
     }
+    if (receivedLate(str(returnOrder, 'due_back'), todayIso())) recordFee('late_return', asset, returnOrder.getUniqueValue())
+}
+
+/** What came of an evaluation: the Asset moved on and its line is evaluated, or why not. */
+export type Evaluation = { evaluated: true } | { evaluated: false; why: string }
+
+function notEvaluated(why: string): Evaluation {
+    return { evaluated: false, why }
 }
 
 /**
- * Charge a Fee event of `type` for the Asset on the Return order, once (domain/returns `chargedFeeQuery`): a step
- * retried after a refused save (an evaluation chosen again, a line declared missing again) does not charge it twice.
- * Two runs may also charge it at the same time (two users saving one line's evaluation, overlapping overdue runs; two
- * scans of one unit already take turns under its receive lock, entry/warehouse). A unique index on the fee's identity
- * would also refuse a fee charged after a waived one, so the check and the insert are made under a lock on the fee,
- * re-checking there (as platform/exceptions `openException`). A run that finds the lock held through every try (a
- * holder keeps it for one check and one insert) leaves the fee to the holder, which is charging it. A fee that is
- * refused, that the holder has still not charged when this run gives up, or whose lock cannot be taken is logged, not
- * thrown.
+ * Route the Asset of a return line whose evaluation was set onward, and mark the line evaluated. A unit its owner
+ * takes back, the Customer or the Lessor of a lease being returned, goes to wiping, not stock (domain/returns
+ * `evaluationTarget`). A refused move leaves the line received, so the evaluation can be chosen again.
  */
-export function recordFee(type: FeeType, asset: GlideRecord, returnOrderId: string): void {
-    const fee: FeeIdentity = { type, assetId: asset.getUniqueValue(), returnOrderId }
-    // A retried step mostly finds the fee charged already: that needs no lock.
-    if (isCharged(fee)) return
-    const agreement = findById('x_daas_ham_agreement', str(asset, 'x_daas_ham_agreement'))
-    const amount = feeAmount(type, {
-        lost: agreement ? num(agreement, 'lost_asset_fee') : 0,
-        damaged: agreement ? num(agreement, 'damage_fee') : 0,
-        late_return: agreement ? num(agreement, 'late_return_fee') : 0,
+export function evaluateReturnLine(line: GlideRecord): Evaluation {
+    const asset = findById('alm_hardware', str(line, 'asset'))
+    if (!asset || readStage(asset) !== 'pending_evaluation') {
+        return notEvaluated('Evaluate the asset after it has been received at the depot')
+    }
+    const target = evaluationTarget(str(line, 'evaluation') as EvaluationOutcome, {
+        legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner | '',
+        leaseEndAction: str(asset, 'x_daas_ham_lease.end_action') as LeaseEndAction | '',
     })
-    if (amount <= 0) return
-    const attempt = attemptLock(LOCK.fee(fee), (lock) => {
-        if (!isCharged(fee)) chargeHolding(lock, fee, asset, amount)
-    })
-    if (attempt.ran) return
-    const why = attempt.held ? 'left to a run holding its lock, which has not recorded it yet' : messageOf(attempt.error)
-    // The holder has normally charged it by now; one that has not may be slow, or have died holding the lock.
-    if (isCharged(fee)) return
-    gs.warn(`[x_daas_ham] ${type} fee for ${str(asset, 'serial_number')} not recorded: ${why}; check its Fee events`)
+    // Charged before refurbishing hands the unit back to the Provider; choosing the evaluation again charges it once.
+    if (str(line, 'condition') === 'damaged') recordFee('damaged', asset, str(line, 'return_order'))
+    if (target === 'available') releaseToProviderStock(asset)
+    if (!moveAsset(asset, target).allowed) return notEvaluated(`The asset cannot go to ${target} from its current stage`)
+    if (!asset.update()) return notEvaluated(`The asset was not moved to ${target}: ${refusal(asset)}`)
+    line.setValue('status', 'evaluated')
+    if (!line.update()) {
+        return notEvaluated(`The asset went to ${target}, but its return line was not marked evaluated: ${refusal(line)}`)
+    }
+    closeReturnIfDone(str(line, 'return_order'))
+    return { evaluated: true }
 }
 
-function isCharged(fee: FeeIdentity): boolean {
-    return exists('x_daas_ham_fee_event', chargedFeeQuery(fee))
+/** Escalate overdue returns once, then declare the Assets missing and charge the lost-asset fee (the daily job). */
+export function chaseOverdue(): void {
+    const today = todayIso()
+    const grace = intProperty(PROPERTY.returnGraceDays, 14)
+    runTableJob({
+        job: 'chase_overdue_returns',
+        table: RETURN_LINE,
+        query: `status=${AWAITED}^return_order.due_back<${today}`,
+        read: (line) => ({
+            assetId: str(line, 'asset'),
+            returnOrderId: str(line, 'return_order'),
+            dueDate: str(line, 'return_order.due_back'),
+        }),
+        handle: (line, lineId) => {
+            // Read the header fresh: an earlier line of the same order may have escalated it in this batch.
+            const returnOrder = findById(RETURN, line.returnOrderId)
+            if (!returnOrder) return
+            const number = str(returnOrder, 'number')
+            const step = overdueStep({ dueDate: line.dueDate, today, graceDays: grace, received: false, escalated: bool(returnOrder, 'escalated') })
+            if (step === 'escalate') {
+                returnOrder.setValue('escalated', true)
+                returnOrder.setValue('work_notes', `Return overdue since ${line.dueDate}; customer and account manager notified.`)
+                // Not marked escalated, it would be escalated again every day: nobody is told until the mark holds.
+                if (!returnOrder.update()) return void warnRefused(returnOrder, `${number} not escalated`)
+                const recipients = [...customerAdminIds(str(returnOrder, 'customer')), str(returnOrder, 'agreement.account_manager')]
+                fire(EVENT.returnOverdue, returnOrder, recipients.filter(Boolean).join(','), line.assetId)
+            } else if (step === 'declare_missing') {
+                declareMissing({ lineId, assetId: line.assetId, returnOrderId: line.returnOrderId, number })
+            }
+        },
+    })
+}
+
+/** An overdue return line to declare missing, with its Return order's number for the log. */
+interface OverdueLine {
+    lineId: string
+    assetId: string
+    returnOrderId: string
+    number: string
 }
 
 /**
- * Insert the fee holding `lock`. A holder that outlasts the lock (ADR 0013) may overlap the run that took it over and
- * charges the fee too: one that lost it before the insert leaves the fee to that run, one that lost it during the
- * insert is logged.
+ * Declare an overdue unit missing and charge its lost fee. The unit may be scanned in at the depot meanwhile, and a
+ * receipt saved between this run's read and its saves would be overwritten: back on the shelf, yet its line missing and
+ * a lost fee billed. So this is done under the lock the receipt takes (platform/receiving `receive`), from a fresh
+ * read. A run that finds the lock held leaves the line awaiting: the next day's run finds the unit received, or
+ * declares it then. Taking the lock throws only when an insert is refused with no lock row (platform/locks); the job
+ * counts that line as failed and goes on.
  */
-function chargeHolding(lock: HeldLock, fee: FeeIdentity, asset: GlideRecord, amount: number): void {
-    const record = new GlideRecord('x_daas_ham_fee_event')
-    record.initialize()
-    record.setValue('fee_type', fee.type)
-    record.setValue('customer', str(asset, 'company'))
-    record.setValue('agreement', str(asset, 'x_daas_ham_agreement'))
-    record.setValue('asset', fee.assetId)
-    record.setValue('return_order', fee.returnOrderId)
-    record.setValue('amount', amount)
-    record.setValue('occurred_on', todayIso())
-    const what = `${fee.type} fee for ${str(asset, 'serial_number')}`
-    const saved = lock.save(`${what} recorded`, () => record.insert(), { check: 'check it is charged once' })
-    if (saved === 'refused') gs.warn(`[x_daas_ham] ${what} not recorded: ${refusal(record)}`)
+function declareMissing(overdue: OverdueLine): void {
+    const declared = withLock(LOCK.receiveAsset(overdue.assetId), (lock) => declareHolding(lock, overdue))
+    if (declared.ran && declared.value) closeReturnIfDone(overdue.returnOrderId)
+}
+
+/**
+ * The declaration, made holding the unit's receive `lock`: only while its line still awaits it and the Asset is still
+ * at or towards the Site, or missing already (an earlier run whose line was refused). True once the line is missing.
+ * A unit anywhere else (received, its line refused), or outside the fleet (a line raised before the Fleet flag, ADR
+ * 0016), is logged each run: no run settles that line.
+ */
+function declareHolding(lock: HeldLock, overdue: OverdueLine): boolean {
+    const record = findById(RETURN_LINE, overdue.lineId)
+    if (!record || str(record, 'status') !== AWAITED) return false
+    const asset = findById('alm_hardware', overdue.assetId)
+    if (asset && !isFleetAsset(asset)) {
+        const unit = `Line of ${str(asset, 'serial_number')} on ${overdue.number}`
+        gs.warn(`[x_daas_ham] ${unit} not declared missing: it is not a fleet asset; settle the line by hand`)
+        return false
+    }
+    const stage = asset ? readStage(asset) : null
+    if (asset && stage !== 'missing' && !isDeployed(stage)) {
+        const unit = `Line of ${str(asset, 'serial_number')} on ${overdue.number}`
+        gs.warn(`[x_daas_ham] ${unit} not declared missing: the unit is ${stage ?? 'unknown'}; settle the line by hand`)
+        return false
+    }
+    // A holder that outlasted the lock (ADR 0013) may overlap the next receipt: it saves only while it holds it.
+    if (!lock.held()) return false
+    if (asset) {
+        clearRackPlacement(asset)
+        // Refused (moveAndSave warns): the unit and its awaiting line stay as they are, for the next run.
+        if (!moveAndSave(asset, 'missing', `return ${overdue.number} overdue`)) return false
+        recordFee('lost', asset, overdue.returnOrderId)
+        // A missing unit no longer holds its site package open. It keeps its Site and line so that, found again and
+        // back in service, it bills on that line again while it is open (entry/assets.ts onAssetServiceChange).
+        endSitePackageIfEmpty(str(asset, 'x_daas_ham_site'), str(asset, 'x_daas_ham_agreement'))
+    }
+    record.setValue('status', 'missing')
+    // Left awaiting, it is declared again on the next run, which finds the unit missing and charges no second fee
+    // (platform/fees `recordFee`).
+    if (record.update()) return true
+    const unit = asset ? str(asset, 'serial_number') : overdue.assetId
+    warnRefused(record, `Line of ${unit} on ${overdue.number} not declared missing`)
+    return false
 }
 
 /** Close a Return order once every line is evaluated or declared missing. */
-export function closeReturnIfDone(returnOrderId: string): void {
-    const open = new GlideRecord('x_daas_ham_return_order_line')
-    open.addQuery('return_order', returnOrderId)
-    open.addQuery('status', 'IN', 'awaiting,received')
-    open.setLimit(1)
-    open.query()
-    if (open.hasNext()) return
-    const order = findById('x_daas_ham_return_order', returnOrderId)
-    if (!order || str(order, 'state') === '3') return
-    order.setValue('state', 3)
+function closeReturnIfDone(returnOrderId: string): void {
+    if (exists(RETURN_LINE, `return_order=${returnOrderId}^statusIN${KEEPS_RETURN_OPEN.join(',')}`)) return
+    const order = findById(RETURN, returnOrderId)
+    if (!order || str(order, 'state') === String(RETURN_TASK_STATE.closed)) return
+    order.setValue('state', RETURN_TASK_STATE.closed)
     // No later line calls this again, and an open Return still asks the Customer for its equipment.
     if (!order.update()) gs.warn(`[x_daas_ham] Return ${str(order, 'number')} not closed: ${refusal(order)}; close it`)
-}
-
-export function stampNow(record: GlideRecord, field: string): void {
-    record.setValue(field, new GlideDateTime().getValue())
 }

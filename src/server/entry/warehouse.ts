@@ -36,7 +36,7 @@ import { withOrderLineLock } from '../platform/sourcing.ts'
 import { startStaging } from '../platform/staging-tasks.ts'
 import { changeStock, reserveAsset } from '../platform/stock.ts'
 import { nextProviderTag } from '../platform/tags.ts'
-import { receiveReturnedAsset } from './returns.ts'
+import { receiveReturnedAsset } from '../platform/returns.ts'
 
 /** Warehouse scanning API used by the warehouse React app (P1.5). */
 
@@ -172,9 +172,9 @@ function receiveHolding(lock: HeldLock, response: RESTAPIResponse, assetId: stri
     if (!isFleetAsset(asset)) joinFleet(asset)
     // A unit coming back from a Site is received ('') or refused, staying pending return (or missing) for a rescan, and
     // its unsaved move is not shown. Any other unit (null) is received as stock below.
-    const returnRefusal = receiveReturnedAsset(asset, stockroomId)
-    if (returnRefusal) return reply(response, 422, { error: `Not received: ${returnRefusal}` })
-    if (returnRefusal === '') return reply(response, 200, summarise(asset))
+    const returned = receiveReturnedAsset(asset, stockroomId)
+    if (returned === 'received') return reply(response, 200, summarise(asset))
+    if (returned !== 'not_returning') return reply(response, 422, { error: `Not received: ${returned.refused}` })
     if (!awaitsReceipt(stage) || !moveAsset(asset, 'available').allowed) {
         return reply(response, 409, { error: `Not awaiting receipt (${stage ?? 'unknown stage'})` })
     }

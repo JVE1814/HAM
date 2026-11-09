@@ -223,7 +223,7 @@ export function transferFellThrough(context: TransferContext): boolean {
 
 /**
  * Whether a move voids the Asset's wipe evidence: entering staging loads a Customer's configuration, which a wipe
- * recorded before does not cover. (Receipt from a Site voids it too, in entry/returns.)
+ * recorded before does not cover. (Receipt from a Site voids it too, in platform/returns.)
  */
 export function voidsWipeEvidence(from: Stage | null, to: Stage): boolean {
     return to === 'staging' && from !== 'staging'

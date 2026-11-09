@@ -4,6 +4,7 @@ import { awaitsInstall, type InstallState } from '../domain/install-confirmation
 import type { HeldLock } from '../domain/job-lock.ts'
 import { isDeployed, stagesQuery } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
+import { collectionMethod } from '../domain/returns.ts'
 import type { InstallMode, OrderStage, OrderType } from '../domain/vocabulary.ts'
 import { moveAndSave, moveAsset, readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
@@ -249,9 +250,10 @@ function retireReplacedAssets(order: GlideRecord): void {
 }
 
 /**
- * The Assets an install replaced (refresh swap-back, defective unit) go back on a Return. When the platform refuses it
- * (platform/returns `raiseReturn` logs why) the units stay in service and billed, and completing the install again
- * raises it, as they are not yet pending return.
+ * The Assets an install replaced (refresh swap-back, defective unit) go back on a Return, which opens no de-install
+ * work: the swap work order already collects the old unit (domain/returns `opensDeinstallWork`). When the platform
+ * refuses it (platform/returns `raiseReturn` logs why) the units stay in service and billed, and completing the install
+ * again raises it, as they are not yet pending return.
  */
 function returnReplacedAssets(order: GlideRecord, assetIds: readonly string[]): void {
     if (assetIds.length === 0) return
@@ -261,11 +263,9 @@ function returnReplacedAssets(order: GlideRecord, assetIds: readonly string[]): 
         customerId: str(order, 'customer'),
         siteId: str(order, 'site'),
         agreementId: str(order, 'agreement'),
-        method: str(order, 'install_mode') === 'self_install' ? 'ship_back' : 'fsm_deinstall',
+        method: collectionMethod(str(order, 'install_mode') as InstallMode),
         assetIds,
         sourceOrderId: order.getUniqueValue(),
-        // The swap work order already collects the old unit.
-        openFieldWork: false,
         description: `${refresh ? 'Refresh swap-back' : 'Defective unit'} from ${str(order, 'number')}`,
     })
 }

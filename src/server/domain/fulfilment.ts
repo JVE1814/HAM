@@ -1,6 +1,7 @@
 import type { ApprovalDecision } from './approvals.ts'
 import type { Approver } from './entitlement.ts'
 import type { Stage } from './lifecycle.ts'
+import { AWAITED } from './returns.ts'
 import type { LineStage, OrderStage, ReturnTrigger } from './vocabulary.ts'
 
 /**
@@ -119,7 +120,7 @@ const SITE_RECOVERY_TRIGGERS: readonly ReturnTrigger[] = ['site_decommission', '
 
 /** Encoded query on x_daas_ham_return_order_line: the Asset is awaited back on a whole-Site recovery. */
 export function siteRecoveryLineQuery(assetId: string): string {
-    return `asset=${assetId}^status=awaiting^return_order.triggerIN${SITE_RECOVERY_TRIGGERS.join(',')}`
+    return `asset=${assetId}^status=${AWAITED}^return_order.triggerIN${SITE_RECOVERY_TRIGGERS.join(',')}`
 }
 
 /** What Cancel order reads of an Order: the stages of its lines and of every Asset on them. */

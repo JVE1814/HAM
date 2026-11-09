@@ -3,8 +3,12 @@ import { toIsoDate } from '../domain/calendar.ts'
 import { chooseSubscriptionLine, type SubscriptionLineView } from '../domain/in-service.ts'
 import { TRY_AGAIN, type HeldLock, type TryAgain } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
+import { sitePackageHoldersQuery } from '../domain/returns.ts'
+import { nowMs } from './clock.ts'
 import { withLockTries } from './locks.ts'
-import { findById, refusal, str } from './records.ts'
+import { exists, findById, refusal, str, warnRefused } from './records.ts'
+
+/** Subscription lines (x_daas_ham_subscription_line): a pending one starts with its first Asset into service, a site package ends as the last unit leaves its Site. */
 
 /**
  * Attach an Asset going into service to the Subscription line it delivers and start that line (the caller saves the
@@ -73,4 +77,29 @@ function startHolding(lock: HeldLock, lineId: string, inServiceAt: number): stri
     const saved = lock.save(`${str(line, 'description')} started`, () => line.update(), late)
     if (saved === 'lock lost') return TRY_AGAIN
     return saved === 'refused' ? refusal(line) : ''
+}
+
+/**
+ * An active site package ends on the day nothing is left at its Site under its Agreement (domain/returns
+ * `sitePackageHoldersQuery`). It is found by the Site and Agreement the unit leaves, not the line it carries, so a
+ * swap's new unit that leaves before monitoring attached it still ends it. The Assets left are counted past the
+ * before-query visibility rules (ADR 0005): the receiving tech sees only Assets in their stockrooms, so the units
+ * still at the Site would be missed and the line would end on the first unit back.
+ */
+export function endSitePackageIfEmpty(siteId: string, agreementId: string): void {
+    if (!siteId || !agreementId) return
+    const line = new GlideRecord('x_daas_ham_subscription_line')
+    line.addQuery('agreement', agreementId)
+    line.addQuery('site', siteId)
+    line.addQuery('line_type', 'site_package')
+    line.addQuery('status', 'active')
+    line.query()
+    if (!line.hasNext()) return
+    if (exists('alm_hardware', sitePackageHoldersQuery({ siteId, agreementId }), { beyondVisibility: true })) return
+    while (line.next()) {
+        line.setValue('status', 'ended')
+        line.setValue('end_date', toIsoDate(nowMs()))
+        // A site package bills its own dates, and no later unit leaving ends it: logged for finance to end by hand.
+        if (!line.update()) warnRefused(line, `Site package "${str(line, 'description')}" not ended`)
+    }
 }
