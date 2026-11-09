@@ -126,6 +126,24 @@ export function currencyCode(value: string): string {
     return /^[A-Za-z]{3}$/.test(code) ? code.toUpperCase() : ''
 }
 
+/**
+ * A stored currency as totals and Margin group it: its code (currencyCode), else as stored, trimmed (so a value that is
+ * no code is still kept apart from every other, never merged into one).
+ */
+export function currencyKey(value: string): string {
+    return currencyCode(value) || value.trim()
+}
+
+/**
+ * Why a currency entered on an Agreement cannot be saved (it must be a three-letter code, e.g. EUR), or null when it
+ * can: caught as it is entered, not when every line of the Agreement fails to bill. Blank is left to the field's
+ * mandatory check (an Agreement saved before it had one keeps saving until finance sets it).
+ */
+export function agreementCurrencyProblem(value: string): string | null {
+    if (value.trim() === '' || currencyCode(value)) return null
+    return `'${value.trim()}' is not a currency code: enter the three letters of an ISO 4217 code, e.g. EUR`
+}
+
 /** An Agreement an amount names, for its currency: `name` (its number) for messages, and its Currency as stored. */
 export interface AgreementCurrency {
     name: string
@@ -371,7 +389,7 @@ export interface CurrencyTotal {
 export function currencyTotals(groups: Iterable<CurrencyTotal>): CurrencyTotal[] {
     const byCurrency = new Map<string, { lines: number; cents: number }>()
     for (const group of groups) {
-        const currency = currencyCode(group.currency) || group.currency.trim()
+        const currency = currencyKey(group.currency)
         const total = byCurrency.get(currency) ?? { lines: 0, cents: 0 }
         total.lines += group.lines
         total.cents += toCents(group.amount)

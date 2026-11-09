@@ -197,7 +197,8 @@ export const agreement_form = Form({
                 {
                     layout: 'two-column',
                     leftElements: [{ field: 'number', type: 'table_field' }, { field: 'customer', type: 'table_field' }, { field: 'account_manager', type: 'table_field' }, { field: 'short_description', type: 'table_field' }],
-                    rightElements: [{ field: 'state', type: 'table_field' }, { field: 'starts', type: 'table_field' }, { field: 'ends', type: 'table_field' }],
+                    // Currency is mandatory with no default: on the form, so a new Agreement gets one and an old one is set.
+                    rightElements: [{ field: 'state', type: 'table_field' }, { field: 'starts', type: 'table_field' }, { field: 'ends', type: 'table_field' }, { field: 'currency', type: 'table_field' }],
                 },
             ],
         },
@@ -270,7 +271,9 @@ export const subscription_line_form = Form({
                 {
                     layout: 'two-column',
                     leftElements: [{ field: 'description', type: 'table_field' }, { field: 'agreement', type: 'table_field' }, { field: 'customer', type: 'table_field' }, { field: 'line_type', type: 'table_field' }, { field: 'site', type: 'table_field' }, { field: 'device_class', type: 'table_field' }],
-                    rightElements: [{ field: 'monthly_rate', type: 'table_field' }, { field: 'currency', type: 'table_field' }, { field: 'status', type: 'table_field' }, { field: 'start_date', type: 'table_field' }, { field: 'end_date', type: 'table_field' }],
+                    // No currency: the line bills in its Agreement's (its own Currency is unused). Not 'agreement.currency' either:
+                    // a dot-walked field on a form is editable and saving the line would change the whole Agreement's currency.
+                    rightElements: [{ field: 'monthly_rate', type: 'table_field' }, { field: 'status', type: 'table_field' }, { field: 'start_date', type: 'table_field' }, { field: 'end_date', type: 'table_field' }],
                 },
             ],
         },
@@ -473,7 +476,7 @@ export const job_cursor_form = Form({
                 {
                     layout: 'two-column',
                     leftElements: [{ field: 'job', type: 'table_field' }, { field: 'cursor', type: 'table_field' }],
-                    rightElements: [{ field: 'last_run', type: 'table_field' }, { field: 'last_status', type: 'table_field' }, { field: 'processed_total', type: 'table_field' }],
+                    rightElements: [{ field: 'last_run', type: 'table_field' }, { field: 'last_status', type: 'table_field' }, { field: 'processed_total', type: 'table_field' }, { field: 'failed_total', type: 'table_field' }, { field: 'last_error', type: 'table_field' }],
                 },
             ],
         },
@@ -492,7 +495,7 @@ List({ table: 'x_daas_ham_staging_template', view: default_view, columns: ['name
 
 List({ table: 'x_daas_ham_staging_tmpl_item', view: default_view, columns: ['template', 'order', 'label', 'mandatory', 'automation'] })
 
-List({ table: 'x_daas_ham_agreement', view: default_view, columns: ['number', 'customer', 'account_manager', 'state', 'starts', 'ends', 'replacement_tier', 'refresh_cycle_months'] })
+List({ table: 'x_daas_ham_agreement', view: default_view, columns: ['number', 'customer', 'account_manager', 'state', 'currency', 'starts', 'ends', 'replacement_tier', 'refresh_cycle_months'] })
 
 List({ table: 'x_daas_ham_agreement_quantity', view: default_view, columns: ['agreement', 'device_class', 'model', 'contracted_quantity'] })
 
@@ -516,7 +519,7 @@ List({ table: 'x_daas_ham_stockroom_member', view: default_view, columns: ['user
 
 List({ table: 'x_daas_ham_device_event', view: default_view, columns: ['observed_at', 'asset', 'identifier', 'event', 'source'] })
 
-List({ table: 'x_daas_ham_job_cursor', view: default_view, columns: ['job', 'cursor', 'last_run', 'last_status', 'processed_total'] })
+List({ table: 'x_daas_ham_job_cursor', view: default_view, columns: ['job', 'cursor', 'last_run', 'last_status', 'processed_total', 'failed_total', 'last_error'] })
 
 export const oem_coverage_form = Form({
     table: 'x_daas_ham_oem_coverage',
@@ -624,7 +627,9 @@ export const fee_event_form = Form({
                 {
                     layout: 'two-column',
                     leftElements: [{ field: 'fee_type', type: 'table_field' }, { field: 'customer', type: 'table_field' }, { field: 'agreement', type: 'table_field' }, { field: 'asset', type: 'table_field' }, { field: 'return_order', type: 'table_field' }],
-                    rightElements: [{ field: 'amount', type: 'table_field' }, { field: 'currency', type: 'table_field' }, { field: 'occurred_on', type: 'table_field' }, { field: 'status', type: 'table_field' }],
+                    // No currency: the fee bills in its Agreement's (its own Currency is unused). Not 'agreement.currency' either:
+                    // a dot-walked field on a form is editable and saving the fee would change the whole Agreement's currency.
+                    rightElements: [{ field: 'amount', type: 'table_field' }, { field: 'occurred_on', type: 'table_field' }, { field: 'status', type: 'table_field' }],
                 },
             ],
         },
@@ -802,7 +807,7 @@ List({ table: 'x_daas_ham_return_order', view: default_view, columns: ['number',
 
 List({ table: 'x_daas_ham_return_order_line', view: default_view, columns: ['return_order', 'asset', 'status', 'received_at', 'condition', 'evaluation'] })
 
-List({ table: 'x_daas_ham_fee_event', view: default_view, columns: ['occurred_on', 'fee_type', 'customer', 'asset', 'amount', 'currency', 'status'] })
+List({ table: 'x_daas_ham_fee_event', view: default_view, columns: ['occurred_on', 'fee_type', 'customer', 'asset', 'amount', 'agreement.currency', 'status'] })
 
 List({ table: 'x_daas_ham_disposal_order', view: default_view, columns: ['number', 'method', 'disposal_vendor', 'customer', 'stage', 'approval'] })
 

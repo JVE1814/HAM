@@ -23,6 +23,8 @@ export const x_daas_ham_lease_schedule = Table({
         monthly_payment: DecimalColumn({ label: 'Monthly payment (all assets)' }),
         buyout_price: DecimalColumn({ label: 'Buyout price' }),
         buyout_share: DecimalColumn({ label: 'Buyout cost per asset', readOnly: true, scale: 6 }),
+        // The buyout's left-over cents go one each to the Assets up to this sys_id (domain/leases buyoutSplit).
+        buyout_extra_through: StringColumn({ label: 'Buyout: one cent more up to asset', maxLength: 32, readOnly: true }),
         buyout_assets: IntegerColumn({ label: 'Assets covered at buyout', readOnly: true }),
         decision_lead_days: IntegerColumn({ label: 'Decide this many days before the end', default: 120, min: 0 }),
         end_action: ChoiceColumn({

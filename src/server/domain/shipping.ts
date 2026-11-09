@@ -1,5 +1,5 @@
 import { currencyCode } from './billing.ts'
-import { errorText, isSuccess, type HttpPort } from './http.ts'
+import { failureText, isSuccess, type HttpPort } from './http.ts'
 import { asArray, field, isoDate, parseJson, text } from './json.ts'
 
 /**
@@ -144,7 +144,8 @@ export function buyLabel(http: HttpPort, input: LabelInput): LabelResult {
         if (problem) return { ok: false, error: `${side} address ${problem}` }
     }
     const response = http({ fn: 'create_label', params: {}, body: labelRequestBody(input) })
-    if (!isSuccess(response.status)) return { ok: false, error: errorText(response.status, response.body) }
+    // An answer's status and message, or the transport's reason when none came (as the OEM adapters say it).
+    if (!isSuccess(response.status)) return { ok: false, error: failureText(response) }
     const json = parseJson(response.body)
     const trackingNumber = text(field(json, 'tracking_number'))
     if (!trackingNumber) return { ok: false, error: 'the aggregator returned no tracking number' }

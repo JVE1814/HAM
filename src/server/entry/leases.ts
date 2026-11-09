@@ -3,8 +3,9 @@
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
 import {
+    buyoutCost,
     buyoutPurchase,
-    evenShare,
+    buyoutSplit,
     groupExpiringCoverage,
     leaseDecisionProblem,
     leaseMismatch,
@@ -26,7 +27,7 @@ import { EVENT, fire } from '../platform/events.ts'
 import { refreshLifecycleDates } from '../platform/lifecycle-dates.ts'
 import type { HeldLock } from '../platform/locks.ts'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties.ts'
-import { bool, count, exists, findById, num, refusal, str } from '../platform/records.ts'
+import { bool, count, exists, findById, num, pluck, refusal, str } from '../platform/records.ts'
 import { changeStock, stockUnit } from '../platform/stock.ts'
 
 /** Leases, end-of-lease decisions and renewals (P3.23–P3.24), over fleet assets only (ADR 0016). */
@@ -169,12 +170,17 @@ export function uiApplyLeaseDecision(current: GlideRecord): void {
     } else {
         lease.setValue('end_action', decision)
     }
-    // The buyout's terms are fixed once, while every Asset is still covered: Margin keeps splitting the
-    // lease payment over that many while the transfer runs, and each costs its share of the buyout price.
+    // The buyout's terms are fixed once, while every Asset is still covered: Margin keeps splitting the lease payment
+    // over that many while the transfer runs, and each costs its share of the buyout price to the cent, the cents left
+    // over going one each to the first Assets in sys_id order (domain/leases `buyoutSplit`), so the costs add up to it.
     if (decision === 'buyout' && !num(lease, 'buyout_assets')) {
-        const covered = countAssets(lease.getUniqueValue())
-        lease.setValue('buyout_assets', covered)
-        lease.setValue('buyout_share', evenShare(num(lease, 'buyout_price'), covered))
+        const leaseId = lease.getUniqueValue()
+        // Every covered Asset's sys_id (as many as are counted, not pluck's default limit), so none is left out of the split.
+        const covered = pluck('alm_hardware', stillCovered(`x_daas_ham_lease=${leaseId}`), 'sys_id', Math.max(countAssets(leaseId), 1))
+        const split = buyoutSplit(num(lease, 'buyout_price'), covered)
+        lease.setValue('buyout_assets', covered.length)
+        lease.setValue('buyout_share', split.share)
+        lease.setValue('buyout_extra_through', split.extraThrough)
     }
     if (!lease.update()) {
         // Refused: no transfer or return may act on a decision the lease does not record, so the decision opens again.
@@ -340,8 +346,8 @@ export function refreshLeaseAssets(event: GlideRecord, current: GlideRecord): vo
 
 /**
  * Script action on x_daas_ham.lease.buyout: the Provider owns the Assets the lease covers, each costing
- * the lease's Buyout cost per asset (for Margin). Retired units, which the Lessor or the OEM holds, keep
- * their lease link and are not transferred.
+ * its share of the buyout price to the cent (domain/leases `buyoutCost`, for Margin). Retired units,
+ * which the Lessor or the OEM holds, keep their lease link and are not transferred.
  *
  * Every transferred Asset leaves the query set. The cursor (sys_id > last handled) still holds:
  * batches run in ascending sys_id order, so the Assets that were on the lease when the pass reached
@@ -354,8 +360,11 @@ export function transferLeaseAssets(event: GlideRecord, current: GlideRecord): v
     const leaseId = str(event, 'parm1')
     // Never run with a blank lease: the query would match every Asset that has no lease.
     if (!leaseId) return
+    // Each Asset's cost is its share of the price to the cent, fixed when the buyout was decided (domain/leases
+    // `buyoutCost`); a share stored before shares were split to the cent is rounded, with no cent left over to place.
+    const split = { share: num(current, 'buyout_share'), extraThrough: str(current, 'buyout_extra_through') }
     // Every Asset the chunk transfers is bought today.
-    const purchase = buyoutPurchase(num(current, 'buyout_share'), todayIso())
+    const today = todayIso()
     runEventTableJob({
         eventName: EVENT.leaseBuyout,
         record: current,
@@ -370,6 +379,7 @@ export function transferLeaseAssets(event: GlideRecord, current: GlideRecord): v
             asset.setValue('x_daas_ham_lease', '')
             asset.setValue('x_daas_ham_lessor', '')
             asset.setValue('x_daas_ham_legal_owner', 'provider')
+            const purchase = buyoutPurchase(buyoutCost(split, assetId), today)
             if (purchase) {
                 asset.setValue('cost', purchase.cost)
                 asset.setValue('purchase_date', purchase.date)

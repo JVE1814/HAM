@@ -297,7 +297,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 10,
                     table: 'x_daas_ham_agreement',
                     condition: 'ORDERBYcustomer^EQ',
-                    columns: 'number,customer,account_manager,state,starts,ends,replacement_tier,refresh_cycle_months',
+                    columns: 'number,customer,account_manager,state,currency,starts,ends,replacement_tier,refresh_cycle_months',
                     applicabilities: [{ $id: Now.ID['ws_agreements_aud'], applicability: broadStaffAudience }],
                 },
                 {
@@ -430,7 +430,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 80,
                     table: 'x_daas_ham_fee_event',
                     condition: 'status=open^EQ',
-                    columns: 'occurred_on,fee_type,customer,asset,amount,currency',
+                    columns: 'occurred_on,fee_type,customer,asset,amount,agreement.currency',
                     applicabilities: [{ $id: Now.ID['ws_fees_open_aud'], applicability: broadStaffAudience }],
                 },
             ],
@@ -516,7 +516,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 10,
                     table: 'x_daas_ham_billing_period',
                     condition: 'ORDERBYDESCperiod^EQ',
-                    columns: 'period,status,line_count,total_amount,generated_at,closed_at,closed_by',
+                    columns: 'period,status,line_count,totals,total_amount,generated_at,closed_at,closed_by',
                     applicabilities: [{ $id: Now.ID['ws_billing_periods_aud'], applicability: moneyAudience }],
                 },
                 {
@@ -534,7 +534,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 30,
                     table: 'x_daas_ham_fee_event',
                     condition: 'status=open^ORDERBYoccurred_on^EQ',
-                    columns: 'fee_type,customer,asset,return_order,amount,occurred_on,billing_period',
+                    columns: 'fee_type,customer,asset,return_order,amount,agreement.currency,occurred_on,billing_period',
                     applicabilities: [{ $id: Now.ID['ws_fees_unbilled_aud'], applicability: broadStaffAudience }],
                 },
                 {
@@ -552,7 +552,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 50,
                     table: 'x_daas_ham_margin',
                     condition: 'ORDERBYDESCbilling_period.period^ORDERBYmargin^EQ',
-                    columns: 'billing_period,customer,site,revenue,cost,margin,margin_pct',
+                    columns: 'billing_period,customer,site,currency,revenue,cost,margin,margin_pct',
                     applicabilities: [{ $id: Now.ID['ws_margin_aud'], applicability: moneyAudience }],
                 },
                 {
@@ -586,7 +586,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 10,
                     table: 'x_daas_ham_job_cursor',
                     condition: '',
-                    columns: 'job,cursor,last_run,last_status,processed_total',
+                    columns: 'job,cursor,last_run,last_status,processed_total,failed_total,last_error',
                     applicabilities: [{ $id: Now.ID['ws_admin_jobs_aud'], applicability: adminAudience }],
                 },
                 {

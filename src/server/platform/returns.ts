@@ -144,8 +144,9 @@ export function awaitsReturn(assetId: string): boolean {
 
 /**
  * Put the Asset on the Return order under its return lock (`returnAssetLockName`); 'skipped' when it is not found,
- * already awaits a return, or another Return holds its lock through every try and is taking it. A lock that cannot be
- * taken (platform/locks throws) leaves the unit off the order, logged; the line's own errors escape.
+ * already awaits a return, or another Return held its lock through every try and has taken it. One whose lock was held
+ * through every try but that still awaits no return (the holder was slow, refused or died holding it) is 'refused',
+ * logged, as is one whose lock cannot be taken (platform/locks throws); the line's own errors escape.
  */
 function addUnderLock(order: GlideRecord, assetId: string): LineResult {
     let result = 'skipped' as LineResult
@@ -160,8 +161,14 @@ function addUnderLock(order: GlideRecord, assetId: string): LineResult {
             result = added
             return true
         })
-        if (!ran) gs.info(`[x_daas_ham] Asset ${assetId} left off return ${str(order, 'number')}: another return holds its lock and takes it`)
-        return result
+        if (ran) return result
+        // The holder has normally put it on its Return by now; one that has not leaves the unit on none (as recordFee).
+        if (awaitsReturn(assetId)) {
+            gs.info(`[x_daas_ham] Asset ${assetId} left off return ${str(order, 'number')}: another return held its lock and took it`)
+            return 'skipped'
+        }
+        gs.warn(`[x_daas_ham] Asset ${assetId} left off return ${str(order, 'number')}: its return lock was held through every try, yet it awaits no return: put it on one by hand if it is due back`)
+        return 'refused'
     } catch (error) {
         if (started) throw error
         gs.warn(`[x_daas_ham] Asset ${assetId} left off return ${str(order, 'number')}: ${errorText(error)}`)

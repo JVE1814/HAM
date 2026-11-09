@@ -2,11 +2,13 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
     activeDays,
+    agreementCurrencyProblem,
     BILLED_STAGES,
     billingMonthProblem,
     billsFromIntervals,
     chooseCurrency,
     currencyCode,
+    currencyKey,
     currencyTotals,
     decideGenerationReset,
     divideRounded,
@@ -186,6 +188,33 @@ describe('currencyCode', () => {
         expect(currencyCode('')).toBe('')
         expect(currencyCode('EURO')).toBe('')
         expect(currencyCode('E1R')).toBe('')
+    })
+})
+
+describe('currencyKey', () => {
+    it('groups a stored currency by its code, and keeps a value that is no code apart, trimmed', () => {
+        expect(currencyKey(' eur')).toBe('EUR')
+        expect(currencyKey('USD')).toBe('USD')
+        expect(currencyKey(' EU1 ')).toBe('EU1')
+        expect(currencyKey('')).toBe('')
+    })
+})
+
+describe('agreementCurrencyProblem', () => {
+    it('lets a three-letter code be saved, in any case', () => {
+        expect(agreementCurrencyProblem('EUR')).toBeNull()
+        expect(agreementCurrencyProblem('usd')).toBeNull()
+    })
+
+    it('leaves a blank currency to the mandatory check', () => {
+        expect(agreementCurrencyProblem('')).toBeNull()
+        expect(agreementCurrencyProblem('  ')).toBeNull()
+    })
+
+    it('refuses a typo, saying what to enter', () => {
+        for (const typo of ['EU1', 'EU', 'E R', '€']) {
+            expect(agreementCurrencyProblem(typo)).toBe(`'${typo.trim()}' is not a currency code: enter the three letters of an ISO 4217 code, e.g. EUR`)
+        }
     })
 })
 

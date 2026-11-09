@@ -3,6 +3,7 @@ import { BusinessRule, Record, ScheduledScript, ScriptAction, UiAction } from '@
 import {
     exportBillingPeriod,
     generateBillingLines,
+    guardAgreementCurrency,
     guardBillingPeriodMonth,
     guardClosedBillingLine,
     guardClosedBillingPeriod,
@@ -155,6 +156,18 @@ BusinessRule({
     order: 100,
     condition: 'current.period.changes()',
     script: guardBillingPeriodMonth,
+})
+
+// A mistyped currency is refused as it is entered, not at the next generation (owner decision: one currency per Agreement).
+BusinessRule({
+    $id: Now.ID['br_agreement_currency'],
+    name: 'NaaS - check the agreement currency',
+    table: 'x_daas_ham_agreement',
+    when: 'before',
+    action: ['insert', 'update'],
+    order: 100,
+    condition: 'current.currency.changes()',
+    script: guardAgreementCurrency,
 })
 
 // Where a new period's generation starts, whether the monthly job or a person created it (Regenerate starts its own).

@@ -124,7 +124,9 @@ export const x_daas_ham_fee_event = Table({
         asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', referenceQual: 'x_daas_ham_fleet=true' }),
         return_order: ReferenceColumn({ label: 'Return order', referenceTable: 'x_daas_ham_return_order' }),
         amount: DecimalColumn({ label: 'Amount', mandatory: true }),
-        currency: StringColumn({ label: 'Currency', maxLength: 3, default: 'EUR' }),
+        // Not billed: a fee bills in its Agreement's currency (else the one its Customer's Agreements share), so a copy
+        // here could only disagree with it. Kept (read-only, no default) for the values saved before, as on Subscription lines.
+        currency: StringColumn({ label: 'Currency (unused: billed in the Agreement currency)', maxLength: 3, readOnly: true }),
         occurred_on: DateColumn({ label: 'Occurred on', mandatory: true }),
         status: ChoiceColumn({
             label: 'Status',
