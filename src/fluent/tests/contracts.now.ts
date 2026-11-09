@@ -2,13 +2,17 @@ import '@servicenow/sdk/global'
 import { Test, TestSuite } from '@servicenow/sdk/core'
 import { assetManager, finance } from '../security/roles.now'
 
-/* ATF: lessor ownership and lease extension (D65), billing period lock (D66), rack power budget (P3.29). */
+/*
+ * ATF: lessor ownership and lease extension (D65), billing period lock (D66), rack power budget (P3.29). The lease and
+ * rack rules act on fleet assets only (ADR 0016), so the Assets here are fleet assets. Fixtures setting the Fleet flag
+ * insert without security enforcement: the flag is read-only on forms, and the app's intake paths set it server-side.
+ */
 
 export const leasedAssetOwnershipTest = Test(
     {
         $id: Now.ID['atf_leased_asset_owner'],
-        name: 'NaaS - an asset on a lease schedule is owned by its lessor',
-        description: 'Setting the lease schedule makes the legal owner the lessor of that schedule.',
+        name: 'NaaS - a fleet asset on a lease schedule is owned by its lessor',
+        description: "Setting a fleet asset's lease schedule makes its legal owner the lessor of that schedule.",
         active: true,
         failOnServerError: true,
     },
@@ -28,7 +32,15 @@ export const leasedAssetOwnershipTest = Test(
         const asset = atf.server.recordInsert({
             $id: Now.ID['atf_lao_asset'],
             table: 'alm_hardware',
-            fieldValues: { serial_number: 'ATF-LAO-0001', install_status: 6, substatus: 'available', quantity: 1, x_daas_ham_lease: lease.record_id },
+            fieldValues: {
+                serial_number: 'ATF-LAO-0001',
+                install_status: 6,
+                substatus: 'available',
+                quantity: 1,
+                x_daas_ham_fleet: true,
+                x_daas_ham_lease: lease.record_id,
+            },
+            enforceSecurity: false,
         })
         atf.server.recordValidation({
             $id: Now.ID['atf_lao_validate'],
@@ -142,7 +154,7 @@ export const rackPowerBudgetTest = Test(
     {
         $id: Now.ID['atf_rack_power'],
         name: 'NaaS - a placement over the rack power budget is refused',
-        description: 'Two 80 W devices do not fit a 100 W rack: the second placement is not saved.',
+        description: 'Two 80 W fleet devices do not fit a 100 W rack: the second placement is not saved.',
         active: true,
         failOnServerError: false,
     },
@@ -165,15 +177,18 @@ export const rackPowerBudgetTest = Test(
                 model: model.record_id,
                 install_status: 1,
                 quantity: 1,
+                x_daas_ham_fleet: true,
                 x_daas_ham_rack: rack.record_id,
                 x_daas_ham_ru_start: 40,
                 x_daas_ham_rack_face: 'front',
             },
+            enforceSecurity: false,
         })
         const second = atf.server.recordInsert({
             $id: Now.ID['atf_rp_second'],
             table: 'alm_hardware',
-            fieldValues: { serial_number: 'ATF-RP-0002', model: model.record_id, install_status: 1, quantity: 1 },
+            fieldValues: { serial_number: 'ATF-RP-0002', model: model.record_id, install_status: 1, quantity: 1, x_daas_ham_fleet: true },
+            enforceSecurity: false,
         })
         atf.server.recordUpdate({
             $id: Now.ID['atf_rp_place'],

@@ -2,6 +2,8 @@ import '@servicenow/sdk/global'
 import { Test, TestSuite } from '@servicenow/sdk/core'
 import { assetManager } from '../security/roles.now'
 import { inventoryTechAuditVisibilityTest } from './audit-visibility.now'
+import { addToFleetTest } from './fleet.now'
+import { transferStageTest } from './transfers.now'
 import { customerAdminVisibilityTest, inventoryTechVisibilityTest } from './visibility.now'
 
 /* ATF: order entitlement routing (D35). */
@@ -165,5 +167,13 @@ export const offCatalogOrderTest = Test(
 export const phase1Suite = TestSuite({
     $id: Now.ID['atf_suite_p1'],
     name: 'NaaS - P1',
-    tests: [customerAdminVisibilityTest, inventoryTechVisibilityTest, inventoryTechAuditVisibilityTest, withinAgreementOrderTest, offCatalogOrderTest],
+    tests: [
+        customerAdminVisibilityTest,
+        inventoryTechVisibilityTest,
+        inventoryTechAuditVisibilityTest,
+        withinAgreementOrderTest,
+        offCatalogOrderTest,
+        transferStageTest,
+        addToFleetTest,
+    ],
 })

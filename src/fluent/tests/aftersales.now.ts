@@ -2,7 +2,11 @@ import '@servicenow/sdk/global'
 import { Test, TestSuite } from '@servicenow/sdk/core'
 import { assetManager, inventoryTech } from '../security/roles.now'
 
-/* ATF: break-fix entitlement neutrality (D46) and depot evaluation routing (D60). */
+/*
+ * ATF: break-fix entitlement neutrality (D46) and depot evaluation routing (D60), on fleet assets: the app counts and
+ * moves those only (ADR 0016). Fixtures setting the Fleet flag insert without security enforcement: the flag is
+ * read-only on forms, and the app's intake paths set it server-side.
+ */
 
 export const replacementWithinAgreementTest = Test(
     {
@@ -38,6 +42,7 @@ export const replacementWithinAgreementTest = Test(
             table: 'x_daas_ham_agreement_quantity',
             fieldValues: { agreement: agreement.record_id, device_class: 'switch', contracted_quantity: 1 },
         })
+        // In service under the Agreement, a fleet asset puts it at its cap of one switch: the usage counts fleet assets only.
         const failed = atf.server.recordInsert({
             $id: Now.ID['atf_rwa_failed'],
             table: 'alm_hardware',
@@ -47,9 +52,11 @@ export const replacementWithinAgreementTest = Test(
                 company: customer.record_id,
                 install_status: 1,
                 quantity: 1,
+                x_daas_ham_fleet: true,
                 x_daas_ham_agreement: agreement.record_id,
                 x_daas_ham_site: site.record_id,
             },
+            enforceSecurity: false,
         })
         const order = atf.server.recordInsert({
             $id: Now.ID['atf_rwa_order'],
@@ -90,7 +97,7 @@ export const returnEvaluationTest = Test(
     {
         $id: Now.ID['atf_return_evaluation'],
         name: 'NaaS - evaluating a returned unit as refurbish puts it back in stock',
-        description: 'A received provider-owned unit evaluated "refurbish" becomes available and its line evaluated.',
+        description: 'A received provider-owned fleet unit evaluated "refurbish" becomes available and its line evaluated.',
         active: true,
         failOnServerError: true,
     },
@@ -116,8 +123,10 @@ export const returnEvaluationTest = Test(
                 install_status: 6,
                 substatus: 'pending_evaluation',
                 quantity: 1,
+                x_daas_ham_fleet: true,
                 x_daas_ham_legal_owner: 'provider',
             },
+            enforceSecurity: false,
         })
         const returnOrder = atf.server.recordInsert({
             $id: Now.ID['atf_rev_return'],
