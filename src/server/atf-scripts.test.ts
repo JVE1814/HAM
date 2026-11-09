@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest'
  * - It requires server modules by the path the instance keeps them under, as the SDK's generated wrappers do
  *   (<scope>/<package name>/<package version>/<file>): a version bump in package.json changes it. Each module exists
  *   and exports what the script calls.
+ * - One of them runs a scheduled job by the entry function its schedule runs, so the suites test a job too.
  * - Every step and test id is unique, and every test is in one suite (`now-sdk cicd testsuite run` runs suites).
  */
 
@@ -188,6 +189,21 @@ describe('ATF server-side scripts', () => {
                 expect(used.filter((name) => !exported.has(name)), `${id}: ${path}`).toEqual([])
             }
         }
+    })
+
+    it('run at least one scheduled job by the entry function its schedule runs', () => {
+        const fluent = (dir: string): string[] =>
+            readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+                entry.isDirectory() ? fluent(join(dir, entry.name)) : entry.name.endsWith('.now.ts') ? [join(dir, entry.name)] : [],
+            )
+        const scheduled = new Set(
+            fluent(join(ROOT, 'src/fluent')).flatMap((file) => [...readFileSync(file, 'utf8').matchAll(/ScheduledScript\(\{[\s\S]*?\bscript:\s*(\w+)/g)].map((m) => m[1])),
+        )
+        const called = SCRIPTS.flatMap(({ script }) =>
+            requires(script ?? '').flatMap(({ binding }) => [...(script ?? '').matchAll(new RegExp(`\\b${binding}\\.(\\w+)\\(`, 'g'))].map((m) => m[1])),
+        )
+        expect(scheduled.size).toBeGreaterThan(10)
+        expect(called.filter((name) => scheduled.has(name))).not.toEqual([])
     })
 
     it('run their harness to a verdict against fakes', () => {

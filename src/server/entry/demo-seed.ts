@@ -1,4 +1,5 @@
 import { GlideRecord, gs } from '@servicenow/glide'
+import { fleetCondition } from '../domain/fleet.ts'
 import { isFleetAsset, joinFleet, newAsset } from '../platform/assets.ts'
 import { PROPERTY, stringProperty } from '../platform/properties.ts'
 import { findById, refusal, str } from '../platform/records.ts'
@@ -68,6 +69,30 @@ function keepCurrency(agreementId: string): void {
     save(agreement, `agreement ${str(agreement, 'short_description')} (its currency)`)
 }
 
+/** The sys_id of the Model category named `name` (base system data), or '' (logged): its demo Models then get none. */
+function findCategory(name: string): string {
+    const category = new GlideRecord('cmdb_model_category')
+    if (category.get('name', name)) return category.getUniqueValue()
+    gs.warn(`[x_daas_ham] Demo Model category ${name} not found: its demo Models get none, and no purchase order is raised for them`)
+    return ''
+}
+
+/**
+ * A demo Model loaded before the demo data set Model categories gets its category; one already set is kept. Found by
+ * its OEM PID, as a NaaS Model is (ADR 0016); a refused save is logged.
+ */
+function keepCategory(pid: string, categoryId: string): void {
+    if (!categoryId) return
+    const model = new GlideRecord('cmdb_hardware_product_model')
+    model.addQuery('x_daas_ham_oem_pid', pid)
+    model.addNullQuery('cmdb_model_category')
+    model.query()
+    while (model.next()) {
+        model.setValue('cmdb_model_category', categoryId)
+        save(model, `model ${pid} (its Model category)`)
+    }
+}
+
 /** A demo asset loaded before the Fleet flag existed joins the fleet (ADR 0016); a refused save is logged. */
 function keepInFleet(asset: GlideRecord): void {
     if (isFleetAsset(asset)) return
@@ -110,20 +135,30 @@ export function loadDemoData(): void {
     setDemoProperty(PROPERTY.stagingStockroom, stagingCentre)
 
     const sourceOf = new Map([[cisco, 'cisco'], [hpe, 'aruba'], [fortinet, 'fortinet'], [checkpoint, 'checkpoint']])
-    const model = (pid: string, name: string, manufacturer: string, deviceClass: string, track = true, power = 0) =>
-        ensure(
+    // Procurement refuses a purchase order line item for a Model without a Model category. Modules, power supplies and
+    // optics take Hardware: under Network Gear each would become a network device CI of its own.
+    const networkGear = findCategory('Network Gear')
+    const hardware = findCategory('Hardware')
+    const categoryOf = { switch: networkGear, ap: networkGear, router: networkGear, firewall: networkGear, module: hardware, psu: hardware, optic: hardware }
+    const model = (pid: string, name: string, manufacturer: string, deviceClass: keyof typeof categoryOf, track = true, power = 0) => {
+        const category = categoryOf[deviceClass]
+        const id = ensure(
             'cmdb_hardware_product_model',
             { x_daas_ham_oem_pid: pid },
             {
                 name,
                 model_number: pid,
                 manufacturer,
+                cmdb_model_category: category,
                 x_daas_ham_device_class: deviceClass,
                 x_daas_ham_track_as_asset: track,
                 x_daas_ham_typical_power_w: power,
                 x_daas_ham_oem_source: pid.endsWith('-HW') ? 'meraki' : (sourceOf.get(manufacturer) ?? ''),
             },
         )
+        keepCategory(pid, category)
+        return id
+    }
     const c9300 = model('C9300-48P-E', 'Catalyst 9300 48-port PoE+', cisco, 'switch', true, 715)
     model('C9300-NM-8X', 'Catalyst 9300 8x10G network module', cisco, 'module')
     model('PWR-C1-715WAC', 'Catalyst 9300 715W AC power supply', cisco, 'psu')
@@ -267,6 +302,7 @@ export function loadDemoData(): void {
     })
     const live = new GlideRecord('alm_hardware')
     live.addQuery('serial_number', 'STARTSWITH', 'DEMOLIVE')
+    live.addEncodedQuery(fleetCondition())
     live.orderBy('serial_number')
     live.query()
     let ru = 40
@@ -278,6 +314,7 @@ export function loadDemoData(): void {
     // OEM coverage for the in-service demo switches (normally from the Cisco API or CSV import)
     const covered = new GlideRecord('alm_hardware')
     covered.addQuery('serial_number', 'STARTSWITH', 'DEMOLIVE')
+    covered.addEncodedQuery(fleetCondition())
     covered.query()
     while (covered.next()) {
         ensure('x_daas_ham_oem_coverage', { serial_number: str(covered, 'serial_number'), contract_number: 'DEMO-SNTC-1' }, {
@@ -308,6 +345,7 @@ export function loadDemoData(): void {
     // Billing history of the in-service switches (normally opened by in-service detection), and their lease
     const leased = new GlideRecord('alm_hardware')
     leased.addQuery('serial_number', 'STARTSWITH', 'DEMOLIVE')
+    leased.addEncodedQuery(fleetCondition())
     leased.query()
     while (leased.next()) {
         ensure('x_daas_ham_service_interval', { asset: leased.getUniqueValue() }, {

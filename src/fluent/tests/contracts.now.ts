@@ -92,12 +92,13 @@ export const leaseExtensionTest = Test(
             uiAction: Now.ref('sys_ui_action', 'ua_lease_apply_decision'),
             assert: 'form_submitted_to_server',
         })
-        atf.server.recordValidation({
+        // A database query, not Record Validation: that checks the loaded record, where a date's '=' is read in the
+        // session time zone and misses by a day west of GMT (the PDI runs America/Los_Angeles).
+        atf.server.recordQuery({
             $id: Now.ID['atf_lext_validate_lease'],
             table: 'x_daas_ham_lease_schedule',
-            recordId: lease.record_id,
-            fieldValues: 'ends=2028-01-31^end_action=undecided',
-            assert: 'record_validated',
+            fieldValues: `sys_id=${lease.record_id}^ends=2028-01-31^end_action=undecided`,
+            assert: 'records_match_query',
         })
         atf.server.recordValidation({
             $id: Now.ID['atf_lext_validate_decision'],
