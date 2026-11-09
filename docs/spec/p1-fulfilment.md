@@ -8,8 +8,11 @@ on_order ─► in_transit ─► available ─► reserved ─► staging ─�
    ─► pending_evaluation ─► available | spare_pool | pending_oem_rma | pending_wipe
 pending_oem_rma ─► returned_to_oem | pending_evaluation
 pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | returned_to_customer | returned_to_lessor
+available | reserved | spare_pool | staging ─► in_transfer ─► available | reserved | spare_pool | staging
 ```
 
+- The app acts on Fleet assets only (ADR 0016): its rules on `alm_hardware` neither check nor change
+  the stage of the Provider IT's equipment.
 - Going to a Site (shipped, pending in service, in service, temporary deployment) needs a Site and an
   Agreement.
 - Leaving the Provider needs wipe evidence. Evidence counts only if it was recorded since the Asset
@@ -21,16 +24,49 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   pending disposal is refused). Customer-owned Assets leave only back to the Customer.
 - A stage set outside the app's moves that breaks the matrix, or that the app does not model, is
   refused when a user without `admin` saves it in their own transaction. That covers a form edit and
-  also out-of-box logic the user's action runs: an inventory tech closing a transfer order line's
-  task has Inventory set the Asset to *In stock / Pending transfer* or *In transit / Reserved*, and
-  that save is refused while the line moves on (ADR 0002). Administrators and background processes
-  are not checked (their moves into staging still clear the wipe evidence). ADR 0002 used to say
-  such changes were accepted unchecked; this spec and the code win.
+  also out-of-box logic the user's action runs, such as an inventory tech working a transfer order
+  line (below). Administrators and background processes are not checked (their moves into staging
+  still clear the wipe evidence). ADR 0002 used to say such changes were accepted unchecked; this
+  spec and the code win.
+- **In transfer** is an Asset on an open transfer order line between two stockrooms, stored as either
+  of the combinations Inventory sets: *In stock / Pending transfer* (Draft, Requested, Shipment
+  Preparation) and *In transit / Reserved* (In Transit) (ADR 0002, external-contracts N38).
+  - An Asset goes into transfer only while Inventory has it on an open line, which it records in the
+    Asset's *Active transfer order* flag in the same save: a user without `admin` cannot set either
+    combination on the form of an Asset on no open line. It leaves transfer only once Inventory lets
+    it go and clears the flag, back to available, reserved, spare pool or staging: a user without
+    `admin` cannot free on the form a unit still on its way between two stockrooms. *Cancel order*
+    takes a unit in transfer off its Order line and leaves it in transfer; it is free stock once
+    Inventory lets it go.
+  - Inventory takes onto a line only an Asset *In stock / Available*. A transfer order made by hand
+    therefore moves free stock; the ones sourcing raises move units it reserved for an Order line
+    (P1 ordering spec).
+  - When Inventory lets the Asset go, it saves it *In stock / Available*: in the transfer order's
+    to-stockroom once the line is received (*In stock / Reserved* for a line requested for a user),
+    where it was when the line is cancelled or deleted (external-contracts N39). In that same save
+    the Asset takes back the stage it left instead, as what it still carries shows. On an Order line
+    it goes into staging once it is received at the staging centre with its Staging task open; at the
+    staging centre without that task it stays reserved for the line. Held for a Customer (its company
+    not the Provider), it goes back to the Customer's Spare pool. Otherwise it is free stock,
+    available. The stockroom Inventory set is kept, and the lifecycle rule checks that move. An Asset
+    that comes back into staging this way loses its wipe evidence, as on any move into staging.
+  - A unit on an Order line that Inventory lets go anywhere but the staging centre (its line
+    cancelled or deleted) is reserved for the line again where it was, and its transfer has fallen
+    through: nothing would move it on from there. So it is then put back as free stock under the
+    Provider company (the Source it was picked from is no longer known; the spare-pool top-up
+    replaces a spare), its Staging task is skipped, and its line goes back to awaiting stock and is
+    sourced again, which may pick the same unit and raise a new transfer order (a warning is logged;
+    P1 ordering spec). A unit the platform refuses to put back stays reserved for its line (logged).
+    The lines sourcing removes from a transfer order it could not complete are let go the same way,
+    but sourcing puts those units back itself (P1 ordering spec).
+  - A line received, or delivered, after its last task was closed skipped leaves the Asset in transfer
+    with the flag cleared, for its stage to be set by hand.
 
 ## Derived stages (`domain/fulfilment.ts`)
 
 - A line follows its slowest Asset: sourced, staging, ready to ship, shipped, installed, in service.
-  It is *awaiting stock* while fewer Assets than ordered are allocated.
+  It is *awaiting stock* while fewer Assets than ordered are allocated. A unit in transfer to the
+  staging centre counts as sourced: on its way, not yet sent to the Site.
 - A unit that leaves while in transit (shipped, then missing or pending return) is taken off its
   line (logged). The line goes back to awaiting stock and is sourced again, with no new approval and
   its quantity unchanged. The exception is a whole-Site recovery (site decommission, agreement end):
@@ -81,8 +117,9 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   the reply shows it reserved). That holds while the line, read again under its lock, still awaits
   stock and has room; otherwise the unit is received as free stock (available) and the reply shows it
   unallocated. An unknown serial with a PID is received without an ASN. Returned units
-  (pending return or missing) are received by the returns process (P2 after-sales spec); any other
-  scanned Asset is refused as not awaiting receipt.
+  (pending return or missing) are received by the returns process (P2 after-sales spec), and a unit
+  in transfer on its transfer order line, in Inventory (Lifecycle stages); any other scanned Asset is
+  refused as not awaiting receipt.
 - The chosen stockroom must be a central depot or a staging centre: a customer-site stockroom is
   refused (HTTP 400), for returned units too.
 - If the platform refuses to save the new or confirmed Asset, the call answers HTTP 422 and the unit is

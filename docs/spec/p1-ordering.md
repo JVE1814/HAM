@@ -86,8 +86,9 @@
   spares, the Customer's Spare pool, free stock), filtered to the Customer in the query and read by
   stockroom then sys_id, so other Customers' spares never crowd out usable stock and the picks are the
   same on every run.
-- Free central stock is available stock outside customer-site stockrooms; a stockroom with no type,
-  or an Asset in none, counts as a central depot.
+- Only Fleet assets are sourced (ADR 0016). Free central stock is available stock in a central depot
+  or a staging centre. A stockroom with no type is not a NaaS stockroom, so stock there, or in no
+  stockroom, is never picked.
 - Reserved Assets take the Customer as `company` and the Agreement (ADR 0006); in-house stock at the
   staging centre moves to *staging* at once, with a Staging task.
 - Stock already on an Order line is not picked: a hot spare linked to a line stays in the Spare pool but
@@ -104,13 +105,24 @@
 - A claim that outlasts its lock (cleared as abandoned, ADR 0013) saves only while it still holds the
   lock. One that lost the lock during its save keeps the Asset only if a fresh read still shows it on the
   line. Otherwise it gives the Asset up with a warning, and the unit counts in the shortfall.
-- Stock outside the staging centre is reserved and gets a transfer order to it, and only then its
-  Staging task and the move to *staging*. If Inventory does not create the transfer order or all its
-  lines, what was created is removed (or named in the summary for cancelling) and the stock is put back:
-  Spare-pool stock to the pool, the rest to free stock. That stock is not bought: the line waits for
-  stock, its sourcing summary says why, and it picks the stock again when next sourced.
+- Stock outside the staging centre is reserved and gets a transfer order to it (P1 fulfilment spec,
+  In transfer). Inventory takes onto a line only an Asset *In stock / Available*, so each unit is
+  saved available, still on its Order line and claimed by nobody else, just before its line is
+  inserted, and Inventory then puts it *in transfer*. Its Staging task is opened at once, and the
+  unit goes into *staging* when Inventory receives the line at the staging centre (in the stockroom
+  Inventory sets). Meanwhile the line counts it as sourced. If Inventory cancels or deletes the line
+  instead, the transfer has fallen through: the unit, reserved for the line again where it was, is
+  put back as free stock, its Staging task is skipped, and the line goes back to awaiting stock and
+  is sourced again (P1 fulfilment spec, In transfer), with a warning.
+- If Inventory does not create the transfer order or all its lines, or a unit cannot be saved
+  available for it, what was created is removed (or named in the summary for cancelling) and the
+  stock is put back, read again as Inventory left it: Spare-pool stock to the pool, the rest to free
+  stock. Inventory lets go each unit whose line is removed, reserved for the line again; sourcing
+  marks those units while it removes the lines, so that is not taken for a transfer fallen
+  through. That stock is not bought: the line waits for stock, its sourcing summary says why, and it
+  picks the stock again when next sourced.
 - If the Staging task cannot be created, the Asset stays reserved for the line (a warning is logged) and
-  is not moved to *staging*.
+  is not moved to *staging*; a unit in transfer then stays reserved for the line once received.
 - Hot spares at the site stay in the Spare pool, linked to the line (claimed the same way, under the
   Asset lock), until Ship hands them over where they are (shipped, with no package).
 - Each sourcing run with a shortfall requests one purchase order for the line (ship to the staging
@@ -166,7 +178,8 @@
     for cancelling in Procurement (if the platform refuses, the user is told and nothing is
     released);
   - releases the stock: hot spares stay in the pool, other Assets return to free stock under the
-    Provider company;
+    Provider company; a unit in transfer leaves its line but stays in transfer, and is free stock
+    once Inventory lets it go (P1 fulfilment spec, In transfer);
   - skips open staging tasks;
   - cancels the Order's pending approvals.
 

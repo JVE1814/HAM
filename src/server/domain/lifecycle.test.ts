@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+    ALL_STAGES,
     billingChange,
     checkTransition,
     DEPLOYED_STAGES,
@@ -7,11 +8,14 @@ import {
     isBillable,
     isDeployed,
     SERVING_STAGES,
+    stageAfterTransfer,
     stageChangeRefusal,
     stageOf,
     stagesQuery,
+    transferFellThrough,
     voidsWipeEvidence,
     type Stage,
+    type TransferContext,
     type TransitionFacts,
 } from './lifecycle'
 
@@ -35,6 +39,22 @@ describe('stage mapping', () => {
 
     it('treats a missing substatus the same as an empty one', () => {
         expect(stageOf({ installStatus: '2', substatus: null })).toBe('on_order')
+    })
+
+    it("reads both of Inventory's transfer combinations as in transfer, and gives the first back", () => {
+        expect(stageOf({ installStatus: '6', substatus: 'pending_transfer' })).toBe('in_transfer')
+        expect(stageOf({ installStatus: '9', substatus: 'reserved' })).toBe('in_transfer')
+        expect(fieldsOf('in_transfer')).toEqual({ installStatus: '6', substatus: 'pending_transfer' })
+    })
+
+    it('keeps In stock / Reserved and plain In transit their own stages', () => {
+        expect(stageOf({ installStatus: '6', substatus: 'reserved' })).toBe('reserved')
+        expect(stageOf({ installStatus: '9', substatus: '' })).toBe('in_transit')
+    })
+
+    it('reads the combination every stage is stored as back as that stage', () => {
+        const stored = ALL_STAGES.map((stage) => fieldsOf(stage))
+        for (const [i, fields] of stored.entries()) expect(stageOf(fields)).toBe(ALL_STAGES[i])
     })
 })
 
@@ -122,6 +142,154 @@ describe('checkTransition', () => {
     })
 })
 
+describe('transfers between stockrooms', () => {
+    const onLine: TransitionFacts = { ...deployable, onTransferOrderLine: true }
+    const transferable = ['available', 'reserved', 'spare_pool', 'staging'] as const
+
+    it.each(transferable)('lets Inventory take %s stock onto an open transfer order line', (from) => {
+        expect(checkTransition(from, 'in_transfer', onLine)).toEqual({ allowed: true })
+    })
+
+    it('puts nothing in transfer that is not on an open line, the app\'s own moves included', () => {
+        const reason = 'An asset is in transfer only while it is on an open transfer order line'
+        expect(checkTransition('available', 'in_transfer', deployable)).toEqual({ allowed: false, reason })
+        expect(checkTransition('reserved', 'in_transfer', { ...deployable, onTransferOrderLine: false })).toEqual({ allowed: false, reason })
+    })
+
+    it.each(['staged', 'shipped', 'in_service', 'pending_evaluation', 'pending_wipe', 'on_order'] as const)(
+        'never transfers %s units',
+        (from) => {
+            expect(checkTransition(from, 'in_transfer', onLine)).toEqual({ allowed: false, reason: `Cannot move an asset from ${from} to in_transfer` })
+        },
+    )
+
+    it.each(transferable)('lets an asset Inventory let go take back %s', (to) => {
+        expect(checkTransition('in_transfer', to, { ...deployable, onTransferOrderLine: false })).toEqual({ allowed: true })
+        expect(checkTransition('in_transfer', to, deployable)).toEqual({ allowed: true })
+    })
+
+    it.each(transferable)('keeps an asset in transfer, not %s, while Inventory still has it on an open line', (to) => {
+        const reason = 'An asset leaves transfer only once Inventory lets it go from its transfer order line'
+        expect(checkTransition('in_transfer', to, onLine)).toEqual({ allowed: false, reason })
+    })
+
+    it('refuses a hand-made form edit that frees a unit still on its way between stockrooms', () => {
+        const inTransit = stageOf({ installStatus: '9', substatus: 'reserved' })
+        expect(stageChangeRefusal(inTransit, 'available', onLine)).toBe(
+            'An asset leaves transfer only once Inventory lets it go from its transfer order line',
+        )
+        expect(stageChangeRefusal(inTransit, 'available', { ...onLine, onTransferOrderLine: false })).toBeNull()
+    })
+
+    it.each(['staged', 'shipped', 'missing', 'pending_in_service'] as const)('takes an asset out of transfer into no other stage (%s)', (to) => {
+        expect(checkTransition('in_transfer', to, deployable).allowed).toBe(false)
+    })
+
+    it('stays in transfer from Pending transfer to In transit / Reserved, whatever the line says', () => {
+        const pending = stageOf({ installStatus: '6', substatus: 'pending_transfer' })
+        const inTransit = stageOf({ installStatus: '9', substatus: 'reserved' })
+        expect(stageChangeRefusal(pending, inTransit, onLine)).toBeNull()
+        expect(stageChangeRefusal(inTransit, pending, deployable)).toBeNull()
+    })
+
+    it('checks a hand-made form edit into a transfer combination against the line', () => {
+        expect(stageChangeRefusal('available', 'in_transfer', deployable)).toBe(
+            'An asset is in transfer only while it is on an open transfer order line',
+        )
+        expect(stageChangeRefusal('available', 'in_transfer', onLine)).toBeNull()
+    })
+
+    it('needs no site or agreement, and never counts as deployed or billed', () => {
+        const bare: TransitionFacts = { hasSite: false, hasAgreement: false, legalOwner: '', wipeEvidenceComplete: false, onTransferOrderLine: true }
+        expect(checkTransition('available', 'in_transfer', bare)).toEqual({ allowed: true })
+        expect(isDeployed('in_transfer')).toBe(false)
+        expect(isBillable('in_transfer')).toBe(false)
+        expect(billingChange('reserved', 'in_transfer', { today: '2026-11-09' })).toBeNull()
+    })
+})
+
+describe('stageAfterTransfer', () => {
+    const none: TransferContext = {
+        onOrderLine: false,
+        stagingTaskOpen: false,
+        heldForCustomer: false,
+        atStagingCentre: false,
+        withdrawnBySourcing: false,
+    }
+    const sourced: TransferContext = { ...none, onOrderLine: true, stagingTaskOpen: true, heldForCustomer: true }
+
+    it('stages a unit sourcing transferred to the staging centre once it is received there, as its Staging task waits', () => {
+        expect(stageAfterTransfer({ ...sourced, atStagingCentre: true })).toBe('staging')
+    })
+
+    it('keeps a unit on an Order line reserved for it when its transfer was cancelled or deleted short of the staging centre', () => {
+        expect(stageAfterTransfer(sourced)).toBe('reserved')
+        expect(stageAfterTransfer({ ...sourced, withdrawnBySourcing: true })).toBe('reserved')
+    })
+
+    it('keeps a unit on an Order line without a Staging task reserved for the line, at the staging centre too', () => {
+        expect(stageAfterTransfer({ ...sourced, stagingTaskOpen: false, atStagingCentre: true })).toBe('reserved')
+        expect(stageAfterTransfer({ ...sourced, stagingTaskOpen: false })).toBe('reserved')
+    })
+
+    it("puts a Customer's spare back in its Spare pool, wherever Inventory left it", () => {
+        expect(stageAfterTransfer({ ...none, heldForCustomer: true })).toBe('spare_pool')
+        expect(stageAfterTransfer({ ...none, heldForCustomer: true, atStagingCentre: true })).toBe('spare_pool')
+    })
+
+    it("leaves the Provider's free stock available, as Inventory does", () => {
+        expect(stageAfterTransfer(none)).toBe('available')
+        expect(stageAfterTransfer({ ...none, stagingTaskOpen: true, atStagingCentre: true })).toBe('available')
+    })
+
+    it('only gives stages the lifecycle lets an asset take back from transfer', () => {
+        const flags = [true, false]
+        for (const onOrderLine of flags) {
+            for (const stagingTaskOpen of flags) {
+                for (const heldForCustomer of flags) {
+                    for (const atStagingCentre of flags) {
+                        const context = { onOrderLine, stagingTaskOpen, heldForCustomer, atStagingCentre, withdrawnBySourcing: false }
+                        const to = stageAfterTransfer(context)
+                        expect(checkTransition('in_transfer', to, deployable), to).toEqual({ allowed: true })
+                        // Inventory sets it available first, in the same save (reserved for a line requested for a user).
+                        expect(checkTransition('available', to, deployable), to).toEqual({ allowed: true })
+                        expect(checkTransition('reserved', to, deployable), to).toEqual({ allowed: true })
+                    }
+                }
+            }
+        }
+    })
+})
+
+describe('transferFellThrough', () => {
+    const sourced: TransferContext = {
+        onOrderLine: true,
+        stagingTaskOpen: true,
+        heldForCustomer: true,
+        atStagingCentre: false,
+        withdrawnBySourcing: false,
+    }
+
+    it('finds the transfer of a unit on an Order line fallen through when Inventory let it go short of the staging centre', () => {
+        expect(transferFellThrough(sourced)).toBe(true)
+        expect(transferFellThrough({ ...sourced, stagingTaskOpen: false })).toBe(true)
+    })
+
+    it('does not once the unit is received at the staging centre', () => {
+        expect(transferFellThrough({ ...sourced, atStagingCentre: true })).toBe(false)
+        expect(transferFellThrough({ ...sourced, atStagingCentre: true, stagingTaskOpen: false })).toBe(false)
+    })
+
+    it('leaves a transfer order sourcing is removing itself to sourcing, which puts the unit back', () => {
+        expect(transferFellThrough({ ...sourced, withdrawnBySourcing: true })).toBe(false)
+    })
+
+    it('never holds for stock on no Order line: a transfer made by hand, or a unit Cancel order released', () => {
+        expect(transferFellThrough({ ...sourced, onOrderLine: false })).toBe(false)
+        expect(transferFellThrough({ ...sourced, onOrderLine: false, heldForCustomer: false })).toBe(false)
+    })
+})
+
 describe('stageChangeRefusal', () => {
     it('lets a stage set by hand follow the lifecycle', () => {
         expect(stageChangeRefusal('staged', 'shipped', deployable)).toBeNull()
@@ -152,6 +320,11 @@ describe('voidsWipeEvidence', () => {
         }
     })
 
+    it('voids it when a unit in transfer goes into staging on arrival', () => {
+        expect(voidsWipeEvidence('in_transfer', 'staging')).toBe(true)
+        expect(voidsWipeEvidence('in_transfer', 'reserved')).toBe(false)
+    })
+
     it('leaves it on every other move, and on staying in staging', () => {
         expect(voidsWipeEvidence('staging', 'staging')).toBe(false)
         expect(voidsWipeEvidence('staging', 'pending_evaluation')).toBe(false)
@@ -179,6 +352,15 @@ describe('stagesQuery', () => {
 
     it('works without a base query', () => {
         expect(stagesQuery(['available'])).toBe('install_status=6^substatus=available')
+    })
+
+    it("gives in transfer a clause for each of Inventory's combinations, each carrying the base query", () => {
+        expect(stagesQuery(['in_transfer'])).toBe('install_status=6^substatus=pending_transfer^NQinstall_status=9^substatus=reserved')
+        expect(stagesQuery(['reserved', 'in_transfer'], 'model=m1', 'asset.')).toBe(
+            'asset.install_status=6^asset.substatus=reserved^model=m1' +
+                '^NQasset.install_status=6^asset.substatus=pending_transfer^model=m1' +
+                '^NQasset.install_status=9^asset.substatus=reserved^model=m1',
+        )
     })
 
     it('dot-walks to the asset from a related table', () => {

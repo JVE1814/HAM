@@ -3,9 +3,9 @@ import { andEachClause } from './encoded-query.ts'
 /**
  * Asset lifecycle stages and the moves allowed between them.
  *
- * A Lifecycle stage is stored on the platform as an `install_status` + `substatus` pair (ADR 0002).
- * This module owns that mapping and the allowed-moves matrix; nothing else in the app should compare
- * raw install status or substatus values.
+ * A Lifecycle stage is stored on the platform as an `install_status` + `substatus` pair (ADR 0002); In transfer is
+ * stored as either of two, both Inventory's. This module owns that mapping and the allowed-moves matrix; nothing else
+ * in the app should compare raw install status or substatus values.
  */
 
 export interface StageFields {
@@ -32,6 +32,8 @@ const STAGE_FIELDS = {
     spare_pool: { installStatus: INSTALL_STATUS.inStock, substatus: 'reserved_spare_pool' },
     staging: { installStatus: INSTALL_STATUS.inStock, substatus: 'staging' },
     staged: { installStatus: INSTALL_STATUS.inStock, substatus: 'staged' },
+    // Set by Inventory's transfer order logic, never by the app; also stored as In transit / Reserved (ALSO_STORED_AS).
+    in_transfer: { installStatus: INSTALL_STATUS.inStock, substatus: 'pending_transfer' },
     shipped: { installStatus: INSTALL_STATUS.inTransit, substatus: 'shipped_to_site' },
     pending_in_service: { installStatus: INSTALL_STATUS.inUse, substatus: 'pending_in_service' },
     in_service: { installStatus: INSTALL_STATUS.inUse, substatus: '' },
@@ -52,6 +54,20 @@ const STAGE_FIELDS = {
 export type Stage = keyof typeof STAGE_FIELDS
 
 export const ALL_STAGES = Object.keys(STAGE_FIELDS) as Stage[]
+
+/**
+ * The other platform combinations a stage is stored as. Inventory's *Push Status to Asset/Consumable* rule sets an
+ * Asset on a transfer order line to In stock / Pending transfer (Draft, Requested, Shipment Preparation) and to In
+ * transit / Reserved (In Transit), both one stage here: In transfer (external-contracts N38).
+ */
+const ALSO_STORED_AS: Partial<Record<Stage, readonly StageFields[]>> = {
+    in_transfer: [{ installStatus: INSTALL_STATUS.inTransit, substatus: 'reserved' }],
+}
+
+/** Every combination `stage` is stored as, the one `fieldsOf` gives first. */
+function storedAs(stage: Stage): readonly StageFields[] {
+    return [STAGE_FIELDS[stage], ...(ALSO_STORED_AS[stage] ?? [])]
+}
 
 /**
  * Substatus values this app adds to the platform, with the install_status they depend on.
@@ -94,14 +110,18 @@ const NEEDS_SITE_AND_AGREEMENT: ReadonlySet<Stage> = new Set([
     'temporary_deployment',
 ])
 
+/** Stock a transfer order moves between stockrooms, and the stages it takes back once Inventory lets it go. */
+const TRANSFERABLE: readonly Stage[] = ['available', 'reserved', 'spare_pool', 'staging']
+
 const ALLOWED_MOVES: Record<Stage, readonly Stage[]> = {
     on_order: ['in_transit', 'available'],
     in_transit: ['available'],
-    available: ['reserved', 'spare_pool', 'staging', 'pending_evaluation', 'pending_wipe', 'missing'],
-    spare_pool: ['reserved', 'available', 'staging', 'shipped', 'pending_in_service', 'missing'],
-    reserved: ['staging', 'available', 'spare_pool', 'missing'],
-    staging: ['staged', 'pending_evaluation', 'available'],
+    available: ['reserved', 'spare_pool', 'staging', 'pending_evaluation', 'pending_wipe', 'missing', 'in_transfer'],
+    spare_pool: ['reserved', 'available', 'staging', 'shipped', 'pending_in_service', 'missing', 'in_transfer'],
+    reserved: ['staging', 'available', 'spare_pool', 'missing', 'in_transfer'],
+    staging: ['staged', 'pending_evaluation', 'available', 'in_transfer'],
     staged: ['shipped', 'available', 'spare_pool'],
+    in_transfer: TRANSFERABLE,
     shipped: ['pending_in_service', 'pending_return', 'missing'],
     pending_in_service: ['in_service', 'temporary_deployment', 'pending_return'],
     in_service: ['pending_return', 'missing'],
@@ -126,21 +146,25 @@ export interface TransitionFacts {
     hasAgreement: boolean
     legalOwner: LegalOwner
     wipeEvidenceComplete: boolean
+    /**
+     * Inventory has the Asset on an open transfer order line once the save is made (its *Active transfer order* flag,
+     * which Inventory sets and clears in the same save as the stage). Only then may an Asset go into transfer, and
+     * only once Inventory lets it go may it leave: a unit on its way between two stockrooms is nobody's stock. Left
+     * out, it counts as not on a line, so the app's own moves never put an Asset into transfer; none of them takes one
+     * out either (Cancel order takes a unit in transfer off its Order line and leaves it in transfer, entry/orders).
+     */
+    onTransferOrderLine?: boolean
 }
 
 export type TransitionVerdict = { allowed: true } | { allowed: false; reason: string }
 
 export function stageOf(fields: StageFields): Stage | null {
     const substatus = fields.substatus ?? ''
-    for (const stage of ALL_STAGES) {
-        const candidate = STAGE_FIELDS[stage]
-        if (candidate.installStatus === fields.installStatus && candidate.substatus === substatus) {
-            return stage
-        }
-    }
-    return null
+    const matches = (candidate: StageFields) => candidate.installStatus === fields.installStatus && candidate.substatus === substatus
+    return ALL_STAGES.find((stage) => storedAs(stage).some(matches)) ?? null
 }
 
+/** The combination the app stores `stage` as (In transfer: In stock / Pending transfer, which the app never sets). */
 export function fieldsOf(stage: Stage): StageFields {
     return { ...STAGE_FIELDS[stage] }
 }
@@ -161,6 +185,12 @@ export function checkTransition(from: Stage | null, to: Stage, facts: Transition
     }
     if (!ALLOWED_MOVES[from].includes(to)) {
         return { allowed: false, reason: `Cannot move an asset from ${from} to ${to}` }
+    }
+    if (to === 'in_transfer' && !facts.onTransferOrderLine) {
+        return { allowed: false, reason: 'An asset is in transfer only while it is on an open transfer order line' }
+    }
+    if (from === 'in_transfer' && facts.onTransferOrderLine) {
+        return { allowed: false, reason: 'An asset leaves transfer only once Inventory lets it go from its transfer order line' }
     }
     if (NEEDS_SITE_AND_AGREEMENT.has(to)) {
         if (!facts.hasSite) return { allowed: false, reason: `An asset must have a site before it can be ${to}` }
@@ -204,6 +234,48 @@ function checkRetirement(from: Stage, to: Stage, facts: TransitionFacts): Transi
 }
 
 /**
+ * What an Asset Inventory lets go from its transfer order line still carries, and where Inventory left it: what tells
+ * the stage it left, and whether the transfer sourcing raised for it fell through.
+ */
+export interface TransferContext {
+    /** It is on an Order line: only sourcing transfers such a unit, to the staging centre. */
+    onOrderLine: boolean
+    /** A Staging task is open for it: sourcing opens one for each unit it transfers to the staging centre. */
+    stagingTaskOpen: boolean
+    /** Its company is a Customer, not the Provider: on no Order line, that Customer's Spare pool. */
+    heldForCustomer: boolean
+    /**
+     * Inventory left it in the staging centre's stockroom: there once its line is received, and still where it was
+     * sent from when its line is cancelled or deleted.
+     */
+    atStagingCentre: boolean
+    /** Sourcing is removing the transfer order it could not complete, and puts the unit back itself. */
+    withdrawnBySourcing: boolean
+}
+
+/**
+ * The stage an Asset takes back once Inventory lets it go from its transfer order line (received, cancelled or
+ * deleted), instead of the platform's In stock / Available: the one it left, as its context still shows. On an Order
+ * line it was reserved for it, and goes into staging once it is at the staging centre with its Staging task waiting
+ * (a unit sourcing transfers there is staged on arrival); anywhere else it is reserved again, its transfer fallen
+ * through (`transferFellThrough`). In a Customer's Spare pool it goes back to the pool; else it is free stock. Each is
+ * a move out of transfer the matrix allows.
+ */
+export function stageAfterTransfer(context: TransferContext): Stage {
+    if (context.onOrderLine) return context.stagingTaskOpen && context.atStagingCentre ? 'staging' : 'reserved'
+    return context.heldForCustomer ? 'spare_pool' : 'available'
+}
+
+/**
+ * Whether the transfer sourcing raised for a unit on an Order line fell through: Inventory let it go short of the
+ * staging centre (its line cancelled or deleted), reserved where nothing moves it on. It is put back as stock and its
+ * Order sourced again (entry/orders `putBackUntransferred`), unless sourcing is removing that transfer order itself.
+ */
+export function transferFellThrough(context: TransferContext): boolean {
+    return context.onOrderLine && !context.atStagingCentre && !context.withdrawnBySourcing
+}
+
+/**
  * Whether a move voids the Asset's wipe evidence: entering staging loads a Customer's configuration, which a wipe
  * recorded before does not cover. (Receipt from a Site voids it too, in entry/returns.)
  */
@@ -218,12 +290,13 @@ export const SERVING_STAGES: readonly Stage[] = ['shipped', 'pending_in_service'
 
 /**
  * An encoded query matching assets in any of `stages` (and `base`, repeated per clause because
- * ^NQ starts a new top-level OR group). `via` dot-walks to the asset from another table (`asset.`).
+ * ^NQ starts a new top-level OR group), one clause per combination a stage is stored as. `via`
+ * dot-walks to the asset from another table (`asset.`).
  */
 export function stagesQuery(stages: readonly Stage[], base = '', via = ''): string {
     const clauses = stages
-        .map((stage) => {
-            const { installStatus, substatus } = STAGE_FIELDS[stage]
+        .flatMap(storedAs)
+        .map(({ installStatus, substatus }) => {
             return `${via}install_status=${installStatus}^${via}${substatus ? `substatus=${substatus}` : 'substatusISEMPTY'}`
         })
         .join('^NQ')

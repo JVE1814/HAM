@@ -5,6 +5,7 @@ import {
     explainLifecycleRefusal,
     onAllocatedAssetStageChange,
     onAssetServiceChange,
+    onTransferReleased,
 } from '../../server/entry/assets'
 import { explainWorkWindowRefusal, onWorkOrderClosed } from '../../server/entry/delivery'
 import { onOrderApprovalDecision } from '../../server/entry/orders'
@@ -18,7 +19,23 @@ import { guardStagingClosure, onStagingClosed, releaseWaitingSteps, stampStaging
  * check) holds, and its script only says why. The platform runs a condition on every save of the table, whether or not
  * the rule's filter matches, so each condition starts with its change test: the module loads only when that holds. The
  * condition field holds at most 254 characters.
+ *
+ * alm_hardware also holds the Provider IT's own equipment, which the app leaves alone (ADR 0016): each rule on it
+ * tests the Fleet flag right after its change test, before anything else it checks or loads.
  */
+
+// Ahead of the lifecycle rule, so that it checks the stage the Asset takes back, not Inventory's In stock / Available.
+BusinessRule({
+    $id: Now.ID['br_asset_transfer_released'],
+    name: 'NaaS - asset back to its stage after a transfer',
+    table: 'alm_hardware',
+    when: 'before',
+    action: ['update'],
+    order: 80,
+    condition: 'current.active_to.changes() && current.x_daas_ham_fleet == true',
+    script: onTransferReleased,
+})
+
 BusinessRule({
     $id: Now.ID['br_asset_enforce_lifecycle'],
     name: 'NaaS - enforce asset lifecycle',
@@ -27,7 +44,7 @@ BusinessRule({
     action: ['update'],
     order: 100,
     condition:
-        "(current.install_status.changes() || current.substatus.changes()) && require('x_daas_ham/naas-ham/0.1.0/src/server/entry/assets.ts').refusesLifecycleChange(current, previous)",
+        "(current.install_status.changes() || current.substatus.changes()) && current.x_daas_ham_fleet == true && require('x_daas_ham/naas-ham/0.1.0/src/server/entry/assets.ts').refusesLifecycleChange(current, previous)",
     abortAction: true,
     script: explainLifecycleRefusal,
 })
@@ -41,10 +58,11 @@ BusinessRule({
     when: 'before',
     action: ['update'],
     order: 100,
-    condition: 'current.install_status.changes() || current.substatus.changes()',
+    condition: '(current.install_status.changes() || current.substatus.changes()) && current.x_daas_ham_fleet == true',
     script: clearVoidedWipeEvidence,
 })
 
+// Also takes a unit that left its line in transit off it.
 BusinessRule({
     $id: Now.ID['br_asset_stage_to_order_line'],
     name: 'NaaS - advance order line on asset stage change',
@@ -52,7 +70,8 @@ BusinessRule({
     when: 'after',
     action: ['update'],
     order: 200,
-    condition: "(current.install_status.changes() || current.substatus.changes()) && current.x_daas_ham_order_line != ''",
+    condition:
+        "(current.install_status.changes() || current.substatus.changes()) && current.x_daas_ham_fleet == true && current.x_daas_ham_order_line != ''",
     script: onAllocatedAssetStageChange,
 })
 
@@ -63,7 +82,7 @@ BusinessRule({
     when: 'after',
     action: ['update'],
     order: 210,
-    condition: 'current.install_status.changes() || current.substatus.changes()',
+    condition: '(current.install_status.changes() || current.substatus.changes()) && current.x_daas_ham_fleet == true',
     script: onAssetServiceChange,
 })
 

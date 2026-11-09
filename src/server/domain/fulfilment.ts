@@ -20,9 +20,13 @@ export type LineStage =
 
 export type OrderStage = 'sourcing' | 'preparing' | 'delivering' | 'installing' | 'complete' | 'cancelled'
 
-/** How far an allocated Asset has progressed along fulfilment (higher is further). */
+/**
+ * How far an allocated Asset has progressed along fulfilment (higher is further). A unit in transfer is on its way to
+ * the staging centre, sourced like one reserved where it is.
+ */
 const PROGRESS: Partial<Record<Stage, number>> = {
     reserved: 1,
+    in_transfer: 1,
     staging: 2,
     staged: 3,
     spare_pool: 3,
@@ -48,14 +52,16 @@ const DELIVERED: ReadonlySet<LineStage> = new Set(['shipped', 'installed', 'in_s
 
 /**
  * Stages a unit on a line can hold before Ship sends it. Missing and available are among them, as a unit lost or put
- * back before Ship goes there too. Any other stage means it was sent (a hot spare handed over at Ship included) and
- * may have come back since: failed staging takes a unit off its line, so one evaluated on its line came from the Site.
+ * back before Ship goes there too, and so is in transfer, between two of the Provider's stockrooms. Any other stage
+ * means it was sent (a hot spare handed over at Ship included) and may have come back since: failed staging takes a
+ * unit off its line, so one evaluated on its line came from the Site.
  */
 const BEFORE_SHIP: ReadonlySet<Stage> = new Set([
     'on_order',
     'in_transit',
     'available',
     'reserved',
+    'in_transfer',
     'spare_pool',
     'staging',
     'staged',

@@ -37,6 +37,7 @@ import {
     requestApprovals,
 } from '../platform/approvals.ts'
 import { moveAndSave, readStage } from '../platform/assets.ts'
+import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { EVENT, fire } from '../platform/events.ts'
 import { orderShipment, recomputeLine, recomputeOrder } from '../platform/fulfilment.ts'
 import { todayIso } from '../platform/clock.ts'
@@ -461,26 +462,33 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
         if (stagingId && from && from !== stagingId) appendTo(toTransfer, from, { asset, source: pick.source })
         else toStage.push(asset)
     }
-    // Stock outside the staging centre is only staged once its transfer order exists; without one it goes back.
+    // Stock outside the staging centre is in transfer to it once its transfer order exists; without one it goes back.
     const transfers: string[] = []
     const unmoved: UnmovedStock[] = []
+    const inTransfer: GlideRecord[] = []
     let putBack = 0
     for (const [from, picked] of toTransfer) {
-        const transfer = requestTransfer({ fromStockroomId: from, toStockroomId: stagingId, assets: picked.map(({ asset }) => ({ assetId: asset.getUniqueValue(), modelId })) })
+        const assets = picked.map(({ asset }) => asset)
+        const transfer = requestTransfer({ fromStockroomId: from, toStockroomId: stagingId, modelId, assets })
         if (transfer.ok) {
             transfers.push(transfer.transferId)
-            toStage.push(...picked.map(({ asset }) => asset))
+            inTransfer.push(...assets)
             continue
         }
         unmoved.push({ units: picked.length, from: picked[0].asset.getDisplayValue('stockroom'), reason: transfer.reason })
         for (const { asset, source } of picked) {
-            if (unreserve(asset, source)) putBack++
+            // As Inventory left it once its line was removed (platform/transfers `requestTransfer`).
+            const fresh = findById('alm_hardware', asset.getUniqueValue())
+            if (fresh && unreserve(fresh, source)) putBack++
         }
     }
     // An Asset whose Staging task could not be opened stays reserved for the line rather than staging with no task to finish.
     for (const asset of toStage) {
         if (openStagingTask(asset, lineId)) moveAndSave(asset, 'staging', 'sourcing')
     }
+    // A unit in transfer gets its Staging task now and goes into staging when its line is received at the staging
+    // centre (entry/assets `onTransferReleased`); without the task it is reserved for the line there.
+    for (const asset of inTransfer) openStagingTask(asset, lineId)
     // Unmoved stock is not bought (see shortfallOutcome).
     const toPurchase = shortfall - reserved
     // Only a break-fix line for the same Model can be served by the OEM's advance replacement; a
@@ -642,47 +650,86 @@ function countAllocated(lineId: string): number {
 
 /**
  * Put back stock reserved for a line but never moved to staging: Spare-pool stock to the pool, the rest to free stock.
- * False when the platform refuses (logged): the Asset stays on the line.
+ * False when the platform refuses (logged with `why`): the Asset stays on the line.
  */
-function unreserve(asset: GlideRecord, source: Source): boolean {
+function unreserve(asset: GlideRecord, source: Source, why = 'no transfer order'): boolean {
     asset.setValue('x_daas_ham_order_line', '')
-    if (source === 'spare_pool') return moveAndSave(asset, 'spare_pool', 'no transfer order')
+    if (source === 'spare_pool') return moveAndSave(asset, 'spare_pool', why)
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('x_daas_ham_agreement', '')
-    return moveAndSave(asset, 'available', 'no transfer order')
+    return moveAndSave(asset, 'available', why)
 }
 
 /**
- * Give an allocated Asset back to stock: hot spares stay in the Spare pool, the rest become free stock. False when
- * the platform refuses that or the closing of its Staging tasks (logged).
+ * After-update rule's work for a unit whose transfer to the staging centre fell through (entry/assets
+ * `onAllocatedAssetStageChange`): Inventory let it go short of the staging centre, its transfer order line cancelled
+ * or deleted, and it was reserved for its line again where it was, which nothing moves it on from (domain/lifecycle
+ * `transferFellThrough`). So it is put back as stock is for want of a transfer order, as free stock: the Source it was
+ * picked from is no longer known (the spare-pool top-up replaces a spare). Its Staging task is skipped, its line
+ * derived again (back to awaiting stock) and its Order sourced again, queued, which picks stock again and may raise a
+ * new transfer order for the same unit. Logged. A unit the platform refuses to put back stays reserved for its line
+ * (logged), which is then not sourced again.
+ */
+export function putBackUntransferred(current: GlideRecord, lineId: string): void {
+    const where = current.getDisplayValue('stockroom')
+    const what = `${str(current, 'serial_number')} left its transfer to the staging centre in ${where}`
+    const orderId = str(current, 'x_daas_ham_order_line.order')
+    // A fresh record, read past the user's rules: saving `current` again from its own after rule would run its rules
+    // twice, and an inventory tech of the staging centre who cancelled the line does not see a unit stored elsewhere.
+    const asset = new GlideRecord('alm_hardware')
+    if (!beyondVisibility(asset, () => asset.get(current.getUniqueValue()))) return
+    if (!unreserve(asset, 'central_stock', `${what}, so it is put back`)) return
+    closeOpenStagingTasks(asset.getUniqueValue(), 'Transfer to the staging centre fell through')
+    recomputeLine(lineId)
+    gs.warn(`[x_daas_ham] ${what}: put back as free stock, its line sourced again`)
+    resourceOrder(orderId)
+}
+
+/**
+ * Give an allocated Asset back to stock: hot spares stay in the Spare pool, the rest become free stock. A unit in
+ * transfer stays in transfer (domain/lifecycle `checkTransition`): only its reservation goes, and it is free stock
+ * once Inventory lets it go (entry/assets `onTransferReleased`). False when the platform refuses that or the closing
+ * of its Staging tasks (logged).
  */
 function releaseAsset(asset: GlideRecord): boolean {
-    const closed = closeOpenStagingTasks(asset.getUniqueValue())
+    const closed = closeOpenStagingTasks(asset.getUniqueValue(), 'Order cancelled')
+    const serial = str(asset, 'serial_number')
+    const stage = readStage(asset)
     asset.setValue('x_daas_ham_order_line', '')
-    if (readStage(asset) === 'spare_pool') {
-        // Still linked to the line, the spare is never picked again.
-        if (asset.update()) return closed
-        saveRefused(asset, `order cancelled: ${str(asset, 'serial_number')} still linked to its line, unlink it`)
-        return false
-    }
+    // Still linked to the line, the spare is never picked again.
+    if (stage === 'spare_pool') return saveReleased(asset, `${serial} still linked to its line, unlink it`) && closed
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('x_daas_ham_agreement', '')
+    // Left on the line, it would go into staging once received.
+    if (stage === 'in_transfer') {
+        return saveReleased(asset, `${serial} still on its line, release it once received`) && closed
+    }
     return moveAndSave(asset, 'available', 'order cancelled') && closed
 }
 
-/** Skip the Asset's open Staging tasks; false when the platform refuses one (logged). */
-function closeOpenStagingTasks(assetId: string): boolean {
+/** Save an Asset Cancel order releases at its stage; false when the platform refuses (logged with what is `left`). */
+function saveReleased(asset: GlideRecord, left: string): boolean {
+    if (asset.update()) return true
+    saveRefused(asset, `order cancelled: ${left}`)
+    return false
+}
+
+/**
+ * Skip the Asset's open Staging tasks, noting `why`; false when the platform refuses one (logged). Read past the
+ * user's rules (ADR 0005): an inventory tech sees only the tasks of Assets in their stockrooms.
+ */
+function closeOpenStagingTasks(assetId: string, why: string): boolean {
     const task = new GlideRecord('x_daas_ham_staging_task')
     task.addQuery('asset', assetId)
     task.addQuery('active', true)
-    task.query()
+    beyondVisibility(task, () => task.query())
     let closed = true
     while (task.next()) {
         task.setValue('state', 7)
-        task.setValue('work_notes', 'Order cancelled; staging skipped.')
+        task.setValue('work_notes', `${why}; staging skipped.`)
         if (task.update()) continue
         // Left open, it asks a technician to stage a unit that is back in stock.
-        saveRefused(task, `order cancelled: ${str(task, 'number')} left open, close it`)
+        saveRefused(task, `${why.toLowerCase()}: ${str(task, 'number')} left open, close it`)
         closed = false
     }
     return closed

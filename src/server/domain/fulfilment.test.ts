@@ -24,6 +24,17 @@ describe('lineStageFor', () => {
         expect(lineStageFor({ current: 'installed', quantity: 2, assetStages: ['in_service', 'temporary_deployment'] })).toBe('in_service')
     })
 
+    it('counts a unit in transfer to the staging centre as sourced, on its way', () => {
+        expect(lineStageFor({ current: 'awaiting_stock', quantity: 1, assetStages: ['in_transfer'] })).toBe('sourced')
+        expect(lineStageFor({ current: 'sourced', quantity: 2, assetStages: ['in_transfer', 'staged'] })).toBe('sourced')
+        expect(lineStageFor({ current: 'sourced', quantity: 3, assetStages: ['in_transfer', 'reserved'] })).toBe('awaiting_stock')
+    })
+
+    it('moves on once a unit in transfer is received and goes into staging', () => {
+        expect(lineStageFor({ current: 'sourced', quantity: 2, assetStages: ['staging', 'staged'] })).toBe('staging')
+        expect(lineStageFor({ current: 'sourced', quantity: 1, assetStages: ['reserved'] })).toBe('sourced')
+    })
+
     it('counts a hot spare that skips staging as staged', () => {
         expect(lineStageFor({ current: 'sourced', quantity: 1, assetStages: ['spare_pool'] })).toBe('ready_to_ship')
     })
@@ -132,6 +143,7 @@ describe('leftInTransit', () => {
 
     it('is not a unit lost before Ship', () => {
         expect(leftInTransit('reserved', 'missing')).toBe(false)
+        expect(leftInTransit('in_transfer', 'available')).toBe(false)
         expect(leftInTransit(null, 'missing')).toBe(false)
     })
 })
@@ -171,7 +183,7 @@ describe('anythingShipped', () => {
     })
 
     it('is nothing before Ship', () => {
-        const unitStages = ['reserved', 'staging', 'staged', 'spare_pool', 'missing', null] as const
+        const unitStages = ['reserved', 'in_transfer', 'staging', 'staged', 'spare_pool', 'missing', null] as const
         expect(anythingShipped({ lineStages: ['awaiting_stock', 'ready_to_ship', 'cancelled'], unitStages })).toBe(false)
     })
 })
