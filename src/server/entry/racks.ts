@@ -58,7 +58,8 @@ function placementOf(slot: Slot, models: ReadonlyMap<string, RackModel>): Placem
 /**
  * Every device placed in the rack but `exceptAssetId`, past the visibility rules (ADR 0005): an inventory tech sees
  * only their Stockrooms' Assets, and a device they cannot see still fills its units and draws power. Only read, never
- * saved.
+ * saved. The platform refuses setWorkflow from this scope on alm_hardware, so for now the rules still narrow the read
+ * (docs/research/external-contracts.md, "Refusing a save, or skipping the rules, on a global table").
  */
 function slotsIn(rackId: string, exceptAssetId = ''): Slot[] {
     const asset = new GlideRecord('alm_hardware')
@@ -73,15 +74,18 @@ function slotsIn(rackId: string, exceptAssetId = ''): Slot[] {
 }
 
 /**
- * Before rule on alm_hardware: a rack position must be free, inside the rack and within its power budget. It checks
- * against the placements saved so far and takes no lock: one taken here is released before the platform writes the
- * record, so two saves into the same units at the same moment could still both pass. Placements are entered by hand,
- * one Asset per save, and no app logic places one, so what slips through is reported, not refused: the after rule
- * (recheckRackPlacement) re-checks the rack once the save is written.
+ * Why the save cannot put the Asset where it is placed (a unit taken on its face, outside the rack, or past the rack's
+ * power budget), or null when it fits or is not placed. It checks against the placements saved so far and takes no
+ * lock: one taken here is released before the platform writes the record, so two saves into the same units at the
+ * same moment could still both pass. Placements are entered by hand, one Asset per save, and no app logic places one,
+ * so what slips through is reported, not refused: the after rule (recheckRackPlacement) re-checks the rack once the
+ * save is written. A rack no longer there holds nothing, as for the re-check.
  */
-export function guardRackPlacement(current: GlideRecord, previous: GlideRecord): void {
+function placementRefusal(current: GlideRecord, previous: GlideRecord | null): string | null {
     const rackId = str(current, 'x_daas_ham_rack')
-    if (!rackId || !str(current, 'x_daas_ham_ru_start')) return
+    if (!rackId || !str(current, 'x_daas_ham_ru_start')) return null
+    const rack = findById('cmdb_ci_rack', rackId)
+    if (!rack) return null
     const others = slotsIn(rackId, current.getUniqueValue())
     const candidate = { ...slotOf(current), assetId: current.getUniqueValue() }
     // The Model this device already had in this rack; undefined when it is new to the rack.
@@ -90,18 +94,28 @@ export function guardRackPlacement(current: GlideRecord, previous: GlideRecord):
     // Every Model involved in one query; an unchanged Model is the candidate's own entry.
     const models = rackModels([candidate.modelId, previousModelId ?? '', ...others.map((slot) => slot.modelId)])
     const previousPowerW = previousModelId === undefined ? undefined : (models.get(previousModelId) ?? NO_MODEL).powerW
-    const rack = { units: num(current, 'x_daas_ham_rack.rack_units') || 42, powerCapacityW: num(current, 'x_daas_ham_rack.x_daas_ham_power_capacity_w') }
     const placements = others.map((slot) => placementOf(slot, models))
-    const problem = placementProblem(rack, placements, placementOf(candidate, models), previousPowerW)
-    if (problem) {
-        gs.addErrorMessage(problem)
-        current.setAbortAction(true)
-    }
+    return placementProblem(rackSpec(rack), placements, placementOf(candidate, models), previousPowerW)
+}
+
+/**
+ * Condition of the before rule on alm_hardware (br_rack_placement): whether the save must be refused. The rule refuses
+ * it with its Abort action, not with current.setAbortAction: the platform refuses that call from a scoped app on a
+ * record of a global table ("Security restricted" in the script's output, nothing in the system log) and writes the
+ * record anyway.
+ */
+export function refusesRackPlacement(current: GlideRecord, previous: GlideRecord | null): boolean {
+    return placementRefusal(current, previous) !== null
+}
+
+/** Script of that rule, run only when its condition refuses the save: why, as the error message. */
+export function explainRackRefusal(current: GlideRecord, previous: GlideRecord | null): void {
+    gs.addErrorMessage(placementRefusal(current, previous) ?? 'This rack placement is refused')
 }
 
 /**
  * After rule on alm_hardware: re-check the rack the Asset is placed in, and the one it left, now the save is written.
- * guardRackPlacement checks against the placements saved before, so two saves into the same units (or the last of a
+ * The before rule checks against the placements saved before, so two saves into the same units (or the last of a
  * rack's power) at the same moment can both pass it. Each after rule runs once its own save is written, so the later
  * of the two reads both and raises the exception; a later save that clears it resolves it.
  */

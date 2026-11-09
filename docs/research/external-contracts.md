@@ -754,7 +754,8 @@ Sources:
 | `GlideRecord.updateMultiple()` and clearing a field | Clears `billing_period` record by record (`billing.ts` unlinkFees) | `updateMultiple` does not clear values unless set to `'NULL'` | matches | N30 |
 | `RESTMessageV2(name, methodName)`, `setStringParameterNoEscape` | As used; app URL-encodes values itself (`rest-port.ts:8,26-28`) | Constructor documented; neither method URL-encodes | matches | N31, N32, N33 |
 | `GlideAggregate.groupBy` on date fields | Grouped `start_date`/`end_date` read as `YYYY-MM-DD` (`billing.ts` intervalsByLine) | Format of a grouped `glide_date` key not documented | unverifiable | N34 |
-| `setWorkflow(false)` on a global table from the scoped app | Skips the app's before-query rule on `alm_hardware` (`assets.ts:87,94`; `billing.ts:183`; `returns.ts` endLineIfEmpty) | "This method can't be set for cross-scoped applications" | unverifiable | N30 |
+| `setWorkflow(false)` on a global table from the scoped app | Skips the app's before-query rule on `alm_hardware` (`assets.ts:87,94`; `billing.ts:183`; `returns.ts` endLineIfEmpty) | "This method can't be set for cross-scoped applications"; refused on the instance, so the rules still run | differs | N30, N35 |
+| `current.setAbortAction(true)` in a before rule on a global table | Refuses the save (`assets.ts` enforceLifecycle on `alm_hardware`, `delivery.ts` guardWorkWindow on `wm_order`) | Refused on the instance: the save goes through; the rule's own Abort action does refuse | differs | N35 |
 
 Notes:
 
@@ -909,6 +910,13 @@ Sources:
 - N33: `node_modules/@servicenow/glide/src/sn_ws/RESTMessageV2.d.ts`
 - N34: https://www.servicenow.com/docs/r/api-reference/server-api-reference/c_GlideAggregateScopedAPI.html
   (Brazil, 2026-09-10).
+- N35: Brazil instance, 2026-11-09, script output of a probe in scope `x_daas_ham` that saved
+  nothing: on `alm_hardware` and `wm_order`, "Security restricted: Access to api 'setAbortAction' from
+  scope 'x_daas_ham' has been refused due to the api's cross-scope access policy" (`isActionAborted()`
+  stays false) and, for `setWorkflow`, "setWorkflow can only be called from within the same Scope as the
+  Table on which it is called. Table's Scope was: Global"; neither on `x_daas_ham_billing_line`. Both
+  calls return without an error and the system log shows nothing. An ATF save of `alm_hardware` refused
+  only that way was written.
 
 ## Changes needed in the app
 
@@ -1146,6 +1154,18 @@ recommended hardening are described in the notes of their area.
   "Scheduled start" and "Estimated end" on an instance.
 - **`cmdb_ci.discovery_source` (partially).** No code change proposed; confirm that ServiceNow
   Discovery writes `ServiceNow` on an instance.
+- **Refusing a save, or skipping the rules, on a global table (differs).** From `x_daas_ham` the
+  platform ignores `current.setAbortAction` and `setWorkflow` on a table of another scope (N35). A
+  before rule on such a table refuses with its Abort action: its check is the condition and its script
+  only adds the message. **Done** for `NaaS - rack placement must be free and within power`
+  (`assurance.now.ts`, `racks.ts` refusesRackPlacement). Still to change: `NaaS - enforce asset
+  lifecycle` (`alm_hardware`, `assets.ts` enforceLifecycle, which also clears wipe evidence on
+  `current`, so that part needs a rule or script that does not refuse) and `NaaS - work inside change
+  and maintenance window` (`wm_order`, `delivery.ts` guardWorkWindow): both show their message and
+  save. The reads ADR 0005 runs past the visibility rules with `setWorkflow(false)` on `alm_hardware`
+  (`racks.ts` slotsIn, `platform/assets.ts` beyondVisibility, `fulfilment.ts`, `delivery.ts`,
+  `warehouse.ts`, `imports.ts`, `in-service.ts`) are still narrowed for an inventory tech; they need a
+  bypass the before-query rule itself honours.
 
 ## Still needs an instance or vendor login
 
@@ -1172,9 +1192,6 @@ Items with verdict unverifiable:
 - **`wm_order` state 3 = Closed Complete.** Only community posts give the number.
 - **`GlideAggregate.groupBy` on date fields.** The format of a grouped `glide_date` key is not
   documented.
-- **`setWorkflow(false)` on `alm_hardware` from `x_daas_ham`.** Test with an ATF step that calls the
-  device-events API as a scoped role user. If it is ignored, grant the API's callers a role whose
-  visibility scope is "everything", or add a bypass condition to the `alm_hardware` before-query rule.
 
 Other open points raised in the findings:
 

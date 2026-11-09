@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { Acl, BusinessRule, ScheduledScript, UiAction, UiPage } from '@servicenow/sdk/core'
 import { raiseAttestations, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudit } from '../../server/entry/assurance'
-import { guardRackPlacement, reconcileInstalledBaseAndRacks, recheckRackPlacement } from '../../server/entry/racks'
+import { explainRackRefusal, reconcileInstalledBaseAndRacks, recheckRackPlacement } from '../../server/entry/racks'
 import rackPage from '../../client/rack.html'
 import { accountManager, assetManager, customerAdmin, fieldTech, finance, inventoryTech, noc, siteContact } from '../security/roles.now'
 
@@ -43,6 +43,9 @@ UiAction({
     script: uiCloseAudit,
 })
 
+// alm_hardware is a global table: the platform refuses current.setAbortAction from this scope and saves anyway, so
+// the rule refuses with its Abort action when the condition (the module's check) holds; the script only says why. The
+// change filter keeps the module unloaded on other saves, and the condition field holds at most 254 characters.
 BusinessRule({
     $id: Now.ID['br_rack_placement'],
     name: 'NaaS - rack placement must be free and within power',
@@ -50,9 +53,10 @@ BusinessRule({
     when: 'before',
     action: ['insert', 'update'],
     order: 150,
-    condition:
-        "current.x_daas_ham_rack.changes() || current.x_daas_ham_ru_start.changes() || current.x_daas_ham_rack_face.changes() || (current.model.changes() && current.x_daas_ham_rack != '')",
-    script: guardRackPlacement,
+    filterCondition: 'x_daas_ham_rackVALCHANGES^ORx_daas_ham_ru_startVALCHANGES^ORx_daas_ham_rack_faceVALCHANGES^ORmodelVALCHANGES^EQ',
+    condition: "require('x_daas_ham/naas-ham/0.1.0/src/server/entry/racks.ts').refusesRackPlacement(current, previous)",
+    abortAction: true,
+    script: explainRackRefusal,
 })
 
 // The before rule checks the placements saved so far; this one re-checks the racks once the save is written, for two

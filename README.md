@@ -206,6 +206,12 @@ Conventions that the build or tests enforce:
 - `.now.ts` files are literal: no helper functions, loops or string concatenation.
 - Entry-point parameters must be named after the platform globals (`current`, `previous`, `event`,
   `producer`, `request`, `response`): the SDK wrapper passes them by name (`entry-points.test.ts`).
+- A business rule condition fits the 254-character field and loads a module by its installed path,
+  `x_daas_ham/<package name>/<version>/src/...`, calling a function it exports
+  (`entry-points.test.ts`). A before rule on a table of another scope (`alm_hardware`, `wm_order`)
+  refuses that way, with its Abort action: the platform ignores `current.setAbortAction` and
+  `setWorkflow` called from this scope on such a table
+  ([external-contracts.md](docs/research/external-contracts.md#servicenow-platform)).
 - Substatus values added to `alm_asset` live in `domain/lifecycle.ts` and
   `fluent/data/substatus-choices.now.ts` (`substatus-choices.test.ts` keeps them in sync).
 - Commit `src/fluent/generated/keys.ts`. Deleting Fluent code that was installed generates delete

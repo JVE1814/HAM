@@ -58,3 +58,48 @@ describe('module entry points wired from Fluent', () => {
         }
     })
 })
+
+/*
+ * A business rule condition is a script the platform runs as written, in a field of at most 254 characters: a longer
+ * one is cut off, never runs, and the rule never fires. A condition that loads a module names it by the path the SDK
+ * installs it under, which carries the package name and version.
+ */
+const CONDITION_MAX_LENGTH = 254
+const { name: packageName, version: packageVersion } = JSON.parse(readFileSync(join(root, '..', 'package.json'), 'utf8')) as {
+    name: string
+    version: string
+}
+
+function businessRuleConditions(): Array<{ rule: string; condition: string }> {
+    const found: Array<{ rule: string; condition: string }> = []
+    for (const file of files(join(root, 'fluent'), '.now.ts')) {
+        for (const block of readFileSync(file, 'utf8').split('BusinessRule({').slice(1)) {
+            const body = block.split('\n})')[0]
+            const literal = body.match(/condition:\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/)?.[1]
+            if (!literal) continue
+            const condition = literal.startsWith('"') ? (JSON.parse(literal) as string) : literal.slice(1, -1).replace(/\\(.)/g, '$1')
+            found.push({ rule: body.match(/name:\s*'([^']+)'/)?.[1] ?? file, condition })
+        }
+    }
+    return found
+}
+
+describe('business rule conditions', () => {
+    const conditions = businessRuleConditions()
+
+    it('fit the condition field', () => {
+        expect(conditions.length).toBeGreaterThan(0)
+        for (const { rule, condition } of conditions) expect(condition.length, rule).toBeLessThanOrEqual(CONDITION_MAX_LENGTH)
+    })
+
+    it('load modules by their installed path and call what they export', () => {
+        for (const { rule, condition } of conditions) {
+            for (const [, path, fn] of condition.matchAll(/require\('([^']+)'\)\.(\w+)\(/g)) {
+                const prefix = `x_daas_ham/${packageName}/${packageVersion}/src/`
+                expect(path.startsWith(prefix), `${rule}: ${path}`).toBe(true)
+                const source = readFileSync(join(root, path.slice(prefix.length)), 'utf8')
+                expect(source, `${rule}: ${fn}`).toMatch(new RegExp(`export function ${fn}\\(`))
+            }
+        }
+    })
+})
