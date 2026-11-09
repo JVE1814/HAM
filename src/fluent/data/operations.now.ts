@@ -66,6 +66,9 @@ export const x_daas_ham_job_cursor = Table({
         last_run: DateTimeColumn({ label: 'Last run' }),
         last_status: StringColumn({ label: 'Last status', maxLength: 255 }),
         processed_total: IntegerColumn({ label: 'Processed (last run)', default: 0 }),
+        // A pass's records that failed so far, over all its runs, and the last error (platform/chunked `runTableJob`).
+        failed_total: IntegerColumn({ label: 'Failed (this pass)', default: 0 }),
+        last_error: StringColumn({ label: 'Last error', maxLength: 1000 }),
     },
     index: [{ name: 'x_daas_ham_jc_job', unique: true, element: 'job' }],
 })

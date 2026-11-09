@@ -6630,6 +6630,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '0e87f1623fa94b9ba1bebee745f59abf'
+                        key: {
+                            name: 'x_daas_ham_job_cursor'
+                            element: 'failed_total'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '0eda8e6d52084f00923d68fd54de20ce'
                         key: {
@@ -17373,6 +17381,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_oem_coverage'
                             element: 'end_date'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '496c0d1358414eccb987227a7eb0f4a4'
+                        key: {
+                            name: 'x_daas_ham_job_cursor'
+                            element: 'failed_total'
                             language: 'en'
                         }
                     },
@@ -32063,6 +32080,15 @@ declare global {
                         key: {
                             document_key: 'ef2265787f8141f3a697d8d4645ce6ea'
                             variable: '1985e0ceff2433008d3f5d9ad53bf1ba'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '966f0e3a6bee4e11adfb334f21cece86'
+                        key: {
+                            name: 'x_daas_ham_job_cursor'
+                            element: 'last_error'
+                            language: 'en'
                         }
                     },
                     {
@@ -49366,6 +49392,14 @@ declare global {
                             name: 'x_daas_ham_staging_step'
                             element: 'staging_task'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'f8d961feba1c40309953e005f8e92770'
+                        key: {
+                            name: 'x_daas_ham_job_cursor'
+                            element: 'last_error'
                         }
                     },
                     {

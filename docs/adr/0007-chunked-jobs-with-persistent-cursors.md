@@ -1,11 +1,59 @@
 # Bulk work runs as chunked jobs with persistent cursors
 
-With 100k–1M Assets, every bulk process (lifecycle phase recalculation, spare-pool top-up, refresh
-eligibility, reconciliation, OEM sync, billing) runs through one chunked-job runner: keyset paging by
-an indexed key, a time budget per run, and a cursor persisted in `x_daas_ham_job_cursor` so the next
-run resumes where the last stopped. Event-driven queues (only changed records) are preferred over
-scans wherever a trigger exists. A cursor save the platform refuses is logged, and the next run
-repeats from the last saved cursor.
+With 100k–1M Assets, bulk passes over Assets and the records that follow them run through one
+chunked-job runner (`platform/chunked.ts` over `domain/chunked-job.ts`): keyset paging by sys_id, a
+time budget per run, and a persisted cursor so the next run resumes where the last stopped.
+Event-driven queues (only changed records) are preferred over scans wherever a trigger exists. The
+runner is used in two ways:
+
+- Scheduled, with the cursor in `x_daas_ham_job_cursor` (`runTableJob`): installed-base
+  reconciliation (`reconcile_installed_base`), in-service detection (`in_service_detection`), raw
+  model normalization (`normalize_raw_models`), overdue return chasing (`chase_overdue_returns`) and
+  spare-pool top-up (`spare_pool_top_up`). A cursor save the platform refuses is logged, and the
+  next run repeats from the last saved cursor.
+- Event-driven, with the cursor in the event's `parm2` (`runEventTableJob`): the lifecycle phase
+  and refresh date recalculation of a Model's, Agreement's or Lease's Assets (queued when the dates
+  they are worked out from change, and by the daily lifecycle roll for the Models with a milestone
+  that day), the lease buyout transfer, billing generation and the margin recompute (ADR 0013).
+
+Other scheduled jobs do not use the runner. Each bounds its work its own way, or not at all:
+
+- Refresh Orders (`entry/refresh.ts`) read at most 2000 due in-service fleet assets per run,
+  earliest due first, in one query, then skip those already on an open replacing line. The limit
+  applies before the skip, and raising a line changes nothing on the Asset it replaces, so Assets
+  on open Orders still take places in the 2000: while 2000 or more of the earliest due wait on open
+  Orders (a draft left for review, a replacement not yet installed), no later-due Asset is raised.
+- OEM sync (`entry/oem-sync.ts`): the lifecycle sync reads every NaaS Model of each enabled vendor in
+  one query; the coverage sync takes batches of stale Assets, oldest check first, until the time
+  budget is spent, with no cursor since a checked Asset drops out of the query; the RMA status sync
+  asks at most 200 open RMAs per vendor a run, least recently synced first.
+- OEM claim and provisioning (`runOemClaims`) makes at most `x_daas_ham.oem.claim.max_calls`
+  adapter calls per vendor a run, holding its run lock.
+- Scheduled returns (`raiseScheduledReturns`) take at most 50 ended Agreements and 50 ending
+  temporary Orders a run; each one raised is flagged and drops out.
+- Attestations (`raiseAttestations`) read every in-service or temporarily deployed fleet asset of
+  each active Agreement with an attestation interval, in one run with no time budget or cursor.
+- Lease review (`reviewLeases`) reads every undecided lease that ended no more than 30 days ago or
+  ends later, in one query; the renewal warnings read every Agreement not yet warned, and the
+  coverage-expiry warnings at most 5000 contracts a run.
+- The installed-base reconciliation's exception clean-up, its *seen without asset* report (at most
+  1000 CIs a run) and the rack re-check run after its chunked pass, unchunked. The device-event
+  purge deletes with one query.
+
+A record whose handling throws fails, and the pass moves on past it: only the next pass handles it
+again. A refused save counts as a failure only where its handler throws for it (the lifecycle
+recalculation does); a handler that logs the refusal itself and returns leaves it out. Every run or
+chunk with failed records logs how many and the last error with `gs.error`. A scheduled job's cursor
+also keeps its pass's failures, over all the runs the pass takes: `failed_total` and `last_error`,
+cleared when a run starts a fresh pass. Its `last_status` reads *complete* only for a pass that
+reached the end with no record failed; otherwise *complete with N failed record(s)*, or *paused
+(time budget)* followed by *N failed record(s) so far*. An event-driven job keeps its failures where
+its outcome is kept, through its `flush` (the billing period's failed lines, the margin period's
+failure count). The lifecycle recalculation and the buyout transfer have no flush, and keep them
+only in the log. A superseding pass (ADR 0013) marks its job cursor *running* as it starts and
+*complete* once its last chunk is written. A completion the platform refuses is logged rather than
+thrown, since the pass's own completion is already written, and the cursor reads *running* with an
+old last run, as a stalled pass would, until the next pass starts.
 
 A run whose first insert of the cursor record loses to another run doing the same (the unique index
 on job) goes on from that run's record. When there is still no record, a scheduled job does not run

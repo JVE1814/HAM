@@ -1,14 +1,26 @@
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
-import { runChunked, writeChunkUnderLock, writeHoldingLock, type ChunkedJobPorts, type ChunkedJobResult, type ChunkWrite, type LockLost } from '../domain/chunked-job.ts'
+import {
+    cursorReport,
+    runChunked,
+    writeChunkUnderLock,
+    writeHoldingLock,
+    type ChunkedJobPorts,
+    type ChunkedJobResult,
+    type ChunkWrite,
+    type Failures,
+    type LockLost,
+} from '../domain/chunked-job.ts'
 import { andEachClause } from '../domain/encoded-query.ts'
 import { msToGlide, nowMs } from './clock.ts'
 import { isLocked, withLock } from './locks.ts'
 import { intProperty, PROPERTY } from './properties.ts'
-import { refusal, str } from './records.ts'
+import { num, refusal, str } from './records.ts'
 
 /**
  * Run the chunked-job runner over a table, persisting the cursor in x_daas_ham_job_cursor (ADR 0007).
  * Each record is read into a row `R`; the item handled is `T`, the row itself unless `prepare` is set.
+ * A record whose handling throws is a failure: the pass moves on past it, the run logs its failures as an
+ * error, and the cursor counts the pass's (`failed_total`, `last_error`), reading complete only without any.
  */
 interface TableJobFields<T, R> {
     job: string
@@ -36,6 +48,15 @@ export class RowFailure {
 
 export type TableJob<T, R = T> = TableJobFields<T, R> & Prepare<T, R>
 
+/** The length of the job cursor's Last error column (data/operations.now.ts). */
+const LAST_ERROR_LENGTH = 1000
+
+/** Log the records of a run or chunk that failed as an error (`where` names it): the pass has moved on past them. */
+function logFailures(where: string, failures: Failures): void {
+    if (failures.failed === 0) return
+    gs.error(`[x_daas_ham] ${where}: ${failures.failed} record(s) failed, the last: ${failures.lastError}`)
+}
+
 // The row type comes first so that, without `prepare`, the item type defaults to it.
 export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
     let cursorRecord: GlideRecord
@@ -47,13 +68,21 @@ export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
         gs.error(`[x_daas_ham] ${spec.job}: not run: ${reason}`)
         return { processed: 0, failed: 0, done: false, cursor: '', lastError: reason }
     }
+    // A run that starts from a saved cursor goes on with a pass that earlier runs began, and adds to their failures.
+    const resumed = str(cursorRecord, 'cursor') !== ''
     return runOverTable(spec, {
         loadCursor: () => str(cursorRecord, 'cursor'),
-        saveCursor: (cursor, processed, done) => {
+        saveCursor: (cursor, processed, done, failures) => {
+            // The pass moves on past a failed record: the log and the cursor are where it shows.
+            logFailures(`${spec.job}: in this run`, failures)
+            const stored = { failed: num(cursorRecord, 'failed_total'), lastError: str(cursorRecord, 'last_error') }
+            const report = cursorReport(stored, { ...failures, resumed, done })
             cursorRecord.setValue('cursor', cursor)
             cursorRecord.setValue('last_run', msToGlide(nowMs()))
             cursorRecord.setValue('processed_total', processed)
-            cursorRecord.setValue('last_status', done ? 'complete' : 'paused (time budget)')
+            cursorRecord.setValue('failed_total', report.failed)
+            cursorRecord.setValue('last_error', report.lastError.slice(0, LAST_ERROR_LENGTH))
+            cursorRecord.setValue('last_status', report.status)
             if (cursorRecord.update()) return
             // The next run starts again from the cursor last saved, and would do so unseen.
             const reason = refusal(cursorRecord)
@@ -76,12 +105,16 @@ function startRun(job: string): string {
     throw new Error(`job cursor ${job} not saved: ${refusal(record)}`)
 }
 
-/** Mark the current run of `job` complete (a run still 'running' with an old last run has stalled). */
+/**
+ * Mark the current run of `job` complete (a run still 'running' with an old last run has stalled). Called once the
+ * pass's own completion is written, so a refusal here is only logged: thrown, it would stop a pass that completed.
+ */
 function completeRun(job: string): void {
     const record = loadCursorRecord(job)
     record.setValue('last_run', msToGlide(nowMs()))
     record.setValue('last_status', 'complete')
-    record.update()
+    if (record.update()) return
+    gs.warn(`[x_daas_ham] ${job}: the pass completed, but its job cursor still reads running (as if stalled): ${refusal(record)}`)
 }
 
 function isCurrentRun(job: string, token: string): boolean {
@@ -115,8 +148,11 @@ interface EventJobFields {
     parm1: string
     /** The event's parm2 as received ('' on the first event of a pass). */
     cursor: string
-    /** Write out what the chunk accumulated in memory, with its records that failed, before the next chunk can start. */
-    flush?: (failures: { failed: number; lastError: string }) => void
+    /**
+     * Write out what the chunk accumulated in memory, with its records that failed, before the next chunk can start.
+     * The runner logs a chunk's failures either way; `flush` records them where the pass's outcome is kept.
+     */
+    flush?: (failures: Failures) => void
     /**
      * Make each fresh pass supersede one still running under `job` (see runEventTableJob). `onStart` runs once
      * as a pass starts, `complete` once its last chunk is flushed and `stopped` when a chunk throws, each only
@@ -132,6 +168,7 @@ const LOCKED_RETRY_SECONDS = 60
 /**
  * The same runner driven by an event instead of a schedule: the cursor travels in the event's parm2
  * (with the pass token when `supersede` is set) and the event is queued again until the pass is complete.
+ * A chunk's failed records are logged as an error; without `flush` they are kept nowhere else.
  *
  * With `supersede`, a pass's start, each chunk's flush and the pass's completion hold the job's lock
  * (ADR 0013), and each checks under it that its pass is still the current one: a fresh pass starts only
@@ -148,6 +185,7 @@ export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): ChunkedJo
         return runOverTable(spec, {
             loadCursor: () => spec.cursor,
             saveCursor: (next, _processed, done, failures) => {
+                logFailures(`${spec.eventName} ${spec.parm1}: in this chunk`, failures)
                 spec.flush?.(failures)
                 if (!done) gs.eventQueue(spec.eventName, spec.record, spec.parm1, next)
             },
@@ -188,7 +226,11 @@ export function runEventTableJob<R, T = R>(spec: EventTableJob<T, R>): ChunkedJo
                         {
                             isCurrent: () => isCurrentRun(job, token),
                             held: () => lock.held(),
-                            flush: () => spec.flush?.(failures),
+                            // Logged only as the chunk is written: a superseded chunk's work is dropped, a locked one runs again.
+                            flush: () => {
+                                logFailures(`${spec.eventName} ${spec.parm1}: in this chunk`, failures)
+                                spec.flush?.(failures)
+                            },
                             queueNext: () => gs.eventQueue(spec.eventName, spec.record, spec.parm1, `${token}:${next}`),
                             complete: () => {
                                 supersede.complete?.()

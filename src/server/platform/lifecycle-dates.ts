@@ -4,7 +4,7 @@ import { assetLifecycleStamp, type AssetLifecycleFacts, type LifecycleDates } fr
 import { memoized } from '../domain/memo.ts'
 import { runEventTableJob, type EventTableJob } from './chunked.ts'
 import { glideToIsoDate, todayIso } from './clock.ts'
-import { findById, num, str } from './records.ts'
+import { findById, num, refusal, str } from './records.ts'
 
 /** Lifecycle phase and Refresh due date of an Asset, from its Model lifecycle, Agreement and Lease schedule. */
 
@@ -118,7 +118,8 @@ export function refreshLifecycleDates(pass: LifecycleRefresh): void {
             const { phase, refreshDue } = stampOf(inputs, readers)
             if (inputs.phase === phase && inputs.refreshDue === refreshDue) return
             const asset = findById('alm_hardware', assetId)
-            if (asset && applyLifecycleDates(asset, readers)) asset.update()
+            // Refused, it fails as a record of the chunk, which the runner logs: the Asset keeps its old dates until the next pass.
+            if (asset && applyLifecycleDates(asset, readers) && !asset.update()) throw new Error(`lifecycle dates not saved: ${refusal(asset)}`)
         },
     })
 }
