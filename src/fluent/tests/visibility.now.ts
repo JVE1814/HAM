@@ -85,10 +85,16 @@ export const inventoryTechVisibilityTest = Test(
         failOnServerError: true,
     },
     (atf) => {
+        // A stockroom is a tech's when they are a member of its Assignment group (ADR 0018).
+        const team = atf.server.recordInsert({
+            $id: Now.ID['atf_itv_group'],
+            table: 'sys_user_group',
+            fieldValues: { name: 'ATF-ITV stockroom team' },
+        })
         const assigned = atf.server.recordInsert({
             $id: Now.ID['atf_itv_stockroom_assigned'],
             table: 'alm_stockroom',
-            fieldValues: { x_daas_ham_stockroom_type: 'central_depot' },
+            fieldValues: { x_daas_ham_stockroom_type: 'central_depot', assignment_group: team.record_id },
         })
         const other = atf.server.recordInsert({
             $id: Now.ID['atf_itv_stockroom_other'],
@@ -123,8 +129,8 @@ export const inventoryTechVisibilityTest = Test(
         })
         atf.server.recordInsert({
             $id: Now.ID['atf_itv_member'],
-            table: 'x_daas_ham_stockroom_member',
-            fieldValues: { user: tech.user, stockroom: assigned.record_id },
+            table: 'sys_user_grmember',
+            fieldValues: { user: tech.user, group: team.record_id },
         })
         atf.server.impersonate({ $id: Now.ID['atf_itv_impersonate'], user: tech.user })
         atf.server.recordQuery({

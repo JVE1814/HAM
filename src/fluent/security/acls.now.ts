@@ -578,38 +578,6 @@ Acl({
 })
 
 Acl({
-    $id: Now.ID['acl_stockroom_member_read'],
-    type: 'record',
-    table: 'x_daas_ham_stockroom_member',
-    operation: 'read',
-    roles: broadStaff,
-})
-
-Acl({
-    $id: Now.ID['acl_stockroom_member_write'],
-    type: 'record',
-    table: 'x_daas_ham_stockroom_member',
-    operation: 'write',
-    roles: [assetManager],
-})
-
-Acl({
-    $id: Now.ID['acl_stockroom_member_create'],
-    type: 'record',
-    table: 'x_daas_ham_stockroom_member',
-    operation: 'create',
-    roles: [assetManager],
-})
-
-Acl({
-    $id: Now.ID['acl_stockroom_member_delete'],
-    type: 'record',
-    table: 'x_daas_ham_stockroom_member',
-    operation: 'delete',
-    roles: [assetManager],
-})
-
-Acl({
     $id: Now.ID['acl_device_event_read'],
     type: 'record',
     table: 'x_daas_ham_device_event',

@@ -459,20 +459,6 @@ Record({
 })
 
 Record({
-    $id: Now.ID['module_stockroom_members'],
-    table: 'sys_app_module',
-    data: {
-        title: 'Stockroom members',
-        application: naasMenu,
-        link_type: 'LIST',
-        name: 'x_daas_ham_stockroom_member',
-        roles: ['x_daas_ham.admin'],
-        active: true,
-        order: 930,
-    },
-})
-
-Record({
     $id: Now.ID['module_racks'],
     table: 'sys_app_module',
     data: {

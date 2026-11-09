@@ -123,8 +123,11 @@ Then configure (System Properties, `x_daas_ham.*`):
 | `x_daas_ham.meraki.api_host`, `x_daas_ham.mist.api_host` | regional API hosts (defaults `api.meraki.com`, `api.mist.com`; set for Canada, China, India, FedRAMP or another Mist cloud) |
 
 Assign roles (`x_daas_ham.asset_manager`, `.inventory_tech`, `.field_tech`, `.noc`, `.account_manager`,
-`.finance`, `.admin`; customers: `.customer_admin`, `.site_contact`) and add inventory techs to
-stockrooms (*Administration > Stockroom members*).
+`.finance`, `.admin`; customers: `.customer_admin`, `.site_contact`) and assign inventory techs to
+their stockrooms ([ADR 0018](docs/adr/0018-platform-fields-over-custom-ones.md)): an inventory tech
+works at the NaaS stockrooms whose *Assignment group* they are a member of. Setting a stockroom's
+*Assignment group* takes the platform's `inventory_admin` (which `x_daas_ham.admin` contains); adding
+a user to a group takes `user_admin`.
 
 Mark what is NaaS ([ADR 0016](docs/adr/0016-fleet-assets.md)): give each NaaS stockroom its
 *Stockroom type* (central depot, staging centre or customer site) and each NaaS Model its *OEM PID*.
@@ -144,6 +147,8 @@ agreements, subscription lines, catalog entries, staging checklists, demo users 
 service intervals and a lease that ends before the Acme agreement, and sets the two properties
 above. Every demo Asset is a fleet asset (run again, the job adds to the fleet the demo Assets an
 earlier version loaded), and the demo stockrooms and Models carry their stockroom type and OEM PID.
+The demo depot and staging centre are assigned to the group *NaaS demo depot team*, which ships with
+the demo data and gets `naas.inventory` as its member.
 Lifecycle dates in the demo data are illustrative, not vendor bulletins.
 
 ## Integrations
@@ -274,6 +279,15 @@ What remains can only be confirmed on an instance or behind a vendor login:
   `x_daas_ham_model_lifecycle`, check that the table is still there with its rows (the build deletes
   its ACLs, form, list and labels, not the table); the app no longer reads them: load them again
   through the lifecycle import or enter them by hand.
+- **Stockroom assignment** (ADR 0018; the platform's columns, ACLs and table access were read on a
+  Brazil instance, the app's use of them was not run there): an inventory-tech-only user who is a
+  member of a NaaS stockroom's *Assignment group* sees that stockroom's fleet assets, staging tasks
+  and blind counts and no other NaaS stockroom's; taken out of the group, none. With demo data, the
+  group *NaaS demo depot team* is installed (a `sys_user_group` record in the app's demo data) and the
+  demo job makes `naas.inventory` its member and sets it on *Central Depot Utrecht* and *Staging
+  Centre Utrecht*; if the system log says the group was not found, create it by that name and run
+  the job again. On an instance upgraded from a version that had `x_daas_ham_stockroom_member`, the
+  app no longer reads its rows: give each NaaS stockroom an *Assignment group* holding its techs.
 - **Fleet column** (ADR 0016): *Fleet* (`x_daas_ham_fleet`) on `alm_hardware` is a read-only
   boolean, default false, with the index `x_daas_ham_hw_fleet`, and the install sets it true on no
   row. The dictionary entries of *Legal owner* (`alm_hardware`), *Track as asset* (`cmdb_model`) and
@@ -520,7 +534,7 @@ What remains can only be confirmed on an instance or behind a vendor login:
 - **Inventory tech access** (ADR 0005), also after upgrading an existing install: the ACLs that
   `security/acls*.now.ts` give `broadStaff` (agreements, subscription lines, catalog entries, site
   templates, fee events, attestations, leases, OEM coverage and cloud accounts, model data, device
-  events, reconciliation exceptions, stockroom members, ...) no longer list `x_daas_ham.inventory_tech`
+  events, reconciliation exceptions, ...) no longer list `x_daas_ham.inventory_tech`
   in `sys_security_acl_role`. Impersonating an inventory-tech-only user, the Agreements list is denied,
   other stockrooms' blind counts and site audits are not listed, and in the warehouse app receiving one
   returned unit of a multi-unit site package keeps its subscription line active, receiving the last one

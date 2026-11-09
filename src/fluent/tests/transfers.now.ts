@@ -33,10 +33,16 @@ export const transferStageTest = Test(
             table: 'customer_account',
             fieldValues: { name: 'ATF Transfer Customer', customer: true },
         })
+        // The tech works at the depot: a member of its Assignment group (ADR 0018).
+        const depotGroup = atf.server.recordInsert({
+            $id: Now.ID['atf_xfer_group'],
+            table: 'sys_user_group',
+            fieldValues: { name: 'ATF Transfer Depot team' },
+        })
         const depot = atf.server.recordInsert({
             $id: Now.ID['atf_xfer_from'],
             table: 'alm_stockroom',
-            fieldValues: { name: 'ATF Transfer Depot', x_daas_ham_stockroom_type: 'central_depot' },
+            fieldValues: { name: 'ATF Transfer Depot', x_daas_ham_stockroom_type: 'central_depot', assignment_group: depotGroup.record_id },
         })
         const destination = atf.server.recordInsert({
             $id: Now.ID['atf_xfer_to'],
@@ -79,8 +85,8 @@ export const transferStageTest = Test(
         })
         atf.server.recordInsert({
             $id: Now.ID['atf_xfer_member'],
-            table: 'x_daas_ham_stockroom_member',
-            fieldValues: { user: tech.user, stockroom: depot.record_id },
+            table: 'sys_user_grmember',
+            fieldValues: { user: tech.user, group: depotGroup.record_id },
         })
         atf.server.impersonate({ $id: Now.ID['atf_xfer_impersonate'], user: tech.user })
         // Inventory's "Push Status to Asset/Consumable" saves the Asset In stock / Pending transfer, with its Active

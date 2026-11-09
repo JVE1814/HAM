@@ -950,7 +950,7 @@ Sources:
   `setWorkflow(false)` on `sys_user` and `alm_transfer_order_line` is refused like on `alm_hardware`
   (`isWorkflow()` stays true); on `x_daas_ham_order_line` it applies. Only the app may add a
   before-query rule to an app table: the platform's *Reject before-Q for out-of-scope tables*
-  refused one on `x_daas_ham_stockroom_member` saved from global.
+  refused one saved from global on a table of the app.
 - N38: Brazil instance, 2026-11-09. Read on the instance: the before rule *Push Status to
   Asset/Consumable* on `alm_transfer_order_line` (global, order 500, insert and update, condition
   `!current.isActionAborted() && (current.stage.changes() || current.asset.changes() ||

@@ -404,22 +404,6 @@ export const norm_exception_form = Form({
     ],
 })
 
-export const stockroom_member_form = Form({
-    table: 'x_daas_ham_stockroom_member',
-    view: default_view,
-    sections: [
-        {
-            caption: 'Member',
-            content: [
-                {
-                    layout: 'one-column',
-                    elements: [{ field: 'user', type: 'table_field' }, { field: 'stockroom', type: 'table_field' }],
-                },
-            ],
-        },
-    ],
-})
-
 export const device_event_form = Form({
     table: 'x_daas_ham_device_event',
     view: default_view,
@@ -483,8 +467,6 @@ List({ table: 'x_daas_ham_manufacturer_alias', view: default_view, columns: ['al
 List({ table: 'x_daas_ham_model_match_rule', view: default_view, columns: ['order', 'manufacturer', 'match_type', 'pattern', 'model', 'active'] })
 
 List({ table: 'x_daas_ham_norm_exception', view: default_view, columns: ['raw_manufacturer', 'raw_model', 'reason', 'occurrences', 'status', 'resolved_model'] })
-
-List({ table: 'x_daas_ham_stockroom_member', view: default_view, columns: ['user', 'stockroom'] })
 
 List({ table: 'x_daas_ham_device_event', view: default_view, columns: ['observed_at', 'asset', 'identifier', 'event', 'source'] })
 

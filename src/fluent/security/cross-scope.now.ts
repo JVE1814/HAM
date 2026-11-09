@@ -516,6 +516,34 @@ CrossScopePrivilege({
     targetType: 'sys_db_object',
 })
 
+// A user's Stockrooms are those assigned to one of their groups (ADR 0018); the demo data adds its inventory tech to one.
+CrossScopePrivilege({
+    $id: Now.ID['xsp_sys_user_grmember_read'],
+    operation: 'read',
+    status: 'allowed',
+    targetName: 'sys_user_grmember',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_sys_user_grmember_create'],
+    operation: 'create',
+    status: 'allowed',
+    targetName: 'sys_user_grmember',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_sys_user_group_read'],
+    operation: 'read',
+    status: 'allowed',
+    targetName: 'sys_user_group',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
 CrossScopePrivilege({
     $id: Now.ID['xsp_sys_attachment_read'],
     operation: 'read',

@@ -313,8 +313,8 @@ Confidence tags:
 - **Provider staff:**
   - All staff see **every customer**.
   - `inventory_tech` is limited to **their assigned stockrooms**: stock, transfer orders, staging,
-    receiving and audits. Assignment is through a scoped "stockroom assignment" table (user ↔
-    stockroom).
+    receiving and audits. A tech's stockrooms are those whose platform *Assignment group* they are a
+    member of (ADR 0018).
 - **Customer contacts:**
   - They see only records whose account matches their own CSM account.
   - Site contacts are further limited to their assigned site(s).
@@ -403,7 +403,6 @@ Confidence tags:
 | `order_line` | — | order, model, quantity, sourcing_result (reserved spare / central stock / PO), transfer_order, po_line, staging_task(s), fsm_work_order, change_request, stage |
 | `staging_task` | `task` | asset, order_line, staging_source, checklist_template, firmware_target, verified_by, result |
 | `staging_checklist_template` | — | account (optional), device_class / model family, vendor, items (child table `staging_checklist_item`) |
-| `stockroom_assignment` | — | user, stockroom (visibility for inventory techs) |
 | `manufacturer_alias` | — | alias_string, canonical manufacturer (`core_company`) |
 | `model_match_rule` | — | order, manufacturer, pattern (regex / prefix / exact on PID or model name), canonical model, active |
 | `asn_import` (import set staging) | `sys_import_set_row` | distributor, po_number, ship date, carrier, tracking, serial, PID, MAC, quantity |
@@ -792,7 +791,7 @@ Phase 1 gives every persona a working path:
 - **Event-driven over scans:** model lifecycle changes, CI updates and device events queue only the
   affected assets.
 - **Indexes** are declared on every column we query: agreement, subscription_line, site,
-  customer_tag, last_seen, refresh_due, `oem_pid`, and the stockroom assignment keys.
+  customer_tag, last_seen, refresh_due and `oem_pid`.
 - **`device_event`** stores state changes only, with a retention job (property-driven, e.g. 90
   days). `last_seen` on the asset is the derived cache.
 - **No GlideAggregate over all assets in synchronous code.** Quota counters are maintained

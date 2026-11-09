@@ -2,23 +2,6 @@ import '@servicenow/sdk/global'
 import { ChoiceColumn, DateTimeColumn, IntegerColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 import { DEVICE_EVENT_KIND_CHOICES, DEVICE_EVENT_SOURCE_CHOICES } from '../../server/domain/vocabulary'
 
-/** Assigns an inventory tech to a Stockroom; drives stockroom-scoped visibility (ADR 0005). */
-export const x_daas_ham_stockroom_member = Table({
-    name: 'x_daas_ham_stockroom_member',
-    label: 'Stockroom member',
-    schema: {
-        user: ReferenceColumn({ label: 'User', referenceTable: 'sys_user', mandatory: true }),
-        // NaaS stockrooms only (ADR 0016): domain/fleet `naasStockroomCondition()`.
-        stockroom: ReferenceColumn({
-            label: 'Stockroom',
-            referenceTable: 'alm_stockroom',
-            mandatory: true,
-            referenceQual: 'x_daas_ham_stockroom_typeINcentral_depot,staging_centre,customer_site',
-        }),
-    },
-    index: [{ name: 'x_daas_ham_sm_user', unique: false, element: 'user' }],
-})
-
 /** A Seen signal (state change only) from monitoring for one Asset. */
 export const x_daas_ham_device_event = Table({
     name: 'x_daas_ham_device_event',

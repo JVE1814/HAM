@@ -49,6 +49,9 @@
 | site contact | their Customer's fleet assets (and no other company's hardware), Orders and lines, Return orders and lines, Shipments and events, and Attestations and items at the Sites listing them as contacts; no Fee events |
 | anyone with no NaaS role | whatever the platform's ACLs and rules allow, fleet assets included |
 
+An inventory tech's stockrooms are the NaaS stockrooms whose *Assignment group* (the platform's
+`alm_stockroom.assignment_group`) is a group they are a member of (ADR 0018).
+
 Before-query rules add the filter; for a site contact it checks the record's Customer as well as its
 Site, as the ACLs do, so another Customer's Site that lists them shows them nothing. Customer ACLs
 re-check the Customer and, for a site contact without the customer admin role, that the record's

@@ -256,7 +256,6 @@ describe("the Asset, Model and Stockroom references on the app's tables and cata
                 'x_daas_ham_site_template_item.model',
                 'x_daas_ham_norm_exception.resolved_model',
                 'cmdb_model.x_daas_ham_normalized_to',
-                'x_daas_ham_stockroom_member.stockroom',
                 'x_daas_ham_audit.stockroom',
                 'x_daas_ham_shipment.stockroom',
                 'vs_order_devices.model',

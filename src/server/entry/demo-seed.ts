@@ -28,6 +28,9 @@ function ensure(table: string, key: Fields, fields: Fields = {}): string {
 
 const ADMIN_USER = '6816f79cc0a8016401c5a33be04be441'
 
+/** The group the demo depots are assigned to. It ships with the demo data (fluent/demo): this scope may not create a group. */
+export const DEMO_DEPOT_GROUP = 'NaaS demo depot team'
+
 /** A demo asset loaded before the Fleet flag existed joins the fleet (ADR 0016); a refused save is logged. */
 function keepInFleet(asset: GlideRecord): void {
     if (isFleetAsset(asset)) return
@@ -181,8 +184,20 @@ export function loadDemoData(): void {
     user('sys_user', 'naas.field', 'Femi', 'Field (demo)', 'x_daas_ham.field_tech')
     user('customer_contact', 'acme.admin', 'Ada', 'Acme (demo)', 'x_daas_ham.customer_admin', acme)
     const acmeContact = user('customer_contact', 'acme.hq.contact', 'Sam', 'Site (demo)', 'x_daas_ham.site_contact', acme)
-    ensure('x_daas_ham_stockroom_member', { user: inventoryUser, stockroom: depot })
-    ensure('x_daas_ham_stockroom_member', { user: inventoryUser, stockroom: stagingCentre })
+    // The demo inventory tech works at the depot and the staging centre: a member of their Assignment group (ADR 0018).
+    const depotGroup = new GlideRecord('sys_user_group')
+    if (depotGroup.get('name', DEMO_DEPOT_GROUP)) {
+        const groupId = depotGroup.getUniqueValue()
+        ensure('sys_user_grmember', { user: inventoryUser, group: groupId })
+        for (const stockroomId of [depot, stagingCentre]) {
+            const assigned = new GlideRecord('alm_stockroom')
+            if (!assigned.get(stockroomId) || str(assigned, 'assignment_group') === groupId) continue
+            assigned.setValue('assignment_group', groupId)
+            if (!assigned.update()) gs.warn(`[x_daas_ham] Demo stockroom ${str(assigned, 'name')} not assigned to its group: ${refusal(assigned)}`)
+        }
+    } else {
+        gs.warn(`[x_daas_ham] Demo group "${DEMO_DEPOT_GROUP}" not found: the demo inventory tech is assigned to no stockroom`)
+    }
     const hq = new GlideRecord('cmn_location')
     if (hq.get(acmeHq)) {
         hq.setValue('x_daas_ham_site_contacts', acmeContact)
