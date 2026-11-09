@@ -14,6 +14,7 @@ import {
 import { accountManager, admin, assetManager, finance } from '../security/roles.now'
 import { CURRENT_IS_FLEET, FLEET_FIELD } from '../../server/domain/fleet'
 import { LEASE_END_ACTION } from '../../server/domain/vocabulary'
+import { EVENT } from '../../server/platform/events'
 
 /* Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
 
@@ -100,15 +101,14 @@ ScheduledScript({
     script: warnRenewals,
 })
 
-export const leaseAssetsEvent = Record({
+Record({
     $id: Now.ID['event_lease_assets'],
     table: 'sysevent_register',
     data: {
         suffix: 'lease.assets',
-        event_name: 'x_daas_ham.lease.assets',
+        event_name: EVENT.leaseAssets,
         table: 'x_daas_ham_lease_schedule',
         description: 'Recompute refresh due dates of a returned lease\'s assets. parm1 = lease, parm2 = cursor.',
-        fired_by: 'entry/leases.ts uiApplyLeaseDecision, onReturnedLeaseEndChanged',
         priority: 200,
     },
 })
@@ -116,21 +116,20 @@ export const leaseAssetsEvent = Record({
 ScriptAction({
     $id: Now.ID['sa_lease_assets'],
     name: 'NaaS - refresh due of a returned lease',
-    eventName: 'x_daas_ham.lease.assets',
+    eventName: EVENT.leaseAssets,
     active: true,
     script: refreshLeaseAssets,
     description: "Sets refresh due dates no later than the lease end (again when a returned lease's end moves) so automatic refresh swaps the equipment out in time.",
 })
 
-export const leaseBuyoutEvent = Record({
+Record({
     $id: Now.ID['event_lease_buyout'],
     table: 'sysevent_register',
     data: {
         suffix: 'lease.buyout',
-        event_name: 'x_daas_ham.lease.buyout',
+        event_name: EVENT.leaseBuyout,
         table: 'x_daas_ham_lease_schedule',
         description: 'Transfer a bought-out lease\'s assets to the Provider. parm1 = lease, parm2 = cursor.',
-        fired_by: 'entry/leases.ts uiApplyLeaseDecision',
         priority: 200,
     },
 })
@@ -138,21 +137,20 @@ export const leaseBuyoutEvent = Record({
 ScriptAction({
     $id: Now.ID['sa_lease_buyout'],
     name: 'NaaS - transfer a bought-out lease',
-    eventName: 'x_daas_ham.lease.buyout',
+    eventName: EVENT.leaseBuyout,
     active: true,
     script: transferLeaseAssets,
     description: 'Takes each asset off the lease, makes the Provider its legal owner and sets its cost to its share of the buyout price.',
 })
 
-export const leaseMismatchEvent = Record({
+Record({
     $id: Now.ID['event_lease_mismatch'],
     table: 'sysevent_register',
     data: {
         suffix: 'lease.mismatch',
-        event_name: 'x_daas_ham.lease.mismatch',
+        event_name: EVENT.leaseMismatch,
         table: 'x_daas_ham_lease_schedule',
         description: 'A lease ends before the agreements its deployed assets serve; parm1 = recipients.',
-        fired_by: 'entry/leases.ts reviewLeases',
         priority: 200,
     },
 })
@@ -163,7 +161,7 @@ EmailNotification({
     name: 'NaaS - lease ends before the service',
     description: 'Tells the asset managers that a lease ends while its equipment still serves customers.',
     active: true,
-    triggerConditions: { generationType: 'event', eventName: 'x_daas_ham.lease.mismatch' },
+    triggerConditions: { generationType: 'event', eventName: EVENT.leaseMismatch },
     recipientDetails: { eventParm1WithRecipient: true },
     emailContent: {
         subject: 'Lease ${number} ends before the service it supports',
@@ -173,15 +171,14 @@ EmailNotification({
     },
 })
 
-export const agreementRenewalEvent = Record({
+Record({
     $id: Now.ID['event_agreement_renewal'],
     table: 'sysevent_register',
     data: {
         suffix: 'agreement.renewal',
-        event_name: 'x_daas_ham.agreement.renewal',
+        event_name: EVENT.agreementRenewal,
         table: 'x_daas_ham_agreement',
         description: 'An agreement is within its renewal lead time; parm1 = recipients.',
-        fired_by: 'entry/leases.ts warnRenewals',
         priority: 200,
     },
 })
@@ -192,7 +189,7 @@ EmailNotification({
     name: 'NaaS - agreement up for renewal',
     description: 'Tells the account manager (or the asset managers) that an agreement ends soon.',
     active: true,
-    triggerConditions: { generationType: 'event', eventName: 'x_daas_ham.agreement.renewal' },
+    triggerConditions: { generationType: 'event', eventName: EVENT.agreementRenewal },
     recipientDetails: { eventParm1WithRecipient: true },
     emailContent: {
         subject: 'Agreement ${number} (${customer}) ends on ${ends}',
@@ -201,15 +198,14 @@ EmailNotification({
     },
 })
 
-export const coverageExpiringEvent = Record({
+Record({
     $id: Now.ID['event_coverage_expiring'],
     table: 'sysevent_register',
     data: {
         suffix: 'coverage.expiring',
-        event_name: 'x_daas_ham.coverage.expiring',
+        event_name: EVENT.coverageExpiring,
         table: 'customer_account',
         description: 'OEM coverage of deployed assets ends soon; parm1 = recipients, parm2 = summary.',
-        fired_by: 'entry/leases.ts warnRenewals',
         priority: 200,
     },
 })
@@ -220,7 +216,7 @@ EmailNotification({
     name: 'NaaS - OEM coverage expiring',
     description: 'Tells the asset managers that OEM coverage of a customer’s deployed equipment ends soon.',
     active: true,
-    triggerConditions: { generationType: 'event', eventName: 'x_daas_ham.coverage.expiring' },
+    triggerConditions: { generationType: 'event', eventName: EVENT.coverageExpiring },
     recipientDetails: { eventParm1WithRecipient: true },
     emailContent: {
         subject: 'OEM coverage expiring for ${name}',

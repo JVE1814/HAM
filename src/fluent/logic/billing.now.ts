@@ -16,6 +16,7 @@ import {
 import { admin, finance } from '../security/roles.now'
 import { BILLING_PERIOD_STATUS } from '../../server/domain/vocabulary'
 import { RESET_AFTER_IDLE_MINUTES } from '../../server/domain/billing'
+import { EVENT } from '../../server/platform/events'
 
 /* Billing periods (P3.25, D66): monthly generation, review, close and lock, CSV export. */
 
@@ -30,16 +31,15 @@ ScheduledScript({
     script: openMonthlyBillingPeriod,
 })
 
-export const billingGenerateEvent = Record({
+Record({
     $id: Now.ID['event_billing_generate'],
     table: 'sysevent_register',
     data: {
         suffix: 'billing.generate',
-        event_name: 'x_daas_ham.billing.generate',
+        event_name: EVENT.billingGenerate,
         table: 'x_daas_ham_billing_period',
         // Holds 100 characters at most; the pass token is kept on job cursor billing_generate_<period>.
         description: 'Generate the lines of a billing period; parm1 = period, parm2 = pass token:cursor.',
-        fired_by: 'entry/billing.ts startBillingPeriodGeneration, uiRegenerateBillingPeriod',
         priority: 200,
     },
 })
@@ -47,21 +47,20 @@ export const billingGenerateEvent = Record({
 ScriptAction({
     $id: Now.ID['sa_billing_generate'],
     name: 'NaaS - generate billing lines',
-    eventName: 'x_daas_ham.billing.generate',
+    eventName: EVENT.billingGenerate,
     active: true,
     script: generateBillingLines,
     description: 'Prorates the active subscription lines of a billing period in time-boxed chunks, then adds open fee events.',
 })
 
-export const billingExportEvent = Record({
+Record({
     $id: Now.ID['event_billing_export'],
     table: 'sysevent_register',
     data: {
         suffix: 'billing.export',
-        event_name: 'x_daas_ham.billing.export',
+        event_name: EVENT.billingExport,
         table: 'x_daas_ham_billing_period',
         description: 'Attach the CSV export of a closed billing period unless it is already attached; parm1 = period.',
-        fired_by: 'entry/billing.ts uiCloseBillingPeriod, uiExportBillingPeriod',
         priority: 200,
     },
 })
@@ -69,7 +68,7 @@ export const billingExportEvent = Record({
 ScriptAction({
     $id: Now.ID['sa_billing_export'],
     name: 'NaaS - export billing period',
-    eventName: 'x_daas_ham.billing.export',
+    eventName: EVENT.billingExport,
     active: true,
     script: exportBillingPeriod,
     description: 'Builds billing-YYYY-MM.csv from the lines of a closed billing period and attaches it to the period, without updating the period.',

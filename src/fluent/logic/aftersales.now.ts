@@ -5,6 +5,7 @@ import { chaseOverdueReturns, onReturnEvaluated, raiseScheduledReturns } from '.
 import { assetManager, noc, stockroomWorkers } from '../security/roles.now'
 import { ORDER_STAGE, RETURN_LINE_STATUS, RMA_STATE } from '../../server/domain/vocabulary'
 import { PLATFORM_ROLE } from '../../server/domain/visibility'
+import { EVENT } from '../../server/platform/events'
 
 /* Break-fix (D58) and returns (D60): rules, actions, SLAs, jobs and notifications. */
 
@@ -102,15 +103,14 @@ BusinessRule({
     script: onReturnEvaluated,
 })
 
-export const returnOverdueEvent = Record({
+Record({
     $id: Now.ID['event_return_overdue'],
     table: 'sysevent_register',
     data: {
         suffix: 'return.overdue',
-        event_name: 'x_daas_ham.return.overdue',
+        event_name: EVENT.returnOverdue,
         table: 'x_daas_ham_return_order',
         description: 'Equipment on a return order was not received by its due date; parm1 = recipients, parm2 = asset.',
-        fired_by: 'entry/returns.ts chaseOverdueReturns',
         priority: 100,
     },
 })
@@ -121,7 +121,7 @@ EmailNotification({
     name: 'NaaS - return overdue',
     description: 'Tells the customer admins and the account manager that equipment is overdue for return.',
     active: true,
-    triggerConditions: { generationType: 'event', eventName: 'x_daas_ham.return.overdue' },
+    triggerConditions: { generationType: 'event', eventName: EVENT.returnOverdue },
     recipientDetails: { eventParm1WithRecipient: true },
     emailContent: {
         subject: 'Equipment overdue for return: ${number}',

@@ -3,6 +3,7 @@ import { Property, Record, RestMessage, ScriptAction, UiAction } from '@servicen
 import { retryTrackingUpdate, uiCreateReturnLabel, uiMarkLabelVoided } from '../../server/entry/shipping'
 import { admin, assetManager, inventoryTech, noc } from '../security/roles.now'
 import { SHIPMENT_DIRECTION, SHIPMENT_STATUS } from '../../server/domain/vocabulary'
+import { EVENT } from '../../server/platform/events'
 
 /*
  * Shipping aggregator (P3.26, D73). The message targets ShipEngine's label API; point the endpoint at
@@ -65,15 +66,14 @@ UiAction({
 })
 
 // A tracking update whose Shipment lock stayed held is applied in the background, not resent by the aggregator.
-export const shipmentTrackEvent = Record({
+Record({
     $id: Now.ID['event_shipment_track'],
     table: 'sysevent_register',
     data: {
         suffix: 'shipment.track',
-        event_name: 'x_daas_ham.shipment.track',
+        event_name: EVENT.trackShipment,
         table: 'x_daas_ham_shipment',
         description: "A Shipment's lock held off a tracking update; parm1 = update (JSON), parm2 = times queued again.",
-        fired_by: 'entry/shipping.ts postTrackingUpdate, retryTrackingUpdate',
         priority: 100,
     },
 })
@@ -81,7 +81,7 @@ export const shipmentTrackEvent = Record({
 ScriptAction({
     $id: Now.ID['sa_shipment_track'],
     name: 'NaaS - apply held-off tracking update',
-    eventName: 'x_daas_ham.shipment.track',
+    eventName: EVENT.trackShipment,
     active: true,
     script: retryTrackingUpdate,
     description: "Applies a tracking update under its Shipment's lock, again a minute later while the lock is held.",

@@ -3,18 +3,18 @@ import { Property, Record, ScriptAction, UiAction } from '@servicenow/sdk/core'
 import { computeMargin, uiRecomputeMargin } from '../../server/entry/margin'
 import { admin, finance } from '../security/roles.now'
 import { BILLING_PERIOD_STATUS } from '../../server/domain/vocabulary'
+import { EVENT } from '../../server/platform/events'
 
 /* Cost facts and Margin per Customer and Site (P3.28). */
 
-export const marginComputeEvent = Record({
+Record({
     $id: Now.ID['event_margin_compute'],
     table: 'sysevent_register',
     data: {
         suffix: 'margin.compute',
-        event_name: 'x_daas_ham.margin.compute',
+        event_name: EVENT.marginCompute,
         table: 'x_daas_ham_billing_period',
         description: 'Compute the cost facts and margin of a closed billing period; parm1 = period, parm2 = cursor.',
-        fired_by: 'entry/billing.ts uiCloseBillingPeriod, entry/margin.ts uiRecomputeMargin',
         priority: 200,
     },
 })
@@ -22,7 +22,7 @@ export const marginComputeEvent = Record({
 ScriptAction({
     $id: Now.ID['sa_margin_compute'],
     name: 'NaaS - compute margin',
-    eventName: 'x_daas_ham.margin.compute',
+    eventName: EVENT.marginCompute,
     active: true,
     script: computeMargin,
     description: "Attributes asset, lease, OEM support and field labour costs to customers and sites, then subtracts them from the period's revenue.",

@@ -3,7 +3,7 @@ import { default_view, Form } from '@servicenow/sdk/core'
 
 /* Form layouts for the contracts and money tables (P3). */
 
-export const lease_schedule_form = Form({
+Form({
     table: 'x_daas_ham_lease_schedule',
     view: default_view,
     sections: [
@@ -39,7 +39,7 @@ export const lease_schedule_form = Form({
     ],
 })
 
-export const lease_decision_form = Form({
+Form({
     table: 'x_daas_ham_lease_decision',
     view: default_view,
     sections: [
@@ -65,7 +65,7 @@ export const lease_decision_form = Form({
     ],
 })
 
-export const billing_period_form = Form({
+Form({
     table: 'x_daas_ham_billing_period',
     view: default_view,
     sections: [
@@ -91,7 +91,7 @@ export const billing_period_form = Form({
     ],
 })
 
-export const billing_line_form = Form({
+Form({
     table: 'x_daas_ham_billing_line',
     view: default_view,
     sections: [
@@ -108,7 +108,7 @@ export const billing_line_form = Form({
     ],
 })
 
-export const service_interval_form = Form({
+Form({
     table: 'x_daas_ham_service_interval',
     view: default_view,
     sections: [
@@ -125,7 +125,7 @@ export const service_interval_form = Form({
     ],
 })
 
-export const cost_fact_form = Form({
+Form({
     table: 'x_daas_ham_cost_fact',
     view: default_view,
     sections: [
@@ -142,7 +142,7 @@ export const cost_fact_form = Form({
     ],
 })
 
-export const margin_form = Form({
+Form({
     table: 'x_daas_ham_margin',
     view: default_view,
     sections: [

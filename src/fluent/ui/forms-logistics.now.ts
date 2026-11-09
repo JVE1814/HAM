@@ -3,7 +3,7 @@ import { default_view, Form } from '@servicenow/sdk/core'
 
 /* Form layouts for shipping (P3.26). */
 
-export const shipment_form = Form({
+Form({
     table: 'x_daas_ham_shipment',
     view: default_view,
     sections: [
@@ -39,7 +39,7 @@ export const shipment_form = Form({
     ],
 })
 
-export const cloud_account_form = Form({
+Form({
     table: 'x_daas_ham_cloud_account',
     view: default_view,
     sections: [

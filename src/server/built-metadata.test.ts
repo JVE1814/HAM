@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import {
     CURRENT_IS_FLEET,
     FLEET_CONDITION,
@@ -25,6 +25,10 @@ import {
     type RmaState,
     type ShipmentStatus,
 } from './domain/vocabulary'
+import { EVENT } from './platform/events'
+
+// The registries the metadata imports from platform modules are plain constants; Glide itself is not needed to read them.
+vi.mock('@servicenow/glide', () => ({ gs: {}, GlideRecord: class {}, GlideDateTime: class {} }))
 
 /*
  * What the instance is given: the metadata `now-sdk build` writes to dist/app, read as built. The Fluent sources import
@@ -749,6 +753,25 @@ describe('workspace audiences', () => {
         expect(audience('NaaS provider staff except inventory techs')).toEqual(BROAD_STAFF)
         expect(audience('NaaS billing and margin readers').sort()).toEqual(grantedOn('x_daas_ham_margin', 'read').sort())
         expect(audience('NaaS administrators')).toEqual([ROLE.admin])
+    })
+})
+
+/*
+ * platform/events EVENT is the one list of the app's events. An event the metadata does not register is dropped by the
+ * platform when it is queued, and one nothing answers does nothing: both pass the build.
+ */
+describe('events', () => {
+    const scope = (JSON.parse(readFileSync(join(ROOT, 'now.config.json'), 'utf8')) as { scope: string }).scope
+    const registered = () => records('sysevent_register')
+
+    it('are registered, each once, under the name the server code fires it by', () => {
+        expect(registered().map((event) => event.event_name).sort()).toEqual(Object.values(EVENT).sort())
+        for (const event of registered()) expect(event.event_name).toBe(`${scope}.${event.suffix}`)
+    })
+
+    it('are each answered by a script action or a notification, which answer no other event', () => {
+        const answered = [...records('sysevent_script_action'), ...records('sysevent_email_action')].map((action) => action.event_name ?? '')
+        expect([...new Set(answered)].sort()).toEqual(Object.values(EVENT).sort())
     })
 })
 

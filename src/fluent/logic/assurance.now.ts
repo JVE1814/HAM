@@ -126,7 +126,7 @@ ScheduledScript({
     script: raiseAttestations,
 })
 
-export const rackElevationPage = UiPage({
+UiPage({
     $id: Now.ID['page_racks'],
     endpoint: 'x_daas_ham_racks.do',
     description: 'Front and rear rack elevations per site, coloured by stage, customer or EoX / coverage risk.',

@@ -3,7 +3,7 @@ import { default_view, Form, List } from '@servicenow/sdk/core'
 
 /* Default form and list layouts for the app's tables (classic UI and workspace record pages). */
 
-export const order_form = Form({
+Form({
     table: 'x_daas_ham_order',
     view: default_view,
     sections: [
@@ -57,7 +57,7 @@ export const order_form = Form({
     ],
 })
 
-export const order_line_form = Form({
+Form({
     table: 'x_daas_ham_order_line',
     view: default_view,
     sections: [
@@ -83,7 +83,7 @@ export const order_line_form = Form({
     ],
 })
 
-export const staging_task_form = Form({
+Form({
     table: 'x_daas_ham_staging_task',
     view: default_view,
     sections: [
@@ -118,7 +118,7 @@ export const staging_task_form = Form({
     ],
 })
 
-export const staging_step_form = Form({
+Form({
     table: 'x_daas_ham_staging_step',
     view: default_view,
     sections: [
@@ -145,7 +145,7 @@ export const staging_step_form = Form({
     ],
 })
 
-export const staging_template_form = Form({
+Form({
     table: 'x_daas_ham_staging_template',
     view: default_view,
     sections: [
@@ -171,7 +171,7 @@ export const staging_template_form = Form({
     ],
 })
 
-export const staging_tmpl_item_form = Form({
+Form({
     table: 'x_daas_ham_staging_tmpl_item',
     view: default_view,
     sections: [
@@ -187,7 +187,7 @@ export const staging_tmpl_item_form = Form({
     ],
 })
 
-export const agreement_form = Form({
+Form({
     table: 'x_daas_ham_agreement',
     view: default_view,
     sections: [
@@ -243,7 +243,7 @@ export const agreement_form = Form({
     ],
 })
 
-export const agreement_quantity_form = Form({
+Form({
     table: 'x_daas_ham_agreement_quantity',
     view: default_view,
     sections: [
@@ -260,7 +260,7 @@ export const agreement_quantity_form = Form({
     ],
 })
 
-export const subscription_line_form = Form({
+Form({
     table: 'x_daas_ham_subscription_line',
     view: default_view,
     sections: [
@@ -286,7 +286,7 @@ export const subscription_line_form = Form({
     ],
 })
 
-export const catalog_entry_form = Form({
+Form({
     table: 'x_daas_ham_catalog_entry',
     view: default_view,
     sections: [
@@ -303,7 +303,7 @@ export const catalog_entry_form = Form({
     ],
 })
 
-export const site_template_form = Form({
+Form({
     table: 'x_daas_ham_site_template',
     view: default_view,
     sections: [
@@ -337,7 +337,7 @@ export const site_template_form = Form({
     ],
 })
 
-export const site_template_item_form = Form({
+Form({
     table: 'x_daas_ham_site_template_item',
     view: default_view,
     sections: [
@@ -354,7 +354,7 @@ export const site_template_item_form = Form({
     ],
 })
 
-export const manufacturer_alias_form = Form({
+Form({
     table: 'x_daas_ham_manufacturer_alias',
     view: default_view,
     sections: [
@@ -370,7 +370,7 @@ export const manufacturer_alias_form = Form({
     ],
 })
 
-export const model_match_rule_form = Form({
+Form({
     table: 'x_daas_ham_model_match_rule',
     view: default_view,
     sections: [
@@ -387,7 +387,7 @@ export const model_match_rule_form = Form({
     ],
 })
 
-export const norm_exception_form = Form({
+Form({
     table: 'x_daas_ham_norm_exception',
     view: default_view,
     sections: [
@@ -404,7 +404,7 @@ export const norm_exception_form = Form({
     ],
 })
 
-export const device_event_form = Form({
+Form({
     table: 'x_daas_ham_device_event',
     view: default_view,
     sections: [
@@ -421,7 +421,7 @@ export const device_event_form = Form({
     ],
 })
 
-export const job_cursor_form = Form({
+Form({
     table: 'x_daas_ham_job_cursor',
     view: default_view,
     sections: [
@@ -472,7 +472,7 @@ List({ table: 'x_daas_ham_device_event', view: default_view, columns: ['observed
 
 List({ table: 'x_daas_ham_job_cursor', view: default_view, columns: ['job', 'cursor', 'last_run', 'last_status', 'processed_total'] })
 
-export const oem_coverage_form = Form({
+Form({
     table: 'x_daas_ham_oem_coverage',
     view: default_view,
     sections: [
@@ -489,7 +489,7 @@ export const oem_coverage_form = Form({
     ],
 })
 
-export const oem_rma_form = Form({
+Form({
     table: 'x_daas_ham_oem_rma',
     view: default_view,
     sections: [
@@ -506,7 +506,7 @@ export const oem_rma_form = Form({
     ],
 })
 
-export const return_order_form = Form({
+Form({
     table: 'x_daas_ham_return_order',
     view: default_view,
     sections: [
@@ -551,7 +551,7 @@ export const return_order_form = Form({
     ],
 })
 
-export const return_order_line_form = Form({
+Form({
     table: 'x_daas_ham_return_order_line',
     view: default_view,
     sections: [
@@ -568,7 +568,7 @@ export const return_order_line_form = Form({
     ],
 })
 
-export const fee_event_form = Form({
+Form({
     table: 'x_daas_ham_fee_event',
     view: default_view,
     sections: [
@@ -585,7 +585,7 @@ export const fee_event_form = Form({
     ],
 })
 
-export const disposal_order_form = Form({
+Form({
     table: 'x_daas_ham_disposal_order',
     view: default_view,
     sections: [
@@ -620,7 +620,7 @@ export const disposal_order_form = Form({
     ],
 })
 
-export const disposal_line_form = Form({
+Form({
     table: 'x_daas_ham_disposal_line',
     view: default_view,
     sections: [
@@ -637,7 +637,7 @@ export const disposal_line_form = Form({
     ],
 })
 
-export const audit_form = Form({
+Form({
     table: 'x_daas_ham_audit',
     view: default_view,
     sections: [
@@ -672,7 +672,7 @@ export const audit_form = Form({
     ],
 })
 
-export const audit_line_form = Form({
+Form({
     table: 'x_daas_ham_audit_line',
     view: default_view,
     sections: [
@@ -689,7 +689,7 @@ export const audit_line_form = Form({
     ],
 })
 
-export const attestation_form = Form({
+Form({
     table: 'x_daas_ham_attestation',
     view: default_view,
     sections: [
@@ -715,7 +715,7 @@ export const attestation_form = Form({
     ],
 })
 
-export const attestation_item_form = Form({
+Form({
     table: 'x_daas_ham_attestation_item',
     view: default_view,
     sections: [
@@ -731,7 +731,7 @@ export const attestation_item_form = Form({
     ],
 })
 
-export const recon_exception_form = Form({
+Form({
     table: 'x_daas_ham_recon_exception',
     view: default_view,
     sections: [
