@@ -18,6 +18,36 @@ describe('compareAudit', () => {
     it('reports nothing missing when everything was scanned', () => {
         expect(compareAudit(expected, ['FOC111', 'FOC222', 'FOC333']).missing).toEqual([])
     })
+
+    it('matches a scan by serial before another unit\'s Provider or Customer tag', () => {
+        const units = [
+            { assetId: 'a1', serial: 'FOC111', providerTag: 'NAAS-1', customerTag: '' },
+            { assetId: 'a2', serial: 'FOC222', providerTag: 'NAAS-2', customerTag: 'FOC111' },
+        ]
+        const result = compareAudit(units, ['FOC111', 'FOC222'])
+        expect(result.matched).toEqual(['a1', 'a2'])
+        expect(result.missing).toEqual([])
+        expect(result.unexpected).toEqual([])
+    })
+
+    it('falls back to the Customer tag only when no serial or Provider tag carries the code', () => {
+        const units = [
+            { assetId: 'a1', serial: 'FOC111', providerTag: 'NAAS-1', customerTag: 'SW-01' },
+            { assetId: 'a2', serial: 'FOC222', providerTag: 'SW-01', customerTag: '' },
+        ]
+        expect(compareAudit(units, ['sw-01']).matched).toEqual(['a2'])
+    })
+
+    it('leaves a code two units carry in the same field unresolved, as unexpected', () => {
+        const units = [
+            { assetId: 'a1', serial: 'FOC111', providerTag: 'NAAS-1', customerTag: 'SW-01' },
+            { assetId: 'a2', serial: 'FOC222', providerTag: 'NAAS-2', customerTag: 'SW-01' },
+        ]
+        const result = compareAudit(units, ['SW-01', 'FOC222'])
+        expect(result.matched).toEqual(['a2'])
+        expect(result.missing).toEqual(['a1'])
+        expect(result.unexpected).toEqual(['SW-01'])
+    })
 })
 
 describe('attestationDue', () => {
