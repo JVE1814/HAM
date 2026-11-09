@@ -115,7 +115,7 @@ The date by which an in-service Asset must be replaced, from the Agreement's ref
 ### Commercial
 
 **Agreement**:
-The commercial contract between the Provider and a Customer that sets terms, quantities and service levels.
+The commercial contract between the Provider and a Customer that sets terms, quantities, service levels and the one currency it bills in.
 _Avoid_: contract (also used for leases and OEM coverage), subscription
 
 **Renewal**:
@@ -128,7 +128,7 @@ _Avoid_: quota, entitlement
 
 **Subscription line**:
 A billable service line of an Agreement (a site package or a device-class line) that delivering Assets are attached to.
-_Avoid_: service line, billing line, subscription
+_Avoid_: service line, billing line (one charge of a Billing period), subscription
 
 **Catalog entry**:
 A Model or Site template a Customer may order under its Agreement.
@@ -139,7 +139,7 @@ A named bill of materials describing the standard equipment for a kind of Site.
 _Avoid_: BOM, bundle, kit
 
 **Spare pool**:
-In-stock Assets reserved for one Customer's replacements, sized by the Agreement's spare-pool ratio.
+In-stock Assets of one Model reserved for one Customer's replacements, sized from all the Customer's deployed Assets of that Model, each Agreement's spare-pool ratio applied to the Assets it covers.
 _Avoid_: spares, buffer stock
 
 **Fee event**:
@@ -252,11 +252,11 @@ The choice, due ahead of a Lease schedule's end, to buy its Assets out, extend i
 A Lease schedule that ends while an Agreement its deployed Assets serve runs on (including an Agreement with no end date).
 
 **Billing period**:
-A calendar month of prorated Subscription line charges and Fee events, locked once closed.
+A calendar month of prorated Subscription line charges and Fee events, totalled per currency and locked once closed.
 _Avoid_: invoice (issued by finance, not here)
 
 **Billing line**:
-One charge of a Billing period: a Subscription line at a Site, or one Fee event.
+One charge of a Billing period, in its Agreement's currency: a Subscription line at a Site, or one Fee event.
 _Avoid_: invoice line
 
 **Service interval**:
@@ -264,8 +264,18 @@ The days one Asset delivered a Subscription line, from the day it went in servic
 _Avoid_: usage, billable period
 
 **Cost fact**:
-A cost of one kind (purchase write-off, lease, OEM support, field labour) attributed to a Customer and Site for one Billing period.
+A cost of one kind (purchase write-off, lease, OEM support, field labour) attributed to a Customer and Site for one Billing period, in one currency.
 
 **Margin**:
-A Billing period's subscription and fee revenue minus its Cost facts, per Customer and Site.
+A Billing period's subscription and fee revenue minus its Cost facts, per Customer, Site and currency: amounts in two currencies are never added.
 _Avoid_: profit, TCO (cost only)
+
+## Avoided words kept in names
+
+Some names users and the platform already see keep a word avoided above. Each means only what is said here, and the reason it stays follows.
+
+- **entitlement**, in the Order's *Entitlement* verdict and *Entitlement findings*: the check of an Order against its Agreement's Catalog entries and Contracted quantities, never a quantity; the columns are installed, and renaming them means migrating their data.
+- **over_quota**, the stored value of that verdict: its label reads *Over contracted quantity*, and a stored choice value cannot change without rewriting the Orders that hold it.
+- **allocated**, in the Order line's `quantity_allocated`: the Assets an Order line holds, from whatever source; the column is installed.
+- **warehouse**, in the warehouse app (*Warehouse scanning*, `x_daas_ham_warehouse.do`): the scanning page, used in every kind of Stockroom, not a kind of Stockroom; its URL is installed and linked.
+- **device**, in what Customers and the NMS see (the customer page and its API's errors such as *Unknown device*, a *Device removal* return, device events): their word for one physical unit; they never see an Asset record, and staff language keeps Asset.
