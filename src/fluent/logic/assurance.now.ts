@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { Acl, BusinessRule, ScheduledScript, UiAction, UiPage } from '@servicenow/sdk/core'
-import { raiseAttestations, reconcileInstalledBase, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudit } from '../../server/entry/assurance'
-import { guardRackPlacement } from '../../server/entry/racks'
+import { raiseAttestations, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudit } from '../../server/entry/assurance'
+import { guardRackPlacement, reconcileInstalledBaseAndRacks, recheckRackPlacement } from '../../server/entry/racks'
 import rackPage from '../../client/rack.html'
 import { accountManager, assetManager, customerAdmin, fieldTech, finance, inventoryTech, noc, siteContact } from '../security/roles.now'
 
@@ -55,6 +55,20 @@ BusinessRule({
     script: guardRackPlacement,
 })
 
+// The before rule checks the placements saved so far; this one re-checks the racks once the save is written, for two
+// saves at the same moment that both passed it.
+BusinessRule({
+    $id: Now.ID['br_rack_recheck'],
+    name: 'NaaS - re-check rack for overlaps and power',
+    table: 'alm_hardware',
+    when: 'after',
+    action: ['insert', 'update'],
+    order: 150,
+    condition:
+        "current.x_daas_ham_rack.changes() || current.x_daas_ham_ru_start.changes() || current.x_daas_ham_rack_face.changes() || (current.model.changes() && current.x_daas_ham_rack != '')",
+    script: recheckRackPlacement,
+})
+
 ScheduledScript({
     $id: Now.ID['job_reconcile_installed_base'],
     name: 'NaaS - reconcile installed base',
@@ -62,7 +76,7 @@ ScheduledScript({
     frequency: 'daily',
     executionTime: { hours: 2, minutes: 5, seconds: 0 },
     timeZone: 'UTC',
-    script: reconcileInstalledBase,
+    script: reconcileInstalledBaseAndRacks,
 })
 
 ScheduledScript({

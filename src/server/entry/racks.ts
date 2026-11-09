@@ -2,12 +2,15 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { placementProblem, powerBudget, type Placement, type RackFace } from '../domain/rack'
+import { placementProblem, powerBudget, type Placement, type RackFace, type RackSpec } from '../domain/rack'
+import { RACK_EXCEPTION_TYPES, reconcileRack } from '../domain/reconciliation'
 import { visibilityFilter } from '../domain/visibility'
 import { readStage } from '../platform/assets'
+import { openException, resolveCiExceptions } from '../platform/exceptions'
 import { currentSession } from '../platform/session'
-import { exists, findById, num, recordsById, str } from '../platform/records'
+import { exists, findById, num, pluck, recordsById, str } from '../platform/records'
 import { queryParam, reply } from '../platform/rest-api'
+import { reconcileInstalledBase } from './assurance'
 
 /** Rack placement and the rack elevation view (P2.8, D67). */
 
@@ -53,14 +56,15 @@ function placementOf(slot: Slot, models: ReadonlyMap<string, RackModel>): Placem
 }
 
 /**
- * Every other device placed in the rack, past the visibility rules (ADR 0005): an inventory tech sees only their
- * Stockrooms' Assets, and a device they cannot see still fills its units and draws power. Only read, never saved.
+ * Every device placed in the rack but `exceptAssetId`, past the visibility rules (ADR 0005): an inventory tech sees
+ * only their Stockrooms' Assets, and a device they cannot see still fills its units and draws power. Only read, never
+ * saved.
  */
-function slotsIn(rackId: string, exceptAssetId: string): Slot[] {
+function slotsIn(rackId: string, exceptAssetId = ''): Slot[] {
     const asset = new GlideRecord('alm_hardware')
     asset.setWorkflow(false)
     asset.addQuery('x_daas_ham_rack', rackId)
-    asset.addQuery('sys_id', '!=', exceptAssetId)
+    if (exceptAssetId) asset.addQuery('sys_id', '!=', exceptAssetId)
     asset.addNotNullQuery('x_daas_ham_ru_start')
     asset.query()
     const slots: Slot[] = []
@@ -72,7 +76,8 @@ function slotsIn(rackId: string, exceptAssetId: string): Slot[] {
  * Before rule on alm_hardware: a rack position must be free, inside the rack and within its power budget. It checks
  * against the placements saved so far and takes no lock: one taken here is released before the platform writes the
  * record, so two saves into the same units at the same moment could still both pass. Placements are entered by hand,
- * one Asset per save, and no app logic places one, so that is accepted.
+ * one Asset per save, and no app logic places one, so what slips through is reported, not refused: the after rule
+ * (recheckRackPlacement) re-checks the rack once the save is written.
  */
 export function guardRackPlacement(current: GlideRecord, previous: GlideRecord): void {
     const rackId = str(current, 'x_daas_ham_rack')
@@ -92,6 +97,55 @@ export function guardRackPlacement(current: GlideRecord, previous: GlideRecord):
         gs.addErrorMessage(problem)
         current.setAbortAction(true)
     }
+}
+
+/**
+ * After rule on alm_hardware: re-check the rack the Asset is placed in, and the one it left, now the save is written.
+ * guardRackPlacement checks against the placements saved before, so two saves into the same units (or the last of a
+ * rack's power) at the same moment can both pass it. Each after rule runs once its own save is written, so the later
+ * of the two reads both and raises the exception; a later save that clears it resolves it.
+ */
+export function recheckRackPlacement(current: GlideRecord, previous: GlideRecord): void {
+    const left = previous ? str(previous, 'x_daas_ham_rack') : ''
+    for (const rackId of new Set([str(current, 'x_daas_ham_rack'), left])) if (rackId) recheckRack(rackId)
+}
+
+/**
+ * The daily reconciliation job: the installed base against monitoring, then each rack with an open rack exception,
+ * even when the first part throws. A rack exception resolves there when it cleared without a placement save (a
+ * Model's size or power, the rack's capacity, a deleted Asset), or when a check raised it from a read taken just
+ * before the save that cleared it: the open and the resolve take no lock in common.
+ */
+export function reconcileInstalledBaseAndRacks(): void {
+    try {
+        reconcileInstalledBase()
+    } finally {
+        const flagged = pluck('x_daas_ham_recon_exception', `status=open^exception_typeIN${RACK_EXCEPTION_TYPES.join(',')}^ciISNOTEMPTY`, 'ci')
+        for (const rackId of new Set(flagged)) recheckRack(rackId)
+    }
+}
+
+/**
+ * Open the rack's overlap and power exceptions that a fresh read of the rack and every device placed in it finds
+ * (domain/reconciliation `reconcileRack`), and resolve the others. A rack no longer there holds nothing, so its
+ * exceptions resolve.
+ */
+function recheckRack(rackId: string): void {
+    const rack = findById('cmdb_ci_rack', rackId)
+    const found = rack ? reconcileRack(rackSpec(rack), placementsIn(rackId)) : []
+    for (const { type, detail } of found) openException(type, { ciId: rackId, customerId: rack ? str(rack, 'company') : '', detail })
+    resolveCiExceptions(rackId, RACK_EXCEPTION_TYPES.filter((type) => !found.some((exception) => exception.type === type)))
+}
+
+function rackSpec(rack: GlideRecord): RackSpec {
+    return { units: num(rack, 'rack_units') || 42, powerCapacityW: num(rack, 'x_daas_ham_power_capacity_w') }
+}
+
+/** Every device placed in the rack, past the visibility rules, with its Model's height and draw. */
+function placementsIn(rackId: string): Placement[] {
+    const slots = slotsIn(rackId)
+    const models = rackModels(slots.map((slot) => slot.modelId))
+    return slots.map((slot) => placementOf(slot, models))
 }
 
 function forbidden(response: RESTAPIResponse): boolean {

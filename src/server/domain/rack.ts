@@ -52,6 +52,34 @@ function drawW(placement: Placement): number {
     return Math.max(0, placement.powerW ?? 0)
 }
 
+function topUnit(placement: Placement): number {
+    return placement.ruStart + Math.max(1, placement.height) - 1
+}
+
+/** Two devices on one face of a rack that share units; `unit` is the lowest unit they share. */
+export interface Overlap {
+    assetIds: [string, string]
+    face: RackFace
+    unit: number
+}
+
+/**
+ * Every pair of devices sharing a unit on the same face, lowest unit first. placementProblem refuses a save that
+ * would overlap, but two saves into the same units at the same moment both pass it, so the whole rack is re-checked
+ * once they are written. Pairs are by position in the list, so two devices with the same name are still compared.
+ */
+export function overlaps(placements: readonly Placement[]): Overlap[] {
+    const found: Overlap[] = []
+    placements.forEach((a, i) => {
+        for (const b of placements.slice(i + 1)) {
+            if (a.face !== b.face) continue
+            const unit = Math.max(a.ruStart, b.ruStart)
+            if (unit <= Math.min(topUnit(a), topUnit(b))) found.push({ assetIds: [a.assetId, b.assetId], face: a.face, unit })
+        }
+    })
+    return found.sort((x, y) => x.unit - y.unit)
+}
+
 export interface PowerBudget {
     capacityW: number
     usedW: number

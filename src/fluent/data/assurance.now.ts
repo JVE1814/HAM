@@ -88,7 +88,7 @@ export const x_daas_ham_attestation_item = Table({
     index: [{ name: 'x_daas_ham_ati_att', unique: false, element: 'attestation' }],
 })
 
-/** A disagreement between Assets and monitoring, an audit or an attestation. */
+/** A disagreement between Assets and monitoring, an audit or an attestation, or a rack's placements. */
 export const x_daas_ham_recon_exception = Table({
     name: 'x_daas_ham_recon_exception',
     label: 'Reconciliation exception',
@@ -102,6 +102,8 @@ export const x_daas_ham_recon_exception = Table({
                 seen_without_asset: { label: 'Seen device without asset', sequence: 3 },
                 audit_missing: { label: 'Missing in audit', sequence: 4 },
                 attested_missing: { label: 'Customer reports missing', sequence: 5 },
+                rack_overlap: { label: 'Devices overlap in rack', sequence: 6 },
+                rack_over_power: { label: 'Rack over power budget', sequence: 7 },
             },
             mandatory: true,
             dropdown: 'dropdown_without_none',

@@ -75,7 +75,7 @@ function catalogModels(customerId: string): Array<{ modelId: string; deviceClass
     return models
 }
 
-/** Raise one wave's Order and lines and submit it: the Order's number, or '' when none was raised. */
+/** Raise one wave's Order and lines and submit it: the Order's number, or '' when none was raised with a line. */
 function raiseWave({ customerId, siteId, agreementId, assets }: RefreshWave): string {
     const catalog = catalogModels(customerId)
     const lifecycle = new Map<string, LifecycleDates>()
@@ -95,6 +95,7 @@ function raiseWave({ customerId, siteId, agreementId, assets }: RefreshWave): st
         return ''
     }
     const unmatched: string[] = []
+    let saved = 0
     for (const candidate of assets) {
         const modelId = replacementModel(candidate, catalog, lifecycle, todayIso())
         const line = new GlideRecord('x_daas_ham_order_line')
@@ -107,7 +108,12 @@ function raiseWave({ customerId, siteId, agreementId, assets }: RefreshWave): st
             gs.warn(`[x_daas_ham] Asset ${candidate.assetId} left off ${str(order, 'number')}: ${refusal(line)}`)
             continue
         }
+        saved++
         if (!modelId) unmatched.push(candidate.assetId)
+    }
+    if (saved === 0) {
+        removeEmpty(order, siteId)
+        return ''
     }
     if (unmatched.length > 0) {
         order.setValue('work_notes', `${unmatched.length} asset(s) have no sellable catalogued successor; their lines reuse the current model. Review before submitting.`)
@@ -116,4 +122,14 @@ function raiseWave({ customerId, siteId, agreementId, assets }: RefreshWave): st
     }
     submitOrder(order)
     return str(order, 'number')
+}
+
+/**
+ * Remove a refresh Order none of whose lines was saved: it replaces nothing, Submit would leave it a draft, and the
+ * next run raises its Assets on a new one, so each run would add another empty draft for as long as lines are refused.
+ */
+function removeEmpty(order: GlideRecord, siteId: string): void {
+    const empty = `Refresh Order ${str(order, 'number')} for site ${siteId}`
+    if (order.deleteRecord()) return void gs.warn(`[x_daas_ham] ${empty} removed: none of its lines was saved`)
+    gs.warn(`[x_daas_ham] ${empty} has no lines and was not removed (${refusal(order, 'the delete was refused')}): cancel it`)
 }

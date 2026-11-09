@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { placementProblem, powerBudget, rackElevation } from './rack'
+import { overlaps, placementProblem, powerBudget, rackElevation } from './rack'
 
 const rack42 = { units: 42, powerCapacityW: 0 }
 const placed = [
@@ -73,6 +73,48 @@ describe('powerBudget', () => {
 
     it('has no utilisation without a capacity', () => {
         expect(powerBudget(0, [...placed, { assetId: 'x', ruStart: 1, height: 1, face: 'front' }])).toEqual({ capacityW: 0, usedW: 600, utilisation: null })
+    })
+})
+
+describe('overlaps', () => {
+    it('finds nothing in a rack whose devices each have their own units', () => {
+        expect(overlaps(placed)).toEqual([])
+    })
+
+    it('lets devices touch: one directly above or below another shares no unit', () => {
+        const touching = [
+            ...placed,
+            { assetId: 'above', ruStart: 32, height: 1, face: 'front' as const },
+            { assetId: 'below', ruStart: 28, height: 2, face: 'front' as const },
+        ]
+        expect(overlaps(touching)).toEqual([])
+        expect(overlaps([...placed, { assetId: 'low', ruStart: 29, height: 2, face: 'front' }])).toEqual([
+            { assetIds: ['fw1', 'low'], face: 'front', unit: 30 },
+        ])
+    })
+
+    it('finds devices sharing units on the same face, lowest shared unit first', () => {
+        const twoSaves = [
+            ...placed,
+            { assetId: 'sw2', ruStart: 31, height: 2, face: 'front' as const },
+            { assetId: 'ap1', ruStart: 40, height: 1, face: 'front' as const },
+        ]
+        expect(overlaps(twoSaves)).toEqual([
+            { assetIds: ['fw1', 'sw2'], face: 'front', unit: 31 },
+            { assetIds: ['sw1', 'ap1'], face: 'front', unit: 40 },
+        ])
+    })
+
+    it('lets devices share units on opposite faces, and counts a height under 1 as 1', () => {
+        expect(overlaps([...placed, { assetId: 'pdu', ruStart: 30, height: 2, face: 'rear' }])).toEqual([])
+        expect(overlaps([...placed, { assetId: 'blank', ruStart: 40, height: 0, face: 'front' }])).toEqual([
+            { assetIds: ['sw1', 'blank'], face: 'front', unit: 40 },
+        ])
+    })
+
+    it('compares two devices with the same name', () => {
+        const unnamed = { assetId: '', ruStart: 5, height: 1, face: 'front' as const }
+        expect(overlaps([unnamed, unnamed])).toEqual([{ assetIds: ['', ''], face: 'front', unit: 5 }])
     })
 })
 

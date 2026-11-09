@@ -2,9 +2,9 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import type { ExceptionType } from '../domain/reconciliation'
 import { msToGlide, nowMs } from './clock'
 import { withLockTries } from './locks'
-import { refusal } from './records'
+import { refusal, str } from './records'
 
-/** Reconciliation exceptions: at most one open exception per type and asset (or CI). */
+/** Reconciliation exceptions: at most one open exception per type and asset (or CI, such as a rack). */
 
 interface ExceptionSubject {
     assetId?: string
@@ -61,14 +61,28 @@ function insertException(type: ExceptionType, subject: ExceptionSubject): void {
 
 /** Resolve an asset's open exceptions of the given types that no longer apply. */
 export function resolveExceptions(assetId: string, types: readonly ExceptionType[]): void {
-    if (types.length === 0) return
+    resolveOpen('asset', assetId, types)
+}
+
+/** Resolve a CI's open exceptions of the given types that no longer apply, such as a rack's (domain/reconciliation). */
+export function resolveCiExceptions(ciId: string, types: readonly ExceptionType[]): void {
+    resolveOpen('ci', ciId, types)
+}
+
+/**
+ * A blank subject would match every exception of the other kind, so it resolves nothing. One the platform refuses to
+ * resolve stays open and is logged; the next check that finds it cleared tries again.
+ */
+function resolveOpen(field: 'asset' | 'ci', subjectId: string, types: readonly ExceptionType[]): void {
+    if (!subjectId || types.length === 0) return
     const exception = new GlideRecord('x_daas_ham_recon_exception')
-    exception.addQuery('asset', assetId)
+    exception.addQuery(field, subjectId)
     exception.addQuery('status', 'open')
     exception.addQuery('exception_type', 'IN', types.join(','))
     exception.query()
     while (exception.next()) {
         exception.setValue('status', 'resolved')
-        exception.update()
+        if (exception.update()) continue
+        gs.warn(`[x_daas_ham] ${str(exception, 'exception_type')} exception for ${subjectId} not resolved: ${refusal(exception)}`)
     }
 }

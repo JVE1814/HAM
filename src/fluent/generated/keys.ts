@@ -1333,6 +1333,10 @@ declare global {
                         table: 'sys_script'
                         id: '66c23ff913d343e7ba09fa4fca2e6b7b'
                     }
+                    br_rack_recheck: {
+                        table: 'sys_script'
+                        id: '550643d51ea747cabac0011058244900'
+                    }
                     br_return_evaluated: {
                         table: 'sys_script'
                         id: '6bfdb105c685422eae8b2488e27c1f97'
@@ -8056,6 +8060,17 @@ declare global {
                         id: '16eaf12b43fa401987424344863c25b8'
                         key: {
                             name: 'x_daas_ham_eox_import'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '1707b13fc1f64b36baa09096d6f59be1'
+                        key: {
+                            name: 'x_daas_ham_recon_exception'
+                            element: 'exception_type'
+                            value: 'rack_over_power'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
@@ -31495,6 +31510,17 @@ declare global {
                         key: {
                             name: 'cmn_location'
                             element: 'x_daas_ham_site_tier'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '99317063225047138937cda52c1d1f5a'
+                        key: {
+                            name: 'x_daas_ham_recon_exception'
+                            element: 'exception_type'
+                            value: 'rack_overlap'
+                            language: 'en'
+                            dependent_value: 'NULL'
                         }
                     },
                     {
