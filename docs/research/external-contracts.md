@@ -754,8 +754,10 @@ Sources:
 | `GlideRecord.updateMultiple()` and clearing a field | Clears `billing_period` record by record (`billing.ts` unlinkFees) | `updateMultiple` does not clear values unless set to `'NULL'` | matches | N30 |
 | `RESTMessageV2(name, methodName)`, `setStringParameterNoEscape` | As used; app URL-encodes values itself (`rest-port.ts:8,26-28`) | Constructor documented; neither method URL-encodes | matches | N31, N32, N33 |
 | `GlideAggregate.groupBy` on date fields | Grouped `start_date`/`end_date` read as `YYYY-MM-DD` (`billing.ts` intervalsByLine) | Format of a grouped `glide_date` key not documented | unverifiable | N34 |
-| `setWorkflow(false)` on a global table from the scoped app | Skips the app's before-query rule on `alm_hardware` (`assets.ts:87,94`; `billing.ts:183`; `returns.ts` endLineIfEmpty) | "This method can't be set for cross-scoped applications"; refused on the instance, so the rules still run | differs | N30, N35 |
-| `current.setAbortAction(true)` in a before rule on a global table | Refuses the save (`assets.ts` enforceLifecycle on `alm_hardware`, `delivery.ts` guardWorkWindow on `wm_order`) | Refused on the instance: the save goes through; the rule's own Abort action does refuse | differs | N35 |
+| `setWorkflow(false)` on a global table from the scoped app | No longer relied on there: a read past the visibility rules on `alm_hardware` marks its GlideRecord while its query runs and the app's before-query rules skip a marked record (`platform/beyond-visibility.ts`, `entry/visibility.ts` restrict); `setWorkflow(false)` stays on `x_daas_ham_*` tables | "This method can't be set for cross-scoped applications"; refused on the instance, so the rules still run. Module state reaches the rules the query sets off, within that transaction only | matches | N30, N35, N37 |
+| `current.setAbortAction(true)` in a before rule on a global table | No longer used there: the rules on `alm_hardware` and `wm_order` refuse with their Abort action (`assets.ts` refusesLifecycleChange, `delivery.ts` refusesWorkWindow, `racks.ts` refusesRackPlacement); the rules on `x_daas_ham_*` tables keep it | Refused on the instance: the save goes through. The rule's own Abort action refuses it, whoever saves, and its script still runs | matches | N35, N36 |
+| Business rule condition and filter | The check is the condition, behind a change test in the condition itself (`rules.now.ts`, `assurance.now.ts`) | The condition runs on every save the rule's table and action match, even when the filter does not; the rule fires only when both hold | matches | N36 |
+| Out-of-box transfer order line logic and the Asset | Inventory works the transfer orders sourcing raises (`transfers.ts`); the lifecycle rule checks the Asset save that sets off (`assets.ts` refusesLifecycleChange) | *Push Status to Asset/Consumable* sets *In stock / Pending transfer* or *In transit / Reserved* in the user's transaction and saves through `alm_asset` without checking; the app's `alm_hardware` rules run on that save | differs | N38 |
 
 Notes:
 
@@ -917,6 +919,54 @@ Sources:
   Table on which it is called. Table's Scope was: Global"; neither on `x_daas_ham_billing_line`. Both
   calls return without an error and the system log shows nothing. An ATF save of `alm_hardware` refused
   only that way was written.
+- N36: Brazil instance, 2026-11-09, probe with a temporary before-update rule of `x_daas_ham` on
+  `alm_hardware` (deleted after, with its probe Asset): Abort action set, filter
+  `serial_numberSTARTSWITHABORTPROBE`, a condition that logs, calls a function of an installed
+  module (`require('x_daas_ham/naas-ham/0.1.0/src/server/platform/records.ts')`) on `previous` and
+  holds for one serial, and a script that logs and adds an error message. A save of that serial,
+  from scope `x_daas_ham` and from global, returned no sys_id, `isActionAborted()` was true, the
+  stored record kept its value, the script ran, and `getLastErrorMessage()` read "Operation against
+  file 'alm_hardware' was aborted by Business Rule '<rule name>^<record sys_id>'. Business Rule
+  Stack:<rule name>" (the name cut to 40 characters), not the script's message. A save the filter
+  does not match ran the condition all the same (its log line is in the system log); with the
+  condition then pointed at that save, it was written. In the same scope, `setAbortAction` on an
+  unsaved record of `x_daas_ham_staging_task`, `x_daas_ham_disposal_order` (both extend `task`),
+  `x_daas_ham_disposal_line`, `x_daas_ham_billing_line` and `x_daas_ham_billing_period` leaves
+  `isActionAborted()` true; on `alm_hardware` and `wm_order`, false.
+- N37: Brazil instance, 2026-11-09, probes in scope `x_daas_ham` (background scripts through
+  `sys.scripts.do` in one session, and temporary before-query rules of `x_daas_ham` on
+  `alm_hardware`, deleted after with their update records) that saved nothing. A property set on an
+  object exported by an installed module (`domain/visibility.ts` `ROLE`) is seen by a second
+  `require()` in the script, by the before-query rule its query sets off, and by a second rule a
+  query in the first rule's script sets off; it is gone in the next transaction, even in the same
+  session, where the session's client data (`putClientData`) is still set. A module's import gives
+  the instance the script's `require()` gives (`domain/returns.ts` read the `DEPLOYED_STAGES` of
+  `domain/lifecycle.ts` as the script had changed it). A rule's `current` is the GlideRecord whose
+  `query()` or `get()` set it off (`===`), also one made and returned by module code (`records.ts`
+  findById); another GlideRecord queried meanwhile is not. A property set on the GlideRecord itself,
+  and a global variable of the script, reach the rule too. A rule is not run again for a query made
+  in its own script. From global, `require()` of the app's module fails: "Module ... not found".
+  `setWorkflow(false)` on `sys_user` and `alm_transfer_order_line` is refused like on `alm_hardware`
+  (`isWorkflow()` stays true); on `x_daas_ham_order_line` it applies. Only the app may add a
+  before-query rule to an app table: the platform's *Reject before-Q for out-of-scope tables*
+  refused one on `x_daas_ham_stockroom_member` saved from global.
+- N38: Brazil instance, 2026-11-09. Read on the instance: the before rule *Push Status to
+  Asset/Consumable* on `alm_transfer_order_line` (global, order 500, insert and update, condition
+  `!current.isActionAborted() && (current.stage.changes() || current.asset.changes() ||
+  current.operation() == 'insert')`) reads the line's Asset through `GlideRecord('alm_asset')`. It
+  sets install status 6 / substatus `pending_transfer` at Draft (on insert), and, when the line's
+  last closed task was not Closed Skipped, 6 / `pending_transfer` at Requested and Shipment
+  Preparation, 9 / `reserved` at In Transit, and 6 / `available` in the transfer order's
+  to-stockroom at Received (with no work order task or service order on it). It then calls
+  `asset.update()` and ignores the result. The after rule *Push stages of TO and TOL* on
+  `alm_transfer_order_line_task` (state changes to 3 or 7) sets the line's stage with
+  `TransferOrderLineTemplateTaskAPI.pushStageOfTOAndTOLFromTOL`, which saves the line
+  (`tolGr.update()`) in the same transaction, so the Asset save runs in the transaction of whoever
+  closes the task. Probe in global scope with two temporary `alm_hardware` records (deleted after,
+  with their audit rows): moving one from *In stock / Available* to *In stock / Staging* through
+  `GlideRecord('alm_asset')` (`getRecordClassName()` `alm_hardware`) cleared its wipe evidence, as
+  moving the other through `GlideRecord('alm_hardware')` did. So the app's before rule on
+  `alm_hardware` ran on both saves.
 
 ## Changes needed in the app
 
@@ -1157,15 +1207,32 @@ recommended hardening are described in the notes of their area.
 - **Refusing a save, or skipping the rules, on a global table (differs).** From `x_daas_ham` the
   platform ignores `current.setAbortAction` and `setWorkflow` on a table of another scope (N35). A
   before rule on such a table refuses with its Abort action: its check is the condition and its script
-  only adds the message. **Done** for `NaaS - rack placement must be free and within power`
-  (`assurance.now.ts`, `racks.ts` refusesRackPlacement). Still to change: `NaaS - enforce asset
-  lifecycle` (`alm_hardware`, `assets.ts` enforceLifecycle, which also clears wipe evidence on
-  `current`, so that part needs a rule or script that does not refuse) and `NaaS - work inside change
-  and maintenance window` (`wm_order`, `delivery.ts` guardWorkWindow): both show their message and
-  save. The reads ADR 0005 runs past the visibility rules with `setWorkflow(false)` on `alm_hardware`
-  (`racks.ts` slotsIn, `platform/assets.ts` beyondVisibility, `fulfilment.ts`, `delivery.ts`,
-  `warehouse.ts`, `imports.ts`, `in-service.ts`) are still narrowed for an inventory tech; they need a
-  bypass the before-query rule itself honours.
+  only adds the message; the platform runs a condition whatever the filter (N36), so the condition
+  starts with the change test that keeps the module unloaded on other saves. **Done** for the rack
+  placement rule (`assurance.now.ts`, `racks.ts` refusesRackPlacement), `NaaS - enforce asset
+  lifecycle` (`alm_hardware`, `assets.ts` refusesLifecycleChange; the wipe evidence a save into
+  staging voids is cleared by a rule of its own, `assets.ts` clearVoidedWipeEvidence) and `NaaS -
+  work inside change and maintenance window` (`wm_order`, `delivery.ts` refusesWorkWindow). No other
+  rule refuses a save on another scope's table: the before rule on `sn_customerservice_case`
+  (`breakfix.ts` onCaseFailedAsset) and the lease rule on `alm_hardware` (`leases.ts`
+  onAssetLeaseChanged) only set fields, and the rest that refuse run on `x_daas_ham_*` tables, where
+  `setAbortAction` works (`entry-points.test.ts` keeps it that way).
+  Now that the lifecycle rule's refusal holds, it also refuses the Asset saves Inventory's transfer
+  order logic makes for an inventory tech working a line, which set combinations the app does not
+  model (N38, ADR 0002); whether its exemption should widen is listed below.
+  The reads ADR 0005 runs past the visibility rules on `alm_hardware` no longer call `setWorkflow`:
+  each marks its GlideRecord while its query runs (`platform/beyond-visibility.ts`) and the app's
+  before-query rules leave a marked record's query as it is (N37). **Done** for `racks.ts` slotsIn,
+  `platform/assets.ts` findAssetByIdentifier (`beyondVisibility`), `platform/fulfilment.ts`
+  assetStages and readPastRules, `platform/service-intervals.ts` inServiceNow, `delivery.ts`
+  shippable and Ship's re-read, `warehouse.ts` arrivingAsset, `imports.ts` serialExists,
+  `in-service.ts` freshAsset, `returns.ts` endSitePackageIfEmpty and the survivor check of
+  `records.ts` deleteWhere. The mark skips only the app's rules: on `alm_asset`, Customer Service's
+  and the platform's query rules still run, for users with Customer Service roles, which the app
+  does not grant. `approvals.ts` isActiveUser reads `sys_user`, where the app has no rule and the
+  platform's *user query* rule only hides inactive users, which it asks for anyway. No app logic
+  saves a record of another scope's table with the rules off: each read above that is saved runs
+  every rule on the save, as it did when `setWorkflow(true)` came before it.
 
 ## Still needs an instance or vendor login
 
@@ -1195,6 +1262,9 @@ Items with verdict unverifiable:
 
 Other open points raised in the findings:
 
+- Transfer orders: whether the lifecycle rule's refusing, for an inventory tech, the Asset saves
+  Inventory's transfer order logic makes (N38) gets in the way of the transfer orders sourcing
+  raises, so that its exemption should widen (README, Verify on the first install).
 - Cisco: how Cisco's path parsing handles PIDs containing `/` (e.g. `CISCO2901/K9`), which
   `rest-port.ts:27` sends as `%2F`; some servers reject encoded slashes.
 - Cisco: whether SN2INFO `service_contract_number` can hold several comma-separated numbers (the field

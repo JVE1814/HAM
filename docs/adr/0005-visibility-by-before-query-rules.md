@@ -13,10 +13,17 @@ every Customer and are not narrowed. Tables inventory techs may not read at all 
 commercial and configuration tables) are closed by the read ACLs' role lists, not by a match-nothing
 filter: a before-query rule also applies to the server logic the user's actions set off. Receiving a
 returned Asset, for example, reads and can end its Subscription line and record a late-return Fee
-event. Server logic that must count past the user's rules queries with business rules off: the units
-of a site package still at the Site, the Assets of an Order line when its stage is derived, and the
-Assets Ship sends. Logic that saves what such a query read turns the rules back on before any save
-(`setWorkflow(true)`), so the stage-change and billing rules still run.
+event. Server logic that must count past the user's rules reads past them: the units of a site
+package still at the Site, the Assets of an Order line when its stage is derived, the Assets Ship
+sends, every device in a rack, and the unit a receipt or a device event names. On the app's own
+tables it queries with business rules off (`setWorkflow(false)`) or with the mark below. On
+`alm_hardware`, a table of another scope, the platform refuses `setWorkflow` from the app's scope
+and runs the rules anyway, so the read marks its GlideRecord while its query runs (`platform/beyond-
+visibility.ts`) and the app's before-query rules leave a marked record's query as it is. The mark
+lives in a module, which only the app's code can load and which no other transaction shares, and it
+is the record itself, so it skips the rules for that one query and no other; rules of other scopes
+(the platform's, Customer Service's on `alm_asset`) still run. A record read that way is saved with
+every rule, so the stage-change and billing rules run.
 
 For Customer contacts, a rule on a table with no Customer field (or no Site field, for Site contacts)
 matches nothing. Site contacts therefore get no Stockrooms, Agreements, subscription lines, catalog

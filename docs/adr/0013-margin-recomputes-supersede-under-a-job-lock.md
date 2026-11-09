@@ -56,8 +56,8 @@ holder only takes locks later in it than those it holds:
 
 `refresh_orders` < `seen_asset` < `receive_serial` < `receive_asset` < `source_order` <
 `ship_order` < `track_shipment` < `return_label` < `order_line` < `provider_tag_sequence` <
-`reserve_asset` < `fee` < `recon_exception` < `subscription_line` < `service_interval` < job locks
-(the margin recompute's).
+`spare_pool` < `reserve_asset` < `fee` < `recon_exception` < `subscription_line` <
+`service_interval` < job locks (the margin recompute's).
 
 Only the device-events REST handler and the in-service detection job take `seen_asset_<sys_id>`, and
 they hold no other lock when they do. The go-live under it starts its pending Subscription line
@@ -79,5 +79,11 @@ held does not retry, like *Cancel order*: it changes nothing and asks the user t
 its inner `track_shipment_` take is tried 5 times back to back. Nothing takes another lock while
 holding `track_shipment_`: the Order's delivered note, its cleared tracking and the Return order's
 voided note are written after it is released. So it must stay after `ship_order`.
+The daily spare-pool top-up counts, fills and buys for each short Spare pool under
+`spare_pool_<Customer sys_id>_<Model sys_id>`, so a run and an *Execute now* at once never both buy
+for one shortfall. It holds no other lock when it takes it, tries 5 times back to back and leaves a
+pool held through them to the run holding it. Under it, it takes only the `reserve_asset_` lock of
+each unit it moves (and what that unit's save takes under it), so it comes just before
+`reserve_asset`.
 
 Whether the instance behaves as expected is on the first-install checklist.

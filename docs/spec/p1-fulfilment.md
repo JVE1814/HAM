@@ -16,11 +16,16 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   last came back from a Site or last entered staging: receipt at the depot clears it, and so does
   every save into staging, since staging loads a Customer's configuration. That covers the app's moves
   and a stage set on the form by anyone, administrators included, or by a background process (the
-  before-update rule on `alm_hardware` clears it).
+  before-update rule *NaaS - staging voids wipe evidence* on `alm_hardware` clears it).
 - Leased Assets leave only to the Lessor, or to the OEM from pending OEM RMA (an OEM takeback from
   pending disposal is refused). Customer-owned Assets leave only back to the Customer.
-- Form edits that break the matrix are refused; administrators and background processes are not
-  checked (their moves into staging still clear the wipe evidence).
+- A stage set outside the app's moves that breaks the matrix, or that the app does not model, is
+  refused when a user without `admin` saves it in their own transaction. That covers a form edit and
+  also out-of-box logic the user's action runs: an inventory tech closing a transfer order line's
+  task has Inventory set the Asset to *In stock / Pending transfer* or *In transit / Reserved*, and
+  that save is refused while the line moves on (ADR 0002). Administrators and background processes
+  are not checked (their moves into staging still clear the wipe evidence). ADR 0002 used to say
+  such changes were accepted unchecked; this spec and the code win.
 
 ## Derived stages (`domain/fulfilment.ts`)
 

@@ -209,8 +209,11 @@ Conventions that the build or tests enforce:
 - A business rule condition fits the 254-character field and loads a module by its installed path,
   `x_daas_ham/<package name>/<version>/src/...`, calling a function it exports
   (`entry-points.test.ts`). A before rule on a table of another scope (`alm_hardware`, `wm_order`)
-  refuses that way, with its Abort action: the platform ignores `current.setAbortAction` and
-  `setWorkflow` called from this scope on such a table
+  refuses that way, with its Abort action, and its script only adds the reason: the platform ignores
+  `current.setAbortAction` and `setWorkflow` called from this scope on such a table. So no entry
+  point wired on one calls `setAbortAction`, and a rule with an Abort action has a condition
+  (`entry-points.test.ts`). The platform runs a condition on every save of the table, whatever the
+  rule's filter, so it starts with the change test that keeps the module unloaded on other saves
   ([external-contracts.md](docs/research/external-contracts.md#servicenow-platform)).
 - Substatus values added to `alm_asset` live in `domain/lifecycle.ts` and
   `fluent/data/substatus-choices.now.ts` (`substatus-choices.test.ts` keeps them in sync).
@@ -259,7 +262,11 @@ What remains can only be confirmed on an instance or behind a vendor login:
   *stopped: old Cost facts not all removed* (or *old Margin rows not all removed*) and logs
   *[x_daas_ham] Margin of <period> stopped: ...*; and no lock row is left once a recompute ends.
 - **Provider tag counter** (warehouse Receive): the counter is advanced under the job lock
-  `provider_tag_sequence`, so two units received at the same moment get different tags. A receipt that
+  `provider_tag_sequence`, so two units received at the same moment get different tags. A number
+  whose tag an Asset already carries is skipped, so a counter set back (by a holder that outlasted
+  the lock) skips the tags issued since; only a tag issued but not yet saved on its Asset when such a
+  write lands could be issued again (ADR 0013). With *Cursor* of the `provider_tag_sequence` row in
+  *Job cursor* set to 0, the next unit received gets the first tag no Asset carries. A receipt that
   finds the lock held 5 times in a row answers HTTP 503 *Other receipts are taking Provider tags: scan
   again* and leaves the unit unreceived; each refused try logs two *Unique Key violation* errors (up to
   10 for one 503). A try that meets the lock being released logs the same two, then tries a third
@@ -331,6 +338,14 @@ What remains can only be confirmed on an instance or behind a vendor login:
   refresh_orders lock and raises them* (info). Delete the row and the next run raises them. A row left
   more than 10 minutes is cleared as abandoned by the next take, which then raises them. No
   `refresh_orders` row is left once a run ends.
+- **Spare-pool lock** (daily spare-pool top-up): the *NaaS - spare pool top-up* run counts, fills
+  and buys for each short Spare pool under the job lock `spare_pool_<Customer sys_id>_<Model
+  sys_id>`. With a row of that name in *Job lock* for a pool that is short, *Execute now* moves
+  nothing into it and buys nothing for it. Each of its 5 refused tries logs two *Unique Key
+  violation* errors (up to 10), and the run logs *[x_daas_ham] Spare pool of <Customer sys_id> for
+  <Model sys_id> not topped up: another run holds the spare_pool_... lock and tops it up* (info).
+  Delete the row and the next run tops it up. A row left more than 10 minutes is cleared as
+  abandoned by the next take. No `spare_pool_` row is left once a run ends.
 - **Sourcing locks** (Order sourcing and receiving): a sourcing pass holds the job lock
   `source_order_<Order sys_id>` for its whole run, and reads and saves each line under
   `order_line_<line sys_id>`, which a receipt for a waiting line takes too. A pass that finds the
@@ -415,6 +430,14 @@ What remains can only be confirmed on an instance or behind a vendor login:
   ends it, and a late one records the late-return fee. Impersonating a field-tech-only user, the
   warehouse app offers only Audit and Look up, and `POST /api/x_daas_ham/naas/receive` (and
   `/putaway`, `/pick`, `GET /stockrooms`) answers HTTP 403.
+- **Reads past the visibility rules** (ADR 0005, `platform/beyond-visibility.ts`): impersonating an
+  inventory-tech-only user assigned to one stockroom, the Assets list shows only that stockroom's
+  units, yet in the warehouse app scanning the serial of a unit in transit (in no stockroom yet)
+  receives that Asset, not *Unknown serial: scan the PID too ...*, an ASN row for a serial an Asset
+  of another stockroom carries is marked error *serial <serial> already exists*, Ship of an Order
+  whose hot spare sits in the customer-site stockroom ships the spare with the staged units, and
+  placing an Asset in rack units a device at the Site already fills (in none of the tech's
+  stockrooms) is refused with the overlap reason.
 - **Returns and site packages**: when an Agreement with equipment at two Sites ends, the daily job
   raises one Return order per Site, each with a normal change and a de-install work order located at
   that Site. A site package whose last outstanding unit is declared missing ends that day. With every
@@ -444,6 +467,24 @@ What remains can only be confirmed on an instance or behind a vendor login:
   (`GlideRecord.canCreate()`). The daily job *NaaS - raise refresh orders* relies on its *Run as* user
   (expected to be the system user) passing it; one without an Order raiser role leaves its refresh
   Orders as drafts with the work note *You may not raise orders*.
+- **Refusals on `alm_hardware` and `wm_order`** (the rules' Abort action): a user without `admin`
+  who sets an Asset's install status and substatus on the form to a move the lifecycle does not
+  allow (*Available* to *In use*, say) or to a combination the app does not model gets the reason as
+  an error, and the Asset keeps its stage; an administrator's same save is written. A save into
+  staging clears *Wiped on* and *Wipe certificate*, an administrator's too. Moving the planned start
+  of a NaaS Order's work order outside its change window on the form is refused with *The work must
+  be scheduled inside the change window*. A save by script that these rules refuse returns no
+  sys_id, and its last error names the rule (*Operation against file 'alm_hardware' was aborted by
+  Business Rule ...*), not the reason (external-contracts N36).
+- **Transfer orders and the lifecycle rule** (ADR 0002, external-contracts N38): impersonating an
+  inventory-tech-only user, work a transfer order that sourcing raised through its tasks. Such a
+  transfer order comes from an Order line filled from stock outside the staging centre, and its
+  Asset is in *Staging*. Closing the tasks that move the line to *Shipment Preparation* and *In
+  Transit* has Inventory set the Asset to *In stock / Pending transfer* and *In transit / Reserved*.
+  Expected: each of those Asset saves is refused with *This install status / substatus combination
+  is not used by NaaS asset management*, the Asset stays in *Staging*, and the line moves on all the
+  same. Note what receiving the line does to the Asset, and whether its Staging task can still be
+  finished. If these refusals get in the way, the lifecycle rule's exemption needs to widen.
 - **Rack re-check** (D67): two saves placing Assets into the same rack units at the same moment both
   pass the before rule, and the after rule of the later one, reading the rack afresh, sees both and
   opens *Devices overlap in rack* (or *Rack over power budget*) on the rack. Moving one device away
