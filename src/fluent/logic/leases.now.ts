@@ -15,6 +15,7 @@ import { accountManager, admin, assetManager, finance } from '../security/roles.
 import { CURRENT_IS_FLEET, FLEET_FIELD } from '../../server/domain/fleet'
 import { LEASE_END_ACTION } from '../../server/domain/vocabulary'
 import { EVENT } from '../../server/platform/events'
+import { PROPERTY } from '../../server/platform/properties'
 
 /* Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
 
@@ -227,18 +228,18 @@ EmailNotification({
 
 Property({
     $id: Now.ID['prop_coverage_warning_days'],
-    name: 'x_daas_ham.oem.coverage_warning_days',
+    name: PROPERTY.coverageWarningDays.name,
     type: 'integer',
-    value: 60,
+    value: PROPERTY.coverageWarningDays.default,
     description: 'Days before an OEM coverage contract of deployed equipment ends that the asset managers are warned.',
     roles: { read: [admin], write: [admin] },
 })
 
 Property({
     $id: Now.ID['prop_lease_decision_group'],
-    name: 'x_daas_ham.leases.decision_group',
+    name: PROPERTY.leaseDecisionGroup.name,
     type: 'string',
-    value: '',
+    value: PROPERTY.leaseDecisionGroup.default,
     description: 'sys_id of the group that end-of-lease decisions are assigned to (blank = unassigned).',
     roles: { read: [admin], write: [admin] },
 })

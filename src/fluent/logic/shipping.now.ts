@@ -2,8 +2,9 @@ import '@servicenow/sdk/global'
 import { Property, Record, RestMessage, ScriptAction, UiAction } from '@servicenow/sdk/core'
 import { retryTrackingUpdate, uiCreateReturnLabel, uiMarkLabelVoided } from '../../server/entry/shipping'
 import { admin, assetManager, inventoryTech, noc } from '../security/roles.now'
-import { SHIPMENT_DIRECTION, SHIPMENT_STATUS } from '../../server/domain/vocabulary'
+import { RETURN_METHOD, SHIPMENT_DIRECTION, SHIPMENT_STATUS } from '../../server/domain/vocabulary'
 import { EVENT } from '../../server/platform/events'
+import { PROPERTY } from '../../server/platform/properties'
 
 /*
  * Shipping aggregator (P3.26, D73). The message targets ShipEngine's label API; point the endpoint at
@@ -40,7 +41,7 @@ UiAction({
     table: 'x_daas_ham_return_order',
     actionName: 'x_daas_ham_return_label',
     hint: 'Buy a prepaid label from the Site back to the depot for the awaited equipment.',
-    condition: "current.method == 'ship_back' && current.active == true && gs.getProperty('x_daas_ham.shipping.enabled') == 'true'",
+    condition: `current.method == '${RETURN_METHOD.ship_back}' && current.active == true && gs.getProperty('${PROPERTY.shippingEnabled.name}') == 'true'`,
     roles: [assetManager, inventoryTech, noc],
     form: { showButton: true },
     showUpdate: true,
@@ -89,72 +90,72 @@ ScriptAction({
 
 Property({
     $id: Now.ID['prop_shipping_enabled'],
-    name: 'x_daas_ham.shipping.enabled',
+    name: PROPERTY.shippingEnabled.name,
     type: 'boolean',
-    value: false,
+    value: PROPERTY.shippingEnabled.default,
     description: 'Buy labels through the shipping aggregator when an order ships without a tracking number.',
     roles: { read: [admin], write: [admin] },
 })
 
 Property({
     $id: Now.ID['prop_shipping_api_key'],
-    name: 'x_daas_ham.shipping.api_key',
+    name: PROPERTY.shippingApiKey.name,
     type: 'password2',
-    value: '',
+    value: PROPERTY.shippingApiKey.default,
     description: 'Shipping aggregator API key.',
     roles: { read: [admin], write: [admin] },
 })
 
 Property({
     $id: Now.ID['prop_shipping_webhook_token'],
-    name: 'x_daas_ham.shipping.webhook_token',
+    name: PROPERTY.shippingWebhookToken.name,
     type: 'password2',
-    value: '',
+    value: PROPERTY.shippingWebhookToken.default,
     description: 'Shared secret the tracking webhook sends in the X-NaaS-Webhook-Token header, or as ?token= (webhooks are refused while it is empty).',
     roles: { read: [admin], write: [admin] },
 })
 
 Property({
     $id: Now.ID['prop_shipping_carrier_id'],
-    name: 'x_daas_ham.shipping.carrier_id',
+    name: PROPERTY.shippingCarrierId.name,
     type: 'string',
-    value: '',
+    value: PROPERTY.shippingCarrierId.default,
     description: 'ShipEngine carrier account id (se-...) billed for labels (labels are refused while it is empty).',
     roles: { read: [admin], write: [admin] },
 })
 
 Property({
     $id: Now.ID['prop_shipping_service_code'],
-    name: 'x_daas_ham.shipping.service_code',
+    name: PROPERTY.shippingServiceCode.name,
     type: 'string',
-    value: 'ups_standard',
+    value: PROPERTY.shippingServiceCode.default,
     description: 'Aggregator service code used for labels (service level of the carrier account in x_daas_ham.shipping.carrier_id).',
     roles: { read: [admin], write: [admin] },
 })
 
 Property({
     $id: Now.ID['prop_shipping_package_kg'],
-    name: 'x_daas_ham.shipping.package_kg',
+    name: PROPERTY.shippingPackageKg.name,
     type: 'integer',
-    value: 5,
+    value: PROPERTY.shippingPackageKg.default,
     description: 'Declared weight (kg) of each package; one package per asset.',
     roles: { read: [admin], write: [admin] },
 })
 
 Property({
     $id: Now.ID['prop_shipping_sender_name'],
-    name: 'x_daas_ham.shipping.sender_name',
+    name: PROPERTY.shippingSenderName.name,
     type: 'string',
-    value: '',
+    value: PROPERTY.shippingSenderName.default,
     description: 'Company name printed as the depot sender / return recipient.',
     roles: { read: [admin], write: [admin] },
 })
 
 Property({
     $id: Now.ID['prop_shipping_sender_phone'],
-    name: 'x_daas_ham.shipping.sender_phone',
+    name: PROPERTY.shippingSenderPhone.name,
     type: 'string',
-    value: '',
+    value: PROPERTY.shippingSenderPhone.default,
     description: "Depot phone number for labels when the depot's location has none (carriers require the sender's phone).",
     roles: { read: [admin], write: [admin] },
 })

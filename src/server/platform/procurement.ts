@@ -14,7 +14,7 @@ import { findById, refusal, str } from './records.ts'
  */
 export function requestPurchase(input: { modelId: string; quantity: number; description: string }): PurchaseResult {
     const shipTo = stagingStockroom()
-    if (!shipTo) return noPurchase(input.description, `set ${PROPERTY.stagingStockroom}`)
+    if (!shipTo) return noPurchase(input.description, `set ${PROPERTY.stagingStockroom.name}`)
     const model = findById('cmdb_model', input.modelId)
     if (model && !str(model, 'cmdb_model_category')) {
         return noPurchase(input.description, `give Model ${str(model, 'name')} a Model category: Procurement refuses a line item without one`)

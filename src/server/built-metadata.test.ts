@@ -26,6 +26,7 @@ import {
     type ShipmentStatus,
 } from './domain/vocabulary'
 import { EVENT } from './platform/events'
+import { PROPERTY, type PropertyOf } from './platform/properties'
 
 // The registries the metadata imports from platform modules are plain constants; Glide itself is not needed to read them.
 vi.mock('@servicenow/glide', () => ({ gs: {}, GlideRecord: class {}, GlideDateTime: class {} }))
@@ -772,6 +773,33 @@ describe('events', () => {
     it('are each answered by a script action or a notification, which answer no other event', () => {
         const answered = [...records('sysevent_script_action'), ...records('sysevent_email_action')].map((action) => action.event_name ?? '')
         expect([...new Set(answered)].sort()).toEqual(Object.values(EVENT).sort())
+    })
+})
+
+/*
+ * platform/properties PROPERTY is the one list of the app's system properties. A property the server code reads but
+ * the metadata does not declare exists on no instance, and one declared with another value than the reader falls back
+ * to behaves differently once an administrator clears it.
+ */
+describe('system properties', () => {
+    type Entry = PropertyOf<string | number | boolean>
+    const isEntry = (value: object): value is Entry => 'name' in value && 'default' in value
+    /** Every entry of the registry, those of its per-vendor tables included. */
+    const entries: Entry[] = Object.values(PROPERTY).flatMap((value) => (isEntry(value) ? [value] : Object.values(value)))
+
+    it('are declared, each once, with the value the server code falls back to', () => {
+        const declared = records('sys_properties').map((property) => ({ name: property.name, value: property.value }))
+        const expected = entries.map((entry) => ({ name: entry.name, value: String(entry.default) }))
+        const byName = (a: { name?: string }, b: { name?: string }) => (a.name ?? '').localeCompare(b.name ?? '')
+        expect(declared.sort(byName)).toEqual(expected.sort(byName))
+    })
+
+    it('are of the type their value has', () => {
+        const typeOf = new Map(records('sys_properties').map((property) => [property.name ?? '', property.type ?? '']))
+        for (const entry of entries) {
+            const types = typeof entry.default === 'number' ? ['integer'] : typeof entry.default === 'boolean' ? ['boolean'] : ['string', 'password2']
+            expect(types, entry.name).toContain(typeOf.get(entry.name))
+        }
     })
 })
 

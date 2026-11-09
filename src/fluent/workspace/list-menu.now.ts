@@ -8,6 +8,7 @@ import { OPEN_RMAS_QUERY } from '../../server/domain/sourcing'
 import { INSTALLED_PAST_SUPPORT } from '../../server/domain/model-lifecycle'
 import { INSTALLED_WITHOUT_COVERAGE } from '../../server/domain/coverage'
 import { INSTALL_STATUS, SHIPMENT_STATUS } from '../../server/domain/vocabulary'
+import { PROPERTY } from '../../server/platform/properties'
 
 /*
  * Lists of the NaaS asset workspace, grouped by the job they serve.
@@ -188,10 +189,11 @@ export const naasListMenu = UxListMenuConfig({
                 },
                 {
                     $id: Now.ID['ws_assets_refresh_due'],
-                    title: 'Refresh due within 90 days',
+                    // The days the refresh job plans ahead by default: a list's condition cannot read the property itself.
+                    title: `Refresh due within ${PROPERTY.refreshHorizonDays.default} days`,
                     order: 30,
                     table: 'alm_hardware',
-                    condition: `x_daas_ham_refresh_dueRELATIVELT@dayofweek@ahead@90^${FLEET_INSTALLED}^EQ`,
+                    condition: `x_daas_ham_refresh_dueRELATIVELT@dayofweek@ahead@${PROPERTY.refreshHorizonDays.default}^${FLEET_INSTALLED}^EQ`,
                     columns: 'asset_tag,serial_number,model,company,x_daas_ham_site,install_status,substatus,x_daas_ham_last_seen,x_daas_ham_refresh_due,x_daas_ham_lifecycle_phase',
                     applicabilities: [{ $id: Now.ID['ws_assets_refresh_aud'], applicability: staffAudience }],
                 },

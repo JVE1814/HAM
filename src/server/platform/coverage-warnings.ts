@@ -19,7 +19,7 @@ import { findById, str, warnRefused } from './records.ts'
  * whose mark is refused is logged and counted again the next day, which beats not warning at all.
  */
 export function warnExpiringCoverage(today: string): void {
-    const horizon = addDays(today, intProperty(PROPERTY.coverageWarningDays, 60))
+    const horizon = addDays(today, intProperty(PROPERTY.coverageWarningDays))
     const coverage = new GlideRecord('x_daas_ham_oem_coverage')
     coverage.addEncodedQuery(fleetStagesQuery(SERVING_STAGES, `covered=true^expiry_notified=false^end_date>=${today}^end_date<=${horizon}`, 'asset.'))
     coverage.setLimit(5000)

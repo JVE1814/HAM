@@ -22,8 +22,8 @@ const SEQUENCE_JOB = 'provider_tag_sequence'
  * and that error escapes only when every try threw), as does a failure to save the counter.
  */
 export function nextProviderTag(): string | null {
-    const prefix = stringProperty(PROPERTY.tagPrefix, 'NAAS')
-    const digits = intProperty(PROPERTY.tagDigits, 7)
+    const prefix = stringProperty(PROPERTY.tagPrefix)
+    const digits = intProperty(PROPERTY.tagDigits)
     const tagOf = (sequence: number) => formatProviderTag(prefix, sequence, digits)
     const counted = withLockTries(LOCK.providerTagSequence(), (lock) => {
         const sequence = advanceCounter(lock, (next) => onAsset(tagOf(next)))

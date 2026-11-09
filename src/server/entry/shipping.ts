@@ -1,7 +1,7 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { parseTrackingWebhook, tokenMatches, WEBHOOK_TOKEN_HEADER, webhookToken } from '../domain/shipping.ts'
-import { PROPERTY } from '../platform/properties.ts'
+import { PROPERTY, secretProperty } from '../platform/properties.ts'
 import { str } from '../platform/records.ts'
 import { queryParam, reply } from '../platform/rest-api.ts'
 import { labelReturn, retryTracking, trackShipment, voidLabel } from '../platform/shipping.ts'
@@ -36,7 +36,7 @@ export function uiMarkLabelVoided(current: GlideRecord): void {
  */
 export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIResponse): void {
     const token = webhookToken(request.getHeader(WEBHOOK_TOKEN_HEADER), queryParam(request, 'token'))
-    if (!tokenMatches(token, gs.getPropertySecured(PROPERTY.shippingWebhookToken, ''))) return reply(response, 401, { error: 'bad token' })
+    if (!tokenMatches(token, secretProperty(PROPERTY.shippingWebhookToken))) return reply(response, 401, { error: 'bad token' })
     const update = parseTrackingWebhook(request.body.data)
     if ('error' in update) return reply(response, 400, { error: update.error })
     const tracking = trackShipment(update)

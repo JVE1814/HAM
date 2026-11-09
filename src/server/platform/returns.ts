@@ -345,7 +345,7 @@ export function evaluateReturnLine(line: GlideRecord): Evaluation {
 /** Escalate overdue returns once, then declare the Assets missing and charge the lost-asset fee (the daily job). */
 export function chaseOverdue(): void {
     const today = todayIso()
-    const grace = intProperty(PROPERTY.returnGraceDays, 14)
+    const grace = intProperty(PROPERTY.returnGraceDays)
     runTableJob({
         job: 'chase_overdue_returns',
         table: RETURN_LINE,

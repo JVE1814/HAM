@@ -1,6 +1,6 @@
 import type { OemContext } from '../domain/oem/adapters.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
-import { boolProperty, stringProperty } from './properties.ts'
+import { boolProperty, PROPERTY, stringProperty, type PropertyOf } from './properties.ts'
 import { restMessagePort } from './rest-messages.ts'
 
 /** RESTMessageV2 transport for the OEM adapters (REST messages in fluent/logic/oem-messages.now.ts). */
@@ -13,13 +13,12 @@ const MESSAGE: Partial<Record<OemVendor, string>> = {
     mist: 'NaaS HPE Mist',
 }
 
-const ORG_IDS: Partial<Record<OemVendor, string>> = {
-    meraki: 'x_daas_ham.meraki.org_ids',
-    mist: 'x_daas_ham.mist.org_ids',
-}
+const ENABLED: Partial<Record<OemVendor, PropertyOf<boolean>>> = PROPERTY.oemEnabled
+const ORG_IDS: Partial<Record<OemVendor, PropertyOf<string>>> = PROPERTY.oemOrgIds
 
 export function oemEnabled(vendor: OemVendor): boolean {
-    return !!MESSAGE[vendor] && boolProperty(`x_daas_ham.oem.${vendor}.enabled`, false)
+    const enabled = ENABLED[vendor]
+    return !!MESSAGE[vendor] && !!enabled && boolProperty(enabled)
 }
 
 /** The adapter context for calls served by `vendor`'s REST message. */

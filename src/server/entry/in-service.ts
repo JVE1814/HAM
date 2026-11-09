@@ -20,7 +20,7 @@ import { reply } from '../platform/rest-api.ts'
  */
 export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!gs.hasRole(ROLE.integration) && !gs.hasRole(ROLE.assetManager)) return reply(response, 403, { error: 'Requires the x_daas_ham.integration role' })
-    const parsed = parseDeviceEvents(request.body.data, intProperty(PROPERTY.eventsMaxBatch, 500), nowMs())
+    const parsed = parseDeviceEvents(request.body.data, intProperty(PROPERTY.eventsMaxBatch), nowMs())
     if ('error' in parsed) return reply(response, 400, { error: parsed.error })
     const readers = lifecycleReaders()
     const unknown: string[] = []
@@ -61,5 +61,5 @@ export function evaluatePendingInService(): void {
 
 /** Daily job: drop device events older than the retention period. */
 export function purgeDeviceEvents(): void {
-    purgeDeviceEventsOlderThan(intProperty(PROPERTY.eventsRetentionDays, 90))
+    purgeDeviceEventsOlderThan(intProperty(PROPERTY.eventsRetentionDays))
 }

@@ -38,7 +38,7 @@ import { restMessagePort } from './rest-messages.ts'
 const SHIPMENT = 'x_daas_ham_shipment'
 
 export function shippingEnabled(): boolean {
-    return boolProperty(PROPERTY.shippingEnabled, false)
+    return boolProperty(PROPERTY.shippingEnabled)
 }
 
 function aggregator() {
@@ -86,9 +86,9 @@ function createShipment(
     lock: HeldLock,
 ): LabelResult {
     const carrierId = stringProperty(PROPERTY.shippingCarrierId)
-    if (!carrierId) return { ok: false, error: `set ${PROPERTY.shippingCarrierId} to the ShipEngine carrier account (se-...) billed for labels` }
+    if (!carrierId) return { ok: false, error: `set ${PROPERTY.shippingCarrierId.name} to the ShipEngine carrier account (se-...) billed for labels` }
     const stockroom = depot()
-    if (!stockroom) return { ok: false, error: `set ${PROPERTY.stagingStockroom} to the depot that ships` }
+    if (!stockroom) return { ok: false, error: `set ${PROPERTY.stagingStockroom.name} to the depot that ships` }
     const siteId = str(parent, 'site')
     const depotLocation = findById('cmn_location', str(stockroom, 'location'))
     const site = findById('cmn_location', siteId)
@@ -103,7 +103,7 @@ function createShipment(
         from: direction === 'to_site' ? depotAddress : siteAddress,
         to: direction === 'to_site' ? siteAddress : depotAddress,
         packages,
-        weightKg: intProperty(PROPERTY.shippingPackageKg, 5),
+        weightKg: intProperty(PROPERTY.shippingPackageKg),
         reference: str(parent, 'number'),
     })
     if (!result.ok) return result

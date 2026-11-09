@@ -64,9 +64,9 @@ export function syncLifecycle(): void {
  */
 export function syncCoverage(): void {
     const started = nowMs()
-    const budgetMs = intProperty(PROPERTY.jobBudgetSeconds, 120) * 1000
+    const budgetMs = intProperty(PROPERTY.jobBudgetSeconds) * 1000
     const staleBefore = new GlideDateTime()
-    staleBefore.addDaysUTC(-intProperty('x_daas_ham.oem.coverage_refresh_days', 7))
+    staleBefore.addDaysUTC(-intProperty(PROPERTY.coverageRefreshDays))
     let due = enabledRoutes('coverage', oemEnabled)
     for (let round = 0; due.length > 0; round++) {
         const behind: typeof due = []

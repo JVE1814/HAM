@@ -6,6 +6,7 @@ import type { Stage } from '../domain/lifecycle.ts'
 import type { CatalogEntryType } from '../domain/vocabulary.ts'
 import { OEM_PID_FIELD, SITE_FIELD, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import { ROLE } from '../domain/visibility.ts'
+import { PROPERTY } from '../platform/properties.ts'
 
 /**
  * Demo data for dev/test instances: two Customers with Sites, racks and stockrooms, models from the
@@ -35,7 +36,7 @@ export const DEMO_DEPOT_GROUP = 'NaaS demo depot team'
 
 export function loadDemoData(): void {
     const provider = ensure('core_company', { name: 'Demo NaaS Provider' })
-    gs.setProperty('x_daas_ham.provider_company', provider)
+    gs.setProperty(PROPERTY.providerCompany.name, provider)
 
     const vendor = (name: string) => ensure('core_company', { name }, { manufacturer: true, vendor: true })
     const cisco = vendor('Cisco Systems')
@@ -62,7 +63,7 @@ export function loadDemoData(): void {
     const depot = stockroom('Central Depot Utrecht', 'central_depot')
     const stagingCentre = stockroom('Staging Centre Utrecht', 'staging_centre')
     const acmeSpares = stockroom('Acme HQ hot spares', 'customer_site', { x_daas_ham_customer: acme, location: acmeMdf })
-    gs.setProperty('x_daas_ham.staging.default_stockroom', stagingCentre)
+    gs.setProperty(PROPERTY.stagingStockroom.name, stagingCentre)
 
     const sourceOf = new Map([[cisco, 'cisco'], [hpe, 'aruba'], [fortinet, 'fortinet'], [checkpoint, 'checkpoint']])
     const model = (pid: string, name: string, manufacturer: string, deviceClass: string, power = 0) =>

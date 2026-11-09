@@ -10,7 +10,7 @@ import {
     type ClaimStore,
     type ClaimTarget,
 } from '../domain/oem/claims.ts'
-import { boolProperty, intProperty, PROPERTY } from './properties.ts'
+import { boolProperty, intProperty, PROPERTY, type PropertyOf } from './properties.ts'
 import { restMessagePort } from './rest-messages.ts'
 import { num, pluck, recordsById, str, warnRefused } from './records.ts'
 import { memoized } from '../domain/memo.ts'
@@ -29,15 +29,19 @@ interface ClaimAsset {
 /** A staging task or Asset not found reads as empty, as a dot-walk through a broken reference did. */
 const NO_ASSET: ClaimAsset = { customerId: '', serial: '', mac: '', claimCode: '' }
 
+/** The property that turns each vendor's claims on: a vendor without one is never claimed for. */
+const CLAIM_ENABLED: Partial<Record<OemVendor, PropertyOf<boolean>>> = PROPERTY.claimEnabled
+
 /**
  * For each enabled vendor, send its due automated staging steps (pending, and failed ones due a retry) through the
  * vendor's adapters, within `x_daas_ham.oem.claim.max_calls` calls a vendor (domain/oem/claims `runVendorClaims`).
  */
 export function runClaims(): void {
-    const maxCalls = intProperty(PROPERTY.claimMaxCalls, 8)
+    const maxCalls = intProperty(PROPERTY.claimMaxCalls)
     const store = glideClaimStore()
     for (const vendor of CLAIM_VENDORS) {
-        if (boolProperty(`x_daas_ham.oem.claim.${vendor}.enabled`, false)) runVendorClaims(vendor, store, restMessagePort, maxCalls)
+        const enabled = CLAIM_ENABLED[vendor]
+        if (enabled && boolProperty(enabled)) runVendorClaims(vendor, store, restMessagePort, maxCalls)
     }
 }
 

@@ -1,4 +1,5 @@
 import type { HttpPort } from '../domain/http.ts'
+import { PROPERTY } from './properties.ts'
 import { restPort, type MessageVariables } from './rest-port.ts'
 
 /**
@@ -13,21 +14,21 @@ import { restPort, type MessageVariables } from './rest-port.ts'
  */
 const VARIABLES: Record<string, MessageVariables> = {
     'NaaS Meraki Dashboard': {
-        secrets: [{ variable: 'api_key', property: 'x_daas_ham.meraki.api_key' }],
-        settings: [{ variable: 'meraki_host', property: 'x_daas_ham.meraki.api_host', fallback: 'api.meraki.com' }],
+        secrets: [{ variable: 'api_key', property: PROPERTY.merakiApiKey }],
+        settings: [{ variable: 'meraki_host', property: PROPERTY.merakiApiHost }],
     },
     'NaaS HPE Mist': {
-        secrets: [{ variable: 'api_token', property: 'x_daas_ham.mist.api_token' }],
-        settings: [{ variable: 'mist_host', property: 'x_daas_ham.mist.api_host', fallback: 'api.mist.com' }],
+        secrets: [{ variable: 'api_token', property: PROPERTY.mistApiToken }],
+        settings: [{ variable: 'mist_host', property: PROPERTY.mistApiHost }],
     },
     'NaaS Check Point Zero Touch': {
         // Both go into the JSON login body.
         secrets: [
-            { variable: 'api_client_id', property: 'x_daas_ham.checkpoint.api_client_id', inJson: true },
-            { variable: 'api_key', property: 'x_daas_ham.checkpoint.api_key', inJson: true },
+            { variable: 'api_client_id', property: PROPERTY.checkpointApiClientId, inJson: true },
+            { variable: 'api_key', property: PROPERTY.checkpointApiKey, inJson: true },
         ],
     },
-    'NaaS Shipping aggregator': { secrets: [{ variable: 'api_key', property: 'x_daas_ham.shipping.api_key' }] },
+    'NaaS Shipping aggregator': { secrets: [{ variable: 'api_key', property: PROPERTY.shippingApiKey }] },
 }
 
 /** Calls functions of the REST message `message`, with its secrets and settings (platform/rest-port). */

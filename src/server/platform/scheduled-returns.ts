@@ -68,7 +68,7 @@ function recoverEndedAgreements(today: string): void {
 
 /** Temporary deployments ending within the lead time bring their equipment back, once. */
 function returnTemporaryDeployments(today: string): void {
-    const leadDays = intProperty(PROPERTY.temporaryReturnLeadDays, 7)
+    const leadDays = intProperty(PROPERTY.temporaryReturnLeadDays)
     const horizon = toIsoDate(nowMs() + leadDays * 86_400_000)
     const order = new GlideRecord('x_daas_ham_order')
     order.addQuery('order_type', 'temporary')

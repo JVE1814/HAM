@@ -240,7 +240,7 @@ function restartPass(queued: JobEvent, error: string): EventJobResult {
 type BatchRecord<T> = { id: string; item: T } | { id: string; prepareError: unknown }
 
 function batchSize(): number {
-    return usableBatchSize(intProperty(PROPERTY.jobBatchSize, 500))
+    return usableBatchSize(intProperty(PROPERTY.jobBatchSize))
 }
 
 /** The runner over a table's records in sys_id order, with the batch size and time budget from properties. */
@@ -259,7 +259,7 @@ function runOverTable<T, R>(spec: TableSource<T, R>, cursor: Pick<ChunkedJobPort
         },
         {
             batchSize: batchSize(),
-            budgetMs: intProperty(PROPERTY.jobBudgetSeconds, 120) * 1000,
+            budgetMs: intProperty(PROPERTY.jobBudgetSeconds) * 1000,
         },
     )
 }

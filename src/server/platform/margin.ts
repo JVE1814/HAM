@@ -36,7 +36,7 @@ export function computeMarginChunk(queued: JobEvent): void {
 function costServiceIntervals(period: GlideRecord, queued: JobEvent): void {
     const periodId = period.getUniqueValue()
     const bounds = monthBounds(str(period, 'period'))
-    const amortisationMonths = intProperty(PROPERTY.amortisationMonths, 60)
+    const amortisationMonths = intProperty(PROPERTY.amortisationMonths)
     const ledger = new CostLedger()
     const leases = memoized(leaseTermsOf)
     runEventTableJob(queued, {
@@ -193,7 +193,7 @@ function checkSaved(sysId: string | null, record: GlideRecord, what: string): vo
 
 /** Field work orders closed in the month, as Cost facts: their labour cost, or the standard visit cost. */
 function addFieldLabour(periodId: string, bounds: MonthBounds): void {
-    const visitCost = intProperty(PROPERTY.visitCost, 250)
+    const visitCost = intProperty(PROPERTY.visitCost)
     const ledger = new CostLedger()
     const workOrder = new GlideRecord('wm_order')
     workOrder.addEncodedQuery(`x_daas_ham_purposeISNOTEMPTY^closed_at>=${bounds.first} 00:00:00^closed_at<=${bounds.last} 23:59:59`)

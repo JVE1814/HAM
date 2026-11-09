@@ -34,7 +34,7 @@ export function raiseDueRefreshOrders(lock: HeldLock): void {
  * due first. The Provider IT's equipment in use is in service by its install status too, and is left out.
  */
 function dueCandidates(): RefreshCandidate[] {
-    const horizon = addDays(todayIso(), intProperty(PROPERTY.refreshHorizonDays, 90))
+    const horizon = addDays(todayIso(), intProperty(PROPERTY.refreshHorizonDays))
     const onOrder = new Set(
         pluck('x_daas_ham_order_line', `replaces_assetISNOTEMPTY^order.${OPEN_ORDERS_QUERY}`, 'replaces_asset'),
     )

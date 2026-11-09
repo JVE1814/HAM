@@ -21,9 +21,9 @@ import { moveToSparePool, stockCandidates } from './stock.ts'
  * staging stockroom for them to ship to. Without one, the run buys none and says so, once.
  */
 export function sparePurchasesEnabled(): boolean {
-    if (!boolProperty(PROPERTY.autoPurchaseSpares, false)) return false
+    if (!boolProperty(PROPERTY.autoPurchaseSpares)) return false
     if (stagingStockroom()) return true
-    gs.warn(`[x_daas_ham] Spare-pool top-up buys no spares: set ${PROPERTY.stagingStockroom}`)
+    gs.warn(`[x_daas_ham] Spare-pool top-up buys no spares: set ${PROPERTY.stagingStockroom.name}`)
     return false
 }
 

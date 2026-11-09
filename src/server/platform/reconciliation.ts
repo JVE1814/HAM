@@ -23,7 +23,7 @@ import { IN_USE_STAGES } from '../domain/lifecycle.ts'
  * without asset* one whose CI no longer matches.
  */
 export function reconcileInstalledBase(): void {
-    const unseenDays = intProperty(PROPERTY.unseenDays, 7)
+    const unseenDays = intProperty(PROPERTY.unseenDays)
     const now = nowMs()
     runTableJob({
         job: 'reconcile_installed_base',
