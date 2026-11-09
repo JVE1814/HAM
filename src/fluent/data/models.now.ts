@@ -43,7 +43,8 @@ export const x_daas_ham_model_match_rule = Table({
             dropdown: 'dropdown_without_none',
         }),
         pattern: StringColumn({ label: 'Pattern', maxLength: 255, mandatory: true }),
-        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true }),
+        // NaaS Models only (ADR 0016), on every Model reference here: domain/fleet `naasModelCondition()`.
+        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true, referenceQual: 'x_daas_ham_oem_pidISNOTEMPTY' }),
         active: BooleanColumn({ label: 'Active', default: true }),
     },
     index: [{ name: 'x_daas_ham_mmr_mfr', unique: false, element: 'manufacturer' }],
@@ -54,7 +55,7 @@ export const x_daas_ham_model_lifecycle = Table({
     name: 'x_daas_ham_model_lifecycle',
     label: 'Model lifecycle',
     schema: {
-        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true }),
+        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true, referenceQual: 'x_daas_ham_oem_pidISNOTEMPTY' }),
         end_of_sale: DateColumn({ label: 'End of sale' }),
         end_of_support: DateColumn({ label: 'End of support' }),
         end_of_extended_support: DateColumn({ label: 'End of extended support' }),
@@ -95,7 +96,7 @@ export const x_daas_ham_norm_exception = Table({
             default: 'open',
             dropdown: 'dropdown_without_none',
         }),
-        resolved_model: ReferenceColumn({ label: 'Resolved model', referenceTable: 'cmdb_model' }),
+        resolved_model: ReferenceColumn({ label: 'Resolved model', referenceTable: 'cmdb_model', referenceQual: 'x_daas_ham_oem_pidISNOTEMPTY' }),
     },
     index: [{ name: 'x_daas_ham_ne_raw', unique: false, element: ['raw_manufacturer', 'raw_model'] }],
 })

@@ -8,7 +8,8 @@ export const x_daas_ham_service_interval = Table({
     name: 'x_daas_ham_service_interval',
     label: 'Service interval',
     schema: {
-        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true }),
+        // Fleet assets only (ADR 0016): domain/fleet `fleetCondition()`.
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true, referenceQual: 'x_daas_ham_fleet=true' }),
         subscription_line: ReferenceColumn({ label: 'Subscription line', referenceTable: 'x_daas_ham_subscription_line', mandatory: true }),
         customer: ReferenceColumn({ label: 'Customer', referenceTable: 'customer_account' }),
         site: ReferenceColumn({ label: 'Site', referenceTable: 'cmn_location' }),

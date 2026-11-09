@@ -22,7 +22,8 @@ export const x_daas_ham_staging_task = Table({
     label: 'Staging task',
     extends: 'task',
     schema: {
-        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true }),
+        // Fleet assets only (ADR 0016): domain/fleet `fleetCondition()`.
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true, referenceQual: 'x_daas_ham_fleet=true' }),
         order_line: ReferenceColumn({ label: 'Order line', referenceTable: 'x_daas_ham_order_line' }),
         staging_source: ChoiceColumn({
             label: 'Staging source',

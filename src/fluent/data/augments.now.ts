@@ -19,6 +19,14 @@ import {
 export const alm_hardware = Table({
     augments: 'alm_hardware',
     schema: {
+        // The Provider's IT shares this table: the app acts only on fleet assets (ADR 0016, domain/fleet). Set by the
+        // app's intake paths and by "Add to fleet", never by a form; rows from before the column stay unflagged.
+        x_daas_ham_fleet: BooleanColumn({
+            label: 'Fleet',
+            default: false,
+            readOnly: true,
+            hint: 'Part of the NaaS fleet: equipment the Provider runs as part of the network service, which NaaS asset management sources, stages, tracks and bills. Set when the app takes a unit in, or by Add to fleet.',
+        }),
         x_daas_ham_legal_owner: ChoiceColumn({
             label: 'Legal owner',
             choices: {
@@ -26,8 +34,9 @@ export const alm_hardware = Table({
                 customer: { label: 'Customer', sequence: 1 },
                 lessor: { label: 'Lessor', sequence: 2 },
             },
-            default: 'provider',
-            dropdown: 'dropdown_without_none',
+            // No default: rows the Provider's IT creates are not stamped as NaaS-owned. The app's intake paths set the
+            // owner (platform/assets newAsset, joinFleet), and a blank owner counts as the Provider's (domain/lifecycle).
+            dropdown: 'dropdown_with_none',
         }),
         x_daas_ham_lessor: ReferenceColumn({ label: 'Lessor', referenceTable: 'core_company' }),
         x_daas_ham_lease: ReferenceColumn({ label: 'Lease schedule', referenceTable: 'x_daas_ham_lease_schedule' }),
@@ -97,6 +106,7 @@ export const alm_hardware = Table({
         { name: 'x_daas_ham_hw_rack', unique: false, element: 'x_daas_ham_rack' },
         { name: 'x_daas_ham_hw_cov_checked', unique: false, element: 'x_daas_ham_coverage_checked' },
         { name: 'x_daas_ham_hw_lease', unique: false, element: 'x_daas_ham_lease' },
+        { name: 'x_daas_ham_hw_fleet', unique: false, element: 'x_daas_ham_fleet' },
     ],
 })
 
@@ -117,7 +127,8 @@ export const cmdb_model = Table({
             },
         }),
         x_daas_ham_oem_pid: StringColumn({ label: 'OEM PID', maxLength: 100 }),
-        x_daas_ham_track_as_asset: BooleanColumn({ label: 'Track as asset', default: true }),
+        // No default: the Provider IT's Models are not stamped. A NaaS Model is one with an OEM PID (domain/fleet).
+        x_daas_ham_track_as_asset: BooleanColumn({ label: 'Track as asset' }),
         x_daas_ham_typical_power_w: IntegerColumn({ label: 'Typical power (W)', min: 0 }),
         x_daas_ham_oem_source: ChoiceColumn({
             label: 'OEM data source',
@@ -130,10 +141,12 @@ export const cmdb_model = Table({
                 checkpoint: { label: 'Check Point (CSV)', sequence: 5 },
             },
         }),
+        // A raw model is normalized to a NaaS Model (ADR 0016): domain/fleet `naasModelCondition()`.
         x_daas_ham_normalized_to: ReferenceColumn({
             label: 'Normalized to',
             referenceTable: 'cmdb_model',
             readOnly: true,
+            referenceQual: 'x_daas_ham_oem_pidISNOTEMPTY',
         }),
     },
     index: [{ name: 'x_daas_ham_model_pid', unique: false, element: 'x_daas_ham_oem_pid' }],
@@ -149,7 +162,9 @@ export const alm_stockroom = Table({
                 staging_centre: { label: 'Staging centre', sequence: 1 },
                 customer_site: { label: 'Customer site', sequence: 2 },
             },
-            default: 'central_depot',
+            // No default: a stockroom with no type is the Provider IT's, not a NaaS stockroom (domain/fleet). Dropping the
+            // default clears no value: where an earlier version was installed, the Provider IT's stockrooms keep the
+            // 'central_depot' it stamped, and count as NaaS until an administrator clears their type.
         }),
         x_daas_ham_customer: ReferenceColumn({ label: 'Customer', referenceTable: 'customer_account' }),
     },
@@ -199,7 +214,12 @@ export const wm_order = Table({
 export const sn_customerservice_case = Table({
     augments: 'sn_customerservice_case',
     schema: {
-        x_daas_ham_failed_asset: ReferenceColumn({ label: 'Failed asset', referenceTable: 'alm_hardware' }),
+        // Only fleet assets are replaced (ADR 0016): the query is domain/fleet `fleetCondition()`.
+        x_daas_ham_failed_asset: ReferenceColumn({
+            label: 'Failed asset',
+            referenceTable: 'alm_hardware',
+            referenceQual: 'x_daas_ham_fleet=true',
+        }),
         x_daas_ham_replacement_order: ReferenceColumn({
             label: 'Replacement order',
             referenceTable: 'x_daas_ham_order',

@@ -26,7 +26,8 @@ export const deviceRows = VariableSet({
         model: ReferenceVariable({
             question: 'Model',
             referenceTable: 'cmdb_model',
-            referenceQualCondition: 'x_daas_ham_device_classISNOTEMPTY^x_daas_ham_device_class!=optic',
+            // NaaS Models (domain/fleet naasModelCondition, ADR 0016) of a device class other than optic.
+            referenceQualCondition: 'x_daas_ham_oem_pidISNOTEMPTY^x_daas_ham_device_classISNOTEMPTY^x_daas_ham_device_class!=optic',
             mandatory: true,
             order: 100,
         }),

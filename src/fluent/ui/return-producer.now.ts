@@ -49,8 +49,9 @@ export const requestReturn = CatalogItemRecordProducer({
         assets: ListCollectorVariable({
             question: 'Devices to return (selected devices only)',
             listTable: 'alm_hardware',
-            // The chosen Site's devices (none before a Site is chosen); submitting checks the same again.
-            referenceQual: "javascript:'install_status=1^x_daas_ham_siteISNOTEMPTY^x_daas_ham_site=' + current.variables.site",
+            // The fleet assets installed at the chosen Site (none before a Site is chosen), domain/fleet fleetCondition: the
+            // Provider IT's equipment shares the table (ADR 0016). Submitting checks the fleet and the Site again.
+            referenceQual: "javascript:'x_daas_ham_fleet=true^install_status=1^x_daas_ham_siteISNOTEMPTY^x_daas_ham_site=' + current.variables.site",
             attributes: 'ref_qual_elements=site',
             order: 400,
         }),

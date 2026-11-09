@@ -15,7 +15,12 @@ export const x_daas_ham_audit = Table({
             mandatory: true,
             dropdown: 'dropdown_without_none',
         }),
-        stockroom: ReferenceColumn({ label: 'Stockroom', referenceTable: 'alm_stockroom' }),
+        // The pickers here offer NaaS stockrooms and fleet assets only (ADR 0016): domain/fleet's conditions.
+        stockroom: ReferenceColumn({
+            label: 'Stockroom',
+            referenceTable: 'alm_stockroom',
+            referenceQual: 'x_daas_ham_stockroom_typeINcentral_depot,staging_centre,customer_site',
+        }),
         site: ReferenceColumn({ label: 'Site', referenceTable: 'cmn_location' }),
         customer: ReferenceColumn({ label: 'Customer', referenceTable: 'customer_account' }),
         expected_count: IntegerColumn({ label: 'Expected', readOnly: true, default: 0 }),
@@ -32,7 +37,7 @@ export const x_daas_ham_audit_line = Table({
     label: 'Audit line',
     schema: {
         audit: ReferenceColumn({ label: 'Audit', referenceTable: 'x_daas_ham_audit', mandatory: true, cascadeRule: 'delete' }),
-        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware' }),
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', referenceQual: 'x_daas_ham_fleet=true' }),
         scanned_code: StringColumn({ label: 'Scanned code', maxLength: 100 }),
         result: ChoiceColumn({
             label: 'Result',
@@ -75,7 +80,7 @@ export const x_daas_ham_attestation_item = Table({
     label: 'Attestation item',
     schema: {
         attestation: ReferenceColumn({ label: 'Attestation', referenceTable: 'x_daas_ham_attestation', mandatory: true, cascadeRule: 'delete' }),
-        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true }),
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true, referenceQual: 'x_daas_ham_fleet=true' }),
         response: ChoiceColumn({
             label: 'Response',
             choices: {
@@ -108,7 +113,7 @@ export const x_daas_ham_recon_exception = Table({
             mandatory: true,
             dropdown: 'dropdown_without_none',
         }),
-        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware' }),
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', referenceQual: 'x_daas_ham_fleet=true' }),
         ci: ReferenceColumn({ label: 'Configuration item', referenceTable: 'cmdb_ci' }),
         customer: ReferenceColumn({ label: 'Customer', referenceTable: 'core_company' }),
         detail: StringColumn({ label: 'Detail', maxLength: 255 }),

@@ -1,6 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { newAsset } from '../platform/assets.ts'
-import { str } from '../platform/records.ts'
+import { isFleetAsset, joinFleet, newAsset } from '../platform/assets.ts'
+import { refusal, str } from '../platform/records.ts'
 import type { Stage } from '../domain/lifecycle.ts'
 
 /**
@@ -25,6 +25,14 @@ function ensure(table: string, key: Fields, fields: Fields = {}): string {
 }
 
 const ADMIN_USER = '6816f79cc0a8016401c5a33be04be441'
+
+/** A demo asset loaded before the Fleet flag existed joins the fleet (ADR 0016); a refused save is logged. */
+function keepInFleet(asset: GlideRecord): void {
+    if (isFleetAsset(asset)) return
+    joinFleet(asset)
+    if (asset.update()) return
+    gs.warn(`[x_daas_ham] Demo asset ${str(asset, 'serial_number')} not added to the fleet: ${refusal(asset)}`)
+}
 
 export function loadDemoData(): void {
     const provider = ensure('core_company', { name: 'Demo NaaS Provider' })
@@ -181,18 +189,22 @@ export function loadDemoData(): void {
         hq.update()
     }
 
+    // Every demo network asset is a fleet asset (ADR 0016): newAsset flags the new ones (the Provider owning them), and
+    // a demo unit loaded before the Fleet flag existed is flagged when the demo data is loaded again.
     const stock = (modelId: string, count: number, prefix: string, stage: Stage, fields: Fields) => {
         for (let i = 0; i < count; i++) {
             const serial = `${prefix}${String(i).padStart(4, '0')}`
             const existing = new GlideRecord('alm_hardware')
-            if (existing.get('serial_number', serial)) continue
+            if (existing.get('serial_number', serial)) {
+                keepInFleet(existing)
+                continue
+            }
             const asset = newAsset(modelId, stage)
             asset.setValue('serial_number', serial)
             asset.setValue('asset_tag', `NAAS-D${serial.slice(-7)}`)
-            asset.setValue('x_daas_ham_legal_owner', 'provider')
             asset.setValue('x_daas_ham_staging_source', 'in_house')
             for (const [field, value] of Object.entries(fields)) asset.setValue(field, value)
-            asset.insert()
+            if (!asset.insert()) gs.warn(`[x_daas_ham] Demo asset ${serial} not created: ${refusal(asset)}`)
         }
     }
     stock(c9300, 6, 'DEMOC93', 'available', { stockroom: depot, company: provider })

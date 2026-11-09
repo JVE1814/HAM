@@ -7,7 +7,13 @@ export const x_daas_ham_stockroom_member = Table({
     label: 'Stockroom member',
     schema: {
         user: ReferenceColumn({ label: 'User', referenceTable: 'sys_user', mandatory: true }),
-        stockroom: ReferenceColumn({ label: 'Stockroom', referenceTable: 'alm_stockroom', mandatory: true }),
+        // NaaS stockrooms only (ADR 0016): domain/fleet `naasStockroomCondition()`.
+        stockroom: ReferenceColumn({
+            label: 'Stockroom',
+            referenceTable: 'alm_stockroom',
+            mandatory: true,
+            referenceQual: 'x_daas_ham_stockroom_typeINcentral_depot,staging_centre,customer_site',
+        }),
     },
     index: [{ name: 'x_daas_ham_sm_user', unique: false, element: 'user' }],
 })
@@ -17,7 +23,8 @@ export const x_daas_ham_device_event = Table({
     name: 'x_daas_ham_device_event',
     label: 'Device event',
     schema: {
-        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware' }),
+        // Fleet assets only (ADR 0016): domain/fleet `fleetCondition()`.
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', referenceQual: 'x_daas_ham_fleet=true' }),
         identifier: StringColumn({ label: 'Identifier', maxLength: 100, mandatory: true }),
         event: ChoiceColumn({
             label: 'Event',

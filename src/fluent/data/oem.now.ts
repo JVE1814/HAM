@@ -17,7 +17,8 @@ export const x_daas_ham_oem_coverage = Table({
     name: 'x_daas_ham_oem_coverage',
     label: 'OEM coverage',
     schema: {
-        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware' }),
+        // Fleet assets only (ADR 0016), as the RMA's Defective asset: domain/fleet `fleetCondition()`.
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', referenceQual: 'x_daas_ham_fleet=true' }),
         serial_number: StringColumn({ label: 'Serial number', maxLength: 100, mandatory: true }),
         vendor: ChoiceColumn({ label: 'Vendor', choices: vendorChoices, mandatory: true }),
         contract_number: StringColumn({ label: 'Contract number', maxLength: 100 }),
@@ -49,7 +50,12 @@ export const x_daas_ham_oem_rma = Table({
     schema: {
         vendor: ChoiceColumn({ label: 'Vendor', choices: vendorChoices, mandatory: true }),
         rma_number: StringColumn({ label: 'RMA number', maxLength: 60 }),
-        defective_asset: ReferenceColumn({ label: 'Defective asset', referenceTable: 'alm_hardware', mandatory: true }),
+        defective_asset: ReferenceColumn({
+            label: 'Defective asset',
+            referenceTable: 'alm_hardware',
+            mandatory: true,
+            referenceQual: 'x_daas_ham_fleet=true',
+        }),
         order_line: ReferenceColumn({ label: 'Replacement order line', referenceTable: 'x_daas_ham_order_line' }),
         case: ReferenceColumn({ label: 'Case', referenceTable: 'sn_customerservice_case' }),
         advance_replacement: BooleanColumn({ label: 'OEM advance replacement', default: true }),

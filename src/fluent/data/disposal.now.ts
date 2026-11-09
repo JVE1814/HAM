@@ -48,7 +48,8 @@ export const x_daas_ham_disposal_line = Table({
             mandatory: true,
             cascadeRule: 'delete',
         }),
-        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true }),
+        // Fleet assets only (ADR 0016): domain/fleet `fleetCondition()`.
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true, referenceQual: 'x_daas_ham_fleet=true' }),
         method: ChoiceColumn({ label: 'Method (blank = order method)', choices: methodChoices }),
         sale_amount: DecimalColumn({ label: 'Sale amount' }),
         credit_amount: DecimalColumn({ label: 'OEM credit' }),

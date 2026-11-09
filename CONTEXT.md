@@ -45,8 +45,12 @@ _Avoid_: leasing company, bank
 ### Equipment
 
 **Asset**:
-The tracked record of one serialised physical piece of equipment across its whole life.
+The tracked record of one serialised physical piece of equipment across its whole life. The application acts only on Fleet assets; the Provider's own IT equipment shares the same records and is left alone.
 _Avoid_: device (for the record), CI, hardware
+
+**Fleet asset**:
+An Asset the Provider runs as part of the network service, from receipt or ASN through staging, install, spares, returns and disposal. An Asset becomes one when the application creates or receives it, or when an asset manager adds existing equipment to the fleet.
+_Avoid_: NaaS asset, managed device
 
 **Chassis**:
 An Asset that is a complete network device (switch, AP, router, firewall).
@@ -156,8 +160,12 @@ Choosing where an Order line's Assets come from: the Customer's Spare pool, a cu
 _Avoid_: allocation, fulfilment
 
 **Stockroom**:
-A place holding stock: a central depot, a staging centre or a customer-site stockroom.
+A place holding stock: a central depot, a staging centre or a customer-site stockroom. A stockroom of none of these types is the Provider's own IT's, not a NaaS stockroom, and the application leaves it alone.
 _Avoid_: warehouse (one kind of Stockroom)
+
+**Transfer order**:
+A move of stock from one Stockroom to another, one line per Asset, worked by the platform's Inventory. An Asset on an open line is in transfer, a Lifecycle stage of its own, until Inventory lets it go.
+_Avoid_: stock move, shipment (a carrier consignment)
 
 **ASN**:
 An advance shipment notice from a distributor listing serials in transit for a purchase order.

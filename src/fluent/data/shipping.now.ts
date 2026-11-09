@@ -30,7 +30,12 @@ export const x_daas_ham_shipment = Table({
         order: ReferenceColumn({ label: 'Order', referenceTable: 'x_daas_ham_order' }),
         return_order: ReferenceColumn({ label: 'Return order', referenceTable: 'x_daas_ham_return_order' }),
         site: ReferenceColumn({ label: 'Site', referenceTable: 'cmn_location' }),
-        stockroom: ReferenceColumn({ label: 'Depot', referenceTable: 'alm_stockroom' }),
+        // NaaS stockrooms only (ADR 0016): domain/fleet `naasStockroomCondition()`.
+        stockroom: ReferenceColumn({
+            label: 'Depot',
+            referenceTable: 'alm_stockroom',
+            referenceQual: 'x_daas_ham_stockroom_typeINcentral_depot,staging_centre,customer_site',
+        }),
         carrier: StringColumn({ label: 'Carrier', maxLength: 60, readOnly: true }),
         service_code: StringColumn({ label: 'Service', maxLength: 60, readOnly: true }),
         packages: IntegerColumn({ label: 'Packages', readOnly: true }),

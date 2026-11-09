@@ -104,9 +104,10 @@ export const x_daas_ham_order_line = Table({
             mandatory: true,
             cascadeRule: 'delete',
         }),
-        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true }),
+        // NaaS Models and fleet assets only (ADR 0016): domain/fleet `naasModelCondition()`, `fleetCondition()`.
+        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true, referenceQual: 'x_daas_ham_oem_pidISNOTEMPTY' }),
         quantity: IntegerColumn({ label: 'Quantity', mandatory: true, default: 1, min: 1 }),
-        replaces_asset: ReferenceColumn({ label: 'Replaces asset', referenceTable: 'alm_hardware' }),
+        replaces_asset: ReferenceColumn({ label: 'Replaces asset', referenceTable: 'alm_hardware', referenceQual: 'x_daas_ham_fleet=true' }),
         from_site_template: BooleanColumn({ label: 'From site template', default: false, readOnly: true }),
         line_stage: ChoiceColumn({
             label: 'Line stage',

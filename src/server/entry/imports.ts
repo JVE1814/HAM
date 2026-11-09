@@ -84,7 +84,7 @@ function checkAsnRow(row: GlideRecord, serial: string): AsnRowCheck {
 /**
  * Check the row again and insert its Asset, holding the serial's `lock`. A holder that outlasted the lock (ADR 0013)
  * may overlap the scan or row that took it over: it inserts only while it holds it, and one that lost it during the
- * insert is logged.
+ * insert is logged. Made by `newAsset`, the Asset is a fleet asset (ADR 0016) the Provider owns.
  */
 function insertHolding(lock: HeldLock, row: GlideRecord, serial: string, modelId: string): RowOutcome {
     const check = checkAsnRow(row, serial)
@@ -94,7 +94,6 @@ function insertHolding(lock: HeldLock, row: GlideRecord, serial: string, modelId
     asset.setValue('serial_number', serial)
     asset.setValue('po_number', str(row, 'po_number'))
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
-    asset.setValue('x_daas_ham_legal_owner', 'provider')
     asset.setValue('x_daas_ham_customer_tag', str(row, 'customer_tag'))
     asset.setValue('x_daas_ham_mac_address', str(row, 'mac_address'))
     asset.setValue('x_daas_ham_claim_code', str(row, 'claim_code'))
@@ -107,7 +106,8 @@ function insertHolding(lock: HeldLock, row: GlideRecord, serial: string, modelId
 
 /**
  * Whether an Asset has the serial, read past the importer's before-query rules (ADR 0005): an inventory tech sees only
- * their stockrooms' Assets, and an Asset in transit or on order is in none yet. Only read, never saved.
+ * their stockrooms' Assets, and an Asset in transit or on order is in none yet. Any Asset counts, the Provider IT's
+ * too (ADR 0016), so a serial never has two. Only read, never saved.
  */
 function serialExists(serial: string): boolean {
     const asset = new GlideRecord('alm_hardware')
