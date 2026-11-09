@@ -80,7 +80,6 @@ select {
 }
 .unit {
     width: 2.5em;
-    color: var(--muted);
     font-family: ui-monospace, monospace;
 }
 .error {
