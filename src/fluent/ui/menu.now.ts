@@ -42,7 +42,8 @@ Record({
         application: naasMenu,
         link_type: 'DIRECT',
         query: 'x_daas_ham_warehouse.do',
-        roles: ['x_daas_ham.inventory_tech', 'x_daas_ham.asset_manager'],
+        // The roles the page's ACL grants (ui/warehouse-page.now.ts).
+        roles: ['x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.asset_manager'],
         active: true,
         order: 110,
     },
@@ -407,7 +408,9 @@ Record({
         application: naasMenu,
         link_type: 'DIRECT',
         query: 'sys_import.do',
-        roles: ['x_daas_ham.inventory_tech', 'x_daas_ham.asset_manager'],
+        // Loading an import set takes the platform's import_set_loader role (import_admin contains it), which no NaaS
+        // role contains: offered to those who hold it.
+        roles: ['import_set_loader'],
         active: true,
         order: 630,
     },

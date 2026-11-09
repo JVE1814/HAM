@@ -1,18 +1,21 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { isFleetAsset, joinFleet, newAsset } from '../platform/assets.ts'
-import { refusal, str } from '../platform/records.ts'
+import { PROPERTY, stringProperty } from '../platform/properties.ts'
+import { findById, refusal, str } from '../platform/records.ts'
 import type { Stage } from '../domain/lifecycle.ts'
 
 /**
  * Demo data for dev/test instances: two Customers with Sites, racks and stockrooms, models from the
  * four vendors, site templates, agreements, subscription lines, catalog entries, staging checklists,
- * demo users and stock. Run the "NaaS - load demo data" job (installed only with --demo-data).
- * Idempotent: records are looked up by a natural key before they are created.
+ * demo users and stock. Run the "NaaS - load demo data" job, which the SDK installs unless the app is
+ * installed with `now-sdk install --no-demoData` (as on production); it refuses an instance in use
+ * (`demoRefusal`). Idempotent: records are looked up by a natural key before they are created.
  * Lifecycle dates are illustrative, not vendor EoX bulletins.
  */
 
 type Fields = { [field: string]: string | number | boolean }
 
+/** The record of `table` with `key`, created with `fields` when there is none: its sys_id, '' when the insert is refused (logged). */
 function ensure(table: string, key: Fields, fields: Fields = {}): string {
     const gr = new GlideRecord(table)
     for (const [field, value] of Object.entries(key)) gr.addQuery(field, value)
@@ -21,10 +24,49 @@ function ensure(table: string, key: Fields, fields: Fields = {}): string {
     if (gr.next()) return gr.getUniqueValue()
     gr.initialize()
     for (const [field, value] of Object.entries({ ...key, ...fields })) gr.setValue(field, value)
-    return gr.insert() ?? ''
+    const id = gr.insert()
+    if (id) return id
+    gs.warn(`[x_daas_ham] Demo ${table} ${JSON.stringify(key)} not created: ${refusal(gr)}`)
+    return ''
+}
+
+/** Save a demo record; a refused save is logged. */
+function save(record: GlideRecord, what: string): void {
+    if (!record.update()) gs.warn(`[x_daas_ham] Demo ${what} not saved: ${refusal(record)}`)
+}
+
+/** Point an app property at a demo record; one whose insert was refused ('') leaves the property as it is (logged). */
+function setDemoProperty(name: string, recordId: string): void {
+    if (recordId) return void gs.setProperty(name, recordId)
+    gs.warn(`[x_daas_ham] ${name} not set: its demo record was not created`)
 }
 
 const ADMIN_USER = '6816f79cc0a8016401c5a33be04be441'
+
+const DEMO_PROVIDER = 'Demo NaaS Provider'
+
+/**
+ * Why the demo data must not load here, or null. It is for dev/test instances, and it sets the app's Provider and
+ * default staging stockroom to its own and adds demo Customers, users with roles, and stock. An instance whose Provider
+ * (x_daas_ham.provider_company) is set to a company other than the demo's is in use, as a production instance is, so
+ * nothing is loaded there. (glide.installation.production cannot tell: a personal developer instance reports true.)
+ */
+function demoRefusal(): string | null {
+    const providerId = stringProperty(PROPERTY.providerCompany)
+    if (!providerId) return null
+    const provider = findById('core_company', providerId)
+    if (provider && str(provider, 'name') === DEMO_PROVIDER) return null
+    const named = provider ? str(provider, 'name') : `${providerId}, no company`
+    return `its Provider (${PROPERTY.providerCompany}) is ${named}, not ${DEMO_PROVIDER}: the instance is in use. Clear the property to load the demo data on a dev/test instance`
+}
+
+/** A demo Agreement loaded before Agreements had a currency bills in EUR, as its lines did; a refused save is logged. */
+function keepCurrency(agreementId: string): void {
+    const agreement = findById('x_daas_ham_agreement', agreementId)
+    if (!agreement || str(agreement, 'currency')) return
+    agreement.setValue('currency', 'EUR')
+    save(agreement, `agreement ${str(agreement, 'short_description')} (its currency)`)
+}
 
 /** A demo asset loaded before the Fleet flag existed joins the fleet (ADR 0016); a refused save is logged. */
 function keepInFleet(asset: GlideRecord): void {
@@ -35,8 +77,10 @@ function keepInFleet(asset: GlideRecord): void {
 }
 
 export function loadDemoData(): void {
-    const provider = ensure('core_company', { name: 'Demo NaaS Provider' })
-    gs.setProperty('x_daas_ham.provider_company', provider)
+    const refused = demoRefusal()
+    if (refused) return void gs.error(`[x_daas_ham] Demo data not loaded: ${refused}`)
+    const provider = ensure('core_company', { name: DEMO_PROVIDER })
+    setDemoProperty(PROPERTY.providerCompany, provider)
 
     const vendor = (name: string) => ensure('core_company', { name }, { manufacturer: true, vendor: true })
     const cisco = vendor('Cisco Systems')
@@ -63,7 +107,7 @@ export function loadDemoData(): void {
     const depot = stockroom('Central Depot Utrecht', 'central_depot')
     const stagingCentre = stockroom('Staging Centre Utrecht', 'staging_centre')
     const acmeSpares = stockroom('Acme HQ hot spares', 'customer_site', { x_daas_ham_customer: acme, location: acmeMdf })
-    gs.setProperty('x_daas_ham.staging.default_stockroom', stagingCentre)
+    setDemoProperty(PROPERTY.stagingStockroom, stagingCentre)
 
     const sourceOf = new Map([[cisco, 'cisco'], [hpe, 'aruba'], [fortinet, 'fortinet'], [checkpoint, 'checkpoint']])
     const model = (pid: string, name: string, manufacturer: string, deviceClass: string, track = true, power = 0) =>
@@ -126,13 +170,15 @@ export function loadDemoData(): void {
     const agreement = (customerId: string, description: string, terms: Fields) =>
         ensure('x_daas_ham_agreement', { customer: customerId }, { short_description: description, state: 'active', account_manager: ADMIN_USER, ...terms })
     const acmeAgreement = agreement(acme, 'Acme Retail managed network', {
-        starts: '2026-01-01', ends: '2030-12-31', replacement_tier: 'same_day', refresh_cycle_months: 60, refresh_basis: 'earliest',
+        currency: 'EUR', starts: '2026-01-01', ends: '2030-12-31', replacement_tier: 'same_day', refresh_cycle_months: 60, refresh_basis: 'earliest',
         spare_pool_ratio: 0.05, overdue_return_days: 30, lost_asset_fee: 1500, late_return_fee: 150, damage_fee: 400, attestation_interval_months: 12,
     })
     const globexAgreement = agreement(globex, 'Globex data-centre and campus network', {
-        starts: '2026-03-01', ends: '2029-02-28', replacement_tier: 'four_hour', refresh_cycle_months: 48, refresh_basis: 'cycle',
+        currency: 'EUR', starts: '2026-03-01', ends: '2029-02-28', replacement_tier: 'four_hour', refresh_cycle_months: 48, refresh_basis: 'cycle',
         spare_pool_ratio: 0.1, overdue_return_days: 21, lost_asset_fee: 2500, late_return_fee: 250, damage_fee: 600, attestation_interval_months: 6,
     })
+    keepCurrency(acmeAgreement)
+    keepCurrency(globexAgreement)
     const quantities: Array<[string, string, number]> = [
         [acmeAgreement, 'switch', 200], [acmeAgreement, 'ap', 600], [acmeAgreement, 'firewall', 60],
         [globexAgreement, 'switch', 40], [globexAgreement, 'ap', 120], [globexAgreement, 'firewall', 8],
@@ -141,7 +187,8 @@ export function loadDemoData(): void {
         ensure('x_daas_ham_agreement_quantity', { agreement: agreementId, device_class: deviceClass }, { contracted_quantity: contracted })
     }
 
-    const line = (description: string, fields: Fields) => ensure('x_daas_ham_subscription_line', { description }, { currency: 'EUR', ...fields })
+    // A Subscription line bills in its Agreement's currency (EUR here).
+    const line = (description: string, fields: Fields) => ensure('x_daas_ham_subscription_line', { description }, fields)
     const acmeHqPackage = line('Acme HQ site package', { agreement: acmeAgreement, customer: acme, line_type: 'site_package', site: acmeHq, monthly_rate: 4500, status: 'active', start_date: '2026-02-01' })
     line('Acme managed switches', { agreement: acmeAgreement, customer: acme, line_type: 'device_class', device_class: 'switch', monthly_rate: 45, status: 'pending' })
     line('Acme managed Wi-Fi', { agreement: acmeAgreement, customer: acme, line_type: 'device_class', device_class: 'ap', monthly_rate: 18, status: 'pending' })
@@ -186,7 +233,7 @@ export function loadDemoData(): void {
     const hq = new GlideRecord('cmn_location')
     if (hq.get(acmeHq)) {
         hq.setValue('x_daas_ham_site_contacts', acmeContact)
-        hq.update()
+        save(hq, 'site Acme HQ Amsterdam (its site contact)')
     }
 
     // Every demo network asset is a fleet asset (ADR 0016): newAsset flags the new ones (the Provider owning them), and
@@ -226,7 +273,7 @@ export function loadDemoData(): void {
     while (live.next()) {
         live.setValue('x_daas_ham_ru_start', ru)
         ru -= 2
-        live.update()
+        save(live, `asset ${str(live, 'serial_number')} (its rack unit)`)
     }
     // OEM coverage for the in-service demo switches (normally from the Cisco API or CSV import)
     const covered = new GlideRecord('alm_hardware')
@@ -244,7 +291,7 @@ export function loadDemoData(): void {
         })
         covered.setValue('x_daas_ham_coverage_end', '2029-01-31')
         covered.setValue('x_daas_ham_coverage_level', 'SNTC 8X5XNBD')
-        covered.update()
+        save(covered, `asset ${str(covered, 'serial_number')} (its coverage)`)
     }
     // A lease ending before the Acme agreement it serves: the daily review flags it and raises a decision
     const lessor = ensure('core_company', { name: 'Demo Capital Leasing' }, { vendor: true })
@@ -270,7 +317,7 @@ export function loadDemoData(): void {
             start_date: '2026-02-01',
         })
         leased.setValue('x_daas_ham_lease', lease)
-        leased.update()
+        save(leased, `asset ${str(leased, 'serial_number')} (its lease)`)
     }
     gs.info('[x_daas_ham] demo data loaded')
 }

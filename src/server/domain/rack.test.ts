@@ -21,6 +21,22 @@ describe('placementProblem', () => {
     it('lets a device keep its own slot', () => {
         expect(placementProblem(rack42, placed, { assetId: 'fw1', ruStart: 30, height: 2, face: 'front' })).toBeNull()
     })
+
+    it("tells devices apart by their id and names them by their label, which two may share", () => {
+        const tagged = [
+            { assetId: 'sys-a', label: 'NAAS-0001', ruStart: 30, height: 2, face: 'front' as const },
+            { assetId: 'sys-b', label: '', ruStart: 20, height: 1, face: 'front' as const },
+        ]
+        // Another device with the same (or no) label still takes its units; one with none is named by its id.
+        expect(placementProblem(rack42, tagged, { assetId: 'sys-c', label: 'NAAS-0001', ruStart: 31, height: 1, face: 'front' })).toBe(
+            'Rack unit 31 is taken by NAAS-0001',
+        )
+        expect(placementProblem(rack42, tagged, { assetId: 'sys-c', label: '', ruStart: 20, height: 1, face: 'front' })).toBe(
+            'Rack unit 20 is taken by sys-b',
+        )
+        // The device's own earlier placement is left out by its id, whatever its label now.
+        expect(placementProblem(rack42, tagged, { assetId: 'sys-a', label: 'NAAS-0099', ruStart: 31, height: 1, face: 'front' })).toBeNull()
+    })
 })
 
 describe('placementProblem with a power budget', () => {
@@ -89,7 +105,7 @@ describe('overlaps', () => {
         ]
         expect(overlaps(touching)).toEqual([])
         expect(overlaps([...placed, { assetId: 'low', ruStart: 29, height: 2, face: 'front' }])).toEqual([
-            { assetIds: ['fw1', 'low'], face: 'front', unit: 30 },
+            { assetIds: ['fw1', 'low'], labels: ['fw1', 'low'], face: 'front', unit: 30 },
         ])
     })
 
@@ -100,31 +116,37 @@ describe('overlaps', () => {
             { assetId: 'ap1', ruStart: 40, height: 1, face: 'front' as const },
         ]
         expect(overlaps(twoSaves)).toEqual([
-            { assetIds: ['fw1', 'sw2'], face: 'front', unit: 31 },
-            { assetIds: ['sw1', 'ap1'], face: 'front', unit: 40 },
+            { assetIds: ['fw1', 'sw2'], labels: ['fw1', 'sw2'], face: 'front', unit: 31 },
+            { assetIds: ['sw1', 'ap1'], labels: ['sw1', 'ap1'], face: 'front', unit: 40 },
         ])
     })
 
     it('lets devices share units on opposite faces, and counts a height under 1 as 1', () => {
         expect(overlaps([...placed, { assetId: 'pdu', ruStart: 30, height: 2, face: 'rear' }])).toEqual([])
         expect(overlaps([...placed, { assetId: 'blank', ruStart: 40, height: 0, face: 'front' }])).toEqual([
-            { assetIds: ['sw1', 'blank'], face: 'front', unit: 40 },
+            { assetIds: ['sw1', 'blank'], labels: ['sw1', 'blank'], face: 'front', unit: 40 },
         ])
     })
 
     it('compares two devices with the same name', () => {
         const unnamed = { assetId: '', ruStart: 5, height: 1, face: 'front' as const }
-        expect(overlaps([unnamed, unnamed])).toEqual([{ assetIds: ['', ''], face: 'front', unit: 5 }])
+        expect(overlaps([unnamed, unnamed])).toEqual([{ assetIds: ['', ''], labels: ['', ''], face: 'front', unit: 5 }])
+    })
+
+    it('reports the two devices by id and by label', () => {
+        const a = { assetId: 'sys-a', label: 'NAAS-0001', ruStart: 5, height: 1, face: 'front' as const }
+        const b = { assetId: 'sys-b', label: 'FOC123', ruStart: 5, height: 1, face: 'front' as const }
+        expect(overlaps([a, b])).toEqual([{ assetIds: ['sys-a', 'sys-b'], labels: ['NAAS-0001', 'FOC123'], face: 'front', unit: 5 }])
     })
 })
 
 describe('rackElevation', () => {
     it('lists units top-down with each device once at its top unit', () => {
-        const rows = rackElevation(4, [{ assetId: 'a', ruStart: 2, height: 2, face: 'front' }], 'front')
+        const rows = rackElevation(4, [{ assetId: 'sys-a', label: 'NAAS-0001', ruStart: 2, height: 2, face: 'front' }], 'front')
         expect(rows).toEqual([
-            { unit: 4, assetId: null, span: 1 },
-            { unit: 3, assetId: 'a', span: 2 },
-            { unit: 1, assetId: null, span: 1 },
+            { unit: 4, assetId: null, label: null, span: 1 },
+            { unit: 3, assetId: 'sys-a', label: 'NAAS-0001', span: 2 },
+            { unit: 1, assetId: null, label: null, span: 1 },
         ])
     })
 })

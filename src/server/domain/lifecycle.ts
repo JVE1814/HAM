@@ -123,7 +123,8 @@ const ALLOWED_MOVES: Record<Stage, readonly Stage[]> = {
     staged: ['shipped', 'available', 'spare_pool'],
     in_transfer: TRANSFERABLE,
     shipped: ['pending_in_service', 'pending_return', 'missing'],
-    pending_in_service: ['in_service', 'temporary_deployment', 'pending_return'],
+    // Missing: an installed unit never seen, on a return that is overdue (entry/returns), like one in service.
+    pending_in_service: ['in_service', 'temporary_deployment', 'pending_return', 'missing'],
     in_service: ['pending_return', 'missing'],
     temporary_deployment: ['pending_return', 'missing'],
     pending_return: ['pending_evaluation', 'missing'],

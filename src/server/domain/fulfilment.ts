@@ -1,5 +1,6 @@
 import type { ApprovalDecision } from './approvals.ts'
 import type { Approver } from './entitlement.ts'
+import { assertNever, oneOf } from './exhaustive.ts'
 import type { Stage } from './lifecycle.ts'
 
 /**
@@ -45,7 +46,18 @@ const LINE_FOR_PROGRESS: Record<number, LineStage> = {
     6: 'in_service',
 }
 
-const LINE_ORDER: readonly LineStage[] = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped', 'installed', 'in_service']
+/** A line's stages in the order a line goes through them; cancelled is none of them. */
+const LINE_ORDER = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped', 'installed', 'in_service'] as const satisfies readonly LineStage[]
+
+type LiveLineStage = (typeof LINE_ORDER)[number]
+
+/** Every line stage, to read x_daas_ham_order_line.line_stage with (platform/records `choice`). */
+export const LINE_STAGES: readonly LineStage[] = [...LINE_ORDER, 'cancelled']
+
+/** How far along LINE_ORDER a line stage is; -1 for cancelled or a stage the app does not know. */
+function rank(stage: LineStage): number {
+    return (LINE_ORDER as readonly LineStage[]).indexOf(stage)
+}
 
 /** Line stages at which the line's equipment has left the Provider. */
 const DELIVERED: ReadonlySet<LineStage> = new Set(['shipped', 'installed', 'in_service'])
@@ -101,7 +113,7 @@ export function lineStageFor(line: LineFacts): LineStage {
         return LINE_FOR_PROGRESS[Math.min(...progress)]
     }
     const derived = progress.length > 0 ? LINE_FOR_PROGRESS[Math.min(...progress)] : line.current
-    return LINE_ORDER.indexOf(derived) > LINE_ORDER.indexOf(line.current) ? derived : line.current
+    return rank(derived) > rank(line.current) ? derived : line.current
 }
 
 /**
@@ -175,10 +187,17 @@ export function followsLines(orderStage: string): boolean {
     return !SETTLED_ORDER_STAGES.includes(orderStage)
 }
 
+/**
+ * The stage an Order takes from its lines: cancelled once every line is, else that of its slowest live line, complete
+ * only once each is in service. A line stage the app does not know (a corrupt row, a choice an administrator added: the
+ * stages are read from records) counts as slower than any, so it holds the Order at sourcing and never completes it.
+ */
 export function orderStageFor(lineStages: readonly LineStage[]): OrderStage {
     const live = lineStages.filter((s) => s !== 'cancelled')
     if (live.length === 0) return 'cancelled'
-    const slowest = live.reduce((a, b) => (LINE_ORDER.indexOf(a) <= LINE_ORDER.indexOf(b) ? a : b))
+    const known = live.filter((stage): stage is LiveLineStage => oneOf(stage, LINE_ORDER) !== undefined)
+    if (known.length < live.length) return 'sourcing'
+    const slowest = known.reduce((a, b) => (rank(a) <= rank(b) ? a : b))
     switch (slowest) {
         case 'new':
             return 'sourcing'
@@ -191,7 +210,9 @@ export function orderStageFor(lineStages: readonly LineStage[]): OrderStage {
         case 'shipped':
         case 'installed':
             return 'installing'
-        default:
+        case 'in_service':
             return 'complete'
+        default:
+            return assertNever(slowest, 'line stage')
     }
 }

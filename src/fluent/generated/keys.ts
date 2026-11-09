@@ -2663,6 +2663,10 @@ declare global {
                         table: 'sys_module'
                         id: 'a466182b22e144d0bef3523185c6cb68'
                     }
+                    src_server_domain_exhaustive_ts: {
+                        table: 'sys_module'
+                        id: '3856fa292b1e4d828135c86590ba068b'
+                    }
                     src_server_domain_fleet_ts: {
                         table: 'sys_module'
                         id: 'ec4a1353f8304437a353f3e3ec413fd0'

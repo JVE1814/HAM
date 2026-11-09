@@ -31,12 +31,18 @@ const OBSERVED_AT_FORMAT = 'observed_at must be an ISO-8601 timestamp with a UTC
  */
 const ISO_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(?:Z|([+-])(\d{2}):?(\d{2}))$/
 
+/**
+ * The events of a batch, validated (a malformed one is rejected by its index in the batch) and in the order they were
+ * observed, oldest first: last_seen only moves forward (entry/in-service), so a batch listing a later sighting before an
+ * earlier one would otherwise put a pending Asset in service at the later one, its first days unbilled. Events observed
+ * at the same instant keep their order in the batch.
+ */
 export function parseDeviceEvents(body: unknown, maxBatch: number, now: number): ParsedEvents {
     const raw = (body as { events?: unknown } | null)?.events
     if (!Array.isArray(raw)) return { error: 'Body must be { "events": [...] }' }
     if (raw.length > maxBatch) return { error: `At most ${maxBatch} events per request` }
 
-    const events: DeviceEvent[] = []
+    const accepted: Array<{ event: DeviceEvent; index: number }> = []
     const rejected: Array<{ index: number; reason: string }> = []
     raw.forEach((item: Record<string, unknown>, index) => {
         const identifier = typeof item?.identifier === 'string' ? item.identifier.trim() : ''
@@ -48,9 +54,11 @@ export function parseDeviceEvents(body: unknown, maxBatch: number, now: number):
         if (Number.isNaN(observedAt)) return void rejected.push({ index, reason: OBSERVED_AT_FORMAT })
         if (observedAt > now + MAX_CLOCK_SKEW_MS) return void rejected.push({ index, reason: 'observed_at is in the future' })
         if (!SOURCES.includes(source)) return void rejected.push({ index, reason: 'source must be one of discovery, connector, nms' })
-        events.push({ identifier, event, observedAt, source })
+        accepted.push({ event: { identifier, event, observedAt, source }, index })
     })
-    return { events, rejected }
+    // The index breaks ties, so the order does not rest on the engine's sort being stable.
+    accepted.sort((a, b) => a.event.observedAt - b.event.observedAt || a.index - b.index)
+    return { events: accepted.map(({ event }) => event), rejected }
 }
 
 /**

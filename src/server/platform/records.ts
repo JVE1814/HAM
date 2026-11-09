@@ -1,4 +1,5 @@
-import { GlideAggregate, type GlideElement, GlideRecord } from '@servicenow/glide'
+import { GlideAggregate, type GlideElement, GlideRecord, gs } from '@servicenow/glide'
+import { oneOf } from '../domain/exhaustive.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 
 /** Small Glide helpers shared by repositories and gateways. Keep this module free of business rules. */
@@ -104,9 +105,29 @@ export function str(gr: GlideRecord, field: string): string {
     return value === null || value === undefined ? '' : String(value)
 }
 
+/**
+ * The number in `field`; 0 when it is blank. A value that is not a number (a corrupt or hand-edited row, a dot-walk to a
+ * text field) reads as 0 too, which would bill or cost nothing without a word, so it is logged as a warning naming the
+ * record, the field and the value.
+ */
 export function num(gr: GlideRecord, field: string): number {
-    const value = Number(valueOf(gr, field))
-    return Number.isFinite(value) ? value : 0
+    const raw = valueOf(gr, field)
+    if (raw === null || raw === undefined) return 0
+    const value = Number(raw)
+    if (Number.isFinite(value)) return value
+    gs.warn(`[x_daas_ham] ${gr.getTableName()} ${gr.getUniqueValue()}: ${field} holds '${String(raw)}', not a number; read as 0`)
+    return 0
+}
+
+/**
+ * The value of choice field `field` when it is one of `allowed` (domain/exhaustive `oneOf`), else `fallback`, or undefined
+ * when none is given: a value the app does not know, such as a choice an administrator added, a corrupt row or a blank
+ * not in `allowed`, is never read as one it does, as a cast (`str(...) as T`) would.
+ */
+export function choice<T extends string>(gr: GlideRecord, field: string, allowed: readonly T[]): T | undefined
+export function choice<T extends string>(gr: GlideRecord, field: string, allowed: readonly T[], fallback: T): T
+export function choice<T extends string>(gr: GlideRecord, field: string, allowed: readonly T[], fallback?: T): T | undefined {
+    return oneOf(str(gr, field), allowed) ?? fallback
 }
 
 export function bool(gr: GlideRecord, field: string): boolean {

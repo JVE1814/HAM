@@ -4,10 +4,12 @@ import {
     approvalAwaited,
     followsLines,
     leftInTransit,
+    LINE_STAGES,
     lineStageFor,
     orderStageFor,
     refillsLine,
     siteRecoveryLineQuery,
+    type LineStage,
 } from './fulfilment'
 
 describe('lineStageFor', () => {
@@ -124,6 +126,27 @@ describe('orderStageFor', () => {
 
     it('is still sourcing while a line is new', () => {
         expect(orderStageFor(['new', 'sourced'])).toBe('sourcing')
+    })
+
+    it('is never complete while a line is in a stage the app does not know, read from a record as it is', () => {
+        const unknown = 'on_hold' as LineStage
+        expect(orderStageFor(['in_service', unknown])).toBe('sourcing')
+        expect(orderStageFor([unknown])).toBe('sourcing')
+        expect(orderStageFor(['' as LineStage, 'in_service', 'cancelled'])).toBe('sourcing')
+    })
+
+    it('derives every live line stage to a stage of its own, complete only from in service', () => {
+        const live = LINE_STAGES.filter((stage) => stage !== 'cancelled')
+        expect(live.map((stage) => orderStageFor([stage]))).toEqual([
+            'sourcing',
+            'preparing',
+            'preparing',
+            'preparing',
+            'delivering',
+            'installing',
+            'installing',
+            'complete',
+        ])
     })
 })
 
