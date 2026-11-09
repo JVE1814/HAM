@@ -15,14 +15,16 @@ import {
     type ReceivingLine,
 } from '../domain/warehouse.ts'
 import {
-    findAssetByIdentifier,
     fleetCandidate,
+    identifyAsset,
     isFleetAsset,
     joinFleet,
     moveAndSave,
     moveAsset,
     newAsset,
     readStage,
+    type AssetIdentified,
+    type IdentifierLookup,
 } from '../platform/assets.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { lineAssetStages } from '../platform/fulfilment.ts'
@@ -101,12 +103,26 @@ function body(request: RESTAPIRequest): Record<string, string> {
     return Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [k, String(v ?? '').trim()]))
 }
 
+/**
+ * The fleet asset a scanned code names (platform/assets `identifyAsset`: serial, else Provider tag, else Customer tag),
+ * or why it is not used: none carries it (404), or two do, as two Customers may share a Customer tag (409).
+ */
+function scannedAsset(code: string): { asset: GlideRecord } | Unsaved {
+    return scanned(identifyAsset(code)) ?? NOT_FOUND
+}
+
+/** An identifier lookup as a scan reads it: the Asset, an ambiguous code refused (409), or null when none carries it. */
+function scanned(identified: AssetIdentified): { asset: GlideRecord } | Unsaved | null {
+    if (identified && 'ambiguous' in identified) return { status: 409, error: identified.ambiguous }
+    return identified
+}
+
 /** GET /assets/{code}: look a fleet asset up by serial, Provider tag or Customer tag (not the Provider IT's). */
 export function lookupAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowedLookup(response)) return
-    const asset = findAssetByIdentifier(String(request.pathParams.code ?? ''))
-    if (!asset) return refuse(response, NOT_FOUND)
-    reply(response, 200, summarise(asset))
+    const found = scannedAsset(String(request.pathParams.code ?? ''))
+    if ('error' in found) return refuse(response, found)
+    reply(response, 200, summarise(found.asset))
 }
 
 /**
@@ -139,15 +155,14 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
 
     // Arriving units (bought or returned) sit in none of the user's stockrooms yet, so the lookup goes past the stockroom
     // rule; only those stages are received below, never stock held elsewhere. It finds the Provider IT's Assets too, so
-    // a serial IT holds is refused below rather than given a second Asset.
-    let asset = findAssetByIdentifier(input.code, { beyondVisibility: true, includeNonFleet: true })
-    if (!asset) {
+    // a serial IT holds is refused below rather than given a second Asset. A code two Assets carry is refused (409).
+    let found = scanned(identifyAsset(input.code, ARRIVING))
+    if (!found) {
         if (!input.pid) return reply(response, 404, { error: 'Unknown serial: scan the PID too to receive without an ASN' })
-        const created = createReceivedAsset(input)
-        if ('error' in created) return refuse(response, created)
-        asset = created.asset
+        found = createReceivedAsset(input)
     }
-    const assetId = asset.getUniqueValue()
+    if ('error' in found) return refuse(response, found)
+    const assetId = found.asset.getUniqueValue()
     // Not the stock lock (platform/stock) the allocation's reservation takes: a second take of a lock is refused.
     const taken = withLock(`receive_asset_${assetId}`, (lock) => {
         receiveHolding(lock, response, assetId, input.stockroom)
@@ -169,6 +184,9 @@ const STOCK_BUSY: Unsaved = { status: 503, error: 'This unit is being reserved o
 
 const NOT_FOUND: Unsaved = { status: 404, error: 'No fleet asset with that serial or tag' }
 
+/** How a receipt looks a unit up: past the stockroom rule, the Provider IT's Assets too (see `receiveAsset`). */
+const ARRIVING: IdentifierLookup = { beyondVisibility: true, includeNonFleet: true }
+
 function refuse(response: RESTAPIResponse, unsaved: Unsaved): void {
     reply(response, unsaved.status, { error: unsaved.error })
 }
@@ -189,6 +207,8 @@ function receiveHolding(lock: HeldLock, response: RESTAPIResponse, assetId: stri
     if (returnRefusal) return reply(response, 422, { error: `Not received: ${returnRefusal}` })
     if (returnRefusal === '') return reply(response, 200, summarise(asset))
     if (!awaitsReceipt(stage) || !moveAsset(asset, 'available').allowed) {
+        // Found past the stockroom rule: a unit held in a stockroom the user cannot see is not described to them.
+        if (!findById('alm_hardware', assetId)) return refuse(response, NOT_FOUND)
         return reply(response, 409, { error: `Not awaiting receipt (${stage ?? 'unknown stage'})` })
     }
     const tag = str(asset, 'asset_tag') || nextProviderTag()
@@ -257,8 +277,7 @@ function createReceivedAsset(input: Record<string, string>): { asset: GlideRecor
     let created = SCAN_AGAIN as { asset: GlideRecord } | Unsaved
     withLock(receiveSerialLockName(serial), (lock) => {
         // Any Asset with the serial, the Provider IT's too: the receipt refuses it rather than create a second one.
-        const found = findAssetByIdentifier(input.code, { beyondVisibility: true, includeNonFleet: true })
-        created = found ? { asset: found } : insertReceivedAsset(lock, modelId, serial)
+        created = scanned(identifyAsset(input.code, ARRIVING)) ?? insertReceivedAsset(lock, modelId, serial)
     })
     return created
 }
@@ -391,11 +410,11 @@ export function putAwayAsset(request: RESTAPIRequest, response: RESTAPIResponse)
     const type = stockroomType(stockroom)
     if (!type) return reply(response, 400, { error: NOT_NAAS_STOCKROOM })
     // A fleet asset only: the Provider IT's are not found.
-    const found = findAssetByIdentifier(input.code ?? '')
-    if (!found) return refuse(response, NOT_FOUND)
+    const found = scannedAsset(input.code ?? '')
+    if ('error' in found) return refuse(response, found)
     // Set inside the Asset's stock lock.
     let putAway = STOCK_BUSY as Unsaved | { asset: GlideRecord }
-    changeStock(found.getUniqueValue(), 'put away', (asset, lock) => {
+    changeStock(found.asset.getUniqueValue(), 'put away', (asset, lock) => {
         putAway = asset ? putAwayHolding(lock, asset, stockroom, type) : NOT_FOUND
     })
     if ('error' in putAway) return refuse(response, putAway)
@@ -425,8 +444,9 @@ function putAwayHolding(
 export function pickAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const input = body(request)
-    const asset = findAssetByIdentifier(input.code ?? '')
-    if (!asset) return refuse(response, NOT_FOUND)
+    const found = scannedAsset(input.code ?? '')
+    if ('error' in found) return refuse(response, found)
+    const asset = found.asset
     const orderNumber = str(asset, 'x_daas_ham_order_line.order.number')
     if (orderNumber !== input.order) {
         return reply(response, 409, { error: orderNumber ? `Belongs to ${orderNumber}` : 'Not allocated to an order' })

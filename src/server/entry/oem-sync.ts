@@ -33,32 +33,60 @@ const VENDORS: readonly OemVendor[] = ['cisco', 'meraki', 'fortinet', 'mist', 'a
 /** Assets per coverage batch. */
 const COVERAGE_BATCH = 200
 
+/** Errors logged per job and run; the rest are counted in one more line. */
+const REPORTED_ERRORS = 20
+
 function report(job: string, errors: readonly string[]): void {
-    for (const error of errors.slice(0, 20)) gs.warn(`[x_daas_ham] ${job}: ${error}`)
+    for (const error of errors.slice(0, REPORTED_ERRORS)) gs.warn(`[x_daas_ham] ${job}: ${error}`)
+    const more = errors.length - REPORTED_ERRORS
+    if (more > 0) gs.warn(`[x_daas_ham] ${job}: and ${more} more error(s) not logged`)
 }
 
-/** Daily: EoX milestones for NaaS Models (those with an OEM PID) of every vendor with a lifecycle API. */
+/** A PID as Models are matched to an OEM's answer: trimmed and in upper case, as the OEMs write it. */
+function pidKey(pid: string): string {
+    return pid.trim().toUpperCase()
+}
+
+/**
+ * Daily: EoX milestones for NaaS Models (those with an OEM PID) of every vendor with a lifecycle API. Models are
+ * matched to the answer by PID ignoring case and surrounding spaces, so a PID stored in lower case still gets its
+ * dates, and Models sharing a PID each get them; one asked once. An answer for a PID no Model has is logged.
+ */
 export function syncOemLifecycle(): void {
     for (const vendor of VENDORS) {
         const route = enabledRoute(vendor, 'lifecycle', oemEnabled)
         if (!route) continue
-        const models = new Map<string, string>()
+        // The PID asked for each key (as the first of its Models stores it, trimmed), and the Models with it.
+        const asked = new Map<string, string>()
+        const models = new Map<string, string[]>()
         const model = new GlideRecord('cmdb_model')
         model.addQuery('x_daas_ham_oem_source', vendor)
         model.addEncodedQuery(naasModelCondition())
         model.query()
-        while (model.next()) models.set(str(model, 'x_daas_ham_oem_pid'), model.getUniqueValue())
-
-        const result = route.run([...models.keys()], oemContext(route.via))
-        report(`lifecycle ${vendor}`, result.errors)
-        for (const fact of result.facts) {
-            const modelId = models.get(fact.pid)
-            if (modelId) upsertLifecycle(modelId, fact.dates, vendor, fact.reference)
+        while (model.next()) {
+            const pid = str(model, 'x_daas_ham_oem_pid').trim()
+            if (!pid) continue
+            if (!asked.has(pidKey(pid))) asked.set(pidKey(pid), pid)
+            appendTo(models, pidKey(pid), model.getUniqueValue())
         }
+        if (asked.size === 0) continue
+
+        const result = route.run([...asked.values()], oemContext(route.via))
+        const errors = [...result.errors]
+        for (const fact of result.facts) {
+            const modelIds = models.get(pidKey(fact.pid))
+            if (!modelIds) errors.push(`an answer for PID ${fact.pid} matches no ${vendor} Model`)
+            for (const modelId of modelIds ?? []) {
+                const refused = upsertLifecycle(modelId, fact.dates, vendor, fact.reference)
+                if (refused) errors.push(`lifecycle of PID ${fact.pid} (Model ${modelId}) not saved: ${refused}`)
+            }
+        }
+        report(`lifecycle ${vendor}`, errors)
     }
 }
 
-function upsertLifecycle(modelId: string, incoming: LifecycleDates, vendor: OemVendor, reference: string): void {
+/** Write a Model's lifecycle dates, merged onto those stored: null once saved, else why the platform refused it. */
+function upsertLifecycle(modelId: string, incoming: LifecycleDates, vendor: OemVendor, reference: string): string | null {
     const lifecycle = new GlideRecord('x_daas_ham_model_lifecycle')
     const exists = lifecycle.get('model', modelId)
     if (!exists) {
@@ -82,8 +110,9 @@ function upsertLifecycle(modelId: string, incoming: LifecycleDates, vendor: OemV
     lifecycle.setValue('source', vendor)
     lifecycle.setValue('source_reference', reference)
     lifecycle.setValue('last_refreshed', new GlideDateTime().getValue())
-    if (exists) lifecycle.update()
-    else lifecycle.insert()
+    // A refused save leaves the Model's stored dates as they were: the next daily run asks again.
+    const saved = exists ? lifecycle.update() : lifecycle.insert()
+    return saved ? null : refusal(lifecycle)
 }
 
 /**

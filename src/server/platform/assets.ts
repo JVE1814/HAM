@@ -1,5 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { normalizeSerial } from '../domain/asn.ts'
+import { ambiguousIdentifier, fieldMatch, IDENTIFIER_FIELDS, IDENTIFIER_READ_LIMIT } from '../domain/asset-identifier.ts'
 import { FLEET_FIELD, fleetCondition, fleetField, OEM_PID_FIELD, STOCKROOM_TYPE_FIELD, type FleetCandidate } from '../domain/fleet.ts'
 import {
     checkTransition,
@@ -120,28 +121,77 @@ export function fleetCandidate(asset: GlideRecord): FleetCandidate {
     }
 }
 
+/** What an identifier names (platform/assets `identifyAsset`): the one Asset, none, or more than one (refused). */
+export type AssetIdentified = { asset: GlideRecord } | { ambiguous: string } | null
+
+/** Options of an identifier lookup (`identifyAsset`). */
+export interface IdentifierLookup {
+    beyondVisibility?: boolean
+    includeNonFleet?: boolean
+}
+
 /**
- * The fleet asset (ADR 0016) with this serial number, Provider tag or Customer tag. `beyondVisibility` reads it past
+ * The fleet asset (ADR 0016) this identifier names: by serial number, else Provider tag, else Customer tag (domain/
+ * asset-identifier); `{ ambiguous }`, saying why, when two Assets carry it in the first of those fields that any does,
+ * as two Customers may give their switches one Customer tag; null when none carries it. `beyondVisibility` reads past
  * the app's before-query visibility rules (ADR 0005, platform/beyond-visibility): receiving must find incoming units
  * that belong to no stockroom yet, and the device-events API must find any fleet asset (it reports another identifier
  * unknown). Its later saves run every rule. `includeNonFleet` finds the Provider IT's Assets too, a fleet asset first
  * when both carry the identifier: for a receipt, which takes in a unit Procurement created on order and must not
  * create a second Asset for a serial IT holds.
  */
-export function findAssetByIdentifier(
-    identifier: string,
-    options: { beyondVisibility?: boolean; includeNonFleet?: boolean } = {},
-): GlideRecord | null {
+export function identifyAsset(identifier: string, options: IdentifierLookup = {}): AssetIdentified {
     const code = identifier.trim()
     if (!code) return null
+    for (const field of IDENTIFIER_FIELDS) {
+        const value = field.field === 'serial_number' ? normalizeSerial(code) : code
+        const found = assetsCarrying(field.field, value, options)
+        const match = fieldMatch(found.map((asset) => asset.fleet))
+        if (match.kind === 'ambiguous') return { ambiguous: ambiguousIdentifier(code, field) }
+        if (match.kind === 'none') continue
+        const asset = found[match.index].record()
+        return asset ? { asset } : null
+    }
+    return null
+}
+
+/**
+ * The fleet asset this identifier names (`identifyAsset`), or null when none does or it is ambiguous (logged), for a
+ * caller that reports both as an unknown identifier.
+ */
+export function findAssetByIdentifier(identifier: string, options: IdentifierLookup = {}): GlideRecord | null {
+    const identified = identifyAsset(identifier, options)
+    if (identified && 'ambiguous' in identified) {
+        gs.warn(`[x_daas_ham] Identifier ${identifier.trim()} refused: ${identified.ambiguous}`)
+        return null
+    }
+    return identified?.asset ?? null
+}
+
+/** One Asset carrying an identifier: whether it is a fleet asset, and the record itself (null once it is gone). */
+interface Carrier {
+    fleet: boolean
+    record: () => GlideRecord | null
+}
+
+/**
+ * The Assets (at most IDENTIFIER_READ_LIMIT) whose `field` is `value`: fleet assets only, or fleet ones first with
+ * `includeNonFleet`. The query's own record is handed back while it is still on the first one; only when a second
+ * one is read past it is the first read again, by sys_id, the same way (past the visibility rules or not).
+ */
+function assetsCarrying(field: string, value: string, options: IdentifierLookup): Carrier[] {
+    const read = (record: GlideRecord, run: () => boolean | void) => (options.beyondVisibility ? beyondVisibility(record, run) : run())
     const asset = new GlideRecord('alm_hardware')
-    const byIdentifier = asset.addQuery('serial_number', normalizeSerial(code))
-    byIdentifier.addOrCondition('asset_tag', code)
-    byIdentifier.addOrCondition('x_daas_ham_customer_tag', code)
+    asset.addQuery(field, value)
     if (options.includeNonFleet) asset.orderByDesc(FLEET_FIELD)
     else asset.addEncodedQuery(fleetCondition())
-    asset.setLimit(1)
-    if (options.beyondVisibility) beyondVisibility(asset, () => asset.query())
-    else asset.query()
-    return asset.next() ? asset : null
+    asset.setLimit(IDENTIFIER_READ_LIMIT)
+    read(asset, () => asset.query())
+    if (!asset.next()) return []
+    const first = { fleet: isFleetAsset(asset), id: asset.getUniqueValue() }
+    if (!asset.hasNext()) return [{ fleet: first.fleet, record: () => asset }]
+    asset.next()
+    const again = new GlideRecord('alm_hardware')
+    const reread = () => (read(again, () => again.get(first.id)) ? again : null)
+    return [{ fleet: first.fleet, record: reread }, { fleet: isFleetAsset(asset), record: () => asset }]
 }

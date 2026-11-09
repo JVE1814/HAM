@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { annualSupportCost, answersByContract, contractKey, coverageBySerial, coverageDisposition, coverageSummary, mergeCoverage } from './coverage'
+import {
+    annualSupportCost,
+    answersByContract,
+    contractKey,
+    coverageBySerial,
+    coverageDisposition,
+    coverageSummary,
+    mergeCoverage,
+    OPEN_ENDED_COVERAGE_END,
+} from './coverage'
 import type { CoverageFact } from './oem/types'
 
 describe('coverageSummary', () => {
@@ -26,6 +35,35 @@ describe('coverageSummary', () => {
 
     it('has no end without contracts', () => {
         expect(coverageSummary([], '2026-11-07')).toEqual({ coveredToday: false, coverageEnd: '', serviceLevel: '' })
+    })
+
+    it('covers open-ended for a covering contract without an end date (Mist has_support, a CSV row without an end)', () => {
+        const summary = coverageSummary(
+            [
+                { covered: true, endDate: '2028-01-31', serviceLevel: '24x7x4' },
+                { covered: true, serviceLevel: 'Mist support' },
+            ],
+            '2026-11-07',
+        )
+        expect(summary).toEqual({ coveredToday: true, coverageEnd: OPEN_ENDED_COVERAGE_END, serviceLevel: 'Mist support' })
+        // Read as covered where an Asset's coverage end is compared with today (break-fix routing, the rack risk view).
+        expect(summary.coverageEnd >= '2026-11-07').toBe(true)
+    })
+
+    it('leaves a contract without an end date that does not cover out', () => {
+        expect(coverageSummary([{ covered: false, serviceLevel: 'expired' }], '2026-11-07')).toEqual({ coveredToday: false, coverageEnd: '', serviceLevel: '' })
+    })
+
+    it('agrees with annualSupportCost on whether each contract covers today', () => {
+        const contracts = [
+            [{ covered: true, serviceLevel: 'open-ended', annualCost: 30 }],
+            [{ covered: true, endDate: '2026-11-07', serviceLevel: 'ends today', annualCost: 30 }],
+            [{ covered: true, endDate: '2026-11-06', serviceLevel: 'ended', annualCost: 30 }],
+            [{ covered: false, serviceLevel: 'not covering', annualCost: 30 }],
+        ]
+        for (const contract of contracts) {
+            expect(coverageSummary(contract, '2026-11-07').coveredToday, contract[0].serviceLevel).toBe(annualSupportCost(contract, '2026-11-07') > 0)
+        }
     })
 })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { errorText, isSuccess } from './http'
+import { errorText, failureText, isSuccess } from './http'
 
 describe('isSuccess', () => {
     it('accepts 2xx only', () => {
@@ -19,5 +19,19 @@ describe('errorText', () => {
         )
         expect(errorText(400, '{"error":"invalid_grant"}')).toBe('HTTP 400: invalid_grant')
         expect(errorText(502, 'not json')).toBe('HTTP 502')
+    })
+})
+
+describe('failureText', () => {
+    it('names the reason the transport gave when no answer came (status 0), never "HTTP 0"', () => {
+        expect(failureText({ status: 0, body: '', error: 'java.net.SocketTimeoutException: Read timed out' })).toBe(
+            'no response: java.net.SocketTimeoutException: Read timed out',
+        )
+        expect(failureText({ status: 0, body: '' })).toBe('no response')
+        expect(errorText(0, '')).toBe('no response')
+    })
+
+    it('reads an answer as errorText does', () => {
+        expect(failureText({ status: 403, body: '{"message":"Forbidden"}' })).toBe('HTTP 403: Forbidden')
     })
 })

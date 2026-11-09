@@ -6,6 +6,7 @@ import {
     applyTracking,
     buyLabel,
     labelVoidable,
+    newestEventAt,
     newTrackingEvents,
     OPEN_SHIPMENTS,
     parseTrackingRetry,
@@ -171,8 +172,10 @@ export function uiCreateReturnLabel(current: GlideRecord): void {
     if (!result) return
     if (!result.ok) return void gs.addErrorMessage(`No label: ${result.error}`)
     current.setValue('work_notes', `Return label ${result.trackingNumber} (${result.carrier}): ${result.labelUrl}`)
-    current.update()
-    gs.addInfoMessage(`Return label ${result.trackingNumber} created`)
+    // The label and its Shipment are saved either way; only the note giving the Site contact the label link is lost.
+    if (current.update()) return void gs.addInfoMessage(`Return label ${result.trackingNumber} created`)
+    const where = `its link is on the Shipment (${result.labelUrl})`
+    gs.addErrorMessage(`Return label ${result.trackingNumber} created, but its work note was not saved (${refusal(current)}): ${where}`)
 }
 
 /** The Return order's latest return label still in use (as platform/shipments returnLabels finds it), with its status. */
@@ -206,7 +209,11 @@ export function uiMarkLabelVoided(current: GlideRecord): void {
     const returnOrder = findById('x_daas_ham_return_order', str(voided, 'return_order'))
     if (returnOrder) {
         returnOrder.setValue('work_notes', `Return label ${trackingNumber} voided with the carrier: do not ship on it.`)
-        returnOrder.update()
+        // The label is voided all the same; only the note telling the Site not to ship on it is lost.
+        if (!returnOrder.update()) {
+            const unnoted = `${str(returnOrder, 'number')} was not noted (${refusal(returnOrder)}): tell the Site not to ship on it`
+            return void gs.addErrorMessage(`Label ${trackingNumber} marked voided, but ${unnoted}`)
+        }
     }
     gs.addInfoMessage(`Label ${trackingNumber} marked voided`)
 }
@@ -324,6 +331,11 @@ type Tracked = { error: string } | Saved
  * and its events read again there (`trackUnderLock`). One held off through every try is answered 202 and queued to be
  * applied in the background (`trackLater`), not left to the aggregator: ShipEngine resends at most twice, typically
  * 30 minutes apart, then drops it. Only an update that cannot be queued is answered 503.
+ *
+ * Deliveries also arrive out of order: ShipEngine resends one answered 500 about 30 minutes later, by when a newer
+ * update may have been applied. So a webhook is placed by its newest event, as a queued update is (`track`): one
+ * overtaken by an event stored since adds only its events, and its older status, detail and estimate do not move the
+ * Shipment back (say from Out for delivery to In transit, or to Label created, offering Mark label voided again).
  */
 export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIResponse): void {
     const token = webhookToken(request.getHeader(WEBHOOK_TOKEN_HEADER), queryParam(request, 'token'))
@@ -333,7 +345,7 @@ export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIRes
     const found = new GlideRecord('x_daas_ham_shipment')
     if (!found.get('tracking_number', update.trackingNumber)) return reply(response, 200, { matched: false })
 
-    const tracked = trackUnderLock(found.getUniqueValue(), update)
+    const tracked = trackUnderLock(found.getUniqueValue(), update, newestEventAt(update.events))
     if (tracked === 'busy') {
         if (trackLater(found, update)) return reply(response, 202, { matched: true, queued: true })
         return reply(response, 503, { error: 'Another update of this Shipment is being saved; send it again' })
@@ -391,12 +403,12 @@ function shipmentName(shipment: GlideRecord): string {
 /**
  * Apply `update` to the Shipment `shipmentId` under its tracking lock (`track`, on the Shipment read again there): what
  * it did, null when the Shipment is gone, or 'busy' when other holders kept the lock through every try. `newestAt` is
- * given for a queued update only (`track`). The lock is a leaf (ADR 0013): taken holding no other lock, and none is
- * taken under it, so the Order is noted after it is released (`noteDelivery`). Taking it throws only when an insert is
- * refused with no lock row (platform/locks `withLockTries` tries again, and that error escapes only when every try
- * threw).
+ * when the update's newest event happened (`track`). The lock is a leaf (ADR 0013): taken holding no other lock, and
+ * none is taken under it, so the Order is noted after it is released (`noteDelivery`). Taking it throws only when an
+ * insert is refused with no lock row (platform/locks `withLockTries` tries again, and that error escapes only when
+ * every try threw).
  */
-function trackUnderLock(shipmentId: string, update: TrackingUpdate, newestAt?: string): Tracked | null | 'busy' {
+function trackUnderLock(shipmentId: string, update: TrackingUpdate, newestAt: string): Tracked | null | 'busy' {
     // Set inside the lock; left null when the Shipment is gone by then.
     let tracked = null as Tracked | null
     const ran = withLockTries(trackingLockName(shipmentId), TRACKING_LOCK_TRIES, () => {
@@ -406,13 +418,17 @@ function trackUnderLock(shipmentId: string, update: TrackingUpdate, newestAt?: s
     return ran ? tracked : 'busy'
 }
 
-/** Put a work note on the Order of a Shipment the update delivered just now (only the first delivery is noted). */
+/**
+ * Put a work note on the Order of a Shipment the update delivered just now (only the first delivery is noted). A
+ * refused note is logged, not retried: the Shipment shows the delivery, and a retry would not note it again.
+ */
 function noteDelivery(saved: Saved, trackingNumber: string): void {
     if (!saved.deliveredNow) return
     const order = findById('x_daas_ham_order', saved.orderId)
     if (!order) return
     order.setValue('work_notes', `Delivered to ${order.getDisplayValue('site')} (${saved.carrier} ${trackingNumber}).`)
-    order.update()
+    if (order.update()) return
+    gs.warn(`[x_daas_ham] Delivery of ${trackingNumber} not noted on ${str(order, 'number')}: ${refusal(order)}`)
 }
 
 /**
@@ -448,18 +464,19 @@ function trackAgain(shipment: GlideRecord, param: string, tries: number, why: st
 }
 
 /**
- * Apply `update` to `shipment`, read again under its tracking lock, save it and add the events not stored yet. A queued
- * update (`newestAt`: when its newest event happened) overtaken by an update applied while it waited (domain/shipping
- * `statusOvertaken`) adds only its events, so its older status cannot move the Shipment back. A holder does not check
- * that it still holds the lock: its few writes take a moment, far inside the lock's ten minutes.
+ * Apply `update` to `shipment`, read again under its tracking lock, save it and add the events not stored yet. An
+ * update (`newestAt`: when its newest event happened, '' when none is dated) overtaken by one applied before it, a
+ * webhook resent late or one queued while another was applied (domain/shipping `statusOvertaken`), adds only its
+ * events, so its older status cannot move the Shipment back. A holder does not check that it still holds the lock:
+ * its few writes take a moment, far inside the lock's ten minutes.
  */
-function track(shipment: GlideRecord, update: TrackingUpdate, newestAt?: string): Tracked {
+function track(shipment: GlideRecord, update: TrackingUpdate, newestAt: string): Tracked {
     const shipmentId = shipment.getUniqueValue()
     // Read under the lock, so no other delivery inserts between this read and the inserts below.
     const stored = storedEvents(shipmentId)
     let status = str(shipment, 'status') as ShipmentStatus
     let deliveredNow = false
-    if (newestAt === undefined || !statusOvertaken(update, newestAt, stored.times)) {
+    if (!statusOvertaken(update, newestAt, stored.times)) {
         const applied = applyTracking(status, update)
         status = applied.status
         deliveredNow = applied.deliveredNow

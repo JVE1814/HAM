@@ -32,7 +32,9 @@ export function refreshWaves(candidates: readonly RefreshCandidate[]): RefreshWa
 
 /**
  * The model to refresh to: the same one while the Customer may still order it and it is still sold,
- * otherwise the catalogued model of the same Device class with the latest end of support.
+ * otherwise the catalogued model of the same Device class with the latest end of support. A model whose end of
+ * support is not known (not synced from its OEM yet, or with no date given) ranks after every model with one, in
+ * catalog order: its support is unknown, not unlimited, so a model with known dates is preferred.
  */
 export function replacementModel(
     current: { modelId: string; deviceClass: string },
@@ -45,8 +47,10 @@ export function replacementModel(
         return !endOfSale || endOfSale > today
     }
     if (catalog.some((c) => c.modelId === current.modelId) && sellable(current.modelId)) return current.modelId
+    const endOfSupport = (modelId: string) => lifecycle.get(modelId)?.endOfSupport ?? ''
+    // Latest end of support first; '' (unknown) sorts after every date. The sort is stable, so ties keep catalog order.
     const options = catalog
         .filter((c) => c.deviceClass === current.deviceClass && sellable(c.modelId))
-        .sort((a, b) => (lifecycle.get(b.modelId)?.endOfSupport ?? '9999').localeCompare(lifecycle.get(a.modelId)?.endOfSupport ?? '9999'))
+        .sort((a, b) => endOfSupport(b.modelId).localeCompare(endOfSupport(a.modelId)))
     return options[0]?.modelId ?? null
 }
