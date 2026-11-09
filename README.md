@@ -55,8 +55,8 @@ on-demand job **NaaS - preflight check** (System Definition > Scheduled Jobs); i
 |---|---|---|
 | Asset Management | base platform | `alm_hardware`, stockrooms, transfer orders |
 | Procurement | `com.snc.procurement` | purchase orders (`proc_po`, `proc_po_item`) |
-| Customer Service Management | CSM | `customer_account`, `customer_contact`, cases (P2), portal (P2) |
-| Field Service Management | FSM | `wm_order` work orders |
+| Customer Service Management | CSM (`com.sn_customerservice`) | `customer_account`, `customer_contact`, cases (P2), portal (P2) |
+| Field Service Management | FSM (`com.snc.work_management`) | `wm_order` work orders |
 | Change Management | ITSM | `change_request` (standard changes for routine work) |
 | Discovery / Service Graph Connectors | ITOM | CI `last_discovered` as a Seen signal |
 
@@ -64,14 +64,34 @@ Roles the app's roles contain and that must exist: `asset`, `inventory_user`, `i
 `procurement_user`, `procurement_admin`, `report_user`, `snc_external`, `canvas_user`,
 `sn_customerservice_agent`.
 
+Without these plugins the install fails and rolls back with only *Unable to install third party
+application 'x_daas_ham'*: the app's tables reference theirs. On a personal developer instance,
+activate them from *System Definition > Plugins* or with the CI/CD API
+(`POST /api/sn_cicd/plugin/<id>/activate`).
+
+### Vendor prefix
+
+The scope `x_daas_ham` carries the vendor prefix `daas`. An instance whose vendor key differs (a
+personal developer instance has a number, e.g. `2307953`) refuses the install with the same *Unable
+to install third party application* error. Add `daas` to the system property
+`sn_appauthor.all_company_keys`, comma-separated after the existing key (e.g. `2307953,daas`). Leave
+`glide.appcreator.company.code` as it is: a comma list there becomes the scope prefix of new apps
+(`x_2307953,daas_`) and does not let the install through.
+
 ## Install
 
 ```bash
 npm install
 npm run check                      # typecheck, lint, unit tests, build
 npx now-sdk auth --add <alias>     # once per instance
-npx now-sdk install --auth <alias> # add --demo-data on dev/test instances only
+npx now-sdk install --auth <alias> --no-demoData   # production: demo data loads unless turned off
+npx now-sdk install --auth <alias>                  # dev/test: demo data included
 ```
+
+The install log (*System Applications > Application install history*, `sys_upgrade_history_log`)
+lists one *Skipped Error* row per global table the app adds columns to
+(`sys_documentation_<table>__en`, eight of them): SDK 4.14 writes a table label for each augmented
+table, and the platform keeps the table's own. Any other *Skipped Error* row is a defect.
 
 Then configure (System Properties, `x_daas_ham.*`):
 
@@ -101,13 +121,13 @@ stockrooms (*Administration > Stockroom members*).
 
 ### Demo data
 
-With `--demo-data`, the on-demand job **NaaS - load demo data** is installed. Run it once
-("Execute Now"): it creates two customers (Acme Retail, Globex Logistics) with sites, racks and
-stockrooms, models from Cisco/Meraki, HPE Aruba, Fortinet and Check Point, site templates, agreements,
-subscription lines, catalog entries, staging checklists, demo users (`naas.inventory`, `naas.field`,
-`acme.admin`, `acme.hq.contact`) and stock, in-service switches with OEM coverage, service intervals
-and a lease that ends before the Acme agreement, and sets the two properties above. Lifecycle dates in the
-demo data are illustrative, not vendor bulletins.
+Unless installed with `--no-demoData`, the on-demand job **NaaS - load demo data** is installed. Run
+it once ("Execute Now"): it creates two customers (Acme Retail, Globex Logistics) with sites, racks
+and stockrooms, models from Cisco/Meraki, HPE Aruba, Fortinet and Check Point, site templates,
+agreements, subscription lines, catalog entries, staging checklists, demo users (`naas.inventory`,
+`naas.field`, `acme.admin`, `acme.hq.contact`) and stock, in-service switches with OEM coverage,
+service intervals and a lease that ends before the Acme agreement, and sets the two properties
+above. Lifecycle dates in the demo data are illustrative, not vendor bulletins.
 
 ## Integrations
 
