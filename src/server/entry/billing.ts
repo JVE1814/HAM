@@ -5,11 +5,18 @@ import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_in
 import {
     billingMonthProblem,
     billsFromIntervals,
+    decideGenerationReset,
+    generationEventParm,
+    isCurrentGeneration,
     monthBounds,
     overlapsMonth,
     previousMonth,
+    readGenerationEventParm,
+    RESET_AFTER_IDLE_MINUTES,
+    resetGenerationError,
     subscriptionCharges,
     toCsv,
+    type GenerationEventParm,
     type MonthBounds,
     type ServiceInterval,
     type SubscriptionLineTerms,
@@ -18,7 +25,7 @@ import { appendTo } from '../domain/collections'
 import { memoized } from '../domain/memo'
 import { ROLE } from '../domain/visibility'
 import { RowFailure, runEventTableJob } from '../platform/chunked'
-import { msToGlide, nowMs, todayIso } from '../platform/clock'
+import { glideToMs, msToGlide, nowMs, todayIso } from '../platform/clock'
 import { EVENT, fire } from '../platform/events'
 import { deleteWhere, exists, findById, num, refusal, str } from '../platform/records'
 import { queryInt, reply } from '../platform/rest-api'
@@ -42,33 +49,132 @@ export function openMonthlyBillingPeriod(): void {
     gs.error(`[x_daas_ham] Billing period ${month} not opened: ${refusal(period)}; create it by hand`)
 }
 
-/** After insert rule on billing periods still generating (the monthly job's or one made by hand): generate it. */
-export function startBillingPeriodGeneration(current: GlideRecord): void {
-    fire(EVENT.billingGenerate, current, current.getUniqueValue())
-}
-
 /**
- * Script action on x_daas_ham.billing.generate: one pass over the Subscription lines active in the month.
- * A chunk that cannot run (e.g. a month saved past the month rule) stops the pass and holds the period for review.
+ * After insert rule on billing periods still generating (the monthly job's or one made by hand): generate it. A pass
+ * that cannot be started is held for review with why, as a generation that stops is.
  */
-export function generateBillingLines(event: GlideRecord, current: GlideRecord): void {
-    const period = findById('x_daas_ham_billing_period', str(event, 'parm1'))
-    if (!period || str(period, 'status') !== 'generating') return
+export function startBillingPeriodGeneration(current: GlideRecord): void {
     try {
-        generateChunk(period, str(event, 'parm2'), current)
+        queueGeneration(current)
     } catch (error) {
-        stopGeneration(period, error instanceof Error ? error.message : String(error))
+        const period = findById('x_daas_ham_billing_period', current.getUniqueValue())
+        if (period) stopGeneration(period, `generation not started: ${messageOf(error)}`)
     }
 }
 
+/**
+ * Script action on x_daas_ham.billing.generate (parm1 = period and pass, parm2 = cursor): one chunk of a pass over the
+ * Subscription lines active in the month. A chunk of a pass that was reset or replaced since is dropped. A chunk that
+ * cannot run (e.g. a month saved past the month rule) stops the pass and holds the period for review.
+ */
+export function generateBillingLines(event: GlideRecord, current: GlideRecord): void {
+    const parm1 = str(event, 'parm1')
+    const pass = readGenerationEventParm(parm1)
+    const period = findById('x_daas_ham_billing_period', pass.periodId)
+    if (!period || str(period, 'status') !== 'generating') return
+    try {
+        if (!startChunk(pass)) return void dropChunk(period)
+        generateChunk(period, pass, parm1, str(event, 'parm2'), current)
+    } catch (error) {
+        // A pass reset or replaced meanwhile must not hold the period, which may be generating afresh by now.
+        if (!isCurrentPass(pass)) return void dropChunk(period)
+        stopGeneration(period, messageOf(error))
+    }
+}
+
+function messageOf(error: unknown): string {
+    return error instanceof Error ? error.message : String(error)
+}
+
+/*
+ * A period's generation passes are tracked on its job cursor `billing_generate_<sys_id>` (ADR 0007): `cursor` holds the
+ * current pass's token ('' once reset by hand) and `last_run` when that pass last started a chunk, its activity. Each
+ * chunk's position still travels in its event's parm2.
+ */
+
+function generationJob(periodId: string): string {
+    return `billing_generate_${periodId}`
+}
+
+function generationCursor(periodId: string): GlideRecord | null {
+    const row = new GlideRecord('x_daas_ham_job_cursor')
+    return row.get('job', generationJob(periodId)) ? row : null
+}
+
+/**
+ * Start a new pass of the period's generation and queue its first chunk. The chunks still queued of any earlier pass
+ * (one reset by hand) are dropped from then on. Throws (with why) when the pass cannot be recorded.
+ */
+function queueGeneration(period: GlideRecord): void {
+    const periodId = period.getUniqueValue()
+    const token = String(nowMs())
+    recordPass(periodId, token)
+    fire(EVENT.billingGenerate, period, generationEventParm({ periodId, token }))
+}
+
+/** Make `token` the period's current pass, active now, on its job cursor (created on its first pass). */
+function recordPass(periodId: string, token: string): void {
+    const job = generationJob(periodId)
+    let row = generationCursor(periodId)
+    if (!row) {
+        const created = new GlideRecord('x_daas_ham_job_cursor')
+        created.initialize()
+        created.setValue('job', job)
+        setPass(created, token)
+        if (created.insert()) return
+        // Another start inserted it first (the unique index on job): this pass replaces that one on its row.
+        row = generationCursor(periodId)
+        if (!row) throw new Error(`job cursor ${job} not created: ${refusal(created)}`)
+    }
+    setPass(row, token)
+    if (!row.update()) throw new Error(`job cursor ${job} not saved: ${refusal(row)}`)
+}
+
+function setPass(row: GlideRecord, token: string): void {
+    row.setValue('cursor', token)
+    row.setValue('last_run', msToGlide(nowMs()))
+    // Not 'generating': nothing marks the row as the pass ends, so it would read as stalled; the period has the state.
+    row.setValue('last_status', 'pass started')
+}
+
+function isCurrentPass(pass: GenerationEventParm): boolean {
+    const row = generationCursor(pass.periodId)
+    return row !== null && isCurrentGeneration(str(row, 'cursor'), pass.token)
+}
+
+/**
+ * As a chunk starts: record its pass's activity, then check that it is still the current pass. Recorded before the
+ * check, so a Reset generation that retires the pass meanwhile sees it and leaves the period generating. Throws when
+ * the activity is refused: a pass that cannot show activity could be reset while it runs.
+ */
+function startChunk(pass: GenerationEventParm): boolean {
+    const row = generationCursor(pass.periodId)
+    if (!row) return false
+    row.setValue('last_run', msToGlide(nowMs()))
+    if (!row.update()) throw new Error(`generation activity not recorded: ${refusal(row)}`)
+    return isCurrentPass(pass)
+}
+
+function dropChunk(period: GlideRecord): void {
+    gs.warn(
+        `[x_daas_ham] Billing period ${str(period, 'period')}: dropped a generation chunk of a pass reset or replaced (or queued before passes were tracked); if the period stays Generating, Reset generation and Regenerate it`,
+    )
+}
+
 /** Bill the next chunk of the period's Subscription lines after `cursor`, then finish the period once the last one is billed. */
-function generateChunk(period: GlideRecord, cursor: string, current: GlideRecord): void {
+function generateChunk(
+    period: GlideRecord,
+    pass: GenerationEventParm,
+    parm1: string,
+    cursor: string,
+    current: GlideRecord,
+): void {
     const bounds = monthBounds(str(period, 'period'))
     const siteName = memoized(siteNameOf)
     const result = runEventTableJob({
         eventName: EVENT.billingGenerate,
         record: current,
-        parm1: period.getUniqueValue(),
+        parm1,
         cursor,
         table: 'x_daas_ham_subscription_line',
         query: `status!=pending^${overlapsMonth(bounds)}`,
@@ -88,8 +194,10 @@ function generateChunk(period: GlideRecord, cursor: string, current: GlideRecord
         }),
         prepare: (lines: readonly LineRow[]) => withIntervals(lines, bounds),
         // Before the next chunk is queued: a line that could not be billed must not vanish from the bill, so a count
-        // the period refuses stops the generation (held for review) instead of letting it finish as clean.
+        // the period refuses stops the generation (held for review) instead of letting it finish as clean. A pass reset
+        // during the chunk neither queues the next nor finishes the period.
         flush: (failures) => {
+            if (!isCurrentPass(pass)) throw new Error('its generation pass was reset or replaced')
             if (failures.failed === 0) return
             addFailedLines(period, failures.failed, failures.lastError)
             if (!period.update()) throw new Error(`${failures.failed} failed line(s) not counted: ${refusal(period)}`)
@@ -313,8 +421,53 @@ export function uiRegenerateBillingPeriod(current: GlideRecord): void {
         return void gs.addErrorMessage(`${str(current, 'period')} not regenerated: some of its old lines could not be removed`)
     }
     // The period's open fees stay linked to it: the generation bills them again (finishGeneration).
-    fire(EVENT.billingGenerate, current, current.getUniqueValue())
+    try {
+        queueGeneration(current)
+    } catch (error) {
+        stopGeneration(current, `generation not started: ${messageOf(error)}`)
+        return void gs.addErrorMessage(`${str(current, 'period')} not regenerated: ${messageOf(error)}`)
+    }
     gs.addInfoMessage(`Regenerating ${str(current, 'period')}`)
+}
+
+/**
+ * UI action "Reset generation" (admin) on a period stuck generating: hold it for review with the reset as its error, so
+ * Close period refuses until a Regenerate bills it afresh. It deletes and bills nothing, and only resets a generation
+ * that has shown no activity for 30 minutes (domain/billing `decideGenerationReset`): the period's own last save, or
+ * its pass's last chunk start on the job cursor. The pass is retired first, so a chunk of it still queued is dropped,
+ * even once a Regenerate has the period generating again. A chunk that starts as the pass is retired may have found it
+ * still current; the period then stays generating, so nothing can be regenerated beside that chunk until it is done.
+ */
+export function uiResetBillingGeneration(current: GlideRecord): void {
+    if (!gs.hasRole(ROLE.admin)) return void gs.addErrorMessage('Only an admin can reset a generation')
+    const name = str(current, 'period')
+    const periodId = current.getUniqueValue()
+    const cursor = generationCursor(periodId)
+    const lastChunk = cursor ? str(cursor, 'last_run') : ''
+    const activity = [glideToMs(str(current, 'sys_updated_on')), glideToMs(lastChunk)]
+    const decision = decideGenerationReset(str(current, 'status'), activity, nowMs())
+    if (!decision.reset) return void gs.addErrorMessage(`${name} not reset: ${decision.why}`)
+    // Without a cursor no pass was recorded, and chunks of none are dropped (startChunk): nothing is left to retire.
+    if (cursor) {
+        // Its activity is left as it was, so a chunk that starts from now on shows on the read below.
+        cursor.setValue('cursor', '')
+        cursor.setValue('last_status', 'reset by hand')
+        if (!cursor.update()) {
+            return void gs.addErrorMessage(`${name} not reset: its generation could not be stopped: ${refusal(cursor)}`)
+        }
+        if (str(generationCursor(periodId) ?? cursor, 'last_run') !== lastChunk) {
+            return void gs.addErrorMessage(
+                `${name} not reset: a chunk of its generation started as it was being reset. Its generation is stopped and the period stays Generating until that chunk is done: Reset generation again in ${RESET_AFTER_IDLE_MINUTES} minutes`,
+            )
+        }
+    }
+    current.setValue('status', 'ready')
+    current.setValue('last_error', resetGenerationError(gs.getUserDisplayName(), decision.idleMinutes))
+    // As when a generation stops: the totals of an earlier generation do not match the lines written so far.
+    setTotals(current)
+    // Refused (the platform says why), it stays generating with its pass retired: Reset generation again.
+    if (!current.update()) return
+    gs.addInfoMessage(`${name} is ready for review, reset by hand: Regenerate it before closing`)
 }
 
 const CSV_HEADER = ['period', 'kind', 'customer', 'agreement', 'subscription_line', 'site', 'description', 'units', 'monthly_rate', 'amount', 'currency']

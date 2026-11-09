@@ -1,20 +1,31 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
     activeDays,
+    BILLED_STAGES,
     billingMonthProblem,
     billsFromIntervals,
+    decideGenerationReset,
+    generationEventParm,
+    IN_SERVICE_ON_ENDED_LINE,
     intervalEnd,
+    isCurrentGeneration,
     isMonth,
     monthBounds,
     overlapsMonth,
     previousMonth,
     prorate,
+    readGenerationEventParm,
+    RESET_AFTER_IDLE_MINUTES,
+    resetGenerationError,
     restartInterval,
     subscriptionCharges,
     toCsv,
+    withinLine,
     type ChargeSources,
     type ServiceInterval,
 } from './billing'
+import { ALL_STAGES, isBillable } from './lifecycle'
 
 const nov = monthBounds('2026-11')
 const feb = monthBounds('2028-02')
@@ -143,7 +154,7 @@ describe('billsFromIntervals', () => {
 
 describe('subscriptionCharges', () => {
     const sitePackage = { lineType: 'site_package', monthlyRate: 4500, siteId: 'hq', description: 'Site package' }
-    const perDevice = { lineType: 'device_class', monthlyRate: 45, siteId: '', description: 'Laptop' }
+    const perDevice = { lineType: 'device_class', monthlyRate: 45, siteId: '', description: 'Laptop', start: '2026-01-01' }
 
     it('charges a site package for the days it was active', () => {
         expect(subscriptionCharges({ ...sitePackage, start: '2026-11-16' }, nov, sources())).toEqual([
@@ -236,6 +247,33 @@ describe('subscriptionCharges', () => {
         ])
     })
 
+    it('bills a per-device line only from its own start date', () => {
+        const read = sources([
+            { siteId: 'hq', start: '2026-02-01' },
+            { siteId: 'store', start: '2026-11-20', end: '2026-11-25' },
+        ])
+        expect(subscriptionCharges({ ...perDevice, start: '2026-11-21' }, nov, read)).toEqual([
+            { siteId: 'hq', description: 'Laptop - Head office', units: 10, amount: 15 },
+            { siteId: 'store', description: 'Laptop - Store 12', units: 5, amount: 7.5 },
+        ])
+    })
+
+    it('stops billing a per-device line on its end date, for units still in service too', () => {
+        const read = sources([
+            { siteId: 'hq', start: '2026-02-01', count: 2 },
+            { siteId: 'hq', start: '2026-11-10', end: '2026-11-12' },
+            { siteId: 'store', start: '2026-11-16' },
+        ])
+        expect(subscriptionCharges({ ...perDevice, end: '2026-11-15' }, nov, read)).toEqual([
+            { siteId: 'hq', description: 'Laptop - Head office', units: 33, amount: 49.5 },
+        ])
+    })
+
+    it('bills nothing for a per-device line without a start date, as for a site package', () => {
+        const { start: _start, ...unstarted } = perDevice
+        expect(subscriptionCharges(unstarted, nov, sources([{ siteId: 'hq', start: '2026-11-01' }]))).toEqual([])
+    })
+
     it('bills nothing for an unknown line type, whatever Service intervals it is given, and reads no Site name', () => {
         const read = sources([{ siteId: 'hq', start: '2026-11-01' }])
         expect(subscriptionCharges({ ...perDevice, lineType: 'per_seat', siteId: 'hq', start: '2026-11-01' }, nov, read)).toEqual([])
@@ -265,5 +303,133 @@ describe('restartInterval', () => {
     it('starts the day after an interval elsewhere that covers the restart day', () => {
         expect(restartInterval({ ...here, end: '2026-11-10' }, { ...here, lineId: 'L2' }, '2026-11-10')).toEqual({ start: '2026-11-11' })
         expect(restartInterval({ ...here, end: '2026-11-10' }, { ...here, siteId: 'S2' }, '2026-11-10')).toEqual({ start: '2026-11-11' })
+    })
+})
+
+describe('withinLine', () => {
+    const line = { start: '2026-11-10', end: '2026-11-20' }
+
+    it('cuts a Service interval to its line start and end date, both billed', () => {
+        expect(withinLine({ start: '2026-02-01' }, line)).toEqual({ start: '2026-11-10', end: '2026-11-20' })
+        expect(withinLine({ start: '2026-11-12', end: '2026-11-14' }, line)).toEqual({ start: '2026-11-12', end: '2026-11-14' })
+        expect(withinLine({ start: '2026-11-20', end: '2026-12-31' }, line)).toEqual({ start: '2026-11-20', end: '2026-11-20' })
+    })
+
+    it('leaves an interval open on a line without an end date', () => {
+        expect(withinLine({ start: '2026-11-12' }, { start: '2026-11-10' })).toEqual({ start: '2026-11-12', end: undefined })
+        expect(withinLine({ start: '2026-11-01', end: '2026-11-05' }, { start: '2026-10-01' })).toEqual({ start: '2026-11-01', end: '2026-11-05' })
+    })
+
+    it('bills nothing outside the line, or on a line not started', () => {
+        expect(withinLine({ start: '2026-11-21' }, line)).toBeNull()
+        expect(withinLine({ start: '2026-10-01', end: '2026-11-09' }, line)).toBeNull()
+        expect(withinLine({ start: '2026-11-12' }, {})).toBeNull()
+        expect(withinLine({ start: '' }, line)).toBeNull()
+    })
+})
+
+describe('IN_SERVICE_ON_ENDED_LINE', () => {
+    it('flags billed Assets whose line was set ended or is past its end date', () => {
+        expect(BILLED_STAGES).toEqual(ALL_STAGES.filter((stage) => isBillable(stage)))
+        expect(BILLED_STAGES.length).toBeGreaterThan(0)
+        const ended = 'x_daas_ham_subscription_line.status=ended^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()'
+        expect(IN_SERVICE_ON_ENDED_LINE).toBe(
+            `install_status=1^substatusISEMPTY^${ended}^NQinstall_status=1^substatus=temporary_deployment^${ended}`,
+        )
+    })
+
+    it('is what the Billing integrity dashboard counts', () => {
+        const tile = readFileSync(new URL('../../fluent/workspace/dashboard.now.ts', import.meta.url), 'utf8')
+            .split('$id: Now.ID[')
+            .find((source) => source.startsWith("'dash_w_ended_line_in_service']"))
+        expect(/headerTitle:\s*'([^']*)'/.exec(tile ?? '')?.[1]).toBe('In service on an ended line')
+        expect(/filterQuery:\s*'([^']*)'/.exec(tile ?? '')?.[1]).toBe(IN_SERVICE_ON_ENDED_LINE)
+    })
+})
+
+describe('decideGenerationReset', () => {
+    const now = Date.parse('2026-11-09T12:00:00Z')
+    const minutesAgo = (minutes: number) => now - minutes * 60000
+
+    it('resets a generating period once its latest activity is 30 minutes old', () => {
+        expect(RESET_AFTER_IDLE_MINUTES).toBe(30)
+        expect(decideGenerationReset('generating', [minutesAgo(30)], now)).toEqual({ reset: true, idleMinutes: 30 })
+        expect(decideGenerationReset('generating', [minutesAgo(240), minutesAgo(45)], now)).toEqual({ reset: true, idleMinutes: 45 })
+        expect(decideGenerationReset('generating', [undefined, minutesAgo(31)], now)).toEqual({ reset: true, idleMinutes: 31 })
+    })
+
+    it('refuses while any activity is more recent, since the generation may still be running', () => {
+        const decision = decideGenerationReset('generating', [minutesAgo(240), minutesAgo(29.5)], now)
+        expect(decision).toEqual({
+            reset: false,
+            why: 'its generation was active 29 minute(s) ago and may still be running; it can be reset once it has shown no activity for 30 minutes',
+        })
+        expect(decideGenerationReset('generating', [now + 60000], now)).toMatchObject({ reset: false, why: expect.stringContaining('active 0 minute(s) ago') })
+    })
+
+    it('refuses when no activity can be read', () => {
+        expect(decideGenerationReset('generating', [undefined], now)).toEqual({
+            reset: false,
+            why: 'when its generation was last active cannot be read, so it may still be running',
+        })
+        expect(decideGenerationReset('generating', [], now)).toMatchObject({ reset: false })
+    })
+
+    it('resets only a period still generating', () => {
+        for (const status of ['ready', 'closed', '']) {
+            expect(decideGenerationReset(status, [minutesAgo(600)], now)).toEqual({ reset: false, why: 'only a period still generating can be reset' })
+        }
+    })
+})
+
+describe('resetGenerationError', () => {
+    it('says the period was reset by hand and must be regenerated', () => {
+        expect(resetGenerationError('Fran Admin', 42)).toBe(
+            'Generation reset by hand by Fran Admin after 42 minutes without activity; its lines may be incomplete: Regenerate before closing',
+        )
+    })
+
+    it('fits the 255 characters of the period error', () => {
+        expect(resetGenerationError('x'.repeat(300), 30)).toHaveLength(255)
+    })
+})
+
+describe('generation event parm', () => {
+    it('carries the period and its pass token, and reads back', () => {
+        expect(generationEventParm({ periodId: 'p1', token: '1762689600000' })).toBe('p1:1762689600000')
+        expect(readGenerationEventParm('p1:1762689600000')).toEqual({ periodId: 'p1', token: '1762689600000' })
+    })
+
+    it('reads an event from before passes were tracked as belonging to no pass', () => {
+        expect(readGenerationEventParm('p1')).toEqual({ periodId: 'p1', token: '' })
+        expect(readGenerationEventParm('')).toEqual({ periodId: '', token: '' })
+    })
+})
+
+describe('isCurrentGeneration', () => {
+    it('lets only the current pass go on', () => {
+        expect(isCurrentGeneration('1762689600000', '1762689600000')).toBe(true)
+        expect(isCurrentGeneration('1762689600000', '1762680000000')).toBe(false)
+    })
+
+    it('stops every pass of a period reset by hand, and events without a pass', () => {
+        expect(isCurrentGeneration('', '1762689600000')).toBe(false)
+        expect(isCurrentGeneration('', '')).toBe(false)
+        expect(isCurrentGeneration('1762689600000', '')).toBe(false)
+    })
+})
+
+describe('the Reset generation action', () => {
+    const action = readFileSync(new URL('../../fluent/logic/billing.now.ts', import.meta.url), 'utf8')
+        .split('UiAction({')
+        .find((source) => source.includes("actionName: 'x_daas_ham_billing_reset_generation'"))
+
+    it('is offered to admins only, on a period still generating', () => {
+        expect(action).toContain('roles: [admin],')
+        expect(action).toContain(`condition: "current.status == 'generating'"`)
+    })
+
+    it('tells how long a generation must have shown no activity', () => {
+        expect(/hint:\s*'([^']*)'/.exec(action ?? '')?.[1]).toContain(`no activity for ${RESET_AFTER_IDLE_MINUTES} minutes`)
     })
 })

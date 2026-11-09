@@ -1,4 +1,5 @@
 import { addDays, addMonths, daysBetween } from './calendar'
+import { ALL_STAGES, isBillable, stagesQuery, type Stage } from './lifecycle'
 
 /** Billing periods: daily proration of Subscription lines and Fee events (P3.25, D52, D66). */
 
@@ -100,6 +101,7 @@ export interface SubscriptionLineTerms {
     siteId: string
     /** The Subscription line's own description. */
     description: string
+    /** The line's own dates, end inclusive: a site package bills them, a per-device line its intervals within them. */
     start?: string
     end?: string
 }
@@ -108,6 +110,39 @@ export interface SubscriptionLineTerms {
 export function billsFromIntervals(line: SubscriptionLineTerms): boolean {
     return line.lineType === 'device_class'
 }
+
+/** A range of days, end inclusive; no end means still open. */
+export interface DayRange {
+    start: string
+    end?: string
+}
+
+/**
+ * The days of a Service interval its per-device line bills: the interval cut to the line's own start and end date, so
+ * a unit still in service after its line ended stops billing on the line's end date (the Billing integrity dashboard
+ * flags it, IN_SERVICE_ON_ENDED_LINE; it is never moved to another line). Null when they do not overlap, and for a
+ * line without a start date, which has not started (a site package without one bills nothing either).
+ */
+export function withinLine(interval: DayRange, line: Partial<DayRange>): DayRange | null {
+    if (!line.start || !interval.start) return null
+    const start = interval.start > line.start ? interval.start : line.start
+    const end = !line.end || (interval.end && interval.end < line.end) ? interval.end : line.end
+    return end !== undefined && end < start ? null : { start, end }
+}
+
+/** The stages in which an Asset delivers its Subscription line and is billed from its Service interval. */
+export const BILLED_STAGES: readonly Stage[] = ALL_STAGES.filter((stage) => isBillable(stage))
+
+/**
+ * Encoded query on alm_hardware for the Billing integrity dashboard: Assets billed from a Service interval whose
+ * Subscription line has ended (set ended, or past its end date; the end date itself is billed). Their days after the
+ * line's end are not billed (withinLine), so they are flagged; nothing moves them to another line.
+ */
+export const IN_SERVICE_ON_ENDED_LINE = stagesQuery(
+    BILLED_STAGES,
+    'x_daas_ham_subscription_line.status=ended' +
+        '^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()',
+)
 
 /** What one Subscription line bills at one Site for the month: the content of its Billing line. */
 export interface Charge {
@@ -129,7 +164,7 @@ export interface ChargeSources {
 
 /**
  * The charges (one per Site) a Subscription line produces for the month: a site package by its own
- * active days, a per-device line by the device-days its Assets were in service, per Site.
+ * active days, a per-device line by the device-days its Assets were in service while it ran, per Site.
  */
 export function subscriptionCharges(line: SubscriptionLineTerms, bounds: MonthBounds, sources: ChargeSources): Charge[] {
     return [...unitsBySite(line, bounds, sources)].map(([siteId, units]) => {
@@ -151,11 +186,74 @@ function unitsBySite(line: SubscriptionLineTerms, bounds: MonthBounds, sources: 
         if (units > 0) bySite.set(line.siteId, units)
     } else if (billsFromIntervals(line)) {
         for (const interval of sources.intervals) {
-            const units = activeDays(bounds, interval.start, interval.end) * (interval.count ?? 1)
+            const billed = withinLine(interval, line)
+            const units = billed ? activeDays(bounds, billed.start, billed.end) * (interval.count ?? 1) : 0
             if (units > 0) bySite.set(interval.siteId, (bySite.get(interval.siteId) ?? 0) + units)
         }
     }
     return bySite
+}
+
+/** How long a generating Billing period must show no activity before an admin may reset it (Reset generation). */
+export const RESET_AFTER_IDLE_MINUTES = 30
+
+/** Whether an admin may reset a period's generation by hand now, and how long it has shown no activity. */
+export type GenerationReset = { reset: true; idleMinutes: number } | { reset: false; why: string }
+
+/**
+ * Whether a Billing period stuck in Generating may be reset by hand to Ready for review: only once its generation has
+ * shown no activity (the latest of `activityMs`, undefined where unknown) for RESET_AFTER_IDLE_MINUTES. Each chunk
+ * records its activity as it starts and runs for the job's time budget (minutes), so a generation still running is not
+ * cut short and its lines are not billed beside those of the Regenerate that follows.
+ */
+export function decideGenerationReset(
+    status: string,
+    activityMs: ReadonlyArray<number | undefined>,
+    nowMs: number,
+): GenerationReset {
+    if (status !== 'generating') return { reset: false, why: 'only a period still generating can be reset' }
+    const known = activityMs.filter((ms): ms is number => ms !== undefined)
+    if (known.length === 0) {
+        return { reset: false, why: 'when its generation was last active cannot be read, so it may still be running' }
+    }
+    const idleMinutes = Math.max(0, Math.floor((nowMs - Math.max(...known)) / 60000))
+    if (idleMinutes >= RESET_AFTER_IDLE_MINUTES) return { reset: true, idleMinutes }
+    return {
+        reset: false,
+        why: `its generation was active ${idleMinutes} minute(s) ago and may still be running; it can be reset once it has shown no activity for ${RESET_AFTER_IDLE_MINUTES} minutes`,
+    }
+}
+
+/** The generation error a reset period records, which Close period refuses on until a Regenerate clears it. */
+export function resetGenerationError(byUser: string, idleMinutes: number): string {
+    const note = `Generation reset by hand by ${byUser} after ${idleMinutes} minutes without activity; its lines may be incomplete: Regenerate before closing`
+    return note.slice(0, 255)
+}
+
+/** What a generation event's parm1 names: the period, and the pass the event belongs to ('' for none). */
+export interface GenerationEventParm {
+    periodId: string
+    token: string
+}
+
+/**
+ * The parm1 of a period's generation events: its sys_id and the pass's token, so that the queued events of a pass that
+ * was reset or replaced by a Regenerate are told from the current pass's and dropped.
+ */
+export function generationEventParm(parm: GenerationEventParm): string {
+    return `${parm.periodId}:${parm.token}`
+}
+
+/** A generation event's parm1 read back; one without a token (queued before passes were tracked) belongs to no pass. */
+export function readGenerationEventParm(parm1: string): GenerationEventParm {
+    const separator = parm1.indexOf(':')
+    if (separator < 0) return { periodId: parm1, token: '' }
+    return { periodId: parm1.slice(0, separator), token: parm1.slice(separator + 1) }
+}
+
+/** Whether an event's pass `token` is the period's current pass (`currentToken`, '' once reset by hand). */
+export function isCurrentGeneration(currentToken: string, token: string): boolean {
+    return token !== '' && token === currentToken
 }
 
 /** RFC 4180 CSV: fields with commas, quotes or line breaks are quoted, quotes doubled. */

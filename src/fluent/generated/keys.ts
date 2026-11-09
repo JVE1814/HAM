@@ -1457,6 +1457,10 @@ declare global {
                         table: 'par_dashboard_widget'
                         id: '5ec1036ab76243a49ec8b568448cd001'
                     }
+                    dash_w_ended_line_in_service: {
+                        table: 'par_dashboard_widget'
+                        id: '221f91fe58bc491f87172c0224863b5f'
+                    }
                     dash_w_exception_types: {
                         table: 'par_dashboard_widget'
                         id: '2b1d992881204939a7bf0891ce08c990'
@@ -2847,6 +2851,10 @@ declare global {
                     ua_billing_regenerate: {
                         table: 'sys_ui_action'
                         id: 'd3641bdb2998498da3eff3e227d43ecb'
+                    }
+                    ua_billing_reset_generation: {
+                        table: 'sys_ui_action'
+                        id: '639860d306bf42aba4baf43fe568171b'
                     }
                     ua_case_raise_replacement: {
                         table: 'sys_ui_action'
@@ -10394,6 +10402,19 @@ declare global {
                                         }
                                     }
                                     sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: '2510d1085c644a889b4964c9ea070c90'
+                        key: {
+                            sys_ui_action: '639860d306bf42aba4baf43fe568171b'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
                                 }
                             }
                         }

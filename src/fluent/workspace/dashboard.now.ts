@@ -159,8 +159,29 @@ export const naasDashboard = Dashboard({
                         metrics: [{ dataSource: 'unbilled', id: 'm_unbilled', aggregateFunction: 'COUNT', axisId: 'primary' }],
                     },
                     height: 12,
-                    width: 16,
+                    width: 12,
                     position: { x: 0, y: 0 },
+                },
+                {
+                    // Not billed past the line's end date (domain/billing IN_SERVICE_ON_ENDED_LINE): flagged, never moved.
+                    $id: Now.ID['dash_w_ended_line_in_service'],
+                    component: 'single-score',
+                    componentProps: {
+                        dataSources: [
+                            {
+                                label: 'Hardware',
+                                sourceType: 'table',
+                                tableOrViewName: 'alm_hardware',
+                                filterQuery: 'install_status=1^substatusISEMPTY^x_daas_ham_subscription_line.status=ended^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()^NQinstall_status=1^substatus=temporary_deployment^x_daas_ham_subscription_line.status=ended^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()',
+                                id: 'ended_line',
+                            },
+                        ],
+                        headerTitle: 'In service on an ended line',
+                        metrics: [{ dataSource: 'ended_line', id: 'm_ended_line', aggregateFunction: 'COUNT', axisId: 'primary' }],
+                    },
+                    height: 12,
+                    width: 12,
+                    position: { x: 12, y: 0 },
                 },
                 {
                     $id: Now.ID['dash_w_pending_lines'],
@@ -179,8 +200,8 @@ export const naasDashboard = Dashboard({
                         metrics: [{ dataSource: 'pending_lines', id: 'm_pending_lines', aggregateFunction: 'COUNT', axisId: 'primary' }],
                     },
                     height: 12,
-                    width: 16,
-                    position: { x: 16, y: 0 },
+                    width: 12,
+                    position: { x: 24, y: 0 },
                 },
                 {
                     $id: Now.ID['dash_w_lines_by_customer'],
@@ -200,8 +221,8 @@ export const naasDashboard = Dashboard({
                         groupBy: [{ groupBy: [{ dataSource: 'lines_by_customer', groupByField: 'customer' }], maxNumberOfGroups: 10, showOthers: true }],
                     },
                     height: 16,
-                    width: 16,
-                    position: { x: 32, y: 0 },
+                    width: 12,
+                    position: { x: 36, y: 0 },
                 },
             ],
         },

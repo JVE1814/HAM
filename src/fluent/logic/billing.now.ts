@@ -11,8 +11,9 @@ import {
     uiCloseBillingPeriod,
     uiExportBillingPeriod,
     uiRegenerateBillingPeriod,
+    uiResetBillingGeneration,
 } from '../../server/entry/billing'
-import { finance } from '../security/roles.now'
+import { admin, finance } from '../security/roles.now'
 
 /* Billing periods (P3.25, D66): monthly generation, review, close and lock, CSV export. */
 
@@ -34,7 +35,8 @@ export const billingGenerateEvent = Record({
         suffix: 'billing.generate',
         event_name: 'x_daas_ham.billing.generate',
         table: 'x_daas_ham_billing_period',
-        description: 'Generate the lines of a billing period; parm1 = period, parm2 = cursor.',
+        // Holds 100 characters at most; the pass token is kept on job cursor billing_generate_<period>.
+        description: 'Generate the lines of a billing period; parm1 = period:pass token, parm2 = cursor.',
         fired_by: 'entry/billing.ts startBillingPeriodGeneration, uiRegenerateBillingPeriod',
         priority: 200,
     },
@@ -82,6 +84,20 @@ UiAction({
     form: { showButton: true },
     showUpdate: true,
     script: uiRegenerateBillingPeriod,
+})
+
+// Admin only: a generation that stopped without being held for review (e.g. its chunk died) is left Generating.
+UiAction({
+    $id: Now.ID['ua_billing_reset_generation'],
+    name: 'Reset generation',
+    table: 'x_daas_ham_billing_period',
+    actionName: 'x_daas_ham_billing_reset_generation',
+    hint: 'Hold a generation that has shown no activity for 30 minutes as Ready for review, to Regenerate; deletes and bills nothing.',
+    condition: "current.status == 'generating'",
+    roles: [admin],
+    form: { showButton: true },
+    showUpdate: true,
+    script: uiResetBillingGeneration,
 })
 
 UiAction({
