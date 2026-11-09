@@ -1,8 +1,6 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
     activeDays,
-    BILLED_STAGES,
     billingCsvHeader,
     billingCsvRow,
     billingLineJson,
@@ -10,6 +8,9 @@ import {
     billsFromIntervals,
     decideGenerationReset,
     IN_SERVICE_ON_ENDED_LINE,
+    IN_SERVICE_UNBILLED,
+    NO_LINE,
+    ON_ENDED_LINE,
     intervalEnd,
     isMonth,
     monthBounds,
@@ -27,7 +28,8 @@ import {
     type ServiceInterval,
     type StoredBillingLine,
 } from './billing'
-import { ALL_STAGES, isBillable } from './lifecycle'
+import { fleetStagesQuery } from './fleet'
+import { ALL_STAGES, IN_USE_STAGES, isBillable } from './lifecycle'
 
 const nov = monthBounds('2026-11')
 const feb = monthBounds('2028-02')
@@ -332,8 +334,8 @@ describe('withinLine', () => {
 
 describe('IN_SERVICE_ON_ENDED_LINE', () => {
     it('flags billed fleet assets whose line was set ended or is past its end date', () => {
-        expect(BILLED_STAGES).toEqual(ALL_STAGES.filter((stage) => isBillable(stage)))
-        expect(BILLED_STAGES.length).toBeGreaterThan(0)
+        expect(IN_USE_STAGES).toEqual(ALL_STAGES.filter((stage) => isBillable(stage)))
+        expect(IN_USE_STAGES.length).toBeGreaterThan(0)
         const ended = 'x_daas_ham_subscription_line.status=ended^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()'
         const fleet = 'x_daas_ham_fleet=true'
         expect(IN_SERVICE_ON_ENDED_LINE).toBe(
@@ -341,12 +343,9 @@ describe('IN_SERVICE_ON_ENDED_LINE', () => {
         )
     })
 
-    it('is what the Billing integrity dashboard counts', () => {
-        const tile = readFileSync(new URL('../../fluent/workspace/dashboard.now.ts', import.meta.url), 'utf8')
-            .split('$id: Now.ID[')
-            .find((source) => source.startsWith("'dash_w_ended_line_in_service']"))
-        expect(/headerTitle:\s*'([^']*)'/.exec(tile ?? '')?.[1]).toBe('In service on an ended line')
-        expect(/filterQuery:\s*'([^']*)'/.exec(tile ?? '')?.[1]).toBe(IN_SERVICE_ON_ENDED_LINE)
+    it('is, like the unbilled tile, the query the server would build: the dashboard imports the constant', () => {
+        expect(IN_SERVICE_ON_ENDED_LINE).toBe(fleetStagesQuery(IN_USE_STAGES, ON_ENDED_LINE))
+        expect(IN_SERVICE_UNBILLED).toBe(fleetStagesQuery(['in_service'], NO_LINE))
     })
 })
 
@@ -443,20 +442,5 @@ describe('a Billing line as exported', () => {
 
     it('reads a number column that is empty or unreadable as 0', () => {
         expect(billingLineJson('l3', storedLine({ units: 'n/a' }, {}))).toMatchObject({ units: 0, monthlyRate: 0, amount: 0 })
-    })
-})
-
-describe('the Reset generation action', () => {
-    const action = readFileSync(new URL('../../fluent/logic/billing.now.ts', import.meta.url), 'utf8')
-        .split('UiAction({')
-        .find((source) => source.includes("actionName: 'x_daas_ham_billing_reset_generation'"))
-
-    it('is offered to admins only, on a period still generating', () => {
-        expect(action).toContain('roles: [admin],')
-        expect(action).toContain(`condition: "current.status == 'generating'"`)
-    })
-
-    it('tells how long a generation must have shown no activity', () => {
-        expect(/hint:\s*'([^']*)'/.exec(action ?? '')?.[1]).toContain(`no activity for ${RESET_AFTER_IDLE_MINUTES} minutes`)
     })
 })

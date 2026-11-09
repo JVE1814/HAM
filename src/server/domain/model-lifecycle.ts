@@ -1,5 +1,6 @@
 import { addMonths, earliest, isIsoDate } from './calendar.ts'
-import type { LifecyclePhase } from './vocabulary.ts'
+import { FLEET_CONDITION } from './fleet.ts'
+import { INSTALL_STATUS, LIFECYCLE_PHASE, type LifecyclePhase } from './vocabulary.ts'
 
 /** A Model's manufacturer support milestones (ISO dates). */
 export interface LifecycleDates {
@@ -120,3 +121,9 @@ export function mergeLifecycle(existing: LifecycleDates, incoming: LifecycleDate
         endOfLife: incoming.endOfLife || existing.endOfLife,
     }
 }
+
+/**
+ * Encoded query on alm_hardware: the installed fleet assets (ADR 0016) whose Model is past its end of support, as the
+ * workspace lists and counts them.
+ */
+export const INSTALLED_PAST_SUPPORT = `install_status=${INSTALL_STATUS.inUse}^x_daas_ham_lifecycle_phaseIN${LIFECYCLE_PHASE.end_of_support},${LIFECYCLE_PHASE.end_of_extended_support},${LIFECYCLE_PHASE.end_of_life}^${FLEET_CONDITION}`

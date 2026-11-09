@@ -1,6 +1,6 @@
 import { inFleet, OEM_PID_FIELD } from './fleet.ts'
 import { seenWithoutFleetAssetQuery } from './reconciliation.ts'
-import type { MatchType } from './vocabulary.ts'
+import { type MatchType, NORM_EXCEPTION_STATUS } from './vocabulary.ts'
 
 /**
  * Model normalization: map the raw manufacturer/model strings reported by Discovery, connectors and
@@ -143,7 +143,7 @@ export const NOT_NAAS_REASON = 'not_naas'
  * Encoded query on normalization exceptions: the open ones the hourly normalization raised, whose source is a raw
  * model. Those an ASN row raised name the import row instead.
  */
-export const RAW_MODEL_EXCEPTIONS_QUERY = `status=open^source_table=${RAW_MODEL_TABLE}`
+export const RAW_MODEL_EXCEPTIONS_QUERY = `status=${NORM_EXCEPTION_STATUS.open}^source_table=${RAW_MODEL_TABLE}`
 
 /**
  * Encoded query on RAW_MODEL_TABLE: of the raw models open exceptions name (`exceptionModelIds`), those that are not

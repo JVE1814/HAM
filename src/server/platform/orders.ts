@@ -3,7 +3,6 @@ import { approversToAsk } from '../domain/approvals.ts'
 import {
     approversFor,
     assessOrder,
-    OPEN_LINE_STAGES,
     ownershipFindings,
     raiserRefusal,
     siteTemplateOffered,
@@ -12,7 +11,7 @@ import {
     type OrderParties,
     type RequestedLine,
 } from '../domain/entitlement.ts'
-import { anythingShipped, ORDER_TASK_STATE } from '../domain/fulfilment.ts'
+import { anythingShipped, OPEN_LINE_STAGES, ORDER_TASK_STATE } from '../domain/fulfilment.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { cancelledUnit } from '../domain/sourcing.ts'

@@ -13,12 +13,6 @@ export const AUDIT_STATE = { inProgress: 2, closed: 3 } as const
 export const ATTESTATION_STATE = { pending: -5, open: 1, closed: 3 } as const
 
 /**
- * The stages of the units in use at a Site: what an attestation is raised for, and what the daily reconciliation
- * compares with monitoring.
- */
-export const IN_USE_STAGES: readonly Stage[] = ['in_service', 'temporary_deployment']
-
-/**
  * The stages of the units on a stockroom's shelves, which its blind count expects there. A unit in transfer is one of
  * them until its transfer order line is In Transit: from Draft to Shipment Preparation Inventory keeps it In stock
  * (Pending transfer) in the stockroom it is sent from, and sets the stockroom it is sent to only once the line is

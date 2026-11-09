@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { checkTransition, DEPLOYED_STAGES, stagesQuery, type Stage } from './lifecycle'
+import { checkTransition, DEPLOYED_STAGES, INSTALLED_STAGES, stagesQuery, type Stage } from './lifecycle'
 import {
     chargedFeeQuery,
     collectionMethod,
     evaluationTarget,
     feeAmount,
-    INSTALLED_STAGES,
     opensDeinstallWork,
     overdueStep,
     receivedLate,

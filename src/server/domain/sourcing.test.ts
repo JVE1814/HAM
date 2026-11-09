@@ -11,19 +11,22 @@ import {
     lineShortfall,
     lineStillOpen,
     needsTransfer,
+    OPEN_RMAS_QUERY,
+    type OpenRma,
     pickForSparePool,
     planSourcing,
+    type PurchaseResult,
     reservedSparesQuery,
+    RMA_AWAITED,
+    RMA_OPEN,
     shortfallOutcome,
     shortfallRouteFor,
     sourcingPurpose,
+    type SourcingRequest,
     sparePoolShortfall,
     stillToBuy,
-    stockQueries,
-    type OpenRma,
-    type PurchaseResult,
-    type SourcingRequest,
     type StockCandidate,
+    stockQueries,
     type StockUnit,
 } from './sourcing'
 
@@ -431,5 +434,12 @@ describe('cancelledUnit', () => {
 
     it('makes any other unit free stock', () => {
         for (const stage of ['reserved', 'staging', 'staged', 'available', null] as const) expect(cancelledUnit(stage)).toBe('free_stock')
+    })
+})
+
+describe('the open RMAs', () => {
+    it('are the awaited ones and those whose replacement came, as the query the metadata imports selects them', () => {
+        for (const state of RMA_AWAITED) expect(RMA_OPEN).toContain(state)
+        expect(OPEN_RMAS_QUERY).toBe(`stateIN${RMA_OPEN.join(',')}`)
     })
 })

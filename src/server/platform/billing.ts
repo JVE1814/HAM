@@ -26,6 +26,7 @@ import { EVENT, fire, type JobEvent } from './events.ts'
 import { billableFees, markBilled, putOnPeriod, takeOffPeriod, visitWaivedFees } from './fees.ts'
 import { findJobCursor, retirePass } from './job-cursor.ts'
 import { deleteWhere, exists, findById, num, refusal, str } from './records.ts'
+import { BILLING_PERIOD_STATUS } from '../domain/vocabulary.ts'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
 
@@ -54,7 +55,7 @@ export function openBillingPeriod(month: string): void {
     const period = new GlideRecord(PERIOD)
     period.initialize()
     period.setValue('period', month)
-    period.setValue('status', 'generating')
+    period.setValue('status', BILLING_PERIOD_STATUS.generating)
     if (period.insert()) return
     // No later run opens this month, so a refused one would go unbilled unseen.
     gs.error(`[x_daas_ham] Billing period ${month} not opened: ${refusal(period)}; create it by hand`)
@@ -206,7 +207,7 @@ function stopGeneration(period: GlideRecord, error: string): void {
  */
 function holdForReview(period: GlideRecord): boolean {
     setTotals(period)
-    period.setValue('status', 'ready')
+    period.setValue('status', BILLING_PERIOD_STATUS.ready)
     return Boolean(period.update())
 }
 
@@ -341,14 +342,14 @@ function feeLabel(fee: GlideRecord): string {
 /** Regenerate a period ready for review: rebuild its lines from current data. */
 export function regeneratePeriod(period: GlideRecord): PeriodOutcome {
     if (str(period, 'status') !== 'ready') return notDone('Only a period ready for review can be regenerated')
-    period.setValue('status', 'generating')
+    period.setValue('status', BILLING_PERIOD_STATUS.generating)
     period.setValue('failed_lines', 0)
     period.setValue('last_error', '')
     // Saved first: a refused form save (the platform says why) keeps the period ready with its lines, not without them.
     if (!period.update()) return notDone('')
     // Lines the delete left would be billed twice by the new generation.
     if (!dropLinesForRegeneration(period)) {
-        period.setValue('status', 'ready')
+        period.setValue('status', BILLING_PERIOD_STATUS.ready)
         period.setValue('last_error', 'Regenerate could not remove all of the old lines; remove them and Regenerate again')
         period.update()
         return notDone(`${str(period, 'period')} not regenerated: some of its old lines could not be removed`)
@@ -430,7 +431,7 @@ export function closePeriod(period: GlideRecord): PeriodOutcome {
     }
     // Always: finance may have adjusted lines during review, and the locked total must match the locked lines.
     setTotals(period)
-    period.setValue('status', 'closed')
+    period.setValue('status', BILLING_PERIOD_STATUS.closed)
     period.setValue('closed_at', nowGlide())
     period.setValue('closed_by', gs.getUserID())
     // Closed first: a refused form save (the platform says why) leaves its fees open, so a Regenerate still bills them.
@@ -541,7 +542,7 @@ export function linesPage(periodId: string, offset: number, limit: number): obje
     return {
         period: str(period, 'period'),
         status: str(period, 'status'),
-        final: str(period, 'status') === 'closed',
+        final: str(period, 'status') === BILLING_PERIOD_STATUS.closed,
         total: num(period, 'total_amount'),
         offset,
         lines,
@@ -557,7 +558,7 @@ export function linesPage(periodId: string, offset: number, limit: number): obje
 
 /** Why this save or delete of a period is refused: it is closed. Null for one that is not. */
 export function closedPeriodRefusal(current: GlideRecord, previous: GlideRecord | null): string | null {
-    return str(previous ?? current, 'status') === 'closed' ? 'This billing period is closed and locked' : null
+    return str(previous ?? current, 'status') === BILLING_PERIOD_STATUS.closed ? 'This billing period is closed and locked' : null
 }
 
 /**

@@ -2,6 +2,7 @@ import '@servicenow/sdk/global'
 import { Property, Record, RestMessage, ScriptAction, UiAction } from '@servicenow/sdk/core'
 import { retryTrackingUpdate, uiCreateReturnLabel, uiMarkLabelVoided } from '../../server/entry/shipping'
 import { admin, assetManager, inventoryTech, noc } from '../security/roles.now'
+import { SHIPMENT_DIRECTION, SHIPMENT_STATUS } from '../../server/domain/vocabulary'
 
 /*
  * Shipping aggregator (P3.26, D73). The message targets ShipEngine's label API; point the endpoint at
@@ -53,8 +54,10 @@ UiAction({
     table: 'x_daas_ham_shipment',
     actionName: 'x_daas_ham_mark_label_voided',
     hint: 'Once voided with the carrier: close this label (a return can get a new one; its Order stops naming it).',
+    // On either direction, in the statuses domain/shipping labelVoidable allows (built-metadata.test.ts holds the built
+    // condition to it).
     condition:
-        "(current.direction == 'return' || current.direction == 'to_site') && (current.status == 'label_created' || current.status == 'exception')",
+        `(current.direction == '${SHIPMENT_DIRECTION.return}' || current.direction == '${SHIPMENT_DIRECTION.to_site}') && (current.status == '${SHIPMENT_STATUS.label_created}' || current.status == '${SHIPMENT_STATUS.exception}')`,
     roles: [assetManager, inventoryTech, noc],
     form: { showButton: true, style: 'destructive' },
     showUpdate: true,

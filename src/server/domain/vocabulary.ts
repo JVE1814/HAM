@@ -8,7 +8,14 @@
  * Fluent evaluates this file statically, so it holds constants and types only: no imports, no function calls, no
  * spread, no array indexing, and no `satisfies` on a list (the build then refuses the column). A list that offers
  * part of another is built from that list's entries by property access.
+ *
+ * A list whose values are written into a text (an encoded query, a rule's or UI action's condition) also has its
+ * values by name, e.g. `ORDER_STAGE.rejected`: Fluent reads a property of a constant, but not the keys of one. The
+ * sets built from those values, and the queries that select them, are in the domain module that owns the concept.
  */
+
+/** Every value of a choice list by its own name: complete, and no key names another value. */
+type Named<Value extends string> = { readonly [V in Value]: V }
 
 /* Assets (alm_hardware) */
 
@@ -123,6 +130,13 @@ export const LIFECYCLE_PHASE_CHOICES = {
     end_of_life: { label: 'End of life', sequence: 4 },
 } as const
 export type LifecyclePhase = keyof typeof LIFECYCLE_PHASE_CHOICES
+export const LIFECYCLE_PHASE = {
+    available: 'available',
+    end_of_sale: 'end_of_sale',
+    end_of_support: 'end_of_support',
+    end_of_extended_support: 'end_of_extended_support',
+    end_of_life: 'end_of_life',
+} as const satisfies Named<LifecyclePhase>
 
 /* Monitoring (x_daas_ham_device_event) */
 
@@ -168,6 +182,10 @@ export const NORM_EXCEPTION_STATUS_CHOICES = {
     resolved: { label: 'Resolved', sequence: 1 },
 } as const
 export type NormExceptionStatus = keyof typeof NORM_EXCEPTION_STATUS_CHOICES
+export const NORM_EXCEPTION_STATUS = {
+    open: 'open',
+    resolved: 'resolved',
+} as const satisfies Named<NormExceptionStatus>
 
 /* OEM vendors, coverage and RMAs */
 
@@ -224,6 +242,13 @@ export const RMA_STATE_CHOICES = {
     closed: { label: 'Closed', sequence: 4 },
 } as const
 export type RmaState = keyof typeof RMA_STATE_CHOICES
+export const RMA_STATE = {
+    to_open: 'to_open',
+    open: 'open',
+    replacement_received: 'replacement_received',
+    defective_returned: 'defective_returned',
+    closed: 'closed',
+} as const satisfies Named<RmaState>
 
 /* Stockrooms, Sites and on-site work */
 
@@ -234,6 +259,11 @@ export const STOCKROOM_TYPE_CHOICES = {
     customer_site: { label: 'Customer site', sequence: 2 },
 } as const
 export type StockroomType = keyof typeof STOCKROOM_TYPE_CHOICES
+export const STOCKROOM_TYPE = {
+    central_depot: 'central_depot',
+    staging_centre: 'staging_centre',
+    customer_site: 'customer_site',
+} as const satisfies Named<StockroomType>
 
 /** wm_order.x_daas_ham_purpose: what an FSM work order the app opened is for. */
 export const FIELD_PURPOSE_CHOICES = {
@@ -273,6 +303,11 @@ export const SUBSCRIPTION_LINE_STATUS_CHOICES = {
     ended: { label: 'Ended', sequence: 2 },
 } as const
 export type SubscriptionLineStatus = keyof typeof SUBSCRIPTION_LINE_STATUS_CHOICES
+export const SUBSCRIPTION_LINE_STATUS = {
+    pending: 'pending',
+    active: 'active',
+    ended: 'ended',
+} as const satisfies Named<SubscriptionLineStatus>
 
 export const CATALOG_ENTRY_TYPE_CHOICES = {
     model: { label: 'Model', sequence: 0 },
@@ -298,6 +333,12 @@ export const INSTALL_MODE_CHOICES = {
     remote_hands: { label: 'Data-centre remote hands', sequence: 3 },
 } as const
 export type InstallMode = keyof typeof INSTALL_MODE_CHOICES
+export const INSTALL_MODE = {
+    fsm_engineer: 'fsm_engineer',
+    self_install: 'self_install',
+    subcontractor: 'subcontractor',
+    remote_hands: 'remote_hands',
+} as const satisfies Named<InstallMode>
 
 export const ORDER_STAGE_CHOICES = {
     draft: { label: 'Draft', sequence: 0 },
@@ -311,6 +352,17 @@ export const ORDER_STAGE_CHOICES = {
     cancelled: { label: 'Cancelled', sequence: 8 },
 } as const
 export type OrderStage = keyof typeof ORDER_STAGE_CHOICES
+export const ORDER_STAGE = {
+    draft: 'draft',
+    awaiting_approval: 'awaiting_approval',
+    sourcing: 'sourcing',
+    preparing: 'preparing',
+    delivering: 'delivering',
+    installing: 'installing',
+    complete: 'complete',
+    rejected: 'rejected',
+    cancelled: 'cancelled',
+} as const satisfies Named<OrderStage>
 
 export const ENTITLEMENT_VERDICT_CHOICES = {
     within_agreement: { label: 'Within agreement', sequence: 0 },
@@ -331,6 +383,17 @@ export const LINE_STAGE_CHOICES = {
     cancelled: { label: 'Cancelled', sequence: 8 },
 } as const
 export type LineStage = keyof typeof LINE_STAGE_CHOICES
+export const LINE_STAGE = {
+    new: 'new',
+    awaiting_stock: 'awaiting_stock',
+    sourced: 'sourced',
+    staging: 'staging',
+    ready_to_ship: 'ready_to_ship',
+    shipped: 'shipped',
+    installed: 'installed',
+    in_service: 'in_service',
+    cancelled: 'cancelled',
+} as const satisfies Named<LineStage>
 
 /* Staging and OEM claims */
 
@@ -370,12 +433,26 @@ export const SHIPMENT_STATUS_CHOICES = {
     voided: { label: 'Voided', sequence: 7 },
 } as const
 export type ShipmentStatus = keyof typeof SHIPMENT_STATUS_CHOICES
+export const SHIPMENT_STATUS = {
+    label_created: 'label_created',
+    in_transit: 'in_transit',
+    out_for_delivery: 'out_for_delivery',
+    delivered: 'delivered',
+    exception: 'exception',
+    returned: 'returned',
+    unknown: 'unknown',
+    voided: 'voided',
+} as const satisfies Named<ShipmentStatus>
 
 export const SHIPMENT_DIRECTION_CHOICES = {
     to_site: { label: 'To a Site', sequence: 0 },
     return: { label: 'Return to the depot', sequence: 1 },
 } as const
 export type ShipmentDirection = keyof typeof SHIPMENT_DIRECTION_CHOICES
+export const SHIPMENT_DIRECTION = {
+    to_site: 'to_site',
+    return: 'return',
+} as const satisfies Named<ShipmentDirection>
 
 /* Return orders and Fee events */
 
@@ -394,6 +471,10 @@ export const RETURN_METHOD_CHOICES = {
     ship_back: { label: 'Site contact ships back', sequence: 1 },
 } as const
 export type ReturnMethod = keyof typeof RETURN_METHOD_CHOICES
+export const RETURN_METHOD = {
+    fsm_deinstall: 'fsm_deinstall',
+    ship_back: 'ship_back',
+} as const satisfies Named<ReturnMethod>
 
 export const RETURN_LINE_STATUS_CHOICES = {
     awaiting: { label: 'Awaiting return', sequence: 0 },
@@ -402,6 +483,12 @@ export const RETURN_LINE_STATUS_CHOICES = {
     missing: { label: 'Declared missing', sequence: 3 },
 } as const
 export type ReturnLineStatus = keyof typeof RETURN_LINE_STATUS_CHOICES
+export const RETURN_LINE_STATUS = {
+    awaiting: 'awaiting',
+    received: 'received',
+    evaluated: 'evaluated',
+    missing: 'missing',
+} as const satisfies Named<ReturnLineStatus>
 
 export const RETURN_CONDITION_CHOICES = {
     good: { label: 'Good', sequence: 0 },
@@ -430,6 +517,12 @@ export const FEE_STATUS_CHOICES = {
     waived: { label: 'Waived', sequence: 2 },
 } as const
 export type FeeStatus = keyof typeof FEE_STATUS_CHOICES
+/** Open until a closed Billing period bills it, or waived (a missing unit turned up), which is never billed. */
+export const FEE_STATUS = {
+    open: 'open',
+    billed: 'billed',
+    waived: 'waived',
+} as const satisfies Named<FeeStatus>
 
 /* Disposal orders */
 
@@ -451,6 +544,13 @@ export const DISPOSAL_STAGE_CHOICES = {
     rejected: { label: 'Rejected', sequence: 4 },
 } as const
 export type DisposalStage = keyof typeof DISPOSAL_STAGE_CHOICES
+export const DISPOSAL_STAGE = {
+    draft: 'draft',
+    awaiting_approval: 'awaiting_approval',
+    approved: 'approved',
+    completed: 'completed',
+    rejected: 'rejected',
+} as const satisfies Named<DisposalStage>
 
 export const DISPOSAL_LINE_STATUS_CHOICES = {
     pending: { label: 'Pending', sequence: 0 },
@@ -469,6 +569,12 @@ export const LEASE_END_ACTION_CHOICES = {
     return: { label: 'Return to lessor', sequence: 3 },
 } as const
 export type LeaseEndAction = keyof typeof LEASE_END_ACTION_CHOICES
+export const LEASE_END_ACTION = {
+    undecided: 'undecided',
+    buyout: 'buyout',
+    extend: 'extend',
+    return: 'return',
+} as const satisfies Named<LeaseEndAction>
 
 /* Audits, Attestations and Reconciliation exceptions */
 
@@ -511,6 +617,11 @@ export const EXCEPTION_STATUS_CHOICES = {
     accepted: { label: 'Accepted (no action)', sequence: 2 },
 } as const
 export type ExceptionStatus = keyof typeof EXCEPTION_STATUS_CHOICES
+export const EXCEPTION_STATUS = {
+    open: 'open',
+    resolved: 'resolved',
+    accepted: 'accepted',
+} as const satisfies Named<ExceptionStatus>
 
 /* Billing and Margin */
 
@@ -520,6 +631,11 @@ export const BILLING_PERIOD_STATUS_CHOICES = {
     closed: { label: 'Closed (locked)', sequence: 2 },
 } as const
 export type BillingPeriodStatus = keyof typeof BILLING_PERIOD_STATUS_CHOICES
+export const BILLING_PERIOD_STATUS = {
+    generating: 'generating',
+    ready: 'ready',
+    closed: 'closed',
+} as const satisfies Named<BillingPeriodStatus>
 
 export const BILLING_LINE_KIND_CHOICES = {
     subscription: { label: 'Subscription', sequence: 0 },

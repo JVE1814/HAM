@@ -1,5 +1,4 @@
 import { GlideDateTime, GlideRecord } from '@servicenow/glide'
-import { IN_USE_STAGES } from '../domain/audit.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import {
     MONITORING_EXCEPTION_TYPES,
@@ -13,6 +12,7 @@ import { glideToMs, nowMs } from './clock.ts'
 import { cisWithOpenException, openException, resolveExceptions, resolveExceptionsWhere, settleExceptions } from './exceptions.ts'
 import { intProperty, PROPERTY } from './properties.ts'
 import { pluck, str } from './records.ts'
+import { IN_USE_STAGES } from '../domain/lifecycle.ts'
 
 /** Reconciliation of the installed base with what monitoring reports (P2.7). */
 

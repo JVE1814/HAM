@@ -1,6 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { initialAutomationStatus } from '../domain/oem/claims.ts'
-import { DEFAULT_STAGING_SOURCE, selectStagingTemplate, type StagingTemplateView } from '../domain/staging.ts'
+import { DEFAULT_STAGING_SOURCE, selectStagingTemplate, STAGING_TASK_STATE, type StagingTemplateView } from '../domain/staging.ts'
 import { moveAndSave } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { lineLostUnit } from './fulfilment.ts'
@@ -107,7 +107,7 @@ export function skipOpenStagingTasks(assetId: string, why: string): boolean {
     beyondVisibility(task, () => task.query())
     let closed = true
     while (task.next()) {
-        task.setValue('state', 7)
+        task.setValue('state', STAGING_TASK_STATE.skipped)
         task.setValue('work_notes', `${why}; staging skipped.`)
         if (task.update()) continue
         // Left open, it asks a technician to stage a unit that is back in stock.

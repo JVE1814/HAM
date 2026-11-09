@@ -13,6 +13,7 @@ import {
 } from '../../server/entry/leases'
 import { accountManager, admin, assetManager, finance } from '../security/roles.now'
 import { CURRENT_IS_FLEET, FLEET_FIELD } from '../../server/domain/fleet'
+import { LEASE_END_ACTION } from '../../server/domain/vocabulary'
 
 /* Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
 
@@ -51,7 +52,7 @@ BusinessRule({
     when: 'after',
     action: ['update'],
     order: 200,
-    condition: "current.ends.changes() && current.end_action == 'return'",
+    condition: `current.ends.changes() && current.end_action == '${LEASE_END_ACTION.return}'`,
     script: onReturnedLeaseEndChanged,
 })
 

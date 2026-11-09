@@ -1,6 +1,6 @@
 import { addDays, addMonths, daysBetween } from './calendar.ts'
-import { fleetStagesQuery } from './fleet.ts'
-import { ALL_STAGES, isBillable, type Stage } from './lifecycle.ts'
+import { FLEET_CONDITION } from './fleet.ts'
+import { STAGE_FIELDS, SUBSCRIPTION_LINE_STATUS } from './vocabulary.ts'
 
 /** Billing periods: daily proration of Subscription lines and Fee events (P3.25, D52, D66). */
 
@@ -131,19 +131,26 @@ export function withinLine(interval: DayRange, line: Partial<DayRange>): DayRang
     return end !== undefined && end < start ? null : { start, end }
 }
 
-/** The stages in which an Asset delivers its Subscription line and is billed from its Service interval. */
-export const BILLED_STAGES: readonly Stage[] = ALL_STAGES.filter((stage) => isBillable(stage))
+/** An Asset is on no Subscription line. */
+export const NO_LINE = 'x_daas_ham_subscription_lineISEMPTY'
+
+/**
+ * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets in service on no Subscription line,
+ * which nothing bills. `fleetStagesQuery(['in_service'], NO_LINE)` written out for the tile to import.
+ */
+export const IN_SERVICE_UNBILLED = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${NO_LINE}^${FLEET_CONDITION}`
+
+/** An Asset's Subscription line has ended: set ended, or past its end date. */
+export const ON_ENDED_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION_LINE_STATUS.ended}^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()`
 
 /**
  * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets (ADR 0016) billed from a Service
  * interval whose Subscription line has ended (set ended, or past its end date; the end date itself is billed). Their
  * days after the line's end are not billed (withinLine), so they are flagged; nothing moves them to another line.
+ * It is `fleetStagesQuery(IN_USE_STAGES, ON_ENDED_LINE)` written out, one clause per stage in use: the dashboard tile
+ * imports it, and Fluent metadata reads no function call (domain/billing.test.ts holds it to the function's result).
  */
-export const IN_SERVICE_ON_ENDED_LINE = fleetStagesQuery(
-    BILLED_STAGES,
-    'x_daas_ham_subscription_line.status=ended' +
-        '^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()',
-)
+export const IN_SERVICE_ON_ENDED_LINE = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${ON_ENDED_LINE}^${FLEET_CONDITION}^NQinstall_status=${STAGE_FIELDS.temporary_deployment.installStatus}^substatus=${STAGE_FIELDS.temporary_deployment.substatus}^${ON_ENDED_LINE}^${FLEET_CONDITION}`
 
 /** What one Subscription line bills at one Site for the month: the content of its Billing line. */
 export interface Charge {

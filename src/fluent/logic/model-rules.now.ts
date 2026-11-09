@@ -3,6 +3,7 @@ import { BusinessRule } from '@servicenow/sdk/core'
 import { processAsnRow, processLifecycleRow } from '../../server/entry/imports'
 import { onAgreementTermsChanged, onModelLifecycleChanged, onNormalizationResolved } from '../../server/entry/models'
 import { processCoverageRow } from '../../server/entry/oem-sync'
+import { NORM_EXCEPTION_STATUS } from '../../server/domain/vocabulary'
 
 /* Rules for model data, agreements' refresh terms and import-set rows. */
 
@@ -43,7 +44,7 @@ BusinessRule({
     when: 'after',
     action: ['update'],
     order: 200,
-    condition: "current.resolved_model.changes() && current.resolved_model != '' && current.status == 'open'",
+    condition: `current.resolved_model.changes() && current.resolved_model != '' && current.status == '${NORM_EXCEPTION_STATUS.open}'`,
     script: onNormalizationResolved,
 })
 

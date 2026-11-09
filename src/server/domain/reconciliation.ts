@@ -1,7 +1,7 @@
 import { outsideFleetCondition, SITE_CONDITION } from './fleet.ts'
 import { overlaps, powerBudget, type Placement, type RackSpec } from './rack.ts'
 import { normalizeSerial } from './serials.ts'
-import type { ExceptionType } from './vocabulary.ts'
+import { EXCEPTION_STATUS, type ExceptionType } from './vocabulary.ts'
 
 /** Reconciliation exceptions between installed Assets and monitoring (P2.7), and in racks (D67). */
 
@@ -61,7 +61,7 @@ export function stillSeenWithoutFleetAssetQuery(ciIds: readonly string[]): strin
  * deleted) counts as outside.
  */
 export function outsideFleetExceptionsQuery(types: readonly ExceptionType[]): string {
-    return `status=open^exception_typeIN${types.join(',')}^assetISNOTEMPTY^${outsideFleetCondition('asset.')}`
+    return `status=${EXCEPTION_STATUS.open}^exception_typeIN${types.join(',')}^assetISNOTEMPTY^${outsideFleetCondition('asset.')}`
 }
 
 /** Disagreements between an installed Asset and what monitoring reports. */

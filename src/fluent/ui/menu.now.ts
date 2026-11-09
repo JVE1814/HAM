@@ -3,13 +3,16 @@ import { ApplicationMenu, Record } from '@servicenow/sdk/core'
 import { accountManager, assetManager, fieldTech, finance, inventoryTech, noc } from '../security/roles.now'
 import { requestNetworkEquipment } from './order-producer.now'
 import { requestReturn } from './return-producer.now'
+import { OPEN_ORDERS_QUERY } from '../../server/domain/fulfilment'
+import { FLEET_IN_STAGE, NAAS_MODEL_MILESTONES } from '../../server/domain/fleet'
+import { WORKSPACE_HOME } from '../workspace/workspace.now'
 
 /*
  * Navigator menu "NaaS Asset Management".
  *
  * A module on alm_hardware lists fleet assets only (ADR 0016: the table holds the Provider IT's equipment too): its
- * filter carries domain/fleet `fleetCondition()` in each ^NQ clause, and none opens the table unfiltered (link type
- * LIST). domain/fleet-queries.test.ts checks the literals.
+ * filter holds the fleet condition in each ^NQ clause, and none opens the table unfiltered (link type LIST), which
+ * built-metadata.test.ts checks.
  */
 
 export const naasMenu = ApplicationMenu({
@@ -27,7 +30,7 @@ Record({
         title: 'NaaS Asset Workspace',
         application: naasMenu,
         link_type: 'DIRECT',
-        query: 'x/daas/naas-assets/home',
+        query: WORKSPACE_HOME,
         roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
         active: true,
         order: 100,
@@ -83,7 +86,7 @@ Record({
         application: naasMenu,
         link_type: 'FILTER',
         name: 'x_daas_ham_order',
-        filter: 'stageNOT INcomplete,cancelled,rejected',
+        filter: OPEN_ORDERS_QUERY,
         roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
         active: true,
         order: 210,
@@ -154,7 +157,7 @@ Record({
         application: naasMenu,
         link_type: 'FILTER',
         name: 'alm_hardware',
-        filter: 'install_status=1^substatusISEMPTY^x_daas_ham_fleet=true',
+        filter: FLEET_IN_STAGE.in_service,
         roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
         active: true,
         order: 310,
@@ -169,7 +172,7 @@ Record({
         application: naasMenu,
         link_type: 'FILTER',
         name: 'alm_hardware',
-        filter: 'install_status=1^substatus=pending_in_service^x_daas_ham_fleet=true',
+        filter: FLEET_IN_STAGE.pending_in_service,
         roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
         active: true,
         order: 320,
@@ -184,7 +187,7 @@ Record({
         application: naasMenu,
         link_type: 'FILTER',
         name: 'alm_hardware',
-        filter: 'install_status=6^substatus=reserved_spare_pool^x_daas_ham_fleet=true',
+        filter: FLEET_IN_STAGE.spare_pool,
         roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
         active: true,
         order: 330,
@@ -297,7 +300,7 @@ Record({
         application: naasMenu,
         link_type: 'LIST',
         name: 'cmdb_model_lifecycle',
-        filter: 'model.x_daas_ham_oem_pidISNOTEMPTY^lifecycle_type=publisher^ORDERBYmodel^ORDERBYstart_date',
+        filter: NAAS_MODEL_MILESTONES,
         roles: ['x_daas_ham.asset_manager', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
         active: true,
         order: 510,

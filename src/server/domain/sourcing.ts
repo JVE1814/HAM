@@ -1,8 +1,8 @@
-import { OPEN_LINE_STAGES } from './entitlement.ts'
+import { OPEN_LINE_STAGES, UNFULFILLED_ORDER_STAGES } from './fulfilment.ts'
 import { fleetStagesQuery, naasStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
-import type { Stage } from './lifecycle.ts'
+import { STOCK_STAGES, type Stage } from './lifecycle.ts'
 import { shortfallRoute, type ShortfallRoute } from './returns.ts'
-import type { LeaseEndAction, LineStage, OrderType, RmaState, StockroomType } from './vocabulary.ts'
+import { RMA_STATE, type LeaseEndAction, type LineStage, type OrderType, type RmaState, type StockroomType } from './vocabulary.ts'
 
 /**
  * Sourcing: where an Order line's Assets come from.
@@ -198,7 +198,7 @@ export function stockQueries(scope: StockScope): string[] {
     const customerSite = `${base}^${type}=customer_site^stockroom.x_daas_ham_customer=${scope.customerId}`
     const atSite = `stockroom.location=${scope.siteId}^ORstockroom.location.parent=${scope.siteId}`
     const bySource: Record<Source, string> = {
-        customer_site_stock: fleetStagesQuery(['available', 'spare_pool'], `${customerSite}^${atSite}`),
+        customer_site_stock: fleetStagesQuery(STOCK_STAGES, `${customerSite}^${atSite}`),
         spare_pool: fleetStagesQuery(['spare_pool'], `${provider}^company=${scope.customerId}`),
         central_stock: fleetStagesQuery(['available'], provider),
     }
@@ -288,19 +288,28 @@ function routedOutcome(route: ShortfallRoute, line: { planSummary: string; missi
     return { ...sourced, purchaseOrder: bought.poId, purchased: line.missing }
 }
 
-/** Order stages in which nothing is sourced, even for a line a refused save left open. */
-const ENDED_ORDER_STAGES: readonly string[] = ['cancelled', 'rejected']
-
 /** Whether an Order line still waits to be filled: not shipped or cancelled, its Order not cancelled or rejected. */
 export function lineStillOpen(line: { lineStage: string; orderStage: string }): boolean {
-    return OPEN_LINE_STAGES.includes(line.lineStage as LineStage) && !ENDED_ORDER_STAGES.includes(line.orderStage)
+    return OPEN_LINE_STAGES.includes(line.lineStage as LineStage) && !(UNFULFILLED_ORDER_STAGES as readonly string[]).includes(line.orderStage)
 }
 
 /** RMAs whose replacement is still to come: their line counts each as a unit on its way. */
-export const RMA_AWAITED: readonly RmaState[] = ['to_open', 'open']
+export const RMA_AWAITED: readonly RmaState[] = [RMA_STATE.to_open, RMA_STATE.open]
 
-/** RMAs still open, the defective unit not yet back with the OEM (as the workspace's Open OEM RMAs list them). */
-export const RMA_OPEN: readonly RmaState[] = ['to_open', 'open', 'replacement_received']
+/** RMAs still open, the defective unit not yet back with the OEM. */
+export const RMA_OPEN: readonly RmaState[] = [...RMA_AWAITED, RMA_STATE.replacement_received]
+
+/**
+ * The open RMAs the OEM knows of: its status can be asked for, and the defective unit can be recorded as returned to it
+ * (the action's condition is written from these states; the built action is checked against them).
+ */
+export const RMA_AT_OEM: readonly RmaState[] = RMA_OPEN.filter((state) => state !== RMA_STATE.to_open)
+
+/**
+ * Encoded query on x_daas_ham_oem_rma: the open RMAs, as the workspace lists them. A constant written out from the
+ * state names for Fluent metadata to import (domain/sourcing.test.ts holds it to `RMA_OPEN`).
+ */
+export const OPEN_RMAS_QUERY = `stateIN${RMA_STATE.to_open},${RMA_STATE.open},${RMA_STATE.replacement_received}`
 
 /** An RMA for the Asset a break-fix line replaces, as `advanceReplacementRma` weighs it. */
 export interface OpenRma {

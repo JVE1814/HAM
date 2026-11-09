@@ -1,9 +1,9 @@
 import { appendTo } from './collections.ts'
-import { fleetCondition } from './fleet.ts'
+import { FLEET_CONDITION, fleetCondition } from './fleet.ts'
 import { notRetiredCondition } from './lifecycle.ts'
 import type { CoverageFact, CoverageFetched } from './oem/types.ts'
 import { normalizeSerial } from './serials.ts'
-import type { OemVendor } from './vocabulary.ts'
+import { INSTALL_STATUS, type OemVendor } from './vocabulary.ts'
 
 /** One coverage contract, as an Asset's coverage is summarised from it. */
 export interface CoverageView {
@@ -138,3 +138,9 @@ export function staleCoverageQuery(vendor: OemVendor, staleBefore: string): stri
     const stale = `${COVERAGE_CHECKED_FIELD}ISEMPTY^OR${COVERAGE_CHECKED_FIELD}<${staleBefore}`
     return `${fleetCondition()}^model.x_daas_ham_oem_source=${vendor}^${notRetiredCondition()}^serial_numberISNOTEMPTY^${stale}`
 }
+
+/**
+ * Encoded query on alm_hardware: the installed fleet assets (ADR 0016) without OEM coverage, missing or ended before
+ * today, as the workspace lists and counts them.
+ */
+export const INSTALLED_WITHOUT_COVERAGE = `install_status=${INSTALL_STATUS.inUse}^x_daas_ham_coverage_endISEMPTY^ORx_daas_ham_coverage_end<javascript:gs.beginningOfToday()^${FLEET_CONDITION}`

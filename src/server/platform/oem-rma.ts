@@ -1,6 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
-import { lineStillOpen, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse } from '../domain/sourcing.ts'
+import { lineStillOpen, RMA_AT_OEM, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse } from '../domain/sourcing.ts'
 import type { OemVendor, RmaState } from '../domain/vocabulary.ts'
 import { isFleetAsset, moveAsset } from './assets.ts'
 import { nowGlide, todayIso } from './clock.ts'
@@ -99,8 +99,6 @@ export function lineAwaitingRma(rmaNumber: string, modelId: string): { lineId: s
     return rma.next() ? { lineId: str(rma, 'order_line'), rmaId: rma.getUniqueValue() } : null
 }
 
-/** The open RMAs the OEM knows of, whose status it can be asked for: RMA_OPEN but those still to open with it. */
-const RMA_AT_OEM: readonly RmaState[] = RMA_OPEN.filter((state) => state !== 'to_open')
 
 /** The most RMAs of one vendor a status sync asks about. */
 const RMAS_PER_SYNC = 200

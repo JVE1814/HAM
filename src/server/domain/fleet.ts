@@ -1,6 +1,6 @@
 import { andEachClause } from './encoded-query.ts'
 import { stagesQuery, type Stage } from './lifecycle.ts'
-import type { StockroomType } from './vocabulary.ts'
+import { INSTALL_STATUS, STAGE_FIELDS, STOCKROOM_TYPE, type StockroomType } from './vocabulary.ts'
 
 /**
  * Fleet assets (ADR 0016): the equipment the Provider runs as part of the network service, which is all this app acts
@@ -61,24 +61,33 @@ export function fleetStagesQuery(stages: readonly Stage[], base = '', via = ''):
     return inFleet(stagesQuery(stages, base, via), via)
 }
 
+/**
+ * Fleet assets in one stage, as `fleetStagesQuery([stage])` gives them: the constants Fluent metadata imports for its
+ * lists, modules and dashboard tiles (domain/fleet.test.ts holds each to the function's result).
+ */
+export const FLEET_IN_STAGE = {
+    in_service: `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${FLEET_CONDITION}`,
+    pending_in_service: `install_status=${STAGE_FIELDS.pending_in_service.installStatus}^substatus=${STAGE_FIELDS.pending_in_service.substatus}^${FLEET_CONDITION}`,
+    temporary_deployment: `install_status=${STAGE_FIELDS.temporary_deployment.installStatus}^substatus=${STAGE_FIELDS.temporary_deployment.substatus}^${FLEET_CONDITION}`,
+    available: `install_status=${STAGE_FIELDS.available.installStatus}^substatus=${STAGE_FIELDS.available.substatus}^${FLEET_CONDITION}`,
+    spare_pool: `install_status=${STAGE_FIELDS.spare_pool.installStatus}^substatus=${STAGE_FIELDS.spare_pool.substatus}^${FLEET_CONDITION}`,
+    in_transit: `install_status=${STAGE_FIELDS.in_transit.installStatus}^substatusISEMPTY^${FLEET_CONDITION}`,
+} as const
+
+/** Fleet assets In use by install status: installed at a Site, whatever their substatus. */
+export const FLEET_INSTALLED = `install_status=${INSTALL_STATUS.inUse}^${FLEET_CONDITION}`
+
 /** The Stockroom field that holds its type (alm_stockroom.x_daas_ham_stockroom_type). */
 export const STOCKROOM_TYPE_FIELD = 'x_daas_ham_stockroom_type'
 
-/** The stockroom types by name: every one is a NaaS stockroom's. */
-export const STOCKROOM_TYPE = {
-    centralDepot: 'central_depot',
-    stagingCentre: 'staging_centre',
-    customerSite: 'customer_site',
-} as const satisfies Record<string, StockroomType>
-
-/** The types of NaaS stockrooms. A stockroom with no type (or another) is the Provider IT's, not NaaS. */
+/** The types of NaaS stockrooms: every type there is. A stockroom with no type (or another) is the Provider IT's, not NaaS. */
 export const NAAS_STOCKROOM_TYPES: readonly StockroomType[] = Object.values(STOCKROOM_TYPE)
 
 /** Encoded condition matching NaaS stockrooms, on alm_stockroom itself (domain/fleet.test.ts holds it to the list above). */
-export const NAAS_STOCKROOM_CONDITION = `${STOCKROOM_TYPE_FIELD}IN${STOCKROOM_TYPE.centralDepot},${STOCKROOM_TYPE.stagingCentre},${STOCKROOM_TYPE.customerSite}`
+export const NAAS_STOCKROOM_CONDITION = `${STOCKROOM_TYPE_FIELD}IN${STOCKROOM_TYPE.central_depot},${STOCKROOM_TYPE.staging_centre},${STOCKROOM_TYPE.customer_site}`
 
 /** The same as a script condition on `current`, a Stockroom (domain/fleet.test.ts holds it to the list above too). */
-export const CURRENT_IS_NAAS_STOCKROOM = `current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.centralDepot}' || current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.stagingCentre}' || current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.customerSite}'`
+export const CURRENT_IS_NAAS_STOCKROOM = `current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.central_depot}' || current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.staging_centre}' || current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.customer_site}'`
 
 /** The NaaS stockroom type `value` (a stored type) names, or null for a stockroom outside NaaS. */
 export function naasStockroomType(value: string): StockroomType | null {
@@ -95,6 +104,12 @@ export const OEM_PID_FIELD = 'x_daas_ham_oem_pid'
 
 /** Encoded condition matching NaaS Models, on cmdb_model itself. */
 export const NAAS_MODEL_CONDITION = `${OEM_PID_FIELD}ISNOTEMPTY`
+
+/**
+ * Encoded query on cmdb_model_lifecycle: the milestones the manufacturers publish for NaaS Models, by Model and date
+ * (ADR 0017: the table holds the milestones of the Provider IT's Models too).
+ */
+export const NAAS_MODEL_MILESTONES = `model.${NAAS_MODEL_CONDITION}^lifecycle_type=publisher^ORDERBYmodel^ORDERBYstart_date`
 
 /** Whether a Model with this OEM PID is a NaaS Model: it has one. */
 export function isNaasModel(oemPid: string): boolean {

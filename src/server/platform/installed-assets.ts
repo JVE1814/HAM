@@ -1,8 +1,9 @@
 import { GlideRecord } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
-import { INSTALLED_STAGES, SITE_RECOVERY_STAGES } from '../domain/returns.ts'
+import { SITE_RECOVERY_STAGES } from '../domain/returns.ts'
 import { str } from './records.ts'
+import { INSTALLED_STAGES } from '../domain/lifecycle.ts'
 
 /** The fleet assets installed at Sites, as returns, audits and attestations list them. */
 

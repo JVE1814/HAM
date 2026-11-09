@@ -2,6 +2,7 @@ import '@servicenow/sdk/global'
 import { Property, Record, ScriptAction, UiAction } from '@servicenow/sdk/core'
 import { computeMargin, uiRecomputeMargin } from '../../server/entry/margin'
 import { admin, finance } from '../security/roles.now'
+import { BILLING_PERIOD_STATUS } from '../../server/domain/vocabulary'
 
 /* Cost facts and Margin per Customer and Site (P3.28). */
 
@@ -33,7 +34,7 @@ UiAction({
     table: 'x_daas_ham_billing_period',
     actionName: 'x_daas_ham_billing_recompute_margin',
     hint: 'Rebuild the cost facts and margin of this closed period from current costs.',
-    condition: "current.status == 'closed'",
+    condition: `current.status == '${BILLING_PERIOD_STATUS.closed}'`,
     roles: [finance],
     form: { showButton: true },
     showUpdate: true,

@@ -1,5 +1,5 @@
-import type { Stage } from './lifecycle.ts'
-import { INSTALLED_STAGES } from './returns.ts'
+import { UNFULFILLED_ORDER_STAGES } from './fulfilment.ts'
+import { INSTALLED_STAGES, type Stage } from './lifecycle.ts'
 import type { OrderStage } from './vocabulary.ts'
 
 /** Break-fix (P2.3, D58): what "Raise replacement" does on a case that may already link a replacement Order. */
@@ -12,14 +12,11 @@ import type { OrderStage } from './vocabulary.ts'
 export type ReplacementStep = 'raise' | 'submit_draft' | 'keep'
 
 /**
- * Stages in which an Order ended without replacing anything: a new one may take its place on the case, and the
- * "Raise replacement" action is offered again (its condition lists these stages).
+ * The step for a case whose linked replacement Order is in `linkedStage`, or links none (null, also when it is gone).
+ * An Order that ended without replacing anything gives way to a new one, and "Raise replacement" is offered again.
  */
-export const ENDED_UNFULFILLED: readonly string[] = ['rejected', 'cancelled']
-
-/** The step for a case whose linked replacement Order is in `linkedStage`, or links none (null, also when it is gone). */
 export function replacementStep(linkedStage: OrderStage | null): ReplacementStep {
-    if (linkedStage === null || ENDED_UNFULFILLED.includes(linkedStage)) return 'raise'
+    if (linkedStage === null || UNFULFILLED_ORDER_STAGES.includes(linkedStage)) return 'raise'
     return linkedStage === 'draft' ? 'submit_draft' : 'keep'
 }
 

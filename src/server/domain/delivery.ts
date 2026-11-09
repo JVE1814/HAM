@@ -1,5 +1,4 @@
-import type { Stage } from './lifecycle.ts'
-import { INSTALLED_STAGES } from './returns.ts'
+import { INSTALLED_STAGES, type Stage } from './lifecycle.ts'
 import type { FieldPurpose, InstallMode, OrderType } from './vocabulary.ts'
 
 /**

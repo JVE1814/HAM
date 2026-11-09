@@ -1,6 +1,6 @@
 import { errorText, isSuccess, type HttpPort } from './http.ts'
 import { asArray, field, isoDate, parseJson, text } from './json.ts'
-import type { ShipmentStatus } from './vocabulary.ts'
+import { SHIPMENT_STATUS, type ShipmentStatus } from './vocabulary.ts'
 
 /**
  * Shipping aggregator (P3.26, D73): one adapter buys labels and reads tracking webhooks. Requests
@@ -269,10 +269,14 @@ export function parseTrackingWebhook(body: unknown): TrackingUpdate | { error: s
     return { error: 'not a tracking update (no tracking number)' }
 }
 
-const FINAL: ReadonlySet<ShipmentStatus> = new Set(['delivered', 'returned', 'voided'])
+const FINAL: ReadonlySet<ShipmentStatus> = new Set([SHIPMENT_STATUS.delivered, SHIPMENT_STATUS.returned, SHIPMENT_STATUS.voided])
 
-/** Encoded query on x_daas_ham_shipment: shipments not delivered, returned or voided (their label is still in use). */
-export const OPEN_SHIPMENTS = `statusNOT IN${[...FINAL].join(',')}`
+/**
+ * Encoded query on x_daas_ham_shipment: shipments not delivered, returned or voided (their label is still in use).
+ * Written out from the status names, as Fluent metadata, which imports it for the workspace's list, reads no function
+ * call (domain/shipping.test.ts holds it to the final statuses).
+ */
+export const OPEN_SHIPMENTS = `statusNOT IN${SHIPMENT_STATUS.delivered},${SHIPMENT_STATUS.returned},${SHIPMENT_STATUS.voided}`
 
 /**
  * The status a shipment takes from a tracking update. Webhooks can arrive late or out of order, so a

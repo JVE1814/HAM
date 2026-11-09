@@ -11,11 +11,19 @@ import { naasListMenu } from './list-menu.now'
  * workspace to the platform's catch-all ux_route ACL, which lets in every canvas_user.
  */
 
+/** The vendor prefix of the scope (x_daas_ham). */
+const VENDOR = 'daas'
+const PATH = 'naas-assets'
+const LANDING_PATH = 'home'
+
+/** The workspace's landing page, as a navigator module links to it. */
+export const WORKSPACE_HOME = `x/${VENDOR}/${PATH}/${LANDING_PATH}`
+
 export const naasWorkspace = Workspace({
     $id: Now.ID['ws_naas_assets'],
     title: 'NaaS Asset Workspace',
-    path: 'naas-assets',
-    landingPath: 'home',
+    path: PATH,
+    landingPath: LANDING_PATH,
     tables: [
         'x_daas_ham_order',
         'x_daas_ham_order_line',
@@ -35,5 +43,5 @@ Acl({
     type: 'ux_route',
     operation: 'read',
     roles: [assetManager, inventoryTech, fieldTech, noc, accountManager, finance],
-    name: 'x.daas.naas-assets.*',
+    name: `x.${VENDOR}.${PATH}.*`,
 })

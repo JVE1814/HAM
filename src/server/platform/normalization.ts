@@ -18,6 +18,7 @@ import {
 } from '../domain/normalization.ts'
 import { runTableJob } from './chunked.ts'
 import { bool, countBy, num, pluck, str, warnRefused } from './records.ts'
+import { NORM_EXCEPTION_STATUS } from '../domain/vocabulary.ts'
 
 /** Resolving raw manufacturer/model strings to canonical Models (domain/normalization). */
 
@@ -85,7 +86,7 @@ export function recordNormalizationException(
     const exception = new GlideRecord('x_daas_ham_norm_exception')
     exception.addQuery('raw_manufacturer', raw.manufacturer)
     exception.addQuery('raw_model', raw.model)
-    exception.addQuery('status', 'open')
+    exception.addQuery('status', NORM_EXCEPTION_STATUS.open)
     exception.setLimit(1)
     exception.query()
     if (exception.next()) {

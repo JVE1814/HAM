@@ -7,6 +7,7 @@ import { installState } from './delivery.ts'
 import { findById, str, warnRefused } from './records.ts'
 import type { SessionScope } from './session.ts'
 import { returnLabels } from './shipping.ts'
+import { OPEN_ORDERS_QUERY } from '../domain/fulfilment.ts'
 
 /*
  * What the customer self-service page shows and takes (P2.9, D49). Every query runs as the signed-in customer contact,
@@ -49,7 +50,7 @@ export function customerEquipment(session: SessionScope): CustomerAsset[] {
 export function ordersUnderWay(): CustomerOrder[] {
     const orders: CustomerOrder[] = []
     const order = new GlideRecord('x_daas_ham_order')
-    order.addQuery('stage', 'NOT IN', 'complete,cancelled,rejected')
+    order.addEncodedQuery(OPEN_ORDERS_QUERY)
     order.orderByDesc('sys_created_on')
     order.setLimit(200)
     order.query()

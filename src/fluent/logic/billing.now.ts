@@ -14,6 +14,8 @@ import {
     uiResetBillingGeneration,
 } from '../../server/entry/billing'
 import { admin, finance } from '../security/roles.now'
+import { BILLING_PERIOD_STATUS } from '../../server/domain/vocabulary'
+import { RESET_AFTER_IDLE_MINUTES } from '../../server/domain/billing'
 
 /* Billing periods (P3.25, D66): monthly generation, review, close and lock, CSV export. */
 
@@ -79,7 +81,7 @@ UiAction({
     table: 'x_daas_ham_billing_period',
     actionName: 'x_daas_ham_billing_regenerate',
     hint: 'Rebuild the lines from the current subscription lines, service intervals and fee events.',
-    condition: "current.status == 'ready'",
+    condition: `current.status == '${BILLING_PERIOD_STATUS.ready}'`,
     roles: [finance],
     form: { showButton: true },
     showUpdate: true,
@@ -92,8 +94,8 @@ UiAction({
     name: 'Reset generation',
     table: 'x_daas_ham_billing_period',
     actionName: 'x_daas_ham_billing_reset_generation',
-    hint: 'Hold a generation that has shown no activity for 30 minutes as Ready for review, to Regenerate; deletes and bills nothing.',
-    condition: "current.status == 'generating'",
+    hint: `Hold a generation that has shown no activity for ${RESET_AFTER_IDLE_MINUTES} minutes as Ready for review, to Regenerate; deletes and bills nothing.`,
+    condition: `current.status == '${BILLING_PERIOD_STATUS.generating}'`,
     roles: [admin],
     form: { showButton: true },
     showUpdate: true,
@@ -106,7 +108,7 @@ UiAction({
     table: 'x_daas_ham_billing_period',
     actionName: 'x_daas_ham_billing_close',
     hint: 'Mark the fees billed and lock the period; the CSV export is attached in the background shortly after.',
-    condition: "current.status == 'ready'",
+    condition: `current.status == '${BILLING_PERIOD_STATUS.ready}'`,
     roles: [finance],
     form: { showButton: true, style: 'primary' },
     showUpdate: true,
@@ -119,7 +121,7 @@ UiAction({
     table: 'x_daas_ham_billing_period',
     actionName: 'x_daas_ham_billing_reexport',
     hint: 'Attach the CSV export again if it is missing (delete the attached one first to rebuild it).',
-    condition: "current.status == 'closed'",
+    condition: `current.status == '${BILLING_PERIOD_STATUS.closed}'`,
     roles: [finance],
     form: { showButton: true },
     showUpdate: true,
@@ -165,6 +167,6 @@ BusinessRule({
     when: 'after',
     action: ['insert'],
     order: 200,
-    condition: "current.status == 'generating'",
+    condition: `current.status == '${BILLING_PERIOD_STATUS.generating}'`,
     script: startBillingPeriodGeneration,
 })

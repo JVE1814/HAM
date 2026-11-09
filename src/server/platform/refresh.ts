@@ -10,6 +10,7 @@ import { readModelLifecycle } from './model-lifecycle.ts'
 import { createOrder, submitOrder, type NewLine } from './orders.ts'
 import { intProperty, PROPERTY } from './properties.ts'
 import { pluck, str } from './records.ts'
+import { OPEN_ORDERS_QUERY } from '../domain/fulfilment.ts'
 
 /** Refresh Orders for in-service Assets due within the horizon (P2.2, D48: fully automatic). */
 
@@ -35,7 +36,7 @@ export function raiseDueRefreshOrders(lock: HeldLock): void {
 function dueCandidates(): RefreshCandidate[] {
     const horizon = addDays(todayIso(), intProperty(PROPERTY.refreshHorizonDays, 90))
     const onOrder = new Set(
-        pluck('x_daas_ham_order_line', 'replaces_assetISNOTEMPTY^order.stageNOT INcomplete,cancelled,rejected', 'replaces_asset'),
+        pluck('x_daas_ham_order_line', `replaces_assetISNOTEMPTY^order.${OPEN_ORDERS_QUERY}`, 'replaces_asset'),
     )
     const candidates: RefreshCandidate[] = []
     const asset = new GlideRecord('alm_hardware')

@@ -3,16 +3,16 @@ import type { NamedRecord } from './entitlement.ts'
 import { fleetStagesQuery } from './fleet.ts'
 import { DEPLOYED_STAGES, SERVING_STAGES, type Stage } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
-import type {
-    EvaluationOutcome,
-    FeeStatus,
-    FeeType,
-    InstallMode,
-    LeaseEndAction,
-    LegalOwner,
-    ReturnLineStatus,
-    ReturnMethod,
-    ReturnTrigger,
+import {
+    type EvaluationOutcome,
+    FEE_STATUS,
+    type FeeType,
+    type InstallMode,
+    type LeaseEndAction,
+    type LegalOwner,
+    type ReturnLineStatus,
+    type ReturnMethod,
+    type ReturnTrigger,
 } from './vocabulary.ts'
 
 /** Returns, depot evaluation, Fee events and break-fix shortfalls (P2.3–P2.4). */
@@ -127,9 +127,6 @@ export function sitePackageHoldersQuery(line: { siteId: string; agreementId: str
     return fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_site=${line.siteId}^x_daas_ham_agreement=${line.agreementId}`)
 }
 
-/** Installed at a Site: in service, temporary or awaiting first sighting (temporary ends, audits, attestations). */
-export const INSTALLED_STAGES: readonly Stage[] = ['in_service', 'temporary_deployment', 'pending_in_service']
-
 /**
  * What a whole-Site recovery (agreement end, site decommission) takes back: every unit serving the Site, including
  * those still shipped there, which the lifecycle lets go straight to pending return. Left off, a shipped unit would
@@ -174,12 +171,6 @@ export interface FeeIdentity {
     assetId: string
     returnOrderId: string
 }
-
-/**
- * A Fee event's statuses: open until a closed Billing period bills it, or waived (a missing unit turned up), which is
- * never billed.
- */
-export const FEE_STATUS = { open: 'open', billed: 'billed', waived: 'waived' } as const satisfies { [S in FeeStatus]: S }
 
 /** The x_daas_ham_fee_event query for the charges of `fee` that count, any not waived: it is charged at most once. */
 export function chargedFeeQuery(fee: FeeIdentity): string {

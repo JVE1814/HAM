@@ -43,3 +43,6 @@ export function stagingOutcome(steps: ReadonlyArray<{ mandatory: boolean; done: 
     const remaining = steps.filter((s) => s.mandatory && !s.done).length
     return { complete: remaining === 0, remaining }
 }
+
+/** The platform's task states a Staging task is closed with: Closed Complete once staged, Closed Skipped when its unit left staging. */
+export const STAGING_TASK_STATE = { closed: 3, skipped: 7 } as const

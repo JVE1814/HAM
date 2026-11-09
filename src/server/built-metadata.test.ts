@@ -10,7 +10,20 @@ import {
     OEM_PID_FIELD,
     STOCKROOM_TYPE_FIELD,
 } from './domain/fleet'
-import { STAGE_FIELDS } from './domain/vocabulary'
+import { replacementStep } from './domain/breakfix'
+import { CANCELLABLE_ORDER_STAGES } from './domain/fulfilment'
+import { labelVoidable } from './domain/shipping'
+import { RMA_AT_OEM } from './domain/sourcing'
+import {
+    ORDER_STAGE_CHOICES,
+    RMA_STATE_CHOICES,
+    SHIPMENT_DIRECTION_CHOICES,
+    SHIPMENT_STATUS_CHOICES,
+    STAGE_FIELDS,
+    type OrderStage,
+    type RmaState,
+    type ShipmentStatus,
+} from './domain/vocabulary'
 
 /*
  * What the instance is given: the metadata `now-sdk build` writes to dist/app, read as built. The Fluent sources import
@@ -441,6 +454,78 @@ describe('the columns the app adds to the shared tables', () => {
         expect(column('alm_stockroom', STOCKROOM_TYPE_FIELD)?.default_value).toBeUndefined()
         expect(column('cmdb_model', OEM_PID_FIELD)).toMatchObject({ type: 'string' })
         expect(column('cmdb_model', OEM_PID_FIELD)?.default_value).toBeUndefined()
+    })
+})
+
+/*
+ * A UI action's condition is a script in the metadata, so one that offers the action exactly where a rule of the
+ * server code allows it is that rule written a second time, from the same named values. The built condition is run
+ * here against each value and held to the rule.
+ */
+describe('UI action conditions that restate a rule of the server code', () => {
+    const conditionOf = (actionName: string): string => {
+        const action = records('sys_ui_action').find((found) => found.action_name === actionName)
+        expect(action?.condition, actionName).toBeTruthy()
+        return action?.condition ?? ''
+    }
+    /** Whether a script condition holds for `current`, a record with these field values. */
+    const holds = (condition: string, current: Record<string, unknown>) => new Function('current', `return ${condition}`)(current) as boolean
+    const orderStages = Object.keys(ORDER_STAGE_CHOICES) as OrderStage[]
+
+    it('offer Cancel order in the cancellable stages', () => {
+        const condition = conditionOf('x_daas_ham_cancel_order')
+        expect(orderStages.filter((stage) => holds(condition, { stage }))).toEqual(CANCELLABLE_ORDER_STAGES)
+    })
+
+    it('offer Raise replacement while no replacement goes ahead for the case', () => {
+        const condition = conditionOf('x_daas_ham_raise_replacement')
+        const caseWith = (replacement: unknown) => ({ x_daas_ham_failed_asset: 'a1', active: true, x_daas_ham_replacement_order: replacement })
+        expect(holds(condition, caseWith(''))).toBe(replacementStep(null) === 'raise')
+        for (const stage of orderStages) expect({ stage, offered: holds(condition, caseWith({ stage })) }).toEqual({ stage, offered: replacementStep(stage) === 'raise' })
+        expect(holds(condition, { ...caseWith(''), active: false })).toBe(false)
+        expect(holds(condition, { ...caseWith(''), x_daas_ham_failed_asset: '' })).toBe(false)
+    })
+
+    it('offer Defective returned to OEM on the RMAs open with the OEM', () => {
+        const condition = conditionOf('x_daas_ham_rma_defective_returned')
+        const states = Object.keys(RMA_STATE_CHOICES) as RmaState[]
+        expect(states.filter((state) => holds(condition, { state }))).toEqual(RMA_AT_OEM)
+    })
+
+    it('offer Mark label voided on return and outbound Shipments alike, in the statuses labelVoidable allows', () => {
+        const condition = conditionOf('x_daas_ham_mark_label_voided')
+        const statuses = Object.keys(SHIPMENT_STATUS_CHOICES) as ShipmentStatus[]
+        for (const direction of Object.keys(SHIPMENT_DIRECTION_CHOICES)) {
+            expect({ direction, statuses: statuses.filter((status) => holds(condition, { direction, status })) }).toEqual({
+                direction,
+                statuses: statuses.filter(labelVoidable),
+            })
+        }
+        expect(statuses.filter((status) => holds(condition, { direction: '', status }))).toEqual([])
+    })
+})
+
+/*
+ * The platform serves a custom scoped app's workspace under x/<vendor>/<path> and names its route ACLs
+ * x.<vendor>.<path>.<route>, the vendor being the second part of the scope (x_daas_ham: daas). The SDK's workspace
+ * guide says now/<path>: a now/ link is "Page not found", and a now. route ACL guards nothing.
+ */
+describe('NaaS Asset Workspace URL', () => {
+    const scope = (JSON.parse(readFileSync(join(ROOT, 'now.config.json'), 'utf8')) as { scope: string }).scope
+    const vendor = /^x_([a-z0-9]+)_/.exec(scope)?.[1]
+    const path = () => records('sys_ux_page_registry').find((registry) => registry.title === 'NaaS Asset Workspace')?.path
+
+    it('has a vendor prefix and a path', () => {
+        expect([vendor, path()]).toEqual(['daas', 'naas-assets'])
+    })
+
+    it("names the route ACL after the workspace's routes", () => {
+        expect(records('sys_security_acl').map((acl) => acl.name)).toContain(`x.${vendor}.${path()}.*`)
+    })
+
+    it('links the navigator module to its landing page', () => {
+        const module = records('sys_app_module').find((found) => found.title === 'NaaS Asset Workspace')
+        expect(module?.query).toBe(`x/${vendor}/${path()}/home`)
     })
 })
 

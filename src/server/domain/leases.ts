@@ -1,7 +1,7 @@
 import { addDays, addMonths, endOfMonth, isMonthEnd } from './calendar.ts'
 import { inFleet } from './fleet.ts'
-import type { Stage } from './lifecycle.ts'
-import { INSTALL_STATUS, type LeaseEndAction } from './vocabulary.ts'
+import { notRetiredCondition, type Stage } from './lifecycle.ts'
+import type { LeaseEndAction } from './vocabulary.ts'
 
 /** Lease schedules, end-of-lease decisions and renewals (P3.23–P3.24). */
 
@@ -11,7 +11,7 @@ import { INSTALL_STATUS, type LeaseEndAction } from './vocabulary.ts'
  * counted, bought out, transferred or paid for; a unit of the Provider IT's is none of the app's to count.
  */
 export function stillCovered(leaseCondition: string): string {
-    return inFleet(`${leaseCondition}^install_status!=${INSTALL_STATUS.retired}`)
+    return inFleet(`${leaseCondition}^${notRetiredCondition()}`)
 }
 
 /** True once `today` is within `leadDays` of `endDate` (or past it). */

@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { HttpRequest } from './http'
 import {
@@ -29,7 +28,7 @@ import {
     type TrackingEvent,
     type TrackingUpdate,
 } from './shipping'
-import type { ShipmentStatus } from './vocabulary'
+import { SHIPMENT_STATUS_CHOICES, type ShipmentStatus } from './vocabulary'
 
 const depot: Address = { name: 'NaaS Depot', company: 'Demo NaaS Provider', phone: '+31 30 000', line1: '1 Depot Way', city: 'Utrecht', postalCode: '3511AA', country: 'nl' }
 const site: Address = { name: 'Acme HQ reception', phone: '+31 20 000', line1: '5 Main St', city: 'Amsterdam', postalCode: '1011AB', country: 'The Netherlands' }
@@ -340,14 +339,10 @@ describe('parseTrackingWebhook', () => {
 describe('OPEN_SHIPMENTS', () => {
     it('leaves out the final statuses, whose label is no longer in use', () => {
         expect(OPEN_SHIPMENTS).toBe('statusNOT INdelivered,returned,voided')
-    })
-
-    it('is what the workspace list of shipments under way shows', () => {
-        const list = readFileSync(new URL('../../fluent/workspace/list-menu.now.ts', import.meta.url), 'utf8')
-            .split('$id: Now.ID[')
-            .find((source) => source.startsWith("'ws_shipments_open']"))
-        const condition = /condition:\s*'([^']*)'/.exec(list ?? '')?.[1] ?? ''
-        expect(condition.split('^ORDERBY')[0]).toBe(OPEN_SHIPMENTS)
+        // The statuses a later tracking update no longer moves on.
+        const statuses = Object.keys(SHIPMENT_STATUS_CHOICES) as ShipmentStatus[]
+        const final = statuses.filter((status) => status !== 'label_created' && nextShipmentStatus(status, 'label_created') === status)
+        expect(OPEN_SHIPMENTS).toBe(`statusNOT IN${final.join(',')}`)
     })
 })
 
@@ -418,27 +413,6 @@ describe('voidedLabelOrderNote', () => {
     it('never takes an empty tracking number for the label', () => {
         const none = { trackingNumber: ' ', carrier: '' }
         expect(voidedLabelOrderNote({ trackingNumber: '', carrier: '' }, none)).toBeNull()
-    })
-})
-
-describe('Mark label voided', () => {
-    const action = readFileSync(new URL('../../fluent/logic/shipping.now.ts', import.meta.url), 'utf8')
-        .split('$id: Now.ID[')
-        .find((source) => source.startsWith("'ua_shipment_mark_voided']"))
-    const condition = /condition:\s*"([^"]*)"/.exec(action ?? '')?.[1] ?? ''
-
-    it('is offered on return and outbound Shipments alike', () => {
-        expect(condition).toContain("current.direction == 'return'")
-        expect(condition).toContain("current.direction == 'to_site'")
-    })
-
-    it('is offered in exactly the statuses labelVoidable allows', () => {
-        const offered = [...condition.matchAll(/current\.status == '([a-z_]+)'/g)].map((match) => match[1])
-        const all: ShipmentStatus[] = [
-            'label_created', 'in_transit', 'out_for_delivery', 'delivered',
-            'exception', 'returned', 'unknown', 'voided',
-        ]
-        expect(offered.sort()).toEqual(all.filter(labelVoidable).sort())
     })
 })
 

@@ -3,7 +3,6 @@ import {
     assessOrder,
     deployedUsageQuery,
     inFlightLinesQuery,
-    OPEN_LINE_STAGES,
     ownershipFindings,
     raiserRefusal,
     siteTemplateOffered,
@@ -11,7 +10,7 @@ import {
     type Orderer,
     type OrderParties,
 } from './entitlement'
-import { lineStageFor } from './fulfilment'
+import { lineStageFor, OPEN_LINE_STAGES } from './fulfilment'
 import { DEPLOYED_STAGES } from './lifecycle'
 
 const context: EntitlementContext = {

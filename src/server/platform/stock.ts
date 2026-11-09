@@ -16,6 +16,7 @@ import { moveAsset, readStage } from './assets.ts'
 import { attemptLock, type LockRun } from './locks.ts'
 import { PROPERTY, stringProperty } from './properties.ts'
 import { bool, str } from './records.ts'
+import { STOCK_STAGES } from '../domain/lifecycle.ts'
 
 /** Stock that can serve an Order line, claiming it for one, giving it back, and changing it where a claim could race. */
 
@@ -81,7 +82,7 @@ export interface Reservation {
  * free or the save is refused (see `claim`).
  */
 export function reserveAsset(assetId: string, reservation: Reservation): GlideRecord | null {
-    return claim(assetId, { from: ['available', 'spare_pool'], to: 'reserved', values: lineValues(reservation) })
+    return claim(assetId, { from: STOCK_STAGES, to: 'reserved', values: lineValues(reservation) })
 }
 
 /**
@@ -89,7 +90,7 @@ export function reserveAsset(assetId: string, reservation: Reservation): GlideRe
  * in the pool and is installed from where it is. Null when it is no longer free or the save is refused (see `claim`).
  */
 export function linkHotSpare(assetId: string, reservation: Reservation): GlideRecord | null {
-    return claim(assetId, { from: ['available', 'spare_pool'], to: 'spare_pool', values: lineValues(reservation) })
+    return claim(assetId, { from: STOCK_STAGES, to: 'spare_pool', values: lineValues(reservation) })
 }
 
 /**

@@ -1,5 +1,5 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { ATTESTATION_STATE, attestationDue, IN_USE_STAGES } from '../domain/audit.ts'
+import { ATTESTATION_STATE, attestationDue } from '../domain/audit.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import { ATTESTATION_RESPONSE_CHOICES } from '../domain/vocabulary.ts'
 import { customerAdminIds } from './approvals.ts'
@@ -7,6 +7,7 @@ import { glideToIsoDate, nowGlide, todayIso } from './clock.ts'
 import { openException } from './exceptions.ts'
 import { bool, exists, findById, num, refusal, str } from './records.ts'
 import { installedAssetIds } from './installed-assets.ts'
+import { IN_USE_STAGES } from '../domain/lifecycle.ts'
 
 /**
  * Attestations: a Customer admin confirms the equipment installed at a Site (P2.7, D63). The daily job raises them,

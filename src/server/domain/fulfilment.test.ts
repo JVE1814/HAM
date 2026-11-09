@@ -2,14 +2,20 @@ import { describe, expect, it } from 'vitest'
 import {
     anythingShipped,
     approvalAwaited,
+    CANCELLABLE_ORDER_STAGES,
     closedStateFor,
+    ENDED_ORDER_STAGES,
     followsLines,
     leftInTransit,
     lineStageFor,
+    OPEN_LINE_STAGES,
+    OPEN_ORDERS_QUERY,
     orderStageFor,
     refillsLine,
     siteRecoveryLineQuery,
+    UNFULFILLED_ORDER_STAGES,
 } from './fulfilment'
+import { LINE_STAGE_CHOICES, ORDER_STAGE_CHOICES, type LineStage, type OrderStage } from './vocabulary'
 
 describe('lineStageFor', () => {
     it('waits for stock while fewer assets than ordered are allocated', () => {
@@ -233,5 +239,31 @@ describe('closedStateFor', () => {
         for (const stage of ['draft', 'awaiting_approval', 'sourcing', 'preparing', 'delivering', 'installing'] as const) {
             expect(closedStateFor(stage)).toBeUndefined()
         }
+    })
+})
+
+describe('the Order stage sets', () => {
+    const stages = Object.keys(ORDER_STAGE_CHOICES) as OrderStage[]
+
+    it('count as ended exactly the stages an Order is closed with', () => {
+        expect([...ENDED_ORDER_STAGES].sort()).toEqual(stages.filter((stage) => closedStateFor(stage) !== undefined).sort())
+        for (const stage of UNFULFILLED_ORDER_STAGES) expect(ENDED_ORDER_STAGES).toContain(stage)
+        expect(UNFULFILLED_ORDER_STAGES).not.toContain('complete')
+    })
+
+    it('select the open Orders with the query the metadata imports', () => {
+        expect(OPEN_ORDERS_QUERY).toBe(`stageNOT IN${ENDED_ORDER_STAGES.join(',')}`)
+    })
+
+    it('offer Cancel order until Ship: on no Order that ended, is being installed or is complete', () => {
+        expect(stages.filter((stage) => !CANCELLABLE_ORDER_STAGES.includes(stage))).toEqual(['installing', 'complete', 'rejected', 'cancelled'])
+    })
+})
+
+describe('the Order line stage sets', () => {
+    it('are cut from the one line ordering: open before Ship, and filled again from awaiting stock to shipped', () => {
+        expect(OPEN_LINE_STAGES).toEqual(['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship'])
+        const refilled = (Object.keys(LINE_STAGE_CHOICES) as LineStage[]).filter((stage) => refillsLine({ stage, siteRecovery: false }))
+        expect(refilled).toEqual(['awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped'])
     })
 })

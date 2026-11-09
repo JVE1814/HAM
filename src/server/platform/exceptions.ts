@@ -3,7 +3,7 @@ import { LOCK } from '../domain/lock-names.ts'
 import { nowGlide } from './clock.ts'
 import { withLockTries } from './locks.ts'
 import { exists, pluck, refusal, str } from './records.ts'
-import type { ExceptionType } from '../domain/vocabulary.ts'
+import { EXCEPTION_STATUS, type ExceptionType } from '../domain/vocabulary.ts'
 
 /** Reconciliation exceptions: at most one open exception per type and asset (or CI, such as a rack). */
 
@@ -46,7 +46,7 @@ export function openException(type: ExceptionType, subject: ExceptionSubject, fa
 
 function isOpen(type: ExceptionType, subject: ExceptionSubject): boolean {
     const { field, id } = fieldOf(subject)
-    return exists(TABLE, `exception_type=${type}^status=open^${field}=${id}`)
+    return exists(TABLE, `exception_type=${type}^status=${EXCEPTION_STATUS.open}^${field}=${id}`)
 }
 
 function insertException(type: ExceptionType, subject: ExceptionSubject, facts: ExceptionFacts): void {
@@ -83,7 +83,7 @@ export function resolveExceptions(subject: ExceptionSubject, types: readonly Exc
     if (!id || types.length === 0) return
     const exception = new GlideRecord(TABLE)
     exception.addQuery(field, id)
-    exception.addQuery('status', 'open')
+    exception.addQuery('status', EXCEPTION_STATUS.open)
     exception.addQuery('exception_type', 'IN', types.join(','))
     resolveEach(exception)
 }
@@ -112,5 +112,5 @@ function resolveEach(exception: GlideRecord): void {
 
 /** The CIs (racks, network gear) with an open exception of one of `types`, each once. */
 export function cisWithOpenException(types: readonly ExceptionType[]): string[] {
-    return [...new Set(pluck(TABLE, `status=open^exception_typeIN${types.join(',')}^ciISNOTEMPTY`, 'ci'))]
+    return [...new Set(pluck(TABLE, `status=${EXCEPTION_STATUS.open}^exception_typeIN${types.join(',')}^ciISNOTEMPTY`, 'ci'))]
 }

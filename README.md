@@ -259,6 +259,11 @@ Conventions that the build or tests enforce:
   list as its `choices:`, server code imports the type derived from it. Fluent evaluates that file
   statically, so it holds constants and types only (no imports, calls, spread or `satisfies` on a
   list).
+- A set of those values (the ended Order stages, the stages in use, the open RMAs) is defined once,
+  in the domain module that owns the concept, from the list's values by name (`ORDER_STAGE.rejected`).
+  A query or condition the metadata needs is a constant written out beside the set, which a unit test
+  holds to it; a UI action condition that restates a server rule is run as built against every value
+  (`built-metadata.test.ts`).
 - Substatus values added to `alm_asset` are the `choice` entries of `STAGE_FIELDS` there, which
   `fluent/data/substatus-choices.now.ts` ships one Record each (`built-metadata.test.ts` compares
   the built choice set with them).

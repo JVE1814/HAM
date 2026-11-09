@@ -41,20 +41,23 @@ const RETIRED: ReadonlySet<Stage> = new Set([
     'returned_to_lessor',
 ])
 
-const AT_OR_TOWARDS_SITE: ReadonlySet<Stage> = new Set([
-    'shipped',
-    'pending_in_service',
-    'in_service',
-    'temporary_deployment',
-    'pending_return',
-])
+/** In use at a Site: an Asset in one of these delivers its Subscription line and is billed (D52), and monitoring should see it. */
+export const IN_USE_STAGES: readonly Stage[] = ['in_service', 'temporary_deployment']
 
-const NEEDS_SITE_AND_AGREEMENT: ReadonlySet<Stage> = new Set([
-    'shipped',
-    'pending_in_service',
-    'in_service',
-    'temporary_deployment',
-])
+/** Installed at a Site: in use, or awaiting first sighting (temporary ends, audits, attestations). */
+export const INSTALLED_STAGES: readonly Stage[] = [...IN_USE_STAGES, 'pending_in_service']
+
+/**
+ * At or on the way to a customer Site and not coming back: what leases, coverage warnings and lifecycle refreshes count
+ * as serving. An Asset needs its Site and its Agreement to be in one.
+ */
+export const SERVING_STAGES: readonly Stage[] = ['shipped', 'pending_in_service', 'in_service', 'temporary_deployment']
+
+/** At a Site or on the way there, coming back included: what counts against an Agreement's contracted quantities. */
+export const DEPLOYED_STAGES: readonly Stage[] = [...SERVING_STAGES, 'pending_return']
+
+/** Stock on no Order line: free stock and a Customer's Spare pool, which sourcing reserves from. */
+export const STOCK_STAGES: readonly Stage[] = ['available', 'spare_pool']
 
 /** Stock a transfer order moves between stockrooms, and the stages it takes back once Inventory lets it go. */
 const TRANSFERABLE: readonly Stage[] = ['available', 'reserved', 'spare_pool', 'staging']
@@ -121,7 +124,7 @@ export function isRetired(stage: Stage | null): boolean {
 
 /** Assets that count against an Agreement's contracted quantities: at a Site or on the way there. */
 export function isDeployed(stage: Stage | null): boolean {
-    return stage !== null && AT_OR_TOWARDS_SITE.has(stage)
+    return stage !== null && DEPLOYED_STAGES.includes(stage)
 }
 
 export function checkTransition(from: Stage | null, to: Stage, facts: TransitionFacts): TransitionVerdict {
@@ -138,7 +141,7 @@ export function checkTransition(from: Stage | null, to: Stage, facts: Transition
     if (from === 'in_transfer' && facts.onTransferOrderLine) {
         return { allowed: false, reason: 'An asset leaves transfer only once Inventory lets it go from its transfer order line' }
     }
-    if (NEEDS_SITE_AND_AGREEMENT.has(to)) {
+    if (SERVING_STAGES.includes(to)) {
         if (!facts.hasSite) return { allowed: false, reason: `An asset must have a site before it can be ${to}` }
         if (!facts.hasAgreement) {
             return { allowed: false, reason: `An asset must belong to an agreement before it can be ${to}` }
@@ -229,11 +232,6 @@ export function voidsWipeEvidence(from: Stage | null, to: Stage): boolean {
     return to === 'staging' && from !== 'staging'
 }
 
-export const DEPLOYED_STAGES: readonly Stage[] = [...AT_OR_TOWARDS_SITE]
-
-/** At or on the way to a customer Site and not coming back: what leases, coverage warnings and lifecycle refreshes count as serving. */
-export const SERVING_STAGES: readonly Stage[] = ['shipped', 'pending_in_service', 'in_service', 'temporary_deployment']
-
 /**
  * An encoded query matching assets in any of `stages` (and `base`, repeated per clause because
  * ^NQ starts a new top-level OR group), one clause per combination a stage is stored as. `via`
@@ -254,11 +252,8 @@ export function notRetiredCondition(via = ''): string {
     return `${via}install_status!=${INSTALL_STATUS.retired}`
 }
 
-/** Stages in which an Asset delivers its Subscription line and is billed (D52). */
-const BILLABLE: ReadonlySet<Stage> = new Set(['in_service', 'temporary_deployment'])
-
 export function isBillable(stage: Stage | null): boolean {
-    return stage !== null && BILLABLE.has(stage)
+    return stage !== null && IN_USE_STAGES.includes(stage)
 }
 
 /** The dates a stage change can start or stop an Asset's billing on (YYYY-MM-DD). */

@@ -12,7 +12,7 @@ import {
     stockReturnMoves,
     withinLead,
 } from '../domain/leases.ts'
-import { isRetired, SERVING_STAGES, stagesQuery, type Stage } from '../domain/lifecycle.ts'
+import { isRetired, SERVING_STAGES, type Stage, stagesQuery, STOCK_STAGES } from '../domain/lifecycle.ts'
 import { isFree } from '../domain/sourcing.ts'
 import type { LeaseEndAction } from '../domain/vocabulary.ts'
 import { providerApproverIds } from './approvals.ts'
@@ -33,9 +33,6 @@ import { changeStock, releaseToProviderStock, stockUnit } from './stock.ts'
  */
 
 const LEASE = 'x_daas_ham_lease_schedule'
-
-/** Healthy stock that can go straight back to the Lessor. */
-const IN_STOCK: readonly Stage[] = ['available', 'spare_pool']
 
 /** The task state an applied decision is closed with (Closed Complete). */
 const DECISION_CLOSED = 3
@@ -253,7 +250,7 @@ interface StockReturn {
 function disposeStockToLessor(lease: GlideRecord): StockReturn {
     const found = new GlideRecord('alm_hardware')
     const unclaimed = `x_daas_ham_lease=${lease.getUniqueValue()}^x_daas_ham_order_lineISEMPTY`
-    found.addEncodedQuery(fleetStagesQuery(IN_STOCK, unclaimed))
+    found.addEncodedQuery(fleetStagesQuery(STOCK_STAGES, unclaimed))
     found.query()
     // Undefined until the first unit is withdrawn; null once refused, so it is not tried again for every unit.
     let order: GlideRecord | null | undefined
@@ -280,7 +277,7 @@ function disposeStockToLessor(lease: GlideRecord): StockReturn {
  */
 function withdrawFromStock(found: GlideRecord): GlideRecord | 'taken' | 'refused' {
     const withdrawn = changeStock(found.getUniqueValue(), 'withdrawn for its lessor', (asset, lock) => {
-        if (!asset || !isFree(stockUnit(asset), IN_STOCK)) return 'taken'
+        if (!asset || !isFree(stockUnit(asset), STOCK_STAGES)) return 'taken'
         return moveOutOfStock(lock, asset) ? asset : 'refused'
     })
     if (withdrawn.ran) return withdrawn.value

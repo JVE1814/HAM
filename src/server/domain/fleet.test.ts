@@ -5,6 +5,7 @@ import {
     CURRENT_IS_NAAS_STOCKROOM,
     FLEET_CONDITION,
     FLEET_FIELD,
+    FLEET_IN_STAGE,
     fleetCondition,
     fleetField,
     fleetStagesQuery,
@@ -68,6 +69,10 @@ describe('the conditions the metadata imports', () => {
 
     it('name every stockroom type as a NaaS stockroom’s', () => {
         expect([...NAAS_STOCKROOM_TYPES].sort()).toEqual(Object.keys(STOCKROOM_TYPE_CHOICES).sort())
+    })
+
+    it('list the fleet assets of one stage as fleetStagesQuery does', () => {
+        for (const [stage, query] of Object.entries(FLEET_IN_STAGE)) expect({ stage, query }).toEqual({ stage, query: fleetStagesQuery([stage as Stage]) })
     })
 
     it('test the same in a script: the Fleet flag, and each NaaS stockroom type', () => {

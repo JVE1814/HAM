@@ -1,7 +1,8 @@
 import { fleetStagesQuery } from './fleet.ts'
+import { OPEN_LINE_STAGES, UNFULFILLED_ORDER_STAGES } from './fulfilment.ts'
 import { DEPLOYED_STAGES } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
-import type { CatalogEntryType, EntitlementVerdict, LineStage } from './vocabulary.ts'
+import { ORDER_STAGE, type CatalogEntryType, type EntitlementVerdict, type OrderStage } from './vocabulary.ts'
 
 /**
  * Entitlement: is an Order within the Customer's Agreement?
@@ -177,12 +178,6 @@ export function approversFor(verdict: EntitlementVerdict | ''): Approver[] {
 }
 
 /**
- * Order line stages before the line has shipped: such a line's whole quantity counts as in-flight usage, and it is
- * what cancelling or rejecting its Order cancels.
- */
-export const OPEN_LINE_STAGES: readonly LineStage[] = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship']
-
-/**
  * Encoded query on alm_hardware: the Agreement's fleet assets (ADR 0016) counted as deployed usage. One still on an
  * open Order line is left out, as that line's quantity counts it in flight: a unit a partial Ship sent counts once.
  */
@@ -191,9 +186,12 @@ export function deployedUsageQuery(agreementId: string): string {
     return fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}^${notInFlight}`)
 }
 
+/** Order stages whose lines use nothing of an Agreement: a draft is not asked for yet, and one that ended unfulfilled never will be. */
+const NOT_YET_LIVE_OR_UNFULFILLED: readonly OrderStage[] = [ORDER_STAGE.draft, ...UNFULFILLED_ORDER_STAGES]
+
 /** Encoded query on x_daas_ham_order_line: the Agreement's open lines on live Orders other than `excludeOrderId`. */
 export function inFlightLinesQuery(agreementId: string, excludeOrderId: string): string {
-    return `order.agreement=${agreementId}^order!=${excludeOrderId}^order.stageNOT INdraft,rejected,cancelled^line_stageIN${OPEN_LINE_STAGES.join(',')}`
+    return `order.agreement=${agreementId}^order!=${excludeOrderId}^order.stageNOT IN${NOT_YET_LIVE_OR_UNFULFILLED.join(',')}^line_stageIN${OPEN_LINE_STAGES.join(',')}`
 }
 
 function sum(values: number[]): number {

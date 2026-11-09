@@ -3,6 +3,7 @@ import { BusinessRule, EmailNotification, Record, ScheduledScript, Sla, UiAction
 import { onCaseFailedAsset, uiDefectiveReturnedToOem, uiRaiseReplacement } from '../../server/entry/breakfix'
 import { chaseOverdueReturns, onReturnEvaluated, raiseScheduledReturns } from '../../server/entry/returns'
 import { assetManager, inventoryTech, noc } from '../security/roles.now'
+import { ORDER_STAGE, RETURN_LINE_STATUS, RMA_STATE } from '../../server/domain/vocabulary'
 
 /* Break-fix (D58) and returns (D60): rules, actions, SLAs, jobs and notifications. */
 
@@ -23,9 +24,10 @@ UiAction({
     table: 'sn_customerservice_case',
     actionName: 'x_daas_ham_raise_replacement',
     hint: 'Order a like-for-like replacement of the failed asset (spare at the site, spare pool, stock, OEM advance replacement or purchase).',
-    // Offered while no replacement goes ahead: none linked, or the linked one rejected or cancelled (domain/breakfix).
+    // Offered while no replacement goes ahead: none linked, or the linked one ended unfulfilled (domain/breakfix
+    // replacementStep, which built-metadata.test.ts holds the built condition to).
     condition:
-        "current.x_daas_ham_failed_asset != '' && current.active == true && (current.x_daas_ham_replacement_order == '' || ['rejected', 'cancelled'].indexOf(String(current.x_daas_ham_replacement_order.stage)) >= 0)",
+        `current.x_daas_ham_failed_asset != '' && current.active == true && (current.x_daas_ham_replacement_order == '' || ['${ORDER_STAGE.rejected}', '${ORDER_STAGE.cancelled}'].indexOf(String(current.x_daas_ham_replacement_order.stage)) >= 0)`,
     roles: [noc, assetManager, 'sn_customerservice_agent'],
     form: { showButton: true, style: 'primary' },
     showUpdate: true,
@@ -38,7 +40,8 @@ UiAction({
     table: 'x_daas_ham_oem_rma',
     actionName: 'x_daas_ham_rma_defective_returned',
     hint: 'Record that the defective unit was shipped back to the manufacturer (needs wipe evidence on the asset).',
-    condition: "['open','replacement_received'].indexOf(current.state + '') >= 0",
+    // domain/sourcing RMA_AT_OEM, which built-metadata.test.ts holds the built condition to.
+    condition: `['${RMA_STATE.open}','${RMA_STATE.replacement_received}'].indexOf(current.state + '') >= 0`,
     roles: [inventoryTech, assetManager],
     form: { showButton: true },
     showUpdate: true,
@@ -54,8 +57,8 @@ Sla({
     scheduleSource: 'no_schedule',
     conditions: {
         start: 'x_daas_ham_failed_assetISNOTEMPTY^x_daas_ham_replacement_tier=nbd',
-        stop: 'x_daas_ham_replacement_order.stage=complete',
-        cancel: 'active=false^x_daas_ham_replacement_order.stage!=complete',
+        stop: `x_daas_ham_replacement_order.stage=${ORDER_STAGE.complete}`,
+        cancel: `active=false^x_daas_ham_replacement_order.stage!=${ORDER_STAGE.complete}`,
     },
 })
 
@@ -68,8 +71,8 @@ Sla({
     scheduleSource: 'no_schedule',
     conditions: {
         start: 'x_daas_ham_failed_assetISNOTEMPTY^x_daas_ham_replacement_tier=same_day',
-        stop: 'x_daas_ham_replacement_order.stage=complete',
-        cancel: 'active=false^x_daas_ham_replacement_order.stage!=complete',
+        stop: `x_daas_ham_replacement_order.stage=${ORDER_STAGE.complete}`,
+        cancel: `active=false^x_daas_ham_replacement_order.stage!=${ORDER_STAGE.complete}`,
     },
 })
 
@@ -82,8 +85,8 @@ Sla({
     scheduleSource: 'no_schedule',
     conditions: {
         start: 'x_daas_ham_failed_assetISNOTEMPTY^x_daas_ham_replacement_tier=four_hour',
-        stop: 'x_daas_ham_replacement_order.stage=complete',
-        cancel: 'active=false^x_daas_ham_replacement_order.stage!=complete',
+        stop: `x_daas_ham_replacement_order.stage=${ORDER_STAGE.complete}`,
+        cancel: `active=false^x_daas_ham_replacement_order.stage!=${ORDER_STAGE.complete}`,
     },
 })
 
@@ -94,7 +97,7 @@ BusinessRule({
     when: 'after',
     action: ['update'],
     order: 200,
-    condition: "current.evaluation.changes() && current.evaluation != '' && current.status == 'received'",
+    condition: `current.evaluation.changes() && current.evaluation != '' && current.status == '${RETURN_LINE_STATUS.received}'`,
     script: onReturnEvaluated,
 })
 

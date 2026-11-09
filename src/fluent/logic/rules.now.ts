@@ -12,6 +12,7 @@ import { onOrderApprovalDecision } from '../../server/entry/orders'
 import { guardStagingClosure, onStagingClosed, releaseWaitingSteps, stampStagingStep } from '../../server/entry/staging'
 import { CURRENT_IS_FLEET } from '../../server/domain/fleet'
 import { ENTRY_MODULES } from './server-modules.now'
+import { STAGING_TASK_STATE } from '../../server/domain/staging'
 
 /* Record-change rules driving the Order lifecycle (ADR 0004). */
 
@@ -134,7 +135,7 @@ BusinessRule({
     when: 'before',
     action: ['update'],
     order: 100,
-    condition: 'current.state.changes() && current.state == 3',
+    condition: `current.state.changes() && current.state == ${STAGING_TASK_STATE.closed}`,
     script: guardStagingClosure,
 })
 
@@ -145,7 +146,7 @@ BusinessRule({
     when: 'after',
     action: ['update'],
     order: 200,
-    condition: 'current.state.changes() && current.state == 3',
+    condition: `current.state.changes() && current.state == ${STAGING_TASK_STATE.closed}`,
     script: onStagingClosed,
 })
 
