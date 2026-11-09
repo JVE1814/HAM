@@ -1,15 +1,23 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
+import { fleetCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
 import {
+    fleetOnRawModelQuery,
+    LEARNED_RULE,
+    MODEL_TABLE,
+    NORMALIZED_TO,
     normalizeModel,
     NOT_NAAS_REASON,
     notNaasRawModelsQuery,
     RAW_MODEL_EXCEPTIONS_QUERY,
     RAW_MODEL_TABLE,
+    rawModelsToNormalizeQuery,
     shouldLearnAlias,
+    siteCiOnRawModelQuery,
     type ManufacturerAlias,
     type ModelMatchRule,
 } from '../domain/normalization.ts'
-import { bool, num, pluck, refusal, str } from './records.ts'
+import { runTableJob } from './chunked.ts'
+import { bool, countBy, num, pluck, str, warnRefused } from './records.ts'
 
 /** Resolving raw manufacturer/model strings to canonical Models (domain/normalization). */
 
@@ -18,7 +26,7 @@ export interface NormalizationData {
     rules: ModelMatchRule[]
 }
 
-/** Load aliases and active rules once per job run or transaction (no module-level cache: modules outlive transactions). */
+/** Load aliases and active rules once per job run or transaction. */
 export function loadNormalizationData(): NormalizationData {
     const aliases: ManufacturerAlias[] = []
     const alias = new GlideRecord('x_daas_ham_manufacturer_alias')
@@ -44,10 +52,10 @@ export function loadNormalizationData(): NormalizationData {
 }
 
 /** A canonical Model with exactly this OEM PID. */
-export function modelByPid(pid: string): string {
+function modelByPid(pid: string): string {
     if (!pid.trim()) return ''
-    const model = new GlideRecord('cmdb_model')
-    model.addQuery('x_daas_ham_oem_pid', pid.trim())
+    const model = new GlideRecord(MODEL_TABLE)
+    model.addQuery(OEM_PID_FIELD, pid.trim())
     model.setLimit(1)
     model.query()
     return model.next() ? model.getUniqueValue() : ''
@@ -63,12 +71,17 @@ export function resolveModel(raw: { manufacturer: string; model: string }, data:
     return result.matched ? { modelId: result.modelId } : { modelId: '', reason: result.reason }
 }
 
-/** Remember a raw pair nobody could map (counted, so the worst offenders surface first). */
+/**
+ * Remember a raw pair nobody could map (counted, so the worst offenders surface first). The open exception of the pair
+ * is found and counted on, or raised, without a lock: two rows that raise the same pair at the same moment can each
+ * raise one, and both are then counted on and resolved by hand like any other. A refused save is logged.
+ */
 export function recordNormalizationException(
     raw: { manufacturer: string; model: string },
     reason: string,
     source: { table: string; id: string },
 ): void {
+    const rawPair = `${raw.manufacturer} / ${raw.model}`
     const exception = new GlideRecord('x_daas_ham_norm_exception')
     exception.addQuery('raw_manufacturer', raw.manufacturer)
     exception.addQuery('raw_model', raw.model)
@@ -77,7 +90,7 @@ export function recordNormalizationException(
     exception.query()
     if (exception.next()) {
         exception.setValue('occurrences', num(exception, 'occurrences') + 1)
-        exception.update()
+        if (!exception.update()) warnRefused(exception, `Normalization exception ${rawPair} not counted again`)
         return
     }
     exception.initialize()
@@ -86,7 +99,72 @@ export function recordNormalizationException(
     exception.setValue('reason', reason)
     exception.setValue('source_table', source.table)
     exception.setValue('source_record', source.id)
-    exception.insert()
+    if (!exception.insert()) warnRefused(exception, `No normalization exception for ${rawPair}`)
+}
+
+/**
+ * Map onto canonical Models the raw hardware models that are NaaS's (ADR 0016): those Discovery and connectors put
+ * fleet assets on, and those of the network gear reconciliation reports *seen without asset* at a customer Site, whose
+ * Asset joins the fleet on the canonical Model. A raw model only the Provider IT's equipment is on (its laptops,
+ * printers, servers) is not NaaS's to map, so it is neither mapped nor raised as a normalization exception, and an
+ * exception an earlier run raised for one is closed.
+ */
+export function normalizeNaasRawModels(): void {
+    const naas = [
+        ...distinctValues('alm_hardware', fleetOnRawModelQuery(), 'model'),
+        ...distinctValues('cmdb_ci_netgear', siteCiOnRawModelQuery(), 'model_id'),
+    ]
+    closeNonNaasExceptions(naas)
+    const query = rawModelsToNormalizeQuery(naas)
+    // No raw model is NaaS's: nothing to map.
+    if (!query) return
+    const data = loadNormalizationData()
+    runTableJob({
+        job: 'normalize_raw_models',
+        table: RAW_MODEL_TABLE,
+        query,
+        read: (model) => ({ manufacturer: str(model, 'manufacturer.name'), model: str(model, 'name') }),
+        handle: (raw, rawModelId) => {
+            const resolution = resolveModel(raw, data)
+            if (!resolution.modelId) {
+                recordNormalizationException(raw, 'reason' in resolution ? resolution.reason : '', {
+                    table: RAW_MODEL_TABLE,
+                    id: rawModelId,
+                })
+                return
+            }
+            repointModel(rawModelId, resolution.modelId)
+        },
+    })
+}
+
+/** The distinct values of `field` among the rows of `table` that `query` matches, read with one aggregate query. */
+function distinctValues(table: string, query: string, field: string): string[] {
+    return [...countBy(table, query, field).keys()]
+}
+
+/**
+ * Point the raw model's fleet assets at the canonical Model, then mark the raw model normalized. Marked, it leaves the
+ * job's query, so an Asset whose save is refused leaves it unmarked for the next run to repoint, as does a refused
+ * mark. The Provider IT's Assets on the raw model are left on it (ADR 0016).
+ */
+function repointModel(rawModelId: string, canonicalModelId: string): void {
+    const raw = new GlideRecord(MODEL_TABLE)
+    if (!raw.get(rawModelId)) return
+    let refused = 0
+    const asset = new GlideRecord('alm_hardware')
+    asset.addQuery('model', rawModelId)
+    asset.addEncodedQuery(fleetCondition())
+    asset.query()
+    while (asset.next()) {
+        asset.setValue('model', canonicalModelId)
+        if (asset.update()) continue
+        refused++
+        warnRefused(asset, `Model normalization: ${str(asset, 'serial_number')} left on its raw model`)
+    }
+    if (refused > 0) return
+    raw.setValue(NORMALIZED_TO, canonicalModelId)
+    if (!raw.update()) warnRefused(raw, `Model normalization: raw model ${str(raw, 'name')} not marked normalized`)
 }
 
 /**
@@ -94,7 +172,7 @@ export function recordNormalizationException(
  * none of `naasRawModelIds` (domain/normalization `notNaasRawModelsQuery`). Each is resolved with no Model, its reason
  * `not_naas`. One the platform refuses to close is logged and stays open for the next run.
  */
-export function closeNonNaasExceptions(naasRawModelIds: readonly string[]): void {
+function closeNonNaasExceptions(naasRawModelIds: readonly string[]): void {
     const query = notNaasRawModelsQuery(pluck('x_daas_ham_norm_exception', RAW_MODEL_EXCEPTIONS_QUERY, 'source_record'), naasRawModelIds)
     const notNaas = query ? pluck(RAW_MODEL_TABLE, query, 'sys_id') : []
     if (notNaas.length === 0) return
@@ -107,7 +185,7 @@ export function closeNonNaasExceptions(naasRawModelIds: readonly string[]): void
         exception.setValue('reason', NOT_NAAS_REASON)
         if (exception.update()) continue
         const rawPair = `${str(exception, 'raw_manufacturer')} / ${str(exception, 'raw_model')}`
-        gs.warn(`[x_daas_ham] Normalization exception ${rawPair} not closed as not NaaS: ${refusal(exception)}`)
+        warnRefused(exception, `Normalization exception ${rawPair} not closed as not NaaS`)
     }
 }
 
@@ -117,7 +195,7 @@ export function closeNonNaasExceptions(naasRawModelIds: readonly string[]): void
  * known manufacturer. False (and a warning) when the platform refuses the alias or the rule, so the caller does not
  * take the raw pair as mapped; a refused alias stops before the rule, so a retry learns each once.
  */
-export function learnFromResolution(exception: GlideRecord, data: NormalizationData): boolean {
+function learnFromResolution(exception: GlideRecord, data: NormalizationData): boolean {
     const modelId = str(exception, 'resolved_model')
     const manufacturerId = str(exception, 'resolved_model.manufacturer')
     if (!modelId || !manufacturerId) return true
@@ -132,9 +210,9 @@ export function learnFromResolution(exception: GlideRecord, data: NormalizationD
     }
     const rule = new GlideRecord('x_daas_ham_model_match_rule')
     rule.initialize()
-    rule.setValue('order', 100)
+    rule.setValue('order', LEARNED_RULE.order)
     rule.setValue('manufacturer', manufacturerId)
-    rule.setValue('match_type', 'exact')
+    rule.setValue('match_type', LEARNED_RULE.matchType)
     rule.setValue('pattern', str(exception, 'raw_model'))
     rule.setValue('model', modelId)
     return learned(rule, 'match rule', rawPair)
@@ -142,6 +220,17 @@ export function learnFromResolution(exception: GlideRecord, data: NormalizationD
 
 function learned(record: GlideRecord, what: string, rawPair: string): boolean {
     if (record.insert()) return true
-    gs.warn(`[x_daas_ham] No ${what} learned for ${rawPair}: ${refusal(record)}`)
+    warnRefused(record, `No ${what} learned for ${rawPair}`)
     return false
+}
+
+/**
+ * A normalization exception was given its resolved Model: learn a rule from it (learnFromResolution) and resolve it.
+ * False when no rule was learned: the exception then stays open, as nothing maps its raw pair yet.
+ */
+export function resolveNormalizationException(exception: GlideRecord): boolean {
+    if (!learnFromResolution(exception, loadNormalizationData())) return false
+    exception.setValue('status', 'resolved')
+    if (!exception.update()) warnRefused(exception, `Normalization exception ${str(exception, 'raw_manufacturer')} / ${str(exception, 'raw_model')} not resolved`)
+    return true
 }

@@ -6,6 +6,8 @@ import {
     CLAIM_VENDORS,
     dependentActions,
     dueStepsQuery,
+    settledStatus,
+    STEP_STATUS,
     initialAutomationStatus,
     runVendorClaims,
     type ClaimOutcome,
@@ -533,5 +535,14 @@ describe('initialAutomationStatus', () => {
 
     it('makes the claim step, which waits for nothing, pending', () => {
         expect(initialAutomationStatus('oem_claim', ['oem_claim', 'oem_licence', 'oem_ztp'])).toBe('pending')
+    })
+})
+
+describe('settledStatus', () => {
+    it('ticks a step whose call succeeded and fails the others, which are due again later', () => {
+        expect(settledStatus({ stepId: 's1', ok: true, message: '' })).toBe('done')
+        expect(settledStatus({ stepId: 's1', ok: false, message: 'no' })).toBe('failed')
+        expect(dueStepsQuery('meraki', 'oem_claim')).toContain(`automation_status=${STEP_STATUS.failed}`)
+        expect(dueStepsQuery('meraki', 'oem_claim')).not.toContain(`automation_status=${STEP_STATUS.waiting}`)
     })
 })

@@ -86,8 +86,20 @@ export function normalizeModel(
 /** The table of raw hardware models, as Discovery and connectors create them, that normalization maps. */
 export const RAW_MODEL_TABLE = 'cmdb_hardware_product_model'
 
+/**
+ * The Model table, which RAW_MODEL_TABLE extends. A canonical Model is found on it by its OEM PID, and a raw model is
+ * marked normalized through it: both fields are this table's.
+ */
+export const MODEL_TABLE = 'cmdb_model'
+
 /** The raw model field that records the canonical Model it was mapped to. */
-const NORMALIZED_TO = 'x_daas_ham_normalized_to'
+export const NORMALIZED_TO = 'x_daas_ham_normalized_to'
+
+/**
+ * The rule learned from a resolved exception: an exact match on its raw model, at the order a rule gets when none is
+ * entered (the column's default), so a rule given a lower order still wins.
+ */
+export const LEARNED_RULE = { order: 100, matchType: 'exact' } as const satisfies Pick<ModelMatchRule, 'order' | 'matchType'>
 
 /** Encoded condition: the Model in `field` has no OEM PID (it is a raw model, ADR 0016) and is not yet normalized. */
 function onUnmappedRawModel(field: string): string {

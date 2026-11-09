@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { annualSupportCost, answersByContract, contractKey, coverageBySerial, coverageDisposition, coverageSummary, mergeCoverage } from './coverage'
+import { annualSupportCost, answersByContract, contractKey, coverageBySerial, coverageDisposition, coverageSummary, mergeCoverage, staleCoverageQuery } from './coverage'
 import type { CoverageFact } from './oem/types'
 
 describe('coverageSummary', () => {
@@ -147,5 +147,18 @@ describe('coverageBySerial', () => {
 
     it('keys the coverage by normalised serial', () => {
         expect([...coverageBySerial([' foc1 '], [], today).keys()]).toEqual(['FOC1'])
+    })
+})
+
+describe('staleCoverageQuery', () => {
+    it("asks again for a vendor's fleet assets with a serial, not retired, never checked or checked before the cut-off", () => {
+        expect(staleCoverageQuery('cisco', '2026-11-01 00:00:00').split('^')).toEqual([
+            'x_daas_ham_fleet=true',
+            'model.x_daas_ham_oem_source=cisco',
+            'install_status!=7',
+            'serial_numberISNOTEMPTY',
+            'x_daas_ham_coverage_checkedISEMPTY',
+            'ORx_daas_ham_coverage_checked<2026-11-01 00:00:00',
+        ])
     })
 })

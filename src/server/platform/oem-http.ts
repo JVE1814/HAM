@@ -1,7 +1,7 @@
 import type { OemContext } from '../domain/oem/adapters.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
 import { boolProperty, stringProperty } from './properties.ts'
-import { restMessagePort } from './rest-port.ts'
+import { restMessagePort } from './rest-messages.ts'
 
 /** RESTMessageV2 transport for the OEM adapters (REST messages in fluent/logic/oem-messages.now.ts). */
 

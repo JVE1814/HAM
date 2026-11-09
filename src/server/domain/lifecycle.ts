@@ -249,6 +249,11 @@ export function stagesQuery(stages: readonly Stage[], base = '', via = ''): stri
     return base ? andEachClause(clauses, base) : clauses
 }
 
+/** Encoded condition matching Assets not retired, whatever their stage otherwise (`via` as for stagesQuery). */
+export function notRetiredCondition(via = ''): string {
+    return `${via}install_status!=${INSTALL_STATUS.retired}`
+}
+
 /** Stages in which an Asset delivers its Subscription line and is billed (D52). */
 const BILLABLE: ReadonlySet<Stage> = new Set(['in_service', 'temporary_deployment'])
 

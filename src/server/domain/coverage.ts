@@ -1,6 +1,9 @@
-import { normalizeSerial } from './serials.ts'
 import { appendTo } from './collections.ts'
+import { fleetCondition } from './fleet.ts'
+import { notRetiredCondition } from './lifecycle.ts'
 import type { CoverageFact, CoverageFetched } from './oem/types.ts'
+import { normalizeSerial } from './serials.ts'
+import type { OemVendor } from './vocabulary.ts'
 
 /** One coverage contract, as an Asset's coverage is summarised from it. */
 export interface CoverageView {
@@ -121,4 +124,17 @@ export function coverageBySerial(serials: Iterable<string>, contracts: readonly 
         coverage.set(key, { ...coverageSummary(views, today), supportCost: annualSupportCost(views, today) })
     }
     return coverage
+}
+
+/** The Asset field that holds when its OEM coverage was last checked. */
+export const COVERAGE_CHECKED_FIELD = 'x_daas_ham_coverage_checked'
+
+/**
+ * Encoded alm_hardware query: `vendor`'s fleet assets (ADR 0016: the Provider IT's serials are never sent to an OEM)
+ * whose coverage is to be asked again: not retired, with a serial, and never checked or last checked before
+ * `staleBefore` (a stored date/time).
+ */
+export function staleCoverageQuery(vendor: OemVendor, staleBefore: string): string {
+    const stale = `${COVERAGE_CHECKED_FIELD}ISEMPTY^OR${COVERAGE_CHECKED_FIELD}<${staleBefore}`
+    return `${fleetCondition()}^model.x_daas_ham_oem_source=${vendor}^${notRetiredCondition()}^serial_numberISNOTEMPTY^${stale}`
 }

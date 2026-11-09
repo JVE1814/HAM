@@ -7,6 +7,7 @@ import {
     fieldsOf,
     isBillable,
     isDeployed,
+    notRetiredCondition,
     SERVING_STAGES,
     stageAfterTransfer,
     stageChangeRefusal,
@@ -407,5 +408,12 @@ describe('billingChange', () => {
         expect(billingChange('in_service', 'temporary_deployment', dates)).toBeNull()
         expect(billingChange('pending_return', 'pending_evaluation', dates)).toBeNull()
         expect(billingChange(null, 'available', dates)).toBeNull()
+    })
+})
+
+describe('notRetiredCondition', () => {
+    it('leaves out the retired stages, which are all stored as install status Retired', () => {
+        expect(notRetiredCondition()).toBe('install_status!=7')
+        expect(notRetiredCondition('asset.')).toBe('asset.install_status!=7')
     })
 })

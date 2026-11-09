@@ -1,91 +1,17 @@
-import { GlideRecord, gs } from '@servicenow/glide'
-import { fleetCondition } from '../domain/fleet.ts'
-import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle.ts'
-import {
-    fleetOnRawModelQuery,
-    RAW_MODEL_TABLE,
-    rawModelsToNormalizeQuery,
-    siteCiOnRawModelQuery,
-} from '../domain/normalization.ts'
-import { runTableJob } from '../platform/chunked.ts'
+import { gs, type GlideRecord } from '@servicenow/glide'
+import { DEPLOYED_STAGES, notRetiredCondition, stagesQuery } from '../domain/lifecycle.ts'
 import { todayIso } from '../platform/clock.ts'
 import { EVENT, fire, jobEvent } from '../platform/events.ts'
 import { refreshLifecycleDates } from '../platform/lifecycle-dates.ts'
 import { queueModelRefresh, queueModelsReachingMilestone, writingModelLifecycle } from '../platform/model-lifecycle.ts'
-import {
-    closeNonNaasExceptions,
-    learnFromResolution,
-    loadNormalizationData,
-    recordNormalizationException,
-    resolveModel,
-} from '../platform/normalization.ts'
-import { countBy, str, warnRefused } from '../platform/records.ts'
+import { normalizeNaasRawModels, resolveNormalizationException } from '../platform/normalization.ts'
+import { str } from '../platform/records.ts'
 
 /** Model normalization and Lifecycle phase / Refresh due date upkeep (P1.2), for fleet assets only (ADR 0016). */
 
-/**
- * Scheduled job: map onto canonical Models the raw hardware models that are NaaS's (ADR 0016): those Discovery and
- * connectors put fleet assets on, and those of the network gear reconciliation reports *seen without asset* at a
- * customer Site, whose Asset joins the fleet on the canonical Model. A raw model only the Provider IT's equipment is on
- * (its laptops, printers, servers) is not NaaS's to map, so it is neither mapped nor raised as a normalization
- * exception, and an exception an earlier run raised for one is closed.
- */
+/** Scheduled job: map the raw hardware models that are NaaS's onto canonical Models (platform/normalization). */
 export function normalizeRawModels(): void {
-    const naas = [
-        ...distinctValues('alm_hardware', fleetOnRawModelQuery(), 'model'),
-        ...distinctValues('cmdb_ci_netgear', siteCiOnRawModelQuery(), 'model_id'),
-    ]
-    closeNonNaasExceptions(naas)
-    const query = rawModelsToNormalizeQuery(naas)
-    // No raw model is NaaS's: nothing to map.
-    if (!query) return
-    const data = loadNormalizationData()
-    runTableJob({
-        job: 'normalize_raw_models',
-        table: RAW_MODEL_TABLE,
-        query,
-        read: (model) => ({ manufacturer: str(model, 'manufacturer.name'), model: str(model, 'name') }),
-        handle: (raw, rawModelId) => {
-            const resolution = resolveModel(raw, data)
-            if (!resolution.modelId) {
-                recordNormalizationException(raw, 'reason' in resolution ? resolution.reason : '', {
-                    table: RAW_MODEL_TABLE,
-                    id: rawModelId,
-                })
-                return
-            }
-            repointModel(rawModelId, resolution.modelId)
-        },
-    })
-}
-
-/** The distinct values of `field` among the rows of `table` that `query` matches, read with one aggregate query. */
-function distinctValues(table: string, query: string, field: string): string[] {
-    return [...countBy(table, query, field).keys()]
-}
-
-/**
- * Point the raw model's fleet assets at the canonical Model, then mark the raw model normalized. Marked, it leaves the
- * job's query, so an Asset whose save is refused leaves it unmarked for the next run to repoint. The Provider IT's
- * Assets on the raw model are left on it (ADR 0016).
- */
-function repointModel(rawModelId: string, canonicalModelId: string): void {
-    const raw = new GlideRecord('cmdb_model')
-    if (!raw.get(rawModelId)) return
-    let refused = 0
-    const asset = new GlideRecord('alm_hardware')
-    asset.addQuery('model', rawModelId)
-    asset.addEncodedQuery(fleetCondition())
-    asset.query()
-    while (asset.next()) {
-        asset.setValue('model', canonicalModelId)
-        if (asset.update()) continue
-        refused++
-        warnRefused(asset, `Model normalization: ${str(asset, 'serial_number')} left on its raw model`)
-    }
-    if (refused > 0) return
-    raw.setValue('x_daas_ham_normalized_to', canonicalModelId)
-    raw.update()
+    normalizeNaasRawModels()
 }
 
 /**
@@ -93,12 +19,9 @@ function repointModel(rawModelId: string, canonicalModelId: string): void {
  * is refused stays open, as nothing maps its raw pair yet.
  */
 export function onNormalizationResolved(current: GlideRecord): void {
-    if (!learnFromResolution(current, loadNormalizationData())) {
-        const retry = 'clear its resolved model and set it again to retry'
-        return void gs.addErrorMessage(`No rule learned (see the system log), so the exception stays open: ${retry}`)
-    }
-    current.setValue('status', 'resolved')
-    current.update()
+    if (resolveNormalizationException(current)) return
+    const retry = 'clear its resolved model and set it again to retry'
+    gs.addErrorMessage(`No rule learned (see the system log), so the exception stays open: ${retry}`)
 }
 
 /**
@@ -120,7 +43,7 @@ export function onModelLifecycleChanged(current: GlideRecord, previous: GlideRec
  */
 export function refreshModelAssets(event: GlideRecord, current: GlideRecord): void {
     const queued = jobEvent(EVENT.lifecycleChanged, event, current)
-    refreshLifecycleDates(queued, `model=${queued.subject}^install_status!=7`)
+    refreshLifecycleDates(queued, `model=${queued.subject}^${notRetiredCondition()}`)
 }
 
 /** Daily job: models crossing a milestone today change phase without any record changing. */

@@ -6,7 +6,7 @@ import { runEventTableJob } from './chunked.ts'
 import { glideToIsoDate, todayIso } from './clock.ts'
 import type { JobEvent } from './events.ts'
 import { readModelLifecycle } from './model-lifecycle.ts'
-import { findById, num, str } from './records.ts'
+import { findById, num, str, warnRefused } from './records.ts'
 
 /** Lifecycle phase and Refresh due date of an Asset, from its Model lifecycle, Agreement and Lease schedule. */
 
@@ -102,7 +102,8 @@ export function refreshLifecycleDates(queued: JobEvent, query: string): void {
             const { phase, refreshDue } = stampOf(inputs, readers)
             if (inputs.phase === phase && inputs.refreshDue === refreshDue) return
             const asset = findById('alm_hardware', assetId)
-            if (asset && applyLifecycleDates(asset, readers)) asset.update()
+            if (!asset || !applyLifecycleDates(asset, readers)) return
+            if (!asset.update()) warnRefused(asset, `Lifecycle dates of ${str(asset, 'serial_number')} not saved`)
         },
     })
 }

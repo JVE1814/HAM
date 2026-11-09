@@ -1,6 +1,18 @@
-import { GlideRecord, gs } from '@servicenow/glide'
-import { dependentActions, dueStepsQuery, type ClaimOutcome, type ClaimStore, type ClaimTarget } from '../domain/oem/claims.ts'
-import { num, pluck, recordsById, refusal, str } from './records.ts'
+import { GlideRecord } from '@servicenow/glide'
+import {
+    CLAIM_VENDORS,
+    dependentActions,
+    dueStepsQuery,
+    runVendorClaims,
+    settledStatus,
+    STEP_STATUS,
+    type ClaimOutcome,
+    type ClaimStore,
+    type ClaimTarget,
+} from '../domain/oem/claims.ts'
+import { boolProperty, intProperty, PROPERTY } from './properties.ts'
+import { restMessagePort } from './rest-messages.ts'
+import { num, pluck, recordsById, str, warnRefused } from './records.ts'
 import { memoized } from '../domain/memo.ts'
 import type { ClaimAction, OemVendor } from '../domain/vocabulary.ts'
 
@@ -17,8 +29,20 @@ interface ClaimAsset {
 /** A staging task or Asset not found reads as empty, as a dot-walk through a broken reference did. */
 const NO_ASSET: ClaimAsset = { customerId: '', serial: '', mac: '', claimCode: '' }
 
+/**
+ * For each enabled vendor, send its due automated staging steps (pending, and failed ones due a retry) through the
+ * vendor's adapters, within `x_daas_ham.oem.claim.max_calls` calls a vendor (domain/oem/claims `runVendorClaims`).
+ */
+export function runClaims(): void {
+    const maxCalls = intProperty(PROPERTY.claimMaxCalls, 8)
+    const store = glideClaimStore()
+    for (const vendor of CLAIM_VENDORS) {
+        if (boolProperty(`x_daas_ham.oem.claim.${vendor}.enabled`, false)) runVendorClaims(vendor, store, restMessagePort, maxCalls)
+    }
+}
+
 /** Automated staging steps (x_daas_ham_staging_step) behind the claim run's ClaimStore port; caches OEM cloud accounts per run. */
-export function glideClaimStore(): ClaimStore {
+function glideClaimStore(): ClaimStore {
     const accounts = memoized(cloudAccount)
     return {
         due: (vendor, action, limit) => dueTargets(vendor, action, limit, accounts),
@@ -62,9 +86,9 @@ export function releaseStepsWaitingOn(taskId: string, action: string): void {
     step.addQuery('staging_task', taskId)
     step.addQuery('automation', 'IN', dependents.join(','))
     step.addQuery('done', false)
-    step.addQuery('automation_status', 'waiting')
+    step.addQuery('automation_status', STEP_STATUS.waiting)
     // One set-based update: the staging step rules still run, and they react only to done changing.
-    step.setValue('automation_status', 'pending')
+    step.setValue('automation_status', STEP_STATUS.due)
     step.updateMultiple()
 }
 
@@ -88,17 +112,12 @@ function settle(outcomes: readonly ClaimOutcome[]): void {
     while (step.next()) {
         const outcome = byStep.get(step.getUniqueValue())
         if (!outcome) continue
+        const status = settledStatus(outcome)
         step.setValue('automation_message', outcome.message)
-        if (outcome.ok) {
-            step.setValue('automation_status', 'done')
-            step.setValue('done', true)
-        } else {
-            step.setValue('automation_status', 'failed')
-            step.setValue('attempts', num(step, 'attempts') + 1)
-        }
+        step.setValue('automation_status', status)
+        if (outcome.ok) step.setValue('done', true)
+        else step.setValue('attempts', num(step, 'attempts') + 1)
         if (step.update()) continue
-        const reason = refusal(step)
-        const which = `"${str(step, 'label')}" of ${step.getDisplayValue('staging_task')}`
-        gs.warn(`[x_daas_ham] OEM claim step ${which} not saved as ${outcome.ok ? 'done' : 'failed'}: ${reason}`)
+        warnRefused(step, `OEM claim step "${str(step, 'label')}" of ${step.getDisplayValue('staging_task')} not saved as ${status}`)
     }
 }

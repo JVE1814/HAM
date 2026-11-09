@@ -3014,6 +3014,10 @@ declare global {
                         table: 'sys_module'
                         id: '401af081928d430898e921643f5942ce'
                     }
+                    src_server_platform_coverage_ts: {
+                        table: 'sys_module'
+                        id: '222af00d39bf43329fb67f8b8ed52f9c'
+                    }
                     src_server_platform_delivery_ts: {
                         table: 'sys_module'
                         id: '4e4940e10cae4ead97e954f646da0aaf'
@@ -3074,6 +3078,10 @@ declare global {
                         table: 'sys_module'
                         id: '4a43a7c451e94307bb6ce402cd7fcfaa'
                     }
+                    'src_server_platform_oem-sync_ts': {
+                        table: 'sys_module'
+                        id: '682ac7bc1a7740a5a8ebb99ac6abc885'
+                    }
                     src_server_platform_orders_ts: {
                         table: 'sys_module'
                         id: '13e07b43815f4b939cf2dace76c02a4a'
@@ -3105,6 +3113,10 @@ declare global {
                     'src_server_platform_rest-api_ts': {
                         table: 'sys_module'
                         id: '67584be1604f489285fd778de108a4bb'
+                    }
+                    'src_server_platform_rest-messages_ts': {
+                        table: 'sys_module'
+                        id: '91b7d32b7b374425a1fd6c9948c33091'
                     }
                     'src_server_platform_rest-port_ts': {
                         table: 'sys_module'

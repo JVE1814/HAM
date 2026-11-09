@@ -1,7 +1,8 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { replacementProblem, replacementStep } from '../domain/breakfix.ts'
 import type { OrderStage } from '../domain/vocabulary.ts'
-import { isFleetAsset, moveAsset, readStage } from '../platform/assets.ts'
+import { isFleetAsset, readStage } from '../platform/assets.ts'
+import { returnDefectiveToOem } from '../platform/oem-rma.ts'
 import { createOrder, submitOrder } from '../platform/orders.ts'
 import { findById, refusal, str } from '../platform/records.ts'
 
@@ -76,24 +77,8 @@ function submitReplacement(order: GlideRecord): void {
     gs.addInfoMessage(`Replacement order ${str(order, 'number')} is left as a draft: correct it and submit it`)
 }
 
-/** UI action on an OEM RMA: the defective unit went back to the manufacturer (a fleet asset only, ADR 0016). */
+/** UI action on an OEM RMA: the defective unit went back to the manufacturer (platform/oem-rma `returnDefectiveToOem`). */
 export function uiDefectiveReturnedToOem(current: GlideRecord): void {
-    const asset = findById('alm_hardware', str(current, 'defective_asset'))
-    if (!asset) return
-    if (!isFleetAsset(asset)) return void gs.addErrorMessage('The defective asset is not a fleet asset: it is not retired here')
-    const verdict = moveAsset(asset, 'returned_to_oem')
-    if (!verdict.allowed) {
-        gs.addErrorMessage(verdict.reason)
-        return
-    }
-    // The RMA records the return only once the unit is retired.
-    if (!asset.update()) return void gs.addErrorMessage(`${str(asset, 'serial_number')} not retired: ${refusal(asset)}`)
-    current.setValue('state', 'defective_returned')
-    // The unit is retired already: the user is told so and why the RMA was not marked, rather than it silently staying
-    // open. The action is still offered, and pressed again it finds the unit retired (no move) and marks the RMA.
-    if (!current.update()) {
-        const reason = refusal(current)
-        const serial = str(asset, 'serial_number')
-        gs.addErrorMessage(`${serial} is retired, but the RMA was not marked returned: ${reason}. Press again once that is fixed`)
-    }
+    const problem = returnDefectiveToOem(current)
+    if (problem) gs.addErrorMessage(problem)
 }

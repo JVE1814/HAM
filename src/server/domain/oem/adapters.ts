@@ -301,6 +301,15 @@ export const OEM_ADAPTERS: Record<OemVendor, VendorRoutes> = {
 }
 
 /**
+ * The order the sync jobs take the vendors in. It is an order, not the list of vendors, which is `OemVendor`: the type
+ * below fails when a vendor is missing from it.
+ */
+export const SYNC_ORDER = ['cisco', 'meraki', 'fortinet', 'mist', 'aruba', 'checkpoint'] as const satisfies readonly OemVendor[]
+
+type Holds<T extends true> = T
+type _EveryVendorHasItsTurn = Holds<[OemVendor] extends [(typeof SYNC_ORDER)[number]] ? true : false>
+
+/**
  * `vendor`'s route for `capability` when it may run: `vendor` is enabled and so is the vendor whose REST message
  * serves the call. Meraki coverage therefore needs Cisco enabled too, and with Meraki off no Meraki serial goes to
  * Cisco SN2INFO.
@@ -312,4 +321,18 @@ export function enabledRoute<K extends keyof VendorRoutes>(
 ): VendorRoutes[K] | undefined {
     const route = OEM_ADAPTERS[vendor][capability]
     return route && enabled(vendor) && enabled(route.via) ? route : undefined
+}
+
+/** A vendor whose turn it is in a sync job, with the route the job runs for it. */
+export interface SyncTurn<K extends keyof VendorRoutes> {
+    vendor: OemVendor
+    route: NonNullable<VendorRoutes[K]>
+}
+
+/** The vendors a sync job of `capability` calls, in SYNC_ORDER: those whose route may run (enabledRoute). */
+export function enabledRoutes<K extends keyof VendorRoutes>(capability: K, enabled: (vendor: OemVendor) => boolean): Array<SyncTurn<K>> {
+    return SYNC_ORDER.flatMap((vendor) => {
+        const route = enabledRoute(vendor, capability, enabled)
+        return route ? [{ vendor, route }] : []
+    })
 }

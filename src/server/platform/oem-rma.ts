@@ -1,9 +1,10 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
 import { lineStillOpen, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse } from '../domain/sourcing.ts'
-import type { RmaState } from '../domain/vocabulary.ts'
-import { todayIso } from './clock.ts'
-import { findById, str, warnRefused } from './records.ts'
+import type { OemVendor, RmaState } from '../domain/vocabulary.ts'
+import { isFleetAsset, moveAsset } from './assets.ts'
+import { nowGlide, todayIso } from './clock.ts'
+import { findById, refusal, str, warnRefused } from './records.ts'
 
 /** OEM RMA records (opening the RMA with the vendor is manual, ADR 0008). */
 
@@ -96,4 +97,70 @@ export function lineAwaitingRma(rmaNumber: string, modelId: string): { lineId: s
     rma.setLimit(1)
     rma.query()
     return rma.next() ? { lineId: str(rma, 'order_line'), rmaId: rma.getUniqueValue() } : null
+}
+
+/** The open RMAs the OEM knows of, whose status it can be asked for: RMA_OPEN but those still to open with it. */
+const RMA_AT_OEM: readonly RmaState[] = RMA_OPEN.filter((state) => state !== 'to_open')
+
+/** The most RMAs of one vendor a status sync asks about. */
+const RMAS_PER_SYNC = 200
+
+/**
+ * `vendor`'s RMAs to ask the OEM about: those open with it (`RMA_AT_OEM`) that have an RMA number, at most
+ * RMAS_PER_SYNC, least recently synced (never synced) first; their sys_ids, and their RMA numbers each once.
+ */
+export function rmasToAskAbout(vendor: OemVendor): { ids: string[]; rmaNumbers: string[] } {
+    const rma = new GlideRecord('x_daas_ham_oem_rma')
+    rma.addQuery('vendor', vendor)
+    rma.addQuery('state', 'IN', RMA_AT_OEM.join(','))
+    rma.addNotNullQuery('rma_number')
+    rma.orderBy('last_synced')
+    rma.setLimit(RMAS_PER_SYNC)
+    rma.query()
+    const ids: string[] = []
+    const rmaNumbers = new Set<string>()
+    while (rma.next()) {
+        ids.push(rma.getUniqueValue())
+        rmaNumbers.add(str(rma, 'rma_number'))
+    }
+    return { ids, rmaNumbers: [...rmaNumbers] }
+}
+
+/**
+ * Stamp the asked RMAs synced now, each with the status the OEM answered for its number (kept when it gave none).
+ * Returns why each RMA the platform refused was refused: it stays first in line for the next sync.
+ */
+export function recordRmaStatuses(rmaIds: readonly string[], statusOf: ReadonlyMap<string, string>): string[] {
+    const syncedAt = nowGlide()
+    const refused: string[] = []
+    const asked = new GlideRecord('x_daas_ham_oem_rma')
+    asked.addQuery('sys_id', 'IN', rmaIds.join(','))
+    asked.query()
+    while (asked.next()) {
+        const status = statusOf.get(str(asked, 'rma_number'))
+        if (status !== undefined) asked.setValue('status', status)
+        asked.setValue('last_synced', syncedAt)
+        if (!asked.update()) refused.push(`${str(asked, 'rma_number')} not saved: ${refusal(asked)}`)
+    }
+    return refused
+}
+
+/**
+ * The defective unit of an RMA went back to the manufacturer: retire it (a fleet asset only, ADR 0016), then mark the
+ * RMA defective returned. Why that was not done, to tell the user ('' once done, or when the RMA names no Asset the
+ * user can read). The RMA records the return only once the unit is retired; a unit retired whose RMA the platform
+ * then refuses says so, and asked again it finds the unit retired (no move) and marks the RMA.
+ */
+export function returnDefectiveToOem(rma: GlideRecord): string {
+    const asset = findById('alm_hardware', str(rma, 'defective_asset'))
+    if (!asset) return ''
+    if (!isFleetAsset(asset)) return 'The defective asset is not a fleet asset: it is not retired here'
+    const verdict = moveAsset(asset, 'returned_to_oem')
+    if (!verdict.allowed) return verdict.reason
+    const serial = str(asset, 'serial_number')
+    if (!asset.update()) return `${serial} not retired: ${refusal(asset)}`
+    const returned: RmaState = 'defective_returned'
+    rma.setValue('state', returned)
+    if (rma.update()) return ''
+    return `${serial} is retired, but the RMA was not marked returned: ${refusal(rma)}. Press again once that is fixed`
 }

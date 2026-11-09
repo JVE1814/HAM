@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { enabledRoute, OEM_ADAPTERS, type OemContext } from './adapters'
+import { enabledRoute, enabledRoutes, OEM_ADAPTERS, SYNC_ORDER, type OemContext } from './adapters'
 import type { HttpRequest, HttpResponse } from '../http'
 import type { OemVendor } from '../vocabulary'
 
@@ -315,5 +315,19 @@ describe('vendors without APIs', () => {
     it('have no adapters, so CSV import is used', () => {
         expect(OEM_ADAPTERS.aruba).toEqual({})
         expect(OEM_ADAPTERS.checkpoint).toEqual({})
+    })
+})
+
+describe('enabledRoutes', () => {
+    it('gives each vendor whose route may run its turn, in the sync order', () => {
+        const all = () => true
+        expect(enabledRoutes('coverage', all).map((turn) => turn.vendor)).toEqual(['cisco', 'meraki', 'fortinet', 'mist'])
+        expect(enabledRoutes('rmaStatus', all)).toEqual([{ vendor: 'cisco', route: OEM_ADAPTERS.cisco.rmaStatus }])
+        expect(enabledRoutes('lifecycle', (vendor) => vendor === 'mist').map((turn) => turn.vendor)).toEqual(['mist'])
+        expect(enabledRoutes('coverage', () => false)).toEqual([])
+    })
+
+    it('takes every vendor that has adapters, once', () => {
+        expect([...SYNC_ORDER].sort()).toEqual(Object.keys(OEM_ADAPTERS).sort())
     })
 })

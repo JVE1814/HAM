@@ -298,6 +298,21 @@ export function dependentActions(action: string): ClaimAction[] {
 }
 
 /**
+ * The automation status of a step (x_daas_ham_staging_step.automation_status) by what it means to the claim run. A
+ * step starts due, or waiting when its prerequisite step is on the task too (initialAutomationStatus); a waiting one is
+ * released to due when that step is ticked; a run settles a due step done or failed (settledStatus); a failed one is
+ * due again RETRY_AFTER_MINUTES later, until it has failed MAX_CLAIM_ATTEMPTS times (dueStepsQuery).
+ */
+export const STEP_STATUS = {
+    /** To send at the next run. */
+    due: 'pending',
+    /** Never due: its prerequisite step is not done yet. */
+    waiting: 'waiting',
+    done: 'done',
+    failed: 'failed',
+} as const satisfies Record<string, AutomationStatus>
+
+/**
  * The automation status a new `action` step starts in when a template's steps are copied onto a staging
  * task: waiting when the task also gets the step's CLAIM_PREREQUISITE step, otherwise pending.
  * `taskActions` are the automations of all the task's steps ('' for a step done by hand).
@@ -306,7 +321,12 @@ export function dependentActions(action: string): ClaimAction[] {
  */
 export function initialAutomationStatus(action: string, taskActions: readonly string[]): Extract<AutomationStatus, 'pending' | 'waiting'> {
     const prerequisite: string | undefined = CLAIM_PREREQUISITE[action as ClaimAction]
-    return prerequisite && taskActions.includes(prerequisite) ? 'waiting' : 'pending'
+    return prerequisite && taskActions.includes(prerequisite) ? STEP_STATUS.waiting : STEP_STATUS.due
+}
+
+/** The automation status a run's outcome leaves its step in. */
+export function settledStatus(outcome: ClaimOutcome): Extract<AutomationStatus, 'done' | 'failed'> {
+    return outcome.ok ? STEP_STATUS.done : STEP_STATUS.failed
 }
 
 /** Steps loaded per action and run at most. */
@@ -314,6 +334,9 @@ const MAX_STEPS_PER_LOAD = 200
 
 /** Attempts after which a failing step is left for a person. */
 const MAX_CLAIM_ATTEMPTS = 5
+
+/** How long a failed step waits before a run sends it again. */
+const RETRY_AFTER_MINUTES = 30
 
 /** Length of a staging step's automation_message. */
 const MESSAGE_LENGTH = 255
@@ -327,8 +350,8 @@ export interface ClaimStore {
      */
     due(vendor: OemVendor, action: ClaimAction, limit: number): ClaimTarget[]
     /**
-     * Record the outcomes of one action's run (each step at most once). ok: tick the step (automation_status=done,
-     * done=true); otherwise automation_status=failed and one more attempt. Messages are at most 255 characters.
+     * Record the outcomes of one action's run (each step at most once), each in its settledStatus: ok ticks the step
+     * (done=true); otherwise it has failed one more attempt. Messages are at most 255 characters.
      */
     settle(outcomes: readonly ClaimOutcome[]): void
 }
@@ -371,12 +394,14 @@ function openStepsQuery(vendor: OemVendor, action: ClaimAction): string {
 }
 
 /**
- * Encoded query on x_daas_ham_staging_step: open `action` steps (openStepsQuery) that are pending, or failed
- * over 30 minutes ago with fewer than 5 attempts (so never waiting ones); those conditions are in every OR group (andEachClause).
+ * Encoded query on x_daas_ham_staging_step: open `action` steps (openStepsQuery) that are due, or failed over
+ * RETRY_AFTER_MINUTES ago with fewer than MAX_CLAIM_ATTEMPTS attempts (so never waiting ones); those conditions are in
+ * every OR group (andEachClause).
  */
 export function dueStepsQuery(vendor: OemVendor, action: ClaimAction): string {
+    const retry = `attempts<${MAX_CLAIM_ATTEMPTS}^sys_updated_on<javascript:gs.minutesAgoStart(${RETRY_AFTER_MINUTES})`
     return andEachClause(
-        `automation_status=pending^NQautomation_status=failed^attempts<${MAX_CLAIM_ATTEMPTS}^sys_updated_on<javascript:gs.minutesAgoStart(30)`,
+        `automation_status=${STEP_STATUS.due}^NQautomation_status=${STEP_STATUS.failed}^${retry}`,
         openStepsQuery(vendor, action),
     )
 }
