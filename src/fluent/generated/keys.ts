@@ -19736,6 +19736,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary_override'
+                        id: '58147900888c4906a21ce43783a2d59d'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'number'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: '581789600f454365b8f973d13f29ba23'
                         key: {

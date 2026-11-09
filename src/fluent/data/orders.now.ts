@@ -5,7 +5,6 @@ import {
     DateColumn,
     IntegerColumn,
     ListColumn,
-    MultiLineTextColumn,
     ReferenceColumn,
     StringColumn,
     Table,
@@ -75,7 +74,9 @@ export const x_daas_ham_order = Table({
                 over_quota: { label: 'Over contracted quantity', sequence: 2 },
             },
         }),
-        entitlement_findings: MultiLineTextColumn({ label: 'Entitlement findings', maxLength: 4000, readOnly: true }),
+        // A string column, not a multi-line one: the classic form draws a multi_two_lines column this long with no field
+        // container, and the live form update after Submit then throws on it.
+        entitlement_findings: StringColumn({ label: 'Entitlement findings', maxLength: 4000, readOnly: true }),
         change_request: ReferenceColumn({ label: 'Change request', referenceTable: 'change_request' }),
         work_order: ReferenceColumn({ label: 'Work order', referenceTable: 'wm_order' }),
         tracking_number: StringColumn({ label: 'Tracking number', maxLength: 100 }),

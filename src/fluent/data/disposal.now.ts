@@ -1,5 +1,5 @@
 import '@servicenow/sdk/global'
-import { ChoiceColumn, DecimalColumn, MultiLineTextColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
+import { ChoiceColumn, DecimalColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 
 /* Disposal orders (P2.5, D61). */
 
@@ -64,7 +64,8 @@ export const x_daas_ham_disposal_line = Table({
             readOnly: true,
             dropdown: 'dropdown_without_none',
         }),
-        blockers: MultiLineTextColumn({ label: 'Blocked by', maxLength: 1000, readOnly: true }),
+        // A string column (see Order entitlement_findings): the form draws it inside its field container.
+        blockers: StringColumn({ label: 'Blocked by', maxLength: 1000, readOnly: true }),
     },
     index: [{ name: 'x_daas_ham_dl_order', unique: false, element: 'disposal_order' }],
 })

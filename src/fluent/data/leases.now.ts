@@ -1,5 +1,5 @@
 import '@servicenow/sdk/global'
-import { BooleanColumn, ChoiceColumn, DateColumn, DecimalColumn, IntegerColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
+import { BooleanColumn, ChoiceColumn, DateColumn, DecimalColumn, IntegerColumn, OverrideColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 
 /* Lease schedules and end-of-lease decisions (P3.23, D65). */
 
@@ -16,6 +16,8 @@ export const x_daas_ham_lease_schedule = Table({
     label: 'Lease schedule',
     extends: 'ast_contract',
     schema: {
+        // A reference to a lease shows its number: ast_contract displays vendor_contract, which a lease leaves empty.
+        number: OverrideColumn({ display: true }),
         lessor: ReferenceColumn({ label: 'Lessor', referenceTable: 'core_company', mandatory: true }),
         schedule_number: StringColumn({ label: 'Schedule number', maxLength: 60 }),
         monthly_payment: DecimalColumn({ label: 'Monthly payment (all assets)' }),
