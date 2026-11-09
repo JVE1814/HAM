@@ -49,10 +49,12 @@ vi.mock('@servicenow/glide', () => {
             return this.row !== null
         }
         query() {
+            const terms = this.filters.flatMap((filter) => filter.split('^'))
             this.found = (platform.rows[this.table] ?? []).filter((row) =>
-                this.filters.every((filter) => {
-                    const [, field, operator, operand] = /^(\w+?)(LIKE|=)(.*)$/.exec(filter) ?? []
+                terms.every((term) => {
+                    const [, field, operator, operand] = /^(\w+?)(LIKE|IN|=)(.*)$/.exec(term) ?? []
                     const value = String(row[field] ?? '')
+                    if (operator === 'IN') return operand.split(',').includes(value)
                     return operator === 'LIKE' ? value.includes(operand) : value === operand
                 }),
             )
@@ -92,12 +94,12 @@ const ROLES: Record<Reader, string[]> = {
 }
 
 const SITE1 = { sys_id: 'site1', company: 'cust1', x_daas_ham_site_contacts: '' }
-const DEPOT = { sys_id: 'sr1', x_daas_ham_stockroom_type: 'central_depot' }
+const DEPOT = { sys_id: 'sr1', x_daas_ham_stockroom_type: 'central_depot', assignment_group: 'depot_crew' }
 const OTHER_DEPOT = { sys_id: 'sr9', x_daas_ham_stockroom_type: 'central_depot' }
 
 let users = 0
 /**
- * Sign in a user of Customer cust1, a member of stockroom sr1 and a contact of site1. Each is a new user: the modules
+ * Sign in a user of Customer cust1, in the Assignment group of stockroom sr1 and a contact of site1. Each is a new user: the modules
  * keep a user's session, and where a table is placed, for as long as they are loaded (on the platform, a transaction).
  */
 function signIn(reader: Reader): void {
@@ -106,7 +108,8 @@ function signIn(reader: Reader): void {
     platform.company = 'cust1'
     SITE1.x_daas_ham_site_contacts = `someone,${platform.userId}`
     platform.rows.cmn_location = [SITE1]
-    platform.rows.x_daas_ham_stockroom_member = [{ user: platform.userId, stockroom: 'sr1' }]
+    platform.rows.sys_user_grmember = [{ user: platform.userId, group: 'depot_crew' }]
+    platform.rows.alm_stockroom = [DEPOT, OTHER_DEPOT]
 }
 
 /** A saved record of `table`, as a rule or an ACL is handed it. */
