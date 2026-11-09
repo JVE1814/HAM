@@ -2,17 +2,16 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import { toIsoDate } from '../domain/calendar.ts'
-import type { LeaseEndAction } from '../domain/leases.ts'
-import { isDeployed, type LegalOwner } from '../domain/lifecycle.ts'
+import { isDeployed } from '../domain/lifecycle.ts'
 import {
     evaluationTarget,
     overdueStep,
     returnRequestFindings,
     sitePackageHoldersQuery,
-    type EvaluationOutcome,
     type RequestedReturn,
     type ReturnRequester,
 } from '../domain/returns.ts'
+import type { EvaluationOutcome, LeaseEndAction, LegalOwner, ReturnMethod, ReturnTrigger } from '../domain/vocabulary.ts'
 import { clearRackPlacement, isFleetAsset, moveAndSave, moveAsset, readStage } from '../platform/assets.ts'
 import { customerAdminIds } from '../platform/approvals.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
@@ -32,7 +31,6 @@ import {
     raiseReturn,
     recordFee,
     stampNow,
-    type ReturnTrigger,
     waiveOpenFees,
 } from '../platform/returns.ts'
 
@@ -69,7 +67,7 @@ export function afterReturnProduced(producer: Record<string, unknown>, current: 
         customerId: str(order, 'customer'),
         siteId,
         agreementId: str(order, 'agreement') || agreementOf(assetIds[0]),
-        method: (str(order, 'method') || 'ship_back') as 'fsm_deinstall' | 'ship_back',
+        method: (str(order, 'method') || 'ship_back') as ReturnMethod,
         assetIds,
         openFieldWork: true,
         description: str(order, 'short_description') || `Return from ${order.getDisplayValue('site')}`,
@@ -185,7 +183,7 @@ export function onReturnEvaluated(current: GlideRecord): void {
         return
     }
     const target = evaluationTarget(str(current, 'evaluation') as EvaluationOutcome, {
-        legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner,
+        legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner | '',
         leaseEndAction: str(asset, 'x_daas_ham_lease.end_action') as LeaseEndAction | '',
     })
     // Charged before refurbishing hands the unit back to the Provider; choosing the evaluation again charges it once.

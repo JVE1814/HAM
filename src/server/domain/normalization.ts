@@ -1,5 +1,6 @@
 import { inFleet, OEM_PID_FIELD } from './fleet.ts'
 import { seenWithoutFleetAssetQuery } from './reconciliation.ts'
+import type { MatchType } from './vocabulary.ts'
 
 /**
  * Model normalization: map the raw manufacturer/model strings reported by Discovery, connectors and
@@ -15,7 +16,7 @@ export interface ModelMatchRule {
     id: string
     order: number
     manufacturerId: string
-    matchType: 'exact' | 'prefix' | 'regex'
+    matchType: MatchType
     pattern: string
     modelId: string
     active: boolean

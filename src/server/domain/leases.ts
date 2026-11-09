@@ -1,10 +1,9 @@
 import { addDays, addMonths, endOfMonth, isMonthEnd } from './calendar.ts'
 import { inFleet } from './fleet.ts'
-import { INSTALL_STATUS, type Stage } from './lifecycle.ts'
+import type { Stage } from './lifecycle.ts'
+import { INSTALL_STATUS, type LeaseEndAction } from './vocabulary.ts'
 
 /** Lease schedules, end-of-lease decisions and renewals (P3.23–P3.24). */
-
-export type LeaseEndAction = 'undecided' | 'buyout' | 'extend' | 'return'
 
 /**
  * `leaseCondition` (an encoded query on the Asset's lease) narrowed to the fleet assets (ADR 0016) the lease still

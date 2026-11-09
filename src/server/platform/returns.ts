@@ -10,8 +10,8 @@ import {
     returnDueDate,
     SITE_RECOVERY_STAGES,
     type FeeIdentity,
-    type FeeType,
 } from '../domain/returns.ts'
+import type { FeeType, ReturnMethod, ReturnTrigger } from '../domain/vocabulary.ts'
 import { isFleetAsset, moveAndSave, readStage } from './assets.ts'
 import { todayIso } from './clock.ts'
 import { openFieldWork } from './field-work.ts'
@@ -20,20 +20,12 @@ import { exists, findById, num, refusal, str } from './records.ts'
 
 /** Return orders, their lines and Fee events (P2.4). */
 
-export type ReturnTrigger =
-    | 'site_decommission'
-    | 'device_removal'
-    | 'refresh_swap_back'
-    | 'defective_return'
-    | 'agreement_end'
-    | 'temporary_end'
-
 export interface ReturnRequest {
     trigger: ReturnTrigger
     customerId: string
     siteId: string
     agreementId: string
-    method: 'fsm_deinstall' | 'ship_back'
+    method: ReturnMethod
     assetIds: readonly string[]
     sourceOrderId?: string
     /** Open a de-install change + work order (not when an existing swap work order collects the unit). */

@@ -1,3 +1,5 @@
+import type { OrderStage } from './vocabulary.ts'
+
 /** Break-fix (P2.3, D58): what "Raise replacement" does on a case that may already link a replacement Order. */
 
 /**
@@ -14,7 +16,7 @@ export type ReplacementStep = 'raise' | 'submit_draft' | 'keep'
 export const ENDED_UNFULFILLED: readonly string[] = ['rejected', 'cancelled']
 
 /** The step for a case whose linked replacement Order is in `linkedStage`, or links none (null, also when it is gone). */
-export function replacementStep(linkedStage: string | null): ReplacementStep {
+export function replacementStep(linkedStage: OrderStage | null): ReplacementStep {
     if (linkedStage === null || ENDED_UNFULFILLED.includes(linkedStage)) return 'raise'
     return linkedStage === 'draft' ? 'submit_draft' : 'keep'
 }

@@ -1,6 +1,6 @@
 import { andEachClause } from './encoded-query.ts'
 import { stagesQuery, type Stage } from './lifecycle.ts'
-import type { StockroomType } from './sourcing.ts'
+import type { StockroomType } from './vocabulary.ts'
 
 /**
  * Fleet assets (ADR 0016): the equipment the Provider runs as part of the network service, which is all this app acts

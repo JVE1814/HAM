@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { planShipment, replacementInstalled, type InstallMode, type OrderType, type ShipFacts } from './delivery'
+import { planShipment, replacementInstalled, type ShipFacts } from './delivery'
+import type { InstallMode, OrderType } from './vocabulary'
 
 const order: ShipFacts = {
     orderType: 'site_rollout',

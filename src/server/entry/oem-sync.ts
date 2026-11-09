@@ -16,8 +16,9 @@ import {
 import { fleetCondition, naasModelCondition } from '../domain/fleet.ts'
 import { mergeLifecycle, type LifecycleDates } from '../domain/model-lifecycle.ts'
 import { enabledRoute, type CoverageRoute } from '../domain/oem/adapters.ts'
-import type { CoverageFact, OemVendor } from '../domain/oem/types.ts'
+import type { CoverageFact } from '../domain/oem/types.ts'
 import { normalizeSerial } from '../domain/asn.ts'
+import type { CoverageSource, OemVendor } from '../domain/vocabulary.ts'
 import { msToGlide, nowMs, todayIso } from '../platform/clock.ts'
 import { oemContext, oemEnabled } from '../platform/oem-http.ts'
 import { intProperty } from '../platform/properties.ts'
@@ -163,7 +164,7 @@ function staleAssets(vendor: OemVendor, staleBefore: string, limit: number): Map
  * platform refused: a serial whose coverage is refused leaves its Assets unsummarised and unchecked, so it is asked
  * again rather than summarised from contracts that were not stored.
  */
-function applyCoverage(vendor: OemVendor, source: 'api' | 'csv', answered: ReadonlyMap<string, string>, answers: readonly CoverageAnswer[], stamped: readonly string[]): string[] {
+function applyCoverage(vendor: OemVendor, source: CoverageSource, answered: ReadonlyMap<string, string>, answers: readonly CoverageAnswer[], stamped: readonly string[]): string[] {
     const checkedAt = msToGlide(nowMs())
     const serials = [...new Set(answered.values())]
     const { contracts, refused } = writeCoverage(vendor, source, serials, answers, checkedAt)
@@ -179,7 +180,7 @@ function applyCoverage(vendor: OemVendor, source: 'api' | 'csv', answered: Reado
  * every stored contract of `serials` as it is after the write, which the Assets are summarised from, and why
  * each serial with a refused save was refused.
  */
-function writeCoverage(vendor: OemVendor, source: 'api' | 'csv', serials: readonly string[], answers: readonly CoverageAnswer[], checkedAt: string): CoverageWrite {
+function writeCoverage(vendor: OemVendor, source: CoverageSource, serials: readonly string[], answers: readonly CoverageAnswer[], checkedAt: string): CoverageWrite {
     const contracts: SerialCoverage[] = []
     const refused = new Map<string, string>()
     if (serials.length === 0) return { contracts, refused }
@@ -228,7 +229,7 @@ function contractOf(coverage: GlideRecord): SerialCoverage {
 }
 
 /** Set one answered contract on its coverage record; an answer set after another merges onto the dates it set. */
-function setCoverage(coverage: GlideRecord, vendor: OemVendor, source: 'api' | 'csv', answer: CoverageAnswer, checkedAt: string): void {
+function setCoverage(coverage: GlideRecord, vendor: OemVendor, source: CoverageSource, answer: CoverageAnswer, checkedAt: string): void {
     const { fact } = answer
     const merged = mergeCoverage(
         { startDate: str(coverage, 'start_date') || undefined, endDate: str(coverage, 'end_date') || undefined },

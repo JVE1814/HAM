@@ -1,5 +1,5 @@
 import type { OemContext } from '../domain/oem/adapters.ts'
-import type { OemVendor } from '../domain/oem/types.ts'
+import type { OemVendor } from '../domain/vocabulary.ts'
 import { boolProperty, stringProperty } from './properties.ts'
 import { restMessagePort } from './rest-port.ts'
 

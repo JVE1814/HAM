@@ -1,8 +1,8 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { dependentActions, dueStepsQuery, type ClaimAction, type ClaimOutcome, type ClaimStore, type ClaimTarget } from '../domain/oem/claims.ts'
-import type { OemVendor } from '../domain/oem/types.ts'
+import { dependentActions, dueStepsQuery, type ClaimOutcome, type ClaimStore, type ClaimTarget } from '../domain/oem/claims.ts'
 import { num, pluck, recordsById, refusal, str } from './records.ts'
 import { memoized } from '../domain/memo.ts'
+import type { ClaimAction, OemVendor } from '../domain/vocabulary.ts'
 
 const STEP = 'x_daas_ham_staging_step'
 

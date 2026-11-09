@@ -1,22 +1,12 @@
 import { errorText, isSuccess, type HttpPort } from './http.ts'
 import { asArray, field, isoDate, parseJson, text } from './json.ts'
+import type { ShipmentStatus } from './vocabulary.ts'
 
 /**
  * Shipping aggregator (P3.26, D73): one adapter buys labels and reads tracking webhooks. Requests
  * follow the ShipEngine label shape; webhooks are read in both ShipEngine and EasyPost shapes so the
  * Provider can use either.
  */
-
-/** A shipment's status: `voided` is set by a person who voided the label with the carrier, never by tracking. */
-export type ShipmentStatus =
-    | 'label_created'
-    | 'in_transit'
-    | 'out_for_delivery'
-    | 'delivered'
-    | 'exception'
-    | 'returned'
-    | 'unknown'
-    | 'voided'
 
 export interface Address {
     name: string

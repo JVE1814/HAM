@@ -26,10 +26,10 @@ import {
     webhookToken,
     type Address,
     type LabelInput,
-    type ShipmentStatus,
     type TrackingEvent,
     type TrackingUpdate,
 } from './shipping'
+import type { ShipmentStatus } from './vocabulary'
 
 const depot: Address = { name: 'NaaS Depot', company: 'Demo NaaS Provider', phone: '+31 30 000', line1: '1 Depot Way', city: 'Utrecht', postalCode: '3511AA', country: 'nl' }
 const site: Address = { name: 'Acme HQ reception', phone: '+31 20 000', line1: '5 Main St', city: 'Amsterdam', postalCode: '1011AB', country: 'The Netherlands' }

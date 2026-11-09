@@ -6,10 +6,10 @@ import {
     orderStageFor,
     refillsLine,
     siteRecoveryLineQuery,
-    type LineStage,
     type OrderShipment,
 } from '../domain/fulfilment.ts'
 import type { Stage } from '../domain/lifecycle.ts'
+import type { LineStage } from '../domain/vocabulary.ts'
 import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { exists, findById, num, refusal, str } from './records.ts'

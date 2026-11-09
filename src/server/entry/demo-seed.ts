@@ -2,6 +2,7 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import { isFleetAsset, joinFleet, newAsset } from '../platform/assets.ts'
 import { refusal, str } from '../platform/records.ts'
 import type { Stage } from '../domain/lifecycle.ts'
+import type { CatalogEntryType } from '../domain/vocabulary.ts'
 
 /**
  * Demo data for dev/test instances: two Customers with Sites, racks and stockrooms, models from the
@@ -148,7 +149,7 @@ export function loadDemoData(): void {
     line('Acme managed firewalls', { agreement: acmeAgreement, customer: acme, line_type: 'device_class', device_class: 'firewall', monthly_rate: 60, status: 'pending' })
     line('Globex managed switching', { agreement: globexAgreement, customer: globex, line_type: 'device_class', device_class: 'switch', monthly_rate: 70, status: 'pending' })
 
-    const entries: Array<[string, 'model' | 'site_template', string, number]> = [
+    const entries: Array<[string, CatalogEntryType, string, number]> = [
         [acme, 'model', c9300, 45], [acme, 'model', mr46, 18], [acme, 'model', fg60f, 60], [acme, 'site_template', smallBranch, 420],
         [globex, 'model', aruba6300, 70], [globex, 'model', ap535, 16], [globex, 'model', cp3600, 140], [globex, 'site_template', campusFloor, 520],
     ]

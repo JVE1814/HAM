@@ -1,5 +1,6 @@
 import type { Stage } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
+import type { InstallMode, OrderStage } from './vocabulary.ts'
 
 /**
  * Who may record an Order as installed (P1 fulfilment, D49). An install by an FSM engineer, a subcontractor or
@@ -8,8 +9,8 @@ import type { VisibilityScope } from './visibility.ts'
 
 /** What these rules read of an Order. */
 export interface InstallState {
-    stage: string
-    installMode: string
+    stage: OrderStage
+    installMode: InstallMode
     /** How many of its units are shipped (`awaitsInstall`): read only for an Order held back before installing. */
     shippedUnits(): number
 }

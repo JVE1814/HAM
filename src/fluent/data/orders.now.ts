@@ -9,6 +9,13 @@ import {
     StringColumn,
     Table,
 } from '@servicenow/sdk/core'
+import {
+    ENTITLEMENT_VERDICT_CHOICES,
+    INSTALL_MODE_CHOICES,
+    LINE_STAGE_CHOICES,
+    ORDER_STAGE_CHOICES,
+    ORDER_TYPE_CHOICES,
+} from '../../server/domain/vocabulary'
 
 /** A request to deliver equipment to a Site. */
 export const x_daas_ham_order = Table({
@@ -18,13 +25,7 @@ export const x_daas_ham_order = Table({
     schema: {
         order_type: ChoiceColumn({
             label: 'Order type',
-            choices: {
-                site_rollout: { label: 'Site rollout', sequence: 0 },
-                device_add: { label: 'Device add', sequence: 1 },
-                device_replace: { label: 'Device replace', sequence: 2 },
-                temporary: { label: 'Temporary deployment', sequence: 3 },
-                refresh: { label: 'Refresh', sequence: 4 },
-            },
+            choices: ORDER_TYPE_CHOICES,
             mandatory: true,
             default: 'device_add',
             dropdown: 'dropdown_without_none',
@@ -36,12 +37,7 @@ export const x_daas_ham_order = Table({
         requested_by_contact: ReferenceColumn({ label: 'Requested by', referenceTable: 'customer_contact' }),
         install_mode: ChoiceColumn({
             label: 'Install mode',
-            choices: {
-                fsm_engineer: { label: 'Provider field engineer', sequence: 0 },
-                self_install: { label: 'Customer self-install (ZTP)', sequence: 1 },
-                subcontractor: { label: 'Subcontractor', sequence: 2 },
-                remote_hands: { label: 'Data-centre remote hands', sequence: 3 },
-            },
+            choices: INSTALL_MODE_CHOICES,
             mandatory: true,
             default: 'fsm_engineer',
             dropdown: 'dropdown_without_none',
@@ -50,17 +46,7 @@ export const x_daas_ham_order = Table({
         end_date: DateColumn({ label: 'Deployment end date' }),
         stage: ChoiceColumn({
             label: 'Stage',
-            choices: {
-                draft: { label: 'Draft', sequence: 0 },
-                awaiting_approval: { label: 'Awaiting approval', sequence: 1 },
-                sourcing: { label: 'Sourcing', sequence: 2 },
-                preparing: { label: 'Preparing', sequence: 3 },
-                delivering: { label: 'Delivering', sequence: 4 },
-                installing: { label: 'Installing', sequence: 5 },
-                complete: { label: 'Complete', sequence: 6 },
-                rejected: { label: 'Rejected', sequence: 7 },
-                cancelled: { label: 'Cancelled', sequence: 8 },
-            },
+            choices: ORDER_STAGE_CHOICES,
             default: 'draft',
             readOnly: true,
             dropdown: 'dropdown_without_none',
@@ -68,11 +54,7 @@ export const x_daas_ham_order = Table({
         entitlement_verdict: ChoiceColumn({
             label: 'Entitlement',
             readOnly: true,
-            choices: {
-                within_agreement: { label: 'Within agreement', sequence: 0 },
-                off_catalog: { label: 'Off catalog', sequence: 1 },
-                over_quota: { label: 'Over contracted quantity', sequence: 2 },
-            },
+            choices: ENTITLEMENT_VERDICT_CHOICES,
         }),
         // A string column, not a multi-line one: the classic form draws a multi_two_lines column this long with no field
         // container, and the live form update after Submit then throws on it.
@@ -112,17 +94,7 @@ export const x_daas_ham_order_line = Table({
         from_site_template: BooleanColumn({ label: 'From site template', default: false, readOnly: true }),
         line_stage: ChoiceColumn({
             label: 'Line stage',
-            choices: {
-                new: { label: 'New', sequence: 0 },
-                awaiting_stock: { label: 'Awaiting stock', sequence: 1 },
-                sourced: { label: 'Sourced', sequence: 2 },
-                staging: { label: 'Staging', sequence: 3 },
-                ready_to_ship: { label: 'Ready to ship', sequence: 4 },
-                shipped: { label: 'Shipped', sequence: 5 },
-                installed: { label: 'Installed', sequence: 6 },
-                in_service: { label: 'In service', sequence: 7 },
-                cancelled: { label: 'Cancelled', sequence: 8 },
-            },
+            choices: LINE_STAGE_CHOICES,
             default: 'new',
             readOnly: true,
             dropdown: 'dropdown_without_none',

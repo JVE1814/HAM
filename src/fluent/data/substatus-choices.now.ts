@@ -1,10 +1,13 @@
 import '@servicenow/sdk/global'
 import { Record } from '@servicenow/sdk/core'
+import { STAGE_FIELDS } from '../../server/domain/vocabulary'
 
 /*
  * Substatus values this app adds to alm_asset.substatus (ADR 0002). The SDK refuses ChoiceSet on
- * global tables from a scoped app, so each value ships as a sys_choice record. Keep in sync with
- * ADDED_SUBSTATUSES in src/server/domain/lifecycle.ts (enforced by substatus-choices.test.ts).
+ * global tables from a scoped app, so each value ships as a sys_choice record: one per Lifecycle stage
+ * whose STAGE_FIELDS entry carries a `choice`, every value read from that entry. Fluent has no loops,
+ * so a stage given a `choice` there needs its Record here (substatus-choices.test.ts compares the
+ * built set with STAGE_FIELDS).
  *
  * All sys_choice records for one field share the update name sys_choice_alm_asset_substatus, so
  * without a parent only the last one survives the build. The sys_choice_set parent below groups
@@ -29,10 +32,10 @@ Record({
     data: {
         name: 'alm_asset',
         element: 'substatus',
-        value: 'reserved_spare_pool',
-        label: 'Reserved - spare pool',
-        dependent_value: '6',
-        sequence: 500,
+        value: STAGE_FIELDS.spare_pool.substatus,
+        label: STAGE_FIELDS.spare_pool.choice.label,
+        dependent_value: STAGE_FIELDS.spare_pool.installStatus,
+        sequence: STAGE_FIELDS.spare_pool.choice.sequence,
         language: 'en',
         inactive: false,
     },
@@ -44,10 +47,10 @@ Record({
     data: {
         name: 'alm_asset',
         element: 'substatus',
-        value: 'staging',
-        label: 'Staging',
-        dependent_value: '6',
-        sequence: 510,
+        value: STAGE_FIELDS.staging.substatus,
+        label: STAGE_FIELDS.staging.choice.label,
+        dependent_value: STAGE_FIELDS.staging.installStatus,
+        sequence: STAGE_FIELDS.staging.choice.sequence,
         language: 'en',
         inactive: false,
     },
@@ -59,10 +62,10 @@ Record({
     data: {
         name: 'alm_asset',
         element: 'substatus',
-        value: 'staged',
-        label: 'Staged',
-        dependent_value: '6',
-        sequence: 520,
+        value: STAGE_FIELDS.staged.substatus,
+        label: STAGE_FIELDS.staged.choice.label,
+        dependent_value: STAGE_FIELDS.staged.installStatus,
+        sequence: STAGE_FIELDS.staged.choice.sequence,
         language: 'en',
         inactive: false,
     },
@@ -74,10 +77,10 @@ Record({
     data: {
         name: 'alm_asset',
         element: 'substatus',
-        value: 'shipped_to_site',
-        label: 'Shipped to site',
-        dependent_value: '9',
-        sequence: 530,
+        value: STAGE_FIELDS.shipped.substatus,
+        label: STAGE_FIELDS.shipped.choice.label,
+        dependent_value: STAGE_FIELDS.shipped.installStatus,
+        sequence: STAGE_FIELDS.shipped.choice.sequence,
         language: 'en',
         inactive: false,
     },
@@ -89,10 +92,10 @@ Record({
     data: {
         name: 'alm_asset',
         element: 'substatus',
-        value: 'pending_in_service',
-        label: 'Pending in service',
-        dependent_value: '1',
-        sequence: 540,
+        value: STAGE_FIELDS.pending_in_service.substatus,
+        label: STAGE_FIELDS.pending_in_service.choice.label,
+        dependent_value: STAGE_FIELDS.pending_in_service.installStatus,
+        sequence: STAGE_FIELDS.pending_in_service.choice.sequence,
         language: 'en',
         inactive: false,
     },
@@ -104,10 +107,10 @@ Record({
     data: {
         name: 'alm_asset',
         element: 'substatus',
-        value: 'temporary_deployment',
-        label: 'Temporary deployment',
-        dependent_value: '1',
-        sequence: 550,
+        value: STAGE_FIELDS.temporary_deployment.substatus,
+        label: STAGE_FIELDS.temporary_deployment.choice.label,
+        dependent_value: STAGE_FIELDS.temporary_deployment.installStatus,
+        sequence: STAGE_FIELDS.temporary_deployment.choice.sequence,
         language: 'en',
         inactive: false,
     },
@@ -119,15 +122,14 @@ Record({
     data: {
         name: 'alm_asset',
         element: 'substatus',
-        value: 'pending_return',
-        label: 'Pending return',
-        dependent_value: '1',
-        sequence: 560,
+        value: STAGE_FIELDS.pending_return.substatus,
+        label: STAGE_FIELDS.pending_return.choice.label,
+        dependent_value: STAGE_FIELDS.pending_return.installStatus,
+        sequence: STAGE_FIELDS.pending_return.choice.sequence,
         language: 'en',
         inactive: false,
     },
 })
-
 
 Record({
     $id: Now.ID['substatus_pending_oem_rma'],
@@ -135,10 +137,10 @@ Record({
     data: {
         name: 'alm_asset',
         element: 'substatus',
-        value: 'pending_oem_rma',
-        label: 'Pending OEM RMA',
-        dependent_value: '3',
-        sequence: 580,
+        value: STAGE_FIELDS.pending_oem_rma.substatus,
+        label: STAGE_FIELDS.pending_oem_rma.choice.label,
+        dependent_value: STAGE_FIELDS.pending_oem_rma.installStatus,
+        sequence: STAGE_FIELDS.pending_oem_rma.choice.sequence,
         language: 'en',
         inactive: false,
     },
@@ -150,10 +152,10 @@ Record({
     data: {
         name: 'alm_asset',
         element: 'substatus',
-        value: 'pending_wipe',
-        label: 'Pending wipe',
-        dependent_value: '6',
-        sequence: 590,
+        value: STAGE_FIELDS.pending_wipe.substatus,
+        label: STAGE_FIELDS.pending_wipe.choice.label,
+        dependent_value: STAGE_FIELDS.pending_wipe.installStatus,
+        sequence: STAGE_FIELDS.pending_wipe.choice.sequence,
         language: 'en',
         inactive: false,
     },
@@ -165,10 +167,10 @@ Record({
     data: {
         name: 'alm_asset',
         element: 'substatus',
-        value: 'returned_to_customer',
-        label: 'Returned to customer',
-        dependent_value: '7',
-        sequence: 600,
+        value: STAGE_FIELDS.returned_to_customer.substatus,
+        label: STAGE_FIELDS.returned_to_customer.choice.label,
+        dependent_value: STAGE_FIELDS.returned_to_customer.installStatus,
+        sequence: STAGE_FIELDS.returned_to_customer.choice.sequence,
         language: 'en',
         inactive: false,
     },

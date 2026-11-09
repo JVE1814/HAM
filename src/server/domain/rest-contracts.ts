@@ -1,6 +1,6 @@
 import type { Stage } from './lifecycle.ts'
-import type { LifecyclePhase } from './model-lifecycle.ts'
-import type { PowerBudget, RackFace } from './rack.ts'
+import type { PowerBudget } from './rack.ts'
+import type { AttestationResponse, LifecyclePhase, RackFace } from './vocabulary.ts'
 
 /**
  * What the REST resources of the three pages answer (src/fluent/logic/rest.now.ts): each shape is declared here once,
@@ -107,14 +107,13 @@ export interface CustomerReturn {
     trackingNumber: string
 }
 
-export type AttestationAnswer = 'confirmed' | 'missing' | 'unknown'
 
 export interface AttestationItem {
     id: string
     serial: string
     model: string
     /** Blank until answered. */
-    response: AttestationAnswer | ''
+    response: AttestationResponse | ''
 }
 
 export interface Attestation {

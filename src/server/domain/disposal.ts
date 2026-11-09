@@ -1,9 +1,8 @@
 import type { Approver } from './entitlement.ts'
-import type { LegalOwner, Stage } from './lifecycle.ts'
+import type { Stage } from './lifecycle.ts'
+import type { DisposalMethod, LegalOwner } from './vocabulary.ts'
 
 /** Disposal orders (P2.5, D61). */
-
-export type DisposalMethod = 'broker_resale' | 'oem_takeback' | 'itad_recycle' | 'return_to_customer' | 'return_to_lessor'
 
 const STAGE: Record<DisposalMethod, Stage> = {
     broker_resale: 'sold',
@@ -13,7 +12,7 @@ const STAGE: Record<DisposalMethod, Stage> = {
     return_to_lessor: 'returned_to_lessor',
 }
 
-const ALLOWED: Record<Exclude<LegalOwner, ''>, readonly DisposalMethod[]> = {
+const ALLOWED: Record<LegalOwner, readonly DisposalMethod[]> = {
     provider: ['broker_resale', 'oem_takeback', 'itad_recycle'],
     customer: ['return_to_customer'],
     lessor: ['return_to_lessor'],
@@ -27,7 +26,7 @@ export function disposalStage(method: DisposalMethod): Stage {
 export interface DisposalLine {
     /** It is a fleet asset (ADR 0016): the app retires no equipment of the Provider IT's. */
     fleet: boolean
-    legalOwner: LegalOwner
+    legalOwner: LegalOwner | ''
     method: DisposalMethod
     wipeComplete: boolean
     stage: Stage | null
@@ -57,7 +56,7 @@ export function disposalLineBlockers(line: DisposalLine): string[] {
 
 /** An Asset on a Disposal order at submit: its legal owner, the Customer it belongs to (its company), its name. */
 export interface DisposalAsset {
-    legalOwner: LegalOwner
+    legalOwner: LegalOwner | ''
     customerId: string
     label: string
 }
@@ -86,6 +85,6 @@ export function disposalScopeRefusal(orderStages: readonly string[]): string {
 }
 
 /** The provider always approves; Customer admins too when a customer-owned Asset is involved. */
-export function disposalApprovers(owners: readonly LegalOwner[]): Approver[] {
+export function disposalApprovers(owners: ReadonlyArray<LegalOwner | ''>): Approver[] {
     return owners.includes('customer') ? ['account_manager', 'customer_admin'] : ['account_manager']
 }

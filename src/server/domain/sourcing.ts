@@ -1,9 +1,8 @@
 import { OPEN_LINE_STAGES } from './entitlement.ts'
-import type { LineStage } from './fulfilment.ts'
-import type { LeaseEndAction } from './leases.ts'
 import { fleetStagesQuery, naasStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
 import type { Stage } from './lifecycle.ts'
 import type { ShortfallRoute } from './returns.ts'
+import type { LeaseEndAction, LineStage, RmaState, StockroomType } from './vocabulary.ts'
 
 /**
  * Sourcing: where an Order line's Assets come from.
@@ -13,7 +12,6 @@ import type { ShortfallRoute } from './returns.ts'
  * Order's Site first, then the Spare pool, then central stock, then purchase.
  */
 
-export type StockroomType = 'central_depot' | 'staging_centre' | 'customer_site'
 export type Source = 'customer_site_stock' | 'spare_pool' | 'central_stock'
 
 export interface StockCandidate {
@@ -217,9 +215,6 @@ const ENDED_ORDER_STAGES: readonly string[] = ['cancelled', 'rejected']
 export function lineStillOpen(line: { lineStage: string; orderStage: string }): boolean {
     return OPEN_LINE_STAGES.includes(line.lineStage as LineStage) && !ENDED_ORDER_STAGES.includes(line.orderStage)
 }
-
-/** The states of an OEM RMA (x_daas_ham_oem_rma.state). */
-export type RmaState = 'to_open' | 'open' | 'replacement_received' | 'defective_returned' | 'closed'
 
 /** RMAs whose replacement is still to come: their line counts each as a unit on its way. */
 export const RMA_AWAITED: readonly RmaState[] = ['to_open', 'open']

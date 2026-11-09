@@ -8,11 +8,11 @@ import {
     dueStepsQuery,
     initialAutomationStatus,
     runVendorClaims,
-    type ClaimAction,
     type ClaimOutcome,
     type ClaimStore,
     type ClaimTarget,
 } from './claims'
+import type { ClaimAction } from '../vocabulary'
 
 function fake(responses: Array<HttpResponse | ((request: HttpRequest) => HttpResponse)>) {
     const calls: HttpRequest[] = []

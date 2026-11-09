@@ -4,15 +4,15 @@ import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { attestationDue, compareAudit, type ExpectedAsset } from '../domain/audit.ts'
 import { fleetStagesQuery, naasStockroomType, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
-import { INSTALL_STATUS, type Stage } from '../domain/lifecycle.ts'
+import type { Stage } from '../domain/lifecycle.ts'
 import {
     outsideFleetExceptionsQuery,
     reconcileAsset,
     seenWithoutFleetAssetQuery,
     stillSeenWithoutFleetAssetQuery,
-    type ExceptionType,
 } from '../domain/reconciliation.ts'
 import { ROLE, visibilityFilter } from '../domain/visibility.ts'
+import { INSTALL_STATUS, type ExceptionType } from '../domain/vocabulary.ts'
 import { customerAdminIds } from '../platform/approvals.ts'
 import { runTableJob } from '../platform/chunked.ts'
 import { glideToIsoDate, glideToMs, nowMs, todayIso } from '../platform/clock.ts'

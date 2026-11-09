@@ -11,6 +11,7 @@ import {
     TableNameColumn,
     Table,
 } from '@servicenow/sdk/core'
+import { MATCH_TYPE_CHOICES, NORM_EXCEPTION_STATUS_CHOICES } from '../../server/domain/vocabulary'
 
 /** A raw manufacturer string seen in discovery, connectors or ASNs, mapped to the canonical manufacturer. */
 export const x_daas_ham_manufacturer_alias = Table({
@@ -33,11 +34,7 @@ export const x_daas_ham_model_match_rule = Table({
         manufacturer: ReferenceColumn({ label: 'Manufacturer', referenceTable: 'core_company', mandatory: true }),
         match_type: ChoiceColumn({
             label: 'Match type',
-            choices: {
-                exact: { label: 'Exact (case-insensitive)', sequence: 0 },
-                prefix: { label: 'Starts with', sequence: 1 },
-                regex: { label: 'Regular expression', sequence: 2 },
-            },
+            choices: MATCH_TYPE_CHOICES,
             mandatory: true,
             default: 'exact',
             dropdown: 'dropdown_without_none',
@@ -92,7 +89,7 @@ export const x_daas_ham_norm_exception = Table({
         occurrences: IntegerColumn({ label: 'Occurrences', default: 1, readOnly: true }),
         status: ChoiceColumn({
             label: 'Status',
-            choices: { open: { label: 'Open', sequence: 0 }, resolved: { label: 'Resolved', sequence: 1 } },
+            choices: NORM_EXCEPTION_STATUS_CHOICES,
             default: 'open',
             dropdown: 'dropdown_without_none',
         }),

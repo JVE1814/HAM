@@ -3,7 +3,7 @@ import { andEachClause } from '../encoded-query.ts'
 import { fleetCondition } from '../fleet.ts'
 import { errorText, isSuccess, type HttpPort, type HttpRequest, type HttpResponse } from '../http.ts'
 import { asArray, chunks, field, parseJson, text } from '../json.ts'
-import type { OemVendor } from './types.ts'
+import type { AutomationStatus, ClaimAction, OemVendor } from '../vocabulary.ts'
 import { fortiCloudError } from './forticloud.ts'
 
 /**
@@ -14,9 +14,7 @@ import { fortiCloudError } from './forticloud.ts'
  */
 
 /** The automated checklist actions, in the order a vendor's actions run: a device is claimed before it is licensed or provisioned. */
-export const CLAIM_ORDER = ['oem_claim', 'oem_licence', 'oem_ztp'] as const
-
-export type ClaimAction = (typeof CLAIM_ORDER)[number]
+export const CLAIM_ORDER: readonly ClaimAction[] = ['oem_claim', 'oem_licence', 'oem_ztp']
 
 export interface ClaimTarget {
     stepId: string
@@ -306,7 +304,7 @@ export function dependentActions(action: string): ClaimAction[] {
  * A waiting step is never due, so no run loads or attempts it and it uses no attempts; it goes to pending
  * when its prerequisite step is ticked done, by hand or by a run.
  */
-export function initialAutomationStatus(action: string, taskActions: readonly string[]): 'pending' | 'waiting' {
+export function initialAutomationStatus(action: string, taskActions: readonly string[]): Extract<AutomationStatus, 'pending' | 'waiting'> {
     const prerequisite: string | undefined = CLAIM_PREREQUISITE[action as ClaimAction]
     return prerequisite && taskActions.includes(prerequisite) ? 'waiting' : 'pending'
 }

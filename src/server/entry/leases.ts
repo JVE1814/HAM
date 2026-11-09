@@ -13,11 +13,11 @@ import {
     stockReturnMoves,
     withinLead,
     type ExpiringCoverage,
-    type LeaseEndAction,
 } from '../domain/leases.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import { isRetired, SERVING_STAGES, stagesQuery, type Stage } from '../domain/lifecycle.ts'
 import { isFree } from '../domain/sourcing.ts'
+import type { LeaseEndAction } from '../domain/vocabulary.ts'
 import { providerApproverIds } from '../platform/approvals.ts'
 import { moveAsset, readStage } from '../platform/assets.ts'
 import { runEventTableJob } from '../platform/chunked.ts'

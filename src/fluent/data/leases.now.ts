@@ -1,14 +1,8 @@
 import '@servicenow/sdk/global'
 import { BooleanColumn, ChoiceColumn, DateColumn, DecimalColumn, IntegerColumn, OverrideColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
+import { LEASE_END_ACTION_CHOICES } from '../../server/domain/vocabulary'
 
 /* Lease schedules and end-of-lease decisions (P3.23, D65). */
-
-const endActionChoices = {
-    undecided: { label: 'Undecided', sequence: 0 },
-    buyout: { label: 'Buy out', sequence: 1 },
-    extend: { label: 'Extend', sequence: 2 },
-    return: { label: 'Return to lessor', sequence: 3 },
-}
 
 /** A financing contract with a Lessor covering a set of Assets until an end date. */
 export const x_daas_ham_lease_schedule = Table({
@@ -27,7 +21,7 @@ export const x_daas_ham_lease_schedule = Table({
         decision_lead_days: IntegerColumn({ label: 'Decide this many days before the end', default: 120, min: 0 }),
         end_action: ChoiceColumn({
             label: 'End-of-lease action',
-            choices: endActionChoices,
+            choices: LEASE_END_ACTION_CHOICES,
             default: 'undecided',
             readOnly: true,
             dropdown: 'dropdown_without_none',
@@ -48,7 +42,11 @@ export const x_daas_ham_lease_decision = Table({
         lease_end: DateColumn({ label: 'Lease ends', readOnly: true }),
         decision: ChoiceColumn({
             label: 'Decision',
-            choices: { buyout: endActionChoices.buyout, extend: endActionChoices.extend, return: endActionChoices.return },
+            choices: {
+                buyout: LEASE_END_ACTION_CHOICES.buyout,
+                extend: LEASE_END_ACTION_CHOICES.extend,
+                return: LEASE_END_ACTION_CHOICES.return,
+            },
         }),
         new_end_date: DateColumn({ label: 'New end date (extension)' }),
         covered_assets: IntegerColumn({ label: 'Covered assets', readOnly: true }),

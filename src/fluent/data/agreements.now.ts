@@ -11,17 +11,14 @@ import {
     StringColumn,
     Table,
 } from '@servicenow/sdk/core'
-
-const deviceClassChoices = {
-    switch: { label: 'Switch', sequence: 0 },
-    ap: { label: 'Wireless access point', sequence: 1 },
-    router: { label: 'Router', sequence: 2 },
-    firewall: { label: 'Firewall', sequence: 3 },
-    module: { label: 'Module', sequence: 4 },
-    psu: { label: 'Power supply', sequence: 5 },
-    optic: { label: 'Optic / cable', sequence: 6 },
-    other: { label: 'Other', sequence: 7 },
-}
+import {
+    CATALOG_ENTRY_TYPE_CHOICES,
+    DEVICE_CLASS_CHOICES,
+    REFRESH_BASIS_CHOICES,
+    REPLACEMENT_TIER_CHOICES,
+    SUBSCRIPTION_LINE_STATUS_CHOICES,
+    SUBSCRIPTION_LINE_TYPE_CHOICES,
+} from '../../server/domain/vocabulary'
 
 /** The commercial Agreement between the Provider and a Customer. */
 export const x_daas_ham_agreement = Table({
@@ -36,21 +33,13 @@ export const x_daas_ham_agreement = Table({
         refresh_cycle_months: IntegerColumn({ label: 'Refresh cycle (months)', default: 60, min: 0 }),
         refresh_basis: ChoiceColumn({
             label: 'Refresh basis',
-            choices: {
-                cycle: { label: 'Refresh cycle only', sequence: 0 },
-                end_of_support: { label: 'End of support only', sequence: 1 },
-                earliest: { label: 'Whichever comes first', sequence: 2 },
-            },
+            choices: REFRESH_BASIS_CHOICES,
             default: 'earliest',
             dropdown: 'dropdown_without_none',
         }),
         replacement_tier: ChoiceColumn({
             label: 'Replacement service level',
-            choices: {
-                nbd: { label: 'Next business day', sequence: 0 },
-                same_day: { label: 'Same day (8x5x4)', sequence: 1 },
-                four_hour: { label: '24x7x4', sequence: 2 },
-            },
+            choices: REPLACEMENT_TIER_CHOICES,
             default: 'nbd',
             dropdown: 'dropdown_without_none',
         }),
@@ -80,7 +69,7 @@ export const x_daas_ham_agreement_quantity = Table({
             mandatory: true,
             cascadeRule: 'delete',
         }),
-        device_class: ChoiceColumn({ label: 'Device class', choices: deviceClassChoices, mandatory: true }),
+        device_class: ChoiceColumn({ label: 'Device class', choices: DEVICE_CLASS_CHOICES, mandatory: true }),
         // NaaS Models only (ADR 0016), on every Model reference here: domain/fleet `naasModelCondition()`.
         model: ReferenceColumn({ label: 'Model (optional)', referenceTable: 'cmdb_model', referenceQual: 'x_daas_ham_oem_pidISNOTEMPTY' }),
         contracted_quantity: IntegerColumn({ label: 'Contracted quantity', mandatory: true, min: 0 }),
@@ -99,26 +88,19 @@ export const x_daas_ham_subscription_line = Table({
         description: StringColumn({ label: 'Description', maxLength: 160, mandatory: true }),
         line_type: ChoiceColumn({
             label: 'Line type',
-            choices: {
-                site_package: { label: 'Site package', sequence: 0 },
-                device_class: { label: 'Per device class', sequence: 1 },
-            },
+            choices: SUBSCRIPTION_LINE_TYPE_CHOICES,
             mandatory: true,
             dropdown: 'dropdown_without_none',
         }),
         site: ReferenceColumn({ label: 'Site', referenceTable: 'cmn_location' }),
-        device_class: ChoiceColumn({ label: 'Device class', choices: deviceClassChoices }),
+        device_class: ChoiceColumn({ label: 'Device class', choices: DEVICE_CLASS_CHOICES }),
         monthly_rate: DecimalColumn({ label: 'Monthly rate', mandatory: true }),
         currency: StringColumn({ label: 'Currency', maxLength: 3, default: 'EUR' }),
         start_date: DateColumn({ label: 'Start date', readOnly: true }),
         end_date: DateColumn({ label: 'End date' }),
         status: ChoiceColumn({
             label: 'Status',
-            choices: {
-                pending: { label: 'Pending', sequence: 0 },
-                active: { label: 'Active', sequence: 1 },
-                ended: { label: 'Ended', sequence: 2 },
-            },
+            choices: SUBSCRIPTION_LINE_STATUS_CHOICES,
             default: 'pending',
             dropdown: 'dropdown_without_none',
         }),
@@ -137,10 +119,7 @@ export const x_daas_ham_catalog_entry = Table({
         customer: ReferenceColumn({ label: 'Customer', referenceTable: 'customer_account', mandatory: true }),
         entry_type: ChoiceColumn({
             label: 'Entry type',
-            choices: {
-                model: { label: 'Model', sequence: 0 },
-                site_template: { label: 'Site template', sequence: 1 },
-            },
+            choices: CATALOG_ENTRY_TYPE_CHOICES,
             mandatory: true,
             default: 'model',
             dropdown: 'dropdown_without_none',

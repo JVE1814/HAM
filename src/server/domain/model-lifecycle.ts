@@ -1,4 +1,5 @@
 import { addMonths, earliest, isIsoDate } from './calendar.ts'
+import type { LifecyclePhase } from './vocabulary.ts'
 
 /** A Model's manufacturer support milestones (ISO dates). */
 export interface LifecycleDates {
@@ -7,8 +8,6 @@ export interface LifecycleDates {
     endOfExtendedSupport?: string
     endOfLife?: string
 }
-
-export type LifecyclePhase = 'available' | 'end_of_sale' | 'end_of_support' | 'end_of_extended_support' | 'end_of_life'
 
 const MILESTONES: ReadonlyArray<[keyof LifecycleDates, LifecyclePhase]> = [
     ['endOfLife', 'end_of_life'],

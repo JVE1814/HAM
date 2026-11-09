@@ -1,3 +1,5 @@
+import type { StagingSource } from './vocabulary.ts'
+
 /** Staging: choosing the checklist for an Asset and telling when it is done. */
 
 export interface StagingTemplateView {
@@ -6,7 +8,7 @@ export interface StagingTemplateView {
     customerId: string
     manufacturerId: string
     deviceClass: string
-    source: 'in_house' | 'distributor'
+    source: StagingSource
     active: boolean
 }
 
@@ -14,7 +16,7 @@ export interface StagingSubject {
     customerId: string
     manufacturerId: string
     deviceClass: string
-    source: 'in_house' | 'distributor'
+    source: StagingSource
 }
 
 /** The most specific active template whose non-blank fields all match (customer > manufacturer > device class). */

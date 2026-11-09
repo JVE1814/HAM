@@ -1,12 +1,11 @@
 import { GlideRecord, gs } from '@servicenow/glide'
+import type { FieldPurpose } from '../domain/vocabulary.ts'
 import { refusal, str } from './records.ts'
 
 /**
  * On-site work: an FSM work order (wm_order) and the change request it runs under (D57).
  * Routine jobs use a standard change; the change type is decided by the caller.
  */
-
-export type FieldPurpose = 'install' | 'swap' | 'de_install' | 'site_audit'
 
 /** What the work is for: the Customer, Site and the app record that asked for it. */
 export interface WorkContext {

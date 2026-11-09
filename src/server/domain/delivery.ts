@@ -1,13 +1,11 @@
 import type { Stage } from './lifecycle.ts'
 import { INSTALLED_STAGES } from './returns.ts'
+import type { FieldPurpose, InstallMode, OrderType } from './vocabulary.ts'
 
 /**
  * Shipping an Order to its Site: when "Ship" is refused, what label it buys and what on-site work it opens, and when
  * install completion takes a replaced Asset out of service (P1.7).
  */
-
-export type OrderType = 'site_rollout' | 'device_add' | 'device_replace' | 'temporary' | 'refresh'
-export type InstallMode = 'fsm_engineer' | 'self_install' | 'subcontractor' | 'remote_hands'
 
 /** What "Ship" needs to know about an Order. */
 export interface ShipFacts {
@@ -34,7 +32,7 @@ export interface ShipFacts {
 /** The change request and FSM work order to open at the Site (D57). */
 export interface OnSiteWork {
     changeType: 'standard' | 'normal'
-    purpose: 'install' | 'swap'
+    purpose: Extract<FieldPurpose, 'install' | 'swap'>
     subcontracted: boolean
 }
 

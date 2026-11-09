@@ -1,8 +1,9 @@
 import { GlideDateTime, GlideRecord, GlideSchedule, gs } from '@servicenow/glide'
-import { planShipment, replacementInstalled, type InstallMode, type OnSiteWork, type OrderType } from '../domain/delivery.ts'
+import { planShipment, replacementInstalled, type OnSiteWork } from '../domain/delivery.ts'
 import { awaitsInstall, type InstallState } from '../domain/install-confirmation.ts'
 import { isDeployed, stagesQuery } from '../domain/lifecycle.ts'
 import { checkJobWindow } from '../domain/scheduling.ts'
+import type { InstallMode, OrderStage, OrderType } from '../domain/vocabulary.ts'
 import { moveAndSave, moveAsset, readStage } from '../platform/assets.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { glideToMs } from '../platform/clock.ts'
@@ -33,8 +34,8 @@ export function installState(order: GlideRecord): InstallState {
     const orderId = order.getUniqueValue()
     let shipped: number | undefined
     return {
-        stage: str(order, 'stage'),
-        installMode: str(order, 'install_mode'),
+        stage: str(order, 'stage') as OrderStage,
+        installMode: str(order, 'install_mode') as InstallMode,
         shippedUnits: () => {
             if (shipped === undefined) shipped = countShipped(orderId)
             return shipped

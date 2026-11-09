@@ -1,5 +1,12 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DateTimeColumn, IntegerColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
+import {
+    ATTESTATION_RESPONSE_CHOICES,
+    AUDIT_LINE_RESULT_CHOICES,
+    AUDIT_TYPE_CHOICES,
+    EXCEPTION_STATUS_CHOICES,
+    EXCEPTION_TYPE_CHOICES,
+} from '../../server/domain/vocabulary'
 
 /* Audits, attestations and reconciliation exceptions (P2.7, D63). */
 
@@ -11,7 +18,7 @@ export const x_daas_ham_audit = Table({
     schema: {
         audit_type: ChoiceColumn({
             label: 'Audit type',
-            choices: { stockroom: { label: 'Stockroom blind count', sequence: 0 }, site: { label: 'Site audit', sequence: 1 } },
+            choices: AUDIT_TYPE_CHOICES,
             mandatory: true,
             dropdown: 'dropdown_without_none',
         }),
@@ -41,12 +48,7 @@ export const x_daas_ham_audit_line = Table({
         scanned_code: StringColumn({ label: 'Scanned code', maxLength: 100 }),
         result: ChoiceColumn({
             label: 'Result',
-            choices: {
-                expected: { label: 'Expected, not yet scanned', sequence: 0 },
-                found: { label: 'Found', sequence: 1 },
-                missing: { label: 'Missing', sequence: 2 },
-                unexpected: { label: 'Unexpected', sequence: 3 },
-            },
+            choices: AUDIT_LINE_RESULT_CHOICES,
             default: 'expected',
             readOnly: true,
             dropdown: 'dropdown_without_none',
@@ -83,11 +85,7 @@ export const x_daas_ham_attestation_item = Table({
         asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true, referenceQual: 'x_daas_ham_fleet=true' }),
         response: ChoiceColumn({
             label: 'Response',
-            choices: {
-                confirmed: { label: 'Present', sequence: 0 },
-                missing: { label: 'Not present', sequence: 1 },
-                unknown: { label: "Don't know", sequence: 2 },
-            },
+            choices: ATTESTATION_RESPONSE_CHOICES,
         }),
     },
     index: [{ name: 'x_daas_ham_ati_att', unique: false, element: 'attestation' }],
@@ -100,16 +98,7 @@ export const x_daas_ham_recon_exception = Table({
     schema: {
         exception_type: ChoiceColumn({
             label: 'Type',
-            choices: {
-                unseen: { label: 'Installed but not seen', sequence: 0 },
-                serial_mismatch: { label: 'Serial differs from CI', sequence: 1 },
-                location_mismatch: { label: 'Site differs from CI', sequence: 2 },
-                seen_without_asset: { label: 'Seen device without asset', sequence: 3 },
-                audit_missing: { label: 'Missing in audit', sequence: 4 },
-                attested_missing: { label: 'Customer reports missing', sequence: 5 },
-                rack_overlap: { label: 'Devices overlap in rack', sequence: 6 },
-                rack_over_power: { label: 'Rack over power budget', sequence: 7 },
-            },
+            choices: EXCEPTION_TYPE_CHOICES,
             mandatory: true,
             dropdown: 'dropdown_without_none',
         }),
@@ -119,11 +108,7 @@ export const x_daas_ham_recon_exception = Table({
         detail: StringColumn({ label: 'Detail', maxLength: 255 }),
         status: ChoiceColumn({
             label: 'Status',
-            choices: {
-                open: { label: 'Open', sequence: 0 },
-                resolved: { label: 'Resolved', sequence: 1 },
-                accepted: { label: 'Accepted (no action)', sequence: 2 },
-            },
+            choices: EXCEPTION_STATUS_CHOICES,
             default: 'open',
             dropdown: 'dropdown_without_none',
         }),

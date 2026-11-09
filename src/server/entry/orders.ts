@@ -9,7 +9,6 @@ import {
     raiserRefusal,
     siteTemplateOffered,
     type Approver,
-    type EntitlementVerdict,
     type NamedRecord,
     type Orderer,
     type OrderParties,
@@ -28,6 +27,7 @@ import {
     type SourcingRequest,
     type UnmovedStock,
 } from '../domain/sourcing.ts'
+import type { EntitlementVerdict } from '../domain/vocabulary.ts'
 import { entitlementContext } from '../platform/agreements.ts'
 import {
     approvalsOf,

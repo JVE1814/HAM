@@ -1,55 +1,19 @@
 import { andEachClause } from './encoded-query.ts'
+import { INSTALL_STATUS, STAGE_FIELDS, type LegalOwner } from './vocabulary.ts'
 
 /**
  * Asset lifecycle stages and the moves allowed between them.
  *
- * A Lifecycle stage is stored on the platform as an `install_status` + `substatus` pair (ADR 0002); In transfer is
- * stored as either of two, both Inventory's. This module owns that mapping and the allowed-moves matrix; nothing else
- * in the app should compare raw install status or substatus values.
+ * A Lifecycle stage is stored on the platform as an `install_status` + `substatus` pair (ADR 0002, the pairs in
+ * domain/vocabulary `STAGE_FIELDS`); In transfer is stored as either of two, both Inventory's. This module owns reading
+ * and writing that mapping and the allowed-moves matrix; nothing else in the app should compare raw install status or
+ * substatus values.
  */
 
 export interface StageFields {
     installStatus: string
     substatus: string | null
 }
-
-/** Platform install_status values (alm_asset.install_status). */
-export const INSTALL_STATUS = {
-    inUse: '1',
-    onOrder: '2',
-    inMaintenance: '3',
-    inStock: '6',
-    retired: '7',
-    missing: '8',
-    inTransit: '9',
-} as const
-
-const STAGE_FIELDS = {
-    on_order: { installStatus: INSTALL_STATUS.onOrder, substatus: '' },
-    in_transit: { installStatus: INSTALL_STATUS.inTransit, substatus: '' },
-    available: { installStatus: INSTALL_STATUS.inStock, substatus: 'available' },
-    reserved: { installStatus: INSTALL_STATUS.inStock, substatus: 'reserved' },
-    spare_pool: { installStatus: INSTALL_STATUS.inStock, substatus: 'reserved_spare_pool' },
-    staging: { installStatus: INSTALL_STATUS.inStock, substatus: 'staging' },
-    staged: { installStatus: INSTALL_STATUS.inStock, substatus: 'staged' },
-    // Set by Inventory's transfer order logic, never by the app; also stored as In transit / Reserved (ALSO_STORED_AS).
-    in_transfer: { installStatus: INSTALL_STATUS.inStock, substatus: 'pending_transfer' },
-    shipped: { installStatus: INSTALL_STATUS.inTransit, substatus: 'shipped_to_site' },
-    pending_in_service: { installStatus: INSTALL_STATUS.inUse, substatus: 'pending_in_service' },
-    in_service: { installStatus: INSTALL_STATUS.inUse, substatus: '' },
-    temporary_deployment: { installStatus: INSTALL_STATUS.inUse, substatus: 'temporary_deployment' },
-    pending_return: { installStatus: INSTALL_STATUS.inUse, substatus: 'pending_return' },
-    pending_evaluation: { installStatus: INSTALL_STATUS.inStock, substatus: 'pending_evaluation' },
-    pending_oem_rma: { installStatus: INSTALL_STATUS.inMaintenance, substatus: 'pending_oem_rma' },
-    pending_wipe: { installStatus: INSTALL_STATUS.inStock, substatus: 'pending_wipe' },
-    pending_disposal: { installStatus: INSTALL_STATUS.inStock, substatus: 'pending_disposal' },
-    missing: { installStatus: INSTALL_STATUS.missing, substatus: 'lost' },
-    disposed: { installStatus: INSTALL_STATUS.retired, substatus: 'disposed' },
-    sold: { installStatus: INSTALL_STATUS.retired, substatus: 'sold' },
-    returned_to_oem: { installStatus: INSTALL_STATUS.retired, substatus: 'vendor_credit' },
-    returned_to_customer: { installStatus: INSTALL_STATUS.retired, substatus: 'returned_to_customer' },
-    returned_to_lessor: { installStatus: INSTALL_STATUS.retired, substatus: 'lease_return' },
-} as const satisfies Record<string, StageFields>
 
 export type Stage = keyof typeof STAGE_FIELDS
 
@@ -68,24 +32,6 @@ const ALSO_STORED_AS: Partial<Record<Stage, readonly StageFields[]>> = {
 function storedAs(stage: Stage): readonly StageFields[] {
     return [STAGE_FIELDS[stage], ...(ALSO_STORED_AS[stage] ?? [])]
 }
-
-/**
- * Substatus values this app adds to the platform, with the install_status they depend on.
- * Shipped as sys_choice records (see ADR 0002); out-of-box values are not listed. Brazil ships
- * pending_evaluation under In stock and lease_return under Retired, so those stages use them.
- */
-export const ADDED_SUBSTATUSES: ReadonlyArray<{ value: string; label: string; installStatus: string }> = [
-    { value: 'reserved_spare_pool', label: 'Reserved - spare pool', installStatus: INSTALL_STATUS.inStock },
-    { value: 'staging', label: 'Staging', installStatus: INSTALL_STATUS.inStock },
-    { value: 'staged', label: 'Staged', installStatus: INSTALL_STATUS.inStock },
-    { value: 'shipped_to_site', label: 'Shipped to site', installStatus: INSTALL_STATUS.inTransit },
-    { value: 'pending_in_service', label: 'Pending in service', installStatus: INSTALL_STATUS.inUse },
-    { value: 'temporary_deployment', label: 'Temporary deployment', installStatus: INSTALL_STATUS.inUse },
-    { value: 'pending_return', label: 'Pending return', installStatus: INSTALL_STATUS.inUse },
-    { value: 'pending_oem_rma', label: 'Pending OEM RMA', installStatus: INSTALL_STATUS.inMaintenance },
-    { value: 'pending_wipe', label: 'Pending wipe', installStatus: INSTALL_STATUS.inStock },
-    { value: 'returned_to_customer', label: 'Returned to customer', installStatus: INSTALL_STATUS.retired },
-]
 
 const RETIRED: ReadonlySet<Stage> = new Set([
     'disposed',
@@ -139,12 +85,11 @@ const ALLOWED_MOVES: Record<Stage, readonly Stage[]> = {
     returned_to_lessor: [],
 }
 
-export type LegalOwner = 'provider' | 'customer' | 'lessor' | ''
-
 export interface TransitionFacts {
     hasSite: boolean
     hasAgreement: boolean
-    legalOwner: LegalOwner
+    /** As stored: blank counts as the Provider's. */
+    legalOwner: LegalOwner | ''
     wipeEvidenceComplete: boolean
     /**
      * Inventory has the Asset on an open transfer order line once the save is made (its *Active transfer order* flag,
@@ -166,7 +111,8 @@ export function stageOf(fields: StageFields): Stage | null {
 
 /** The combination the app stores `stage` as (In transfer: In stock / Pending transfer, which the app never sets). */
 export function fieldsOf(stage: Stage): StageFields {
-    return { ...STAGE_FIELDS[stage] }
+    const { installStatus, substatus } = STAGE_FIELDS[stage]
+    return { installStatus, substatus }
 }
 
 export function isRetired(stage: Stage | null): boolean {
@@ -215,7 +161,7 @@ export function stageChangeRefusal(from: Stage | null, to: Stage | null, facts: 
 
 /** The legal owner decides how an Asset may leave; a Lessor's reaches the OEM only on an OEM RMA, not as a takeback. */
 function checkRetirement(from: Stage, to: Stage, facts: TransitionFacts): TransitionVerdict {
-    const exitFor: Record<Exclude<LegalOwner, ''>, readonly Stage[]> = {
+    const exitFor: Record<LegalOwner, readonly Stage[]> = {
         provider: ['disposed', 'sold', 'returned_to_oem'],
         customer: ['returned_to_customer'],
         lessor: ['returned_to_lessor', 'returned_to_oem'],

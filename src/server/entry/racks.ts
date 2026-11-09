@@ -2,11 +2,12 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { placementProblem, powerBudget, type Placement, type RackFace, type RackSpec } from '../domain/rack.ts'
+import { placementProblem, powerBudget, type Placement, type RackSpec } from '../domain/rack.ts'
 import { fleetCondition } from '../domain/fleet.ts'
 import { RACK_EXCEPTION_TYPES, reconcileRack } from '../domain/reconciliation.ts'
 import type { RackDevice, RackElevation, RackList, RackListing, Site, SiteList } from '../domain/rest-contracts.ts'
 import { visibilityFilter } from '../domain/visibility.ts'
+import type { RackFace } from '../domain/vocabulary.ts'
 import { isFleetAsset, readStage } from '../platform/assets.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { openException, resolveCiExceptions } from '../platform/exceptions.ts'

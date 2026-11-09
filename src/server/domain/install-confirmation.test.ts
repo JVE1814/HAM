@@ -8,8 +8,9 @@ import {
     type InstallState,
 } from './install-confirmation'
 import { ALL_STAGES, fieldsOf } from './lifecycle'
+import type { InstallMode, OrderStage } from './vocabulary'
 
-function order(stage: string, installMode: string, shipped = 0): InstallState {
+function order(stage: OrderStage, installMode: InstallMode, shipped = 0): InstallState {
     return { stage, installMode, shippedUnits: () => shipped }
 }
 
@@ -55,7 +56,7 @@ describe('beingInstalled', () => {
     })
 
     it('is false once the Order is complete, cancelled or not yet sourced, whatever its units', () => {
-        for (const stage of ['complete', 'cancelled', 'draft', 'awaiting_approval', 'sourcing']) {
+        for (const stage of ['complete', 'cancelled', 'draft', 'awaiting_approval', 'sourcing'] as const) {
             expect(beingInstalled(order(stage, 'fsm_engineer', 1))).toBe(false)
         }
     })

@@ -9,10 +9,10 @@ import {
     disposalScopeRefusal,
     disposalStage,
     type DisposalAsset,
-    type DisposalMethod,
 } from '../domain/disposal.ts'
-import type { LegalOwner, Stage } from '../domain/lifecycle.ts'
+import type { Stage } from '../domain/lifecycle.ts'
 import { ROLE } from '../domain/visibility.ts'
+import type { DisposalMethod, LegalOwner } from '../domain/vocabulary.ts'
 import {
     approvalsOf,
     cancelPendingApprovals,
@@ -40,7 +40,7 @@ function assetsOf(orderId: string): DisposalAsset[] {
     const line = lines(orderId)
     while (line.next()) {
         assets.push({
-            legalOwner: str(line, 'asset.x_daas_ham_legal_owner') as LegalOwner,
+            legalOwner: str(line, 'asset.x_daas_ham_legal_owner') as LegalOwner | '',
             customerId: str(line, 'asset.company'),
             label: str(line, 'asset.serial_number') || line.getDisplayValue('asset'),
         })
@@ -48,7 +48,7 @@ function assetsOf(orderId: string): DisposalAsset[] {
     return assets
 }
 
-function ownersOf(orderId: string): LegalOwner[] {
+function ownersOf(orderId: string): Array<LegalOwner | ''> {
     return assetsOf(orderId).map((asset) => asset.legalOwner)
 }
 

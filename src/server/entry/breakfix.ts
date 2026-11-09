@@ -2,6 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import { replacementStep } from '../domain/breakfix.ts'
+import type { OrderStage } from '../domain/vocabulary.ts'
 import { isFleetAsset, moveAsset, readStage } from '../platform/assets.ts'
 import { findById, refusal, str } from '../platform/records.ts'
 import { submitOrder } from './orders.ts'
@@ -30,7 +31,7 @@ export function uiRaiseReplacement(current: GlideRecord): void {
     // case does not hold.
     if (!current.update()) return
     const linked = findById('x_daas_ham_order', str(current, 'x_daas_ham_replacement_order'))
-    const step = replacementStep(linked ? str(linked, 'stage') : null)
+    const step = replacementStep(linked ? (str(linked, 'stage') as OrderStage) : null)
     if (linked && step === 'submit_draft') return submitReplacement(linked)
     if (linked && step === 'keep') {
         gs.addInfoMessage(`Replacement order ${str(linked, 'number')} is already raised (${linked.getDisplayValue('stage')})`)

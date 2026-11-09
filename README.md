@@ -231,8 +231,13 @@ Conventions that the build or tests enforce:
   (`entry-points.test.ts`). The platform runs a condition on every save of the table, whatever the
   rule's filter, so it starts with the change test that keeps the module unloaded on other saves
   ([external-contracts.md](docs/research/external-contracts.md#servicenow-platform)).
-- Substatus values added to `alm_asset` live in `domain/lifecycle.ts` and
-  `fluent/data/substatus-choices.now.ts` (`substatus-choices.test.ts` keeps them in sync).
+- Every stored choice value is defined once, in `domain/vocabulary.ts`: a Fluent column imports the
+  list as its `choices:`, server code imports the type derived from it. Fluent evaluates that file
+  statically, so it holds constants and types only (no imports, calls, spread or `satisfies` on a
+  list).
+- Substatus values added to `alm_asset` are the `choice` entries of `STAGE_FIELDS` there, which
+  `fluent/data/substatus-choices.now.ts` ships one Record each (`substatus-choices.test.ts` compares
+  the built choice set with them).
 - Commit `src/fluent/generated/keys.ts`. Deleting Fluent code that was installed generates delete
   records; see the SDK's `fluent-overview` before removing metadata.
 

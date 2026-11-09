@@ -3,9 +3,9 @@
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
 import { monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing.ts'
 import { stillCovered } from '../domain/leases.ts'
-import type { LegalOwner } from '../domain/lifecycle.ts'
 import { cents, CostLedger, costFactKey, marginRows, serviceIntervalCosts, type Amount, type AssetCostFacts, type CostEntry, type LeaseTerms } from '../domain/margin.ts'
 import { memoized } from '../domain/memo.ts'
+import type { LegalOwner } from '../domain/vocabulary.ts'
 import { runEventTableJob } from '../platform/chunked.ts'
 import { EVENT, fire } from '../platform/events.ts'
 import { intProperty, PROPERTY } from '../platform/properties.ts'
@@ -142,7 +142,7 @@ function withAssets(intervals: readonly IntervalRow[]): Array<IntervalRow & { as
         'alm_hardware',
         intervals.map((interval) => interval.assetId),
         (asset): AssetFields => ({
-            legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner,
+            legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner | '',
             purchaseCost: num(asset, 'cost'),
             purchaseDate: str(asset, 'purchase_date'),
             inServiceDate: str(asset, 'x_daas_ham_in_service_date'),

@@ -1,7 +1,7 @@
 import { fleetStagesQuery } from './fleet.ts'
-import type { LineStage } from './fulfilment.ts'
 import { DEPLOYED_STAGES } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
+import type { CatalogEntryType, EntitlementVerdict, LineStage } from './vocabulary.ts'
 
 /**
  * Entitlement: is an Order within the Customer's Agreement?
@@ -17,10 +17,9 @@ import type { VisibilityScope } from './visibility.ts'
  */
 
 export type Approver = 'customer_admin' | 'account_manager'
-export type EntitlementVerdict = 'within_agreement' | 'off_catalog' | 'over_quota'
 
 export interface CatalogEntryView {
-    kind: 'model' | 'site_template'
+    kind: CatalogEntryType
     modelId?: string
     siteTemplateId?: string
     active: boolean

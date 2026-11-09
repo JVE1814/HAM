@@ -5,7 +5,6 @@ import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_in
 import { normalizeSerial, receiveSerialLockName } from '../domain/asn.ts'
 import { naasStockroomType, receiptProblem, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import type { AssetSummary, Stockroom, StockroomList } from '../domain/rest-contracts.ts'
-import type { StockroomType } from '../domain/sourcing.ts'
 import { ROLE } from '../domain/visibility.ts'
 import {
     allocationProblem,
@@ -15,6 +14,7 @@ import {
     receivingProblem,
     type ReceivingLine,
 } from '../domain/warehouse.ts'
+import type { StockroomType } from '../domain/vocabulary.ts'
 import {
     findAssetByIdentifier,
     fleetCandidate,

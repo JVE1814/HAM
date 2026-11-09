@@ -5,12 +5,12 @@ import {
     checkTransition,
     fieldsOf,
     stageOf,
-    type LegalOwner,
     type Stage,
     type TransitionFacts,
     type TransitionVerdict,
     voidsWipeEvidence,
 } from '../domain/lifecycle.ts'
+import type { LegalOwner } from '../domain/vocabulary.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { bool, refusal, str } from './records.ts'
 
@@ -24,7 +24,7 @@ export function transitionFacts(asset: GlideRecord): TransitionFacts {
     return {
         hasSite: !!str(asset, 'x_daas_ham_site'),
         hasAgreement: !!str(asset, 'x_daas_ham_agreement'),
-        legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner,
+        legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner | '',
         wipeEvidenceComplete: !!str(asset, 'x_daas_ham_wiped_on') && !!str(asset, 'x_daas_ham_wipe_certificate'),
     }
 }

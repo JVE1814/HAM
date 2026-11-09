@@ -1,5 +1,6 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DateTimeColumn, IntegerColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
+import { DEVICE_EVENT_KIND_CHOICES, DEVICE_EVENT_SOURCE_CHOICES } from '../../server/domain/vocabulary'
 
 /** Assigns an inventory tech to a Stockroom; drives stockroom-scoped visibility (ADR 0005). */
 export const x_daas_ham_stockroom_member = Table({
@@ -28,21 +29,13 @@ export const x_daas_ham_device_event = Table({
         identifier: StringColumn({ label: 'Identifier', maxLength: 100, mandatory: true }),
         event: ChoiceColumn({
             label: 'Event',
-            choices: {
-                seen: { label: 'Seen', sequence: 0 },
-                down: { label: 'Down', sequence: 1 },
-                up: { label: 'Up', sequence: 2 },
-            },
+            choices: DEVICE_EVENT_KIND_CHOICES,
             mandatory: true,
             dropdown: 'dropdown_without_none',
         }),
         source: ChoiceColumn({
             label: 'Source',
-            choices: {
-                discovery: { label: 'Discovery', sequence: 0 },
-                connector: { label: 'Service Graph Connector', sequence: 1 },
-                nms: { label: 'Provider NMS', sequence: 2 },
-            },
+            choices: DEVICE_EVENT_SOURCE_CHOICES,
             mandatory: true,
             default: 'nms',
             dropdown: 'dropdown_without_none',

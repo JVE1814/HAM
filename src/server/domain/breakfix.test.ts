@@ -12,7 +12,7 @@ describe('replacementStep', () => {
     })
 
     it('keeps a linked replacement that is going ahead or complete', () => {
-        for (const stage of ['awaiting_approval', 'sourcing', 'preparing', 'delivering', 'installing', 'complete']) {
+        for (const stage of ['awaiting_approval', 'sourcing', 'preparing', 'delivering', 'installing', 'complete'] as const) {
             expect(replacementStep(stage)).toBe('keep')
         }
     })

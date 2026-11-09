@@ -1,5 +1,6 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DecimalColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
+import { COST_TYPE_CHOICES } from '../../server/domain/vocabulary'
 
 /* Cost facts and Margin per Customer and Site (P3.28, D72). */
 
@@ -13,12 +14,7 @@ export const x_daas_ham_cost_fact = Table({
         site: ReferenceColumn({ label: 'Site', referenceTable: 'cmn_location' }),
         cost_type: ChoiceColumn({
             label: 'Cost type',
-            choices: {
-                purchase: { label: 'Purchase (written off)', sequence: 0 },
-                lease: { label: 'Lease payment', sequence: 1 },
-                oem_support: { label: 'OEM support', sequence: 2 },
-                field_labour: { label: 'Field labour', sequence: 3 },
-            },
+            choices: COST_TYPE_CHOICES,
             mandatory: true,
             dropdown: 'dropdown_without_none',
         }),

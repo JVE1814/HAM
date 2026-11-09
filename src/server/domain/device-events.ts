@@ -1,22 +1,21 @@
-/** Seen signals posted by the Provider's NMS (validated before anything touches the database). */
+import { DEVICE_EVENT_KIND_CHOICES, DEVICE_EVENT_SOURCE_CHOICES, type DeviceEventKind, type DeviceEventSource } from './vocabulary.ts'
 
-export type DeviceEventKind = 'seen' | 'down' | 'up'
-export type SeenSource = 'discovery' | 'connector' | 'nms'
+/** Seen signals posted by the Provider's NMS (validated before anything touches the database). */
 
 export interface DeviceEvent {
     /** Serial number, Provider tag or Customer tag of the Asset. */
     identifier: string
     event: DeviceEventKind
     observedAt: number
-    source: SeenSource
+    source: DeviceEventSource
 }
 
 export type ParsedEvents =
     | { events: DeviceEvent[]; rejected: Array<{ index: number; reason: string }> }
     | { error: string }
 
-const KINDS: readonly DeviceEventKind[] = ['seen', 'down', 'up']
-const SOURCES: readonly SeenSource[] = ['discovery', 'connector', 'nms']
+const KINDS = Object.keys(DEVICE_EVENT_KIND_CHOICES) as DeviceEventKind[]
+const SOURCES = Object.keys(DEVICE_EVENT_SOURCE_CHOICES) as DeviceEventSource[]
 
 /** Monitoring clocks may run slightly ahead; anything further in the future is rejected. */
 const MAX_CLOCK_SKEW_MS = 5 * 60_000
@@ -42,7 +41,7 @@ export function parseDeviceEvents(body: unknown, maxBatch: number, now: number):
         const identifier = typeof item?.identifier === 'string' ? item.identifier.trim() : ''
         const event = item?.event as DeviceEventKind
         const observedAt = typeof item?.observed_at === 'string' ? parseTimestamp(item.observed_at) : NaN
-        const source = (item?.source ?? 'nms') as SeenSource
+        const source = (item?.source ?? 'nms') as DeviceEventSource
         if (!identifier) return void rejected.push({ index, reason: 'identifier is required' })
         if (!KINDS.includes(event)) return void rejected.push({ index, reason: 'event must be one of seen, down, up' })
         if (Number.isNaN(observedAt)) return void rejected.push({ index, reason: OBSERVED_AT_FORMAT })

@@ -17,6 +17,7 @@ import type {
 } from '../domain/rest-contracts.ts'
 import { returnRequesterRefusal, returnRequestFindings, type RequestedReturn } from '../domain/returns.ts'
 import { actsAsCustomerAdmin, customerEquipmentQuery, ROLE, SCOPE, visibilityFilter } from '../domain/visibility.ts'
+import { ATTESTATION_RESPONSE_CHOICES } from '../domain/vocabulary.ts'
 import { isFleetAsset, readStage } from '../platform/assets.ts'
 import { currentSession } from '../platform/session.ts'
 import { bool, exists, findById, refusal, str } from '../platform/records.ts'
@@ -191,7 +192,7 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
     const answers = Array.isArray(input.items) ? (input.items as Array<{ id?: string; response?: string }>) : []
     let refused = 0
     for (const answer of answers) {
-        if (!['confirmed', 'missing', 'unknown'].includes(String(answer.response))) continue
+        if (!Object.keys(ATTESTATION_RESPONSE_CHOICES).includes(String(answer.response))) continue
         const item = findById('x_daas_ham_attestation_item', String(answer.id ?? ''))
         if (!item || str(item, 'attestation') !== attestation.getUniqueValue()) continue
         item.setValue('response', String(answer.response))

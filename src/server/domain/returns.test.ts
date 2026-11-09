@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import type { LeaseEndAction } from './leases'
 import { checkTransition, DEPLOYED_STAGES, stagesQuery, type Stage } from './lifecycle'
 import {
     chargedFeeQuery,
@@ -17,6 +16,7 @@ import {
     type RequestedReturn,
     type ReturnRequester,
 } from './returns'
+import type { LeaseEndAction } from './vocabulary'
 
 describe('returnRequestFindings', () => {
     const acmeSite: RequestedReturn = { customerId: 'acme', site: { id: 'acme-hq', customerId: 'acme', isSite: true } }

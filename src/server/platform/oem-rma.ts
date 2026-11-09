@@ -1,6 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
-import { lineStillOpen, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse, type RmaState } from '../domain/sourcing.ts'
+import { lineStillOpen, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse } from '../domain/sourcing.ts'
+import type { RmaState } from '../domain/vocabulary.ts'
 import { todayIso } from './clock.ts'
 import { findById, refusal, str } from './records.ts'
 

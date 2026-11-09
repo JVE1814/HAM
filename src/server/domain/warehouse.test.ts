@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { ALL_STAGES, type Stage } from './lifecycle'
-import type { StockroomType } from './sourcing'
 import {
     allocationProblem,
     awaitsReceipt,
@@ -8,6 +7,7 @@ import {
     RECEIVING_STOCKROOM_TYPES,
     receivingProblem,
 } from './warehouse'
+import type { StockroomType } from './vocabulary'
 
 describe('awaitsReceipt', () => {
     it('accepts units bought but not yet in stock', () => {

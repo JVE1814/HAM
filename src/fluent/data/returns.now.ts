@@ -9,6 +9,15 @@ import {
     StringColumn,
     Table,
 } from '@servicenow/sdk/core'
+import {
+    EVALUATION_OUTCOME_CHOICES,
+    FEE_STATUS_CHOICES,
+    FEE_TYPE_CHOICES,
+    RETURN_CONDITION_CHOICES,
+    RETURN_LINE_STATUS_CHOICES,
+    RETURN_METHOD_CHOICES,
+    RETURN_TRIGGER_CHOICES,
+} from '../../server/domain/vocabulary'
 
 /** Bringing Assets back from a Site (P2.4). */
 export const x_daas_ham_return_order = Table({
@@ -18,14 +27,7 @@ export const x_daas_ham_return_order = Table({
     schema: {
         trigger: ChoiceColumn({
             label: 'Trigger',
-            choices: {
-                site_decommission: { label: 'Site decommission', sequence: 0 },
-                device_removal: { label: 'Device removal', sequence: 1 },
-                refresh_swap_back: { label: 'Refresh swap-back', sequence: 2 },
-                defective_return: { label: 'Defective return (break-fix)', sequence: 3 },
-                agreement_end: { label: 'Agreement end', sequence: 4 },
-                temporary_end: { label: 'Temporary deployment end', sequence: 5 },
-            },
+            choices: RETURN_TRIGGER_CHOICES,
             mandatory: true,
             dropdown: 'dropdown_without_none',
         }),
@@ -35,10 +37,7 @@ export const x_daas_ham_return_order = Table({
         source_order: ReferenceColumn({ label: 'Raised by order', referenceTable: 'x_daas_ham_order' }),
         method: ChoiceColumn({
             label: 'Collection',
-            choices: {
-                fsm_deinstall: { label: 'Field engineer de-installs', sequence: 0 },
-                ship_back: { label: 'Site contact ships back', sequence: 1 },
-            },
+            choices: RETURN_METHOD_CHOICES,
             mandatory: true,
             default: 'ship_back',
             dropdown: 'dropdown_without_none',
@@ -73,12 +72,7 @@ export const x_daas_ham_return_order_line = Table({
         asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true, referenceQual: 'x_daas_ham_fleet=true' }),
         status: ChoiceColumn({
             label: 'Status',
-            choices: {
-                awaiting: { label: 'Awaiting return', sequence: 0 },
-                received: { label: 'Received', sequence: 1 },
-                evaluated: { label: 'Evaluated', sequence: 2 },
-                missing: { label: 'Declared missing', sequence: 3 },
-            },
+            choices: RETURN_LINE_STATUS_CHOICES,
             default: 'awaiting',
             readOnly: true,
             dropdown: 'dropdown_without_none',
@@ -86,16 +80,11 @@ export const x_daas_ham_return_order_line = Table({
         received_at: DateTimeColumn({ label: 'Received at', readOnly: true }),
         condition: ChoiceColumn({
             label: 'Condition',
-            choices: { good: { label: 'Good', sequence: 0 }, damaged: { label: 'Damaged', sequence: 1 } },
+            choices: RETURN_CONDITION_CHOICES,
         }),
         evaluation: ChoiceColumn({
             label: 'Evaluation',
-            choices: {
-                refurbish: { label: 'Refurbish to stock', sequence: 0 },
-                oem_rma: { label: 'Return to OEM (RMA)', sequence: 1 },
-                scrap: { label: 'Scrap (wipe and dispose)', sequence: 2 },
-                return_to_owner: { label: 'Return to owner (customer / lessor)', sequence: 3 },
-            },
+            choices: EVALUATION_OUTCOME_CHOICES,
         }),
     },
     index: [
@@ -111,11 +100,7 @@ export const x_daas_ham_fee_event = Table({
     schema: {
         fee_type: ChoiceColumn({
             label: 'Fee type',
-            choices: {
-                lost: { label: 'Lost asset', sequence: 0 },
-                damaged: { label: 'Damaged asset', sequence: 1 },
-                late_return: { label: 'Late return', sequence: 2 },
-            },
+            choices: FEE_TYPE_CHOICES,
             mandatory: true,
             dropdown: 'dropdown_without_none',
         }),
@@ -128,11 +113,7 @@ export const x_daas_ham_fee_event = Table({
         occurred_on: DateColumn({ label: 'Occurred on', mandatory: true }),
         status: ChoiceColumn({
             label: 'Status',
-            choices: {
-                open: { label: 'Open', sequence: 0 },
-                billed: { label: 'Billed', sequence: 1 },
-                waived: { label: 'Waived', sequence: 2 },
-            },
+            choices: FEE_STATUS_CHOICES,
             default: 'open',
             dropdown: 'dropdown_without_none',
         }),

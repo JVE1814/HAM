@@ -2784,6 +2784,10 @@ declare global {
                         table: 'sys_module'
                         id: '41f4b809ba674a7b9783da8f02e6a629'
                     }
+                    src_server_domain_vocabulary_ts: {
+                        table: 'sys_module'
+                        id: '08031fedd1b24c9a943a77036a6580a2'
+                    }
                     src_server_domain_warehouse_ts: {
                         table: 'sys_module'
                         id: 'f8efb37c93ba4672a7b3da6bf81a6621'

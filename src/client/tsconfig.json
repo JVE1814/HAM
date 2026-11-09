@@ -19,7 +19,8 @@
         "./**/*.tsx",
         "../server/domain/calendar.ts",
         "../server/domain/rack.ts",
-        "../server/domain/rest-contracts.ts"
+        "../server/domain/rest-contracts.ts",
+        "../server/domain/vocabulary.ts"
     ],
     "exclude": [
         "./**/*.test.ts"

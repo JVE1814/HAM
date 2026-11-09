@@ -1,9 +1,9 @@
 import { addDays } from './calendar.ts'
 import type { NamedRecord } from './entitlement.ts'
-import type { LeaseEndAction } from './leases.ts'
 import { fleetStagesQuery } from './fleet.ts'
-import { DEPLOYED_STAGES, SERVING_STAGES, type LegalOwner, type Stage } from './lifecycle.ts'
+import { DEPLOYED_STAGES, SERVING_STAGES, type Stage } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
+import type { EvaluationOutcome, FeeType, LeaseEndAction, LegalOwner } from './vocabulary.ts'
 
 /** Returns, depot evaluation, Fee events and break-fix shortfalls (P2.3–P2.4). */
 
@@ -79,11 +79,9 @@ export const INSTALLED_STAGES: readonly Stage[] = ['in_service', 'temporary_depl
  */
 export const SITE_RECOVERY_STAGES: readonly Stage[] = SERVING_STAGES
 
-export type EvaluationOutcome = 'refurbish' | 'oem_rma' | 'scrap' | 'return_to_owner'
-
 /** Who an evaluated Asset belongs to: its Legal owner and the end action of its lease ('' without one). */
 export interface EvaluatedOwnership {
-    legalOwner: LegalOwner
+    legalOwner: LegalOwner | ''
     leaseEndAction: LeaseEndAction | ''
 }
 
@@ -107,8 +105,6 @@ export function evaluationTarget(outcome: EvaluationOutcome, ownership: Evaluate
 function ownerTakesBack({ legalOwner, leaseEndAction }: EvaluatedOwnership): boolean {
     return legalOwner === 'customer' || (legalOwner === 'lessor' && leaseEndAction === 'return')
 }
-
-export type FeeType = 'lost' | 'damaged' | 'late_return'
 
 export function feeAmount(type: FeeType, agreementFees: Record<FeeType, number>): number {
     return agreementFees[type]

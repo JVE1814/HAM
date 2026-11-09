@@ -1,24 +1,12 @@
 import type { ApprovalDecision } from './approvals.ts'
 import type { Approver } from './entitlement.ts'
 import type { Stage } from './lifecycle.ts'
+import type { LineStage, OrderStage, ReturnTrigger } from './vocabulary.ts'
 
 /**
  * Order-line and Order stages are derived, never set by hand: a line follows the slowest of its
  * Assets, an Order follows the slowest of its live lines.
  */
-
-export type LineStage =
-    | 'new'
-    | 'awaiting_stock'
-    | 'sourced'
-    | 'staging'
-    | 'ready_to_ship'
-    | 'shipped'
-    | 'installed'
-    | 'in_service'
-    | 'cancelled'
-
-export type OrderStage = 'sourcing' | 'preparing' | 'delivering' | 'installing' | 'complete' | 'cancelled'
 
 /**
  * How far an allocated Asset has progressed along fulfilment (higher is further). A unit in transfer is on its way to
@@ -127,7 +115,7 @@ export function refillsLine(line: { stage: LineStage; siteRecovery: boolean }): 
 }
 
 /** Return triggers that bring back all of a Site, units in transit too (domain/returns `SITE_RECOVERY_STAGES`). */
-const SITE_RECOVERY_TRIGGERS = ['site_decommission', 'agreement_end']
+const SITE_RECOVERY_TRIGGERS: readonly ReturnTrigger[] = ['site_decommission', 'agreement_end']
 
 /** Encoded query on x_daas_ham_return_order_line: the Asset is awaited back on a whole-Site recovery. */
 export function siteRecoveryLineQuery(assetId: string): string {

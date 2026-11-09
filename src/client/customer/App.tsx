@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import type { AttestationAnswer, AttestationItem, CustomerAsset, CustomerOverview } from '../../server/domain/rest-contracts'
+import type { AttestationItem, CustomerAsset, CustomerOverview } from '../../server/domain/rest-contracts'
+import { ATTESTATION_RESPONSE_CHOICES, type AttestationResponse } from '../../server/domain/vocabulary'
 import { stageText } from '../stage'
 import { customerApi } from './api'
 
@@ -194,8 +195,7 @@ function Orders({ overview, run }: { overview: CustomerOverview; run: Runner }) 
     )
 }
 
-const ANSWER_WORDING: Record<AttestationAnswer, string> = { confirmed: 'Present', missing: 'Not present', unknown: "Don't know" }
-const ANSWERS = Object.keys(ANSWER_WORDING) as AttestationAnswer[]
+const ANSWERS = Object.keys(ATTESTATION_RESPONSE_CHOICES) as AttestationResponse[]
 
 function Attestations({ overview, run }: { overview: CustomerOverview; run: Runner }) {
     const [answers, setAnswers] = useState<Record<string, AttestationItem['response']>>({})
@@ -226,7 +226,7 @@ function Attestations({ overview, run }: { overview: CustomerOverview; run: Runn
                                                         checked={item.response === response}
                                                         onChange={() => setAnswers((a) => ({ ...a, [item.id]: response }))}
                                                     />
-                                                    {ANSWER_WORDING[response]}
+                                                    {ATTESTATION_RESPONSE_CHOICES[response].label}
                                                 </label>
                                             ))}
                                         </td>

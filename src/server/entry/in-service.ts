@@ -4,6 +4,7 @@ import { parseDeviceEvents, type DeviceEvent } from '../domain/device-events.ts'
 import { decideInService } from '../domain/in-service.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import { ROLE } from '../domain/visibility.ts'
+import type { SeenSource } from '../domain/vocabulary.ts'
 import { findAssetByIdentifier, moveAndSave, readStage } from '../platform/assets.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { runTableJob } from '../platform/chunked.ts'
@@ -21,7 +22,7 @@ import { attachToSubscription } from '../platform/subscriptions.ts'
 /** In-service detection: Seen signals in, billing start out (P1.8). */
 
 /** Record that an Asset was seen at `at` (only moves last_seen forward). */
-function recordSeen(asset: GlideRecord, at: number, source: string): void {
+function recordSeen(asset: GlideRecord, at: number, source: SeenSource): void {
     const previous = glideToMs(str(asset, 'x_daas_ham_last_seen'))
     if (previous !== undefined && previous >= at) return
     asset.setValue('x_daas_ham_last_seen', msToGlide(at))

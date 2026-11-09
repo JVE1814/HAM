@@ -1,9 +1,9 @@
+import type { RackFace } from './vocabulary.ts'
+
 /**
  * Rack placement (P2.8) and power budget (P3.29): units are numbered from 1 at the bottom; a device
  * occupies ruStart..ruStart+height-1.
  */
-
-export type RackFace = 'front' | 'rear'
 
 export interface Placement {
     assetId: string

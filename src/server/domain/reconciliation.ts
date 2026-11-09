@@ -1,19 +1,11 @@
 import { outsideFleetCondition } from './fleet.ts'
 import { overlaps, powerBudget, type Placement, type RackSpec } from './rack.ts'
+import type { ExceptionType } from './vocabulary.ts'
 
 /** Reconciliation exceptions between installed Assets and monitoring (P2.7), and in racks (D67). */
 
-export type ExceptionType =
-    | 'unseen'
-    | 'serial_mismatch'
-    | 'location_mismatch'
-    | 'seen_without_asset'
-    | 'audit_missing'
-    | 'attested_missing'
-    | RackExceptionType
-
 /** The types a rack check raises and resolves: each is the rack's, open once per rack. */
-export const RACK_EXCEPTION_TYPES = ['rack_overlap', 'rack_over_power'] as const
+export const RACK_EXCEPTION_TYPES = ['rack_overlap', 'rack_over_power'] as const satisfies readonly ExceptionType[]
 
 export type RackExceptionType = (typeof RACK_EXCEPTION_TYPES)[number]
 

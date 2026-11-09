@@ -21,10 +21,10 @@ import {
     type Address,
     type LabelRef,
     type LabelResult,
-    type ShipmentStatus,
     type TrackingEvent,
     type TrackingUpdate,
 } from '../domain/shipping.ts'
+import type { ShipmentDirection, ShipmentStatus } from '../domain/vocabulary.ts'
 import { msToGlide, nowMs } from '../platform/clock.ts'
 import { EVENT, fire } from '../platform/events.ts'
 import { withLock, withLockTries, type HeldLock } from '../platform/locks.ts'
@@ -78,7 +78,7 @@ function depot(): GlideRecord | null {
  * purchase is logged, as both may have bought one.
  */
 function createShipment(
-    direction: 'to_site' | 'return',
+    direction: ShipmentDirection,
     parent: GlideRecord,
     packages: number,
     lock: HeldLock,

@@ -1,5 +1,6 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DateColumn, DateTimeColumn, DecimalColumn, IntegerColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
+import { BILLING_LINE_KIND_CHOICES, BILLING_PERIOD_STATUS_CHOICES } from '../../server/domain/vocabulary'
 
 /* Service intervals, billing periods and their lines (P3.25, D52, D66). */
 
@@ -33,11 +34,7 @@ export const x_daas_ham_billing_period = Table({
         period_end: DateColumn({ label: 'Last day', readOnly: true }),
         status: ChoiceColumn({
             label: 'Status',
-            choices: {
-                generating: { label: 'Generating', sequence: 0 },
-                ready: { label: 'Ready for review', sequence: 1 },
-                closed: { label: 'Closed (locked)', sequence: 2 },
-            },
+            choices: BILLING_PERIOD_STATUS_CHOICES,
             default: 'generating',
             readOnly: true,
             dropdown: 'dropdown_without_none',
@@ -64,7 +61,7 @@ export const x_daas_ham_billing_line = Table({
         billing_period: ReferenceColumn({ label: 'Billing period', referenceTable: 'x_daas_ham_billing_period', mandatory: true, cascadeRule: 'delete' }),
         kind: ChoiceColumn({
             label: 'Kind',
-            choices: { subscription: { label: 'Subscription', sequence: 0 }, fee: { label: 'Fee', sequence: 1 } },
+            choices: BILLING_LINE_KIND_CHOICES,
             mandatory: true,
             dropdown: 'dropdown_without_none',
         }),

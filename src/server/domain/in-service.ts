@@ -1,4 +1,5 @@
 import type { Stage } from './lifecycle.ts'
+import type { SubscriptionLineStatus, SubscriptionLineType } from './vocabulary.ts'
 
 /**
  * In service: an Asset installed at a Site and seen by monitoring after the install. That instant
@@ -26,10 +27,10 @@ export function decideInService(facts: InServiceFacts): InServiceDecision {
 
 export interface SubscriptionLineView {
     id: string
-    lineType: 'site_package' | 'device_class'
+    lineType: SubscriptionLineType
     siteId: string
     deviceClass: string
-    status: 'pending' | 'active' | 'ended'
+    status: SubscriptionLineStatus
 }
 
 /**

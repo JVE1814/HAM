@@ -1,19 +1,8 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DateColumn, DateTimeColumn, DecimalColumn, IntegerColumn, ReferenceColumn, StringColumn, Table, UrlColumn } from '@servicenow/sdk/core'
+import { SHIPMENT_DIRECTION_CHOICES, SHIPMENT_STATUS_CHOICES } from '../../server/domain/vocabulary'
 
 /* Shipments bought through the shipping aggregator and their tracking events (P3.26, D73). */
-
-const statusChoices = {
-    label_created: { label: 'Label created', sequence: 0 },
-    in_transit: { label: 'In transit', sequence: 1 },
-    out_for_delivery: { label: 'Out for delivery', sequence: 2 },
-    delivered: { label: 'Delivered', sequence: 3 },
-    exception: { label: 'Exception', sequence: 4 },
-    returned: { label: 'Returned to sender', sequence: 5 },
-    unknown: { label: 'Unknown', sequence: 6 },
-    // Set by Mark label voided, never by tracking: a final status, like delivered and returned.
-    voided: { label: 'Voided', sequence: 7 },
-}
 
 export const x_daas_ham_shipment = Table({
     name: 'x_daas_ham_shipment',
@@ -22,7 +11,7 @@ export const x_daas_ham_shipment = Table({
     schema: {
         direction: ChoiceColumn({
             label: 'Direction',
-            choices: { to_site: { label: 'To a Site', sequence: 0 }, return: { label: 'Return to the depot', sequence: 1 } },
+            choices: SHIPMENT_DIRECTION_CHOICES,
             mandatory: true,
             dropdown: 'dropdown_without_none',
         }),
@@ -44,7 +33,7 @@ export const x_daas_ham_shipment = Table({
         label_url: UrlColumn({ label: 'Label', readOnly: true }),
         cost: DecimalColumn({ label: 'Cost', readOnly: true }),
         currency: StringColumn({ label: 'Currency', maxLength: 3, readOnly: true }),
-        status: ChoiceColumn({ label: 'Status', choices: statusChoices, default: 'label_created', readOnly: true, dropdown: 'dropdown_without_none' }),
+        status: ChoiceColumn({ label: 'Status', choices: SHIPMENT_STATUS_CHOICES, default: 'label_created', readOnly: true, dropdown: 'dropdown_without_none' }),
         status_detail: StringColumn({ label: 'Latest update', maxLength: 255, readOnly: true }),
         estimated_delivery: DateColumn({ label: 'Estimated delivery', readOnly: true }),
         delivered_at: DateTimeColumn({ label: 'Delivered at', readOnly: true }),
@@ -63,7 +52,7 @@ export const x_daas_ham_shipment_event = Table({
     schema: {
         shipment: ReferenceColumn({ label: 'Shipment', referenceTable: 'x_daas_ham_shipment', mandatory: true, cascadeRule: 'delete' }),
         occurred_at: StringColumn({ label: 'Occurred at (carrier time)', maxLength: 40 }),
-        status: ChoiceColumn({ label: 'Status', choices: statusChoices }),
+        status: ChoiceColumn({ label: 'Status', choices: SHIPMENT_STATUS_CHOICES }),
         description: StringColumn({ label: 'Description', maxLength: 255 }),
         location: StringColumn({ label: 'Location', maxLength: 120 }),
     },

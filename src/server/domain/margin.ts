@@ -1,11 +1,9 @@
 import { activeDays, monthBounds, type MonthBounds } from './billing.ts'
 import { addDays, addMonths } from './calendar.ts'
 import { evenShare } from './leases.ts'
-import type { LegalOwner } from './lifecycle.ts'
+import type { CostType, LegalOwner } from './vocabulary.ts'
 
 /** Cost facts and Margin per Customer and Site (P3.28, D72). */
-
-export type CostType = 'purchase' | 'lease' | 'oem_support' | 'field_labour'
 
 /** What an Asset's Lease schedule charges, as stored on it. */
 export interface LeaseTerms {
@@ -23,7 +21,7 @@ export interface LeaseTerms {
 /** What an Asset's costs are worked out from, as stored on it. */
 export interface AssetCostFacts {
     /** As stored; '' counts as provider. */
-    legalOwner: LegalOwner
+    legalOwner: LegalOwner | ''
     purchaseCost: number
     /** '' when unknown. */
     purchaseDate: string

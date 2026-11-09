@@ -9,6 +9,7 @@ import {
     VariableSet,
 } from '@servicenow/sdk/core'
 import { afterOrderProduced } from '../../server/entry/orders'
+import { INSTALL_MODE_CHOICES, ORDER_TYPE_CHOICES } from '../../server/domain/vocabulary'
 
 /*
  * "Request network equipment": the one catalog entry point for Orders (D42/D50). The Agreement, Site and Site template
@@ -86,10 +87,10 @@ export const requestNetworkEquipment = CatalogItemRecordProducer({
             mapToField: true,
             field: 'order_type',
             choices: {
-                site_rollout: { label: 'Site rollout', sequence: 0 },
-                device_add: { label: 'Device add', sequence: 1 },
-                device_replace: { label: 'Device replace', sequence: 2 },
-                temporary: { label: 'Temporary deployment', sequence: 3 },
+                site_rollout: ORDER_TYPE_CHOICES.site_rollout,
+                device_add: ORDER_TYPE_CHOICES.device_add,
+                device_replace: ORDER_TYPE_CHOICES.device_replace,
+                temporary: ORDER_TYPE_CHOICES.temporary,
             },
             order: 400,
         }),
@@ -109,12 +110,7 @@ export const requestNetworkEquipment = CatalogItemRecordProducer({
             mandatory: true,
             mapToField: true,
             field: 'install_mode',
-            choices: {
-                fsm_engineer: { label: 'Provider field engineer', sequence: 0 },
-                self_install: { label: 'Customer self-install (ZTP)', sequence: 1 },
-                subcontractor: { label: 'Subcontractor', sequence: 2 },
-                remote_hands: { label: 'Data-centre remote hands', sequence: 3 },
-            },
+            choices: INSTALL_MODE_CHOICES,
             order: 600,
         }),
         requested_date: DateVariable({

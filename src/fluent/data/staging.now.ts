@@ -8,13 +8,14 @@ import {
     StringColumn,
     Table,
 } from '@servicenow/sdk/core'
-
-/** Checklist steps the manufacturer's cloud can do (P3.27); blank = by hand. */
-const automationChoices = {
-    oem_claim: { label: 'Claim / register in the OEM cloud', sequence: 0 },
-    oem_licence: { label: 'Assign the OEM subscription', sequence: 1 },
-    oem_ztp: { label: 'Zero-touch provisioning', sequence: 2 },
-}
+import {
+    AUTOMATION_STATUS_CHOICES,
+    CLAIM_ACTION_CHOICES,
+    CLOUD_ACCOUNT_VENDOR_CHOICES,
+    DEVICE_CLASS_CHOICES,
+    STAGING_RESULT_CHOICES,
+    STAGING_SOURCE_CHOICES,
+} from '../../server/domain/vocabulary'
 
 /** Preparing one Asset before shipment. */
 export const x_daas_ham_staging_task = Table({
@@ -27,10 +28,7 @@ export const x_daas_ham_staging_task = Table({
         order_line: ReferenceColumn({ label: 'Order line', referenceTable: 'x_daas_ham_order_line' }),
         staging_source: ChoiceColumn({
             label: 'Staging source',
-            choices: {
-                in_house: { label: 'In-house', sequence: 0 },
-                distributor: { label: 'Distributor pre-staged (verify)', sequence: 1 },
-            },
+            choices: STAGING_SOURCE_CHOICES,
             mandatory: true,
             default: 'in_house',
             dropdown: 'dropdown_without_none',
@@ -39,10 +37,7 @@ export const x_daas_ham_staging_task = Table({
         firmware_version: StringColumn({ label: 'Firmware version', maxLength: 60 }),
         result: ChoiceColumn({
             label: 'Result',
-            choices: {
-                passed: { label: 'Passed', sequence: 0 },
-                failed: { label: 'Failed', sequence: 1 },
-            },
+            choices: STAGING_RESULT_CHOICES,
         }),
     },
     autoNumber: { prefix: 'NSTG', number: 1000, numberOfDigits: 7 },
@@ -70,15 +65,10 @@ export const x_daas_ham_staging_step = Table({
         done: BooleanColumn({ label: 'Done', default: false }),
         done_by: ReferenceColumn({ label: 'Done by', referenceTable: 'sys_user', readOnly: true }),
         done_at: DateTimeColumn({ label: 'Done at', readOnly: true }),
-        automation: ChoiceColumn({ label: 'Done by the OEM cloud', choices: automationChoices, readOnly: true }),
+        automation: ChoiceColumn({ label: 'Done by the OEM cloud', choices: CLAIM_ACTION_CHOICES, readOnly: true }),
         automation_status: ChoiceColumn({
             label: 'Automation status',
-            choices: {
-                pending: { label: 'Pending', sequence: 0 },
-                done: { label: 'Done', sequence: 1 },
-                failed: { label: 'Failed (do it by hand)', sequence: 2 },
-                waiting: { label: 'Waiting for the OEM claim step', sequence: 3 },
-            },
+            choices: AUTOMATION_STATUS_CHOICES,
             readOnly: true,
         }),
         automation_message: StringColumn({ label: 'Automation result', maxLength: 255, readOnly: true }),
@@ -102,18 +92,15 @@ export const x_daas_ham_staging_template = Table({
         device_class: ChoiceColumn({
             label: 'Device class (blank = all)',
             choices: {
-                switch: { label: 'Switch', sequence: 0 },
-                ap: { label: 'Wireless access point', sequence: 1 },
-                router: { label: 'Router', sequence: 2 },
-                firewall: { label: 'Firewall', sequence: 3 },
+                switch: DEVICE_CLASS_CHOICES.switch,
+                ap: DEVICE_CLASS_CHOICES.ap,
+                router: DEVICE_CLASS_CHOICES.router,
+                firewall: DEVICE_CLASS_CHOICES.firewall,
             },
         }),
         staging_source: ChoiceColumn({
             label: 'Staging source',
-            choices: {
-                in_house: { label: 'In-house', sequence: 0 },
-                distributor: { label: 'Distributor pre-staged (verify)', sequence: 1 },
-            },
+            choices: STAGING_SOURCE_CHOICES,
             mandatory: true,
             default: 'in_house',
             dropdown: 'dropdown_without_none',
@@ -136,7 +123,7 @@ export const x_daas_ham_staging_tmpl_item = Table({
         label: StringColumn({ label: 'Step', maxLength: 160, mandatory: true }),
         order: IntegerColumn({ label: 'Order', default: 100 }),
         mandatory: BooleanColumn({ label: 'Mandatory', default: true }),
-        automation: ChoiceColumn({ label: 'Done by the OEM cloud', choices: automationChoices }),
+        automation: ChoiceColumn({ label: 'Done by the OEM cloud', choices: CLAIM_ACTION_CHOICES }),
     },
     index: [{ name: 'x_daas_ham_sti_tmpl', unique: false, element: 'template' }],
 })
@@ -150,17 +137,11 @@ export const x_daas_ham_cloud_account = Table({
         customer: ReferenceColumn({ label: 'Customer', referenceTable: 'customer_account', mandatory: true }),
         vendor: ChoiceColumn({
             label: 'Vendor',
-            choices: {
-                meraki: { label: 'Cisco Meraki (organization id)', sequence: 0 },
-                mist: { label: 'HPE Mist (org id)', sequence: 1 },
-                aruba: { label: 'HPE GreenLake (subscription id)', sequence: 2 },
-                fortinet: { label: 'FortiZTP (FortiManager OID)', sequence: 3 },
-                checkpoint: { label: 'Check Point Zero Touch (User Center account id/template id)', sequence: 4 },
-            },
+            choices: CLOUD_ACCOUNT_VENDOR_CHOICES,
             mandatory: true,
             dropdown: 'dropdown_without_none',
         }),
-        purpose: ChoiceColumn({ label: 'Used for', choices: automationChoices, mandatory: true, dropdown: 'dropdown_without_none' }),
+        purpose: ChoiceColumn({ label: 'Used for', choices: CLAIM_ACTION_CHOICES, mandatory: true, dropdown: 'dropdown_without_none' }),
         account_id: StringColumn({ label: 'Account', maxLength: 100, mandatory: true }),
     },
     index: [{ name: 'x_daas_ham_ca_customer', unique: false, element: 'customer' }],

@@ -11,6 +11,19 @@ import {
     StringColumn,
     Table,
 } from '@servicenow/sdk/core'
+import {
+    DEVICE_CLASS_CHOICES,
+    FIELD_PURPOSE_CHOICES,
+    LEGAL_OWNER_CHOICES,
+    LIFECYCLE_PHASE_CHOICES,
+    OEM_SOURCE_CHOICES,
+    RACK_FACE_CHOICES,
+    REPLACEMENT_TIER_CHOICES,
+    SEEN_SOURCE_CHOICES,
+    SITE_TIER_CHOICES,
+    STAGING_SOURCE_CHOICES,
+    STOCKROOM_TYPE_CHOICES,
+} from '../../server/domain/vocabulary'
 
 /*
  * Columns this app adds to platform tables (ADR 0001). Every column carries the x_daas_ham_ prefix.
@@ -29,11 +42,7 @@ export const alm_hardware = Table({
         }),
         x_daas_ham_legal_owner: ChoiceColumn({
             label: 'Legal owner',
-            choices: {
-                provider: { label: 'Provider', sequence: 0 },
-                customer: { label: 'Customer', sequence: 1 },
-                lessor: { label: 'Lessor', sequence: 2 },
-            },
+            choices: LEGAL_OWNER_CHOICES,
             // No default: rows the Provider's IT creates are not stamped as NaaS-owned. The app's intake paths set the
             // owner (platform/assets newAsset, joinFleet), and a blank owner counts as the Provider's (domain/lifecycle).
             dropdown: 'dropdown_with_none',
@@ -52,10 +61,7 @@ export const alm_hardware = Table({
         x_daas_ham_claim_code: StringColumn({ label: 'OEM claim code', maxLength: 40 }),
         x_daas_ham_staging_source: ChoiceColumn({
             label: 'Staging source',
-            choices: {
-                in_house: { label: 'In-house', sequence: 0 },
-                distributor: { label: 'Distributor pre-staged', sequence: 1 },
-            },
+            choices: STAGING_SOURCE_CHOICES,
         }),
         x_daas_ham_install_completed: DateTimeColumn({ label: 'Install completed' }),
         x_daas_ham_in_service_date: DateTimeColumn({ label: 'In-service date', readOnly: true }),
@@ -63,29 +69,18 @@ export const alm_hardware = Table({
         x_daas_ham_seen_source: ChoiceColumn({
             label: 'Seen source',
             readOnly: true,
-            choices: {
-                discovery: { label: 'Discovery', sequence: 0 },
-                connector: { label: 'Service Graph Connector', sequence: 1 },
-                nms: { label: 'Provider NMS', sequence: 2 },
-                manual: { label: 'Manual confirmation', sequence: 3 },
-            },
+            choices: SEEN_SOURCE_CHOICES,
         }),
         x_daas_ham_rack: ReferenceColumn({ label: 'Rack', referenceTable: 'cmdb_ci_rack' }),
         x_daas_ham_ru_start: IntegerColumn({ label: 'Lowest rack unit', min: 1, max: 60 }),
         x_daas_ham_rack_face: ChoiceColumn({
             label: 'Rack face',
-            choices: { front: { label: 'Front', sequence: 0 }, rear: { label: 'Rear', sequence: 1 } },
+            choices: RACK_FACE_CHOICES,
         }),
         x_daas_ham_lifecycle_phase: ChoiceColumn({
             label: 'Lifecycle phase',
             readOnly: true,
-            choices: {
-                available: { label: 'Available', sequence: 0 },
-                end_of_sale: { label: 'End of sale', sequence: 1 },
-                end_of_support: { label: 'End of support', sequence: 2 },
-                end_of_extended_support: { label: 'End of extended support', sequence: 3 },
-                end_of_life: { label: 'End of life', sequence: 4 },
-            },
+            choices: LIFECYCLE_PHASE_CHOICES,
         }),
         x_daas_ham_refresh_due: DateColumn({ label: 'Refresh due', readOnly: true }),
         x_daas_ham_coverage_end: DateColumn({ label: 'OEM coverage end', readOnly: true }),
@@ -115,16 +110,7 @@ export const cmdb_model = Table({
     schema: {
         x_daas_ham_device_class: ChoiceColumn({
             label: 'Device class',
-            choices: {
-                switch: { label: 'Switch', sequence: 0 },
-                ap: { label: 'Wireless access point', sequence: 1 },
-                router: { label: 'Router', sequence: 2 },
-                firewall: { label: 'Firewall', sequence: 3 },
-                module: { label: 'Module', sequence: 4 },
-                psu: { label: 'Power supply', sequence: 5 },
-                optic: { label: 'Optic / cable', sequence: 6 },
-                other: { label: 'Other', sequence: 7 },
-            },
+            choices: DEVICE_CLASS_CHOICES,
         }),
         x_daas_ham_oem_pid: StringColumn({ label: 'OEM PID', maxLength: 100 }),
         // No default: the Provider IT's Models are not stamped. A NaaS Model is one with an OEM PID (domain/fleet).
@@ -132,14 +118,7 @@ export const cmdb_model = Table({
         x_daas_ham_typical_power_w: IntegerColumn({ label: 'Typical power (W)', min: 0 }),
         x_daas_ham_oem_source: ChoiceColumn({
             label: 'OEM data source',
-            choices: {
-                cisco: { label: 'Cisco Support APIs', sequence: 0 },
-                meraki: { label: 'Meraki Dashboard API', sequence: 1 },
-                aruba: { label: 'HPE Aruba (CSV)', sequence: 2 },
-                mist: { label: 'HPE Mist API', sequence: 3 },
-                fortinet: { label: 'Fortinet Asset Management API', sequence: 4 },
-                checkpoint: { label: 'Check Point (CSV)', sequence: 5 },
-            },
+            choices: OEM_SOURCE_CHOICES,
         }),
         // A raw model is normalized to a NaaS Model (ADR 0016): domain/fleet `naasModelCondition()`.
         x_daas_ham_normalized_to: ReferenceColumn({
@@ -157,11 +136,7 @@ export const alm_stockroom = Table({
     schema: {
         x_daas_ham_stockroom_type: ChoiceColumn({
             label: 'Stockroom type',
-            choices: {
-                central_depot: { label: 'Central depot', sequence: 0 },
-                staging_centre: { label: 'Staging centre', sequence: 1 },
-                customer_site: { label: 'Customer site', sequence: 2 },
-            },
+            choices: STOCKROOM_TYPE_CHOICES,
             // No default: a stockroom with no type is the Provider IT's, not a NaaS stockroom (domain/fleet). Dropping the
             // default clears no value: where an earlier version was installed, the Provider IT's stockrooms keep the
             // 'central_depot' it stamped, and count as NaaS until an administrator clears their type.
@@ -177,10 +152,7 @@ export const cmn_location = Table({
         x_daas_ham_is_site: BooleanColumn({ label: 'Customer site', default: false }),
         x_daas_ham_site_tier: ChoiceColumn({
             label: 'Site tier',
-            choices: {
-                standard: { label: 'Standard', sequence: 0 },
-                critical: { label: 'Critical', sequence: 1 },
-            },
+            choices: SITE_TIER_CHOICES,
             default: 'standard',
         }),
         x_daas_ham_maintenance_schedule: ReferenceColumn({
@@ -199,12 +171,7 @@ export const wm_order = Table({
         x_daas_ham_audit: ReferenceColumn({ label: 'NaaS audit', referenceTable: 'x_daas_ham_audit' }),
         x_daas_ham_purpose: ChoiceColumn({
             label: 'NaaS purpose',
-            choices: {
-                install: { label: 'Install', sequence: 0 },
-                swap: { label: 'Swap', sequence: 1 },
-                de_install: { label: 'De-install', sequence: 2 },
-                site_audit: { label: 'Site audit', sequence: 3 },
-            },
+            choices: FIELD_PURPOSE_CHOICES,
         }),
         x_daas_ham_labour_cost: DecimalColumn({ label: 'NaaS field labour cost (blank = standard visit cost)' }),
     },
@@ -228,11 +195,7 @@ export const sn_customerservice_case = Table({
         x_daas_ham_replacement_tier: ChoiceColumn({
             label: 'Replacement service level',
             readOnly: true,
-            choices: {
-                nbd: { label: 'Next business day', sequence: 0 },
-                same_day: { label: 'Same day (8x5x4)', sequence: 1 },
-                four_hour: { label: '24x7x4', sequence: 2 },
-            },
+            choices: REPLACEMENT_TIER_CHOICES,
         }),
         x_daas_ham_proactive: BooleanColumn({ label: 'Raised by NOC', default: false }),
     },
