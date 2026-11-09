@@ -295,9 +295,9 @@ What remains can only be confirmed on an instance or behind a vendor login:
   power budget).
 - **Fleet column** (ADR 0016): *Fleet* (`x_daas_ham_fleet`) on `alm_hardware` is a read-only
   boolean, default false, with the index `x_daas_ham_hw_fleet`, and the install sets it true on no
-  row. The dictionary entries of *Legal owner* (`alm_hardware`), *Track as asset* (`cmdb_model`) and
-  *Stockroom type* (`alm_stockroom`) have no default value, and *Legal owner* offers *-- None --*:
-  an Asset, Model or Stockroom the Provider's IT creates on its form gets none of them.
+  row. The dictionary entries of *Legal owner* (`alm_hardware`) and *Stockroom type*
+  (`alm_stockroom`) have no default value, and *Legal owner* offers *-- None --*: an Asset or
+  Stockroom the Provider's IT creates on its form gets neither.
 - **Add to fleet** (ADR 0016): impersonating an asset-manager-only user, *Add to fleet* (form button
   and list choice) is offered on an Asset outside the fleet and not on a fleet asset; an inventory
   tech is not offered it. On an Asset *In stock / Available* in a NaaS stockroom whose Model has an
@@ -349,8 +349,6 @@ What remains can only be confirmed on an instance or behind a vendor login:
     `x_daas_ham_fleet=false^ORx_daas_ham_fleetISEMPTY^x_daas_ham_legal_owner=provider`: clear
     *Legal owner* with *Update All*. A NaaS unit not yet adopted loses nothing: a blank Legal owner
     counts as the Provider's, and adoption sets it.
-  - `cmdb_model`, filter `x_daas_ham_oem_pidISEMPTY^x_daas_ham_track_as_asset=true`: set *Track as
-    asset* to false with *Update All* (a NaaS Model has an OEM PID).
 - **Procurement and FSM data**: the stored `proc_po` / `proc_po_item` status values and column names,
   `wm_order` state 3 = Closed Complete, and `last_discovered` / `discovery_source` as your connectors
   write them.

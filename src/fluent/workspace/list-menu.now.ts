@@ -254,7 +254,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 10,
                     table: 'cmdb_model',
                     condition: 'x_daas_ham_oem_pidISNOTEMPTY^EQ',
-                    columns: 'display_name,manufacturer,x_daas_ham_oem_pid,x_daas_ham_device_class,x_daas_ham_track_as_asset',
+                    columns: 'display_name,manufacturer,x_daas_ham_oem_pid,x_daas_ham_device_class,asset_tracking_strategy',
                     applicabilities: [{ $id: Now.ID['ws_models_canonical_aud'], applicability: staffAudience }],
                 },
                 {

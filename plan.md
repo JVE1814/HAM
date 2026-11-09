@@ -324,10 +324,10 @@ Confidence tags:
     1M rows.
   - ACLs back up every table and field. External contacts get explicit `snc_external` ACLs.
 - **Cross-scope:** we create `CrossScopePrivilege` records for every global table we read or write:
-  - `alm_hardware`, `alm_asset`, `alm_consumable`, `alm_stockroom`, `alm_transfer_order(_line)`;
+  - `alm_hardware`, `alm_asset`, `alm_stockroom`, `alm_transfer_order(_line)`;
   - `cmdb_model`, `cmdb_model_lifecycle`, `cmdb_ci_*`, `cmn_location`, `cmn_schedule`, `ast_contract`;
   - Procurement tables;
-  - `change_request` and standard change templates;
+  - `change_request`;
   - `wm_order` / `wm_task`;
   - CSM case, `customer_account` and `customer_contact`.
 - **Data policies** protect key invariants:
@@ -346,7 +346,7 @@ Confidence tags:
 | Concept | Table |
 |---|---|
 | Device (chassis, FRU, stack member) | `alm_hardware` (FRUs link to the chassis through `parent`) |
-| SFPs, cables, small parts | `alm_consumable` (unless the model is flagged track-as-asset) |
+| SFPs, cables, small parts | `alm_consumable`, where the Model's platform asset tracking strategy says so (ADR 0018) |
 | Model / product ID | `cmdb_model` / `cmdb_hardware_product_model` |
 | Model lifecycle milestones (end of sale, support, extended support, life) | `cmdb_model_lifecycle` / `cmdb_hardware_model_lifecycle`: one row per Model and milestone (ADR 0017) |
 | Customer | `customer_account` (extends `core_company`) |
@@ -379,8 +379,7 @@ Confidence tags:
 | | `lifecycle_phase` | choice: available / end_of_sale / end_of_support / end_of_extended_support / eol | P1 | Derived from the Model's milestones in `cmdb_model_lifecycle` |
 | | `refresh_due` | date | P1 (field) / P2 (logic) | Indexed |
 | | `coverage_end` | date | P2 | Derived from `oem_coverage` |
-| `cmdb_model` | `track_as_asset` | boolean | P1 | For SFPs and other optics |
-| | `device_class` | choice: switch / ap / router / firewall / module / psu / optic / other | P1 | Drives catalog, billing and KPIs |
+| `cmdb_model` | `device_class` | choice: switch / ap / router / firewall / module / psu / optic / other | P1 | Drives catalog, billing and KPIs |
 | | `oem_pid` | string | P1 | Canonical vendor product ID. Indexed. |
 | `alm_stockroom` | `stockroom_type` | choice: central depot / staging centre / customer site | P1 | |
 | | `account` | ref `customer_account` | P1 | For customer-site stockrooms |
@@ -546,7 +545,7 @@ Phase 1 gives every persona a working path:
   - **Pick:** scan the assets for a transfer order or order line.
   - The scanner resolves **serial, provider asset tag or customer tag**.
 - **FRUs and stack members** are received as child assets (`parent` = chassis). SFPs and cables are
-  received as consumable quantities unless the model is `track_as_asset`.
+  received as consumable quantities where the Model's platform asset tracking strategy says so.
 
 ### P1.6 Staging
 - **`staging_task`** is created per asset when the order line has an asset assigned.

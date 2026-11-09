@@ -178,7 +178,6 @@ describe('the Fluent metadata', () => {
         const DEFAULT = /^\s*default:|[{,]\s*default:/m
         expect(column(table('alm_hardware'), 'x_daas_ham_legal_owner')).not.toMatch(DEFAULT)
         expect(column(table('alm_hardware'), 'x_daas_ham_legal_owner')).not.toMatch(/dropdown_without_none/)
-        expect(column(table('cmdb_model'), 'x_daas_ham_track_as_asset')).not.toMatch(DEFAULT)
         expect(column(table('alm_stockroom'), STOCKROOM_TYPE_FIELD)).not.toMatch(DEFAULT)
         // The check itself finds a default where there is one.
         expect(column(table('alm_hardware'), FLEET_FIELD)).toMatch(DEFAULT)

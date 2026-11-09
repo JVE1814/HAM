@@ -63,7 +63,7 @@ _Avoid_: component, part
 A Chassis that operates as one unit of a switch stack; tracked individually.
 
 **Optic**:
-A transceiver or cable counted as stock quantities rather than tracked individually, unless its Model is marked track-as-asset.
+A transceiver or cable counted as stock quantities rather than tracked individually, unless the platform's asset tracking strategy of its Model says otherwise.
 _Avoid_: SFP (one kind of Optic), consumable
 
 **Model**:

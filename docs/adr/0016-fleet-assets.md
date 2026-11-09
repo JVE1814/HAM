@@ -30,9 +30,11 @@ The flag is set by every path through which the app creates or takes in a unit, 
   and nothing else: it moves no stage and opens no Service interval.
 
 The column defaults that stamped a NaaS value on every row the Provider's IT creates are gone: an Asset's Legal owner
-(once *Provider*, and a dropdown without *None*, which a form saved), a Model's *Track as asset* (once true) and a
-Stockroom's type (once *Central depot*). The app's intake paths set those values instead (`newAsset` and adoption set
-the Legal owner; the demo data sets the others), and a blank Legal owner still counts as the Provider's.
+(once *Provider*, and a dropdown without *None*, which a form saved) and a Stockroom's type (once *Central depot*).
+The app's intake paths set those values instead (`newAsset` and adoption set the Legal owner; the demo data sets the
+stockroom type), and a blank Legal owner still counts as the Provider's. A Model's *Track as asset*, which had such a
+default too, is gone altogether: the platform's asset tracking strategy says how a Model's units are tracked
+(ADR 0018).
 
 ## Consequences
 

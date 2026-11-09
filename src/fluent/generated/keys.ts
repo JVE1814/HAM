@@ -3782,14 +3782,17 @@ declare global {
                     xsp_alm_consumable_create: {
                         table: 'sys_scope_privilege'
                         id: 'c6bb794eed8d4f749731421377a29ae3'
+                        deleted: true
                     }
                     xsp_alm_consumable_read: {
                         table: 'sys_scope_privilege'
                         id: '1e72731955e14ca2aee28027e9cef183'
+                        deleted: true
                     }
                     xsp_alm_consumable_write: {
                         table: 'sys_scope_privilege'
                         id: '7aa70cdfae3c4e6f90cdc0af7f689b2b'
+                        deleted: true
                     }
                     xsp_alm_hardware_create: {
                         table: 'sys_scope_privilege'
@@ -3962,6 +3965,7 @@ declare global {
                     xsp_std_change_record_producer_read: {
                         table: 'sys_scope_privilege'
                         id: '924100e156864f019bfde512167b8434'
+                        deleted: true
                     }
                     xsp_sys_attachment_delete: {
                         table: 'sys_scope_privilege'
@@ -10998,6 +11002,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: '25575e54f4974106a451bfed52ce0e1d'
+                        deleted: true
                         key: {
                             name: 'cmdb_model'
                             element: 'x_daas_ham_track_as_asset'
@@ -17185,6 +17190,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: '46c06a7376de45e6a11407b25ed6b4e6'
+                        deleted: true
                         key: {
                             name: 'cmdb_model'
                             element: 'x_daas_ham_track_as_asset'

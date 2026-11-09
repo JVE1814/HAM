@@ -49,33 +49,6 @@ CrossScopePrivilege({
 })
 
 CrossScopePrivilege({
-    $id: Now.ID['xsp_alm_consumable_read'],
-    operation: 'read',
-    status: 'allowed',
-    targetName: 'alm_consumable',
-    targetScope: 'global',
-    targetType: 'sys_db_object',
-})
-
-CrossScopePrivilege({
-    $id: Now.ID['xsp_alm_consumable_write'],
-    operation: 'write',
-    status: 'allowed',
-    targetName: 'alm_consumable',
-    targetScope: 'global',
-    targetType: 'sys_db_object',
-})
-
-CrossScopePrivilege({
-    $id: Now.ID['xsp_alm_consumable_create'],
-    operation: 'create',
-    status: 'allowed',
-    targetName: 'alm_consumable',
-    targetScope: 'global',
-    targetType: 'sys_db_object',
-})
-
-CrossScopePrivilege({
     $id: Now.ID['xsp_alm_stockroom_read'],
     operation: 'read',
     status: 'allowed',
@@ -359,15 +332,6 @@ CrossScopePrivilege({
     operation: 'create',
     status: 'allowed',
     targetName: 'change_request',
-    targetScope: 'global',
-    targetType: 'sys_db_object',
-})
-
-CrossScopePrivilege({
-    $id: Now.ID['xsp_std_change_record_producer_read'],
-    operation: 'read',
-    status: 'allowed',
-    targetName: 'std_change_record_producer',
     targetScope: 'global',
     targetType: 'sys_db_object',
 })

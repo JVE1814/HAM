@@ -71,7 +71,7 @@ export function loadDemoData(): void {
     gs.setProperty('x_daas_ham.staging.default_stockroom', stagingCentre)
 
     const sourceOf = new Map([[cisco, 'cisco'], [hpe, 'aruba'], [fortinet, 'fortinet'], [checkpoint, 'checkpoint']])
-    const model = (pid: string, name: string, manufacturer: string, deviceClass: string, track = true, power = 0) =>
+    const model = (pid: string, name: string, manufacturer: string, deviceClass: string, power = 0) =>
         ensure(
             'cmdb_hardware_product_model',
             { x_daas_ham_oem_pid: pid },
@@ -80,23 +80,22 @@ export function loadDemoData(): void {
                 model_number: pid,
                 manufacturer,
                 x_daas_ham_device_class: deviceClass,
-                x_daas_ham_track_as_asset: track,
                 power_consumption: power,
                 x_daas_ham_oem_source: pid.endsWith('-HW') ? 'meraki' : (sourceOf.get(manufacturer) ?? ''),
             },
         )
-    const c9300 = model('C9300-48P-E', 'Catalyst 9300 48-port PoE+', cisco, 'switch', true, 715)
+    const c9300 = model('C9300-48P-E', 'Catalyst 9300 48-port PoE+', cisco, 'switch', 715)
     model('C9300-NM-8X', 'Catalyst 9300 8x10G network module', cisco, 'module')
     model('PWR-C1-715WAC', 'Catalyst 9300 715W AC power supply', cisco, 'psu')
-    const isr4331 = model('ISR4331/K9', 'ISR 4331 router', cisco, 'router', true, 250)
-    const mr46 = model('MR46-HW', 'Meraki MR46 access point', cisco, 'ap', true, 30)
-    model('MX85-HW', 'Meraki MX85 security appliance', cisco, 'firewall', true, 60)
-    const aruba6300 = model('JL659A', 'Aruba 6300M 48G PoE switch', hpe, 'switch', true, 880)
-    const ap535 = model('JZ336A', 'Aruba AP-535 access point', hpe, 'ap', true, 28)
-    const fg60f = model('FG-60F', 'FortiGate 60F', fortinet, 'firewall', true, 20)
-    const cp3600 = model('CPAP-SG3600', 'Check Point Quantum 3600', checkpoint, 'firewall', true, 75)
-    model('SFP-10G-SR', '10GBASE-SR SFP+ module', cisco, 'optic', false)
-    model('QSFP-100G-SR4-S', '100GBASE-SR4 QSFP module', cisco, 'optic', true)
+    const isr4331 = model('ISR4331/K9', 'ISR 4331 router', cisco, 'router', 250)
+    const mr46 = model('MR46-HW', 'Meraki MR46 access point', cisco, 'ap', 30)
+    model('MX85-HW', 'Meraki MX85 security appliance', cisco, 'firewall', 60)
+    const aruba6300 = model('JL659A', 'Aruba 6300M 48G PoE switch', hpe, 'switch', 880)
+    const ap535 = model('JZ336A', 'Aruba AP-535 access point', hpe, 'ap', 28)
+    const fg60f = model('FG-60F', 'FortiGate 60F', fortinet, 'firewall', 20)
+    const cp3600 = model('CPAP-SG3600', 'Check Point Quantum 3600', checkpoint, 'firewall', 75)
+    model('SFP-10G-SR', '10GBASE-SR SFP+ module', cisco, 'optic')
+    model('QSFP-100G-SR4-S', '100GBASE-SR4 QSFP module', cisco, 'optic')
     ensure('cmdb_hardware_product_model', { name: 'C9300-48P', manufacturer: cisco }) // as Discovery would create it
 
     const lifecycle = (modelId: string, endOfSale: string, endOfSupport: string) => {

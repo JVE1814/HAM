@@ -23,6 +23,10 @@ Brazil instance without Hardware Asset Management Professional (2026-11-09).
 - **An Asset's Lessor**: `alm_hardware.x_daas_ham_lessor`, a copy of its lease's Lessor that a rule stamped and no
   logic read, is gone. An Asset's Lessor is its Lease schedule's Vendor (`x_daas_ham_lease.vendor`); its *Legal
   owner* still says that a Lessor owns it.
+- **Track as asset**: `cmdb_model.x_daas_ham_track_as_asset`, which no code read, is gone. Whether a Model's units
+  are tracked one by one is the platform's *Asset tracking strategy* (`cmdb_model.asset_tracking_strategy`: leave to
+  category, track as consumable, do not track). The cross-scope privileges on `alm_consumable` and
+  `std_change_record_producer`, which nothing used either, went with it.
 
 ## Consequences
 
