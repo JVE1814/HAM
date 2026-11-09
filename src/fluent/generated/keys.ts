@@ -3018,6 +3018,14 @@ declare global {
                         table: 'sys_module'
                         id: '222af00d39bf43329fb67f8b8ed52f9c'
                     }
+                    'src_server_platform_coverage-warnings_ts': {
+                        table: 'sys_module'
+                        id: '771fb087ddeb4370a9b47d72dd4d88d1'
+                    }
+                    'src_server_platform_customer-page_ts': {
+                        table: 'sys_module'
+                        id: '4dd1a36ee8e94a5981ff0df3f1b91159'
+                    }
                     src_server_platform_delivery_ts: {
                         table: 'sys_module'
                         id: '4e4940e10cae4ead97e954f646da0aaf'
@@ -3061,6 +3069,10 @@ declare global {
                     'src_server_platform_job-cursor_ts': {
                         table: 'sys_module'
                         id: 'b1de8d181ecd45489a1e5ab7ad960c84'
+                    }
+                    src_server_platform_leases_ts: {
+                        table: 'sys_module'
+                        id: '751d832e008e4dc9a2d378ff45dd7fc7'
                     }
                     'src_server_platform_lifecycle-dates_ts': {
                         table: 'sys_module'
@@ -3110,6 +3122,10 @@ declare global {
                         table: 'sys_module'
                         id: '58e9b082ffb34d6da952c53e677927f8'
                     }
+                    src_server_platform_receiving_ts: {
+                        table: 'sys_module'
+                        id: 'e603592d2e884ceeb5619c5a8f4dd986'
+                    }
                     src_server_platform_reconciliation_ts: {
                         table: 'sys_module'
                         id: '23455b415f1547a0a67fd957671a68af'
@@ -3121,6 +3137,10 @@ declare global {
                     src_server_platform_refresh_ts: {
                         table: 'sys_module'
                         id: 'b1d768ab141146b194eb72433e189e0a'
+                    }
+                    src_server_platform_renewals_ts: {
+                        table: 'sys_module'
+                        id: '7e7263a350ec447aa4e71582458d9f32'
                     }
                     'src_server_platform_rest-api_ts': {
                         table: 'sys_module'

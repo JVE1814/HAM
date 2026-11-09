@@ -1,6 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { FieldPurpose } from '../domain/vocabulary.ts'
-import { refusal, str } from './records.ts'
+import { refusal, str, warnRefused } from './records.ts'
 
 /**
  * On-site work: an FSM work order (wm_order) and the change request it runs under (D57).
@@ -43,7 +43,7 @@ export function openFieldWork(context: WorkContext, job: FieldJob): FieldWork | 
     change.setValue('parent', context.sourceId)
     const changeId = change.insert()
     if (!changeId) {
-        gs.warn(`[x_daas_ham] No change for ${context.description}: ${refusal(change)}`)
+        warnRefused(change, `No change for ${context.description}`)
         return null
     }
     const workOrder = workRecord('wm_order', context)

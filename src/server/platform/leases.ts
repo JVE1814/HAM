@@ -228,7 +228,7 @@ export function applyLeaseDecision(decisionRecord: GlideRecord): DecisionOutcome
 function reopenDecision(decision: GlideRecord, openState: string, why: string): string {
     decision.setValue('state', openState)
     if (decision.update()) return `${why}. The decision is open again`
-    gs.warn(`[x_daas_ham] Lease decision ${str(decision, 'number')} not reopened (${why}): ${refusal(decision)}`)
+    warnRefused(decision, `Lease decision ${str(decision, 'number')} not reopened (${why})`)
     return `${why}. The decision stays closed (see the system log); the daily lease review raises a new one`
 }
 

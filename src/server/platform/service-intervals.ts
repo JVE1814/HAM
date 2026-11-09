@@ -8,7 +8,7 @@ import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { todayIso } from './clock.ts'
 import { attemptLock } from './locks.ts'
-import { exists, refusal, str } from './records.ts'
+import { exists, refusal, str, warnRefused } from './records.ts'
 
 /** Service intervals: the days each Asset delivered a Subscription line (P3.25). */
 
@@ -89,7 +89,7 @@ function openInterval(lock: HeldLock, asset: GlideRecord, lineId: string, startI
     // The save that took a lost lock over may have opened one too.
     const late = { check: 'check only one is open', level: 'error' } as const
     const saved = lock.save(`${opened}, interval opened`, () => (reopen ? interval.update() : interval.insert()), late)
-    if (saved === 'refused') gs.warn(`[x_daas_ham] ${opened}, no interval open: ${refusal(interval)}`)
+    if (saved === 'refused') warnRefused(interval, `${opened}, no interval open`)
     return saved === 'saved'
 }
 

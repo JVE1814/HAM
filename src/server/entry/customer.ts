@@ -1,20 +1,14 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { awaitsSelfInstallConfirmation } from '../domain/install-confirmation.ts'
 import type {
-    Attestation,
-    AttestationItem,
     AttestationReceipt,
-    CustomerAsset,
-    CustomerOrder,
     CustomerOverview,
-    CustomerReturn,
     FaultReport,
     InstallConfirmation,
     ReturnRequestReceipt,
 } from '../domain/rest-contracts.ts'
-import { actsAsCustomerAdmin, customerEquipmentQuery, ROLE, SCOPED_TABLES, visibilityFilter } from '../domain/visibility.ts'
-import { isFleetAsset, readStage } from '../platform/assets.ts'
+import { actsAsCustomerAdmin, ROLE } from '../domain/visibility.ts'
 import {
     completeAttestation,
     findUnclosedAttestation,
@@ -22,21 +16,25 @@ import {
     saveAttestationAnswers,
     type AttestationAnswer,
 } from '../platform/attestations.ts'
+import {
+    customerEquipment,
+    customerName,
+    openAttestations,
+    openFaultCase,
+    openReturns,
+    ordersUnderWay,
+} from '../platform/customer-page.ts'
 import { currentSession } from '../platform/session.ts'
-import { findById, refusal, str } from '../platform/records.ts'
+import { findById, str } from '../platform/records.ts'
 import { requestReturn } from '../platform/returns.ts'
-import { returnLabels } from '../platform/shipping.ts'
 import { completeInstall, installState } from '../platform/delivery.ts'
 import { reply } from '../platform/rest-api.ts'
 
 /*
  * Customer self-service API (P2.9, D49). Every query runs as the signed-in customer contact, so the
  * before-query visibility rules (ADR 0005) limit it to their Customer (site contacts: their Sites).
- * Asset managers may open the page as a preview, which shows every Customer; the Customer-admin
- * actions stay with Customer admins. A server read is not checked by the read ACLs, so a query with
- * `^NQ` clauses carries the reader's filter in each one itself (customerEquipmentQuery). Only fleet
- * assets (ADR 0016) are the Customer's equipment, so each read checks the Fleet flag: the rules keep a
- * contact to their Customer's hardware, fleet or not, and show staff previewing the page all of it.
+ * Asset managers may open the page as a preview, which shows every Customer (platform/customer-page);
+ * the Customer-admin actions stay with Customer admins.
  */
 
 /** A Customer admin of their own Customer only (`actsAsCustomerAdmin`); staff raise returns via the record producer. */
@@ -54,97 +52,17 @@ function data(request: RESTAPIRequest): Record<string, unknown> {
     return (request.body.data as Record<string, unknown> | null) ?? {}
 }
 
-/** GET /customer/overview: what the customer sees on their page. */
+/** GET /customer/overview: what the customer sees on their page (platform/customer-page). */
 export function customerOverview(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const session = currentSession()
-
-    const assets: CustomerAsset[] = []
-    const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(customerEquipmentQuery(visibilityFilter(session.scope, SCOPED_TABLES.alm_hardware, session)))
-    asset.orderBy('x_daas_ham_site')
-    asset.setLimit(5000)
-    asset.query()
-    while (asset.next()) {
-        assets.push({
-            id: asset.getUniqueValue(),
-            serial: str(asset, 'serial_number'),
-            customerTag: str(asset, 'x_daas_ham_customer_tag'),
-            model: asset.getDisplayValue('model'),
-            site: asset.getDisplayValue('x_daas_ham_site'),
-            siteId: str(asset, 'x_daas_ham_site'),
-            stage: readStage(asset) ?? 'unknown',
-            refreshDue: str(asset, 'x_daas_ham_refresh_due'),
-        })
-    }
-
-    const orders: CustomerOrder[] = []
-    const order = new GlideRecord('x_daas_ham_order')
-    order.addQuery('stage', 'NOT IN', 'complete,cancelled,rejected')
-    order.orderByDesc('sys_created_on')
-    order.setLimit(200)
-    order.query()
-    while (order.next()) {
-        orders.push({
-            id: order.getUniqueValue(),
-            number: str(order, 'number'),
-            type: order.getDisplayValue('order_type'),
-            site: order.getDisplayValue('site'),
-            stageLabel: order.getDisplayValue('stage'),
-            canConfirmInstall: awaitsSelfInstallConfirmation(installState(order)),
-        })
-    }
-
-    const openReturns: Array<{ id: string; listed: Omit<CustomerReturn, 'labelUrl' | 'trackingNumber'> }> = []
-    const ret = new GlideRecord('x_daas_ham_return_order')
-    ret.addQuery('active', true)
-    ret.setLimit(200)
-    ret.query()
-    while (ret.next()) {
-        openReturns.push({
-            id: ret.getUniqueValue(),
-            listed: {
-                number: str(ret, 'number'),
-                site: ret.getDisplayValue('site'),
-                trigger: ret.getDisplayValue('trigger'),
-                dueDate: str(ret, 'due_back'),
-            },
-        })
-    }
-    const labels = returnLabels(openReturns.map(({ id }) => id))
-    const returns: CustomerReturn[] = openReturns.map(({ id, listed }) => {
-        const label = labels.get(id)
-        return { ...listed, labelUrl: label?.labelUrl ?? '', trackingNumber: label?.trackingNumber ?? '' }
-    })
-
-    const attestations: Attestation[] = []
-    const attestation = new GlideRecord('x_daas_ham_attestation')
-    attestation.addQuery('active', true)
-    attestation.setLimit(50)
-    attestation.query()
-    while (attestation.next()) {
-        const items: AttestationItem[] = []
-        const item = new GlideRecord('x_daas_ham_attestation_item')
-        item.addQuery('attestation', attestation.getUniqueValue())
-        item.query()
-        while (item.next()) {
-            items.push({
-                id: item.getUniqueValue(),
-                serial: str(item, 'asset.serial_number'),
-                model: item.getDisplayValue('asset.model'),
-                response: str(item, 'response') as AttestationItem['response'],
-            })
-        }
-        attestations.push({ id: attestation.getUniqueValue(), number: str(attestation, 'number'), site: attestation.getDisplayValue('site'), items })
-    }
-
     reply(response, 200, {
-        customer: findById('core_company', session.customerId)?.getDisplayValue('name') ?? '',
+        customer: customerName(session.customerId),
         isCustomerAdmin: isCustomerAdmin(),
-        assets,
-        orders,
-        returns,
-        attestations,
+        assets: customerEquipment(session),
+        orders: ordersUnderWay(),
+        returns: openReturns(),
+        attestations: openAttestations(),
     } satisfies CustomerOverview)
 }
 
@@ -152,21 +70,10 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
 export function reportFault(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const input = data(request)
-    // Visibility rules apply (a contact's Customer and Sites); only a fleet asset is replaced (ADR 0016).
-    const asset = findById('alm_hardware', String(input.asset ?? ''))
-    if (!asset || !isFleetAsset(asset)) return reply(response, 404, { error: 'Unknown device' })
-    const kase = new GlideRecord('sn_customerservice_case')
-    kase.initialize()
-    kase.setValue('account', str(asset, 'company'))
-    kase.setValue('contact', gs.getUserID())
-    kase.setValue('short_description', `Faulty device ${str(asset, 'asset_tag') || str(asset, 'serial_number')} at ${asset.getDisplayValue('x_daas_ham_site')}`)
-    kase.setValue('description', String(input.description ?? ''))
-    kase.setValue('x_daas_ham_failed_asset', asset.getUniqueValue())
-    if (!kase.insert()) {
-        gs.warn(`[x_daas_ham] No fault case for ${str(asset, 'serial_number')}: ${refusal(kase)}`)
-        return reply(response, 422, { error: 'Fault not reported: the platform refused it' })
-    }
-    reply(response, 201, { case: str(kase, 'number') } satisfies FaultReport)
+    const fault = openFaultCase(String(input.asset ?? ''), String(input.description ?? ''))
+    if (fault.opened) return reply(response, 201, { case: fault.number } satisfies FaultReport)
+    if (fault.reason === 'unknown') return reply(response, 404, { error: 'Unknown device' })
+    reply(response, 422, { error: 'Fault not reported: the platform refused it' })
 }
 
 /**
