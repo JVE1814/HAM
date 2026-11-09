@@ -1,5 +1,6 @@
 import '@servicenow/sdk/global'
 import { RestMessage } from '@servicenow/sdk/core'
+import { REST_MESSAGE } from '../../server/domain/rest-message-names'
 
 /*
  * Outbound REST messages for OEM data (ADR 0008). Credentials are instance configuration:
@@ -15,26 +16,26 @@ import { RestMessage } from '@servicenow/sdk/core'
 
 RestMessage({
     $id: Now.ID['rm_cisco_support'],
-    name: 'NaaS Cisco Support',
+    name: REST_MESSAGE.ciscoSupport.name,
     endpoint: 'https://apix.cisco.com',
     description: 'Cisco Support APIs: EoX v5, Serial Number to Information v2, Service Order Return (requires SNTC/PSS).',
     authenticationType: 'oauth2',
     headers: [{ $id: Now.ID['rm_cisco_accept'], name: 'Accept', value: 'application/json' }],
     functions: [
         {
-            name: 'eox_by_pid',
+            name: REST_MESSAGE.ciscoSupport.fn.eoxByPid,
             httpMethod: 'GET',
             endpoint: 'https://apix.cisco.com/supporttools/eox/rest/5/EOXByProductID/1/${pids}?responseencoding=json',
             variables: [{ $id: Now.ID['rm_cisco_eox_pids'], name: 'pids' }],
         },
         {
-            name: 'coverage_by_serial',
+            name: REST_MESSAGE.ciscoSupport.fn.coverageBySerial,
             httpMethod: 'GET',
             endpoint: 'https://apix.cisco.com/sn2info/v2/coverage/summary/serial_numbers/${serials}',
             variables: [{ $id: Now.ID['rm_cisco_cov_serials'], name: 'serials' }],
         },
         {
-            name: 'rma_status',
+            name: REST_MESSAGE.ciscoSupport.fn.rmaStatus,
             httpMethod: 'GET',
             endpoint: 'https://apix.cisco.com/return/v1.0/returns/rma_numbers/${rma}',
             variables: [{ $id: Now.ID['rm_cisco_rma'], name: 'rma' }],
@@ -44,13 +45,13 @@ RestMessage({
 
 RestMessage({
     $id: Now.ID['rm_meraki'],
-    name: 'NaaS Meraki Dashboard',
+    name: REST_MESSAGE.meraki.name,
     endpoint: 'https://api.meraki.com/api/v1',
     description: 'Meraki Dashboard API v1: organisation inventory with EoX fields.',
     headers: [{ $id: Now.ID['rm_meraki_accept'], name: 'Accept', value: 'application/json' }],
     functions: [
         {
-            name: 'inventory_by_model',
+            name: REST_MESSAGE.meraki.fn.inventoryByModel,
             httpMethod: 'GET',
             endpoint: 'https://${meraki_host}/api/v1/organizations/${org_id}/inventory/devices?models[]=${model}',
             headers: [{ $id: Now.ID['rm_meraki_auth'], name: 'Authorization', value: 'Bearer ${api_key}' }],
@@ -62,7 +63,7 @@ RestMessage({
             ],
         },
         {
-            name: 'claim_inventory',
+            name: REST_MESSAGE.meraki.fn.claimInventory,
             httpMethod: 'POST',
             endpoint: 'https://${meraki_host}/api/v1/organizations/${org_id}/inventory/claim',
             headers: [
@@ -80,7 +81,7 @@ RestMessage({
 
 RestMessage({
     $id: Now.ID['rm_forticare'],
-    name: 'NaaS FortiCare',
+    name: REST_MESSAGE.fortiCare.name,
     endpoint: 'https://support.fortinet.com/ES/api/registration/v3',
     description: 'FortiCloud Asset Management API v3: registered products and entitlements by serial.',
     authenticationType: 'oauth2',
@@ -90,14 +91,14 @@ RestMessage({
     ],
     functions: [
         {
-            name: 'products_list',
+            name: REST_MESSAGE.fortiCare.fn.productsList,
             httpMethod: 'POST',
             endpoint: 'https://support.fortinet.com/ES/api/registration/v3/products/list',
             content: '{ "serialNumber": "${serial}" }',
             variables: [{ $id: Now.ID['rm_forti_serial'], name: 'serial' }],
         },
         {
-            name: 'register_products',
+            name: REST_MESSAGE.fortiCare.fn.registerProducts,
             httpMethod: 'POST',
             endpoint: 'https://support.fortinet.com/ES/api/registration/v3/products/register',
         },
@@ -106,13 +107,13 @@ RestMessage({
 
 RestMessage({
     $id: Now.ID['rm_mist'],
-    name: 'NaaS HPE Mist',
+    name: REST_MESSAGE.mist.name,
     endpoint: 'https://api.mist.com/api/v1',
     description: 'HPE Mist API: JSI inventory with lifecycle and warranty fields.',
     headers: [{ $id: Now.ID['rm_mist_accept'], name: 'Accept', value: 'application/json' }],
     functions: [
         {
-            name: 'jsi_by_model',
+            name: REST_MESSAGE.mist.fn.jsiByModel,
             httpMethod: 'GET',
             endpoint: 'https://${mist_host}/api/v1/orgs/${org_id}/jsi/inventory?model=${model}',
             headers: [{ $id: Now.ID['rm_mist_auth_model'], name: 'Authorization', value: 'Token ${api_token}' }],
@@ -124,7 +125,7 @@ RestMessage({
             ],
         },
         {
-            name: 'jsi_by_serial',
+            name: REST_MESSAGE.mist.fn.jsiBySerial,
             httpMethod: 'GET',
             endpoint: 'https://${mist_host}/api/v1/orgs/${org_id}/jsi/inventory?serial=${serial}',
             headers: [{ $id: Now.ID['rm_mist_auth_serial'], name: 'Authorization', value: 'Token ${api_token}' }],
@@ -136,7 +137,7 @@ RestMessage({
             ],
         },
         {
-            name: 'claim_inventory',
+            name: REST_MESSAGE.mist.fn.claimInventory,
             httpMethod: 'POST',
             endpoint: 'https://${mist_host}/api/v1/orgs/${org_id}/inventory',
             headers: [
@@ -165,7 +166,7 @@ RestMessage({
 
 RestMessage({
     $id: Now.ID['rm_greenlake'],
-    name: 'NaaS HPE GreenLake',
+    name: REST_MESSAGE.greenLake.name,
     endpoint: 'https://global.api.greenlake.hpe.com',
     description: 'HPE GreenLake platform: add network devices to the workspace and assign subscriptions.',
     authenticationType: 'oauth2',
@@ -174,15 +175,15 @@ RestMessage({
         { $id: Now.ID['rm_greenlake_ct'], name: 'Content-Type', value: 'application/json' },
     ],
     functions: [
-        { name: 'add_devices', httpMethod: 'POST', endpoint: 'https://global.api.greenlake.hpe.com/devices/v1/devices' },
+        { name: REST_MESSAGE.greenLake.fn.addDevices, httpMethod: 'POST', endpoint: 'https://global.api.greenlake.hpe.com/devices/v1/devices' },
         {
-            name: 'find_device',
+            name: REST_MESSAGE.greenLake.fn.findDevice,
             httpMethod: 'GET',
             endpoint: "https://global.api.greenlake.hpe.com/devices/v1/devices?filter=serialNumber eq '${serial}'",
             variables: [{ $id: Now.ID['rm_greenlake_serial'], name: 'serial' }],
         },
         {
-            name: 'assign_subscription',
+            name: REST_MESSAGE.greenLake.fn.assignSubscription,
             httpMethod: 'PATCH',
             endpoint: 'https://global.api.greenlake.hpe.com/devices/v1/devices?id=${device_id}',
             // patchDevicesV1 accepts only merge-patch JSON; this overrides the message's Content-Type.
@@ -194,7 +195,7 @@ RestMessage({
 
 RestMessage({
     $id: Now.ID['rm_fortiztp'],
-    name: 'NaaS FortiZTP',
+    name: REST_MESSAGE.fortiZtp.name,
     endpoint: 'https://fortiztp.forticloud.com/public/api/v1',
     description: 'FortiZTP: provision registered FortiGates to the customer FortiManager.',
     authenticationType: 'oauth2',
@@ -204,7 +205,7 @@ RestMessage({
     ],
     functions: [
         {
-            name: 'provision_device',
+            name: REST_MESSAGE.fortiZtp.fn.provisionDevice,
             httpMethod: 'PUT',
             endpoint: 'https://fortiztp.forticloud.com/public/api/v1/devices/${serial}',
             variables: [{ $id: Now.ID['rm_fortiztp_serial'], name: 'serial' }],
@@ -214,7 +215,7 @@ RestMessage({
 
 RestMessage({
     $id: Now.ID['rm_checkpoint_zt'],
-    name: 'NaaS Check Point Zero Touch',
+    name: REST_MESSAGE.checkPoint.name,
     endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2',
     description: 'Check Point Zero Touch web API v2: log in, claim Small Office (Quantum Spark) gateways with a customer template, log out.',
     headers: [
@@ -223,7 +224,7 @@ RestMessage({
     ],
     functions: [
         {
-            name: 'login',
+            name: REST_MESSAGE.checkPoint.fn.login,
             httpMethod: 'POST',
             endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/login',
             content: '{"api-client-id":"${api_client_id}","api-key":"${api_key}"}',
@@ -232,7 +233,7 @@ RestMessage({
                 { $id: Now.ID['rm_checkpoint_login_key'], name: 'api_key' },
             ],
         },
-        { name: 'claim_gateway', httpMethod: 'POST', endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/claim-gateway' },
-        { name: 'logout', httpMethod: 'POST', endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/logout', content: '{}' },
+        { name: REST_MESSAGE.checkPoint.fn.claimGateway, httpMethod: 'POST', endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/claim-gateway' },
+        { name: REST_MESSAGE.checkPoint.fn.logout, httpMethod: 'POST', endpoint: 'https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/logout', content: '{}' },
     ],
 })

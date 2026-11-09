@@ -28,6 +28,7 @@ import { withLock, withLockTries } from './locks.ts'
 import { boolProperty, intProperty, PROPERTY, stagingStockroom, stringProperty } from './properties.ts'
 import { count, findById, refusal, str, warnRefused } from './records.ts'
 import { restMessagePort } from './rest-messages.ts'
+import { REST_MESSAGE } from '../domain/rest-message-names.ts'
 
 /**
  * Shipments bought from the shipping aggregator (P3.26, D73): labels for Orders and ship-back returns, marking one
@@ -42,7 +43,7 @@ export function shippingEnabled(): boolean {
 }
 
 function aggregator() {
-    return restMessagePort('NaaS Shipping aggregator')
+    return restMessagePort(REST_MESSAGE.shipping.name)
 }
 
 /** A cmn_location as a carrier address for `contact` (a name and phone; the location's phone first). */

@@ -5,6 +5,7 @@ import { errorText, isSuccess, type HttpPort, type HttpRequest, type HttpRespons
 import { asArray, chunks, field, parseJson, text } from '../json.ts'
 import type { AutomationStatus, ClaimAction, OemVendor } from '../vocabulary.ts'
 import { fortiCloudError } from './forticloud.ts'
+import { REST_MESSAGE } from '../rest-message-names.ts'
 
 /**
  * OEM claim and provisioning (P3.27, D70): staging checklist steps that the manufacturer's cloud can
@@ -116,7 +117,7 @@ const merakiClaim: ClaimAdapter = (targets, http, maxCalls) => {
     const { usable, outcomes } = unusable(targets, 'serial')
     const sent = batches(usable, MERAKI_CLAIM_BATCH).slice(0, Math.max(0, maxCalls))
     for (const batch of sent) {
-        const response = http({ fn: 'claim_inventory', params: { org_id: batch[0].account }, body: JSON.stringify({ serials: batch.map((t) => t.serial) }) })
+        const response = http({ fn: REST_MESSAGE.meraki.fn.claimInventory, params: { org_id: batch[0].account }, body: JSON.stringify({ serials: batch.map((t) => t.serial) }) })
         if (!isSuccess(response.status)) {
             outcomes.push(...fail(batch, errorText(response.status, response.body)))
             continue
@@ -145,7 +146,7 @@ const mistClaim: ClaimAdapter = (targets, http, maxCalls) => {
     const { usable, outcomes } = unusable(targets, 'claimCode')
     const sent = batches(usable, MIST_CLAIM_BATCH).slice(0, Math.max(0, maxCalls))
     for (const batch of sent) {
-        const response = http({ fn: 'claim_inventory', params: { org_id: batch[0].account }, body: JSON.stringify(batch.map((t) => t.claimCode)) })
+        const response = http({ fn: REST_MESSAGE.mist.fn.claimInventory, params: { org_id: batch[0].account }, body: JSON.stringify(batch.map((t) => t.claimCode)) })
         const json = parseJson(response.body)
         const hasResult = ['added', 'duplicated', 'error'].some((k) => Array.isArray(field(json, k)))
         if (!isSuccess(response.status) && !(response.status === 400 && hasResult)) {
@@ -173,7 +174,7 @@ const greenLakeAdd: ClaimAdapter = (targets, http, maxCalls) => {
     const sent = batches(usable, GREENLAKE_ADD_BATCH).slice(0, Math.max(0, maxCalls))
     for (const batch of sent) {
         const body = JSON.stringify({ network: batch.map((t) => ({ serialNumber: t.serial, macAddress: t.mac })), compute: [], storage: [] })
-        const response = http({ fn: 'add_devices', params: {}, body })
+        const response = http({ fn: REST_MESSAGE.greenLake.fn.addDevices, params: {}, body })
         outcomes.push(...batch.map((t) => outcome(t, response, 'added to the GreenLake workspace')))
     }
     return { outcomes, calls: sent.length }
@@ -190,7 +191,7 @@ const greenLakeSubscribe: ClaimAdapter = (targets, http, maxCalls) => {
     for (const t of usable) {
         if (calls + GREENLAKE_SUBSCRIBE_CALLS > maxCalls) break
         calls++
-        const found = http({ fn: 'find_device', params: { serial: t.serial } })
+        const found = http({ fn: REST_MESSAGE.greenLake.fn.findDevice, params: { serial: t.serial } })
         const device = isSuccess(found.status) ? asArray(field(parseJson(found.body), 'items'))[0] : undefined
         const deviceId = text(field(device, 'id'))
         if (!deviceId) {
@@ -202,7 +203,7 @@ const greenLakeSubscribe: ClaimAdapter = (targets, http, maxCalls) => {
             continue
         }
         calls++
-        const assigned = http({ fn: 'assign_subscription', params: { device_id: deviceId }, body: JSON.stringify({ subscription: [{ id: t.account }] }) })
+        const assigned = http({ fn: REST_MESSAGE.greenLake.fn.assignSubscription, params: { device_id: deviceId }, body: JSON.stringify({ subscription: [{ id: t.account }] }) })
         outcomes.push(outcome(t, assigned, `subscription ${t.account} assigned`))
     }
     return { outcomes, calls }
@@ -215,7 +216,7 @@ const fortiRegister: ClaimAdapter = (targets, http, maxCalls) => {
     const sent = chunks(usable, FORTICLOUD_REGISTER_BATCH).slice(0, Math.max(0, maxCalls))
     for (const batch of sent) {
         const body = JSON.stringify({ registrationUnits: batch.map((t) => ({ serialNumber: t.serial, description: 'NaaS staging', isGovernment: false })) })
-        const response = http({ fn: 'register_products', params: {}, body })
+        const response = http({ fn: REST_MESSAGE.fortiCare.fn.registerProducts, params: {}, body })
         const json = parseJson(response.body)
         const error = isSuccess(response.status) ? fortiCloudError(json) : errorText(response.status, response.body)
         if (error === null) outcomes.push(...batch.map((t) => ({ stepId: t.stepId, ok: true, message: 'registered in FortiCloud' })))
@@ -227,7 +228,7 @@ const fortiRegister: ClaimAdapter = (targets, http, maxCalls) => {
 /** FortiZTP: PUT devices/{serial} provisioned to the customer's FortiManager. */
 const fortiZtp = perDevice(
     (t) => ({
-        fn: 'provision_device',
+        fn: REST_MESSAGE.fortiZtp.fn.provisionDevice,
         params: { serial: t.serial },
         body: JSON.stringify({ deviceType: 'FortiGate', provisionStatus: 'provisioned', provisionTarget: 'FortiManager', fortiManagerOid: t.account }),
     }),
@@ -255,7 +256,7 @@ const checkPointZeroTouch: ClaimAdapter = (targets, http, maxCalls) => {
     }
     const reachable = claims.slice(0, Math.max(0, maxCalls - ZERO_TOUCH_SESSION_CALLS))
     if (reachable.length === 0) return { outcomes, calls: 0 }
-    const login = http({ fn: 'login', params: {} })
+    const login = http({ fn: REST_MESSAGE.checkPoint.fn.login, params: {} })
     const sid = isSuccess(login.status) ? text(field(parseJson(login.body), 'sid')) : ''
     if (!sid) {
         const reason = isSuccess(login.status) ? 'no session id returned' : errorText(login.status, login.body)
@@ -265,25 +266,25 @@ const checkPointZeroTouch: ClaimAdapter = (targets, http, maxCalls) => {
     const headers = { 'X-chkp-sid': sid }
     for (const { target, accountId, templateId } of reachable) {
         const body = JSON.stringify({ 'object-name': target.serial, 'account-id': accountId, 'template-id': templateId, mac: target.mac })
-        outcomes.push(outcome(target, http({ fn: 'claim_gateway', params: {}, headers, body }), `claimed with Zero Touch template ${templateId}`))
+        outcomes.push(outcome(target, http({ fn: REST_MESSAGE.checkPoint.fn.claimGateway, params: {}, headers, body }), `claimed with Zero Touch template ${templateId}`))
     }
-    http({ fn: 'logout', params: {}, headers })
+    http({ fn: REST_MESSAGE.checkPoint.fn.logout, params: {}, headers })
     return { outcomes, calls: reachable.length + ZERO_TOUCH_SESSION_CALLS }
 }
 
 /** Which vendor can do which step, through which REST message. Cisco PnP has no public API. */
 export const CLAIM_ROUTES: Partial<Record<OemVendor, Partial<Record<ClaimAction, ClaimRoute>>>> = {
-    meraki: { oem_claim: { message: 'NaaS Meraki Dashboard', run: merakiClaim, perCall: MERAKI_CLAIM_BATCH } },
-    mist: { oem_claim: { message: 'NaaS HPE Mist', run: mistClaim, perCall: MIST_CLAIM_BATCH } },
+    meraki: { oem_claim: { message: REST_MESSAGE.meraki.name, run: merakiClaim, perCall: MERAKI_CLAIM_BATCH } },
+    mist: { oem_claim: { message: REST_MESSAGE.mist.name, run: mistClaim, perCall: MIST_CLAIM_BATCH } },
     aruba: {
-        oem_claim: { message: 'NaaS HPE GreenLake', run: greenLakeAdd, perCall: GREENLAKE_ADD_BATCH },
-        oem_licence: { message: 'NaaS HPE GreenLake', run: greenLakeSubscribe, perCall: 1 / GREENLAKE_SUBSCRIBE_CALLS },
+        oem_claim: { message: REST_MESSAGE.greenLake.name, run: greenLakeAdd, perCall: GREENLAKE_ADD_BATCH },
+        oem_licence: { message: REST_MESSAGE.greenLake.name, run: greenLakeSubscribe, perCall: 1 / GREENLAKE_SUBSCRIBE_CALLS },
     },
     fortinet: {
-        oem_claim: { message: 'NaaS FortiCare', run: fortiRegister, perCall: FORTICLOUD_REGISTER_BATCH },
-        oem_ztp: { message: 'NaaS FortiZTP', run: fortiZtp, perCall: 1 },
+        oem_claim: { message: REST_MESSAGE.fortiCare.name, run: fortiRegister, perCall: FORTICLOUD_REGISTER_BATCH },
+        oem_ztp: { message: REST_MESSAGE.fortiZtp.name, run: fortiZtp, perCall: 1 },
     },
-    checkpoint: { oem_ztp: { message: 'NaaS Check Point Zero Touch', run: checkPointZeroTouch, perCall: 1 } },
+    checkpoint: { oem_ztp: { message: REST_MESSAGE.checkPoint.name, run: checkPointZeroTouch, perCall: 1 } },
 }
 
 /** Vendors with at least one automated step (Cisco has none). */

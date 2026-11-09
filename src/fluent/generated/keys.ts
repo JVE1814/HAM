@@ -2829,6 +2829,10 @@ declare global {
                         table: 'sys_module'
                         id: 'eb27051e98b344199e66967fbf03b8ce'
                     }
+                    'src_server_domain_rest-message-names_ts': {
+                        table: 'sys_module'
+                        id: 'c15e4dbf345940ec973c3ee76c2bc5db'
+                    }
                     src_server_domain_returns_ts: {
                         table: 'sys_module'
                         id: '67756814d0ef4e529e29a655dfcb2bdf'

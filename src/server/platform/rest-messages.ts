@@ -1,6 +1,7 @@
 import type { HttpPort } from '../domain/http.ts'
 import { PROPERTY } from './properties.ts'
 import { restPort, type MessageVariables } from './rest-port.ts'
+import { REST_MESSAGE } from '../domain/rest-message-names.ts'
 
 /**
  * What each REST message of the app (fluent/logic/oem-messages.now.ts and the shipping aggregator's) takes at call
@@ -13,22 +14,22 @@ import { restPort, type MessageVariables } from './rest-port.ts'
  * RESTMessageV2 substitutes ${} there, and fall back to rest.setEndpoint() with the host put in if it does not.
  */
 const VARIABLES: Record<string, MessageVariables> = {
-    'NaaS Meraki Dashboard': {
+    [REST_MESSAGE.meraki.name]: {
         secrets: [{ variable: 'api_key', property: PROPERTY.merakiApiKey }],
         settings: [{ variable: 'meraki_host', property: PROPERTY.merakiApiHost }],
     },
-    'NaaS HPE Mist': {
+    [REST_MESSAGE.mist.name]: {
         secrets: [{ variable: 'api_token', property: PROPERTY.mistApiToken }],
         settings: [{ variable: 'mist_host', property: PROPERTY.mistApiHost }],
     },
-    'NaaS Check Point Zero Touch': {
+    [REST_MESSAGE.checkPoint.name]: {
         // Both go into the JSON login body.
         secrets: [
             { variable: 'api_client_id', property: PROPERTY.checkpointApiClientId, inJson: true },
             { variable: 'api_key', property: PROPERTY.checkpointApiKey, inJson: true },
         ],
     },
-    'NaaS Shipping aggregator': { secrets: [{ variable: 'api_key', property: PROPERTY.shippingApiKey }] },
+    [REST_MESSAGE.shipping.name]: { secrets: [{ variable: 'api_key', property: PROPERTY.shippingApiKey }] },
 }
 
 /** Calls functions of the REST message `message`, with its secrets and settings (platform/rest-port). */

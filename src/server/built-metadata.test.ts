@@ -12,6 +12,7 @@ import {
 } from './domain/fleet'
 import { replacementStep } from './domain/breakfix'
 import { CANCELLABLE_ORDER_STAGES } from './domain/fulfilment'
+import { REST_MESSAGE } from './domain/rest-message-names'
 import { labelVoidable } from './domain/shipping'
 import { RMA_AT_OEM } from './domain/sourcing'
 import { BROAD_STAFF, PLATFORM_ROLE, ROLE, SCOPED_TABLES, type TableScoping } from './domain/visibility'
@@ -800,6 +801,27 @@ describe('system properties', () => {
             const types = typeof entry.default === 'number' ? ['integer'] : typeof entry.default === 'boolean' ? ['boolean'] : ['string', 'password2']
             expect(types, entry.name).toContain(typeOf.get(entry.name))
         }
+    })
+})
+
+/*
+ * domain/rest-message-names REST_MESSAGE is the one list of the app's REST messages and their functions. An adapter
+ * that calls a function its message does not have gets no answer from RESTMessageV2, on the instance only.
+ */
+describe('REST messages', () => {
+    it('are built with the names and the functions the adapters call them by', () => {
+        const messageName = new Map(records('sys_rest_message').map((message) => [message.sys_id ?? '', message.name ?? '']))
+        const built = [...messageName.values()].sort().map((name) => ({
+            name,
+            functions: records('sys_rest_message_fn')
+                .filter((fn) => messageName.get(fn.rest_message ?? '') === name)
+                .map((fn) => fn.function_name ?? '')
+                .sort(),
+        }))
+        const named = Object.values(REST_MESSAGE)
+            .map((message) => ({ name: message.name as string, functions: (Object.values(message.fn) as string[]).sort() }))
+            .sort((a, b) => a.name.localeCompare(b.name))
+        expect(built).toEqual(named)
     })
 })
 

@@ -1,6 +1,7 @@
 import { errorText, isSuccess, type HttpPort } from './http.ts'
 import { asArray, field, isoDate, parseJson, text } from './json.ts'
 import { SHIPMENT_STATUS, type ShipmentStatus } from './vocabulary.ts'
+import { REST_MESSAGE } from './rest-message-names.ts'
 
 /**
  * Shipping aggregator (P3.26, D73): one adapter buys labels and reads tracking webhooks. Requests
@@ -131,7 +132,7 @@ export function buyLabel(http: HttpPort, input: LabelInput): LabelResult {
         const problem = addressProblem(address, side)
         if (problem) return { ok: false, error: `${side} address ${problem}` }
     }
-    const response = http({ fn: 'create_label', params: {}, body: labelRequestBody(input) })
+    const response = http({ fn: REST_MESSAGE.shipping.fn.createLabel, params: {}, body: labelRequestBody(input) })
     if (!isSuccess(response.status)) return { ok: false, error: errorText(response.status, response.body) }
     const json = parseJson(response.body)
     const trackingNumber = text(field(json, 'tracking_number'))

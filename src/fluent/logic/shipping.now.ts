@@ -5,6 +5,7 @@ import { admin, assetManager, inventoryTech, noc } from '../security/roles.now'
 import { RETURN_METHOD, SHIPMENT_DIRECTION, SHIPMENT_STATUS } from '../../server/domain/vocabulary'
 import { EVENT } from '../../server/platform/events'
 import { PROPERTY } from '../../server/platform/properties'
+import { REST_MESSAGE } from '../../server/domain/rest-message-names'
 
 /*
  * Shipping aggregator (P3.26, D73). The message targets ShipEngine's label API; point the endpoint at
@@ -17,7 +18,7 @@ import { PROPERTY } from '../../server/platform/properties'
 
 RestMessage({
     $id: Now.ID['rm_shipping'],
-    name: 'NaaS Shipping aggregator',
+    name: REST_MESSAGE.shipping.name,
     endpoint: 'https://api.shipengine.com/v1',
     description: 'Buys carrier labels (one call: shipment + label + tracking number).',
     headers: [
@@ -26,7 +27,7 @@ RestMessage({
     ],
     functions: [
         {
-            name: 'create_label',
+            name: REST_MESSAGE.shipping.fn.createLabel,
             httpMethod: 'POST',
             endpoint: 'https://api.shipengine.com/v1/labels',
             headers: [{ $id: Now.ID['rm_shipping_key_header'], name: 'API-Key', value: '${api_key}' }],
