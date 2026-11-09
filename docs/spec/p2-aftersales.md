@@ -9,7 +9,7 @@
   refuses (ordering spec) stays a draft, linked to the case, to correct and submit. If the Order or
   its line cannot be saved, nothing is raised (an Order without its line is removed again, or named
   to cancel). If the case cannot be linked, the Order stays a draft that names the case, to link and
-  submit.
+  submit. A case form whose save is refused raises nothing (the platform says why).
 - **Raise replacement** is offered while the case links no Order, or one that was rejected or
   cancelled: a new Order then takes its place on the case. A form opened before the link can still send
   it: a linked draft is then submitted again, and a linked Order awaiting approval, going ahead or
@@ -47,6 +47,8 @@
 - **Defective returned to OEM** on the RMA retires the unit as *returned to OEM*. This needs wipe
   evidence recorded since the unit was last received back at the depot (receipt clears earlier
   evidence). When the unit cannot be retired, the user is told why and the RMA is left as it was.
+  When the unit is retired but the RMA's save is refused, the user is told the serial and why, and
+  presses the action again once that is fixed: only the RMA is marked then.
 
 ## Returns (D60)
 

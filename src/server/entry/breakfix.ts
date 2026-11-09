@@ -23,7 +23,9 @@ export function onCaseFailedAsset(current: GlideRecord): void {
  * still send it: then a linked draft is submitted again and a linked Order going ahead is kept (domain/breakfix).
  */
 export function uiRaiseReplacement(current: GlideRecord): void {
-    current.update()
+    // A refused form save (the platform says why) raises nothing: the failed asset and linked Order would be values the
+    // case does not hold.
+    if (!current.update()) return
     const linked = findById('x_daas_ham_order', str(current, 'x_daas_ham_replacement_order'))
     const step = replacementStep(linked ? str(linked, 'stage') : null)
     if (linked && step === 'submit_draft') return submitReplacement(linked)
@@ -89,5 +91,11 @@ export function uiDefectiveReturnedToOem(current: GlideRecord): void {
     // The RMA records the return only once the unit is retired.
     if (!asset.update()) return void gs.addErrorMessage(`${str(asset, 'serial_number')} not retired: ${refusal(asset)}`)
     current.setValue('state', 'defective_returned')
-    current.update()
+    // The unit is retired already: the user is told so and why the RMA was not marked, rather than it silently staying
+    // open. The action is still offered, and pressed again it finds the unit retired (no move) and marks the RMA.
+    if (!current.update()) {
+        const reason = refusal(current)
+        const serial = str(asset, 'serial_number')
+        gs.addErrorMessage(`${serial} is retired, but the RMA was not marked returned: ${reason}. Press again once that is fixed`)
+    }
 }
