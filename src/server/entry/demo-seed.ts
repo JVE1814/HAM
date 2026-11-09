@@ -5,6 +5,7 @@ import { refusal, str } from '../platform/records.ts'
 import type { Stage } from '../domain/lifecycle.ts'
 import type { CatalogEntryType } from '../domain/vocabulary.ts'
 import { OEM_PID_FIELD, SITE_FIELD, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
+import { ROLE } from '../domain/visibility.ts'
 
 /**
  * Demo data for dev/test instances: two Customers with Sites, racks and stockrooms, models from the
@@ -172,10 +173,10 @@ export function loadDemoData(): void {
         if (role.get('name', roleName)) ensure('sys_user_has_role', { user: id, role: role.getUniqueValue() })
         return id
     }
-    const inventoryUser = user('sys_user', 'naas.inventory', 'Ingrid', 'Depot (demo)', 'x_daas_ham.inventory_tech')
-    user('sys_user', 'naas.field', 'Femi', 'Field (demo)', 'x_daas_ham.field_tech')
-    user('customer_contact', 'acme.admin', 'Ada', 'Acme (demo)', 'x_daas_ham.customer_admin', acme)
-    const acmeContact = user('customer_contact', 'acme.hq.contact', 'Sam', 'Site (demo)', 'x_daas_ham.site_contact', acme)
+    const inventoryUser = user('sys_user', 'naas.inventory', 'Ingrid', 'Depot (demo)', ROLE.inventoryTech)
+    user('sys_user', 'naas.field', 'Femi', 'Field (demo)', ROLE.fieldTech)
+    user('customer_contact', 'acme.admin', 'Ada', 'Acme (demo)', ROLE.customerAdmin, acme)
+    const acmeContact = user('customer_contact', 'acme.hq.contact', 'Sam', 'Site (demo)', ROLE.siteContact, acme)
     // The demo inventory tech works at the depot and the staging centre: a member of their Assignment group (ADR 0018).
     const depotGroup = new GlideRecord('sys_user_group')
     if (depotGroup.get('name', DEMO_DEPOT_GROUP)) {

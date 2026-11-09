@@ -2,16 +2,7 @@ import '@servicenow/sdk/global'
 import { UiAction } from '@servicenow/sdk/core'
 import { uiConfirmInstalled, uiShipOrder } from '../../server/entry/delivery'
 import { uiCancelOrder, uiRecheckApprovals, uiSubmitOrder } from '../../server/entry/orders'
-import {
-    accountManager,
-    admin,
-    assetManager,
-    customerAdmin,
-    fieldTech,
-    inventoryTech,
-    noc,
-    siteContact,
-} from '../security/roles.now'
+import { accountManager, admin, assetManager, customerAdmin, fieldTech, siteContact, staffOrderRaisers, stockroomWorkers } from '../security/roles.now'
 import { INSTALL_MODE, ORDER_STAGE, STAGE_FIELDS } from '../../server/domain/vocabulary'
 
 /* Form buttons on Orders. Stage transitions after "Submit" are derived from asset stages. */
@@ -22,7 +13,7 @@ UiAction({
     table: 'x_daas_ham_order',
     actionName: 'x_daas_ham_submit_order',
     condition: `current.stage == '${ORDER_STAGE.draft}'`,
-    roles: [assetManager, accountManager, noc, 'sn_customerservice_agent'],
+    roles: staffOrderRaisers,
     form: { showButton: true, style: 'primary' },
     showUpdate: true,
     script: uiSubmitOrder,
@@ -51,7 +42,7 @@ UiAction({
     actionName: 'x_daas_ham_ship_order',
     hint: 'Ship all staged assets to the site and open the on-site work (change + work order).',
     condition: `current.stage == '${ORDER_STAGE.delivering}'`,
-    roles: [inventoryTech, assetManager],
+    roles: stockroomWorkers,
     form: { showButton: true, style: 'primary' },
     showUpdate: true,
     script: uiShipOrder,

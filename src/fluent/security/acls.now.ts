@@ -6,13 +6,17 @@ import {
     admin,
     assetManager,
     broadStaff,
+    commercialEditors,
     customerAdmin,
     customerRoles,
     fieldTech,
     integration,
     inventoryTech,
     noc,
+    orderRaisers,
+    orderWorkers,
     providerStaff,
+    stockroomWorkers,
 } from './roles.now'
 import { grantsCustomerRecord, grantsFleetAsset } from '../../server/entry/visibility'
 
@@ -27,11 +31,6 @@ import { grantsCustomerRecord, grantsFleetAsset } from '../../server/entry/visib
  * staff reads use broadStaff or a narrower list. On the tables narrowed to an inventory tech's stockrooms, a
  * Deny-Unless row check (acls-visibility.now.ts) re-checks the stockroom. Hardware's read ACLs sit on alm_asset (below).
  */
-
-const commercialEditors = [accountManager, assetManager]
-const orderRaisers = [assetManager, accountManager, noc, customerAdmin, 'sn_customerservice_agent']
-const orderWorkers = [assetManager, accountManager, noc, inventoryTech, fieldTech, 'sn_customerservice_agent']
-const stagingWorkers = [inventoryTech, assetManager]
 
 Acl({
     $id: Now.ID['acl_agreement_read'],
@@ -366,7 +365,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_staging_task',
     operation: 'create',
-    roles: stagingWorkers,
+    roles: stockroomWorkers,
 })
 
 Acl({
@@ -374,7 +373,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_staging_task',
     operation: 'write',
-    roles: stagingWorkers,
+    roles: stockroomWorkers,
 })
 
 Acl({
@@ -398,7 +397,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_staging_step',
     operation: 'create',
-    roles: stagingWorkers,
+    roles: stockroomWorkers,
 })
 
 Acl({
@@ -406,7 +405,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_staging_step',
     operation: 'write',
-    roles: stagingWorkers,
+    roles: stockroomWorkers,
 })
 
 Acl({
@@ -695,7 +694,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_asn_import',
     operation: 'read',
-    roles: [inventoryTech, assetManager],
+    roles: stockroomWorkers,
 })
 
 Acl({
@@ -703,7 +702,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_asn_import',
     operation: 'create',
-    roles: [inventoryTech, assetManager],
+    roles: stockroomWorkers,
 })
 
 Acl({
@@ -711,7 +710,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_asn_import',
     operation: 'write',
-    roles: [inventoryTech, assetManager],
+    roles: stockroomWorkers,
 })
 
 Acl({
@@ -847,7 +846,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_disposal_order',
     operation: 'create',
-    roles: [assetManager, inventoryTech],
+    roles: stockroomWorkers,
 })
 
 Acl({
@@ -855,7 +854,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_disposal_order',
     operation: 'write',
-    roles: [assetManager, inventoryTech],
+    roles: stockroomWorkers,
 })
 
 Acl({
@@ -879,7 +878,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_disposal_line',
     operation: 'create',
-    roles: [assetManager, inventoryTech],
+    roles: stockroomWorkers,
 })
 
 Acl({
@@ -887,7 +886,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_disposal_line',
     operation: 'write',
-    roles: [assetManager, inventoryTech],
+    roles: stockroomWorkers,
 })
 
 Acl({
@@ -1051,7 +1050,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_return_order',
     operation: 'create',
-    roles: [assetManager, accountManager, noc, customerAdmin, 'sn_customerservice_agent'],
+    roles: orderRaisers,
 })
 
 Acl({
@@ -1100,7 +1099,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_return_order_line',
     operation: 'write',
-    roles: [assetManager, inventoryTech],
+    roles: stockroomWorkers,
 })
 
 Acl({

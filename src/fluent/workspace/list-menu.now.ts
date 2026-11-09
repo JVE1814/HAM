@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Applicability, UxListMenuConfig } from '@servicenow/sdk/core'
-import { accountManager, admin, assetManager, fieldTech, finance, inventoryTech, noc } from '../security/roles.now'
+import { admin, broadStaffRecords, moneyReaderRecords, providerStaffRecords } from '../security/roles.now'
 import { OPEN_ORDERS_QUERY } from '../../server/domain/fulfilment'
 import { FLEET_CONDITION, FLEET_IN_STAGE, FLEET_INSTALLED, NAAS_MODEL_CONDITION, NAAS_MODEL_MILESTONES } from '../../server/domain/fleet'
 import { OPEN_SHIPMENTS } from '../../server/domain/shipping'
@@ -21,21 +21,21 @@ import { INSTALL_STATUS, SHIPMENT_STATUS } from '../../server/domain/vocabulary'
 export const staffAudience = Applicability({
     $id: Now.ID['ws_audience_staff'],
     name: 'NaaS provider staff',
-    roles: [assetManager, inventoryTech, fieldTech, noc, accountManager, finance],
+    roles: providerStaffRecords,
 })
 
 /** Provider staff without inventory techs, for the customer, commercial and configuration tables whose read ACLs leave inventory techs out (broadStaff). */
 export const broadStaffAudience = Applicability({
     $id: Now.ID['ws_audience_broad_staff'],
     name: 'NaaS provider staff except inventory techs',
-    roles: [assetManager, fieldTech, noc, accountManager, finance],
+    roles: broadStaffRecords,
 })
 
 /** The roles that read billing and margin data (the money tables' read ACLs). */
 export const moneyAudience = Applicability({
     $id: Now.ID['ws_audience_money'],
     name: 'NaaS billing and margin readers',
-    roles: [finance, accountManager, assetManager],
+    roles: moneyReaderRecords,
 })
 
 export const adminAudience = Applicability({

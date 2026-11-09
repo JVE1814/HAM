@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Acl, Workspace } from '@servicenow/sdk/core'
-import { accountManager, assetManager, fieldTech, finance, inventoryTech, noc } from '../security/roles.now'
+import { providerStaff } from '../security/roles.now'
 import { naasListMenu } from './list-menu.now'
 
 /*
@@ -42,6 +42,6 @@ Acl({
     localOrExisting: 'Existing',
     type: 'ux_route',
     operation: 'read',
-    roles: [assetManager, inventoryTech, fieldTech, noc, accountManager, finance],
+    roles: providerStaff,
     name: `x.${VENDOR}.${PATH}.*`,
 })

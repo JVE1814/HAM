@@ -3,7 +3,7 @@ import { Acl, BusinessRule, ScheduledScript, UiAction, UiPage } from '@serviceno
 import { raiseAttestations, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudit } from '../../server/entry/assurance'
 import { explainRackRefusal, reconcileInstalledBaseAndRacks, recheckRackPlacement } from '../../server/entry/racks'
 import rackPage from '../../client/rack.html'
-import { accountManager, assetManager, customerAdmin, fieldTech, finance, inventoryTech, noc, siteContact } from '../security/roles.now'
+import { accountManager, assetManager, customerAdmin, fieldTech, finance, inventoryTech, noc, siteContact, stockroomWorkers } from '../security/roles.now'
 import { CURRENT_IS_FLEET, CURRENT_IS_NAAS_STOCKROOM, FLEET_FIELD, SITE_FIELD } from '../../server/domain/fleet'
 import { PLACEMENT_FIELDS } from '../../server/domain/rack'
 import { ENTRY_MODULES } from './server-modules.now'
@@ -21,7 +21,7 @@ UiAction({
     table: 'alm_stockroom',
     actionName: 'x_daas_ham_start_blind_count',
     condition: CURRENT_IS_NAAS_STOCKROOM,
-    roles: [inventoryTech, assetManager],
+    roles: stockroomWorkers,
     form: { showButton: true },
     showUpdate: true,
     script: uiStartStockroomAudit,

@@ -2,8 +2,9 @@ import '@servicenow/sdk/global'
 import { BusinessRule, EmailNotification, Record, ScheduledScript, Sla, UiAction } from '@servicenow/sdk/core'
 import { onCaseFailedAsset, uiDefectiveReturnedToOem, uiRaiseReplacement } from '../../server/entry/breakfix'
 import { chaseOverdueReturns, onReturnEvaluated, raiseScheduledReturns } from '../../server/entry/returns'
-import { assetManager, inventoryTech, noc } from '../security/roles.now'
+import { assetManager, noc, stockroomWorkers } from '../security/roles.now'
 import { ORDER_STAGE, RETURN_LINE_STATUS, RMA_STATE } from '../../server/domain/vocabulary'
+import { PLATFORM_ROLE } from '../../server/domain/visibility'
 
 /* Break-fix (D58) and returns (D60): rules, actions, SLAs, jobs and notifications. */
 
@@ -28,7 +29,7 @@ UiAction({
     // replacementStep, which built-metadata.test.ts holds the built condition to).
     condition:
         `current.x_daas_ham_failed_asset != '' && current.active == true && (current.x_daas_ham_replacement_order == '' || ['${ORDER_STAGE.rejected}', '${ORDER_STAGE.cancelled}'].indexOf(String(current.x_daas_ham_replacement_order.stage)) >= 0)`,
-    roles: [noc, assetManager, 'sn_customerservice_agent'],
+    roles: [noc, assetManager, PLATFORM_ROLE.serviceDeskAgent],
     form: { showButton: true, style: 'primary' },
     showUpdate: true,
     script: uiRaiseReplacement,
@@ -42,7 +43,7 @@ UiAction({
     hint: 'Record that the defective unit was shipped back to the manufacturer (needs wipe evidence on the asset).',
     // domain/sourcing RMA_AT_OEM, which built-metadata.test.ts holds the built condition to.
     condition: `['${RMA_STATE.open}','${RMA_STATE.replacement_received}'].indexOf(current.state + '') >= 0`,
-    roles: [inventoryTech, assetManager],
+    roles: stockroomWorkers,
     form: { showButton: true },
     showUpdate: true,
     script: uiDefectiveReturnedToOem,

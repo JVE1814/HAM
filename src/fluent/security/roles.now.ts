@@ -1,81 +1,109 @@
 import '@servicenow/sdk/global'
 import { Role } from '@servicenow/sdk/core'
+import { BROAD_STAFF, PLATFORM_ROLE, ROLE } from '../../server/domain/visibility'
 
-/*
- * Base-platform roles contained below (asset, inventory_user, inventory_admin, procurement_user,
- * procurement_admin, model_manager, report_user, snc_external) must exist on the instance; see README "Required
- * plugins".
- */
+/* The base-platform roles contained below (domain/visibility PLATFORM_ROLE) must exist on the instance; see README "Required plugins". */
 
 export const inventoryTech = Role({
-    name: 'x_daas_ham.inventory_tech',
+    name: ROLE.inventoryTech,
     description: 'Depot and staging-centre technician: receiving, put-away, picking, staging and stockroom audits for assigned stockrooms.',
-    containsRoles: ['asset', 'inventory_user', 'canvas_user'],
+    containsRoles: [PLATFORM_ROLE.asset, PLATFORM_ROLE.inventoryUser, PLATFORM_ROLE.canvasUser],
 })
 
 export const fieldTech = Role({
-    name: 'x_daas_ham.field_tech',
+    name: ROLE.fieldTech,
     description: 'Field engineer: installs, swaps, collects and audits equipment at customer sites (in addition to FSM roles).',
-    containsRoles: ['asset', 'canvas_user'],
+    containsRoles: [PLATFORM_ROLE.asset, PLATFORM_ROLE.canvasUser],
 })
 
 export const noc = Role({
-    name: 'x_daas_ham.noc',
+    name: ROLE.noc,
     description: 'Network operations centre: reads the installed base, coverage and lifecycle data and raises proactive cases.',
-    containsRoles: ['canvas_user'],
+    containsRoles: [PLATFORM_ROLE.canvasUser],
 })
 
 export const accountManager = Role({
-    name: 'x_daas_ham.account_manager',
+    name: ROLE.accountManager,
     description: 'Owns customer agreements, catalog entries and site templates; approves over-quota orders.',
-    containsRoles: ['canvas_user'],
+    containsRoles: [PLATFORM_ROLE.canvasUser],
 })
 
 export const finance = Role({
-    name: 'x_daas_ham.finance',
+    name: ROLE.finance,
     description: 'Reads subscription lines and fee events; runs and closes billing periods.',
-    containsRoles: ['report_user', 'canvas_user'],
+    containsRoles: [PLATFORM_ROLE.reportUser, PLATFORM_ROLE.canvasUser],
 })
 
 export const assetManager = Role({
-    name: 'x_daas_ham.asset_manager',
+    name: ROLE.assetManager,
     description: 'Provider asset manager: full lifecycle management across all customers.',
     // model_manager: the platform's ACLs let only it create and change Model lifecycle milestones (ADR 0017).
-    containsRoles: ['asset', 'inventory_user', 'procurement_user', 'model_manager', 'report_user', inventoryTech, noc],
+    containsRoles: [PLATFORM_ROLE.asset, PLATFORM_ROLE.inventoryUser, PLATFORM_ROLE.procurementUser, PLATFORM_ROLE.modelManager, PLATFORM_ROLE.reportUser, inventoryTech, noc],
 })
 
 export const admin = Role({
-    name: 'x_daas_ham.admin',
+    name: ROLE.admin,
     description: 'Application administrator: configuration plus every provider role.',
-    containsRoles: [assetManager, inventoryTech, fieldTech, noc, accountManager, finance, 'inventory_admin', 'procurement_admin'],
+    containsRoles: [assetManager, inventoryTech, fieldTech, noc, accountManager, finance, PLATFORM_ROLE.inventoryAdmin, PLATFORM_ROLE.procurementAdmin],
     scopedAdmin: true,
 })
 
 export const customerAdmin = Role({
-    name: 'x_daas_ham.customer_admin',
+    name: ROLE.customerAdmin,
     description: 'Customer network/IT admin (external): sees their own customer only; orders, raises faults, approves off-catalog orders, attests inventory.',
-    containsRoles: ['snc_external'],
+    containsRoles: [PLATFORM_ROLE.external],
 })
 
 export const siteContact = Role({
-    name: 'x_daas_ham.site_contact',
+    name: ROLE.siteContact,
     description: 'Customer site contact (external): confirms deliveries and installs at their assigned sites.',
-    containsRoles: ['snc_external'],
+    containsRoles: [PLATFORM_ROLE.external],
 })
 
 export const integration = Role({
-    name: 'x_daas_ham.integration',
+    name: ROLE.integration,
     description: 'Machine role for the provider NMS that posts device events (server-side writes need no table roles).',
 })
 
+/*
+ * The role groups the access lists name, each defined here once. They hold role names, which every record that takes
+ * roles reads (a navigator module takes nothing else), and a list keeps the order its module shows the roles in.
+ */
+
 /** Every provider-staff role: reads the installed base and the tables of stockroom work, the only app tables an inventory tech reads. */
-export const providerStaff = [assetManager, inventoryTech, fieldTech, noc, accountManager, finance]
+export const providerStaff = [ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance]
 
 /** Provider staff without inventory techs: the read list for customer, commercial and configuration tables. */
-export const broadStaff = [assetManager, fieldTech, noc, accountManager, finance]
-
-/** Roles that may change lifecycle data. */
-export const assetEditors = [assetManager, inventoryTech, fieldTech]
+export const broadStaff = BROAD_STAFF
 
 /** External customer roles; their reads are filtered to their own customer. */
-export const customerRoles = [customerAdmin, siteContact]
+export const customerRoles = [ROLE.customerAdmin, ROLE.siteContact]
+
+/** Who writes Agreements, Catalog entries and the other commercial records. */
+export const commercialEditors = [ROLE.accountManager, ROLE.assetManager]
+
+/** Who raises an Order: staff, the Customer's admin and the service desk. */
+export const orderRaisers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, ROLE.customerAdmin, PLATFORM_ROLE.serviceDeskAgent]
+
+/** The staff among them, who raise one from the navigator or submit one on its form. */
+export const staffOrderRaisers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, PLATFORM_ROLE.serviceDeskAgent]
+
+/** Who changes an Order as it is fulfilled. */
+export const orderWorkers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, ROLE.inventoryTech, ROLE.fieldTech, PLATFORM_ROLE.serviceDeskAgent]
+
+/** Who does the stockroom's work: receiving, staging, shipping, blind counts. */
+export const stockroomWorkers = [ROLE.inventoryTech, ROLE.assetManager]
+
+/** Who writes Lease schedules and their decisions. */
+export const leaseEditors = [ROLE.assetManager, ROLE.finance]
+
+/** The roles that read billing and margin data. */
+export const moneyReaders = [ROLE.finance, ROLE.accountManager, ROLE.assetManager]
+
+/*
+ * Three of the groups again as role records, for the workspace's audiences: an Applicability stores role ids, which a
+ * name does not give it. built-metadata.test.ts holds each audience to its group of names.
+ */
+export const providerStaffRecords = [assetManager, inventoryTech, fieldTech, noc, accountManager, finance]
+export const broadStaffRecords = [assetManager, fieldTech, noc, accountManager, finance]
+export const moneyReaderRecords = [finance, accountManager, assetManager]

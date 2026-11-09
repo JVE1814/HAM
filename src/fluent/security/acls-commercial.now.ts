@@ -1,11 +1,8 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
-import { accountManager, admin, assetManager, broadStaff, finance } from './roles.now'
+import { admin, broadStaff, finance, leaseEditors, moneyReaders } from './roles.now'
 
 /* Access controls for the contracts and money tables (P3): leases, billing, costs and margin. */
-
-const leaseEditors = [assetManager, finance]
-const moneyReaders = [finance, accountManager, assetManager]
 
 Acl({
     $id: Now.ID['acl_lease_schedule_read'],
@@ -84,7 +81,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_service_interval',
     operation: 'write',
-    roles: [assetManager, finance],
+    roles: leaseEditors,
 })
 
 Acl({
@@ -92,7 +89,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_service_interval',
     operation: 'create',
-    roles: [assetManager, finance],
+    roles: leaseEditors,
 })
 
 Acl({

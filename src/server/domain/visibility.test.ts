@@ -1,4 +1,3 @@
-import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { fleetCondition, naasStockroomCondition } from './fleet'
 import { DEPLOYED_STAGES } from './lifecycle'
@@ -524,90 +523,5 @@ describe("the Customer contacts' read ACLs", () => {
             expect(granted.length, table).toBe(scopingOfTable(table).sharedWithoutCustomer ? 1 : 0)
             for (const [record] of SAMPLES[table]) expect(grantsContactRecord('own_sites', scopingOfTable(table), rowOf(record), none), table).toBe(false)
         }
-    })
-})
-
-describe('read ACLs for inventory techs', () => {
-    /**
-     * The app tables an inventory tech with no broader role may read: the Assets, Staging tasks and Audits of their
-     * Stockrooms, and the ASN imports, Staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and
-     * Disposal orders they work on, which are not narrowed to their Stockrooms. Every other table's read ACL leaves
-     * inventory techs out: the before-query rules do not hide those from them (ADR 0005).
-     */
-    const INVENTORY_TECH_TABLES = [
-        'alm_hardware',
-        'x_daas_ham_asn_import',
-        'x_daas_ham_staging_task',
-        'x_daas_ham_staging_step',
-        'x_daas_ham_staging_template',
-        'x_daas_ham_staging_tmpl_item',
-        'x_daas_ham_order',
-        'x_daas_ham_order_line',
-        'x_daas_ham_shipment',
-        'x_daas_ham_shipment_event',
-        'x_daas_ham_return_order',
-        'x_daas_ham_return_order_line',
-        'x_daas_ham_audit',
-        'x_daas_ham_audit_line',
-        'x_daas_ham_oem_rma',
-        'x_daas_ham_disposal_order',
-        'x_daas_ham_disposal_line',
-    ]
-    const SECURITY = new URL('../../fluent/security/', import.meta.url)
-    const source = (file: string) => readFileSync(new URL(file, SECURITY), 'utf8')
-    const roles = source('roles.now.ts')
-    const items = (list: string) => list.split(',').map((item) => item.trim().replace(/"/g, "'")).filter(Boolean)
-    const namedLists = (text: string) => new Map([...text.matchAll(/const (\w+) = \[([^\]]*)\]/g)].map((m) => [m[1], items(m[2])]))
-    /** What an inventory tech with no other role holds: the role itself and the roles it contains. */
-    const heldByTech = new Set(['inventoryTech', "'x_daas_ham.inventory_tech'", ...items(/inventoryTech = Role\(\{[\s\S]*?containsRoles: \[([^\]]*)\]/.exec(roles)?.[1] ?? '')])
-
-    /**
-     * The table whose records an ACL is for: its own, or for one on a parent table applying to one class only (hardware's
-     * read ACLs, on alm_asset, ADR 0005) that class.
-     */
-    const recordsOf = (acl: string) =>
-        /appliesTo: 'sys_class_name=(\w+)'/.exec(acl)?.[1] ?? /table: '([^']+)'/.exec(acl)?.[1] ?? ''
-    /** Every read ACL of the app as the table of its records and the roles it grants, with named role lists expanded. */
-    const readAcls = readdirSync(SECURITY)
-        .filter((file) => /^acls.*\.now\.ts$/.test(file))
-        .flatMap((file) => {
-            const text = source(file)
-            const lists = new Map([...namedLists(roles), ...namedLists(text)])
-            const expand = (token: string): string[] => {
-                const name = token.replace(/^\.\.\./, '')
-                return lists.has(name) ? (lists.get(name) ?? []).flatMap(expand) : [token]
-            }
-            return text
-                .split('Acl({')
-                .slice(1)
-                // A Deny-Unless ACL (the row checks) grants nothing: it only takes access away.
-                .filter((acl) => acl.includes("operation: 'read'") && !acl.includes("decisionType: 'deny'"))
-                .map((acl) => {
-                    const granted = /roles: (\[[^\]]*\]|\w+)/.exec(acl)?.[1] ?? ''
-                    const tokens = granted.startsWith('[') ? items(granted.slice(1, -1)) : [granted]
-                    return { table: recordsOf(acl), roles: tokens.flatMap(expand) }
-                })
-        })
-    const readableByTech = [...new Set(readAcls.filter((acl) => acl.roles.some((role) => heldByTech.has(role))).map((acl) => acl.table))]
-    const closedToTech = [...new Set(readAcls.map((acl) => acl.table))].filter((table) => !readableByTech.includes(table))
-
-    it('let an inventory tech read exactly the tables of their stockroom work', () => {
-        expect(heldByTech).toContain("'inventory_user'")
-        expect(readableByTech.sort()).toEqual([...INVENTORY_TECH_TABLES].sort())
-    })
-
-    it('close customer, commercial and configuration tables to an inventory tech with no broader role', () => {
-        expect(closedToTech).toEqual(
-            expect.arrayContaining([
-                'x_daas_ham_agreement',
-                'x_daas_ham_subscription_line',
-                'x_daas_ham_catalog_entry',
-                'x_daas_ham_site_template',
-                'x_daas_ham_fee_event',
-                'x_daas_ham_attestation',
-                'x_daas_ham_lease_schedule',
-                'x_daas_ham_cloud_account',
-            ]),
-        )
     })
 })

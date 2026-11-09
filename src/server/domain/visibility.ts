@@ -22,14 +22,30 @@ export const ROLE = {
     integration: 'x_daas_ham.integration',
 } as const
 
-const BROAD_STAFF_ROLES = [
-    ROLE.admin,
-    ROLE.assetManager,
-    ROLE.fieldTech,
-    ROLE.noc,
-    ROLE.accountManager,
-    ROLE.finance,
-]
+/**
+ * The roles of other applications the app's roles contain or its metadata names. They must exist on the instance
+ * (README "Required plugins"), which the preflight check reports (domain/preflight).
+ */
+export const PLATFORM_ROLE = {
+    asset: 'asset',
+    inventoryUser: 'inventory_user',
+    inventoryAdmin: 'inventory_admin',
+    procurementUser: 'procurement_user',
+    procurementAdmin: 'procurement_admin',
+    modelManager: 'model_manager',
+    reportUser: 'report_user',
+    external: 'snc_external',
+    canvasUser: 'canvas_user',
+    serviceDeskAgent: 'sn_customerservice_agent',
+} as const
+
+/**
+ * Provider staff without inventory techs: who reads the customer, commercial and configuration tables, and sees every
+ * Customer. The metadata's read lists (security/roles.now.ts `broadStaff`) are this list.
+ */
+export const BROAD_STAFF = [ROLE.assetManager, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance]
+
+const BROAD_STAFF_ROLES = [ROLE.admin, ...BROAD_STAFF]
 
 export function resolveVisibility(hasRole: (role: string) => boolean): VisibilityScope {
     if (BROAD_STAFF_ROLES.some(hasRole)) return 'everything'

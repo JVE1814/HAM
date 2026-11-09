@@ -14,6 +14,7 @@ import { replacementStep } from './domain/breakfix'
 import { CANCELLABLE_ORDER_STAGES } from './domain/fulfilment'
 import { labelVoidable } from './domain/shipping'
 import { RMA_AT_OEM } from './domain/sourcing'
+import { BROAD_STAFF, PLATFORM_ROLE, ROLE, SCOPED_TABLES, type TableScoping } from './domain/visibility'
 import {
     ORDER_STAGE_CHOICES,
     RMA_STATE_CHOICES,
@@ -75,7 +76,10 @@ const unescapeXml = (text: string) =>
         .replace(/&apos;/g, "'")
         .replace(/&amp;/g, '&')
 
-/** One built record: the table it is a record of (`$table`), and each of its fields as the instance stores it ('' for an empty one). */
+/**
+ * One built record: the table it is a record of (`$table`), and each of its fields as the instance stores it ('' for an
+ * empty one). A reference built with the name of what it points at has that under `<field>.name`.
+ */
 interface BuiltRecord {
     $table: string
     [field: string]: string
@@ -90,8 +94,11 @@ function builtRecords(): BuiltRecord[] {
         const table = /<record_update table="(\w+)">/.exec(xml)?.[1]
         if (!table) return []
         const record: BuiltRecord = { $table: table }
-        for (const [, field, value] of xml.matchAll(/^ {4}<(\w+)(?: [^>]*)?(?:\/>|>([\s\S]*?)<\/\1>)$/gm)) {
-            if (field) record[field] = unescapeXml(value ?? '')
+        for (const [, field = '', attributes = '', value] of xml.matchAll(/^ {4}<(\w+)((?: [^>]*)?)(?:\/>|>([\s\S]*?)<\/\1>)$/gm)) {
+            record[field] = unescapeXml(value ?? '')
+            // A reference is built as the record's id, with what it names beside it.
+            const named = / name="([^"]*)"/.exec(attributes)?.[1]
+            if (named !== undefined) record[`${field}.name`] = unescapeXml(named)
         }
         return [record]
     })
@@ -526,6 +533,222 @@ describe('NaaS Asset Workspace URL', () => {
     it('links the navigator module to its landing page', () => {
         const module = records('sys_app_module').find((found) => found.title === 'NaaS Asset Workspace')
         expect(module?.query).toBe(`x/${vendor}/${path()}/home`)
+    })
+})
+
+/*
+ * What a reader may see is decided in one place (domain/visibility SCOPED_TABLES, tested in visibility.test.ts) and
+ * reached through the scripts of entry/visibility (`scopeRecords`, `readsRecord`, `grantsCustomerRecord`, and
+ * `grantsFleetAsset` for hardware), each of which finds the table of the record it is handed. What code cannot say is
+ * which records call them: that is read here, from the built rules and ACLs. A before-query rule (ADR 0005) narrows
+ * lists, but a record reached another way (a dot-walk from a visible record, an `^NQ` clause the rule's filter does not
+ * reach, or a table with no rule) is guarded only by its read ACL.
+ */
+interface BuiltAcl {
+    table: string
+    /** The table of its records: its own, or the one class an ACL on a parent table applies to. */
+    records: string
+    operation: string
+    deny: boolean
+    /** The names of the roles it grants. */
+    roles: string[]
+    appliesTo: string
+    /** The entry function its script calls, `inline` for a script written in the ACL, '' for none. */
+    script: string
+}
+
+function builtAcls(): BuiltAcl[] {
+    const rolesOf = new Map<string, string[]>()
+    for (const grant of records('sys_security_acl_role')) {
+        rolesOf.set(grant.sys_security_acl ?? '', [...(rolesOf.get(grant.sys_security_acl ?? '') ?? []), grant['sys_user_role.name'] ?? ''])
+    }
+    return records('sys_security_acl')
+        .filter((acl) => acl.type === 'record')
+        .map((acl) => ({
+            table: acl.name ?? '',
+            records: /^sys_class_name=(\w+)$/.exec(acl.applies_to ?? '')?.[1] ?? acl.name ?? '',
+            operation: acl.operation ?? '',
+            deny: acl.decision_type === 'deny',
+            roles: rolesOf.get(acl.sys_id ?? '') ?? [],
+            appliesTo: acl.applies_to ?? '',
+            script: wrapped(acl.script ?? '')?.fn ?? (acl.script ? 'inline' : ''),
+        }))
+}
+
+describe('the rules and ACLs that scope what a reader sees', () => {
+    const SCOPINGS: Readonly<Record<string, TableScoping>> = SCOPED_TABLES
+    const scopedTables = Object.keys(SCOPINGS)
+    const reads = () => builtAcls().filter((acl) => acl.operation === 'read')
+    const rules = () =>
+        records('sys_script')
+            .filter((rule) => rule.action_query === 'true')
+            .map((rule) => ({ table: rule.collection ?? '', script: wrapped(rule.script ?? '')?.fn ?? '' }))
+    const ruledTables = () => rules().map((rule) => rule.table)
+
+    describe('before-query rules', () => {
+        it('run the one script, each on a table that has a scoping for it to find', () => {
+            expect(rules().length).toBeGreaterThan(0)
+            for (const rule of rules()) {
+                expect(rule.script, rule.table).toBe('scopeRecords')
+                expect(scopedTables, rule.table).toContain(rule.table)
+            }
+            expect(new Set(ruledTables()).size).toBe(ruledTables().length)
+        })
+
+        it('narrow every scoped table but the lines and Site templates, which their read ACL alone guards', () => {
+            expect(scopedTables.filter((table) => !ruledTables().includes(table)).sort()).toEqual([
+                'x_daas_ham_attestation_item',
+                'x_daas_ham_return_order_line',
+                'x_daas_ham_shipment_event',
+                'x_daas_ham_site_template',
+                'x_daas_ham_site_template_item',
+            ])
+        })
+    })
+
+    describe('row checks of the read ACLs', () => {
+        const rowChecks = () => reads().filter((acl) => acl.deny)
+        const stockroomScoped = scopedTables.filter((table) => SCOPINGS[table]?.stockroom)
+
+        it('deny, on each table the rules narrow to stockrooms, what its rule would hide', () => {
+            expect(stockroomScoped).toContain('alm_hardware')
+            expect(rowChecks().map((acl) => acl.records).sort()).toEqual([...stockroomScoped].sort())
+            for (const table of stockroomScoped) expect(ruledTables(), table).toContain(table)
+            for (const acl of rowChecks()) expect(acl.script, acl.records).toBe('readsRecord')
+        })
+
+        it('take no role: every reader passes them, as the rules narrow whoever reads', () => {
+            for (const acl of rowChecks()) expect(acl.roles, acl.records).toEqual([])
+        })
+
+        it('apply to every record of their table: the script, not Applies To, tells what a reader leaves to the platform', () => {
+            for (const acl of rowChecks().filter((acl) => acl.table === acl.records)) expect(acl.appliesTo, acl.table).toBe('')
+        })
+    })
+
+    describe('read ACLs for Customer contacts', () => {
+        const contactReads = () =>
+            reads().filter((acl) => !acl.deny && acl.roles.some((role) => role === ROLE.customerAdmin || role === ROLE.siteContact))
+
+        it('cover the tables a Customer contact reads', () => {
+            expect(contactReads().map((acl) => acl.records).sort()).toEqual(
+                expect.arrayContaining(['alm_hardware', 'x_daas_ham_order', 'x_daas_ham_order_line', 'x_daas_ham_return_order', 'x_daas_ham_shipment']),
+            )
+        })
+
+        it('grant a record only through the shared decision: no ACL lets a contact in without it, or decides for itself', () => {
+            for (const acl of contactReads()) {
+                expect(acl.script, acl.records).toBe(acl.records === 'alm_hardware' ? 'grantsFleetAsset' : 'grantsCustomerRecord')
+            }
+            expect(builtAcls().filter((acl) => acl.script === 'inline')).toEqual([])
+        })
+
+        it('sit on a scoped table with a Customer field, and with a Site field where they admit site contacts', () => {
+            for (const acl of contactReads()) {
+                expect(SCOPINGS[acl.records]?.customer, acl.records).toBeTruthy()
+                if (acl.roles.includes(ROLE.siteContact)) expect(SCOPINGS[acl.records]?.site, acl.records).toBeTruthy()
+            }
+        })
+
+        it('are the only check on a scoped table with no before-query rule, so each of those has one', () => {
+            const granted = contactReads().map((acl) => acl.records)
+            for (const table of scopedTables.filter((table) => !ruledTables().includes(table))) expect(granted, table).toContain(table)
+        })
+    })
+
+    describe('ACLs on the hardware the app shares with the Provider IT', () => {
+        const hardware = () => builtAcls().filter((acl) => acl.records === 'alm_hardware')
+
+        it("sit on alm_asset, so alm_hardware inherits the platform's read ACLs there and an alm_asset list is checked too", () => {
+            expect(builtAcls().filter((acl) => acl.table === 'alm_hardware')).toEqual([])
+            expect(hardware().length).toBeGreaterThanOrEqual(3)
+            for (const acl of hardware()) expect(acl.table, `${acl.operation} ${acl.roles}`).toBe('alm_asset')
+            expect(builtAcls().filter((acl) => acl.table === 'alm_asset' && acl.records !== 'alm_hardware')).toEqual([])
+        })
+
+        it('grant only fleet assets: the Allow-If ones leave other hardware to the platform', () => {
+            for (const acl of hardware().filter((acl) => !acl.deny)) expect(acl.script, `${acl.roles}`).toBe('grantsFleetAsset')
+        })
+    })
+
+    describe('read ACLs for inventory techs', () => {
+        /**
+         * The app tables an inventory tech with no broader role may read: the Assets, Staging tasks and Audits of their
+         * Stockrooms, and the ASN imports, Staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and
+         * Disposal orders they work on, which are not narrowed to their Stockrooms. Every other table's read ACL leaves
+         * inventory techs out: the before-query rules do not hide those from them (ADR 0005).
+         */
+        const INVENTORY_TECH_TABLES = [
+            'alm_hardware',
+            'x_daas_ham_asn_import',
+            'x_daas_ham_staging_task',
+            'x_daas_ham_staging_step',
+            'x_daas_ham_staging_template',
+            'x_daas_ham_staging_tmpl_item',
+            'x_daas_ham_order',
+            'x_daas_ham_order_line',
+            'x_daas_ham_shipment',
+            'x_daas_ham_shipment_event',
+            'x_daas_ham_return_order',
+            'x_daas_ham_return_order_line',
+            'x_daas_ham_audit',
+            'x_daas_ham_audit_line',
+            'x_daas_ham_oem_rma',
+            'x_daas_ham_disposal_order',
+            'x_daas_ham_disposal_line',
+        ]
+        /** What an inventory tech with no other role holds: the role itself and the roles it contains. */
+        const heldByTech = () =>
+            new Set([
+                ROLE.inventoryTech,
+                ...records('sys_user_role_contains')
+                    .filter((link) => link['role.name'] === ROLE.inventoryTech)
+                    .map((link) => link['contains.name'] ?? ''),
+            ])
+        // A Deny-Unless ACL (the row checks) grants nothing: it only takes access away.
+        const grants = () => reads().filter((acl) => !acl.deny)
+        const readableByTech = () => [...new Set(grants().filter((acl) => acl.roles.some((role) => heldByTech().has(role))).map((acl) => acl.records))]
+
+        it('let an inventory tech read exactly the tables of their stockroom work', () => {
+            expect(heldByTech()).toContain(PLATFORM_ROLE.inventoryUser)
+            expect(readableByTech().sort()).toEqual([...INVENTORY_TECH_TABLES].sort())
+        })
+
+        it('close customer, commercial and configuration tables to an inventory tech with no broader role', () => {
+            const closedToTech = [...new Set(grants().map((acl) => acl.records))].filter((table) => !readableByTech().includes(table))
+            expect(closedToTech).toEqual(
+                expect.arrayContaining([
+                    'x_daas_ham_agreement',
+                    'x_daas_ham_subscription_line',
+                    'x_daas_ham_catalog_entry',
+                    'x_daas_ham_site_template',
+                    'x_daas_ham_fee_event',
+                    'x_daas_ham_attestation',
+                    'x_daas_ham_lease_schedule',
+                    'x_daas_ham_cloud_account',
+                ]),
+            )
+        })
+    })
+})
+
+/*
+ * A role group is one list of names (security/roles.now.ts). A workspace audience stores role ids, so it is built from
+ * the same roles as records: each audience must name the roles of its group.
+ */
+describe('workspace audiences', () => {
+    const roleNames = () => new Map(records('sys_user_role').map((role) => [role.sys_id ?? '', role.name ?? '']))
+    const audience = (name: string) =>
+        (records('sys_ux_applicability').find((found) => found.name === name)?.roles ?? '').split(',').map((id) => roleNames().get(id) ?? id)
+    const grantedOn = (table: string, operation: string) =>
+        builtAcls().filter((acl) => acl.table === table && acl.operation === operation && !acl.deny).flatMap((acl) => acl.roles)
+
+    it('are the role groups the navigator and the ACLs name', () => {
+        const workspaceModule = records('sys_app_module').find((module) => module.title === 'NaaS Asset Workspace')
+        expect(audience('NaaS provider staff')).toEqual(workspaceModule?.roles?.split(','))
+        expect(audience('NaaS provider staff except inventory techs')).toEqual(BROAD_STAFF)
+        expect(audience('NaaS billing and margin readers').sort()).toEqual(grantedOn('x_daas_ham_margin', 'read').sort())
+        expect(audience('NaaS administrators')).toEqual([ROLE.admin])
     })
 })
 

@@ -1,14 +1,12 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
-import { admin, assetManager, broadStaff, customerRoles, inventoryTech, providerStaff } from './roles.now'
+import { admin, assetManager, broadStaff, customerRoles, providerStaff, stockroomWorkers } from './roles.now'
 import { grantsCustomerRecord } from '../../server/entry/visibility'
 
 /*
  * Access controls for shipping (P3.26) and OEM cloud accounts (P3.27). Customer admins see their own Customer's shipments,
  * site contacts those of their Sites (the same check as the customer ACLs in acls.now.ts).
  */
-
-const shippers = [assetManager, inventoryTech]
 
 Acl({
     $id: Now.ID['acl_shipment_read'],
@@ -23,7 +21,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_shipment',
     operation: 'write',
-    roles: shippers,
+    roles: stockroomWorkers,
 })
 
 Acl({
@@ -31,7 +29,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_shipment',
     operation: 'create',
-    roles: shippers,
+    roles: stockroomWorkers,
 })
 
 Acl({
