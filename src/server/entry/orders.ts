@@ -179,7 +179,8 @@ function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Order
     if (findings.length === 0) return submitAccepted(order)
     gs.addErrorMessage(`Order not submitted. ${findings.join('. ')}.`)
     order.setValue('work_notes', `Not submitted:\n${findings.join('\n')}`)
-    order.update()
+    // A refresh Order the daily job raised has only this note to say why it is a draft.
+    if (!order.update()) saveRefused(order, `${str(order, 'number')} not submitted (${findings.join('; ')}), and its note not saved`)
     return false
 }
 
@@ -213,7 +214,7 @@ function submitAccepted(order: GlideRecord): boolean {
     if (refusal) {
         gs.addErrorMessage(`Order not submitted: ${refusal}.`)
         order.setValue('work_notes', `Not submitted: ${refusal}`)
-        order.update()
+        if (!order.update()) saveRefused(order, `${str(order, 'number')} not submitted (${refusal}), and its note not saved`)
         return false
     }
     order.setValue('stage', 'awaiting_approval')
@@ -482,9 +483,12 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
             if (fresh && unreserve(fresh, source)) putBack++
         }
     }
-    // An Asset whose Staging task could not be opened stays reserved for the line rather than staging with no task to finish.
+    // An Asset whose Staging task could not be opened stays reserved for the line rather than staging with no task to
+    // finish. So does one whose move into staging is refused (moveAndSave warns): the task just opened is skipped
+    // (logged when refused), so the unit is reserved for its line with no task, not reserved under an open task.
     for (const asset of toStage) {
-        if (openStagingTask(asset, lineId)) moveAndSave(asset, 'staging', 'sourcing')
+        if (!openStagingTask(asset, lineId) || moveAndSave(asset, 'staging', 'sourcing')) continue
+        closeOpenStagingTasks(asset.getUniqueValue(), 'Not moved into staging at sourcing')
     }
     // A unit in transfer gets its Staging task now and goes into staging when its line is received at the staging
     // centre (entry/assets `onTransferReleased`); without the task it is reserved for the line there.

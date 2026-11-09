@@ -120,9 +120,11 @@ function raiseWave({ customerId, siteId, agreementId, assets }: RefreshWave): st
         return ''
     }
     if (unmatched.length > 0) {
-        order.setValue('work_notes', `${unmatched.length} asset(s) have no sellable catalogued successor; their lines reuse the current model. Review before submitting.`)
-        order.update()
-        return str(order, 'number') // left in draft for the account manager to adjust
+        // Left in draft for the account manager to adjust; a note the platform refuses is logged, to say why it waits.
+        const note = `${unmatched.length} asset(s) have no sellable catalogued successor; their lines reuse the current model. Review before submitting.`
+        order.setValue('work_notes', note)
+        if (!order.update()) gs.warn(`[x_daas_ham] Refresh Order ${str(order, 'number')} left in draft, its note not saved (${note}): ${refusal(order)}`)
+        return str(order, 'number')
     }
     submitOrder(order)
     return str(order, 'number')

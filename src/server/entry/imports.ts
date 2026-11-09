@@ -20,10 +20,12 @@ interface RowOutcome {
     comment: string
 }
 
+/** Save how the row ended; one the platform refuses is logged with it, as the row then shows neither. */
 function finish(row: GlideRecord, state: ImportState, comment: string): void {
     row.setValue('sys_import_state', state)
     row.setValue('sys_import_state_comment', comment)
-    row.update()
+    if (row.update()) return
+    gs.warn(`[x_daas_ham] Import row ${row.getUniqueValue()} not saved as ${state} (${comment}): ${refusal(row)}`)
 }
 
 /** Tries at a serial's lock before the row is left to load again: a holder keeps it for one check and one insert. */
@@ -48,11 +50,12 @@ export function processAsnRow(current: GlideRecord): void {
     const resolution = resolveModel(raw, loadNormalizationData())
     const modelId = resolution.modelId
     if (!modelId) {
-        recordNormalizationException(raw, 'reason' in resolution ? resolution.reason : '', {
+        const raised = recordNormalizationException(raw, 'reason' in resolution ? resolution.reason : '', {
             table: 'x_daas_ham_asn_import',
             id: current.getUniqueValue(),
         })
-        return finish(current, 'error', `PID ${raw.model} does not map to a model; see normalization exceptions`)
+        const see = raised ? 'see normalization exceptions' : 'no normalization exception was raised (see the system log)'
+        return finish(current, 'error', `PID ${raw.model} does not map to a model; ${see}`)
     }
 
     // Set inside the serial's lock: the insert's own errors escape, and only a lock that could not be taken is marked.

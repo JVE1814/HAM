@@ -94,8 +94,18 @@ export function uiStartStockroomAudit(current: GlideRecord): void {
     while (asset.next()) inStock.push(asset.getUniqueValue())
     const expected = listExpected(audit, inStock)
     audit.setValue('expected_count', expected)
-    audit.update()
+    if (!audit.update()) notSaved(audit, 'its expected count')
     gs.addInfoMessage(`Audit ${str(audit, 'number')} started with ${expected} expected asset(s); scan them in the warehouse app (Audit mode)`)
+}
+
+/**
+ * Log, and tell the user, that the platform refused to save `what` on a started audit, and why. The audit stands: close
+ * compares the scans with its lines, and the counts and links on the audit only show what it holds.
+ */
+function notSaved(audit: GlideRecord, what: string): void {
+    const reason = refusal(audit)
+    gs.warn(`[x_daas_ham] Audit ${str(audit, 'number')} started, ${what} not saved: ${reason}`)
+    gs.addErrorMessage(`Audit ${str(audit, 'number')} started, but ${what} was not saved: ${reason}`)
 }
 
 /** UI action "Start site audit" on a site: expected = installed fleet assets; an FSM work order sends an engineer. */
@@ -120,7 +130,8 @@ export function uiStartSiteAudit(current: GlideRecord): void {
     audit.setValue('expected_count', expected)
     if (work) audit.setValue('work_order', work.workOrderId)
     else gs.addErrorMessage(`No work order for ${str(audit, 'number')} (see the system log): open one by hand`)
-    audit.update()
+    // The work order names the audit all the same (its source), so it is found from there.
+    if (!audit.update()) notSaved(audit, work ? 'its expected count and work order' : 'its expected count')
 }
 
 /** POST /audits/{id}/scan { code }: record one scan against an open audit the user may see. */
@@ -148,10 +159,12 @@ export function scanAudit(request: RESTAPIRequest, response: RESTAPIResponse): v
     line.setValue('scanned_code', code)
     line.setValue('result', 'found')
     line.setValue('scanned_at', new GlideDateTime().getValue())
-    // An unrecorded scan would count its unit missing at close, so the technician is told to scan again.
+    // An unrecorded scan would count its unit missing at close, so the technician is told to scan again. Why the
+    // platform refused it is logged, not sent to the client (as entry/customer).
     if (!line.insert()) {
+        gs.warn(`[x_daas_ham] Scan of ${code} on audit ${str(audit, 'number')} not recorded: ${refusal(line)}`)
         response.setStatus(422)
-        response.setBody({ error: `Scan not recorded: ${refusal(line)}` } as never)
+        response.setBody({ error: 'Scan not recorded: the platform refused it; scan it again' } as never)
         return
     }
     response.setStatus(200)
@@ -177,7 +190,12 @@ function findOpenVisibleAudit(key: string): GlideRecord | null {
     return audit.next() ? audit : null
 }
 
-/** UI action "Close audit": compare scans with the expected list; missing assets become exceptions. */
+/**
+ * UI action "Close audit": compare scans with the expected list; missing assets become exceptions. The audit is closed
+ * first: one the platform refuses to close stays open, to scan and close again, with no line marked and no exception
+ * raised for a unit that may still be scanned. A line result or exception then refused is logged and counted to the
+ * user, to fix by hand: closing does not run again.
+ */
 export function uiCloseAudit(current: GlideRecord): void {
     if (!findOpenVisibleAudit(current.getUniqueValue())) {
         gs.addErrorMessage('Only an open audit of one of your stockrooms can be closed')
@@ -200,36 +218,58 @@ export function uiCloseAudit(current: GlideRecord): void {
         }
     }
     const result = compareAudit(expected, scans)
+    const number = str(current, 'number')
+    current.setValue('matched_count', result.matched.length)
+    current.setValue('missing_count', result.missing.length)
+    current.setValue('unexpected_count', result.unexpected.length)
+    current.setValue('state', 3)
+    if (!current.update()) return void gs.addErrorMessage(`Audit ${number} not closed: ${refusal(current)}`)
+    let unsaved = 0
     const outcome = new GlideRecord('x_daas_ham_audit_line')
     outcome.addQuery('audit', current.getUniqueValue())
     outcome.addNullQuery('scanned_code')
     outcome.query()
     while (outcome.next()) {
         const missing = result.missing.includes(str(outcome, 'asset'))
-        outcome.setValue('result', missing ? 'missing' : 'found')
-        outcome.update()
-        if (missing) {
-            openException('audit_missing', {
-                assetId: str(outcome, 'asset'),
-                customerId: str(outcome, 'asset.company'),
-                detail: `Not found in ${str(current, 'number')}`,
-            })
-        }
+        if (!markLine(outcome, missing ? 'missing' : 'found', number)) unsaved++
+        if (missing && !raiseMissing(outcome, number)) unsaved++
     }
     const scanned = new GlideRecord('x_daas_ham_audit_line')
     scanned.addQuery('audit', current.getUniqueValue())
     scanned.addNotNullQuery('scanned_code')
     scanned.query()
     while (scanned.next()) {
-        if (!result.unexpected.includes(str(scanned, 'scanned_code'))) continue
-        scanned.setValue('result', 'unexpected')
-        scanned.update()
+        if (result.unexpected.includes(str(scanned, 'scanned_code')) && !markLine(scanned, 'unexpected', number)) unsaved++
     }
-    current.setValue('matched_count', result.matched.length)
-    current.setValue('missing_count', result.missing.length)
-    current.setValue('unexpected_count', result.unexpected.length)
-    current.setValue('state', 3)
-    current.update()
+    if (unsaved > 0) gs.addErrorMessage(`Audit ${number} closed, but ${unsaved} line result(s) or exception(s) were not saved (see the system log)`)
+}
+
+/**
+ * Raise the *missing in audit* exception of the line's Asset (platform/exceptions `openException`); false, logged, when
+ * none is open afterwards, as the closed audit does not raise it again. openException returns nothing: an insert the
+ * platform refuses is logged there and returns normally, as does a raise whose lock another holds through every try,
+ * and one whose lock cannot be taken throws. So whether the exception stands is read back.
+ */
+function raiseMissing(line: GlideRecord, number: string): boolean {
+    const assetId = str(line, 'asset')
+    let why = 'none is open (see the system log)'
+    try {
+        openException('audit_missing', { assetId, customerId: str(line, 'asset.company'), detail: `Not found in ${number}` })
+    } catch (error) {
+        why = error instanceof Error ? error.message : String(error)
+    }
+    if (exists('x_daas_ham_recon_exception', `exception_type=audit_missing^status=open^asset=${assetId}`)) return true
+    gs.warn(`[x_daas_ham] Audit ${number}: no missing in audit exception for ${line.getDisplayValue('asset')}: ${why}; raise it by hand`)
+    return false
+}
+
+/** Save an audit line's result; false when the platform refuses (logged): the audit's counts still have it. */
+function markLine(line: GlideRecord, result: 'found' | 'missing' | 'unexpected', number: string): boolean {
+    line.setValue('result', result)
+    if (line.update()) return true
+    const what = str(line, 'scanned_code') || line.getDisplayValue('asset')
+    gs.warn(`[x_daas_ham] Audit ${number}: line of ${what} not saved as ${result}: ${refusal(line)}`)
+    return false
 }
 
 /**

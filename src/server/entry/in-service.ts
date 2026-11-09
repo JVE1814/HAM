@@ -91,7 +91,7 @@ function freshAsset(assetId: string): GlideRecord | null {
 }
 
 /**
- * POST /api/x_daas_ham/naas/v1/device_events - Seen signals from the Provider NMS. An identifier is matched to a fleet
+ * POST /api/x_daas_ham/naas/device_events - Seen signals from the Provider NMS. An identifier is matched to a fleet
  * asset only (platform/assets `findAssetByIdentifier`, ADR 0016): one the Provider IT's equipment carries, like one no
  * Asset carries, is reported in `unknown_identifiers` and stored as no event.
  */
@@ -101,8 +101,8 @@ export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIRespo
     if ('error' in parsed) return reply(response, 400, { error: parsed.error })
     const readers = lifecycleReaders()
     const unknown: string[] = []
-    // Not applied, as another request held their Asset's lock through every try or its save was refused: for the NMS to
-    // send again.
+    // Not applied, as another request held their Asset's lock through every try, its save was refused or its event was
+    // not stored: for the NMS to send again.
     const busy: string[] = []
     for (const event of parsed.events) {
         const asset = findAssetByIdentifier(event.identifier, { beyondVisibility: true })
@@ -121,13 +121,17 @@ export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIRespo
     })
 }
 
-/** Apply one event holding the Asset's sighting `lock` (see goLiveIfSeen for false). */
+/**
+ * Apply one event holding the Asset's sighting `lock`: false when it was not wholly applied (see goLiveIfSeen), or
+ * the platform refused to store it (logged). A down event is only stored, so one refused would be lost once
+ * acknowledged; the NMS sends a refused event again, whose sighting, applied again, changes nothing.
+ */
 function applyEvent(lock: HeldLock, asset: GlideRecord, event: DeviceEvent, readers: LifecycleReaders): boolean {
     const assetId = asset.getUniqueValue()
-    if (event.event !== 'seen' || lastEventKind(assetId) !== 'seen') storeEvent(assetId, event)
-    if (event.event === 'down') return true
+    const stored = (event.event === 'seen' && lastEventKind(assetId) === 'seen') || storeEvent(assetId, event)
+    if (event.event === 'down') return stored
     recordSeen(asset, event.observedAt, event.source)
-    return goLiveIfSeen(lock, asset, readers)
+    return goLiveIfSeen(lock, asset, readers) && stored
 }
 
 function lastEventKind(assetId: string): string {
@@ -139,7 +143,8 @@ function lastEventKind(assetId: string): string {
     return gr.next() ? str(gr, 'event') : ''
 }
 
-function storeEvent(assetId: string, event: DeviceEvent): void {
+/** Store the event; false when the platform refuses it (logged as an error). */
+function storeEvent(assetId: string, event: DeviceEvent): boolean {
     const gr = new GlideRecord('x_daas_ham_device_event')
     gr.initialize()
     gr.setValue('asset', assetId)
@@ -147,7 +152,9 @@ function storeEvent(assetId: string, event: DeviceEvent): void {
     gr.setValue('event', event.event)
     gr.setValue('source', event.source)
     gr.setValue('observed_at', msToGlide(event.observedAt))
-    gr.insert()
+    if (gr.insert()) return true
+    gs.error(`[x_daas_ham] in-service detection: ${event.event} event of ${event.identifier} not stored: ${refusal(gr)}`)
+    return false
 }
 
 /**

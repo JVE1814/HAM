@@ -63,12 +63,17 @@ export function resolveModel(raw: { manufacturer: string; model: string }, data:
     return result.matched ? { modelId: result.modelId } : { modelId: '', reason: result.reason }
 }
 
-/** Remember a raw pair nobody could map (counted, so the worst offenders surface first). */
+/**
+ * Remember a raw pair nobody could map (counted, so the worst offenders surface first). Whether an open exception
+ * names the pair: false when the platform refuses to raise it (logged), so nothing surfaces the pair until it is seen
+ * again. One open already whose count the platform refuses is logged and still names it.
+ */
 export function recordNormalizationException(
     raw: { manufacturer: string; model: string },
     reason: string,
     source: { table: string; id: string },
-): void {
+): boolean {
+    const rawPair = `${raw.manufacturer} / ${raw.model}`
     const exception = new GlideRecord('x_daas_ham_norm_exception')
     exception.addQuery('raw_manufacturer', raw.manufacturer)
     exception.addQuery('raw_model', raw.model)
@@ -77,8 +82,8 @@ export function recordNormalizationException(
     exception.query()
     if (exception.next()) {
         exception.setValue('occurrences', num(exception, 'occurrences') + 1)
-        exception.update()
-        return
+        if (!exception.update()) gs.warn(`[x_daas_ham] Normalization exception ${rawPair}: occurrence not counted: ${refusal(exception)}`)
+        return true
     }
     exception.initialize()
     exception.setValue('raw_manufacturer', raw.manufacturer)
@@ -86,7 +91,9 @@ export function recordNormalizationException(
     exception.setValue('reason', reason)
     exception.setValue('source_table', source.table)
     exception.setValue('source_record', source.id)
-    exception.insert()
+    if (exception.insert()) return true
+    gs.warn(`[x_daas_ham] No normalization exception raised for ${rawPair}: ${refusal(exception)}`)
+    return false
 }
 
 /**

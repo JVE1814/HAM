@@ -3,7 +3,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { toIsoDate } from '../domain/calendar.ts'
 import type { LeaseEndAction } from '../domain/leases.ts'
-import { isDeployed, type LegalOwner } from '../domain/lifecycle.ts'
+import { checkTransition, isDeployed, type LegalOwner, type Stage } from '../domain/lifecycle.ts'
 import {
     evaluationTarget,
     overdueStep,
@@ -13,7 +13,7 @@ import {
     type RequestedReturn,
     type ReturnRequester,
 } from '../domain/returns.ts'
-import { clearRackPlacement, isFleetAsset, moveAndSave, moveAsset, readStage } from '../platform/assets.ts'
+import { clearRackPlacement, isFleetAsset, moveAndSave, moveAsset, readStage, transitionFacts } from '../platform/assets.ts'
 import { customerAdminIds } from '../platform/approvals.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { runTableJob } from '../platform/chunked.ts'
@@ -21,7 +21,7 @@ import { EVENT } from '../platform/events.ts'
 import { withLock, type HeldLock } from '../platform/locks.ts'
 import { nowMs, todayIso } from '../platform/clock.ts'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties.ts'
-import { bool, findById, refusal, str } from '../platform/records.ts'
+import { bool, exists, findById, refusal, str } from '../platform/records.ts'
 import { currentSession } from '../platform/session.ts'
 import {
     closeReturnIfDone,
@@ -97,14 +97,20 @@ function agreementOf(assetId: string | undefined): string {
 }
 
 /**
+ * What came of a unit's arrival at the depot (`receiveFromSite`): it is not coming back from a Site (it is received as
+ * stock instead), it was received, or the lifecycle or the platform refused the receipt, and why.
+ */
+export type SiteReceipt = { outcome: 'not_returning' } | { outcome: 'received' } | { outcome: 'refused'; reason: string }
+
+/**
  * A returned Asset arrived at the depot: it awaits evaluation, its subscription line no longer includes it, its earlier
- * wipe evidence no longer counts, and a late return is charged. Null when the unit is not coming back from a Site (it
- * is received as stock instead); otherwise why the platform refused the receipt, '' once received. A refused unit
- * stays pending return (or missing), with nothing settled, to scan again. The caller holds the unit's receive lock
+ * wipe evidence no longer counts, and a late return is charged. A refused unit stays pending return (or missing), with
+ * nothing settled, to scan again; the record keeps its unsaved move. The caller holds the unit's receive lock
  * (entry/warehouse), which the overdue job's declaration takes too, so a unit is never received and declared at once.
  */
-export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): string | null {
-    if (readStage(asset) !== 'pending_return' && readStage(asset) !== 'missing') return null
+export function receiveFromSite(asset: GlideRecord, stockroomId: string): SiteReceipt {
+    const stage = readStage(asset)
+    if (stage !== 'pending_return' && stage !== 'missing') return { outcome: 'not_returning' }
     const line = expectedReturnLine(asset.getUniqueValue())
     const siteId = str(asset, 'x_daas_ham_site')
     asset.setValue('stockroom', stockroomId)
@@ -115,19 +121,37 @@ export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): s
     asset.setValue('x_daas_ham_wipe_certificate', '')
     clearRackPlacement(asset)
     const verdict = moveAsset(asset, 'pending_evaluation')
-    if (!verdict.allowed) return verdict.reason
-    if (!asset.update()) return refusal(asset)
+    if (!verdict.allowed) return { outcome: 'refused', reason: verdict.reason }
+    if (!asset.update()) return { outcome: 'refused', reason: refusal(asset) }
     endSitePackageIfEmpty(siteId, str(asset, 'x_daas_ham_agreement'))
-    if (!line) return ''
+    if (line) settleReturnLine(asset, line)
+    return { outcome: 'received' }
+}
+
+/**
+ * `receiveFromSite` as entry/warehouse reads it until it takes a SiteReceipt: null when the unit is not coming back
+ * from a Site, '' once received, else why the receipt was refused.
+ */
+export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): string | null {
+    const receipt = receiveFromSite(asset, stockroomId)
+    if (receipt.outcome === 'refused') return receipt.reason
+    return receipt.outcome === 'received' ? '' : null
+}
+
+/**
+ * Settle the received unit's return `line`. The unit is received all the same: a line left unreceived cannot be
+ * evaluated, and a Return order not reopened for a unit that turned up is not evaluated again, so each is logged to fix
+ * by hand.
+ */
+function settleReturnLine(asset: GlideRecord, line: GlideRecord): void {
     const turnedUp = str(line, 'status') === 'missing'
     line.setValue('status', 'received')
     stampNow(line, 'received_at')
-    // The unit is received all the same; a line left unreceived cannot be evaluated, so it is logged to fix by hand.
     const serial = str(asset, 'serial_number')
     const lineOf = `Line of ${serial} on ${line.getDisplayValue('return_order')}`
     if (!line.update()) warnRefused(line, `${lineOf} not marked received`)
     const returnOrder = findById('x_daas_ham_return_order', str(line, 'return_order'))
-    if (!returnOrder) return ''
+    if (!returnOrder) return
     if (turnedUp) {
         // Declared missing, then found: it is late, not lost, and its line needs evaluating again.
         waiveOpenFees('lost', asset.getUniqueValue(), returnOrder.getUniqueValue())
@@ -137,7 +161,6 @@ export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): s
     if (str(returnOrder, 'due_back') && todayIso() > str(returnOrder, 'due_back')) {
         recordFee('late_return', asset, returnOrder.getUniqueValue())
     }
-    return ''
 }
 
 /**
@@ -273,9 +296,10 @@ function declareMissing(overdue: OverdueLine): void {
 
 /**
  * The declaration, made holding the unit's receive `lock`: only while its line still awaits it and the Asset is still
- * at or towards the Site, or missing already (an earlier run whose line was refused). True once the line is missing.
- * A unit anywhere else (received, its line refused), or outside the fleet (a line raised before the Fleet flag, ADR
- * 0016), is logged each run: no run settles that line.
+ * at or towards the Site in a stage the lifecycle lets go missing (`mayGoMissing`), or missing already (an earlier run
+ * whose line was refused). True once the line is missing. A unit anywhere else (received, its line refused; pending in
+ * service, kept on the line when its move to pending return was refused), or outside the fleet (a line raised before
+ * the Fleet flag, ADR 0016), is logged each run, with no move tried: no run settles that line.
  */
 function declareHolding(lock: HeldLock, overdue: OverdueLine): boolean {
     const record = findById('x_daas_ham_return_order_line', overdue.lineId)
@@ -287,7 +311,7 @@ function declareHolding(lock: HeldLock, overdue: OverdueLine): boolean {
         return false
     }
     const stage = asset ? readStage(asset) : null
-    if (asset && stage !== 'missing' && !isDeployed(stage)) {
+    if (asset && stage !== 'missing' && !mayGoMissing(asset, stage)) {
         const unit = `Line of ${str(asset, 'serial_number')} on ${overdue.number}`
         gs.warn(`[x_daas_ham] ${unit} not declared missing: the unit is ${stage ?? 'unknown'}; settle the line by hand`)
         return false
@@ -312,6 +336,11 @@ function declareHolding(lock: HeldLock, overdue: OverdueLine): boolean {
     return false
 }
 
+/** Whether the unit is at or towards its Site in a stage the lifecycle moves to missing (domain/lifecycle `checkTransition`). */
+function mayGoMissing(asset: GlideRecord, stage: Stage | null): boolean {
+    return isDeployed(stage) && checkTransition(stage, 'missing', transitionFacts(asset)).allowed
+}
+
 /** Daily: agreements past their end date and temporary deployments ending soon bring their equipment back. */
 export function raiseScheduledReturns(): void {
     const today = todayIso()
@@ -322,18 +351,24 @@ export function raiseScheduledReturns(): void {
     agreement.setLimit(50)
     agreement.query()
     while (agreement.next()) {
+        const agreementId = agreement.getUniqueValue()
         const recover = `Agreement ${str(agreement, 'number')} ended ${str(agreement, 'ends')}: recover all equipment`
         // One Return per Site, each a field de-install with its own change and work order there. Units still shipped
         // there go too (domain/returns `SITE_RECOVERY_STAGES`): once all are raised, the job leaves this Agreement.
-        const bySite = installedAssetIdsBySite({ agreementId: agreement.getUniqueValue(), wholeSite: true })
+        const bySite = installedAssetIdsBySite({ agreementId, wholeSite: true })
+        // The Returns this end raised: after the end date, so not those of an end before a renewal.
+        const raised = `trigger=agreement_end^agreement=${agreementId}^sys_created_on>=${str(agreement, 'ends')} 00:00:00`
         let refused = false
         for (const [siteId, assetIds] of bySite) {
+            // Raised once per Site: a run sent round again (another Site's Return or the mark below refused) finds the
+            // units that Return could not take (logged then) still there, and would raise an empty Return each day.
+            if (exists('x_daas_ham_return_order', `${raised}^site=${siteId}`)) continue
             const site = findById('cmn_location', siteId)
             const returnId = raiseReturn({
                 trigger: 'agreement_end',
                 customerId: str(agreement, 'customer'),
                 siteId,
-                agreementId: agreement.getUniqueValue(),
+                agreementId,
                 method: 'fsm_deinstall',
                 assetIds,
                 openFieldWork: true,
@@ -344,7 +379,8 @@ export function raiseScheduledReturns(): void {
         // A refused Return is raised on the next run. Units put on a Return now are pending return, so not found again.
         if (refused) continue
         agreement.setValue('end_return_raised', true)
-        agreement.update()
+        // Refused, the next run finds the Agreement again, raises no Return twice (above) and saves the mark again.
+        if (!agreement.update()) warnRefused(agreement, `Agreement ${str(agreement, 'number')} not marked as its end Returns raised`)
     }
 
     const leadDays = intProperty(PROPERTY.temporaryReturnLeadDays, 7)
@@ -362,7 +398,9 @@ export function raiseScheduledReturns(): void {
         const assetIds = installedAssetIds({ orderId: order.getUniqueValue() })
         // Still being installed and not yet ended: wait for the equipment to arrive before raising.
         if (assetIds.length === 0 && str(order, 'stage') === 'installing' && str(order, 'end_date') >= today) continue
-        if (assetIds.length > 0) {
+        // Raised once: a run whose mark below was refused left the units that Return could not take (logged then).
+        const raisedBefore = () => exists('x_daas_ham_return_order', `trigger=temporary_end^source_order=${order.getUniqueValue()}`)
+        if (assetIds.length > 0 && !raisedBefore()) {
             const returnId = raiseReturn({
                 trigger: 'temporary_end',
                 customerId: str(order, 'customer'),
@@ -378,7 +416,8 @@ export function raiseScheduledReturns(): void {
             if (!returnId) continue
         }
         order.setValue('return_raised', true)
-        order.update()
+        // Refused, the next run finds the Order again, raises no second Return (above) and saves the mark again.
+        if (!order.update()) warnRefused(order, `Temporary Order ${str(order, 'number')} not marked as its Return raised`)
     }
 }
 

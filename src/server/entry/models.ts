@@ -94,12 +94,15 @@ function repointModel(rawModelId: string, canonicalModelId: string): void {
     }
     if (refused > 0) return
     raw.setValue('x_daas_ham_normalized_to', canonicalModelId)
-    raw.update()
+    // Unmarked, it stays in the job's query: the next run finds no fleet asset left on it and marks it again.
+    if (!raw.update()) gs.warn(`[x_daas_ham] Model normalization: raw model ${str(raw, 'name')} repointed but not marked normalized: ${refusal(raw)}`)
 }
 
 /**
  * After-update rule on normalization exceptions given a resolved model: learn a rule from it. One whose alias or rule
- * is refused stays open, as nothing maps its raw pair yet.
+ * is refused stays open, as nothing maps its raw pair yet. One learned whose resolution the platform refuses stays open
+ * too (logged): the user sets it resolved by hand, which learns nothing twice, as the rule runs only on a new resolved
+ * model.
  */
 export function onNormalizationResolved(current: GlideRecord): void {
     if (!learnFromResolution(current, loadNormalizationData())) {
@@ -107,7 +110,10 @@ export function onNormalizationResolved(current: GlideRecord): void {
         return void gs.addErrorMessage(`No rule learned (see the system log), so the exception stays open: ${retry}`)
     }
     current.setValue('status', 'resolved')
-    current.update()
+    if (current.update()) return
+    const reason = refusal(current)
+    gs.warn(`[x_daas_ham] Normalization exception ${current.getUniqueValue()}: rule learned, but not saved as resolved: ${reason}`)
+    gs.addErrorMessage(`The rule was learned, but the exception was not saved as resolved (${reason}): set its status to Resolved`)
 }
 
 /** After insert/update rule on Model lifecycle: recompute that model's fleet assets in the background. */

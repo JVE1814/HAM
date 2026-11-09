@@ -114,6 +114,7 @@ function countAssets(leaseId: string, stages?: readonly Stage[]): number {
     return count('alm_hardware', stages ? fleetStagesQuery(stages, ofLease) : stillCovered(ofLease))
 }
 
+/** Raise the lease's end-of-lease decision. Refused (logged), none is open, so the next daily review raises it again. */
 function raiseDecision(lease: GlideRecord, mismatch: boolean): void {
     const decision = new GlideRecord('x_daas_ham_lease_decision')
     decision.initialize()
@@ -128,7 +129,7 @@ function raiseDecision(lease: GlideRecord, mismatch: boolean): void {
         'short_description',
         `Decide on lease ${str(lease, 'number')} (${lease.getDisplayValue('lessor')}) ending ${str(lease, 'ends')}: buy out, extend or return`,
     )
-    decision.insert()
+    if (!decision.insert()) gs.warn(`[x_daas_ham] No end-of-lease decision for lease ${str(lease, 'number')}: ${refusal(decision)}`)
 }
 
 /**

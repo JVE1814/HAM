@@ -128,7 +128,8 @@ export function uiCompleteDisposal(current: GlideRecord): void {
     if (blocked > 0 || unsaved > 0) return
     current.setValue('stage', 'completed')
     current.setValue('state', 3)
-    current.update()
+    // Refused, it stays open with every line done: completing it again retires nothing twice and closes it.
+    if (!current.update()) gs.addErrorMessage(`Every line is done, but ${str(current, 'number')} was not saved as completed: ${refusal(current)}; complete it again`)
 }
 
 /**

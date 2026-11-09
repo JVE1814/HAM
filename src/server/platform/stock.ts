@@ -4,7 +4,7 @@ import type { Stage } from '../domain/lifecycle.ts'
 import { isClaimable, stockQueries, type StockCandidate, type StockScope, type StockUnit } from '../domain/sourcing.ts'
 import { moveAsset, readStage } from './assets.ts'
 import { withLockTries, type HeldLock } from './locks.ts'
-import { bool, str } from './records.ts'
+import { bool, refusal, str } from './records.ts'
 
 /** Stock that can serve an Order line, claiming it for one, and changing it where a claim could race. */
 
@@ -163,7 +163,8 @@ function underStockLock(assetId: string, tries: number, what: string, work: Stoc
 /**
  * The claim, made holding `lock` on the Asset's fresh read. A holder that outlasts the lock (ADR 0013) may overlap the
  * next one, so it saves only while it still holds the lock, and one that lost it during the save keeps the claim only
- * if a fresh read still shows the Asset in the stage and with the values claimed.
+ * if a fresh read still shows the Asset in the stage and with the values claimed. A save the platform refuses is
+ * logged: the Asset stays as it was, and the caller counts it as not claimed.
  */
 function claimHolding(lock: HeldLock, asset: GlideRecord, wanted: Claim): GlideRecord | null {
     const assetId = asset.getUniqueValue()
@@ -171,7 +172,10 @@ function claimHolding(lock: HeldLock, asset: GlideRecord, wanted: Claim): GlideR
     if (!moveAsset(asset, wanted.to).allowed) return null
     for (const [field, value] of Object.entries(wanted.values)) asset.setValue(field, value)
     if (!lock.held()) return lockLost(assetId)
-    if (!asset.update()) return null
+    if (!asset.update()) {
+        gs.warn(`[x_daas_ham] Asset ${str(asset, 'serial_number') || assetId} not claimed as ${wanted.to}: ${refusal(asset)}`)
+        return null
+    }
     if (lock.held()) return asset
     const fresh = new GlideRecord('alm_hardware')
     return fresh.get(assetId) && shows(fresh, wanted) ? fresh : lockLost(assetId)
