@@ -197,10 +197,10 @@ The vendor and platform contracts were checked against primary documentation
 What remains can only be confirmed on an instance or behind a vendor login:
 
 - **Choices**: the instance accepts the app's `alm_asset.substatus` choice set (v2 format, only the
-  app's 12 values) and none of them collides with an out-of-box value; check
-  `sys_choice name=alm_asset^element=substatus^dependent_value=6` for an existing *Pending evaluation*
-  before the first install, and if it exists drop the app's `pending_evaluation` choice (and its
-  `keys.ts` entry) and map the stage to the out-of-box value.
+  app's 10 values). A Brazil instance already has *Pending evaluation* (`pending_evaluation`, In
+  stock) and *Lease return* (`lease_return`, Retired), so the app ships neither and its stages use
+  those values; on an older release check that both exist in
+  `sys_choice name=alm_asset^element=substatus`.
 - **Cross-scope access**: the privileges in `security/cross-scope.now.ts` match the scopes the instance
   reports (`alm_hardware`, `change_request`, `wm_order`, `proc_po`, `sys_attachment`, ...), including
   delete on `alm_transfer_order`, its lines and `proc_po`, which sourcing uses to remove a transfer order

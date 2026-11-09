@@ -1122,6 +1122,9 @@ recommended hardening are described in the notes of their area.
   `STAGE_FIELDS.pending_evaluation.substatus` (`lifecycle.ts:40`) to it and drop the added choice.
   Optional: map `returned_to_lessor` (`lifecycle.ts:49`) to the out-of-box "Lease return" value once
   that value is confirmed.
+  **Done (Brazil instance, 2026-11-09):** `sys_choice` holds `pending_evaluation` (In stock, 6) and
+  `lease_return` (Retired, 7), so the app no longer ships either choice; `STAGE_FIELDS` maps the
+  `pending_evaluation` stage to the first and `returned_to_lessor` to the second.
 - **Out-of-box substatus values (partially).** No code change proposed; confirm the stored values
   other than `available` on an instance.
 - **`alm_asset.cost` currency (partially).** Only needed if the session currency can differ from the

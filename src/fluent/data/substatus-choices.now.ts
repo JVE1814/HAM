@@ -128,20 +128,6 @@ Record({
     },
 })
 
-Record({
-    $id: Now.ID['substatus_pending_evaluation'],
-    table: 'sys_choice',
-    data: {
-        name: 'alm_asset',
-        element: 'substatus',
-        value: 'pending_evaluation',
-        label: 'Pending evaluation',
-        dependent_value: '6',
-        sequence: 570,
-        language: 'en',
-        inactive: false,
-    },
-})
 
 Record({
     $id: Now.ID['substatus_pending_oem_rma'],
@@ -183,21 +169,6 @@ Record({
         label: 'Returned to customer',
         dependent_value: '7',
         sequence: 600,
-        language: 'en',
-        inactive: false,
-    },
-})
-
-Record({
-    $id: Now.ID['substatus_returned_to_lessor'],
-    table: 'sys_choice',
-    data: {
-        name: 'alm_asset',
-        element: 'substatus',
-        value: 'returned_to_lessor',
-        label: 'Returned to lessor',
-        dependent_value: '7',
-        sequence: 610,
         language: 'en',
         inactive: false,
     },

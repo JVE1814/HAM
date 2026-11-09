@@ -4479,17 +4479,6 @@ declare global {
                         }
                     },
                     {
-                        table: 'sys_choice'
-                        id: '037d203f05024e19abefe9be829ca317'
-                        key: {
-                            name: 'alm_asset'
-                            element: 'substatus'
-                            value: 'pending_evaluation'
-                            language: 'en'
-                            dependent_value: '6'
-                        }
-                    },
-                    {
                         table: 'sys_variable_value'
                         id: '03ae671fa65342308b3808b163afcd43'
                         key: {
@@ -5273,17 +5262,6 @@ declare global {
                                     name: 'sn_customerservice_agent'
                                 }
                             }
-                        }
-                    },
-                    {
-                        table: 'sys_choice'
-                        id: '07c97b2b918d4c7593ac13863accd6a6'
-                        key: {
-                            name: 'alm_asset'
-                            element: 'substatus'
-                            value: 'returned_to_lessor'
-                            language: 'en'
-                            dependent_value: '7'
                         }
                     },
                     {

@@ -46,7 +46,7 @@ const STAGE_FIELDS = {
     sold: { installStatus: INSTALL_STATUS.retired, substatus: 'sold' },
     returned_to_oem: { installStatus: INSTALL_STATUS.retired, substatus: 'vendor_credit' },
     returned_to_customer: { installStatus: INSTALL_STATUS.retired, substatus: 'returned_to_customer' },
-    returned_to_lessor: { installStatus: INSTALL_STATUS.retired, substatus: 'returned_to_lessor' },
+    returned_to_lessor: { installStatus: INSTALL_STATUS.retired, substatus: 'lease_return' },
 } as const satisfies Record<string, StageFields>
 
 export type Stage = keyof typeof STAGE_FIELDS
@@ -55,7 +55,8 @@ export const ALL_STAGES = Object.keys(STAGE_FIELDS) as Stage[]
 
 /**
  * Substatus values this app adds to the platform, with the install_status they depend on.
- * Shipped as sys_choice records (see ADR 0002); out-of-box values are not listed.
+ * Shipped as sys_choice records (see ADR 0002); out-of-box values are not listed. Brazil ships
+ * pending_evaluation under In stock and lease_return under Retired, so those stages use them.
  */
 export const ADDED_SUBSTATUSES: ReadonlyArray<{ value: string; label: string; installStatus: string }> = [
     { value: 'reserved_spare_pool', label: 'Reserved - spare pool', installStatus: INSTALL_STATUS.inStock },
@@ -65,11 +66,9 @@ export const ADDED_SUBSTATUSES: ReadonlyArray<{ value: string; label: string; in
     { value: 'pending_in_service', label: 'Pending in service', installStatus: INSTALL_STATUS.inUse },
     { value: 'temporary_deployment', label: 'Temporary deployment', installStatus: INSTALL_STATUS.inUse },
     { value: 'pending_return', label: 'Pending return', installStatus: INSTALL_STATUS.inUse },
-    { value: 'pending_evaluation', label: 'Pending evaluation', installStatus: INSTALL_STATUS.inStock },
     { value: 'pending_oem_rma', label: 'Pending OEM RMA', installStatus: INSTALL_STATUS.inMaintenance },
     { value: 'pending_wipe', label: 'Pending wipe', installStatus: INSTALL_STATUS.inStock },
     { value: 'returned_to_customer', label: 'Returned to customer', installStatus: INSTALL_STATUS.retired },
-    { value: 'returned_to_lessor', label: 'Returned to lessor', installStatus: INSTALL_STATUS.retired },
 ]
 
 const RETIRED: ReadonlySet<Stage> = new Set([
