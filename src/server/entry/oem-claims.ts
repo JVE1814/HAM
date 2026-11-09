@@ -21,7 +21,8 @@ const RUN_LOCK = 'oem_claim_run'
  * Every 5 minutes: for each enabled vendor, send its pending (and stale failed) automated staging steps through the
  * vendor's adapters within `x_daas_ham.oem.claim.max_calls` calls per run, holding the run lock. A run that finds it
  * held sends nothing and leaves the steps to the run holding it. A run that outlasts the lock (ADR 0013) sends nothing
- * more once it has lost it: it saves what its calls so far returned, and the run that took the lock over goes on.
+ * more once it has lost it, checked before every call (runVendorClaims): it saves what its calls so far returned,
+ * leaves the steps it did not send to the run that took the lock over, and that run goes on.
  */
 export function runOemClaims(): void {
     if (withLock(RUN_LOCK, runHolding)) return
@@ -33,7 +34,7 @@ function runHolding(lock: HeldLock): void {
     releaseStranded()
     const store = whileHeld(lock, glideClaimStore())
     for (const vendor of CLAIM_VENDORS) {
-        if (boolProperty(`x_daas_ham.oem.claim.${vendor}.enabled`, false)) runVendorClaims(vendor, store, restMessagePort, maxCalls)
+        if (boolProperty(`x_daas_ham.oem.claim.${vendor}.enabled`, false)) runVendorClaims(vendor, store, restMessagePort, maxCalls, () => lock.held())
     }
 }
 

@@ -342,6 +342,9 @@ export interface ClaimStore {
     settle(outcomes: readonly ClaimOutcome[]): void
 }
 
+/** The transport's reason for a call a run makes after losing its job lock: the call is not sent, nor its step settled. */
+export const NOT_SENT = 'not sent: the claim run lost its job lock'
+
 /** Steps `remaining` calls of `route` can carry: at least one, at most MAX_STEPS_PER_LOAD. */
 function stepsFor(route: ClaimRoute, remaining: number): number {
     return Math.min(MAX_STEPS_PER_LOAD, Math.max(1, Math.ceil(remaining * route.perCall)))
@@ -352,20 +355,36 @@ function stepsFor(route: ClaimRoute, remaining: number): number {
  * An action is loaded only while calls remain, with limit = min(200, max(1, ceil(remaining x perCall))).
  * The outcomes the adapter returns (attempted or refused steps) are settled together, once per action; loaded
  * steps the budget did not reach are not settled and wait for the next run. Returns the calls made (<= maxCalls).
+ * `held` is asked before every call: once it says no (the run's job lock went to another run), nothing more is sent,
+ * the outcomes of calls already made are still settled, and the steps whose calls were not sent are left as they were
+ * for the run that holds the lock (an adapter words such a call's failure with failureText, so it carries NOT_SENT).
  */
-export function runVendorClaims(vendor: OemVendor, store: ClaimStore, transport: (message: string) => HttpPort, maxCalls: number): number {
+export function runVendorClaims(
+    vendor: OemVendor,
+    store: ClaimStore,
+    transport: (message: string) => HttpPort,
+    maxCalls: number,
+    held: () => boolean = () => true,
+): number {
     const routes = CLAIM_ROUTES[vendor] ?? {}
     let calls = 0
+    let lost = false
+    const whileHeld = (port: HttpPort): HttpPort => (request) => {
+        if (!lost && !held()) lost = true
+        return lost ? { status: 0, body: '', error: NOT_SENT } : port(request)
+    }
     for (const action of CLAIM_ORDER) {
+        if (lost) break
         const route = routes[action]
         if (!route) continue
         const remaining = maxCalls - calls
         if (remaining <= 0) break
         const targets = store.due(vendor, action, stepsFor(route, remaining))
         if (targets.length === 0) continue
-        const run = route.run(targets, transport(route.message), remaining)
+        const run = route.run(targets, whileHeld(transport(route.message)), remaining)
         calls += run.calls
-        store.settle(run.outcomes.map((outcome) => ({ ...outcome, message: outcome.message.slice(0, MESSAGE_LENGTH) })))
+        const sent = run.outcomes.filter((outcome) => !outcome.message.includes(NOT_SENT))
+        store.settle(sent.map((outcome) => ({ ...outcome, message: outcome.message.slice(0, MESSAGE_LENGTH) })))
     }
     return calls
 }
