@@ -2,8 +2,9 @@ import type { GlideRecord } from '@servicenow/glide'
 import { inFleet } from '../domain/fleet.ts'
 import { assetLifecycleStamp, type AssetLifecycleFacts, type LifecycleDates } from '../domain/model-lifecycle.ts'
 import { memoized } from '../domain/memo.ts'
-import { runEventTableJob, type EventTableJob } from './chunked.ts'
+import { runEventTableJob } from './chunked.ts'
 import { glideToIsoDate, todayIso } from './clock.ts'
+import type { JobEvent } from './events.ts'
 import { readModelLifecycle } from './model-lifecycle.ts'
 import { findById, num, str } from './records.ts'
 
@@ -81,25 +82,19 @@ export function applyLifecycleDates(asset: GlideRecord, readers: LifecycleReader
     return inputs.phase !== phase || inputs.refreshDue !== refreshDue
 }
 
-/** An event-driven pass recomputing the lifecycle dates of the fleet assets matching `query`. */
-export type LifecycleRefresh = Pick<EventTableJob<StampInputs>, 'eventName' | 'record' | 'parm1' | 'cursor'> & {
-    /** Encoded query on alm_hardware; the pass keeps it to fleet assets. */
-    query: string
-}
-
 /**
- * Run one chunk of a lifecycle refresh pass: recompute each matching fleet asset's Lifecycle phase and Refresh due
- * date (saving only those that changed), reading each Model lifecycle, Agreement and Lease schedule once per chunk;
- * the event is queued again until the pass is complete. The Provider IT's units of a NaaS Model are left alone (ADR
- * 0016): every clause of `query` carries the Fleet flag.
+ * Run one chunk of a lifecycle refresh pass over the fleet assets matching `query` (an encoded query on alm_hardware,
+ * which the pass keeps to fleet assets): recompute each one's Lifecycle phase and Refresh due date (saving only those
+ * that changed), reading each Model lifecycle, Agreement and Lease schedule once per chunk; the event is queued again
+ * until the pass is complete. The Provider IT's units of a NaaS Model are left alone (ADR 0016): every clause of
+ * `query` carries the Fleet flag.
  */
-export function refreshLifecycleDates(pass: LifecycleRefresh): void {
+export function refreshLifecycleDates(queued: JobEvent, query: string): void {
     // Never run for a blank model, agreement or lease: the query would match every Asset without one.
-    if (!pass.parm1) return
+    if (!queued.subject) return
     const readers = lifecycleReaders()
-    runEventTableJob({
-        ...pass,
-        query: inFleet(pass.query),
+    runEventTableJob(queued, {
+        query: inFleet(query),
         table: 'alm_hardware',
         read: stampInputs,
         handle: (inputs, assetId) => {

@@ -31,7 +31,13 @@ export const x_daas_ham_device_event = Table({
     ],
 })
 
-/** Where a chunked job stopped, so the next run resumes there (ADR 0007). */
+/**
+ * One row per background job, read and written only by src/server/platform/job-cursor.ts. Most are cursors (ADR 0007):
+ * where a scheduled chunked job stopped, so the next run resumes there, or, for a job whose passes replace each other
+ * (`margin_<period>`, `billing_generate_<period>`), the current pass's token. Two rows are not cursors and are kept
+ * here under the names they have always had, so an upgrade keeps them: `provider_tag_sequence`, whose Cursor is the
+ * last Provider tag number issued, and `preflight`, whose Last status is the preflight check's last result.
+ */
 export const x_daas_ham_job_cursor = Table({
     name: 'x_daas_ham_job_cursor',
     label: 'Job cursor',

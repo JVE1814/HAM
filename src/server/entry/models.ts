@@ -11,7 +11,7 @@ import {
 } from '../domain/normalization.ts'
 import { runTableJob } from '../platform/chunked.ts'
 import { todayIso } from '../platform/clock.ts'
-import { EVENT, fire } from '../platform/events.ts'
+import { EVENT, fire, jobEvent } from '../platform/events.ts'
 import { refreshLifecycleDates } from '../platform/lifecycle-dates.ts'
 import { queueModelRefresh, queueModelsReachingMilestone, writingModelLifecycle } from '../platform/model-lifecycle.ts'
 import {
@@ -129,14 +129,8 @@ export function onModelLifecycleChanged(current: GlideRecord, previous: GlideRec
  * (platform/lifecycle-dates keeps the pass to the fleet, so the Provider IT's units of the Model are not stamped).
  */
 export function refreshModelAssets(event: GlideRecord, current: GlideRecord): void {
-    const modelId = str(event, 'parm1')
-    refreshLifecycleDates({
-        eventName: EVENT.lifecycleChanged,
-        record: current,
-        parm1: modelId,
-        cursor: str(event, 'parm2'),
-        query: `model=${modelId}^install_status!=7`,
-    })
+    const queued = jobEvent(EVENT.lifecycleChanged, event, current)
+    refreshLifecycleDates(queued, `model=${queued.subject}^install_status!=7`)
 }
 
 /** Daily job: models crossing a milestone today change phase without any record changing. */
@@ -151,12 +145,6 @@ export function onAgreementTermsChanged(current: GlideRecord): void {
 
 /** Script action on x_daas_ham.agreement.terms (parm1 = agreement, parm2 = cursor): its deployed fleet assets. */
 export function refreshAgreementAssets(event: GlideRecord, current: GlideRecord): void {
-    const agreementId = str(event, 'parm1')
-    refreshLifecycleDates({
-        eventName: EVENT.agreementTermsChanged,
-        record: current,
-        parm1: agreementId,
-        cursor: str(event, 'parm2'),
-        query: stagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}`),
-    })
+    const queued = jobEvent(EVENT.agreementTermsChanged, event, current)
+    refreshLifecycleDates(queued, stagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${queued.subject}`))
 }

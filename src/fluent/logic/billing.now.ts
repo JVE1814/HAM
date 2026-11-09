@@ -36,7 +36,7 @@ export const billingGenerateEvent = Record({
         event_name: 'x_daas_ham.billing.generate',
         table: 'x_daas_ham_billing_period',
         // Holds 100 characters at most; the pass token is kept on job cursor billing_generate_<period>.
-        description: 'Generate the lines of a billing period; parm1 = period:pass token, parm2 = cursor.',
+        description: 'Generate the lines of a billing period; parm1 = period, parm2 = pass token:cursor.',
         fired_by: 'entry/billing.ts startBillingPeriodGeneration, uiRegenerateBillingPeriod',
         priority: 200,
     },

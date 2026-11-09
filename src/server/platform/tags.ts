@@ -3,11 +3,11 @@ import { TRY_AGAIN, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { formatProviderTag, nextFreeSequence } from '../domain/provider-tag.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
+import { openJobCursor } from './job-cursor.ts'
 import { withLockTries } from './locks.ts'
 import { intProperty, PROPERTY, stringProperty } from './properties.ts'
-import { refusal } from './records.ts'
 
-/** The counter's row in x_daas_ham_job_cursor. */
+/** The counter's row among the job cursors (platform/job-cursor), which holds the last number issued. */
 const SEQUENCE_JOB = 'provider_tag_sequence'
 
 /**
@@ -38,16 +38,12 @@ export function nextProviderTag(): string | null {
  * writing (the next holder may share the number, so it is not used).
  */
 function advanceCounter(lock: HeldLock, taken: (sequence: number) => boolean): number | null {
-    const counter = new GlideRecord('x_daas_ham_job_cursor')
-    const found = counter.get('job', SEQUENCE_JOB)
-    if (!found) {
-        counter.initialize()
-        counter.setValue('job', SEQUENCE_JOB)
-    }
-    const next = nextFreeSequence(parseInt(String(counter.getValue('cursor') ?? '0'), 10) || 0, taken)
-    counter.setValue('cursor', String(next))
+    // Its first row is created empty, which reads as no number issued, as no row does.
+    const counter = openJobCursor(SEQUENCE_JOB)
+    const next = nextFreeSequence(parseInt(counter.cursor, 10) || 0, taken)
     const saved = lock.write(() => {
-        if (!(found ? counter.update() : counter.insert())) throw new Error(`Provider tag counter could not be saved: ${refusal(counter)}`)
+        const refused = counter.save({ cursor: String(next) })
+        if (refused) throw new Error(`Provider tag counter could not be saved: ${refused}`)
     })
     return saved.written && !saved.lockLost ? next : null
 }

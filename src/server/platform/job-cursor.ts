@@ -1,0 +1,122 @@
+import { GlideRecord } from '@servicenow/glide'
+import { isCurrentPass as namesCurrentPass } from '../domain/chunked-job.ts'
+import { nowGlide, nowMs } from './clock.ts'
+import { refusal, str } from './records.ts'
+
+/**
+ * The rows of x_daas_ham_job_cursor (ADR 0007): one per job, behind a unique index on its name. Only this module reads
+ * and writes the table. What a row's `cursor` holds depends on its job:
+ * - a scheduled job (platform/chunked `runTableJob`): the key its last run stopped at, '' once a pass is complete;
+ * - an event job whose passes replace each other (`margin_<period>`, `billing_generate_<period>`): the current pass's token;
+ * - `provider_tag_sequence` (platform/tags): the last Provider tag number issued;
+ * - `preflight` (entry/preflight): nothing, its result is the row's `last_status`.
+ */
+const TABLE = 'x_daas_ham_job_cursor'
+
+/** What a job's `last_status` reads (the preflight check writes its result there instead). */
+export const JOB_STATUS = {
+    /** A scheduled job's run reached the end of its pass, or a pass its runner started is complete. */
+    complete: 'complete',
+    paused: 'paused (time budget)',
+    /** A pass its runner started and marks complete: one still running with an old last run has stalled. */
+    running: 'running',
+    /** A pass started where it was triggered. Nothing marks its end on the row, so it must not read as running. */
+    passStarted: 'pass started',
+    /** The current pass was retired by hand, and the job has none. */
+    reset: 'reset by hand',
+} as const
+
+/** What a save changes on a job's row; what is left out stays as it is. */
+export interface JobCursorValues {
+    cursor?: string
+    status?: string
+    /** The records the run handled. */
+    processed?: number
+    /** Set the row's last run to now. */
+    ranNow?: boolean
+}
+
+/** A job's row as it was read. */
+export interface JobCursor {
+    readonly cursor: string
+    /** The stored date/time of the last run, '' when there was none. */
+    readonly lastRun: string
+    /** Save `values` on the row: null once saved, else why the platform refused. */
+    save(values: JobCursorValues): string | null
+}
+
+/** The job's row as it is stored now, or null when it has none yet. */
+export function findJobCursor(job: string): JobCursor | null {
+    const record = find(job)
+    return record && rowOf(record)
+}
+
+/** The job's row, created on first use; throws (with why) when there is none and it cannot be created. */
+export function openJobCursor(job: string): JobCursor {
+    const found = find(job)
+    if (found) return rowOf(found)
+    const created = new GlideRecord(TABLE)
+    created.initialize()
+    created.setValue('job', job)
+    if (created.insert()) return rowOf(created)
+    // Another run inserted it first (the unique index on job): go on from that run's record, never an unsaved one.
+    const raced = find(job)
+    if (raced) return rowOf(raced)
+    throw new Error(`job cursor ${job} could not be created: ${refusal(created)}`)
+}
+
+function find(job: string): GlideRecord | null {
+    const record = new GlideRecord(TABLE)
+    return record.get('job', job) ? record : null
+}
+
+function rowOf(record: GlideRecord): JobCursor {
+    return {
+        cursor: str(record, 'cursor'),
+        lastRun: str(record, 'last_run'),
+        save: (values) => {
+            if (values.cursor !== undefined) record.setValue('cursor', values.cursor)
+            if (values.status !== undefined) record.setValue('last_status', values.status)
+            if (values.processed !== undefined) record.setValue('processed_total', values.processed)
+            if (values.ranNow) record.setValue('last_run', nowGlide())
+            return record.update() ? null : refusal(record)
+        },
+    }
+}
+
+/*
+ * Passes that replace each other. A job's row names its current pass by a token (the pass's start time), which every
+ * event of the pass carries (domain/chunked-job `passParm`): starting a pass makes any other pass of the job a stale
+ * one, whose queued chunks find they are no longer current and write nothing.
+ */
+
+/**
+ * Make a new pass the job's current one and return its token. Throws (with why) when the row cannot be created or
+ * saved: that pass could never be current, so nothing may be cleared or queued for it.
+ */
+export function startPass(job: string, status: typeof JOB_STATUS.running | typeof JOB_STATUS.passStarted): string {
+    const row = openJobCursor(job)
+    const token = String(nowMs())
+    const refused = row.save({ cursor: token, status, ranNow: true })
+    if (refused) throw new Error(`job cursor ${job} not saved: ${refused}`)
+    return token
+}
+
+/** Whether the pass `token` names is the job's current one, as stored now. No pass is, of a job without a row or once its pass was retired. */
+export function isCurrentPass(job: string, token: string): boolean {
+    const row = findJobCursor(job)
+    return row !== null && namesCurrentPass(row.cursor, token)
+}
+
+/** Mark the job's current pass complete (the save is not checked: the pass's results are written by then). */
+export function completePass(job: string): void {
+    openJobCursor(job).save({ status: JOB_STATUS.complete, ranNow: true })
+}
+
+/**
+ * Retire the pass `row` names, by hand, leaving the job with no current pass: null once retired, else why the platform
+ * refused. The row's last run is left as it was, so a chunk that starts meanwhile shows on a later read of it.
+ */
+export function retirePass(row: JobCursor): string | null {
+    return row.save({ cursor: '', status: JOB_STATUS.reset })
+}

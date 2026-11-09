@@ -1,5 +1,6 @@
 import { GlideDateTime, gs, type GlideRecord } from '@servicenow/glide'
 import { REQUEUE } from '../domain/job-lock.ts'
+import { str } from './records.ts'
 
 /** Events this app fires (registered in src/fluent/logic/events.now.ts). */
 export const EVENT = {
@@ -20,6 +21,25 @@ export const EVENT = {
 
 export function fire(event: string, record: GlideRecord, parm1 = '', parm2 = ''): void {
     gs.eventQueue(event, record, parm1, parm2)
+}
+
+/**
+ * An event of an event job (platform/chunked `runEventTableJob`) as its script action receives it. Every such event
+ * names the job's subject in parm1 (the sys_id its records are selected by: a Model, a Lease schedule, a Billing
+ * period) and carries where its pass got to in parm2: the key of the last record finished ('' on a pass's first
+ * event), behind the pass's token where the job's passes replace each other (domain/chunked-job `passParm`).
+ */
+export interface JobEvent {
+    name: string
+    /** The record the event is queued on, and the next chunk's with it. */
+    record: GlideRecord
+    subject: string
+    position: string
+}
+
+/** The job event a script action was called with: `event` and `current` are the platform's, `name` the event it is registered for. */
+export function jobEvent(name: string, event: GlideRecord, current: GlideRecord): JobEvent {
+    return { name, record: current, subject: str(event, 'parm1'), position: str(event, 'parm2') }
 }
 
 /**

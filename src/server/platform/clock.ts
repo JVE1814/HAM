@@ -7,6 +7,11 @@ export function nowMs(): number {
     return new GlideDateTime().getNumericValue()
 }
 
+/** The time now as a date/time value to store. */
+export function nowGlide(): string {
+    return msToGlide(nowMs())
+}
+
 export function todayIso(): string {
     return toIsoDate(nowMs())
 }

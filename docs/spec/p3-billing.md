@@ -64,10 +64,11 @@
   of the lines written so far, and *Close period* refuses it until a *Regenerate*. Reset deletes and
   bills nothing. A chunk that starts during the reset leaves the period *Generating*: reset again 30
   minutes later.
-- Each generation pass is recorded on that job cursor, with a token its events carry in `parm1`.
-  Chunks of a pass reset or replaced since, and events queued before passes were tracked, are dropped
-  with a warning. A pass whose cursor cannot be saved does not start: the period is held as *Ready
-  for review* with the error. The *Background jobs* list (Administration) shows one
+- Each generation pass is recorded on that job cursor, with a token its events carry in `parm2`,
+  ahead of the chunk's position (`parm1` is the period). Chunks of a pass reset or replaced since,
+  and events that name no pass or no period, are dropped with a warning. A pass whose cursor cannot
+  be saved does not start: the period is held as *Ready for review* with the error. The
+  *Background jobs* list (Administration) shows one
   `billing_generate_<period sys_id>` row per period. Its *Cursor* is the current pass's token (empty
   once reset), *Last run* the latest chunk start, and *Last status* *pass started* or *reset by
   hand*. The period's own status says whether the pass finished. Rows are not removed when a period

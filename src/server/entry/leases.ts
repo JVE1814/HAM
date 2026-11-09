@@ -23,7 +23,7 @@ import { providerApproverIds } from '../platform/approvals.ts'
 import { moveAsset, readStage } from '../platform/assets.ts'
 import { runEventTableJob } from '../platform/chunked.ts'
 import { todayIso } from '../platform/clock.ts'
-import { EVENT, fire } from '../platform/events.ts'
+import { EVENT, fire, jobEvent } from '../platform/events.ts'
 import { refreshLifecycleDates } from '../platform/lifecycle-dates.ts'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties.ts'
 import { bool, count, exists, findById, num, refusal, str } from '../platform/records.ts'
@@ -326,14 +326,8 @@ export function onReturnedLeaseEndChanged(current: GlideRecord): void {
  * (platform/lifecycle-dates keeps the pass to the fleet).
  */
 export function refreshLeaseAssets(event: GlideRecord, current: GlideRecord): void {
-    const leaseId = str(event, 'parm1')
-    refreshLifecycleDates({
-        eventName: EVENT.leaseAssets,
-        record: current,
-        parm1: leaseId,
-        cursor: str(event, 'parm2'),
-        query: stagesQuery(SERVING_STAGES, `x_daas_ham_lease=${leaseId}`),
-    })
+    const queued = jobEvent(EVENT.leaseAssets, event, current)
+    refreshLifecycleDates(queued, stagesQuery(SERVING_STAGES, `x_daas_ham_lease=${queued.subject}`))
 }
 
 /**
@@ -349,16 +343,13 @@ export function refreshLeaseAssets(event: GlideRecord, current: GlideRecord): vo
  * from being fetched again in every batch of the pass.
  */
 export function transferLeaseAssets(event: GlideRecord, current: GlideRecord): void {
-    const leaseId = str(event, 'parm1')
+    const queued = jobEvent(EVENT.leaseBuyout, event, current)
+    const leaseId = queued.subject
     // Never run with a blank lease: the query would match every Asset that has no lease.
     if (!leaseId) return
     // Every Asset the chunk transfers is bought today.
     const purchase = buyoutPurchase(num(current, 'buyout_share'), todayIso())
-    runEventTableJob({
-        eventName: EVENT.leaseBuyout,
-        record: current,
-        parm1: leaseId,
-        cursor: str(event, 'parm2'),
+    runEventTableJob(queued, {
         table: 'alm_hardware',
         query: stillCovered(`x_daas_ham_lease=${leaseId}`),
         read: (asset) => asset.getUniqueValue(),

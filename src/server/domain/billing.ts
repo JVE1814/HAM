@@ -231,30 +231,80 @@ export function resetGenerationError(byUser: string, idleMinutes: number): strin
     return note.slice(0, 255)
 }
 
-/** What a generation event's parm1 names: the period, and the pass the event belongs to ('' for none). */
-export interface GenerationEventParm {
-    periodId: string
-    token: string
+/** A column of a Billing line, as its exports give it. */
+interface BillingLineColumn<Field extends string = string> {
+    field: Field
+    /** A reference reads as its display value in the CSV. */
+    type: 'text' | 'number' | 'reference'
+    /** Whether the CSV export has the column, headed by its field name. */
+    csv: boolean
+    /** The pull API's name for the column's stored value. */
+    json?: string
+    /** The pull API's name for a reference's display value. */
+    jsonDisplay?: string
 }
 
 /**
- * The parm1 of a period's generation events: its sys_id and the pass's token, so that the queued events of a pass that
- * was reset or replaced by a Regenerate are told from the current pass's and dropped.
+ * What a Billing line holds besides its period, in the order every export gives it: the CSV attached to a closed
+ * period and the pull API's lines are both read off this list (`billingCsvRow`, `billingLineJson`), and a generated
+ * line sets these fields (`BillingLineValues`).
  */
-export function generationEventParm(parm: GenerationEventParm): string {
-    return `${parm.periodId}:${parm.token}`
+export const BILLING_LINE_COLUMNS = [
+    { field: 'kind', type: 'text', csv: true, json: 'kind' },
+    { field: 'customer', type: 'reference', csv: true, json: 'customerId', jsonDisplay: 'customer' },
+    { field: 'agreement', type: 'reference', csv: true, jsonDisplay: 'agreement' },
+    { field: 'subscription_line', type: 'reference', csv: true, json: 'subscriptionLine' },
+    { field: 'site', type: 'reference', csv: true, json: 'siteId', jsonDisplay: 'site' },
+    { field: 'fee_event', type: 'reference', csv: false, json: 'feeEvent' },
+    { field: 'description', type: 'text', csv: true, json: 'description' },
+    { field: 'units', type: 'number', csv: true, json: 'units' },
+    { field: 'monthly_rate', type: 'number', csv: true, json: 'monthlyRate' },
+    { field: 'amount', type: 'number', csv: true, json: 'amount' },
+    { field: 'currency', type: 'text', csv: true, json: 'currency' },
+] as const satisfies readonly BillingLineColumn[]
+
+export type BillingLineField = (typeof BILLING_LINE_COLUMNS)[number]['field']
+
+/** The fields a generated Billing line is given; one left out keeps the column's default. */
+export type BillingLineValues = { readonly [field in BillingLineField]?: string | number }
+
+/** A stored Billing line as an export reads it. */
+export interface StoredBillingLine {
+    /** The field's stored value ('' when empty). */
+    value(field: BillingLineField): string
+    /** A reference field's display value. */
+    display(field: BillingLineField): string
 }
 
-/** A generation event's parm1 read back; one without a token (queued before passes were tracked) belongs to no pass. */
-export function readGenerationEventParm(parm1: string): GenerationEventParm {
-    const separator = parm1.indexOf(':')
-    if (separator < 0) return { periodId: parm1, token: '' }
-    return { periodId: parm1.slice(0, separator), token: parm1.slice(separator + 1) }
+const COLUMNS: ReadonlyArray<BillingLineColumn<BillingLineField>> = BILLING_LINE_COLUMNS
+const CSV_COLUMNS = COLUMNS.filter((column) => column.csv)
+
+/** The column's stored value: a number column's as a number, 0 when it is empty or unreadable. */
+function storedValue(line: StoredBillingLine, column: BillingLineColumn<BillingLineField>): string | number {
+    const value = line.value(column.field)
+    if (column.type !== 'number') return value
+    const number = Number(value)
+    return Number.isFinite(number) ? number : 0
 }
 
-/** Whether an event's pass `token` is the period's current pass (`currentToken`, '' once reset by hand). */
-export function isCurrentGeneration(currentToken: string, token: string): boolean {
-    return token !== '' && token === currentToken
+/** The CSV export's heading: the period, then each exported column. */
+export function billingCsvHeader(): string[] {
+    return ['period', ...CSV_COLUMNS.map((column) => column.field)]
+}
+
+/** A Billing line's row in the CSV export of `period` (its YYYY-MM month). */
+export function billingCsvRow(period: string, line: StoredBillingLine): Array<string | number> {
+    return [period, ...CSV_COLUMNS.map((column) => (column.type === 'reference' ? line.display(column.field) : storedValue(line, column)))]
+}
+
+/** A Billing line as the pull API gives it. */
+export function billingLineJson(id: string, line: StoredBillingLine): { [key: string]: string | number } {
+    const json: { [key: string]: string | number } = { id }
+    for (const column of COLUMNS) {
+        if (column.json) json[column.json] = storedValue(line, column)
+        if (column.jsonDisplay) json[column.jsonDisplay] = line.display(column.field)
+    }
+    return json
 }
 
 /** RFC 4180 CSV: fields with commas, quotes or line breaks are quoted, quotes doubled. */

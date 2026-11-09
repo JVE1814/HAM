@@ -3,27 +3,29 @@ import { describe, expect, it } from 'vitest'
 import {
     activeDays,
     BILLED_STAGES,
+    billingCsvHeader,
+    billingCsvRow,
+    billingLineJson,
     billingMonthProblem,
     billsFromIntervals,
     decideGenerationReset,
-    generationEventParm,
     IN_SERVICE_ON_ENDED_LINE,
     intervalEnd,
-    isCurrentGeneration,
     isMonth,
     monthBounds,
     overlapsMonth,
     previousMonth,
     prorate,
-    readGenerationEventParm,
     RESET_AFTER_IDLE_MINUTES,
     resetGenerationError,
     restartInterval,
     subscriptionCharges,
     toCsv,
     withinLine,
+    type BillingLineField,
     type ChargeSources,
     type ServiceInterval,
+    type StoredBillingLine,
 } from './billing'
 import { ALL_STAGES, isBillable } from './lifecycle'
 
@@ -395,28 +397,52 @@ describe('resetGenerationError', () => {
     })
 })
 
-describe('generation event parm', () => {
-    it('carries the period and its pass token, and reads back', () => {
-        expect(generationEventParm({ periodId: 'p1', token: '1762689600000' })).toBe('p1:1762689600000')
-        expect(readGenerationEventParm('p1:1762689600000')).toEqual({ periodId: 'p1', token: '1762689600000' })
+describe('a Billing line as exported', () => {
+    function storedLine(values: Partial<Record<BillingLineField, string>>, names: Partial<Record<BillingLineField, string>>): StoredBillingLine {
+        return { value: (field) => values[field] ?? '', display: (field) => names[field] ?? '' }
+    }
+
+    const subscription = storedLine(
+        {
+            kind: 'subscription',
+            customer: 'c1',
+            agreement: 'a1',
+            subscription_line: 'sl1',
+            site: 's1',
+            description: 'Switches - Lyon, HQ',
+            units: '42',
+            monthly_rate: '12.5',
+            amount: '17.5',
+            currency: 'EUR',
+        },
+        { customer: 'Acme, Inc.', agreement: 'AGR0001', subscription_line: 'Switches', site: 'Lyon' },
+    )
+    const fee = storedLine(
+        { kind: 'fee', customer: 'c1', agreement: 'a1', fee_event: 'f1', description: 'Lost fee: SN1 (2026-10-12)', units: '1', amount: '350', currency: 'EUR' },
+        { customer: 'Acme, Inc.', agreement: 'AGR0001', fee_event: 'FEE0001' },
+    )
+
+    it('is a CSV row of its period and columns, a reference by its display value', () => {
+        expect(toCsv([billingCsvHeader(), billingCsvRow('2026-10', subscription), billingCsvRow('2026-10', fee)])).toBe(
+            'period,kind,customer,agreement,subscription_line,site,description,units,monthly_rate,amount,currency\r\n' +
+                '2026-10,subscription,"Acme, Inc.",AGR0001,Switches,Lyon,"Switches - Lyon, HQ",42,12.5,17.5,EUR\r\n' +
+                '2026-10,fee,"Acme, Inc.",AGR0001,,,Lost fee: SN1 (2026-10-12),1,0,350,EUR\r\n',
+        )
     })
 
-    it('reads an event from before passes were tracked as belonging to no pass', () => {
-        expect(readGenerationEventParm('p1')).toEqual({ periodId: 'p1', token: '' })
-        expect(readGenerationEventParm('')).toEqual({ periodId: '', token: '' })
+    it('is a pull API line of its stored values, with the display values the API names', () => {
+        expect(JSON.stringify(billingLineJson('l1', subscription))).toBe(
+            '{"id":"l1","kind":"subscription","customerId":"c1","customer":"Acme, Inc.","agreement":"AGR0001","subscriptionLine":"sl1",' +
+                '"siteId":"s1","site":"Lyon","feeEvent":"","description":"Switches - Lyon, HQ","units":42,"monthlyRate":12.5,"amount":17.5,"currency":"EUR"}',
+        )
+        expect(JSON.stringify(billingLineJson('l2', fee))).toBe(
+            '{"id":"l2","kind":"fee","customerId":"c1","customer":"Acme, Inc.","agreement":"AGR0001","subscriptionLine":"",' +
+                '"siteId":"","site":"","feeEvent":"f1","description":"Lost fee: SN1 (2026-10-12)","units":1,"monthlyRate":0,"amount":350,"currency":"EUR"}',
+        )
     })
-})
 
-describe('isCurrentGeneration', () => {
-    it('lets only the current pass go on', () => {
-        expect(isCurrentGeneration('1762689600000', '1762689600000')).toBe(true)
-        expect(isCurrentGeneration('1762689600000', '1762680000000')).toBe(false)
-    })
-
-    it('stops every pass of a period reset by hand, and events without a pass', () => {
-        expect(isCurrentGeneration('', '1762689600000')).toBe(false)
-        expect(isCurrentGeneration('', '')).toBe(false)
-        expect(isCurrentGeneration('1762689600000', '')).toBe(false)
+    it('reads a number column that is empty or unreadable as 0', () => {
+        expect(billingLineJson('l3', storedLine({ units: 'n/a' }, {}))).toMatchObject({ units: 0, monthlyRate: 0, amount: 0 })
     })
 })
 

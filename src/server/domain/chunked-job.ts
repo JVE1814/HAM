@@ -34,13 +34,18 @@ export interface ChunkedJobResult {
     lastError: string
 }
 
+/** The batch size a job runs with: `configured`, or 1 when that is below 1 or no number. */
+export function usableBatchSize(configured: number): number {
+    return Math.max(1, Math.floor(configured) || 1)
+}
+
 export function runChunked<T>(ports: ChunkedJobPorts<T>, options: ChunkedJobOptions): ChunkedJobResult {
     const started = ports.now()
     let cursor = ports.loadCursor()
     let processed = 0
     let failed = 0
     let lastError = ''
-    const batchSize = Math.max(1, Math.floor(options.batchSize) || 1)
+    const batchSize = usableBatchSize(options.batchSize)
 
     for (;;) {
         const batch = ports.fetchBatch(cursor, batchSize)
@@ -66,6 +71,32 @@ export function runChunked<T>(ports: ChunkedJobPorts<T>, options: ChunkedJobOpti
     }
 }
 
+/**
+ * Where a pass of an event job got to, as each of its events carries it in parm2: `<token>:<cursor>`. The token names
+ * the pass (its job's cursor row holds the current one's) and the cursor is the key of the last record the pass
+ * finished, '' before its first.
+ */
+export interface PassPosition {
+    token: string
+    cursor: string
+}
+
+export function passParm(position: PassPosition): string {
+    return `${position.token}:${position.cursor}`
+}
+
+/** An event's parm2 read back. One that is no `<token>:<cursor>` (the '' a fresh trigger queues, or anything else) names no pass and no cursor. */
+export function readPassParm(parm2: string): PassPosition {
+    const separator = parm2.indexOf(':')
+    if (separator < 0) return { token: '', cursor: '' }
+    return { token: parm2.slice(0, separator), cursor: parm2.slice(separator + 1) }
+}
+
+/** Whether an event's pass `token` names its job's current pass (`currentToken`, '' while the job has none). */
+export function isCurrentPass(currentToken: string, token: string): boolean {
+    return token !== '' && token === currentToken
+}
+
 /** A write that lost its job's lock: a taker that judged the lock abandoned cleared it while the write ran. */
 export interface LockLost {
     outcome: 'lost'
@@ -76,11 +107,11 @@ export interface LockLost {
 /** What became of a chunk's write under its job's lock. */
 export type ChunkWrite = { outcome: 'written' | 'superseded' } | LockLost
 
-/** What a chunk of a superseding pass does while it holds its job's lock (ADR 0013). */
+/** What a chunk of a pass does as it writes, under its job's lock where the job has one (ADR 0013). */
 export interface LockedChunkPorts {
     /** Whether the chunk's pass is still its job's current one. */
     isCurrent(): boolean
-    /** Whether the chunk still holds the job's lock: a taker that judged it abandoned may have cleared it. */
+    /** Whether the chunk still holds the job's lock: a taker that judged it abandoned may have cleared it. Always true for a job without a lock. */
     held(): boolean
     /** Write out what the chunk accumulated. */
     flush(): void
@@ -91,9 +122,8 @@ export interface LockedChunkPorts {
 }
 
 /**
- * Write a chunk of a superseding pass under its job's lock: flush, then queue the next chunk or, after
- * the last one, complete the pass. A chunk whose pass was superseded writes nothing, and one that lost
- * the lock during a write writes nothing more.
+ * Write a chunk of a pass: flush, then queue the next chunk or, after the last one, complete the pass. A chunk whose
+ * pass is no longer the current one writes nothing, and one that lost its job's lock during a write writes nothing more.
  */
 export function writeChunkUnderLock(ports: LockedChunkPorts, last: boolean): ChunkWrite {
     if (!ports.isCurrent()) return { outcome: 'superseded' }

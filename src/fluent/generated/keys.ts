@@ -2985,6 +2985,10 @@ declare global {
                         table: 'sys_module'
                         id: 'cbc9d7b35b924e71bcccd48019541a91'
                     }
+                    src_server_platform_billing_ts: {
+                        table: 'sys_module'
+                        id: 'ae33097ac4024722b27839779913660b'
+                    }
                     src_server_platform_chunked_ts: {
                         table: 'sys_module'
                         id: '3d992cdf9e2447bd89a824a94f2280bd'
@@ -3013,6 +3017,10 @@ declare global {
                         table: 'sys_module'
                         id: '20f956463f92428b85a5cd4c6f22c388'
                     }
+                    'src_server_platform_job-cursor_ts': {
+                        table: 'sys_module'
+                        id: 'b1de8d181ecd45489a1e5ab7ad960c84'
+                    }
                     'src_server_platform_lifecycle-dates_ts': {
                         table: 'sys_module'
                         id: '799d3e78a7604861a5f1cfaeae905bf1'
@@ -3020,6 +3028,10 @@ declare global {
                     src_server_platform_locks_ts: {
                         table: 'sys_module'
                         id: 'd959aeddfa4042d3bf17fda638d0cf0f'
+                    }
+                    src_server_platform_margin_ts: {
+                        table: 'sys_module'
+                        id: '9678e0f1b7744ad5bffba89d94f9d7b3'
                     }
                     'src_server_platform_model-lifecycle_ts': {
                         table: 'sys_module'
