@@ -34,6 +34,8 @@
   its swap work order closed.
 - On install completion the failed unit goes on a **defective return** once its replacement is
   installed, collected by the swap work order.
+- A replacement lost in transit is sourced again by the usual routes (P1 fulfilment spec). That may
+  open a second OEM RMA (*to open*) for the same defective unit, to check with the vendor.
 - **Defective returned to OEM** on the RMA retires the unit as *returned to OEM*. This needs wipe
   evidence recorded since the unit was last received back at the depot (receipt clears earlier
   evidence). When the unit cannot be retired, the user is told why and the RMA is left as it was.
@@ -59,7 +61,9 @@
   is raised for the caller's own Customer. Provider staff and platform admins get HTTP 403 there and
   use the record producer.
 - Installed and shipped Assets on a return become *pending return*. The due date is the Agreement's
-  return allowance.
+  return allowance. A unit still shipped that goes on a device removal, or is declared missing while
+  still shipped, leaves its Order line, which is filled again (P1 fulfilment spec). On a site
+  decommission or agreement end it stays on its line, which is not sourced again.
 - An Asset already awaiting another return is not added again; completing an install twice raises
   one return. A return with nothing to bring back closes at once (a temporary Order still being
   installed waits until its equipment is installed or its end date passes).
@@ -141,7 +145,9 @@
   submitted (within the agreement) and fulfilled like any Order; one that Submit refuses stays a draft
   with the reasons in its work notes.
 - An Order or line the platform refuses is logged; its Assets, on no open replacing line, are raised
-  again on the next run.
+  again on the next run. An Order none of whose lines is saved is removed again, and the removal is
+  logged, so refused saves leave no empty drafts behind. One the platform will not remove is logged
+  by number, to cancel.
 - A run holds the job lock `refresh_orders` (ADR 0013) from its read of the open replacing lines to
   its last Order. A run that finds it held, such as the scheduled job and an *Execute now* at once,
   raises nothing and logs so. A run that outlasts the lock stops after the wave it lost it in and

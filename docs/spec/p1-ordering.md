@@ -32,9 +32,11 @@
 - **Usage** = Assets of the Agreement at or on their way to a Site (shipped, pending in service, in
   service, temporary deployment, pending return) + quantities on other open, not-yet-shipped Order
   lines of the Agreement. A line that has shipped never counts as open again, also when one of its
-  Assets is later returned. An Asset still on an open Order line counts through that line's quantity,
-  not as deployed, so a unit sent by a partial Ship counts once; Assets on no line, or on a line that
-  has shipped or was cancelled, count as deployed.
+  Assets is later returned. The exception is a line filled again after a unit left it in transit (P1
+  fulfilment spec): back to awaiting stock, it counts its whole quantity in flight again until it
+  ships, and the unit sent back counts as deployed until it is received. An Asset still on an open
+  Order line counts through that line's quantity, not as deployed, so a unit sent by a partial Ship
+  counts once; Assets on no line, or on a line that has shipped or was cancelled, count as deployed.
 - A Contracted quantity caps either one Model (model-specific) or a Device class. Classes without a
   quantity are uncapped.
 - Verdict: **over quota** if any cap would be exceeded, else **off catalog** if anything is not
@@ -53,9 +55,13 @@
   The Order's outcome is saved before they are, so cancelling them does not roll the approvals up
   again or start sourcing twice.
 - If that outcome cannot be saved, the Order stays awaiting approval with its remaining requests
-  (logged), and a later decision on them tries again; with none left it stays there until cancelled.
-  A pending request that cannot be cancelled is logged, to cancel by hand; left waiting, it would
-  still count if a draft is submitted again.
+  (logged), and a later decision on them tries again; with none left it stays there until cancelled
+  or re-checked. *Re-check approvals* (asset managers, account managers, admins) rolls the existing
+  approvals up again, as a decision does, or says whose approval is missing. It is offered on an
+  Order awaiting approval only while no request is still waiting, so with several approvers a refused
+  save waits for a remaining decision, or for its requests to be cancelled by hand. Like Submit, it
+  does nothing when the form's save is refused. A pending request that cannot be cancelled is
+  logged, to cancel by hand; left waiting, it would still count if a draft is submitted again.
 - Provider-side approvers are the Agreement's account manager or, if it has none, the asset managers.
   They are active users only: an inactive account manager counts as none, so the asset managers
   approve. If the Customer has no Customer admins, the provider-side approvers stand in for them.
@@ -140,12 +146,15 @@
 - If the line cannot be saved after sourcing, a warning names the purchase order and transfer orders
   it does not list, to add by hand: otherwise units received on them are not allocated to it, and the
   next run buys its shortfall again.
-- A failed staging takes the Asset off the line, which goes back to awaiting stock and is re-sourced.
-  Only a line that has not shipped falls back. A receipt whose unit could not be reserved for its
-  waiting line also sources the Order again (P1 fulfilment spec).
-- **Cancel** is refused once anything has shipped, a hot spare handed over at Ship included (use a
-  return order then), and does nothing when the form's save is refused (the platform says why). It
-  runs under the Order's sourcing lock (`source_order_<sys_id>`), taking turns with sourcing passes:
+- A failed staging takes the Asset off the line, which goes back to awaiting stock and is re-sourced,
+  and so does a unit that leaves in transit (P1 fulfilment spec). Only a line that has not shipped
+  falls back on a failed staging. A receipt whose unit could not be reserved for its waiting line
+  also sources the Order again (P1 fulfilment spec).
+- **Cancel** is refused once anything has shipped: a line shipped or later, or any unit of its lines
+  shipped or later (a hot spare handed over at Ship included), also on a line not delivered whole.
+  The user is told to use a Return order instead. A unit taken off its line in transit no longer
+  counts. Cancel does nothing when the form's save is refused (the platform says why). It runs
+  under the Order's sourcing lock (`source_order_<sys_id>`), taking turns with sourcing passes:
   pressed while a pass holds it, it changes nothing and says *Order not cancelled: sourcing is
   running on it. Try again in a minute*. Otherwise it:
   - saves the Order as cancelled first, listing every purchase order of its lines in its work notes

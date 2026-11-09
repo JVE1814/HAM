@@ -26,11 +26,20 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
 
 - A line follows its slowest Asset: sourced, staging, ready to ship, shipped, installed, in service.
   It is *awaiting stock* while fewer Assets than ordered are allocated.
-- Once shipped, a line only moves forward and follows only the Assets still on their way into
-  service (or in it). One that leaves (a return, a break-fix swap of a dead-on-arrival unit, a refresh
-  swap-back, a temporary Order's end, a decommission, declared missing) neither sends the line back
-  nor holds it up, since nothing re-sources a delivered line. A line whose every unit left before
-  going into service keeps its stage.
+- A unit that leaves while in transit (shipped, then missing or pending return) is taken off its
+  line (logged). The line goes back to awaiting stock and is sourced again, with no new approval and
+  its quantity unchanged. The exception is a whole-Site recovery (site decommission, agreement end):
+  the unit stays on the line, which is not sourced again. A unit the platform refuses to take off
+  the line also stays on it, and that line, like one that cannot be saved back to awaiting stock, is
+  not sourced again (both logged).
+- A unit that leaves after install (pending in service or later: a return, a break-fix swap of a
+  dead-on-arrival unit, a refresh swap-back, a temporary Order's end, a decommission, declared
+  missing) counts as delivered. A shipped line then only moves forward, following only the Assets
+  still on their way into service (or in it), and a complete Order stays complete. A line whose
+  every unit left before going into service keeps its stage. On a line sourced again, such a unit
+  (on its way back, or received back) still counts toward the quantity and holds nothing up.
+- While a line filled again waits, its Order is back in preparing: *Ship* is offered again once the
+  Order is delivering, *Confirm installed* once it is installing.
 - A line's Assets are counted past the user's visibility rules (ADR 0005), so the stage does not
   depend on who moved an Asset (for example an inventory tech closing a Staging task while the hot
   spare sits in a customer-site stockroom).
@@ -138,7 +147,17 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   Order's tracking number and work order afresh. A Ship pressed while another of the same Order is
   running ships, buys and opens nothing and says another Ship is running. A Ship after it finds the
   units shipped and the work opened, so it buys no second label and opens no second change and work
-  order.
+  order. *Mark label voided* on one of the Order's outbound labels (P3 integrations spec) holds the
+  same lock for a moment while it voids the label and clears it from the Order; a Ship pressed then
+  says another Ship is running.
+- After an outbound label is marked voided and cleared from the Order, the Order has no tracking
+  number until the replacement's is typed. A Ship after that counts the typed number as entered by
+  hand, so it buys no label for Assets staged since.
+- After a line is filled again (above), a second Ship ships its new units. It uses the Order's
+  tracking number when it was entered by hand (for one an earlier Ship bought, the shipping
+  aggregator buys the new units a label of their own) and the Order's existing work order: it opens
+  no second change or work order. *Confirm installed* is offered again only once the Order is
+  installing.
 - A work order's planned start and end must lie inside the change window (once scheduled) and the
   Site's maintenance schedule (if any).
 - **Install completion** happens when the work order is closed complete or someone uses *Confirm

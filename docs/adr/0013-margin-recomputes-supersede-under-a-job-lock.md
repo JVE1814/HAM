@@ -63,10 +63,17 @@ taken under it. `refresh_orders` is held by the daily refresh run for the whole 
 holds no other lock when it takes it. The Orders it raises are inserted and submitted under it,
 which takes no lock today (sourcing runs from the queued event), so nothing is taken under it. It
 comes first all the same, ahead of anything a submit might come to take.
-`track_shipment_<Shipment sys_id>` is a leaf: only the tracking webhook, its queued retry
-(`x_daas_ham.shipment.track`) and *Mark label voided* take it, holding no other lock, and nothing
-takes another lock while holding it, because the Order's delivered note and the Return order's voided
-note are written after it is released. So it has no place it must keep, and is listed after
-`ship_order`.
+The Asset rule that takes a unit lost in transit off its Order line takes no lock: it queues the
+Order's sourcing rather than take `source_order_<Order sys_id>` inside an Asset save. The rack
+re-check after an Asset's placement is saved takes `recon_exception_<type>_<rack sys_id>`. It holds
+no lock of its own, and runs under `receive_asset_` only when a return receipt or overdue
+declaration clears a placement, which the lock order allows.
+`track_shipment_<Shipment sys_id>` is taken by the tracking webhook and its queued retry
+(`x_daas_ham.shipment.track`) holding no other lock, and by *Mark label voided*: alone for a return
+label, and under `ship_order_<Order sys_id>` for an outbound one. A void that finds `ship_order_`
+held does not retry, like *Cancel order*: it changes nothing and asks the user to try again. Only
+its inner `track_shipment_` take is tried 5 times back to back. Nothing takes another lock while
+holding `track_shipment_`: the Order's delivered note, its cleared tracking and the Return order's
+voided note are written after it is released. So it must stay after `ship_order`.
 
 Whether the instance behaves as expected is on the first-install checklist.

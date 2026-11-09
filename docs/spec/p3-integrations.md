@@ -11,9 +11,9 @@
   addressed to the first site contact, one package per staged Asset (`x_daas_ham.shipping.package_kg`
   each, at most 20), service `x_daas_ham.shipping.service_code`. Nothing is bought when nothing is
   staged; hot spares already at the Site are handed over without a package. The carrier and tracking
-  number land on the Order; a **Shipment** records the label, cost and status. A remote-hands install
-  still needs no carrier. Ship runs one at a time per Order (P1 fulfilment spec), so two presses buy
-  one label.
+  number land on the Order until the label is marked voided (below); a **Shipment** records the
+  label, cost and status. A remote-hands install still needs no carrier. Ship runs one at a time per
+  Order (P1 fulfilment spec), so two presses buy one label.
 - The number of a label an earlier Ship bought does not count as entered by hand: a later Ship, for
   Assets staged since, buys them a label of their own, or asks for a tracking number while the
   aggregator is off. With a tracking number entered by hand, no label is bought.
@@ -35,6 +35,18 @@
   *Exception*; while the lock stays held it says to try again and changes nothing. The
   customer page stops offering the label and a new return label can be created. Voided Shipments,
   like delivered and returned ones, are left out of the workspace list *Shipments under way*.
+- An outbound label (Ship's) is closed the same way, by the same roles and in the same statuses: the
+  Shipment becomes *Voided* (final) under its tracking lock. Its Order is cleared when the Order's
+  tracking number is the label's and its carrier is the label's (ignoring case) or empty: the
+  tracking number and carrier are emptied, and the Order gets a work note naming the voided label
+  and saying to buy the replacement with the carrier and type its carrier and tracking number on the
+  Order. An Order tracking another label (a later Ship's, one typed since, or the same number with a
+  different carrier) is left as it is. No unit is un-shipped and nothing is bought.
+- The void and the Order's clearing run under the Order's Ship lock (`ship_order_<sys_id>`), so a
+  Ship buying a new label meanwhile cannot have its number cleared. A void pressed while a Ship of
+  the Order, or another void of its labels, is running changes nothing and says to try again once
+  it has finished. If the Order's save is refused, the label stays voided and the user is told to
+  clear the tracking number and carrier by hand.
 - Addresses need a name, street, city, postal code and country (U.S. and Canadian states as their
   two-letter codes), and the sender a phone number (ShipEngine requires `ship_from.phone`): the
   location's phone, else `x_daas_ham.shipping.sender_phone` for the depot or the first site
@@ -84,7 +96,7 @@
 | DE, SP / delivered | Delivered |
 | EX / failure, error, cancelled | Exception |
 | return_to_sender | Returned to sender |
-| — (set by *Mark label voided*, never by tracking) | Voided |
+| — (set by *Mark label voided* on a return or outbound label, never by tracking) | Voided |
 
 ## OEM claims (D70)
 

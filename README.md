@@ -30,18 +30,18 @@ routers and firewalls it installs at customer sites and bills as a service.
 | Refresh | Automatic refresh orders per agreement and site with successor-model choice |
 | Disposal | Approved disposal orders retiring wiped assets by method and legal owner |
 | Assurance | Blind counts, site audits, customer attestation, monitoring reconciliation exceptions |
-| Racks | Placement guard and rack elevation page (`x_daas_ham_racks.do`) |
+| Racks | Placement guard, rack re-check exceptions (overlap, power budget) and rack elevation page (`x_daas_ham_racks.do`) |
 | Customer self-service | `x_daas_ham_customer.do`: equipment, faults, returns, install confirmation, attestation |
 
 | Area | Phase 3 |
 |---|---|
 | Leases | Lease schedules make their assets lessor-owned; mismatch alerts when a lease ends before the service; end-of-lease decisions (buy out, extend, return; one buy out or return per lease, returned stock withdrawn to pending wipe and swapped-back units evaluated into wiping, not stock) ([spec](docs/spec/p3-contracts.md)) |
 | Renewals | Agreement renewal warnings and *Renew agreement*; OEM coverage expiry warnings per customer |
-| Billing | Service intervals per asset; monthly billing periods prorated by day (site packages) and device-day (per-device lines) plus fees; review, regenerate, close and lock; CSV attachment and pull API ([spec](docs/spec/p3-billing.md)) |
+| Billing | Service intervals per asset; monthly billing periods prorated by day (site packages) and device-day (per-device lines, within the line's own dates) plus fees; review, regenerate, reset a stuck generation (admin), close and lock; CSV attachment and pull API ([spec](docs/spec/p3-billing.md)) |
 | Margin | Cost facts (purchase write-off, lease, OEM support, field labour) and margin per customer and site on period close; dashboard tab |
 | Shipping | Labels bought through a shipping aggregator at *Ship* and for ship-back returns; tracking webhooks ([spec](docs/spec/p3-integrations.md)) |
 | OEM claims | Staging steps done by the OEM cloud: Meraki and Mist claim, GreenLake device add and subscription, FortiCloud registration and FortiZTP, Check Point Zero Touch |
-| Racks | Power budget per rack from model typical power |
+| Racks | Power budget per rack from model typical power, with a *Rack over power budget* exception when simultaneous placements exceed it |
 
 See [`docs/spec`](docs/spec) for the behaviour of each module. AI assistance is deferred (plan D68).
 
@@ -147,6 +147,10 @@ API, billed to `x_daas_ham.shipping.carrier_id`). Register the tracking webhook 
 payloads are accepted. Labels are not voided through the aggregator: while a return label is still
 *Label created* or *Exception*, void it with the carrier, then use *Mark label voided* on its
 Shipment so a new one can be created; a label in transit or out for delivery is the return under way.
+Ship's labels are voided the same way: while one is *Label created* or *Exception*, void it with the
+carrier and use *Mark label voided* on its Shipment. The Order's tracking number and carrier are
+cleared, with a work note saying to buy the replacement with the carrier and type its tracking
+number on the Order.
 
 **OEM clouds**: REST messages *NaaS Meraki Dashboard*, *NaaS HPE Mist*, *NaaS HPE GreenLake*,
 *NaaS FortiCare*, *NaaS FortiZTP* and *NaaS Check Point Zero Touch*. Attach OAuth 2.0 profiles to
@@ -313,6 +317,17 @@ What remains can only be confirmed on an instance or behind a vendor login:
   a row of that name in *Job lock*, it says *Order not cancelled: sourcing is running on it. Try
   again in a minute* and changes nothing. No `source_order_` or `order_line_` row is left once a run
   or a cancel ends.
+- **Units that leave in transit** (Order lines): a shipped unit of an Order moved to missing or
+  pending return (a device removal) logs *[x_daas_ham] <serial> left <line> in transit (<stage>):
+  taken off the line, which is filled again* (info), followed by a queued `x_daas_ham.order.source`
+  pass. The after rule's nested Asset save that clears `x_daas_ham_order_line` runs no stage rules
+  and keeps the outer save's stage. A nested save the platform refuses logs *[x_daas_ham] <serial>
+  left <line> in transit (<stage>) but stays on it, which is not sourced again: <reason>* (warning),
+  and a line that cannot be saved back to awaiting stock logs *[x_daas_ham] <line> lost a unit in
+  transit but is not sourced again* (warning).
+- **Re-check approvals** (Order form, next to *Submit*, *Ship*, *Confirm installed* and *Cancel
+  order*): its condition, an inline `sysapproval_approver` query kept under the 254-character
+  condition limit, shows the button only on an Order awaiting approval with no requested approval.
 - **Serial lock** (warehouse Receive without an ASN, and ASN import rows): the first scan of an
   unknown serial with its PID, or an ASN row, creates the Asset under the job lock
   `receive_serial_<serial>`, checking there that no Asset has the serial, so two first scans, or a
@@ -341,7 +356,11 @@ What remains can only be confirmed on an instance or behind a vendor login:
   A retry still held off after 15 re-queues logs *[x_daas_ham] Tracking update of Shipment <number>
   (<tracking number>) dropped after 15 tries (...): check the Shipment with the carrier* (warning).
   With the row in place, *Mark label voided* says *Label <tracking number> not marked voided: a
-  tracking update of it is being saved. Try again* and changes nothing. No lock row is left afterwards.
+  tracking update of it is being saved. Try again* and changes nothing. *Mark label voided* on an
+  outbound label also holds `ship_order_<Order sys_id>`. With a row of that name in place, it says
+  *Label <tracking number> not marked voided: a Ship of its Order, or a void of one of its labels, is
+  running. Try again once it has finished* and changes nothing, and a Ship pressed while a void holds
+  the lock says *Another Ship of this Order is running*. No lock row is left afterwards.
   The queued update travels in the event's `parm1`, at most 4000 characters (a long history is shared
   out over several events, never cut): check that `sysevent.parm1` holds that many on the instance
   (its dictionary max length), as the 4000 comes from community answers, not ServiceNow's
@@ -384,6 +403,11 @@ What remains can only be confirmed on an instance or behind a vendor login:
   (`GlideRecord.canCreate()`). The daily job *NaaS - raise refresh orders* relies on its *Run as* user
   (expected to be the system user) passing it; one without an Order raiser role leaves its refresh
   Orders as drafts with the work note *You may not raise orders*.
+- **Rack re-check** (D67): two saves placing Assets into the same rack units at the same moment both
+  pass the before rule, and the after rule of the later one, reading the rack afresh, sees both and
+  opens *Devices overlap in rack* (or *Rack over power budget*) on the rack. Moving one device away
+  resolves it. A Model or rack capacity edit that clears it is resolved by the next daily
+  reconciliation.
 - **Scale**: before-query rule performance and the chunked jobs at your data volumes (indexes are
   declared on the scoped columns).
 - **Currency**: amounts are written in each line's currency (default EUR); confirm the session

@@ -47,11 +47,12 @@ Each installed Asset is checked for:
 - **site mismatch** with its CI's location: the CI's location, or the location two levels up
   (room → building → site), must be the Asset's Site.
 
-Exceptions open once per type and Asset (or CI), also when two runs raise the same one at once: the
-check and the insert are made under a lock on the type and subject. They resolve themselves when the
-condition clears. One the platform refuses is logged (an audit or attestation, closed once, does not
-raise it again).
-Network-gear CIs discovered recently with no Asset raise *seen without asset*.
+Exceptions open once per type and Asset (or CI; a rack's overlap and power exceptions once per
+rack), also when two runs raise the same one at once: the check and the insert are made under a lock
+on the type and subject. They resolve themselves when the condition clears. One the platform refuses
+is logged (an audit or attestation, closed once, does not raise it again).
+Network-gear CIs discovered recently with no Asset raise *seen without asset*. Racks with an open
+rack exception are re-checked as well (see Racks), and their rack exceptions open or resolve.
 
 ## Racks (D67)
 
@@ -62,9 +63,16 @@ Network-gear CIs discovered recently with no Asset raise *seen without asset*.
   take the typical power (the Models' *typical power (W)*) of all devices in it, both faces, over
   the capacity, when the change adds draw (a device new to the rack, or a different Model). Moves
   within the rack are always allowed. The elevation page shows used against available power.
-- The checks read the placements already saved. Two saves into the same units of one rack at the
-  same moment can both pass: the check is a before rule, and a lock taken there ends before the
-  record is written. Placements are entered by hand, one Asset per save, so this is accepted.
+- The checks read the placements already saved, so two saves into the same units of one rack at the
+  same moment can both pass (the check is a before rule, and a lock taken there ends before the
+  record is written). Once a save that changes an Asset's rack, lowest unit, face or Model is
+  written, an after rule re-checks the rack it is in and the rack it left. The re-check reads every
+  device placed there afresh, past the visibility rules. It opens *Devices overlap in rack* when
+  devices share units on one face, and *Rack over power budget* when their typical power (both
+  faces) is over the rack's capacity. One of each is open per rack, naming the devices (by asset
+  tag, else serial) or the watts. Each resolves when a later re-check finds it cleared. The daily
+  reconciliation also re-checks every rack with one open, so one cleared by a Model's size or power,
+  the rack's capacity or a deleted Asset resolves too.
 - The checks count every device placed in the rack, including ones the saving user cannot see (an
   inventory tech sees only their Stockrooms' Assets). The elevation page and its power figure still
   show only what the viewer may see.

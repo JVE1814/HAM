@@ -230,7 +230,7 @@ _Avoid_: stocktake, inventory
 A Customer admin's periodic confirmation of the Assets installed at their Sites.
 
 **Reconciliation exception**:
-A disagreement between Assets and monitoring (seen but unknown, deployed but unseen, serial or location mismatch).
+A disagreement between Assets and monitoring (seen but unknown, deployed but unseen, serial or location mismatch), or between a Rack's placements and its units or Power budget (devices overlapping, over budget).
 
 ### Money
 
