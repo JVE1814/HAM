@@ -1,15 +1,15 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
-import { monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing'
-import { stillCovered } from '../domain/leases'
-import type { LegalOwner } from '../domain/lifecycle'
-import { cents, CostLedger, costFactKey, marginRows, serviceIntervalCosts, type Amount, type AssetCostFacts, type CostEntry, type LeaseTerms } from '../domain/margin'
-import { memoized } from '../domain/memo'
-import { runEventTableJob } from '../platform/chunked'
-import { EVENT, fire } from '../platform/events'
-import { intProperty, PROPERTY } from '../platform/properties'
-import { count, deleteWhere, findById, num, recordsById, refusal, str } from '../platform/records'
+import { monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing.ts'
+import { stillCovered } from '../domain/leases.ts'
+import type { LegalOwner } from '../domain/lifecycle.ts'
+import { cents, CostLedger, costFactKey, marginRows, serviceIntervalCosts, type Amount, type AssetCostFacts, type CostEntry, type LeaseTerms } from '../domain/margin.ts'
+import { memoized } from '../domain/memo.ts'
+import { runEventTableJob } from '../platform/chunked.ts'
+import { EVENT, fire } from '../platform/events.ts'
+import { intProperty, PROPERTY } from '../platform/properties.ts'
+import { count, deleteWhere, findById, num, recordsById, refusal, str } from '../platform/records.ts'
 
 /** Cost facts and Margin per Customer and Site, computed when a Billing period closes (P3.28). */
 

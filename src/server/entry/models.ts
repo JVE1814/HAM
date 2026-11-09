@@ -1,18 +1,18 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
-import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
-import { runTableJob } from '../platform/chunked'
-import { todayIso } from '../platform/clock'
-import { EVENT, fire } from '../platform/events'
-import { refreshLifecycleDates } from '../platform/lifecycle-dates'
+import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle.ts'
+import { runTableJob } from '../platform/chunked.ts'
+import { todayIso } from '../platform/clock.ts'
+import { EVENT, fire } from '../platform/events.ts'
+import { refreshLifecycleDates } from '../platform/lifecycle-dates.ts'
 import {
     learnFromResolution,
     loadNormalizationData,
     recordNormalizationException,
     resolveModel,
-} from '../platform/normalization'
-import { refusal, str } from '../platform/records'
+} from '../platform/normalization.ts'
+import { refusal, str } from '../platform/records.ts'
 
 /** Model normalization and Lifecycle phase / Refresh due date upkeep (P1.2). */
 

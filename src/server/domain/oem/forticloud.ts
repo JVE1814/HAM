@@ -1,4 +1,4 @@
-import { field, text } from '../json'
+import { field, text } from '../json.ts'
 
 /**
  * FortiCloud APIs answer HTTP 200 with an envelope whose status 0 means success; anything else is an

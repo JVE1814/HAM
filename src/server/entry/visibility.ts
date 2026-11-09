@@ -1,6 +1,6 @@
 import type { GlideRecord } from '@servicenow/glide'
-import { visibilityFilter, type ScopingFields } from '../domain/visibility'
-import { currentSession } from '../platform/session'
+import { visibilityFilter, type ScopingFields } from '../domain/visibility.ts'
+import { currentSession } from '../platform/session.ts'
 
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.

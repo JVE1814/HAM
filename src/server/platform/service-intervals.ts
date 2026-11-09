@@ -1,10 +1,10 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { intervalEnd, restartInterval } from '../domain/billing'
-import { isBillable } from '../domain/lifecycle'
-import { readStage } from './assets'
-import { todayIso } from './clock'
-import { withLockTries, type HeldLock } from './locks'
-import { exists, refusal, str } from './records'
+import { intervalEnd, restartInterval } from '../domain/billing.ts'
+import { isBillable } from '../domain/lifecycle.ts'
+import { readStage } from './assets.ts'
+import { todayIso } from './clock.ts'
+import { withLockTries, type HeldLock } from './locks.ts'
+import { exists, refusal, str } from './records.ts'
 
 /** Service intervals: the days each Asset delivered a Subscription line (P3.25). */
 

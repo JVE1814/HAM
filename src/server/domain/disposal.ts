@@ -1,5 +1,5 @@
-import type { Approver } from './entitlement'
-import type { LegalOwner, Stage } from './lifecycle'
+import type { Approver } from './entitlement.ts'
+import type { LegalOwner, Stage } from './lifecycle.ts'
 
 /** Disposal orders (P2.5, D61). */
 

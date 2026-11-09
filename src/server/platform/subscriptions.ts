@@ -1,8 +1,8 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { toIsoDate } from '../domain/calendar'
-import { chooseSubscriptionLine, type SubscriptionLineView } from '../domain/in-service'
-import { withLockTries, type HeldLock } from './locks'
-import { findById, refusal, str } from './records'
+import { toIsoDate } from '../domain/calendar.ts'
+import { chooseSubscriptionLine, type SubscriptionLineView } from '../domain/in-service.ts'
+import { withLockTries, type HeldLock } from './locks.ts'
+import { findById, refusal, str } from './records.ts'
 
 /**
  * Attach an Asset going into service to the Subscription line it delivers and start that line (the caller saves the

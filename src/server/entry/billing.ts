@@ -20,15 +20,15 @@ import {
     type MonthBounds,
     type ServiceInterval,
     type SubscriptionLineTerms,
-} from '../domain/billing'
-import { appendTo } from '../domain/collections'
-import { memoized } from '../domain/memo'
-import { ROLE } from '../domain/visibility'
-import { RowFailure, runEventTableJob } from '../platform/chunked'
-import { glideToMs, msToGlide, nowMs, todayIso } from '../platform/clock'
-import { EVENT, fire } from '../platform/events'
-import { deleteWhere, exists, findById, num, refusal, str } from '../platform/records'
-import { queryInt, reply } from '../platform/rest-api'
+} from '../domain/billing.ts'
+import { appendTo } from '../domain/collections.ts'
+import { memoized } from '../domain/memo.ts'
+import { ROLE } from '../domain/visibility.ts'
+import { RowFailure, runEventTableJob } from '../platform/chunked.ts'
+import { glideToMs, msToGlide, nowMs, todayIso } from '../platform/clock.ts'
+import { EVENT, fire } from '../platform/events.ts'
+import { deleteWhere, exists, findById, num, refusal, str } from '../platform/records.ts'
+import { queryInt, reply } from '../platform/rest-api.ts'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
 

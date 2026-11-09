@@ -1,5 +1,5 @@
 import { GlideDateTime, GlideRecord } from '@servicenow/glide'
-import { exists, refusal } from './records'
+import { exists, refusal } from './records.ts'
 
 /** Job locks (ADR 0013): a row per lock held, behind a unique index, so taking a lock is one insert only one holder wins. */
 const LOCK = 'x_daas_ham_job_lock'

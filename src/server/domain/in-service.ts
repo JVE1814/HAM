@@ -1,4 +1,4 @@
-import type { Stage } from './lifecycle'
+import type { Stage } from './lifecycle.ts'
 
 /**
  * In service: an Asset installed at a Site and seen by monitoring after the install. That instant

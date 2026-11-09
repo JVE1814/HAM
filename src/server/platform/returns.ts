@@ -1,6 +1,6 @@
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
-import { appendTo } from '../domain/collections'
-import { isDeployed, stagesQuery } from '../domain/lifecycle'
+import { appendTo } from '../domain/collections.ts'
+import { isDeployed, stagesQuery } from '../domain/lifecycle.ts'
 import {
     chargedFeeQuery,
     feeAmount,
@@ -10,12 +10,12 @@ import {
     SITE_RECOVERY_STAGES,
     type FeeIdentity,
     type FeeType,
-} from '../domain/returns'
-import { moveAndSave, readStage } from './assets'
-import { todayIso } from './clock'
-import { openFieldWork } from './field-work'
-import { withLockTries, type HeldLock } from './locks'
-import { exists, findById, num, refusal, str } from './records'
+} from '../domain/returns.ts'
+import { moveAndSave, readStage } from './assets.ts'
+import { todayIso } from './clock.ts'
+import { openFieldWork } from './field-work.ts'
+import { withLockTries, type HeldLock } from './locks.ts'
+import { exists, findById, num, refusal, str } from './records.ts'
 
 /** Return orders, their lines and Fee events (P2.4). */
 

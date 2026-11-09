@@ -1,5 +1,5 @@
-import { errorText, isSuccess, type HttpPort } from './http'
-import { asArray, field, isoDate, parseJson, text } from './json'
+import { errorText, isSuccess, type HttpPort } from './http.ts'
+import { asArray, field, isoDate, parseJson, text } from './json.ts'
 
 /**
  * Shipping aggregator (P3.26, D73): one adapter buys labels and reads tracking webhooks. Requests

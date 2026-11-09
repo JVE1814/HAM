@@ -1,6 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { normalizeModel, shouldLearnAlias, type ManufacturerAlias, type ModelMatchRule } from '../domain/normalization'
-import { bool, num, refusal, str } from './records'
+import { normalizeModel, shouldLearnAlias, type ManufacturerAlias, type ModelMatchRule } from '../domain/normalization.ts'
+import { bool, num, refusal, str } from './records.ts'
 
 /** Resolving raw manufacturer/model strings to canonical Models (domain/normalization). */
 

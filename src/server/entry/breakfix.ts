@@ -1,10 +1,10 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
-import { replacementStep } from '../domain/breakfix'
-import { moveAsset, readStage } from '../platform/assets'
-import { findById, refusal, str } from '../platform/records'
-import { submitOrder } from './orders'
+import { replacementStep } from '../domain/breakfix.ts'
+import { moveAsset, readStage } from '../platform/assets.ts'
+import { findById, refusal, str } from '../platform/records.ts'
+import { submitOrder } from './orders.ts'
 
 /** Break-fix: a CSM case about a failed Asset drives a device-replace Order (P2.3, D58). */
 

@@ -6,9 +6,9 @@ import {
     type ContractedQuantity,
     type EntitlementContext,
     type Usage,
-} from '../domain/entitlement'
-import { todayIso } from './clock'
-import { bool, num, str } from './records'
+} from '../domain/entitlement.ts'
+import { todayIso } from './clock.ts'
+import { bool, num, str } from './records.ts'
 
 /** Read models of an Agreement and its Customer catalog, as the entitlement module needs them. */
 

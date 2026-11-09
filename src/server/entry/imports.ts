@@ -1,13 +1,13 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
-import { normalizeSerial, receiveSerialLockName, validateAsnRows, type AsnRowCheck } from '../domain/asn'
-import { parseLifecycleRow } from '../domain/model-lifecycle'
-import { newAsset } from '../platform/assets'
-import { withLockTries, type HeldLock } from '../platform/locks'
-import { loadNormalizationData, recordNormalizationException, resolveModel } from '../platform/normalization'
-import { PROPERTY, stringProperty } from '../platform/properties'
-import { refusal, str } from '../platform/records'
+import { normalizeSerial, receiveSerialLockName, validateAsnRows, type AsnRowCheck } from '../domain/asn.ts'
+import { parseLifecycleRow } from '../domain/model-lifecycle.ts'
+import { newAsset } from '../platform/assets.ts'
+import { withLockTries, type HeldLock } from '../platform/locks.ts'
+import { loadNormalizationData, recordNormalizationException, resolveModel } from '../platform/normalization.ts'
+import { PROPERTY, stringProperty } from '../platform/properties.ts'
+import { refusal, str } from '../platform/records.ts'
 
 /** Import-set rows processed on insert (ASN, lifecycle CSV). */
 

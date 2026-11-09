@@ -1,8 +1,8 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { beingInstalled, mayConfirmInstall } from '../domain/install-confirmation'
-import { currentSession } from '../platform/session'
-import { completeInstall, installState, shipOrder } from './delivery'
-import { cancelOrder, recheckApprovals, submitOrder } from './orders'
+import { beingInstalled, mayConfirmInstall } from '../domain/install-confirmation.ts'
+import { currentSession } from '../platform/session.ts'
+import { completeInstall, installState, shipOrder } from './delivery.ts'
+import { cancelOrder, recheckApprovals, submitOrder } from './orders.ts'
 
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.

@@ -1,8 +1,8 @@
-import { addDays } from './calendar'
-import type { NamedRecord } from './entitlement'
-import type { LeaseEndAction } from './leases'
-import { DEPLOYED_STAGES, SERVING_STAGES, stagesQuery, type LegalOwner, type Stage } from './lifecycle'
-import type { VisibilityScope } from './visibility'
+import { addDays } from './calendar.ts'
+import type { NamedRecord } from './entitlement.ts'
+import type { LeaseEndAction } from './leases.ts'
+import { DEPLOYED_STAGES, SERVING_STAGES, stagesQuery, type LegalOwner, type Stage } from './lifecycle.ts'
+import type { VisibilityScope } from './visibility.ts'
 
 /** Returns, depot evaluation, Fee events and break-fix shortfalls (P2.3–P2.4). */
 

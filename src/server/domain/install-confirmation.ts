@@ -1,5 +1,5 @@
-import type { Stage } from './lifecycle'
-import type { VisibilityScope } from './visibility'
+import type { Stage } from './lifecycle.ts'
+import type { VisibilityScope } from './visibility.ts'
 
 /**
  * Who may record an Order as installed (P1 fulfilment, D49). An install by an FSM engineer, a subcontractor or

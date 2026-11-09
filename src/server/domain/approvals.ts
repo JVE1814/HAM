@@ -1,4 +1,4 @@
-import type { Approver } from './entitlement'
+import type { Approver } from './entitlement.ts'
 
 export type ApprovalState = 'requested' | 'approved' | 'rejected' | 'cancelled' | 'not_required' | 'not_yet_requested'
 export type ApprovalOutcome = 'requested' | 'approved' | 'rejected'

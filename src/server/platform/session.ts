@@ -1,6 +1,6 @@
 import { gs } from '@servicenow/glide'
-import { resolveVisibility, type VisibilityScope } from '../domain/visibility'
-import { pluck } from './records'
+import { resolveVisibility, type VisibilityScope } from '../domain/visibility.ts'
+import { pluck } from './records.ts'
 
 /** The signed-in user's visibility and the identifiers it is scoped by (ADR 0005). */
 export interface SessionScope {

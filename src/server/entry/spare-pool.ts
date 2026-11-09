@@ -1,11 +1,11 @@
 import { GlideAggregate, gs } from '@servicenow/glide'
-import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle'
-import { freeStockOf, pickForSparePool, reservedSparesQuery, sparePoolShortfall } from '../domain/sourcing'
-import { runTableJob } from '../platform/chunked'
-import { openPurchaseQuantity, requestPurchase } from '../platform/procurement'
-import { boolProperty, PROPERTY, stagingStockroom } from '../platform/properties'
-import { num, str } from '../platform/records'
-import { moveToSparePool, stockCandidates } from '../platform/stock'
+import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle.ts'
+import { freeStockOf, pickForSparePool, reservedSparesQuery, sparePoolShortfall } from '../domain/sourcing.ts'
+import { runTableJob } from '../platform/chunked.ts'
+import { openPurchaseQuantity, requestPurchase } from '../platform/procurement.ts'
+import { boolProperty, PROPERTY, stagingStockroom } from '../platform/properties.ts'
+import { num, str } from '../platform/records.ts'
+import { moveToSparePool, stockCandidates } from '../platform/stock.ts'
 
 /** Daily job: keep every Customer's Spare pool at its Agreement's spare-pool ratio (P1.4). */
 export function topUpSparePools(): void {

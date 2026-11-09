@@ -1,9 +1,9 @@
 import { GlideRecord } from '@servicenow/glide'
-import { assetLifecycleStamp, type AssetLifecycleFacts, type LifecycleDates } from '../domain/model-lifecycle'
-import { memoized } from '../domain/memo'
-import { runEventTableJob, type EventTableJob } from './chunked'
-import { glideToIsoDate, todayIso } from './clock'
-import { findById, num, str } from './records'
+import { assetLifecycleStamp, type AssetLifecycleFacts, type LifecycleDates } from '../domain/model-lifecycle.ts'
+import { memoized } from '../domain/memo.ts'
+import { runEventTableJob, type EventTableJob } from './chunked.ts'
+import { glideToIsoDate, todayIso } from './clock.ts'
+import { findById, num, str } from './records.ts'
 
 /** Lifecycle phase and Refresh due date of an Asset, from its Model lifecycle, Agreement and Lease schedule. */
 

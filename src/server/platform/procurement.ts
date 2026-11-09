@@ -1,7 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import type { PurchaseResult } from '../domain/sourcing'
-import { PROPERTY, stagingStockroom } from './properties'
-import { str } from './records'
+import type { PurchaseResult } from '../domain/sourcing.ts'
+import { PROPERTY, stagingStockroom } from './properties.ts'
+import { str } from './records.ts'
 
 /**
  * Purchase orders through the Procurement plugin (proc_po / proc_po_item), shipped to the staging

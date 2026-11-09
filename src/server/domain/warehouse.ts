@@ -1,6 +1,6 @@
-import type { LineStage } from './fulfilment'
-import type { Stage } from './lifecycle'
-import type { StockroomType } from './sourcing'
+import type { LineStage } from './fulfilment.ts'
+import type { Stage } from './lifecycle.ts'
+import type { StockroomType } from './sourcing.ts'
 
 /** What the warehouse scanning app (P1.5) may do with a scanned Asset, by its Lifecycle stage. */
 

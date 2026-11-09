@@ -1,9 +1,9 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
-import { toIsoDate } from '../domain/calendar'
-import type { LeaseEndAction } from '../domain/leases'
-import { isDeployed, type LegalOwner } from '../domain/lifecycle'
+import { toIsoDate } from '../domain/calendar.ts'
+import type { LeaseEndAction } from '../domain/leases.ts'
+import { isDeployed, type LegalOwner } from '../domain/lifecycle.ts'
 import {
     evaluationTarget,
     overdueStep,
@@ -12,16 +12,16 @@ import {
     type EvaluationOutcome,
     type RequestedReturn,
     type ReturnRequester,
-} from '../domain/returns'
-import { clearRackPlacement, moveAndSave, moveAsset, readStage } from '../platform/assets'
-import { customerAdminIds } from '../platform/approvals'
-import { runTableJob } from '../platform/chunked'
-import { EVENT } from '../platform/events'
-import { withLock, type HeldLock } from '../platform/locks'
-import { nowMs, todayIso } from '../platform/clock'
-import { intProperty, PROPERTY, stringProperty } from '../platform/properties'
-import { bool, findById, refusal, str } from '../platform/records'
-import { currentSession } from '../platform/session'
+} from '../domain/returns.ts'
+import { clearRackPlacement, moveAndSave, moveAsset, readStage } from '../platform/assets.ts'
+import { customerAdminIds } from '../platform/approvals.ts'
+import { runTableJob } from '../platform/chunked.ts'
+import { EVENT } from '../platform/events.ts'
+import { withLock, type HeldLock } from '../platform/locks.ts'
+import { nowMs, todayIso } from '../platform/clock.ts'
+import { intProperty, PROPERTY, stringProperty } from '../platform/properties.ts'
+import { bool, findById, refusal, str } from '../platform/records.ts'
+import { currentSession } from '../platform/session.ts'
 import {
     closeReturnIfDone,
     completeReturn,
@@ -33,7 +33,7 @@ import {
     stampNow,
     type ReturnTrigger,
     waiveOpenFees,
-} from '../platform/returns'
+} from '../platform/returns.ts'
 
 /** Returns, decommissions, depot evaluation and overdue chasing (P2.4). */
 

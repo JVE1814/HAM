@@ -1,5 +1,5 @@
 import { GlideDateTime } from '@servicenow/glide'
-import { toIsoDate } from '../domain/calendar'
+import { toIsoDate } from '../domain/calendar.ts'
 
 /** Conversions between Glide date/time values (UTC "yyyy-MM-dd HH:mm:ss") and domain values. */
 

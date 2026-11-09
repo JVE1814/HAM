@@ -1,4 +1,4 @@
-import { andEachClause } from './encoded-query'
+import { andEachClause } from './encoded-query.ts'
 
 /**
  * Asset lifecycle stages and the moves allowed between them.

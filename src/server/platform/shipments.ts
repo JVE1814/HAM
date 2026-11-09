@@ -1,6 +1,6 @@
 import { GlideRecord } from '@servicenow/glide'
-import { OPEN_SHIPMENTS } from '../domain/shipping'
-import { str } from './records'
+import { OPEN_SHIPMENTS } from '../domain/shipping.ts'
+import { str } from './records.ts'
 
 /** Reads of shipments (x_daas_ham_shipment) bought from the shipping aggregator (P3.26, D73). */
 

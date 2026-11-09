@@ -1,7 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { preflightReport } from '../domain/preflight'
-import { msToGlide, nowMs } from '../platform/clock'
-import { refusal } from '../platform/records'
+import { preflightReport } from '../domain/preflight.ts'
+import { msToGlide, nowMs } from '../platform/clock.ts'
+import { refusal } from '../platform/records.ts'
 
 /** On-demand job "NaaS - preflight check": verifies plugins/roles and records the result. */
 export function runPreflight(): void {

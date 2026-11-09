@@ -24,14 +24,14 @@ import {
     type ShipmentStatus,
     type TrackingEvent,
     type TrackingUpdate,
-} from '../domain/shipping'
-import { msToGlide, nowMs } from '../platform/clock'
-import { EVENT, fire } from '../platform/events'
-import { withLock, withLockTries, type HeldLock } from '../platform/locks'
-import { boolProperty, intProperty, PROPERTY, stagingStockroom, stringProperty } from '../platform/properties'
-import { count, findById, refusal, str } from '../platform/records'
-import { restMessagePort } from '../platform/rest-port'
-import { queryParam, reply } from '../platform/rest-api'
+} from '../domain/shipping.ts'
+import { msToGlide, nowMs } from '../platform/clock.ts'
+import { EVENT, fire } from '../platform/events.ts'
+import { withLock, withLockTries, type HeldLock } from '../platform/locks.ts'
+import { boolProperty, intProperty, PROPERTY, stagingStockroom, stringProperty } from '../platform/properties.ts'
+import { count, findById, refusal, str } from '../platform/records.ts'
+import { restMessagePort } from '../platform/rest-port.ts'
+import { queryParam, reply } from '../platform/rest-api.ts'
 
 /** Shipping aggregator: labels for Orders and ship-back returns, tracking webhooks (P3.26, D73). */
 

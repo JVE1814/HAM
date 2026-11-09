@@ -8,10 +8,10 @@ import {
     siteRecoveryLineQuery,
     type LineStage,
     type OrderShipment,
-} from '../domain/fulfilment'
-import type { Stage } from '../domain/lifecycle'
-import { readStage } from './assets'
-import { exists, findById, num, refusal, str } from './records'
+} from '../domain/fulfilment.ts'
+import type { Stage } from '../domain/lifecycle.ts'
+import { readStage } from './assets.ts'
+import { exists, findById, num, refusal, str } from './records.ts'
 
 /** Keeps Order-line and Order stages in step with their Assets (derived, see domain/fulfilment). */
 

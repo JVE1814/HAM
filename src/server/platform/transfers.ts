@@ -1,6 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import type { TransferResult } from '../domain/sourcing'
-import { deleteWhere, str } from './records'
+import type { TransferResult } from '../domain/sourcing.ts'
+import { deleteWhere, str } from './records.ts'
 
 /**
  * Transfer orders (alm_transfer_order) moving reserved stock to the staging centre, one line per Asset. A

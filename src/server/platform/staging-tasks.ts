@@ -1,7 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { initialAutomationStatus } from '../domain/oem/claims'
-import { selectStagingTemplate, type StagingTemplateView } from '../domain/staging'
-import { bool, deleteWhere, num, refusal, str } from './records'
+import { initialAutomationStatus } from '../domain/oem/claims.ts'
+import { selectStagingTemplate, type StagingTemplateView } from '../domain/staging.ts'
+import { bool, deleteWhere, num, refusal, str } from './records.ts'
 
 /** Creating Staging tasks with their checklist steps. */
 

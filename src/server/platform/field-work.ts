@@ -1,5 +1,5 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { refusal, str } from './records'
+import { refusal, str } from './records.ts'
 
 /**
  * On-site work: an FSM work order (wm_order) and the change request it runs under (D57).

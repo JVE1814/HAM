@@ -1,5 +1,5 @@
-import type { Stage } from './lifecycle'
-import { INSTALLED_STAGES } from './returns'
+import type { Stage } from './lifecycle.ts'
+import { INSTALLED_STAGES } from './returns.ts'
 
 /**
  * Shipping an Order to its Site: when "Ship" is refused, what label it buys and what on-site work it opens, and when

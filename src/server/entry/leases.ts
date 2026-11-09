@@ -1,7 +1,7 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
-import { addDays } from '../domain/calendar'
+import { addDays } from '../domain/calendar.ts'
 import {
     buyoutPurchase,
     evenShare,
@@ -14,19 +14,19 @@ import {
     withinLead,
     type ExpiringCoverage,
     type LeaseEndAction,
-} from '../domain/leases'
-import { isRetired, SERVING_STAGES, stagesQuery, type Stage } from '../domain/lifecycle'
-import { isFree } from '../domain/sourcing'
-import { providerApproverIds } from '../platform/approvals'
-import { moveAsset, readStage } from '../platform/assets'
-import { runEventTableJob } from '../platform/chunked'
-import { todayIso } from '../platform/clock'
-import { EVENT, fire } from '../platform/events'
-import { refreshLifecycleDates } from '../platform/lifecycle-dates'
-import type { HeldLock } from '../platform/locks'
-import { intProperty, PROPERTY, stringProperty } from '../platform/properties'
-import { bool, count, exists, findById, num, refusal, str } from '../platform/records'
-import { changeStock, stockUnit } from '../platform/stock'
+} from '../domain/leases.ts'
+import { isRetired, SERVING_STAGES, stagesQuery, type Stage } from '../domain/lifecycle.ts'
+import { isFree } from '../domain/sourcing.ts'
+import { providerApproverIds } from '../platform/approvals.ts'
+import { moveAsset, readStage } from '../platform/assets.ts'
+import { runEventTableJob } from '../platform/chunked.ts'
+import { todayIso } from '../platform/clock.ts'
+import { EVENT, fire } from '../platform/events.ts'
+import { refreshLifecycleDates } from '../platform/lifecycle-dates.ts'
+import type { HeldLock } from '../platform/locks.ts'
+import { intProperty, PROPERTY, stringProperty } from '../platform/properties.ts'
+import { bool, count, exists, findById, num, refusal, str } from '../platform/records.ts'
+import { changeStock, stockUnit } from '../platform/stock.ts'
 
 /** Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
 

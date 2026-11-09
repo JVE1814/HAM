@@ -1,4 +1,4 @@
-import { addMonths } from './calendar'
+import { addMonths } from './calendar.ts'
 
 /** Audits (blind counts, site audits) and Attestations (P2.7, D63). */
 

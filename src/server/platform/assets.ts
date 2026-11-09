@@ -1,5 +1,5 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { normalizeSerial } from '../domain/asn'
+import { normalizeSerial } from '../domain/asn.ts'
 import {
     checkTransition,
     fieldsOf,
@@ -9,8 +9,8 @@ import {
     type TransitionFacts,
     type TransitionVerdict,
     voidsWipeEvidence,
-} from '../domain/lifecycle'
-import { refusal, str } from './records'
+} from '../domain/lifecycle.ts'
+import { refusal, str } from './records.ts'
 
 /** Reading and moving Assets (alm_hardware) through their Lifecycle stage (ADR 0002). */
 

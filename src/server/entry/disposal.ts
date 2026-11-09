@@ -1,7 +1,7 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
-import { groupDecisions, rollupApprovals } from '../domain/approvals'
+import { groupDecisions, rollupApprovals } from '../domain/approvals.ts'
 import {
     disposalApprovers,
     disposalCustomerFindings,
@@ -10,18 +10,18 @@ import {
     disposalStage,
     type DisposalAsset,
     type DisposalMethod,
-} from '../domain/disposal'
-import type { LegalOwner, Stage } from '../domain/lifecycle'
-import { ROLE } from '../domain/visibility'
+} from '../domain/disposal.ts'
+import type { LegalOwner, Stage } from '../domain/lifecycle.ts'
+import { ROLE } from '../domain/visibility.ts'
 import {
     approvalsOf,
     cancelPendingApprovals,
     customerAdminIds,
     providerApproverIds,
     requestApprovals,
-} from '../platform/approvals'
-import { moveAsset, readStage, transitionFacts } from '../platform/assets'
-import { findById, refusal, str } from '../platform/records'
+} from '../platform/approvals.ts'
+import { moveAsset, readStage, transitionFacts } from '../platform/assets.ts'
+import { findById, refusal, str } from '../platform/records.ts'
 
 /** Disposal orders: approve, then retire each wiped Asset by its method (P2.5, D61). */
 

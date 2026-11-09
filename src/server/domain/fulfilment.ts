@@ -1,6 +1,6 @@
-import type { ApprovalDecision } from './approvals'
-import type { Approver } from './entitlement'
-import type { Stage } from './lifecycle'
+import type { ApprovalDecision } from './approvals.ts'
+import type { Approver } from './entitlement.ts'
+import type { Stage } from './lifecycle.ts'
 
 /**
  * Order-line and Order stages are derived, never set by hand: a line follows the slowest of its

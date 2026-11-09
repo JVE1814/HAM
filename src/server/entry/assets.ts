@@ -1,12 +1,12 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { billingChange, checkTransition, voidsWipeEvidence } from '../domain/lifecycle'
-import { clearWipeEvidence, readStage, transitionFacts } from '../platform/assets'
-import { glideToIsoDate, todayIso } from '../platform/clock'
-import { onLineAssetMoved } from '../platform/fulfilment'
-import { str } from '../platform/records'
-import { closeServiceIntervals, openServiceInterval } from '../platform/service-intervals'
-import { ROLE } from '../domain/visibility'
-import { resourceOrder } from './orders'
+import { billingChange, checkTransition, voidsWipeEvidence } from '../domain/lifecycle.ts'
+import { clearWipeEvidence, readStage, transitionFacts } from '../platform/assets.ts'
+import { glideToIsoDate, todayIso } from '../platform/clock.ts'
+import { onLineAssetMoved } from '../platform/fulfilment.ts'
+import { str } from '../platform/records.ts'
+import { closeServiceIntervals, openServiceInterval } from '../platform/service-intervals.ts'
+import { ROLE } from '../domain/visibility.ts'
+import { resourceOrder } from './orders.ts'
 
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.

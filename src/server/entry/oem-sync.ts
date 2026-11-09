@@ -1,8 +1,8 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
-import { isIsoDate } from '../domain/calendar'
-import { appendTo } from '../domain/collections'
+import { isIsoDate } from '../domain/calendar.ts'
+import { appendTo } from '../domain/collections.ts'
 import {
     answersByContract,
     contractKey,
@@ -12,15 +12,15 @@ import {
     type AssetCoverage,
     type CoverageAnswer,
     type SerialCoverage,
-} from '../domain/coverage'
-import { mergeLifecycle, type LifecycleDates } from '../domain/model-lifecycle'
-import { enabledRoute, type CoverageRoute } from '../domain/oem/adapters'
-import type { CoverageFact, OemVendor } from '../domain/oem/types'
-import { normalizeSerial } from '../domain/asn'
-import { msToGlide, nowMs, todayIso } from '../platform/clock'
-import { oemContext, oemEnabled } from '../platform/oem-http'
-import { intProperty } from '../platform/properties'
-import { addAnyOf, bool, num, refusal, str } from '../platform/records'
+} from '../domain/coverage.ts'
+import { mergeLifecycle, type LifecycleDates } from '../domain/model-lifecycle.ts'
+import { enabledRoute, type CoverageRoute } from '../domain/oem/adapters.ts'
+import type { CoverageFact, OemVendor } from '../domain/oem/types.ts'
+import { normalizeSerial } from '../domain/asn.ts'
+import { msToGlide, nowMs, todayIso } from '../platform/clock.ts'
+import { oemContext, oemEnabled } from '../platform/oem-http.ts'
+import { intProperty } from '../platform/properties.ts'
+import { addAnyOf, bool, num, refusal, str } from '../platform/records.ts'
 
 /** OEM lifecycle, coverage and RMA-status synchronisation (P2.1, ADR 0008). */
 

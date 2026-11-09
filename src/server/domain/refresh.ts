@@ -1,4 +1,4 @@
-import type { LifecycleDates } from './model-lifecycle'
+import type { LifecycleDates } from './model-lifecycle.ts'
 
 /** Hardware refresh (P2.2, D48): which Assets go together and what replaces them. */
 

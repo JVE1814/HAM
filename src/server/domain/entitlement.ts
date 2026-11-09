@@ -1,6 +1,6 @@
-import type { LineStage } from './fulfilment'
-import { DEPLOYED_STAGES, stagesQuery } from './lifecycle'
-import type { VisibilityScope } from './visibility'
+import type { LineStage } from './fulfilment.ts'
+import { DEPLOYED_STAGES, stagesQuery } from './lifecycle.ts'
+import type { VisibilityScope } from './visibility.ts'
 
 /**
  * Entitlement: is an Order within the Customer's Agreement?

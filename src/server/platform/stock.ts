@@ -1,5 +1,5 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import type { Stage } from '../domain/lifecycle'
+import type { Stage } from '../domain/lifecycle.ts'
 import {
     isClaimable,
     stockQueries,
@@ -7,10 +7,10 @@ import {
     type StockroomType,
     type StockScope,
     type StockUnit,
-} from '../domain/sourcing'
-import { moveAsset, readStage } from './assets'
-import { withLockTries, type HeldLock } from './locks'
-import { bool, str } from './records'
+} from '../domain/sourcing.ts'
+import { moveAsset, readStage } from './assets.ts'
+import { withLockTries, type HeldLock } from './locks.ts'
+import { bool, str } from './records.ts'
 
 /** Stock that can serve an Order line, claiming it for one, and changing it where a claim could race. */
 

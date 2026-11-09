@@ -1,11 +1,11 @@
 import { GlideDateTime, gs, type GlideRecord } from '@servicenow/glide'
-import { stagingOutcome } from '../domain/staging'
-import { moveAndSave } from '../platform/assets'
-import { releaseStepsWaitingOn } from '../platform/claim-steps'
-import { recomputeLine } from '../platform/fulfilment'
-import { findById, str } from '../platform/records'
-import { stagingSteps } from '../platform/staging-tasks'
-import { resourceOrder } from './orders'
+import { stagingOutcome } from '../domain/staging.ts'
+import { moveAndSave } from '../platform/assets.ts'
+import { releaseStepsWaitingOn } from '../platform/claim-steps.ts'
+import { recomputeLine } from '../platform/fulfilment.ts'
+import { findById, str } from '../platform/records.ts'
+import { stagingSteps } from '../platform/staging-tasks.ts'
+import { resourceOrder } from './orders.ts'
 
 function orderOfLine(lineId: string): string {
     const line = findById('x_daas_ham_order_line', lineId)

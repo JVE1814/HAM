@@ -2,15 +2,15 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { placementProblem, powerBudget, type Placement, type RackFace, type RackSpec } from '../domain/rack'
-import { RACK_EXCEPTION_TYPES, reconcileRack } from '../domain/reconciliation'
-import { visibilityFilter } from '../domain/visibility'
-import { readStage } from '../platform/assets'
-import { openException, resolveCiExceptions } from '../platform/exceptions'
-import { currentSession } from '../platform/session'
-import { exists, findById, num, pluck, recordsById, str } from '../platform/records'
-import { queryParam, reply } from '../platform/rest-api'
-import { reconcileInstalledBase } from './assurance'
+import { placementProblem, powerBudget, type Placement, type RackFace, type RackSpec } from '../domain/rack.ts'
+import { RACK_EXCEPTION_TYPES, reconcileRack } from '../domain/reconciliation.ts'
+import { visibilityFilter } from '../domain/visibility.ts'
+import { readStage } from '../platform/assets.ts'
+import { openException, resolveCiExceptions } from '../platform/exceptions.ts'
+import { currentSession } from '../platform/session.ts'
+import { exists, findById, num, pluck, recordsById, str } from '../platform/records.ts'
+import { queryParam, reply } from '../platform/rest-api.ts'
+import { reconcileInstalledBase } from './assurance.ts'
 
 /** Rack placement and the rack elevation view (P2.8, D67). */
 

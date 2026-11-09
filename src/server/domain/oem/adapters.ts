@@ -1,7 +1,7 @@
-import { errorText, isSuccess, type HttpPort } from '../http'
-import { asArray, chunks, field, isoDate, parseJson, text } from '../json'
-import type { CoverageFact, CoverageFetched, Fetched, LifecycleFact, OemVendor, RmaFact } from './types'
-import { fortiCloudError } from './forticloud'
+import { errorText, isSuccess, type HttpPort } from '../http.ts'
+import { asArray, chunks, field, isoDate, parseJson, text } from '../json.ts'
+import type { CoverageFact, CoverageFetched, Fetched, LifecycleFact, OemVendor, RmaFact } from './types.ts'
+import { fortiCloudError } from './forticloud.ts'
 
 /*
  * Vendor adapters (ADR 0008). Response shapes follow the vendors' public API documentation; mappers

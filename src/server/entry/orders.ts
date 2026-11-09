@@ -1,6 +1,6 @@
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
-import { groupDecisions, rollupApprovals, type ApprovalDecision, type ApprovalOutcome } from '../domain/approvals'
-import { appendTo } from '../domain/collections'
+import { groupDecisions, rollupApprovals, type ApprovalDecision, type ApprovalOutcome } from '../domain/approvals.ts'
+import { appendTo } from '../domain/collections.ts'
 import {
     approversFor,
     assessOrder,
@@ -14,9 +14,9 @@ import {
     type Orderer,
     type OrderParties,
     type RequestedLine,
-} from '../domain/entitlement'
-import { anythingShipped, approvalAwaited } from '../domain/fulfilment'
-import { shortfallRoute, type ShortfallRoute } from '../domain/returns'
+} from '../domain/entitlement.ts'
+import { anythingShipped, approvalAwaited } from '../domain/fulfilment.ts'
+import { shortfallRoute, type ShortfallRoute } from '../domain/returns.ts'
 import {
     advanceReplacementRma,
     lineStillOpen,
@@ -27,28 +27,28 @@ import {
     type Source,
     type SourcingRequest,
     type UnmovedStock,
-} from '../domain/sourcing'
-import { entitlementContext } from '../platform/agreements'
+} from '../domain/sourcing.ts'
+import { entitlementContext } from '../platform/agreements.ts'
 import {
     approvalsOf,
     cancelPendingApprovals,
     customerAdminIds,
     providerApproverIds,
     requestApprovals,
-} from '../platform/approvals'
-import { moveAndSave, readStage } from '../platform/assets'
-import { EVENT, fire } from '../platform/events'
-import { orderShipment, recomputeLine, recomputeOrder } from '../platform/fulfilment'
-import { todayIso } from '../platform/clock'
-import { withLock, withLockTries, type HeldLock } from '../platform/locks'
-import { openOemRma, openRmaCount, openRmasFor, reuseOemRma } from '../platform/oem-rma'
-import { requestPurchase } from '../platform/procurement'
-import { PROPERTY, stagingStockroom, stringProperty } from '../platform/properties'
-import { bool, count, findById, num, refusal, str } from '../platform/records'
-import { currentSession } from '../platform/session'
-import { openStagingTask } from '../platform/staging-tasks'
-import { linkHotSpare, reserveAsset, stockCandidates } from '../platform/stock'
-import { requestTransfer } from '../platform/transfers'
+} from '../platform/approvals.ts'
+import { moveAndSave, readStage } from '../platform/assets.ts'
+import { EVENT, fire } from '../platform/events.ts'
+import { orderShipment, recomputeLine, recomputeOrder } from '../platform/fulfilment.ts'
+import { todayIso } from '../platform/clock.ts'
+import { withLock, withLockTries, type HeldLock } from '../platform/locks.ts'
+import { openOemRma, openRmaCount, openRmasFor, reuseOemRma } from '../platform/oem-rma.ts'
+import { requestPurchase } from '../platform/procurement.ts'
+import { PROPERTY, stagingStockroom, stringProperty } from '../platform/properties.ts'
+import { bool, count, findById, num, refusal, str } from '../platform/records.ts'
+import { currentSession } from '../platform/session.ts'
+import { openStagingTask } from '../platform/staging-tasks.ts'
+import { linkHotSpare, reserveAsset, stockCandidates } from '../platform/stock.ts'
+import { requestTransfer } from '../platform/transfers.ts'
 
 /*
  * Entry points: parameter names must be the platform globals (current, previous, event, producer,

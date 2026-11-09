@@ -1,4 +1,4 @@
-import type { LifecycleDates } from '../model-lifecycle'
+import type { LifecycleDates } from '../model-lifecycle.ts'
 
 /** OEM integrations behind one port per capability (ADR 0008). */
 

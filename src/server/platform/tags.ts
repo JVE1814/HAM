@@ -1,7 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
-import { formatProviderTag } from '../domain/provider-tag'
-import { withLockTries } from './locks'
-import { intProperty, PROPERTY, stringProperty } from './properties'
+import { formatProviderTag } from '../domain/provider-tag.ts'
+import { withLockTries } from './locks.ts'
+import { intProperty, PROPERTY, stringProperty } from './properties.ts'
 
 /** The counter's row in x_daas_ham_job_cursor, and the job lock taken while advancing it. */
 const SEQUENCE_JOB = 'provider_tag_sequence'

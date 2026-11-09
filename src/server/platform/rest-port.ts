@@ -1,7 +1,7 @@
 import { gs } from '@servicenow/glide'
 import { RESTMessageV2 } from '@servicenow/glide/sn_ws'
-import type { HttpPort } from '../domain/http'
-import { stringProperty } from './properties'
+import type { HttpPort } from '../domain/http.ts'
+import { stringProperty } from './properties.ts'
 
 /** RESTMessageV2 transport behind the HttpPort seam (ADR 0008). */
 

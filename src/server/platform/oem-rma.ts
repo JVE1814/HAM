@@ -1,8 +1,8 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { addDays } from '../domain/calendar'
-import { lineStillOpen, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse, type RmaState } from '../domain/sourcing'
-import { todayIso } from './clock'
-import { findById, refusal, str } from './records'
+import { addDays } from '../domain/calendar.ts'
+import { lineStillOpen, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse, type RmaState } from '../domain/sourcing.ts'
+import { todayIso } from './clock.ts'
+import { findById, refusal, str } from './records.ts'
 
 /** OEM RMA records (opening the RMA with the vendor is manual, ADR 0008). */
 

@@ -1,5 +1,5 @@
-import { addDays, addMonths, endOfMonth, isMonthEnd } from './calendar'
-import { INSTALL_STATUS, type Stage } from './lifecycle'
+import { addDays, addMonths, endOfMonth, isMonthEnd } from './calendar.ts'
+import { INSTALL_STATUS, type Stage } from './lifecycle.ts'
 
 /** Lease schedules, end-of-lease decisions and renewals (P3.23–P3.24). */
 

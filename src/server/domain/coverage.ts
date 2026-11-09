@@ -1,6 +1,6 @@
-import { normalizeSerial } from './asn'
-import { appendTo } from './collections'
-import type { CoverageFact, CoverageFetched } from './oem/types'
+import { normalizeSerial } from './asn.ts'
+import { appendTo } from './collections.ts'
+import type { CoverageFact, CoverageFetched } from './oem/types.ts'
 
 /** One coverage contract, as an Asset's coverage is summarised from it. */
 export interface CoverageView {

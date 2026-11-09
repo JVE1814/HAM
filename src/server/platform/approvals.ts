@@ -1,8 +1,8 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { groupDecisions, rollupApprovals, type ApprovalState } from '../domain/approvals'
-import type { Approver } from '../domain/entitlement'
-import { ROLE } from '../domain/visibility'
-import { pluck, refusal, str } from './records'
+import { groupDecisions, rollupApprovals, type ApprovalState } from '../domain/approvals.ts'
+import type { Approver } from '../domain/entitlement.ts'
+import { ROLE } from '../domain/visibility.ts'
+import { pluck, refusal, str } from './records.ts'
 
 /** sysapproval_approver records for app tasks (ADR 0004). */
 

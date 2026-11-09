@@ -1,10 +1,10 @@
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
-import { runChunked, writeChunkUnderLock, writeHoldingLock, type ChunkedJobPorts, type ChunkedJobResult, type ChunkWrite, type LockLost } from '../domain/chunked-job'
-import { andEachClause } from '../domain/encoded-query'
-import { msToGlide, nowMs } from './clock'
-import { isLocked, withLock } from './locks'
-import { intProperty, PROPERTY } from './properties'
-import { refusal, str } from './records'
+import { runChunked, writeChunkUnderLock, writeHoldingLock, type ChunkedJobPorts, type ChunkedJobResult, type ChunkWrite, type LockLost } from '../domain/chunked-job.ts'
+import { andEachClause } from '../domain/encoded-query.ts'
+import { msToGlide, nowMs } from './clock.ts'
+import { isLocked, withLock } from './locks.ts'
+import { intProperty, PROPERTY } from './properties.ts'
+import { refusal, str } from './records.ts'
 
 /**
  * Run the chunked-job runner over a table, persisting the cursor in x_daas_ham_job_cursor (ADR 0007).

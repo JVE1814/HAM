@@ -1,4 +1,4 @@
-import { overlaps, powerBudget, type Placement, type RackSpec } from './rack'
+import { overlaps, powerBudget, type Placement, type RackSpec } from './rack.ts'
 
 /** Reconciliation exceptions between installed Assets and monitoring (P2.7), and in racks (D67). */
 

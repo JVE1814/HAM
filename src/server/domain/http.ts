@@ -1,4 +1,4 @@
-import { asArray, field, parseJson, text } from './json'
+import { asArray, field, parseJson, text } from './json.ts'
 
 /** The outbound HTTP seam shared by OEM and shipping integrations (ADR 0008). */
 

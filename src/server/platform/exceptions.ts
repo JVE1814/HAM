@@ -1,8 +1,8 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import type { ExceptionType } from '../domain/reconciliation'
-import { msToGlide, nowMs } from './clock'
-import { withLockTries } from './locks'
-import { refusal, str } from './records'
+import type { ExceptionType } from '../domain/reconciliation.ts'
+import { msToGlide, nowMs } from './clock.ts'
+import { withLockTries } from './locks.ts'
+import { refusal, str } from './records.ts'
 
 /** Reconciliation exceptions: at most one open exception per type and asset (or CI, such as a rack). */
 

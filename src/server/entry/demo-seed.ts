@@ -1,7 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { newAsset } from '../platform/assets'
-import { str } from '../platform/records'
-import type { Stage } from '../domain/lifecycle'
+import { newAsset } from '../platform/assets.ts'
+import { str } from '../platform/records.ts'
+import type { Stage } from '../domain/lifecycle.ts'
 
 /**
  * Demo data for dev/test instances: two Customers with Sites, racks and stockrooms, models from the

@@ -1,4 +1,4 @@
-import { isIsoDate, toIsoDate } from './calendar'
+import { isIsoDate, toIsoDate } from './calendar.ts'
 
 /** Tolerant readers for third-party JSON (vendor and aggregator shapes vary between API versions). */
 

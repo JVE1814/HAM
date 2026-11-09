@@ -1,9 +1,9 @@
-import { normalizeSerial } from '../asn'
-import { andEachClause } from '../encoded-query'
-import { errorText, isSuccess, type HttpPort, type HttpRequest, type HttpResponse } from '../http'
-import { asArray, chunks, field, parseJson, text } from '../json'
-import type { OemVendor } from './types'
-import { fortiCloudError } from './forticloud'
+import { normalizeSerial } from '../asn.ts'
+import { andEachClause } from '../encoded-query.ts'
+import { errorText, isSuccess, type HttpPort, type HttpRequest, type HttpResponse } from '../http.ts'
+import { asArray, chunks, field, parseJson, text } from '../json.ts'
+import type { OemVendor } from './types.ts'
+import { fortiCloudError } from './forticloud.ts'
 
 /**
  * OEM claim and provisioning (P3.27, D70): staging checklist steps that the manufacturer's cloud can

@@ -1,7 +1,7 @@
-import { activeDays, monthBounds, type MonthBounds } from './billing'
-import { addDays, addMonths } from './calendar'
-import { evenShare } from './leases'
-import type { LegalOwner } from './lifecycle'
+import { activeDays, monthBounds, type MonthBounds } from './billing.ts'
+import { addDays, addMonths } from './calendar.ts'
+import { evenShare } from './leases.ts'
+import type { LegalOwner } from './lifecycle.ts'
 
 /** Cost facts and Margin per Customer and Site (P3.28, D72). */
 

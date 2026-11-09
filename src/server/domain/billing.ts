@@ -1,5 +1,5 @@
-import { addDays, addMonths, daysBetween } from './calendar'
-import { ALL_STAGES, isBillable, stagesQuery, type Stage } from './lifecycle'
+import { addDays, addMonths, daysBetween } from './calendar.ts'
+import { ALL_STAGES, isBillable, stagesQuery, type Stage } from './lifecycle.ts'
 
 /** Billing periods: daily proration of Subscription lines and Fee events (P3.25, D52, D66). */
 

@@ -2,9 +2,9 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { normalizeSerial, receiveSerialLockName } from '../domain/asn'
-import type { StockroomType } from '../domain/sourcing'
-import { ROLE } from '../domain/visibility'
+import { normalizeSerial, receiveSerialLockName } from '../domain/asn.ts'
+import type { StockroomType } from '../domain/sourcing.ts'
+import { ROLE } from '../domain/visibility.ts'
 import {
     allocationProblem,
     awaitsReceipt,
@@ -12,21 +12,21 @@ import {
     RECEIVING_STOCKROOM_TYPES,
     receivingProblem,
     type ReceivingLine,
-} from '../domain/warehouse'
-import { findAssetByIdentifier, moveAndSave, moveAsset, newAsset, readStage } from '../platform/assets'
-import { lineAssetStages } from '../platform/fulfilment'
-import { withLock, type HeldLock } from '../platform/locks'
-import { loadNormalizationData, resolveModel } from '../platform/normalization'
-import { PROPERTY, stringProperty } from '../platform/properties'
-import { lineAwaitingRma } from '../platform/oem-rma'
-import { purchaseOrderId } from '../platform/procurement'
-import { findById, num, refusal, str } from '../platform/records'
-import { openStagingTask } from '../platform/staging-tasks'
-import { changeStock, reserveAsset } from '../platform/stock'
-import { nextProviderTag } from '../platform/tags'
-import { resourceOrder, withOrderLineLock } from './orders'
-import { receiveReturnedAsset } from './returns'
-import { reply } from '../platform/rest-api'
+} from '../domain/warehouse.ts'
+import { findAssetByIdentifier, moveAndSave, moveAsset, newAsset, readStage } from '../platform/assets.ts'
+import { lineAssetStages } from '../platform/fulfilment.ts'
+import { withLock, type HeldLock } from '../platform/locks.ts'
+import { loadNormalizationData, resolveModel } from '../platform/normalization.ts'
+import { PROPERTY, stringProperty } from '../platform/properties.ts'
+import { lineAwaitingRma } from '../platform/oem-rma.ts'
+import { purchaseOrderId } from '../platform/procurement.ts'
+import { findById, num, refusal, str } from '../platform/records.ts'
+import { openStagingTask } from '../platform/staging-tasks.ts'
+import { changeStock, reserveAsset } from '../platform/stock.ts'
+import { nextProviderTag } from '../platform/tags.ts'
+import { resourceOrder, withOrderLineLock } from './orders.ts'
+import { receiveReturnedAsset } from './returns.ts'
+import { reply } from '../platform/rest-api.ts'
 
 /** Warehouse scanning API used by the warehouse React app (P1.5). */
 

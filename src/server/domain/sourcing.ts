@@ -1,8 +1,8 @@
-import { OPEN_LINE_STAGES } from './entitlement'
-import type { LineStage } from './fulfilment'
-import type { LeaseEndAction } from './leases'
-import { stagesQuery, type Stage } from './lifecycle'
-import type { ShortfallRoute } from './returns'
+import { OPEN_LINE_STAGES } from './entitlement.ts'
+import type { LineStage } from './fulfilment.ts'
+import type { LeaseEndAction } from './leases.ts'
+import { stagesQuery, type Stage } from './lifecycle.ts'
+import type { ShortfallRoute } from './returns.ts'
 
 /**
  * Sourcing: where an Order line's Assets come from.

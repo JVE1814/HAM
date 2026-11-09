@@ -1,4 +1,4 @@
-import { addMonths, earliest, isIsoDate } from './calendar'
+import { addMonths, earliest, isIsoDate } from './calendar.ts'
 
 /** A Model's manufacturer support milestones (ISO dates). */
 export interface LifecycleDates {
