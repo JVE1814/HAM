@@ -81,7 +81,7 @@ export function loadDemoData(): void {
                 manufacturer,
                 x_daas_ham_device_class: deviceClass,
                 x_daas_ham_track_as_asset: track,
-                x_daas_ham_typical_power_w: power,
+                power_consumption: power,
                 x_daas_ham_oem_source: pid.endsWith('-HW') ? 'meraki' : (sourceOf.get(manufacturer) ?? ''),
             },
         )

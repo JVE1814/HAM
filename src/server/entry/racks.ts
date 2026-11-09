@@ -45,12 +45,12 @@ interface RackModel {
 /** A missing or deleted Model reads as a dot-walk through a broken reference did: blank and zeros. */
 const NO_MODEL: RackModel = { name: '', rackUnits: 0, powerW: 0 }
 
-/** Name, rack units and typical power of each Model, read with one query. */
+/** Name, rack units and typical power (the platform's cmdb_model.power_consumption, in watts) of each Model, read with one query. */
 function rackModels(modelIds: readonly string[]): Map<string, RackModel> {
     return recordsById('cmdb_model', modelIds, (model) => ({
         name: str(model, 'display_name'),
         rackUnits: num(model, 'rack_units'),
-        powerW: num(model, 'x_daas_ham_typical_power_w'),
+        powerW: num(model, 'power_consumption'),
     }))
 }
 

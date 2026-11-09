@@ -13,6 +13,8 @@ Brazil instance without Hardware Asset Management Professional (2026-11-09).
   Stockroom's group takes `inventory_admin`, a group's members `user_admin`. A script of the app's scope may add a
   member but not create a group (`sys_user_group` lets other scopes read only), so the demo data ships its group as
   a record. Parent groups are not followed.
+- **A Model's typical power**: `cmdb_model.x_daas_ham_typical_power_w` is gone. The rack power budget reads the
+  platform's *Power (watts)* (`cmdb_model.power_consumption`), which the Provider's IT may already have filled.
 
 ## Consequences
 

@@ -5270,6 +5270,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: '0615d3f90d5546358dfb696ea88de8fb'
+                        deleted: true
                         key: {
                             name: 'cmdb_model'
                             element: 'x_daas_ham_typical_power_w'
@@ -5940,6 +5941,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: '09163bbb11194207a66aab62ac66c927'
+                        deleted: true
                         key: {
                             name: 'cmdb_model'
                             element: 'x_daas_ham_typical_power_w'

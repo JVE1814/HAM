@@ -115,7 +115,6 @@ export const cmdb_model = Table({
         x_daas_ham_oem_pid: StringColumn({ label: 'OEM PID', maxLength: 100 }),
         // No default: the Provider IT's Models are not stamped. A NaaS Model is one with an OEM PID (domain/fleet).
         x_daas_ham_track_as_asset: BooleanColumn({ label: 'Track as asset' }),
-        x_daas_ham_typical_power_w: IntegerColumn({ label: 'Typical power (W)', min: 0 }),
         x_daas_ham_oem_source: ChoiceColumn({
             label: 'OEM data source',
             choices: OEM_SOURCE_CHOICES,

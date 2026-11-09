@@ -69,9 +69,10 @@ rack exception are re-checked as well (see Racks), and their rack exceptions ope
   (minimum 1).
 - Saving a placement that leaves the rack or overlaps another device on the same face is refused.
 - **Power budget (P3.29)**: a rack with a *power capacity (W)* also refuses a placement that would
-  take the typical power (the Models' *typical power (W)*) of all devices in it, both faces, over
-  the capacity, when the change adds draw (a device new to the rack, or a different Model). Moves
-  within the rack are always allowed. The elevation page shows used against available power.
+  take the typical power (the Models' *Power (watts)*, the platform's `cmdb_model.power_consumption`,
+  ADR 0018) of all devices in it, both faces, over the capacity, when the change adds draw (a device
+  new to the rack, or a different Model). Moves within the rack are always allowed. The elevation
+  page shows used against available power.
 - The checks read the placements already saved, so two saves into the same units of one rack at the
   same moment can both pass (the check is a before rule, and a lock taken there ends before the
   record is written). Once a save that changes an Asset's rack, lowest unit, face or Model is

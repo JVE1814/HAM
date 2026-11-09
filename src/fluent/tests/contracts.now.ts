@@ -162,7 +162,7 @@ export const rackPowerBudgetTest = Test(
         const model = atf.server.recordInsert({
             $id: Now.ID['atf_rp_model'],
             table: 'cmdb_model',
-            fieldValues: { name: 'ATF 80 W switch', x_daas_ham_oem_pid: 'ATF-80W', x_daas_ham_device_class: 'switch', x_daas_ham_typical_power_w: 80 },
+            fieldValues: { name: 'ATF 80 W switch', x_daas_ham_oem_pid: 'ATF-80W', x_daas_ham_device_class: 'switch', power_consumption: 80 },
         })
         const rack = atf.server.recordInsert({
             $id: Now.ID['atf_rp_rack'],
