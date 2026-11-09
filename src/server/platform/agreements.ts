@@ -56,9 +56,19 @@ function contractedQuantities(agreementId: string): ContractedQuantity[] {
 
 /** The Agreement's Assets at or on their way to a Site, but not those still on an open Order line (counted in flight). */
 function deployedUsage(agreementId: string): Usage[] {
-    const ga = new GlideAggregate('alm_hardware')
-    ga.addEncodedQuery(deployedUsageQuery(agreementId))
-    ga.addAggregate('COUNT', '')
+    return usageByModel('alm_hardware', deployedUsageQuery(agreementId), 'COUNT', '')
+}
+
+/** Whole quantities on other open Order lines of the Agreement that have not shipped yet, partly shipped included. */
+function inFlightUsage(agreementId: string, excludeOrderId: string): Usage[] {
+    return usageByModel('x_daas_ham_order_line', inFlightLinesQuery(agreementId, excludeOrderId), 'SUM', 'quantity')
+}
+
+/** One aggregate of the records `query` matches, for each Model and its Device class. */
+function usageByModel(table: string, query: string, aggregate: 'COUNT' | 'SUM', field: string): Usage[] {
+    const ga = new GlideAggregate(table)
+    ga.addEncodedQuery(query)
+    ga.addAggregate(aggregate, field)
     ga.groupBy('model')
     ga.groupBy('model.x_daas_ham_device_class')
     ga.query()
@@ -67,27 +77,20 @@ function deployedUsage(agreementId: string): Usage[] {
         usage.push({
             modelId: String(ga.getValue('model') ?? ''),
             deviceClass: String(ga.getValue('model.x_daas_ham_device_class') ?? ''),
-            count: Number(ga.getAggregate('COUNT', '')),
+            count: Number(ga.getAggregate(aggregate, field)),
         })
     }
     return usage
 }
 
-/** Whole quantities on other open Order lines of the Agreement that have not shipped yet, partly shipped included. */
-function inFlightUsage(agreementId: string, excludeOrderId: string): Usage[] {
-    const ga = new GlideAggregate('x_daas_ham_order_line')
-    ga.addEncodedQuery(inFlightLinesQuery(agreementId, excludeOrderId))
-    ga.addAggregate('SUM', 'quantity')
-    ga.groupBy('model')
-    ga.groupBy('model.x_daas_ham_device_class')
-    ga.query()
-    const usage: Usage[] = []
-    while (ga.next()) {
-        usage.push({
-            modelId: String(ga.getValue('model') ?? ''),
-            deviceClass: String(ga.getValue('model.x_daas_ham_device_class') ?? ''),
-            count: Number(ga.getAggregate('SUM', 'quantity')),
-        })
-    }
-    return usage
+/** The Models a Customer's catalog offers now (its active Model entries), each with its Device class. */
+export function catalogModels(customerId: string): Array<{ modelId: string; deviceClass: string }> {
+    const entry = new GlideRecord('x_daas_ham_catalog_entry')
+    entry.addQuery('customer', customerId)
+    entry.addQuery('entry_type', 'model')
+    entry.addQuery('active', true)
+    entry.query()
+    const models: Array<{ modelId: string; deviceClass: string }> = []
+    while (entry.next()) models.push({ modelId: str(entry, 'model'), deviceClass: str(entry, 'model.x_daas_ham_device_class') })
+    return models
 }

@@ -1,23 +1,12 @@
 import { GlideDateTime, gs, type GlideRecord } from '@servicenow/glide'
 import { stagingOutcome } from '../domain/staging.ts'
-import { moveAndSave } from '../platform/assets.ts'
 import { releaseStepsWaitingOn } from '../platform/claim-steps.ts'
-import { recomputeLine } from '../platform/fulfilment.ts'
-import { findById, str } from '../platform/records.ts'
-import { stagingSteps } from '../platform/staging-tasks.ts'
-import { resourceOrder } from './orders.ts'
-
-function orderOfLine(lineId: string): string {
-    const line = findById('x_daas_ham_order_line', lineId)
-    return line ? str(line, 'order') : ''
-}
-
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
+import { bool, str } from '../platform/records.ts'
+import { completeStaging, stagingSteps } from '../platform/staging-tasks.ts'
 
 /** Before-update rule on staging steps: stamp who completed a step and when. */
 export function stampStagingStep(current: GlideRecord): void {
-    if (str(current, 'done') === '1' || str(current, 'done') === 'true') {
+    if (bool(current, 'done')) {
         current.setValue('done_by', gs.getUserID())
         current.setValue('done_at', new GlideDateTime().getValue())
     } else {
@@ -43,17 +32,5 @@ export function guardStagingClosure(current: GlideRecord): void {
 
 /** After-update rule on staging tasks closed complete: the Asset is staged, or goes for evaluation if it failed. */
 export function onStagingClosed(current: GlideRecord): void {
-    const asset = findById('alm_hardware', str(current, 'asset'))
-    if (!asset) return
-    if (str(current, 'result') === 'failed') {
-        const lineId = str(asset, 'x_daas_ham_order_line')
-        asset.setValue('x_daas_ham_order_line', '')
-        moveAndSave(asset, 'pending_evaluation', `staging ${str(current, 'number')} failed`)
-        if (lineId) {
-            recomputeLine(lineId)
-            resourceOrder(orderOfLine(lineId))
-        }
-        return
-    }
-    moveAndSave(asset, 'staged', `staging ${str(current, 'number')}`)
+    completeStaging(str(current, 'asset'), str(current, 'number'), str(current, 'result') === 'failed')
 }

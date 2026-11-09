@@ -96,7 +96,7 @@ export interface TransitionFacts {
      * which Inventory sets and clears in the same save as the stage). Only then may an Asset go into transfer, and
      * only once Inventory lets it go may it leave: a unit on its way between two stockrooms is nobody's stock. Left
      * out, it counts as not on a line, so the app's own moves never put an Asset into transfer; none of them takes one
-     * out either (Cancel order takes a unit in transfer off its Order line and leaves it in transfer, entry/orders).
+     * out either (Cancel order takes a unit in transfer off its Order line and leaves it in transfer, platform/orders).
      */
     onTransferOrderLine?: boolean
 }
@@ -215,7 +215,7 @@ export function stageAfterTransfer(context: TransferContext): Stage {
 /**
  * Whether the transfer sourcing raised for a unit on an Order line fell through: Inventory let it go short of the
  * staging centre (its line cancelled or deleted), reserved where nothing moves it on. It is put back as stock and its
- * Order sourced again (entry/orders `putBackUntransferred`), unless sourcing is removing that transfer order itself.
+ * Order sourced again (platform/sourcing `putBackUntransferred`), unless sourcing is removing that transfer order itself.
  */
 export function transferFellThrough(context: TransferContext): boolean {
     return context.onOrderLine && !context.atStagingCentre && !context.withdrawnBySourcing

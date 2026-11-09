@@ -1,10 +1,21 @@
-import { GlideRecord, gs } from '@servicenow/glide'
-import { groupDecisions, rollupApprovals, type ApprovalState } from '../domain/approvals.ts'
+import { GlideRecord } from '@servicenow/glide'
+import {
+    groupDecisions,
+    rollupApprovals,
+    type ApprovalDecision,
+    type ApprovalOutcome,
+    type ApprovalState,
+} from '../domain/approvals.ts'
 import type { Approver } from '../domain/entitlement.ts'
 import { ROLE } from '../domain/visibility.ts'
-import { pluck, refusal, str } from './records.ts'
+import { exists, pluck, str, warnRefused } from './records.ts'
 
-/** sysapproval_approver records for app tasks (ADR 0004). */
+/**
+ * Approval of app tasks through sysapproval_approver records (ADR 0004), one flow for every task that is approved: the
+ * approvers are asked and the task waits (`putToApproval`), each decision rolls the approvals up and the outcome is
+ * saved (`rollUpApprovals`), and the requests still waiting are then cancelled (`cancelPendingApprovals`). The task
+ * carries `stage` (awaiting_approval while it waits), `approval` and `customer`, as Orders and Disposal orders do.
+ */
 
 export function customerAdminIds(customerId: string): string[] {
     if (!customerId) return []
@@ -31,12 +42,79 @@ export function providerApproverIds(accountManagerId: string): string[] {
  * raising an Order still finds an active account manager.
  */
 function isActiveUser(userId: string): boolean {
-    const user = new GlideRecord('sys_user')
-    user.addQuery('sys_id', userId)
-    user.addQuery('active', true)
-    user.setLimit(1)
-    user.query()
-    return user.hasNext()
+    return exists('sys_user', `sys_id=${userId}^active=true`)
+}
+
+/** Who is asked to approve a task and what their approvals must come to. */
+export interface ApprovalRequest {
+    approverIds: readonly string[]
+    /** The groups that must each approve (domain/approvals `rollupApprovals`). */
+    required: readonly Approver[]
+    /** The Customer admins of the task's Customer, who decide for the customer-admin group. */
+    customerAdmins: readonly string[]
+    /** Why the task cannot be approved when nobody could be asked. */
+    noApprover: string
+}
+
+/**
+ * What came of putting a task to approval: it awaits its approvers' decisions, or it does not and no request is left
+ * waiting, because the requests saved could not approve it (`request`) or the platform refused to save it as awaiting
+ * approval (`save`, logged).
+ */
+export type ApprovalStart = { awaiting: true } | { awaiting: false; step: 'request' | 'save'; reason: string }
+
+/**
+ * Ask the approvers and save `task` as awaiting approval. They are asked first: a task the requests saved could not
+ * approve would wait for ever, so it is left as it was. One the platform will not save as awaiting has its requests
+ * cancelled again: they would wait on a task whose decisions roll up to nothing.
+ */
+export function putToApproval(task: GlideRecord, request: ApprovalRequest): ApprovalStart {
+    const { approverIds, required, customerAdmins, noApprover } = request
+    const unasked = requestApprovals(task, approverIds, required, customerAdmins, noApprover)
+    if (unasked) return { awaiting: false, step: 'request', reason: unasked }
+    task.setValue('stage', 'awaiting_approval')
+    task.setValue('approval', 'requested')
+    if (task.update()) return { awaiting: true }
+    const reason = warnRefused(task, `${str(task, 'number')} not saved as awaiting approval, its requests cancelled`)
+    cancelPendingApprovals(task.getUniqueValue())
+    return { awaiting: false, step: 'save', reason }
+}
+
+/** How a kind of task is decided: an Order by its entitlement verdict, a Disposal order by its Assets' owners. */
+export interface ApprovalFlow {
+    /** The groups that must each approve `task`: read only for a task found awaiting approval. */
+    required(task: GlideRecord): readonly Approver[]
+    /**
+     * Save `task` as approved or rejected, with what follows from it (an approved Order is sourced, a rejected one
+     * cancels its lines); why the platform refused the save ('' once saved).
+     */
+    decide(task: GlideRecord, outcome: Exclude<ApprovalOutcome, 'requested'>): string
+}
+
+/** What rolling a task's approvals up found: the outcome, and why the platform refused to save it ('' once saved). */
+export interface ApprovalRollup {
+    outcome: ApprovalOutcome
+    refused: string
+    required: readonly Approver[]
+    decisions: ApprovalDecision[]
+}
+
+/**
+ * Roll the approvals of a task awaiting approval up (null for any other task) and save the outcome as its `flow`
+ * decides it. The after-update rule on sysapproval_approver runs this on each decision, and so does a re-check.
+ * The requests still waiting are cancelled only once the outcome is saved. Each cancellation runs the rule again,
+ * which stops there as the task no longer awaits approval. A refused save keeps it awaiting approval with its
+ * requests, so the next decision (or a re-check) tries again.
+ */
+export function rollUpApprovals(task: GlideRecord, flow: ApprovalFlow): ApprovalRollup | null {
+    if (str(task, 'stage') !== 'awaiting_approval') return null
+    const required = flow.required(task)
+    const decisions = groupDecisions(approvalsOf(task.getUniqueValue()), customerAdminIds(str(task, 'customer')))
+    const outcome = rollupApprovals(required, decisions)
+    if (outcome === 'requested') return { outcome, refused: '', required, decisions }
+    const refused = flow.decide(task, outcome)
+    if (!refused) cancelPendingApprovals(task.getUniqueValue())
+    return { outcome, refused, required, decisions }
 }
 
 /**
@@ -71,9 +149,7 @@ function requestApproval(task: GlideRecord, approverId: string): string {
     approval.setValue('approver', approverId)
     approval.setValue('state', 'requested')
     if (approval.insert()) return ''
-    const reason = refusal(approval)
-    gs.warn(`[x_daas_ham] No approval request for ${str(task, 'number')} to ${approverId}: ${reason}`)
-    return reason
+    return warnRefused(approval, `No approval request for ${str(task, 'number')} to ${approverId}`)
 }
 
 export function approvalsOf(taskId: string): Array<{ approverId: string; state: ApprovalState }> {
@@ -86,8 +162,9 @@ export function approvalsOf(taskId: string): Array<{ approverId: string; state: 
 }
 
 /**
- * Cancel approvals still waiting once the outcome is decided. Each cancellation is a saved state change, so the
- * after-update rule that rolls approvals up runs again: save the task out of awaiting approval first.
+ * Cancel approvals still waiting once the outcome is decided, or the task is cancelled. Each cancellation is a saved
+ * state change, so the after-update rule that rolls approvals up runs again: save the task out of awaiting approval
+ * first.
  */
 export function cancelPendingApprovals(taskId: string): void {
     const approval = new GlideRecord('sysapproval_approver')
@@ -98,7 +175,6 @@ export function cancelPendingApprovals(taskId: string): void {
         approval.setValue('state', 'cancelled')
         if (approval.update()) continue
         // Left waiting, it still counts in the rollup if a draft task is submitted again (a rejection rejects it).
-        const reason = refusal(approval)
-        gs.warn(`[x_daas_ham] Approval request ${approval.getUniqueValue()} left requested, cancel it: ${reason}`)
+        warnRefused(approval, `Approval request ${approval.getUniqueValue()} left requested, cancel it`)
     }
 }

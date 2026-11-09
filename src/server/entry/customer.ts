@@ -1,5 +1,3 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { awaitsSelfInstallConfirmation } from '../domain/install-confirmation.ts'
@@ -23,8 +21,8 @@ import { currentSession } from '../platform/session.ts'
 import { bool, exists, findById, refusal, str } from '../platform/records.ts'
 import { installedAssetIds, raiseReturn } from '../platform/returns.ts'
 import { returnLabels } from '../platform/shipments.ts'
+import { completeInstall, installState } from '../platform/delivery.ts'
 import { completeAttestation } from './assurance.ts'
-import { completeInstall, installState } from './delivery.ts'
 import { reply } from '../platform/rest-api.ts'
 
 /*

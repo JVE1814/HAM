@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
  * The SDK's generated wrapper calls a module entry point with its own parameter names
  * (e.g. `sourceOrder(event, current)`), so they must be the globals the platform provides.
  */
-const PLATFORM_GLOBALS = new Set(['current', 'previous', 'event', 'producer', 'request', 'response', 'cat_item'])
+const PLATFORM_GLOBALS = new Set(['current', 'previous', 'event', 'producer', 'request', 'response'])
 const root = new URL('../../', import.meta.url).pathname
 
 function files(dir: string, suffix: string): string[] {

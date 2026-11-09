@@ -5,12 +5,9 @@ import { glideToIsoDate, todayIso } from '../platform/clock.ts'
 import { onLineAssetMoved } from '../platform/fulfilment.ts'
 import { str } from '../platform/records.ts'
 import { closeServiceIntervals, openServiceInterval } from '../platform/service-intervals.ts'
+import { putBackUntransferred } from '../platform/sourcing.ts'
 import { fellShortOfStagingCentre, onTransferOrderLine, transferContext } from '../platform/transfers.ts'
 import { ROLE } from '../domain/visibility.ts'
-import { putBackUntransferred, resourceOrder } from './orders.ts'
-
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 
 /**
  * Why a save that changes the stage breaks the lifecycle (domain/lifecycle `stageChangeRefusal`), or null when it may
@@ -79,15 +76,14 @@ export function clearVoidedWipeEvidence(current: GlideRecord, previous: GlideRec
  * the line in transit is taken off it and the line goes back to awaiting stock (platform/fulfilment
  * `onLineAssetMoved`): its Order is then sourced again, queued as after a failed staging, so this save takes no
  * sourcing lock. So is the Order of a unit whose transfer to the staging centre fell through, once it is put back
- * (entry/orders `putBackUntransferred`).
+ * (platform/sourcing `putBackUntransferred`).
  */
 export function onAllocatedAssetStageChange(current: GlideRecord, previous: GlideRecord): void {
     const lineId = str(current, 'x_daas_ham_order_line')
     if (!lineId) return
     const from = readStage(previous)
     if (from === 'in_transfer' && fellShortOfStagingCentre(current)) return void putBackUntransferred(current, lineId)
-    const orderId = onLineAssetMoved(current, lineId, from, readStage(current))
-    if (orderId) resourceOrder(orderId)
+    onLineAssetMoved(current, lineId, from, readStage(current))
 }
 
 /**

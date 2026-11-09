@@ -3,7 +3,7 @@ import { addDays } from '../domain/calendar.ts'
 import { lineStillOpen, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse } from '../domain/sourcing.ts'
 import type { RmaState } from '../domain/vocabulary.ts'
 import { todayIso } from './clock.ts'
-import { findById, refusal, str } from './records.ts'
+import { findById, str, warnRefused } from './records.ts'
 
 /** OEM RMA records (opening the RMA with the vendor is manual, ADR 0008). */
 
@@ -20,8 +20,7 @@ export function openOemRma(input: { defectiveAsset: GlideRecord; orderLineId: st
     rma.setValue('ship_back_due', addDays(todayIso(), 10))
     const rmaId = rma.insert()
     if (rmaId) return rmaId
-    const reason = refusal(rma)
-    gs.warn(`[x_daas_ham] No OEM RMA for ${str(input.defectiveAsset, 'serial_number')}: ${reason}`)
+    warnRefused(rma, `No OEM RMA for ${str(input.defectiveAsset, 'serial_number')}`)
     return ''
 }
 
@@ -53,14 +52,29 @@ export function openRmasFor(defectiveAssetId: string): OpenRma[] {
  */
 export function reuseOemRma(reuse: RmaReuse, orderLineId: string): boolean {
     const rma = findById('x_daas_ham_oem_rma', reuse.rma.rmaId)
-    if (rma) {
-        rma.setValue('order_line', orderLineId)
-        rma.setValue('state', reuse.state)
-        if (rma.update()) return true
+    const notReused = `OEM RMA ${reuse.rma.rmaNumber || reuse.rma.rmaId} not reused`
+    if (!rma) {
+        gs.warn(`[x_daas_ham] ${notReused}: not found`)
+        return false
     }
-    const reason = rma ? refusal(rma) : 'not found'
-    gs.warn(`[x_daas_ham] OEM RMA ${reuse.rma.rmaNumber || reuse.rma.rmaId} not reused: ${reason}`)
+    rma.setValue('order_line', orderLineId)
+    rma.setValue('state', reuse.state)
+    if (rma.update()) return true
+    warnRefused(rma, notReused)
     return false
+}
+
+/**
+ * The replacement unit announced under the RMA arrived: the RMA is marked replacement received, with the unit's
+ * serial. A refused save is logged: the unit still goes to its line, which needs it, and an RMA left open counts as a
+ * replacement still to come.
+ */
+export function markReplacementReceived(rmaId: string, replacementSerial: string): void {
+    const rma = findById('x_daas_ham_oem_rma', rmaId)
+    if (!rma) return
+    rma.setValue('state', 'replacement_received')
+    rma.setValue('replacement_serial', replacementSerial)
+    if (!rma.update()) warnRefused(rma, `RMA ${str(rma, 'rma_number')} not marked replacement received`)
 }
 
 /** OEM advance replacements still expected for an Order line. */

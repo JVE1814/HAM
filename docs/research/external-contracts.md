@@ -1326,7 +1326,7 @@ recommended hardening are described in the notes of their area.
   onTransferReleased, `domain/lifecycle.ts` stageAfterTransfer). Sourcing hands each reserved unit
   over *In stock / Available* just before it inserts the unit's line (`platform/transfers.ts`
   requestTransfer), and a unit whose line is cancelled or deleted short of the staging centre is put
-  back as free stock and its Order sourced again (`entry/orders.ts` putBackUntransferred).
+  back as free stock and its Order sourced again (`platform/sourcing.ts` putBackUntransferred).
 
 ## Still needs an instance or vendor login
 

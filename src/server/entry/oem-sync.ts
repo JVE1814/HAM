@@ -1,5 +1,3 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import { isIsoDate } from '../domain/calendar.ts'
 import { appendTo } from '../domain/collections.ts'

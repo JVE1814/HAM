@@ -1,5 +1,3 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import { groupDecisions, rollupApprovals } from '../domain/approvals.ts'
 import {

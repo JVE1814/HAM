@@ -3,9 +3,9 @@ import { transferFellThrough, type TransferContext } from '../domain/lifecycle.t
 import { createMarks } from '../domain/marks.ts'
 import type { TransferResult } from '../domain/sourcing.ts'
 import { moveAsset } from './assets.ts'
-import { beyondVisibility } from './beyond-visibility.ts'
 import { PROPERTY, stagingStockroom, stringProperty } from './properties.ts'
 import { bool, deleteWhere, refusal, str } from './records.ts'
+import { hasOpenStagingTask } from './staging-tasks.ts'
 
 /**
  * Transfer orders (alm_transfer_order) moving stock between the Provider's stockrooms, one line per Asset. While a
@@ -106,7 +106,7 @@ export function transferContext(asset: GlideRecord): TransferContext {
     const staging = stagingStockroom()
     return {
         onOrderLine: !!str(asset, 'x_daas_ham_order_line'),
-        stagingTaskOpen: openStagingTask(asset.getUniqueValue()),
+        stagingTaskOpen: hasOpenStagingTask(asset.getUniqueValue()),
         heldForCustomer: !!company && company !== stringProperty(PROPERTY.providerCompany),
         atStagingCentre: !!staging && str(asset, 'stockroom') === staging,
         withdrawnBySourcing: withdrawn.has(String(asset.getUniqueValue())),
@@ -120,17 +120,4 @@ export function transferContext(asset: GlideRecord): TransferContext {
  */
 export function fellShortOfStagingCentre(asset: GlideRecord): boolean {
     return !onTransferOrderLine(asset) && transferFellThrough(transferContext(asset))
-}
-
-/**
- * Whether a Staging task is open for the Asset, read past the visibility rules (ADR 0005): an inventory tech receiving
- * the line at the staging centre does not see a task whose Asset is still stored in the stockroom it left.
- */
-function openStagingTask(assetId: string): boolean {
-    const task = new GlideRecord('x_daas_ham_staging_task')
-    task.addQuery('asset', assetId)
-    task.addQuery('active', true)
-    task.setLimit(1)
-    beyondVisibility(task, () => task.query())
-    return task.hasNext()
 }

@@ -1,5 +1,3 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import { toIsoDate } from '../domain/calendar.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
@@ -377,27 +375,4 @@ export function raiseScheduledReturns(): void {
         order.setValue('return_raised', true)
         order.update()
     }
-}
-
-/**
- * The Assets an install replaced (refresh swap-back, defective unit) go back on a Return (entry/delivery
- * completeInstall). False when the platform refused it (raiseReturn logs why): the units stay in service and billed, so
- * the caller reports it, and completing the install again raises it, as they are not yet pending return.
- */
-export function returnReplacedAssets(order: GlideRecord, assetIds: readonly string[]): boolean {
-    if (assetIds.length === 0) return true
-    const refresh = str(order, 'order_type') === 'refresh'
-    const returnId = raiseReturn({
-        trigger: refresh ? 'refresh_swap_back' : 'defective_return',
-        customerId: str(order, 'customer'),
-        siteId: str(order, 'site'),
-        agreementId: str(order, 'agreement'),
-        method: str(order, 'install_mode') === 'self_install' ? 'ship_back' : 'fsm_deinstall',
-        assetIds,
-        sourceOrderId: order.getUniqueValue(),
-        // The swap work order already collects the old unit.
-        openFieldWork: false,
-        description: `${refresh ? 'Refresh swap-back' : 'Defective unit'} from ${str(order, 'number')}`,
-    })
-    return returnId !== null
 }

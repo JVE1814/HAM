@@ -4,19 +4,28 @@ import { naasStockroomType, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import { LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import type { Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { isClaimable, stockQueries, type StockCandidate, type StockScope, type StockUnit } from '../domain/sourcing.ts'
+import {
+    candidateLimit,
+    isClaimable,
+    stockQueries,
+    type StockCandidate,
+    type StockScope,
+    type StockUnit,
+} from '../domain/sourcing.ts'
 import { moveAsset, readStage } from './assets.ts'
 import { attemptLock, type LockRun } from './locks.ts'
+import { PROPERTY, stringProperty } from './properties.ts'
 import { bool, str } from './records.ts'
 
-/** Stock that can serve an Order line, claiming it for one, and changing it where a claim could race. */
+/** Stock that can serve an Order line, claiming it for one, giving it back, and changing it where a claim could race. */
 
 /**
- * Stock on no Order line that may serve `scope` (domain/sourcing `stockQueries`): up to `limit` per Source, by
- * stockroom then sys_id so the limit cuts the same way each run. A hot spare linked to a line stays in the pool but
- * is taken.
+ * Stock on no Order line that may serve `scope` (domain/sourcing `stockQueries`) for a `shortfall`: a bounded number
+ * per Source (`candidateLimit`), by stockroom then sys_id so the limit cuts the same way each run. A hot spare linked
+ * to a line stays in the pool but is taken.
  */
-export function stockCandidates(scope: StockScope, limit: number): StockCandidate[] {
+export function stockCandidates(scope: StockScope, shortfall: number): StockCandidate[] {
+    const limit = candidateLimit(shortfall)
     const candidates: StockCandidate[] = []
     for (const query of stockQueries(scope)) {
         const asset = new GlideRecord('alm_hardware')
@@ -98,6 +107,17 @@ function lineValues(reservation: Reservation): Record<string, string> {
         company: reservation.customerId,
         x_daas_ham_agreement: reservation.agreementId,
     }
+}
+
+/**
+ * Give a unit back to Provider stock, the inverse of a reservation (`lineValues`): it is the Provider's own again
+ * (its company, ADR 0006), under no Agreement and on no Order line. Sets the fields only: the caller moves the Asset to
+ * the stage it goes back to and saves it, each with its own answer to a refusal.
+ */
+export function releaseToProviderStock(asset: GlideRecord): void {
+    asset.setValue('x_daas_ham_order_line', '')
+    asset.setValue('company', stringProperty(PROPERTY.providerCompany))
+    asset.setValue('x_daas_ham_agreement', '')
 }
 
 /** A claim: the stages the Asset may be in, the stage it moves to, and the values it takes. */

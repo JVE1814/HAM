@@ -1,12 +1,7 @@
 import '@servicenow/sdk/global'
 import { UiAction } from '@servicenow/sdk/core'
-import {
-    uiCancelOrder,
-    uiConfirmInstalled,
-    uiRecheckApprovals,
-    uiShipOrder,
-    uiSubmitOrder,
-} from '../../server/entry/ui-actions'
+import { uiConfirmInstalled, uiShipOrder } from '../../server/entry/delivery'
+import { uiCancelOrder, uiRecheckApprovals, uiSubmitOrder } from '../../server/entry/orders'
 import {
     accountManager,
     admin,

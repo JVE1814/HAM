@@ -1,9 +1,12 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { initialAutomationStatus } from '../domain/oem/claims.ts'
-import { selectStagingTemplate, type StagingTemplateView } from '../domain/staging.ts'
-import { bool, deleteWhere, num, refusal, str } from './records.ts'
+import { DEFAULT_STAGING_SOURCE, selectStagingTemplate, type StagingTemplateView } from '../domain/staging.ts'
+import { moveAndSave } from './assets.ts'
+import { beyondVisibility } from './beyond-visibility.ts'
+import { lineLostUnit } from './fulfilment.ts'
+import { bool, deleteWhere, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 
-/** Creating Staging tasks with their checklist steps. */
+/** Staging tasks with their checklist steps: opening them, starting the staging, and skipping those no longer needed. */
 
 function templates(): StagingTemplateView[] {
     const gr = new GlideRecord('x_daas_ham_staging_template')
@@ -29,7 +32,7 @@ function templates(): StagingTemplateView[] {
  * one of its steps. Closure checks only the steps the task has, so a task missing a mandatory step is not kept.
  */
 export function openStagingTask(asset: GlideRecord, orderLineId: string): string | null {
-    const source = (str(asset, 'x_daas_ham_staging_source') || 'in_house') as StagingTemplateView['source']
+    const source = (str(asset, 'x_daas_ham_staging_source') || DEFAULT_STAGING_SOURCE) as StagingTemplateView['source']
     const templateId = selectStagingTemplate(templates(), {
         customerId: str(asset, 'company'),
         manufacturerId: str(asset, 'model.manufacturer'),
@@ -46,7 +49,7 @@ export function openStagingTask(asset: GlideRecord, orderLineId: string): string
     if (templateId) task.setValue('template', templateId)
     const taskId = task.insert()
     if (!taskId) {
-        gs.warn(`[x_daas_ham] No Staging task for ${str(asset, 'serial_number')}: ${refusal(task)}`)
+        warnRefused(task, `No Staging task for ${str(asset, 'serial_number')}`)
         return null
     }
     const stepRefused = templateId ? copyTemplateSteps(templateId, taskId) : null
@@ -58,6 +61,60 @@ export function openStagingTask(asset: GlideRecord, orderLineId: string): string
             (removed ? '' : `; ${str(task, 'number')} keeps an incomplete checklist, cancel it`),
     )
     return null
+}
+
+/**
+ * Start staging the Asset for its Order line: open its Staging task and move it into staging. Without its task
+ * (`no_task`) the Asset stays reserved for the line rather than staging with no task to finish; so does one whose move
+ * the lifecycle or the platform refuses (`not_moved`, logged with `context`), its task left open.
+ */
+export function startStaging(asset: GlideRecord, orderLineId: string, context: string): 'staging' | 'no_task' | 'not_moved' {
+    if (!openStagingTask(asset, orderLineId)) return 'no_task'
+    return moveAndSave(asset, 'staging', context) ? 'staging' : 'not_moved'
+}
+
+/**
+ * The Staging task `taskNumber` of an Asset was closed complete: the Asset is staged. One whose staging `failed` goes
+ * for evaluation instead and leaves its Order line, which is filled again (platform/fulfilment `lineLostUnit`). A move
+ * the lifecycle or the platform refuses is logged.
+ */
+export function completeStaging(assetId: string, taskNumber: string, failed: boolean): void {
+    const asset = findById('alm_hardware', assetId)
+    if (!asset) return
+    if (!failed) return void moveAndSave(asset, 'staged', `staging ${taskNumber}`)
+    const lineId = str(asset, 'x_daas_ham_order_line')
+    asset.setValue('x_daas_ham_order_line', '')
+    moveAndSave(asset, 'pending_evaluation', `staging ${taskNumber} failed`)
+    if (lineId) lineLostUnit(lineId)
+}
+
+/**
+ * Whether a Staging task is open for the Asset, read past the visibility rules (ADR 0005): an inventory tech receiving
+ * a transfer order line at the staging centre does not see a task whose Asset is still stored in the stockroom it left.
+ */
+export function hasOpenStagingTask(assetId: string): boolean {
+    return exists('x_daas_ham_staging_task', `asset=${assetId}^active=true`, { beyondVisibility: true })
+}
+
+/**
+ * Skip the Asset's open Staging tasks, noting `why`; false when the platform refuses one (logged). Read past the
+ * user's rules (ADR 0005): an inventory tech sees only the tasks of Assets in their stockrooms.
+ */
+export function skipOpenStagingTasks(assetId: string, why: string): boolean {
+    const task = new GlideRecord('x_daas_ham_staging_task')
+    task.addQuery('asset', assetId)
+    task.addQuery('active', true)
+    beyondVisibility(task, () => task.query())
+    let closed = true
+    while (task.next()) {
+        task.setValue('state', 7)
+        task.setValue('work_notes', `${why}; staging skipped.`)
+        if (task.update()) continue
+        // Left open, it asks a technician to stage a unit that is back in stock.
+        warnRefused(task, `${why.toLowerCase()}: ${str(task, 'number')} left open, close it`)
+        closed = false
+    }
+    return closed
 }
 
 /**

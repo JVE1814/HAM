@@ -1,6 +1,4 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
-import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { fleetCondition } from '../domain/fleet.ts'
 import { DEPLOYED_STAGES, stagesQuery } from '../domain/lifecycle.ts'
 import {
@@ -21,7 +19,7 @@ import {
     recordNormalizationException,
     resolveModel,
 } from '../platform/normalization.ts'
-import { refusal, str } from '../platform/records.ts'
+import { countBy, str, warnRefused } from '../platform/records.ts'
 
 /** Model normalization and Lifecycle phase / Refresh due date upkeep (P1.2), for fleet assets only (ADR 0016). */
 
@@ -63,14 +61,7 @@ export function normalizeRawModels(): void {
 
 /** The distinct values of `field` among the rows of `table` that `query` matches, read with one aggregate query. */
 function distinctValues(table: string, query: string, field: string): string[] {
-    const ga = new GlideAggregate(table)
-    ga.addEncodedQuery(query)
-    ga.addAggregate('COUNT', '')
-    ga.groupBy(field)
-    ga.query()
-    const values: string[] = []
-    while (ga.next()) values.push(String(ga.getValue(field) ?? ''))
-    return values
+    return [...countBy(table, query, field).keys()]
 }
 
 /**
@@ -90,8 +81,7 @@ function repointModel(rawModelId: string, canonicalModelId: string): void {
         asset.setValue('model', canonicalModelId)
         if (asset.update()) continue
         refused++
-        const reason = refusal(asset)
-        gs.warn(`[x_daas_ham] Model normalization: ${str(asset, 'serial_number')} left on its raw model: ${reason}`)
+        warnRefused(asset, `Model normalization: ${str(asset, 'serial_number')} left on its raw model`)
     }
     if (refused > 0) return
     raw.setValue('x_daas_ham_normalized_to', canonicalModelId)

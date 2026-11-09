@@ -49,14 +49,28 @@ export function purchaseOrderId(number: string): string {
 const CLOSED_PURCHASE_STATUSES = 'received,canceled,cancelled'
 
 /**
- * Units of a model on purchase orders (by description prefix) that are not yet received or
- * cancelled. A line item can be received or canceled on its own under a PO that is still open,
- * so both the PO status and the line status are checked.
+ * How the purchase orders of an Agreement's spare-pool top-up begin their description. Procurement's purchase order
+ * has no field for what a purchase is for, so the top-up's are told from an Order line's by this prefix: it is how the
+ * open ones are found again.
  */
-export function openPurchaseQuantity(descriptionPrefix: string, modelId: string): number {
+function sparePurchasePrefix(agreementId: string): string {
+    return `Spare-pool top-up ${agreementId}:`
+}
+
+/** Request the purchase of `quantity` spares of a Model for an Agreement's Spare pool (the daily top-up). */
+export function requestSparePurchase(agreementId: string, modelId: string, quantity: number): PurchaseResult {
+    return requestPurchase({ modelId, quantity, description: `${sparePurchasePrefix(agreementId)} ${quantity} unit(s)` })
+}
+
+/**
+ * Units of a Model the spare-pool top-up bought for an Agreement that are not yet received or cancelled. A line item
+ * can be received or canceled on its own under a PO that is still open, so both the PO status and the line status are
+ * checked.
+ */
+export function openSparePurchaseQuantity(agreementId: string, modelId: string): number {
     const item = new GlideRecord('proc_po_item')
     item.addQuery('model', modelId)
-    item.addQuery('purchase_order.short_description', 'STARTSWITH', descriptionPrefix)
+    item.addQuery('purchase_order.short_description', 'STARTSWITH', sparePurchasePrefix(agreementId))
     item.addQuery('purchase_order.status', 'NOT IN', CLOSED_PURCHASE_STATUSES)
     item.addQuery('status', 'NOT IN', CLOSED_PURCHASE_STATUSES)
     item.query()

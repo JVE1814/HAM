@@ -1,9 +1,7 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { adoptionProblem } from '../domain/fleet.ts'
 import { fleetCandidate, joinFleet } from '../platform/assets.ts'
-import { refusal, str } from '../platform/records.ts'
+import { str, warnRefused } from '../platform/records.ts'
 
 /** Adopting equipment the Provider already has into the fleet (ADR 0016). */
 
@@ -22,7 +20,6 @@ export function uiAddToFleet(current: GlideRecord): void {
     if (problem) return void gs.addErrorMessage(`${name} not added to the fleet: ${problem}`)
     joinFleet(current)
     if (current.update()) return void gs.addInfoMessage(`${name} added to the fleet`)
-    const why = refusal(current)
-    gs.warn(`[x_daas_ham] ${name} not added to the fleet: ${why}`)
+    const why = warnRefused(current, `${name} not added to the fleet`)
     gs.addErrorMessage(`${name} not added to the fleet: ${why}`)
 }

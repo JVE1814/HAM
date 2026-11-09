@@ -1,5 +1,3 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { normalizeSerial } from '../domain/asn.ts'
@@ -18,29 +16,27 @@ import {
 } from '../domain/warehouse.ts'
 import type { StockroomType } from '../domain/vocabulary.ts'
 import {
+    findAnyAsset,
     findAssetByIdentifier,
     fleetCandidate,
     isFleetAsset,
     joinFleet,
-    moveAndSave,
     moveAsset,
     newAsset,
     readStage,
 } from '../platform/assets.ts'
-import { beyondVisibility } from '../platform/beyond-visibility.ts'
-import { lineAssetStages } from '../platform/fulfilment.ts'
+import { sourceOrderAgain, unitsOnLine } from '../platform/fulfilment.ts'
 import { withLock } from '../platform/locks.ts'
 import { loadNormalizationData, resolveModel } from '../platform/normalization.ts'
-import { PROPERTY, stringProperty } from '../platform/properties.ts'
-import { lineAwaitingRma } from '../platform/oem-rma.ts'
+import { lineAwaitingRma, markReplacementReceived } from '../platform/oem-rma.ts'
 import { purchaseOrderId } from '../platform/procurement.ts'
-import { findById, num, refusal, str } from '../platform/records.ts'
-import { openStagingTask } from '../platform/staging-tasks.ts'
+import { findById, num, refusal, str, warnRefused } from '../platform/records.ts'
+import { reply } from '../platform/rest-api.ts'
+import { withOrderLineLock } from '../platform/sourcing.ts'
+import { startStaging } from '../platform/staging-tasks.ts'
 import { changeStock, reserveAsset } from '../platform/stock.ts'
 import { nextProviderTag } from '../platform/tags.ts'
-import { resourceOrder, withOrderLineLock } from './orders.ts'
 import { receiveReturnedAsset } from './returns.ts'
-import { reply } from '../platform/rest-api.ts'
 
 /** Warehouse scanning API used by the warehouse React app (P1.5). */
 
@@ -129,7 +125,7 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
     // Arriving units (bought or returned) sit in none of the user's stockrooms yet, so the lookup goes past the stockroom
     // rule; only those stages are received below, never stock held elsewhere. It finds the Provider IT's Assets too, so
     // a serial IT holds is refused below rather than given a second Asset.
-    let asset = findAssetByIdentifier(input.code, { beyondVisibility: true, includeNonFleet: true })
+    let asset = findAnyAsset(input.code, 'identifier')
     if (!asset) {
         if (!input.pid) return reply(response, 404, { error: 'Unknown serial: scan the PID too to receive without an ASN' })
         const created = createReceivedAsset(input)
@@ -164,7 +160,9 @@ function refuse(response: RESTAPIResponse, unsaved: Unsaved): void {
 
 /** The receipt, made holding the Asset's `lock`: the stage is read again here, so only one scan receives the unit. */
 function receiveHolding(lock: HeldLock, response: RESTAPIResponse, assetId: string, stockroomId: string): void {
-    const asset = arrivingAsset(assetId)
+    // Read again past the stockroom rule, as the scan's lookup was (see `receiveAsset`); the receipt's saves run the
+    // lifecycle, billing and asset-CI rules.
+    const asset = findById('alm_hardware', assetId, { beyondVisibility: true })
     if (!asset) return refuse(response, NOT_FOUND)
     const stage = readStage(asset)
     // Outside the fleet, only a unit awaiting receipt is taken in, joining the fleet with this receipt's save; any
@@ -190,7 +188,7 @@ function receiveHolding(lock: HeldLock, response: RESTAPIResponse, assetId: stri
         return unsaved ? refuse(response, unsaved) : reply(response, 200, summarise(asset))
     }
     // Saved, taken off order and reserved under the line's lock, where sourcing counts the line's units and on-order
-    // count (entry/orders), so that count sees all of the receipt or none of it. A scan that cannot take it is told to
+    // count (platform/sourcing), so that count sees all of the receipt or none of it. A scan that cannot take it is told to
     // scan again and saves nothing, so the rescan finds the unit still awaiting receipt.
     const lineId = waiting.line.getUniqueValue()
     const underLine = withOrderLineLock(lineId, (lineLock) => saveReceipt(lock, asset) ?? allocateHolding(lineLock, asset, waiting))
@@ -203,7 +201,7 @@ function receiveHolding(lock: HeldLock, response: RESTAPIResponse, assetId: stri
         // line is a unit short, so its Order is sourced again: a sourcing run's stock pick, made outside the line's
         // lock, may have taken the unit between its save and its reservation. Read again for the reply: a run that
         // claimed the unit first has put it on its own line.
-        resourceOrder(str(waiting.line, 'order'))
+        sourceOrderAgain(str(waiting.line, 'order'))
         return reply(response, 200, summarise(findById('alm_hardware', assetId) ?? asset))
     }
     reply(response, 200, summarise(stageReserved(received.reserved, lineId)))
@@ -219,19 +217,8 @@ function saveReceipt(lock: HeldLock, asset: GlideRecord): Unsaved | null {
 }
 
 /**
- * The Asset read again by sys_id, past the stockroom rule as the scan's lookup was (see `receiveAsset`). The receipt's
- * saves run the lifecycle, billing and asset-CI rules.
- */
-function arrivingAsset(assetId: string): GlideRecord | null {
-    const asset = new GlideRecord('alm_hardware')
-    asset.addQuery('sys_id', assetId)
-    beyondVisibility(asset, () => asset.query())
-    return asset.next() ? asset : null
-}
-
-/**
  * The Asset of an unknown serial scanned with its PID. The check that no Asset has the serial and the insert are made
- * under a lock on the serial, which an ASN row for the serial takes too (entry/imports), checking again there, so two
+ * under a lock on the serial, which an ASN row for the serial takes too (platform/imports), checking again there, so two
  * first scans of one unit, or a scan and its ASN row, create it once; a scan that finds the lock held is told to scan
  * again, and the rescan finds the Asset by serial.
  */
@@ -241,8 +228,8 @@ function createReceivedAsset(input: Record<string, string>): { asset: GlideRecor
     if (!modelId) return { status: 422, error: `PID ${input.pid} does not map to a model` }
     const serial = normalizeSerial(input.code)
     const created = withLock(LOCK.receiveSerial(serial), (lock) => {
-        // Any Asset with the serial, the Provider IT's too: the receipt refuses it rather than create a second one.
-        const found = findAssetByIdentifier(input.code, { beyondVisibility: true, includeNonFleet: true })
+        // Any Asset the scanned code names, the Provider IT's too: the receipt refuses it rather than create a second one.
+        const found = findAnyAsset(input.code, 'identifier')
         return found ? { asset: found } : insertReceivedAsset(lock, modelId, serial)
     })
     return created.ran ? created.value : SCAN_AGAIN
@@ -255,7 +242,6 @@ function createReceivedAsset(input: Record<string, string>): { asset: GlideRecor
 function insertReceivedAsset(lock: HeldLock, modelId: string, serial: string): { asset: GlideRecord } | Unsaved {
     const asset = newAsset(modelId, 'on_order')
     asset.setValue('serial_number', serial)
-    asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     const saved = lock.save(`Asset ${serial} created`, () => asset.insert(), { check: 'check it exists once' })
     if (saved === 'lock lost') return SCAN_AGAIN
     if (saved === 'refused') return { status: 422, error: `Not received: ${refusal(asset)}` }
@@ -307,7 +293,7 @@ function allocateHolding(lineLock: HeldLock, asset: GlideRecord, waiting: Waitin
         gs.warn(`[x_daas_ham] Received ${unit}: ${problem ?? ''}`)
         return { leftFree: true }
     }
-    if (waiting.rmaId) markReplacementReceived(waiting.rmaId, asset)
+    if (waiting.rmaId) markReplacementReceived(waiting.rmaId, str(asset, 'serial_number'))
     else takeOffOrder(lineLock, line)
     // Received, the unit is free stock a sourcing run may pick too, so it is reserved the way sourcing claims stock:
     // under the Asset's stock lock, from a fresh read (platform/stock). Only one of them gets it.
@@ -328,18 +314,8 @@ function receivingLine(line: GlideRecord): ReceivingLine {
     return {
         stage: str(line, 'line_stage') as ReceivingLine['stage'],
         quantity: num(line, 'quantity'),
-        allocated: lineAssetStages(line.getUniqueValue()).length,
+        allocated: unitsOnLine(line.getUniqueValue()),
     }
-}
-
-function markReplacementReceived(rmaId: string, asset: GlideRecord): void {
-    const rma = findById('x_daas_ham_oem_rma', rmaId)
-    if (!rma) return
-    rma.setValue('state', 'replacement_received')
-    rma.setValue('replacement_serial', str(asset, 'serial_number'))
-    // The unit still goes to its line, which needs it; an RMA left open counts as a replacement still to come.
-    if (rma.update()) return
-    gs.warn(`[x_daas_ham] RMA ${str(rma, 'rma_number')} not marked replacement received: ${refusal(rma)}`)
 }
 
 /** Take a received purchase off the line's on-order count, on the line read afresh holding its `lineLock`. */
@@ -348,17 +324,16 @@ function takeOffOrder(lineLock: HeldLock, line: GlideRecord): void {
     // A refused count is logged to correct by hand; the unit still goes to the line, which would otherwise wait.
     line.setValue('quantity_to_purchase', Math.max(0, num(line, 'quantity_to_purchase') - 1))
     const number = str(line, 'number')
-    if (!line.update()) return void gs.warn(`[x_daas_ham] ${number} keeps a unit on order: ${refusal(line)}`)
+    if (!line.update()) return void warnRefused(line, `${number} keeps a unit on order`)
     // A holder that outlasted the lock (ADR 0013) may have counted beside a sourcing pass that took it over.
     lineLock.lostAfter(`${number} counted`, { check: 'check its On order count' })
 }
 
 /** Stage a unit reserved on receipt for `lineId`; the Asset as it now stands, for the reply. */
 function stageReserved(reserved: GlideRecord, lineId: string): GlideRecord {
-    // Without its Staging task the Asset stays reserved for the line, not staging with no task to finish. A refused
-    // move (moveAndSave warns) leaves it reserved too, so it is read again for the reply.
-    if (!openStagingTask(reserved, lineId)) return reserved
-    if (!moveAndSave(reserved, 'staging', 'receiving')) reserved.get(reserved.getUniqueValue())
+    // Without its Staging task the Asset stays reserved for the line. A refused move (logged) leaves it reserved too,
+    // with the unsaved move on the record, so it is read again for the reply.
+    if (startStaging(reserved, lineId, 'receiving') === 'not_moved') reserved.get(reserved.getUniqueValue())
     return reserved
 }
 

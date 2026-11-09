@@ -1,5 +1,3 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 import { CLAIM_VENDORS, runVendorClaims } from '../domain/oem/claims.ts'
 import { glideClaimStore } from '../platform/claim-steps.ts'
 import { restMessagePort } from '../platform/rest-port.ts'

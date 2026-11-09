@@ -2960,6 +2960,7 @@ declare global {
                     'src_server_entry_ui-actions_ts': {
                         table: 'sys_module'
                         id: 'c63de99d64df41029e12f7b4897fec1e'
+                        deleted: true
                     }
                     src_server_entry_visibility_ts: {
                         table: 'sys_module'
@@ -3001,6 +3002,10 @@ declare global {
                         table: 'sys_module'
                         id: '401af081928d430898e921643f5942ce'
                     }
+                    src_server_platform_delivery_ts: {
+                        table: 'sys_module'
+                        id: '4e4940e10cae4ead97e954f646da0aaf'
+                    }
                     src_server_platform_events_ts: {
                         table: 'sys_module'
                         id: '33a35be1761245e380a76999fa5bd4fa'
@@ -3016,6 +3021,14 @@ declare global {
                     src_server_platform_fulfilment_ts: {
                         table: 'sys_module'
                         id: '20f956463f92428b85a5cd4c6f22c388'
+                    }
+                    src_server_platform_imports_ts: {
+                        table: 'sys_module'
+                        id: 'ed7d531c06184cbd8ffad0f43ac8a482'
+                    }
+                    'src_server_platform_in-service_ts': {
+                        table: 'sys_module'
+                        id: 'ea05cb2578bd491ebdd441888d41161f'
                     }
                     'src_server_platform_job-cursor_ts': {
                         table: 'sys_module'
@@ -3049,6 +3062,10 @@ declare global {
                         table: 'sys_module'
                         id: '4a43a7c451e94307bb6ce402cd7fcfaa'
                     }
+                    src_server_platform_orders_ts: {
+                        table: 'sys_module'
+                        id: '13e07b43815f4b939cf2dace76c02a4a'
+                    }
                     src_server_platform_procurement_ts: {
                         table: 'sys_module'
                         id: '950b1f7403d94c8ea747daea130a24fd'
@@ -3060,6 +3077,10 @@ declare global {
                     src_server_platform_records_ts: {
                         table: 'sys_module'
                         id: 'b7ff627b508a49f582d8a13d6b24276e'
+                    }
+                    src_server_platform_refresh_ts: {
+                        table: 'sys_module'
+                        id: 'b1d768ab141146b194eb72433e189e0a'
                     }
                     'src_server_platform_rest-api_ts': {
                         table: 'sys_module'
@@ -3084,6 +3105,14 @@ declare global {
                     src_server_platform_shipments_ts: {
                         table: 'sys_module'
                         id: '058c226bc486401194ca3a43c67c9037'
+                    }
+                    src_server_platform_sourcing_ts: {
+                        table: 'sys_module'
+                        id: 'dbce578cb8cf42fcad843970b9cc2d54'
+                    }
+                    'src_server_platform_spare-pools_ts': {
+                        table: 'sys_module'
+                        id: '77cc7cb69a664f46a22b3a6fe2432731'
                     }
                     'src_server_platform_staging-tasks_ts': {
                         table: 'sys_module'

@@ -1,5 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import {
+    closedStateFor,
     followsLines,
     leftInTransit,
     lineStageFor,
@@ -12,9 +13,13 @@ import type { Stage } from '../domain/lifecycle.ts'
 import type { LineStage } from '../domain/vocabulary.ts'
 import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
-import { exists, findById, num, refusal, str } from './records.ts'
+import { EVENT, fire } from './events.ts'
+import { exists, findById, num, str, warnRefused } from './records.ts'
 
-/** Keeps Order-line and Order stages in step with their Assets (derived, see domain/fulfilment). */
+/**
+ * Keeps Order-line and Order stages in step with their Assets (derived, see domain/fulfilment), and has a line that
+ * lost a unit filled again.
+ */
 
 /**
  * The stages of every Asset on a line, read past the user's before-query rules (ADR 0005): an inventory tech closing a
@@ -22,6 +27,14 @@ import { exists, findById, num, refusal, str } from './records.ts'
  */
 export function lineAssetStages(lineId: string): Array<Stage | null> {
     return assetStages('x_daas_ham_order_line', lineId)
+}
+
+/**
+ * How many Assets are on a line, in any stage: what sourcing counts as allocated and what a receipt checks the line
+ * still has room beside. Counted as the line's stage is derived, past the user's rules.
+ */
+export function unitsOnLine(lineId: string): number {
+    return lineAssetStages(lineId).length
 }
 
 /** The stages of the Order's lines and of every Asset on them, read past the user's before-query rules (as above). */
@@ -51,48 +64,62 @@ export function recomputeLine(lineId: string): void {
 }
 
 /**
+ * Queue the Order's sourcing (the event's script action sources its lines that are new or awaiting stock): for a line
+ * that lost a unit, or a unit received for a line and not reserved for it. Queued, not run: sourcing takes the Order's
+ * sourcing lock and saves other Assets, and the saves that ask for it hold locks of their own (ADR 0013).
+ */
+export function sourceOrderAgain(orderId: string): void {
+    const order = findById('x_daas_ham_order', orderId)
+    if (order) queueSourcing(order)
+}
+
+/** Queue the sourcing of `order`, as its approval does first. */
+export function queueSourcing(order: GlideRecord): void {
+    fire(EVENT.sourceOrder, order)
+}
+
+/**
+ * A unit left the Order line, already taken off it (a failed staging, a transfer to the staging centre fallen
+ * through): the line's stage is derived again, back to awaiting stock while it is short, and its Order is sourced
+ * again, queued (`sourceOrderAgain`). The one sequence for a unit that leaves its line; one lost in transit differs
+ * only in how the line is derived (`onLineAssetMoved`).
+ */
+export function lineLostUnit(lineId: string): void {
+    const line = findById('x_daas_ham_order_line', lineId)
+    if (!line) return
+    deriveLine(line, false)
+    sourceOrderAgain(str(line, 'order'))
+}
+
+/**
  * An Asset on `lineId` moved `from` -> `to` (the after-update rule on alm_hardware): the line's stage is derived again.
  * A unit that left it in transit while still owed to it (domain/fulfilment `leftInTransit`, `refillsLine`) is first
- * taken off it, and the line is derived as filled again, back to awaiting stock: then the id of its Order, to source
- * again, else ''.
+ * taken off it, and the line is derived as filled again, back to awaiting stock: its Order is then sourced again,
+ * queued (`sourceOrderAgain`).
  *
  * No lock is taken. The unit comes off the line before the line is saved as awaiting stock, so a sourcing pass or a
- * receipt counting the reopened line never counts it (each counts only a line awaiting stock). The sourcing is left to
- * the caller to queue (entry/orders `resourceOrder`), not run in this save: it takes the Order's sourcing lock and
- * saves other Assets, and this save's own after rule takes the Asset's service-interval lock (ADR 0013).
+ * receipt counting the reopened line never counts it (each counts only a line awaiting stock). The sourcing is queued,
+ * not run in this save, whose own after rule takes the Asset's service-interval lock (ADR 0013).
  */
-export function onLineAssetMoved(asset: GlideRecord, lineId: string, from: Stage | null, to: Stage | null): string {
+export function onLineAssetMoved(asset: GlideRecord, lineId: string, from: Stage | null, to: Stage | null): void {
     // Read past the user's rules: unlike a derived stage, a line not filled again now never is.
-    const line = leftInTransit(from, to) ? readPastRules('x_daas_ham_order_line', lineId) : null
-    if (!line) {
-        recomputeLine(lineId)
-        return ''
-    }
+    const line = leftInTransit(from, to) ? findById('x_daas_ham_order_line', lineId, { beyondVisibility: true }) : null
+    if (!line) return recomputeLine(lineId)
     const stage = str(line, 'line_stage') as LineStage
     const siteRecovery = exists('x_daas_ham_return_order_line', siteRecoveryLineQuery(asset.getUniqueValue()))
     if (!refillsLine({ stage, siteRecovery }) || !takeOffLine(asset.getUniqueValue(), line, to as Stage)) {
-        deriveLine(line, false)
-        return ''
+        return void deriveLine(line, false)
     }
     const next = deriveLine(line, true)
     // Left at its stage, the line is not sourced again, and a later change no longer fills it again.
     if (next === null) gs.warn(`[x_daas_ham] ${str(line, 'number')} lost a unit in transit but is not sourced again`)
-    return next === 'awaiting_stock' ? str(line, 'order') : ''
-}
-
-/**
- * The record, read past the app's before-query visibility rules (platform/beyond-visibility), the only before-query
- * rules on an app table (the platform refuses another scope's); its saves run every rule (null when not found).
- */
-function readPastRules(table: string, sysId: string): GlideRecord | null {
-    const record = new GlideRecord(table)
-    return beyondVisibility(record, () => record.get(sysId)) ? record : null
+    if (next === 'awaiting_stock') sourceOrderAgain(str(line, 'order'))
 }
 
 /** Take a unit that left `line` in transit off it (logged); false when the platform refuses (logged): it stays on. */
 function takeOffLine(assetId: string, line: GlideRecord, to: Stage): boolean {
-    // A fresh record: saving `current` again from its own after rule would run its rules twice.
-    const asset = readPastRules('alm_hardware', assetId)
+    // A fresh record, read past the user's rules: saving `current` again from its own after rule would run its rules twice.
+    const asset = findById('alm_hardware', assetId, { beyondVisibility: true })
     if (!asset) return false
     asset.setValue('x_daas_ham_order_line', '')
     const what = `${str(asset, 'serial_number')} left ${str(line, 'number')} in transit (${to})`
@@ -100,7 +127,7 @@ function takeOffLine(assetId: string, line: GlideRecord, to: Stage): boolean {
         gs.info(`[x_daas_ham] ${what}: taken off the line, which is filled again`)
         return true
     }
-    gs.warn(`[x_daas_ham] ${what} but stays on it, which is not sourced again: ${refusal(asset)}`)
+    warnRefused(asset, `${what} but stays on it, which is not sourced again`)
     return false
 }
 
@@ -116,7 +143,7 @@ function deriveLine(line: GlideRecord, refill: boolean): LineStage | null {
     if (next !== current) {
         line.setValue('line_stage', next)
         if (!line.update()) {
-            warnNotMoved(line, `${str(line, 'number')} not moved to ${next}`)
+            notMoved(line, next)
             return null
         }
     }
@@ -136,15 +163,15 @@ export function recomputeOrder(orderId: string): void {
     const next = orderStageFor(stages)
     if (next === str(order, 'stage')) return
     order.setValue('stage', next)
-    if (next === 'complete') order.setValue('state', 3)
-    if (next === 'cancelled') order.setValue('state', 7)
-    if (!order.update()) warnNotMoved(order, `${str(order, 'number')} not moved to ${next}`)
+    const closed = closedStateFor(next)
+    if (closed !== undefined) order.setValue('state', closed)
+    if (!order.update()) notMoved(order, next)
 }
 
 /**
  * Stages are derived again only when an Asset next changes, so a refused save is logged: it can hold a line, and the
  * Order with the actions offered at its stage (Ship, Confirm installed), where they are.
  */
-function warnNotMoved(record: GlideRecord, what: string): void {
-    gs.warn(`[x_daas_ham] ${what}: ${refusal(record)}`)
+function notMoved(record: GlideRecord, to: string): void {
+    warnRefused(record, `${str(record, 'number')} not moved to ${to}`)
 }

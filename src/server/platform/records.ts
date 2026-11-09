@@ -1,12 +1,22 @@
-import { GlideAggregate, type GlideElement, GlideRecord } from '@servicenow/glide'
+import { GlideAggregate, type GlideElement, GlideRecord, gs } from '@servicenow/glide'
 import { beyondVisibility } from './beyond-visibility.ts'
 
 /** Small Glide helpers shared by repositories and gateways. Keep this module free of business rules. */
 
-export function findById(table: string, sysId: string): GlideRecord | null {
+/** How a read treats the app's before-query visibility rules (ADR 0005). */
+export interface ReadOptions {
+    /**
+     * Read past the app's visibility rules (platform/beyond-visibility), for server logic that must find the record
+     * whoever set it off. A record found this way is saved with every rule.
+     */
+    beyondVisibility?: boolean
+}
+
+export function findById(table: string, sysId: string, options: ReadOptions = {}): GlideRecord | null {
     if (!sysId) return null
     const gr = new GlideRecord(table)
-    return gr.get(sysId) ? gr : null
+    const found = options.beyondVisibility ? beyondVisibility(gr, () => gr.get(sysId)) : gr.get(sysId)
+    return found ? gr : null
 }
 
 /** Values of one field for every record matching an encoded query (bounded by `limit`). */
@@ -65,11 +75,12 @@ export function deleteWhere(table: string, encodedQuery: string, options: { busi
 }
 
 /** Whether any record matches an encoded query (stops at the first). */
-export function exists(table: string, encodedQuery: string): boolean {
+export function exists(table: string, encodedQuery: string, options: ReadOptions = {}): boolean {
     const gr = new GlideRecord(table)
     gr.addEncodedQuery(encodedQuery)
     gr.setLimit(1)
-    gr.query()
+    if (options.beyondVisibility) beyondVisibility(gr, () => gr.query())
+    else gr.query()
     return gr.hasNext()
 }
 
@@ -82,9 +93,31 @@ export function count(table: string, encodedQuery: string): number {
     return ga.next() ? Number(ga.getAggregate('COUNT', '')) : 0
 }
 
+/** How many records match an encoded query for each value of `field` (one aggregate query); values with none are left out. */
+export function countBy(table: string, encodedQuery: string, field: string): Map<string, number> {
+    const ga = new GlideAggregate(table)
+    ga.addEncodedQuery(encodedQuery)
+    ga.addAggregate('COUNT', '')
+    ga.groupBy(field)
+    ga.query()
+    const counts = new Map<string, number>()
+    while (ga.next()) counts.set(String(ga.getValue(field) ?? ''), Number(ga.getAggregate('COUNT', '')))
+    return counts
+}
+
 /** Why the platform refused to save (or delete) `record`: its last error message, or `fallback` when it gave none. */
 export function refusal(record: GlideRecord, fallback = 'the save was refused'): string {
     return record.getLastErrorMessage() || fallback
+}
+
+/**
+ * Log that the platform refused to save (or delete) `record`, naming what that leaves `undone`: a refused save throws
+ * nothing, so unlogged it leaves no trace. Gives why it was refused, for a caller that also tells the user.
+ */
+export function warnRefused(record: GlideRecord, undone: string): string {
+    const reason = refusal(record)
+    gs.warn(`[x_daas_ham] ${undone}: ${reason}`)
+    return reason
 }
 
 /**

@@ -14,8 +14,6 @@ import { beyondVisibility, readsBeyondVisibility } from '../platform/beyond-visi
 import { str } from '../platform/records.ts'
 import { currentSession } from '../platform/session.ts'
 
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 
 /*
  * Every script here finds what to do from the table of the record it is handed (domain/visibility SCOPED_TABLES), so a

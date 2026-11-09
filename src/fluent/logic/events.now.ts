@@ -13,7 +13,7 @@ export const orderSourceEvent = Record({
         event_name: 'x_daas_ham.order.source',
         table: 'x_daas_ham_order',
         description: 'An approved Order needs its lines sourced.',
-        fired_by: 'entry/orders.ts startSourcing',
+        fired_by: 'platform/orders.ts startSourcing',
         priority: 100,
     },
 })

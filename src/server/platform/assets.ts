@@ -1,6 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { normalizeSerial } from '../domain/asn.ts'
-import { FLEET_FIELD, fleetCondition, fleetField, OEM_PID_FIELD, STOCKROOM_TYPE_FIELD, type FleetCandidate } from '../domain/fleet.ts'
+import { FLEET_FIELD, fleetCondition, OEM_PID_FIELD, STOCKROOM_TYPE_FIELD, type FleetCandidate } from '../domain/fleet.ts'
 import {
     checkTransition,
     fieldsOf,
@@ -12,7 +12,8 @@ import {
 } from '../domain/lifecycle.ts'
 import type { LegalOwner } from '../domain/vocabulary.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
-import { bool, refusal, str } from './records.ts'
+import { PROPERTY, stringProperty } from './properties.ts'
+import { bool, refusal, str, type ReadOptions } from './records.ts'
 
 /** Reading and moving Assets (alm_hardware) through their Lifecycle stage (ADR 0002). */
 
@@ -32,19 +33,22 @@ export function transitionFacts(asset: GlideRecord): TransitionFacts {
 /**
  * Move an Asset to `to` if the lifecycle allows it (set its fields; the caller saves the record). A move into staging
  * also clears the wipe evidence (domain/lifecycle `voidsWipeEvidence`); a save that sets the stage some other way has
- * it cleared by a before-update rule (entry/assets `clearVoidedWipeEvidence`). `force` lets administrators correct
- * assets in stages the app does not model.
+ * it cleared by a before-update rule (entry/assets `clearVoidedWipeEvidence`).
  */
-export function moveAsset(asset: GlideRecord, to: Stage, options: { force?: boolean } = {}): TransitionVerdict {
+export function moveAsset(asset: GlideRecord, to: Stage): TransitionVerdict {
     const from = readStage(asset)
-    const verdict = options.force ? ({ allowed: true } as const) : checkTransition(from, to, transitionFacts(asset))
+    const verdict = checkTransition(from, to, transitionFacts(asset))
     if (verdict.allowed) {
-        const fields = fieldsOf(to)
-        asset.setValue('install_status', fields.installStatus)
-        asset.setValue('substatus', fields.substatus ?? '')
+        writeStage(asset, to)
         if (voidsWipeEvidence(from, to)) clearWipeEvidence(asset)
     }
     return verdict
+}
+
+function writeStage(asset: GlideRecord, stage: Stage): void {
+    const fields = fieldsOf(stage)
+    asset.setValue('install_status', fields.installStatus)
+    asset.setValue('substatus', fields.substatus ?? '')
 }
 
 /** Clear the Asset's wipe evidence (the caller saves): a wipe recorded before no longer covers the unit. */
@@ -75,28 +79,28 @@ export function clearRackPlacement(asset: GlideRecord): void {
 
 /**
  * A new, unsaved hardware Asset of `modelId` in `stage`: a fleet asset (ADR 0016) the Provider owns until a lease or a
- * Customer says otherwise, as the columns stamp no default on the rows the Provider's IT creates. Sets the fields the
- * platform treats as mandatory on assets (model category, quantity), which GlideRecord inserts do not enforce. Every
- * Asset the app creates is made here.
+ * Customer says otherwise, as the columns stamp no default on the rows the Provider's IT creates, and the Provider's
+ * own stock (its company, ADR 0006) until a caller holds it for a Customer. Sets the fields the platform treats as
+ * mandatory on assets (model category, quantity), which GlideRecord inserts do not enforce. Every Asset the app
+ * creates is made here.
  */
 export function newAsset(modelId: string, stage: Stage): GlideRecord {
     const asset = new GlideRecord('alm_hardware')
     asset.initialize()
     asset.setValue(FLEET_FIELD, true)
     asset.setValue('x_daas_ham_legal_owner', 'provider')
+    asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('model', modelId)
     asset.setValue('quantity', 1)
     const model = new GlideRecord('cmdb_model')
     if (model.get(modelId)) asset.setValue('model_category', str(model, 'cmdb_model_category').split(',')[0])
-    const fields = fieldsOf(stage)
-    asset.setValue('install_status', fields.installStatus)
-    asset.setValue('substatus', fields.substatus ?? '')
+    writeStage(asset, stage)
     return asset
 }
 
-/** Whether the Asset (or the one `via` dot-walks to, e.g. `asset.`) is a fleet asset (ADR 0016). */
-export function isFleetAsset(record: GlideRecord, via = ''): boolean {
-    return bool(record, fleetField(via))
+/** Whether the Asset is a fleet asset (ADR 0016). */
+export function isFleetAsset(asset: GlideRecord): boolean {
+    return bool(asset, FLEET_FIELD)
 }
 
 /**
@@ -110,36 +114,54 @@ export function joinFleet(asset: GlideRecord): void {
 
 /** The Asset as domain/fleet `adoptionProblem` and `receiptProblem` judge it. */
 export function fleetCandidate(asset: GlideRecord): FleetCandidate {
+    const { hasSite, hasAgreement } = transitionFacts(asset)
     return {
         fleet: isFleetAsset(asset),
         stage: readStage(asset),
         modelPid: str(asset, `model.${OEM_PID_FIELD}`),
         stockroomType: str(asset, `stockroom.${STOCKROOM_TYPE_FIELD}`),
-        hasSite: !!str(asset, 'x_daas_ham_site'),
-        hasAgreement: !!str(asset, 'x_daas_ham_agreement'),
+        hasSite,
+        hasAgreement,
     }
 }
 
 /**
  * The fleet asset (ADR 0016) with this serial number, Provider tag or Customer tag. `beyondVisibility` reads it past
- * the app's before-query visibility rules (ADR 0005, platform/beyond-visibility): receiving must find incoming units
- * that belong to no stockroom yet, and the device-events API must find any fleet asset (it reports another identifier
- * unknown). Its later saves run every rule. `includeNonFleet` finds the Provider IT's Assets too, a fleet asset first
- * when both carry the identifier: for a receipt, which takes in a unit Procurement created on order and must not
- * create a second Asset for a serial IT holds.
+ * the app's before-query visibility rules (ADR 0005, platform/beyond-visibility): the device-events API must find any
+ * fleet asset (it reports another identifier unknown). Its later saves run every rule.
  */
-export function findAssetByIdentifier(
+export function findAssetByIdentifier(identifier: string, options: ReadOptions = {}): GlideRecord | null {
+    return findByCode(identifier, { match: 'identifier', fleetOnly: true, beyondVisibility: !!options.beyondVisibility })
+}
+
+/**
+ * Any Asset that carries `code`, the Provider IT's too (ADR 0016), a fleet asset first when both do, read past the
+ * app's visibility rules (ADR 0005): an arriving unit belongs to no stockroom yet. What a receipt looks a scanned unit
+ * up by, and what both holders of a serial's lock check there before they create its Asset, so a serial never has two
+ * and a serial IT holds is refused rather than given a second Asset. They match differently, each as its input reads:
+ * - `identifier`: a scanned code, which names a unit by its serial number, Provider tag or Customer tag, and is checked
+ *   again under the lock just as it was looked up before it;
+ * - `serial`: an ASN row's serial column, which only another Asset's serial number duplicates (an Asset whose tag
+ *   happens to read the same is another unit).
+ */
+export function findAnyAsset(code: string, match: 'identifier' | 'serial'): GlideRecord | null {
+    return findByCode(code, { match, fleetOnly: false, beyondVisibility: true })
+}
+
+function findByCode(
     identifier: string,
-    options: { beyondVisibility?: boolean; includeNonFleet?: boolean } = {},
+    options: { match: 'identifier' | 'serial'; fleetOnly: boolean; beyondVisibility: boolean },
 ): GlideRecord | null {
     const code = identifier.trim()
     if (!code) return null
     const asset = new GlideRecord('alm_hardware')
     const byIdentifier = asset.addQuery('serial_number', normalizeSerial(code))
-    byIdentifier.addOrCondition('asset_tag', code)
-    byIdentifier.addOrCondition('x_daas_ham_customer_tag', code)
-    if (options.includeNonFleet) asset.orderByDesc(FLEET_FIELD)
-    else asset.addEncodedQuery(fleetCondition())
+    if (options.match === 'identifier') {
+        byIdentifier.addOrCondition('asset_tag', code)
+        byIdentifier.addOrCondition('x_daas_ham_customer_tag', code)
+    }
+    if (options.fleetOnly) asset.addEncodedQuery(fleetCondition())
+    else asset.orderByDesc(FLEET_FIELD)
     asset.setLimit(1)
     if (options.beyondVisibility) beyondVisibility(asset, () => asset.query())
     else asset.query()

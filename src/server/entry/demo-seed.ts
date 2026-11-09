@@ -1,5 +1,5 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { isFleetAsset, joinFleet, newAsset } from '../platform/assets.ts'
+import { newAsset } from '../platform/assets.ts'
 import { writeModelLifecycle } from '../platform/model-lifecycle.ts'
 import { refusal, str } from '../platform/records.ts'
 import type { Stage } from '../domain/lifecycle.ts'
@@ -30,14 +30,6 @@ const ADMIN_USER = '6816f79cc0a8016401c5a33be04be441'
 
 /** The group the demo depots are assigned to. It ships with the demo data (fluent/demo): this scope may not create a group. */
 export const DEMO_DEPOT_GROUP = 'NaaS demo depot team'
-
-/** A demo asset loaded before the Fleet flag existed joins the fleet (ADR 0016); a refused save is logged. */
-function keepInFleet(asset: GlideRecord): void {
-    if (isFleetAsset(asset)) return
-    joinFleet(asset)
-    if (asset.update()) return
-    gs.warn(`[x_daas_ham] Demo asset ${str(asset, 'serial_number')} not added to the fleet: ${refusal(asset)}`)
-}
 
 export function loadDemoData(): void {
     const provider = ensure('core_company', { name: 'Demo NaaS Provider' })
@@ -203,16 +195,12 @@ export function loadDemoData(): void {
         hq.update()
     }
 
-    // Every demo network asset is a fleet asset (ADR 0016): newAsset flags the new ones (the Provider owning them), and
-    // a demo unit loaded before the Fleet flag existed is flagged when the demo data is loaded again.
+    // Every demo network asset is a fleet asset (ADR 0016): newAsset makes it one, the Provider owning it.
     const stock = (modelId: string, count: number, prefix: string, stage: Stage, fields: Fields) => {
         for (let i = 0; i < count; i++) {
             const serial = `${prefix}${String(i).padStart(4, '0')}`
             const existing = new GlideRecord('alm_hardware')
-            if (existing.get('serial_number', serial)) {
-                keepInFleet(existing)
-                continue
-            }
+            if (existing.get('serial_number', serial)) continue
             const asset = newAsset(modelId, stage)
             asset.setValue('serial_number', serial)
             asset.setValue('asset_tag', `NAAS-D${serial.slice(-7)}`)
@@ -232,21 +220,24 @@ export function loadDemoData(): void {
         x_daas_ham_rack_face: 'front', x_daas_ham_subscription_line: acmeHqPackage, x_daas_ham_in_service_date: '2026-02-01 09:00:00',
         x_daas_ham_install_completed: '2026-02-01 08:00:00', x_daas_ham_last_seen: '2026-11-06 23:00:00', x_daas_ham_seen_source: 'nms',
     })
-    const live = new GlideRecord('alm_hardware')
-    live.addQuery('serial_number', 'STARTSWITH', 'DEMOLIVE')
-    live.orderBy('serial_number')
-    live.query()
+    /** Change each in-service demo switch, by serial number, and save it. */
+    const eachLive = (change: (asset: GlideRecord) => void) => {
+        const live = new GlideRecord('alm_hardware')
+        live.addQuery('serial_number', 'STARTSWITH', 'DEMOLIVE')
+        live.orderBy('serial_number')
+        live.query()
+        while (live.next()) {
+            change(live)
+            live.update()
+        }
+    }
     let ru = 40
-    while (live.next()) {
+    eachLive((live) => {
         live.setValue('x_daas_ham_ru_start', ru)
         ru -= 2
-        live.update()
-    }
+    })
     // OEM coverage for the in-service demo switches (normally from the Cisco API or CSV import)
-    const covered = new GlideRecord('alm_hardware')
-    covered.addQuery('serial_number', 'STARTSWITH', 'DEMOLIVE')
-    covered.query()
-    while (covered.next()) {
+    eachLive((covered) => {
         ensure('x_daas_ham_oem_coverage', { serial_number: str(covered, 'serial_number'), contract_number: 'DEMO-SNTC-1' }, {
             asset: covered.getUniqueValue(),
             vendor: 'cisco',
@@ -258,8 +249,7 @@ export function loadDemoData(): void {
         })
         covered.setValue('x_daas_ham_coverage_end', '2029-01-31')
         covered.setValue('x_daas_ham_coverage_level', 'SNTC 8X5XNBD')
-        covered.update()
-    }
+    })
     // A lease ending before the Acme agreement it serves: the daily review flags it and raises a decision
     const lessor = ensure('core_company', { name: 'Demo Capital Leasing' }, { vendor: true })
     const lease = ensure('x_daas_ham_lease_schedule', { vendor_contract: 'DEMO-LS-001' }, {
@@ -273,10 +263,7 @@ export function loadDemoData(): void {
         state: 'active',
     })
     // Billing history of the in-service switches (normally opened by in-service detection), and their lease
-    const leased = new GlideRecord('alm_hardware')
-    leased.addQuery('serial_number', 'STARTSWITH', 'DEMOLIVE')
-    leased.query()
-    while (leased.next()) {
+    eachLive((leased) => {
         ensure('x_daas_ham_service_interval', { asset: leased.getUniqueValue() }, {
             subscription_line: acmeHqPackage,
             customer: acme,
@@ -284,7 +271,6 @@ export function loadDemoData(): void {
             start_date: '2026-02-01',
         })
         leased.setValue('x_daas_ham_lease', lease)
-        leased.update()
-    }
+    })
     gs.info('[x_daas_ham] demo data loaded')
 }

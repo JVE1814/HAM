@@ -1,5 +1,3 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { messageOf } from '../domain/errors.ts'
@@ -138,7 +136,7 @@ function createShipment(
 
 /**
  * Buy the outbound label for an Order's staged Assets and put its tracking number on the Order (does not save). The
- * caller holds `lock` on the Order (entry/delivery shipOrder).
+ * caller holds `lock` on the Order (platform/delivery shipOrder).
  */
 export function labelOrder(order: GlideRecord, packages: number, lock: HeldLock): LabelResult {
     const result = createShipment('to_site', order, packages, lock)
@@ -220,7 +218,7 @@ export function uiMarkLabelVoided(current: GlideRecord): void {
  *
  * Checking the Order's tracking number and clearing it is a check-then-write that a Ship of the Order, buying a label
  * for Assets staged since, could interleave with: its new number would be cleared. So both are made under the Order's
- * Ship lock (entry/delivery `shipOrder`), taken before the tracking lock as in ADR 0013's order; one that finds it held
+ * Ship lock (platform/delivery `shipOrder`), taken before the tracking lock as in ADR 0013's order; one that finds it held
  * (a Ship, or a void of one of the Order's labels, a second press included) changes nothing and asks the user to try
  * again. Taking it throws only when an insert is refused with no lock row (platform/locks); that error escapes.
  */

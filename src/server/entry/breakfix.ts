@@ -1,11 +1,9 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
-import { GlideRecord, gs } from '@servicenow/glide'
-import { replacementStep } from '../domain/breakfix.ts'
+import { gs, type GlideRecord } from '@servicenow/glide'
+import { replacementProblem, replacementStep } from '../domain/breakfix.ts'
 import type { OrderStage } from '../domain/vocabulary.ts'
 import { isFleetAsset, moveAsset, readStage } from '../platform/assets.ts'
+import { createOrder, submitOrder } from '../platform/orders.ts'
 import { findById, refusal, str } from '../platform/records.ts'
-import { submitOrder } from './orders.ts'
 
 /** Break-fix: a CSM case about a failed Asset drives a device-replace Order (P2.3, D58). */
 
@@ -38,40 +36,29 @@ export function uiRaiseReplacement(current: GlideRecord): void {
         return
     }
     const failed = findById('alm_hardware', str(current, 'x_daas_ham_failed_asset'))
-    if (!failed) {
-        gs.addErrorMessage('Set the failed asset on the case first')
-        return
+    if (!failed) return void gs.addErrorMessage('Set the failed asset on the case first')
+    const problem = replacementProblem({ fleet: isFleetAsset(failed), stage: readStage(failed) })
+    if (problem) return void gs.addErrorMessage(problem)
+    const raised = createOrder(
+        {
+            orderType: 'device_replace',
+            customerId: str(failed, 'company'),
+            siteId: str(failed, 'x_daas_ham_site'),
+            agreementId: str(failed, 'x_daas_ham_agreement'),
+            installMode: 'fsm_engineer',
+            caseId: current.getUniqueValue(),
+            shortDescription: `Replace ${str(failed, 'asset_tag') || str(failed, 'serial_number')} (${str(current, 'number')})`,
+        },
+        [{ modelId: str(failed, 'model'), quantity: 1, replacesAssetId: failed.getUniqueValue() }],
+    )
+    if (!raised.created && raised.step === 'order') return void gs.addErrorMessage(`Replacement order not raised: ${raised.reason}`)
+    if (!raised.created) {
+        // Without its line the Order replaces nothing: it was removed again, so the case can raise one afresh.
+        const why = raised.refused.map(({ reason }) => reason).join('; ')
+        const kept = raised.kept ? `; ${raised.number} is left without it, cancel it` : ''
+        return void gs.addErrorMessage(`Replacement order not raised, its line was not saved: ${why}${kept}`)
     }
-    if (!isFleetAsset(failed)) {
-        gs.addErrorMessage('Only a fleet asset is replaced: the failed asset is not one')
-        return
-    }
-    if (!['in_service', 'temporary_deployment', 'pending_in_service'].includes(readStage(failed) ?? '')) {
-        gs.addErrorMessage('Only installed assets can be replaced')
-        return
-    }
-    const order = new GlideRecord('x_daas_ham_order')
-    order.initialize()
-    order.setValue('order_type', 'device_replace')
-    order.setValue('customer', str(failed, 'company'))
-    order.setValue('site', str(failed, 'x_daas_ham_site'))
-    order.setValue('agreement', str(failed, 'x_daas_ham_agreement'))
-    order.setValue('install_mode', 'fsm_engineer')
-    order.setValue('case', current.getUniqueValue())
-    order.setValue('short_description', `Replace ${str(failed, 'asset_tag') || str(failed, 'serial_number')} (${str(current, 'number')})`)
-    if (!order.insert()) return void gs.addErrorMessage(`Replacement order not raised: ${refusal(order)}`)
-
-    const line = new GlideRecord('x_daas_ham_order_line')
-    line.initialize()
-    line.setValue('order', order.getUniqueValue())
-    line.setValue('model', str(failed, 'model'))
-    line.setValue('quantity', 1)
-    line.setValue('replaces_asset', failed.getUniqueValue())
-    if (!line.insert()) {
-        // Without its line the Order replaces nothing: it is removed again, so the case can raise one afresh.
-        const kept = order.deleteRecord() ? '' : `; ${str(order, 'number')} is left without it, cancel it`
-        return void gs.addErrorMessage(`Replacement order not raised, its line was not saved: ${refusal(line)}${kept}`)
-    }
+    const order = raised.order
 
     current.setValue('x_daas_ham_replacement_order', order.getUniqueValue())
     // Unlinked, the case would offer Raise replacement again, so the Order stays a draft (it names the case).
@@ -83,8 +70,10 @@ export function uiRaiseReplacement(current: GlideRecord): void {
 }
 
 function submitReplacement(order: GlideRecord): void {
-    if (submitOrder(order)) gs.addInfoMessage(`Replacement order ${str(order, 'number')} raised`)
-    else gs.addInfoMessage(`Replacement order ${str(order, 'number')} is left as a draft: correct it and submit it`)
+    const submission = submitOrder(order)
+    if (submission.submitted) return void gs.addInfoMessage(`Replacement order ${str(order, 'number')} raised`)
+    gs.addErrorMessage(submission.message)
+    gs.addInfoMessage(`Replacement order ${str(order, 'number')} is left as a draft: correct it and submit it`)
 }
 
 /** UI action on an OEM RMA: the defective unit went back to the manufacturer (a fleet asset only, ADR 0016). */
