@@ -203,6 +203,8 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   - the lifecycle phase and refresh due date are computed.
 - Sightings of one Asset are applied one at a time under a job lock on it (`seen_asset_<sys_id>`),
   from a fresh read: last_seen only moves forward and only a still-pending Asset goes live. An NMS
-  event that finds the lock held 10 times is not applied and is returned in `busy_identifiers`; the
-  detection job leaves that Asset to its next run.
+  event that finds the lock held 10 times, or whose Asset save is refused (logged as an error), is
+  not applied and is returned in `busy_identifiers`; the detection job leaves that Asset to its next
+  run. A go-live whose save is refused after its Subscription line was started leaves the line
+  active: the sighting applied again joins it, its start date kept.
 - Device events store state changes only. They are purged after `x_daas_ham.events.retention_days`.

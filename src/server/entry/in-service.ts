@@ -10,7 +10,7 @@ import { glideToMs, msToGlide, nowMs } from '../platform/clock'
 import { applyLifecycleDates, lifecycleReaders, type LifecycleReaders } from '../platform/lifecycle-dates'
 import { withLockTries, type HeldLock } from '../platform/locks'
 import { intProperty, PROPERTY } from '../platform/properties'
-import { deleteWhere, str } from '../platform/records'
+import { deleteWhere, refusal, str } from '../platform/records'
 import { reply } from '../platform/rest-api'
 import { attachToSubscription } from '../platform/subscriptions'
 
@@ -28,8 +28,9 @@ function recordSeen(asset: GlideRecord, at: number, source: string): void {
 }
 
 /**
- * Put a pending Asset in service if it has been seen since its install, and save it. False when it saved nothing,
- * having outlasted its sighting `lock` (ADR 0013): the sighting that took the lock over read the Asset after this one.
+ * Put a pending Asset in service if it has been seen since its install, and save it. False when it saved nothing:
+ * having outlasted its sighting `lock` (ADR 0013), as the sighting that took the lock over read the Asset after this
+ * one, or because the save was refused (logged), so the sighting is applied again when sent again or at the next run.
  */
 function goLiveIfSeen(lock: HeldLock, asset: GlideRecord, readers: LifecycleReaders): boolean {
     const stage = readStage(asset)
@@ -43,13 +44,17 @@ function goLiveIfSeen(lock: HeldLock, asset: GlideRecord, readers: LifecycleRead
     if (!lock.held()) return false
     // An Asset whose Subscription line could not be started stays pending, so a later sighting or run attaches it.
     if (!decision.goesLive || !attachToSubscription(asset, decision.at)) {
-        asset.update()
-        return true
+        if (asset.update()) return true
+        gs.error(`[x_daas_ham] in-service detection: sighting of ${str(asset, 'serial_number')} not saved: ${refusal(asset)}`)
+        return false
     }
     asset.setValue('x_daas_ham_in_service_date', msToGlide(decision.at))
     applyLifecycleDates(asset, readers)
-    moveAndSave(asset, decision.stage, 'in-service detection')
-    return true
+    if (moveAndSave(asset, decision.stage, 'in-service detection')) return true
+    // A line started above stays active: the sighting applied again finds it active and joins it, its start date kept.
+    const pending = `${str(asset, 'serial_number')} stays pending in service, its Subscription line possibly active`
+    gs.error(`[x_daas_ham] in-service detection: ${pending}: left to the next sighting or run`)
+    return false
 }
 
 /**
@@ -61,12 +66,12 @@ const SEEN_LOCK_TRIES = 10
 /**
  * Run `see` on the Asset read afresh, holding its sighting lock `seen_asset_<sys_id>`: true once `see` applied the
  * sighting (or the Asset is gone), false when another sighting held the lock through every try, or `see` found it lost
- * before saving. Two NMS batches, or a batch and the detection job, can see one Asset at once; each reading it before
- * the other saved, the later save would put back an older last_seen and in-service date, or move an Asset the other had
- * put in service (and since moved on) into service again. Taken before any other lock, by these entry points only: a
- * go-live starts its Subscription line under the line's lock (platform/subscriptions) and its save's rule takes the
- * Asset's interval lock (platform/service-intervals), and a second take of a lock is refused. A lock that cannot be
- * taken throws (platform/locks); that error escapes.
+ * before saving or had its save refused. Two NMS batches, or a batch and the detection job, can see one Asset at once;
+ * each reading it before the other saved, the later save would put back an older last_seen and in-service date, or move
+ * an Asset the other had put in service (and since moved on) into service again. Taken before any other lock, by these
+ * entry points only: a go-live starts its Subscription line under the line's lock (platform/subscriptions) and its
+ * save's rule takes the Asset's interval lock (platform/service-intervals), and a second take of a lock is refused. A
+ * lock that cannot be taken throws (platform/locks); that error escapes.
  */
 function underSeenLock(assetId: string, see: (lock: HeldLock, asset: GlideRecord) => boolean): boolean {
     // Set inside the lock.
@@ -94,7 +99,8 @@ export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIRespo
     if ('error' in parsed) return reply(response, 400, { error: parsed.error })
     const readers = lifecycleReaders()
     const unknown: string[] = []
-    // Not applied, as another request held their Asset's lock through every try: for the NMS to send again.
+    // Not applied, as another request held their Asset's lock through every try or its save was refused: for the NMS to
+    // send again.
     const busy: string[] = []
     for (const event of parsed.events) {
         const asset = findAssetByIdentifier(event.identifier, { beyondVisibility: true })
@@ -150,7 +156,8 @@ export function evaluatePendingInService(): void {
         table: 'alm_hardware',
         query: stagesQuery(['pending_in_service']),
         read: (asset) => asset.getUniqueValue(),
-        // An Asset whose lock an NMS event holds is left to the next run, which reads its CI again.
+        // An Asset whose lock an NMS event holds, or whose save is refused, is left to the next run, which reads its CI
+        // again.
         handle: (assetId) => {
             underSeenLock(assetId, (lock, asset) => {
                 const discovered = glideToMs(str(asset, 'ci.last_discovered'))

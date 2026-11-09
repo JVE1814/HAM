@@ -125,8 +125,9 @@ exist (2026-02-31, 24:00) is a rejected row. Responds `202` with accepted / unkn
 busy identifiers / rejected rows. `accepted` counts only the events applied: unknown and busy
 identifiers and rejected rows are not counted in it. `busy_identifiers` lists the events not applied
 because another request was applying a sighting to the same Asset (job lock
-`seen_asset_<Asset sys_id>`): send those again. That is safe, because a repeated *seen* is not stored
-twice and last_seen only moves forward. Only state changes are stored.
+`seen_asset_<Asset sys_id>`) or because the platform refused the Asset's save (logged as an error):
+send those again. That is safe, because a repeated *seen* is not stored twice and last_seen only
+moves forward. Only state changes are stored.
 
 **Imports**: load CSVs into *ASN import rows* (`x_daas_ham_asn_import`, including MAC address and
 OEM claim code), *Lifecycle import rows* (`x_daas_ham_eox_import`) and *OEM coverage import rows*
