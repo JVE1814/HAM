@@ -32,9 +32,11 @@ export interface RackDevice {
     refreshDue: string
 }
 
-async function get<T>(path: string): Promise<T> {
+/** A GET of the API; `signal` aborts it when the view no longer wants its answer. */
+async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     const response = await fetch(`/api/x_daas_ham/naas${path}`, {
         headers: { Accept: 'application/json', 'X-UserToken': window.g_ck },
+        signal,
     })
     const payload = await response.json().catch(() => ({}))
     const result = payload.result ?? payload
@@ -43,7 +45,8 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export const rackApi = {
-    sites: () => get<{ sites: Site[] }>('/sites').then((r) => r.sites),
-    racks: (siteId: string) => get<{ racks: Rack[] }>(`/racks?site=${encodeURIComponent(siteId)}`).then((r) => r.racks),
-    rack: (rackId: string) => get<{ rack: Rack; devices: RackDevice[] }>(`/racks/${encodeURIComponent(rackId)}`),
+    sites: (signal?: AbortSignal) => get<{ sites: Site[] }>('/sites', signal).then((r) => r.sites),
+    racks: (siteId: string, signal?: AbortSignal) =>
+        get<{ racks: Rack[] }>(`/racks?site=${encodeURIComponent(siteId)}`, signal).then((r) => r.racks),
+    rack: (rackId: string, signal?: AbortSignal) => get<{ rack: Rack; devices: RackDevice[] }>(`/racks/${encodeURIComponent(rackId)}`, signal),
 }

@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { warehouseApi, type AssetSummary, type Stockroom } from './api'
 import Label from './Label'
 import ScanField from './ScanField'
+import { scanQueue } from './scan-queue'
 
 type Mode = 'receive' | 'putaway' | 'pick' | 'audit' | 'lookup'
 
@@ -20,16 +21,44 @@ interface Entry {
     asset?: AssetSummary
 }
 
+/** A scan and the context it was scanned in, which it is sent with however long it waits in the queue. */
+interface Scan {
+    mode: Mode
+    code: string
+    stockroom: string
+    order: string
+    audit: string
+    pid: string
+}
+
 export default function App() {
     const [mode, setMode] = useState<Mode>('receive')
     const [stockrooms, setStockrooms] = useState<Stockroom[]>([])
     const [depotWork, setDepotWork] = useState(true)
     const [stockroom, setStockroom] = useState('')
+    // Pick takes an Order number and Audit an audit number: each mode keeps its own, so a switch sends neither as the other.
     const [order, setOrder] = useState('')
+    const [audit, setAudit] = useState('')
     const [pid, setPid] = useState('')
-    const [busy, setBusy] = useState(false)
+    const [pending, setPending] = useState(0)
     const [log, setLog] = useState<Entry[]>([])
     const [labels, setLabels] = useState<AssetSummary[]>([])
+    const scanInput = useRef<HTMLInputElement>(null)
+    const focusScan = () => scanInput.current?.focus()
+    /** Enter in a context field (Order, audit number, PID) hands the next scan to the scan field. */
+    const enterToScan = (event: React.KeyboardEvent) => {
+        if (event.key !== 'Enter') return
+        event.preventDefault()
+        focusScan()
+    }
+
+    // Accepted scans wait in memory (scan-queue): leaving the page while any are unsent asks first.
+    useEffect(() => {
+        if (pending === 0) return
+        const warn = (event: BeforeUnloadEvent) => event.preventDefault()
+        window.addEventListener('beforeunload', warn)
+        return () => window.removeEventListener('beforeunload', warn)
+    }, [pending])
 
     useEffect(() => {
         warehouseApi
@@ -47,22 +76,25 @@ export default function App() {
             .catch((error: Error) => setLog((l) => [{ ok: false, message: error.message }, ...l]))
     }, [])
 
-    const onScan = useCallback(
-        async (code: string) => {
-            setBusy(true)
+    // One queue for the page's life: each scan carries its own context, and the queue only sets state.
+    const [queue] = useState(() =>
+        scanQueue<Scan>(async (scan) => {
             try {
-                const asset = await perform(mode, code, { stockroom, order, pid })
-                setLog((l) => [{ ok: true, message: describe(mode, asset), asset }, ...l].slice(0, 50))
-                if (mode === 'receive' && asset.providerTag) setLabels((current) => [asset, ...current])
-                setPid('')
+                const asset = await perform(scan)
+                setLog((l) => [{ ok: true, message: describe(scan.mode, asset), asset }, ...l].slice(0, 50))
+                if (scan.mode === 'receive' && asset.providerTag) setLabels((current) => [asset, ...current])
             } catch (error) {
-                setLog((l) => [{ ok: false, message: `${code}: ${(error as Error).message}` }, ...l].slice(0, 50))
-            } finally {
-                setBusy(false)
+                setLog((l) => [{ ok: false, message: `${scan.code}: ${(error as Error).message}` }, ...l].slice(0, 50))
             }
-        },
-        [mode, stockroom, order, pid],
+        }, setPending),
     )
+
+    const onScan = (code: string) => {
+        queue({ mode, code, stockroom, order, audit, pid: mode === 'receive' ? pid.trim() : '' })
+        // A PID is for the one unit scanned after it, whether that receive succeeds or fails: kept, it would go with the
+        // next serial too, and an unknown (or shortened) serial with a PID is created as a new Asset of that Model.
+        if (mode === 'receive') setPid('')
+    }
 
     const current = MODES.find((m) => m.id === mode)!
     const modes = depotWork ? MODES : MODES.filter((m) => !m.depot)
@@ -72,7 +104,14 @@ export default function App() {
                 <h1>NaaS Warehouse</h1>
                 <nav>
                     {modes.map((m) => (
-                        <button key={m.id} className={m.id === mode ? 'active' : ''} onClick={() => setMode(m.id)}>
+                        <button
+                            key={m.id}
+                            className={m.id === mode ? 'active' : ''}
+                            onClick={() => {
+                                setMode(m.id)
+                                focusScan()
+                            }}
+                        >
                             {m.title}
                         </button>
                     ))}
@@ -83,7 +122,13 @@ export default function App() {
                 {(mode === 'receive' || mode === 'putaway') && (
                     <label>
                         Stockroom
-                        <select value={stockroom} onChange={(e) => setStockroom(e.target.value)}>
+                        <select
+                            value={stockroom}
+                            onChange={(e) => {
+                                setStockroom(e.target.value)
+                                focusScan()
+                            }}
+                        >
                             {stockrooms.map((s) => (
                                 <option key={s.id} value={s.id}>
                                     {s.name}
@@ -95,24 +140,24 @@ export default function App() {
                 {mode === 'receive' && (
                     <label>
                         PID (only for units without an ASN)
-                        <input value={pid} onChange={(e) => setPid(e.target.value)} placeholder="e.g. C9300-48P-E" />
+                        <input value={pid} onChange={(e) => setPid(e.target.value)} onKeyDown={enterToScan} placeholder="e.g. C9300-48P-E" />
                     </label>
                 )}
                 {mode === 'audit' && (
                     <label>
                         Audit number
-                        <input value={order} onChange={(e) => setOrder(e.target.value.trim())} placeholder="NAUD0001000" />
+                        <input value={audit} onChange={(e) => setAudit(e.target.value.trim())} onKeyDown={enterToScan} placeholder="NAUD0001000" />
                     </label>
                 )}
                 {mode === 'pick' && (
                     <label>
                         Order number
-                        <input value={order} onChange={(e) => setOrder(e.target.value.trim())} placeholder="NORD0001000" />
+                        <input value={order} onChange={(e) => setOrder(e.target.value.trim())} onKeyDown={enterToScan} placeholder="NORD0001000" />
                     </label>
                 )}
             </section>
 
-            <ScanField label={current.prompt} onScan={onScan} busy={busy} />
+            <ScanField label={current.prompt} onScan={onScan} pending={pending} inputRef={scanInput} />
 
             <ul className="log" aria-live="polite">
                 {log.map((entry, i) => (
@@ -140,18 +185,19 @@ export default function App() {
     )
 }
 
-function perform(mode: Mode, code: string, context: { stockroom: string; order: string; pid: string }): Promise<AssetSummary> {
-    switch (mode) {
+function perform(scan: Scan): Promise<AssetSummary> {
+    const { code } = scan
+    switch (scan.mode) {
         case 'receive':
-            return warehouseApi.receive({ code, stockroom: context.stockroom, pid: context.pid || undefined })
+            return warehouseApi.receive({ code, stockroom: scan.stockroom, pid: scan.pid || undefined })
         case 'putaway':
-            return warehouseApi.putAway({ code, stockroom: context.stockroom })
+            return warehouseApi.putAway({ code, stockroom: scan.stockroom })
         case 'pick':
-            if (!context.order) return Promise.reject(new Error('Enter the order number first'))
-            return warehouseApi.pick({ code, order: context.order })
+            if (!scan.order) return Promise.reject(new Error('Enter the order number first'))
+            return warehouseApi.pick({ code, order: scan.order })
         case 'audit':
-            if (!context.order) return Promise.reject(new Error('Enter the audit number first'))
-            return warehouseApi.auditScan({ audit: context.order, code }).then(() => scannedOnly(code))
+            if (!scan.audit) return Promise.reject(new Error('Enter the audit number first'))
+            return warehouseApi.auditScan({ audit: scan.audit, code }).then(() => scannedOnly(code))
         case 'lookup':
             return warehouseApi.lookup(code)
     }

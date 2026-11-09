@@ -30,6 +30,46 @@ function hashColour(text: string): string {
     return `hsl(${Math.abs(hash) % 360} 55% 45%)`
 }
 
+/**
+ * The roles that open an Asset's form (roles.now.ts `providerStaff`, which alm_hardware's read ACLs admit). Customer
+ * admins and site contacts are external users (snc_external) the platform UI does not open for, so their rack shows
+ * no link.
+ */
+const STAFF_ROLES = [
+    'x_daas_ham.asset_manager',
+    'x_daas_ham.inventory_tech',
+    'x_daas_ham.field_tech',
+    'x_daas_ham.noc',
+    'x_daas_ham.account_manager',
+    'x_daas_ham.finance',
+].join(',')
+
+/**
+ * Whether the user may open an Asset's form, read from g_user, which the page's sdk:now-ux-globals tag defines (admin
+ * passes every role check). Only decides whether a link is shown: the ACLs still guard the form. No g_user, no link.
+ */
+function opensAssetForms(): boolean {
+    const user = (window as { g_user?: { hasRoleFromList?: (roles: string) => boolean } }).g_user
+    return user?.hasRoleFromList?.(STAFF_ROLES) ?? false
+}
+
+/**
+ * Runs `load` for the latest selection only: a fetch the selection moved past is aborted and its answer or error
+ * dropped, so a slow reply for the previous site or rack never overwrites the current one. Returns the effect cleanup.
+ */
+function latest<T>(load: (signal: AbortSignal) => Promise<T>, apply: (value: T) => void, fail: (message: string) => void): () => void {
+    const controller = new AbortController()
+    load(controller.signal).then(
+        (value) => {
+            if (!controller.signal.aborted) apply(value)
+        },
+        (e: Error) => {
+            if (!controller.signal.aborted) fail(e.message)
+        },
+    )
+    return () => controller.abort()
+}
+
 export default function App() {
     const [sites, setSites] = useState<Site[]>([])
     const [siteId, setSiteId] = useState('')
@@ -38,19 +78,23 @@ export default function App() {
     const [detail, setDetail] = useState<{ rack: Rack; devices: RackDevice[] } | null>(null)
     const [colourBy, setColourBy] = useState<ColourBy>('stage')
     const [error, setError] = useState('')
+    const [linkAssets] = useState(opensAssetForms)
     const today = new Date().toISOString().slice(0, 10)
 
-    useEffect(() => {
-        rackApi.sites().then(setSites).catch((e: Error) => setError(e.message))
-    }, [])
+    useEffect(() => latest(rackApi.sites, setSites, setError), [])
+    // A new choice clears the last failure: the message shown is always about what is on screen.
     useEffect(() => {
         setRacks([])
         setRackId('')
-        if (siteId) rackApi.racks(siteId).then(setRacks).catch((e: Error) => setError(e.message))
+        setError('')
+        if (!siteId) return
+        return latest((signal) => rackApi.racks(siteId, signal), setRacks, setError)
     }, [siteId])
     useEffect(() => {
         setDetail(null)
-        if (rackId) rackApi.rack(rackId).then(setDetail).catch((e: Error) => setError(e.message))
+        setError('')
+        if (!rackId) return
+        return latest((signal) => rackApi.rack(rackId, signal), setDetail, setError)
     }, [rackId])
 
     const byId = useMemo(() => new Map((detail?.devices ?? []).map((d) => [d.tag || d.serial, d])), [detail])
@@ -111,11 +155,16 @@ export default function App() {
                                     return (
                                         <li key={row.unit} className={device ? 'device' : 'empty'} style={{ ['--span' as string]: row.span, ...(device ? { background: colour(device) } : {}) }}>
                                             <span className="unit">{row.unit}</span>
-                                            {device && (
-                                                <a href={`/alm_hardware.do?sys_id=${device.id}`} target="_blank" rel="noreferrer" title={`${device.serial} · ${device.stage}`}>
-                                                    {device.tag || device.serial} · {device.model}
-                                                </a>
-                                            )}
+                                            {device &&
+                                                (linkAssets ? (
+                                                    <a href={`/alm_hardware.do?sys_id=${device.id}`} target="_blank" rel="noreferrer" title={`${device.serial} · ${device.stage}`}>
+                                                        {device.tag || device.serial} · {device.model}
+                                                    </a>
+                                                ) : (
+                                                    <span className="device-name" title={`${device.serial} · ${device.stage}`}>
+                                                        {device.tag || device.serial} · {device.model}
+                                                    </span>
+                                                ))}
                                         </li>
                                     )
                                 })}

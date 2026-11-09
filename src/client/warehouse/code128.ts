@@ -32,3 +32,14 @@ export function encodeCode128(text: string): string {
     const checksum = values.reduce((sum, value, i) => sum + value * (i + 1), START_B) % 103
     return [START_B, ...values, checksum].map((v) => PATTERNS[v]).join('') + STOP
 }
+
+/**
+ * The bars of a module string from `encodeCode128`, each as its left edge and width in modules. A barcode is drawn one
+ * shape per bar, never one per module: modules drawn side by side in a scaled SVG leave anti-aliased seams between
+ * them, which print as hairline gaps inside the wide bars.
+ */
+export function barsOf(modules: string): Array<{ x: number; width: number }> {
+    const bars: Array<{ x: number; width: number }> = []
+    for (const run of modules.matchAll(/1+/g)) bars.push({ x: run.index, width: run[0].length })
+    return bars
+}
