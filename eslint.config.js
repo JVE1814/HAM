@@ -7,6 +7,18 @@ const EXTENSIONLESS = {
     message: 'Name the .ts file: the instance resolves a server module import by its exact path.',
 }
 
+/*
+ * Entry modules that still import a sibling entry module, each for an operation that has yet to move to a platform
+ * service: delivery (the outbound label, entry/shipping), warehouse (the receipt of a returned unit, entry/returns),
+ * customer and racks (attestation and reconciliation, entry/assurance). Remove a file from this list as its import goes.
+ */
+const ENTRY_STILL_IMPORTING_ENTRY = [
+    'src/server/entry/customer.ts',
+    'src/server/entry/delivery.ts',
+    'src/server/entry/racks.ts',
+    'src/server/entry/warehouse.ts',
+]
+
 export default tseslint.config(
     {
         ignores: [
@@ -64,6 +76,25 @@ export default tseslint.config(
             'no-restricted-imports': [
                 'error',
                 { patterns: [EXTENSIONLESS, { regex: '/entry/', message: 'Platform never imports entry points (ADR 0003).' }] },
+            ],
+        },
+    },
+    // ADR 0003: an entry module wires triggers to services and is no other entry module's library.
+    {
+        files: ['src/server/entry/**/*.ts'],
+        ignores: ['**/*.test.ts', ...ENTRY_STILL_IMPORTING_ENTRY],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        EXTENSIONLESS,
+                        {
+                            regex: '^\\./|/entry/',
+                            message: 'An entry module never imports another: move the operation to a platform service (ADR 0003).',
+                        },
+                    ],
+                },
             ],
         },
     },
