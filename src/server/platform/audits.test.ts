@@ -116,7 +116,7 @@ vi.mock('@servicenow/glide', () => {
 vi.mock('./session.ts', () => ({ currentSession: () => ({ scope: 'everything', customerId: '', stockroomIds: () => [], siteIds: () => [] }) }))
 vi.mock('./clock.ts', () => ({ nowGlide: () => '2026-11-09 10:00:00' }))
 vi.mock('./locks.ts', () => ({ withLockTries: (_name: string, work: () => void) => work() }))
-vi.mock('./returns.ts', () => ({ installedAssetIds: () => platform.installed }))
+vi.mock('./installed-assets.ts', () => ({ installedAssetIds: () => platform.installed }))
 vi.mock('./field-work.ts', () => ({ openFieldWork: () => (platform.workOrder ? { workOrderId: platform.workOrder } : null) }))
 
 const AUDITS = 'x_daas_ham_audit'

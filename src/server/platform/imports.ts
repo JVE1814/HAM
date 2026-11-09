@@ -36,7 +36,7 @@ function failed(comment: string): RowOutcome {
 /**
  * Import an ASN row: create its in-transit Asset (ASN = scan-to-confirm receiving).
  *
- * A first scan of the serial without an ASN (entry/warehouse) could create its Asset between this row's check and its
+ * A first scan of the serial without an ASN (platform/receiving) could create its Asset between this row's check and its
  * insert, and both would stand. So the check and the insert are made under the serial's lock, which that scan takes
  * too, checking again there. A row that finds the lock held through every try (a holder keeps it for one check and one
  * insert), or whose lock cannot be taken, is marked error with why, to load again; loaded again once the scan has
