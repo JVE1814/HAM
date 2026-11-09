@@ -45,14 +45,16 @@ UiAction({
     script: uiCreateReturnLabel,
 })
 
-// No aggregator call: the person voids the label with the carrier first, as Create return label's refusal says.
+// No aggregator call: the person voids the label with the carrier first, as Create return label's refusal says. On an
+// outbound label it only closes it and clears it from its Order: the units stay shipped and nothing is bought.
 UiAction({
     $id: Now.ID['ua_shipment_mark_voided'],
     name: 'Mark label voided',
     table: 'x_daas_ham_shipment',
     actionName: 'x_daas_ham_mark_label_voided',
-    hint: 'After voiding this return label with the carrier: stop counting it as open, so a new one can be created.',
-    condition: "current.direction == 'return' && (current.status == 'label_created' || current.status == 'exception')",
+    hint: 'Once voided with the carrier: close this label (a return can get a new one; its Order stops naming it).',
+    condition:
+        "(current.direction == 'return' || current.direction == 'to_site') && (current.status == 'label_created' || current.status == 'exception')",
     roles: [assetManager, inventoryTech, noc],
     form: { showButton: true, style: 'destructive' },
     showUpdate: true,

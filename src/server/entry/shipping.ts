@@ -15,9 +15,11 @@ import {
     tokenMatches,
     trackingEventKey,
     trackingRetryParams,
+    voidedLabelOrderNote,
     WEBHOOK_TOKEN_HEADER,
     webhookToken,
     type Address,
+    type LabelRef,
     type LabelResult,
     type ShipmentStatus,
     type TrackingEvent,
@@ -185,22 +187,82 @@ function openReturnLabel(returnOrderId: string): { trackingNumber: string; statu
 }
 
 /**
- * UI action "Mark label voided" on a return Shipment, once the person voided the label with the carrier
- * (nothing is sent to the aggregator): the label stops counting as open, so the Return order can get a
- * new one and the customer page stops offering it.
- *
- * A tracking update that read the label as created before the void and saved after it would put the voided label back
- * (an EasyPost `cancelled` is an Exception), so the check and the save are made under the Shipment's tracking lock,
- * from the Shipment read again there; held off through every try, nothing changes and the user is asked to try again.
- * Edits on the form are not saved with it. The Return order is noted after the lock is released, as the lock is a
- * leaf (ADR 0013). Taking it throws only when an insert is refused with no lock row (platform/locks `withLockTries`
- * tries again, and that error escapes only when every try threw).
+ * UI action "Mark label voided" on a Shipment, once the person voided the label with the carrier (nothing is sent to
+ * the aggregator). Voided is final. A return label stops counting as open, so the Return order can get a new one and
+ * the customer page stops offering it. An outbound label is cleared from its Order (`voidOutboundLabel`); its units
+ * stay shipped and nothing is bought. Edits on the form are not saved with it.
  */
 export function uiMarkLabelVoided(current: GlideRecord): void {
     const shipmentId = current.getUniqueValue()
     const trackingNumber = str(current, 'tracking_number')
+    // Its direction and Order as saved, not as edited on the form.
+    const shipment = findById('x_daas_ham_shipment', shipmentId)
+    if (!shipment) return void gs.addErrorMessage(`Label ${trackingNumber} no longer exists`)
+    const orderId = str(shipment, 'order')
+    const outbound = str(shipment, 'direction') === 'to_site' && orderId
+    if (outbound) return voidOutboundLabel(shipmentId, trackingNumber, orderId)
+    const voided = saveVoided(shipmentId, trackingNumber)
+    if (!voided) return
+    const returnOrder = findById('x_daas_ham_return_order', str(voided, 'return_order'))
+    if (returnOrder) {
+        returnOrder.setValue('work_notes', `Return label ${trackingNumber} voided with the carrier: do not ship on it.`)
+        returnOrder.update()
+    }
+    gs.addInfoMessage(`Label ${trackingNumber} marked voided`)
+}
+
+/**
+ * Mark an outbound label voided and, while its Order still tracks it, clear the Order's tracking number and carrier
+ * with a work note saying to buy the replacement with the carrier (domain/shipping `voidedLabelOrderNote`).
+ *
+ * Checking the Order's tracking number and clearing it is a check-then-write that a Ship of the Order, buying a label
+ * for Assets staged since, could interleave with: its new number would be cleared. So both are made under the Order's
+ * Ship lock (`ship_order_<sys_id>`, entry/delivery `shipOrder`), taken before the tracking lock as in ADR 0013's order;
+ * one that finds it held (a Ship, or a void of one of the Order's labels, a second press included) changes nothing and
+ * asks the user to try again. Taking it throws only when an insert is refused with no lock row (platform/locks); that
+ * error escapes.
+ */
+function voidOutboundLabel(shipmentId: string, trackingNumber: string, orderId: string): void {
+    const taken = withLock(`ship_order_${orderId}`, () => {
+        const voided = saveVoided(shipmentId, trackingNumber)
+        const label = voided && { trackingNumber: str(voided, 'tracking_number'), carrier: str(voided, 'carrier') }
+        if (label) clearOrderTracking(orderId, label)
+    })
+    if (!taken) {
+        const busy = 'a Ship of its Order, or a void of one of its labels, is running. Try again once it has finished'
+        gs.addErrorMessage(`Label ${trackingNumber} not marked voided: ${busy}`)
+    }
+}
+
+/** Clear voided outbound `label` from its Order, with a work note, while it still tracks it; else the Order stays. */
+function clearOrderTracking(orderId: string, label: LabelRef): void {
+    const order = findById('x_daas_ham_order', orderId)
+    const tracked = order ? { trackingNumber: str(order, 'tracking_number'), carrier: str(order, 'carrier') } : null
+    const note = tracked && voidedLabelOrderNote(tracked, label)
+    if (!order || !note) return void gs.addInfoMessage(`Label ${label.trackingNumber} marked voided`)
+    order.setValue('tracking_number', '')
+    order.setValue('carrier', '')
+    order.setValue('work_notes', note)
+    const number = str(order, 'number')
+    if (!order.update()) {
+        const left = `${number} still names it (${refusal(order)}): clear its tracking number and carrier by hand`
+        return void gs.addErrorMessage(`Label ${label.trackingNumber} marked voided, but ${left}`)
+    }
+    const replace = 'buy the replacement with the carrier and type its tracking number on the Order'
+    gs.addInfoMessage(`Label ${label.trackingNumber} marked voided and cleared from ${number}: ${replace}`)
+}
+
+/**
+ * Mark the Shipment voided, from it read again under its tracking lock: the Shipment saved, or null once the user is
+ * told why not. A tracking update that read the label as created before the void and saved after it would put the
+ * voided label back (an EasyPost `cancelled` is an Exception); held off through every try, nothing changes and the
+ * user is asked to try again. The lock is a leaf (ADR 0013): the Order or Return order is noted after it is released.
+ * Taking it throws only when an insert is refused with no lock row (platform/locks `withLockTries` tries again, and
+ * that error escapes only when every try threw).
+ */
+function saveVoided(shipmentId: string, trackingNumber: string): GlideRecord | null {
     // Set inside the lock once the void is saved.
-    let returnOrderId = null as string | null
+    let voided = null as GlideRecord | null
     const ran = withLockTries(trackingLockName(shipmentId), TRACKING_LOCK_TRIES, () => {
         const shipment = findById('x_daas_ham_shipment', shipmentId)
         if (!shipment) return void gs.addErrorMessage(`Label ${trackingNumber} no longer exists`)
@@ -210,23 +272,17 @@ export function uiMarkLabelVoided(current: GlideRecord): void {
         }
         shipment.setValue('status', 'voided')
         shipment.setValue('status_detail', `Voided with the carrier (marked by ${gs.getUserDisplayName()})`)
-        // A refused save leaves the label open: the Return order is not told it is voided.
+        // A refused save leaves the label open: its Order or Return order is not told it is voided.
         if (!shipment.update()) {
             return void gs.addErrorMessage(`Label ${trackingNumber} not marked voided: ${refusal(shipment)}`)
         }
-        returnOrderId = str(shipment, 'return_order')
+        voided = shipment
     })
     if (!ran) {
         const busy = 'a tracking update of it is being saved. Try again'
-        return void gs.addErrorMessage(`Label ${trackingNumber} not marked voided: ${busy}`)
+        gs.addErrorMessage(`Label ${trackingNumber} not marked voided: ${busy}`)
     }
-    if (returnOrderId === null) return
-    const returnOrder = findById('x_daas_ham_return_order', returnOrderId)
-    if (returnOrder) {
-        returnOrder.setValue('work_notes', `Return label ${trackingNumber} voided with the carrier: do not ship on it.`)
-        returnOrder.update()
-    }
-    gs.addInfoMessage(`Label ${trackingNumber} marked voided`)
+    return voided
 }
 
 /**

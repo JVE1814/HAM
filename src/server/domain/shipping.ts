@@ -318,6 +318,30 @@ export function returnLabelRefusal(trackingNumber: string, status: ShipmentStatu
     return `Return label ${trackingNumber} is still open and its status is unknown; check it with the carrier before buying another`
 }
 
+/** A label as an Order or a Shipment names it: its tracking number and carrier. */
+export interface LabelRef {
+    trackingNumber: string
+    carrier: string
+}
+
+/**
+ * The work note for an Order whose outbound label `label` was voided, or null when the Order (`order`) tracks another
+ * label (a later Ship's, or one typed since), which stays. The note goes with clearing the Order's tracking number and
+ * carrier, so a voided number does not pass for the shipment under way; an Order's empty carrier still matches.
+ */
+export function voidedLabelOrderNote(order: LabelRef, label: LabelRef): string | null {
+    const tracking = label.trackingNumber.trim()
+    if (!tracking || order.trackingNumber.trim() !== tracking) return null
+    const carrier = order.carrier.trim().toLowerCase()
+    if (carrier && carrier !== label.carrier.trim().toLowerCase()) return null
+    const voided = [label.carrier.trim(), tracking].filter(Boolean).join(' ')
+    return (
+        `Shipping label ${voided} was voided with the carrier, so its tracking number and carrier were cleared from ` +
+        'this Order; its units stay shipped. Buy the replacement label with the carrier, then type its carrier and ' +
+        'tracking number on the Order.'
+    )
+}
+
 /**
  * What a tracking update does to a shipment: its next status, the status detail to store (only when
  * the shipment took the update's status, at most 255 characters) and whether it was delivered just now.

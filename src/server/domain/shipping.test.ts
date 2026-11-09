@@ -21,6 +21,7 @@ import {
     trackingEventKey,
     TRACKING_RETRY_CHARS,
     trackingRetryParams,
+    voidedLabelOrderNote,
     WEBHOOK_TOKEN_HEADER,
     webhookToken,
     type Address,
@@ -389,6 +390,55 @@ describe('returnLabelRefusal', () => {
     it('never advises Mark label voided for a label whose status is unknown', () => {
         expect(returnLabelRefusal('1Z999', 'unknown')).not.toContain('Mark label voided')
         expect(returnLabelRefusal('1Z999', 'unknown')).toContain('1Z999')
+    })
+})
+
+describe('voidedLabelOrderNote', () => {
+    const label = { trackingNumber: '1Z999', carrier: 'ups' }
+
+    it('notes the Order that still tracks the voided label, naming it and saying how to replace it', () => {
+        expect(voidedLabelOrderNote({ trackingNumber: '1Z999', carrier: 'ups' }, label)).toBe(
+            'Shipping label ups 1Z999 was voided with the carrier, so its tracking number and carrier were cleared ' +
+                'from this Order; its units stay shipped. Buy the replacement label with the carrier, then type its ' +
+                'carrier and tracking number on the Order.',
+        )
+    })
+
+    it('takes the carrier as typed on the Order, in any case, or left empty', () => {
+        expect(voidedLabelOrderNote({ trackingNumber: ' 1Z999 ', carrier: 'UPS ' }, label)).toContain('ups 1Z999')
+        expect(voidedLabelOrderNote({ trackingNumber: '1Z999', carrier: '' }, label)).toContain('ups 1Z999')
+    })
+
+    it("leaves an Order alone that tracks another label: a later Ship's, or one typed since", () => {
+        expect(voidedLabelOrderNote({ trackingNumber: '1Z888', carrier: 'ups' }, label)).toBeNull()
+        expect(voidedLabelOrderNote({ trackingNumber: '', carrier: '' }, label)).toBeNull()
+        expect(voidedLabelOrderNote({ trackingNumber: '1Z999', carrier: 'fedex' }, label)).toBeNull()
+    })
+
+    it('never takes an empty tracking number for the label', () => {
+        const none = { trackingNumber: ' ', carrier: '' }
+        expect(voidedLabelOrderNote({ trackingNumber: '', carrier: '' }, none)).toBeNull()
+    })
+})
+
+describe('Mark label voided', () => {
+    const action = readFileSync(new URL('../../fluent/logic/shipping.now.ts', import.meta.url), 'utf8')
+        .split('$id: Now.ID[')
+        .find((source) => source.startsWith("'ua_shipment_mark_voided']"))
+    const condition = /condition:\s*"([^"]*)"/.exec(action ?? '')?.[1] ?? ''
+
+    it('is offered on return and outbound Shipments alike', () => {
+        expect(condition).toContain("current.direction == 'return'")
+        expect(condition).toContain("current.direction == 'to_site'")
+    })
+
+    it('is offered in exactly the statuses labelVoidable allows', () => {
+        const offered = [...condition.matchAll(/current\.status == '([a-z_]+)'/g)].map((match) => match[1])
+        const all: ShipmentStatus[] = [
+            'label_created', 'in_transit', 'out_for_delivery', 'delivered',
+            'exception', 'returned', 'unknown', 'voided',
+        ]
+        expect(offered.sort()).toEqual(all.filter(labelVoidable).sort())
     })
 })
 
