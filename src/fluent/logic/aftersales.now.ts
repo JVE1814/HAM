@@ -122,7 +122,7 @@ EmailNotification({
     emailContent: {
         subject: 'Equipment overdue for return: ${number}',
         messageHtml:
-            '<p>Equipment on return order ${number} (${site}) was due back by ${due_date} and has not arrived.</p><p>Please ship it back or arrange collection. Equipment not returned within the grace period is charged as lost under your agreement.</p>',
+            '<p>Equipment on return order ${number} (${site}) was due back by ${due_back} and has not arrived.</p><p>Please ship it back or arrange collection. Equipment not returned within the grace period is charged as lost under your agreement.</p>',
         importance: 'high',
     },
 })

@@ -6,6 +6,7 @@ import {
     DecimalColumn,
     IntegerColumn,
     MultiLineTextColumn,
+    OverrideColumn,
     ReferenceColumn,
     StringColumn,
     Table,
@@ -28,7 +29,9 @@ export const x_daas_ham_agreement = Table({
     label: 'Agreement',
     extends: 'ast_contract',
     schema: {
-        customer: ReferenceColumn({ label: 'Customer', referenceTable: 'customer_account', mandatory: true }),
+        // Inherited from ast_contract, where it references core_company: required here and limited to Customer
+        // accounts (customer_account extends core_company).
+        customer: OverrideColumn({ mandatory: true, referenceQualifier: 'sys_class_name=customer_account' }),
         account_manager: ReferenceColumn({ label: 'Account manager', referenceTable: 'sys_user' }),
         refresh_cycle_months: IntegerColumn({ label: 'Refresh cycle (months)', default: 60, min: 0 }),
         refresh_basis: ChoiceColumn({

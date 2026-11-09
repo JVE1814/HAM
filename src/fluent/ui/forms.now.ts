@@ -562,7 +562,7 @@ export const return_order_form = Form({
                 {
                     layout: 'two-column',
                     leftElements: [{ field: 'number', type: 'table_field' }, { field: 'trigger', type: 'table_field' }, { field: 'customer', type: 'table_field' }, { field: 'site', type: 'table_field' }, { field: 'agreement', type: 'table_field' }, { field: 'source_order', type: 'table_field' }],
-                    rightElements: [{ field: 'state', type: 'table_field' }, { field: 'method', type: 'table_field' }, { field: 'due_date', type: 'table_field' }, { field: 'escalated', type: 'table_field' }],
+                    rightElements: [{ field: 'state', type: 'table_field' }, { field: 'method', type: 'table_field' }, { field: 'due_back', type: 'table_field' }, { field: 'escalated', type: 'table_field' }],
                 },
             ],
         },
@@ -798,7 +798,7 @@ List({ table: 'x_daas_ham_oem_coverage', view: default_view, columns: ['serial_n
 
 List({ table: 'x_daas_ham_oem_rma', view: default_view, columns: ['rma_number', 'vendor', 'state', 'status', 'defective_asset', 'replacement_serial', 'ship_back_due'] })
 
-List({ table: 'x_daas_ham_return_order', view: default_view, columns: ['number', 'trigger', 'customer', 'site', 'method', 'due_date', 'state', 'escalated'] })
+List({ table: 'x_daas_ham_return_order', view: default_view, columns: ['number', 'trigger', 'customer', 'site', 'method', 'due_back', 'state', 'escalated'] })
 
 List({ table: 'x_daas_ham_return_order_line', view: default_view, columns: ['return_order', 'asset', 'status', 'received_at', 'condition', 'evaluation'] })
 

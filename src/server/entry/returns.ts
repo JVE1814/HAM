@@ -133,7 +133,7 @@ export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): s
         returnOrder.setValue('state', 2)
         if (!returnOrder.update()) warnRefused(returnOrder, `${str(returnOrder, 'number')} not reopened for ${serial}`)
     }
-    if (str(returnOrder, 'due_date') && todayIso() > str(returnOrder, 'due_date')) {
+    if (str(returnOrder, 'due_back') && todayIso() > str(returnOrder, 'due_back')) {
         recordFee('late_return', asset, returnOrder.getUniqueValue())
     }
     return ''
@@ -222,11 +222,11 @@ export function chaseOverdueReturns(): void {
     runTableJob({
         job: 'chase_overdue_returns',
         table: 'x_daas_ham_return_order_line',
-        query: `status=awaiting^return_order.due_date<${today}`,
+        query: `status=awaiting^return_order.due_back<${today}`,
         read: (line) => ({
             assetId: str(line, 'asset'),
             returnOrderId: str(line, 'return_order'),
-            dueDate: str(line, 'return_order.due_date'),
+            dueDate: str(line, 'return_order.due_back'),
         }),
         handle: (line, lineId) => {
             // Read the header fresh: an earlier line of the same order may have escalated it in this batch.

@@ -43,7 +43,8 @@ export const x_daas_ham_return_order = Table({
             default: 'ship_back',
             dropdown: 'dropdown_without_none',
         }),
-        due_date: DateColumn({ label: 'Due back by' }),
+        // Not due_date: Return orders extend task, whose due_date is a date-time; this is a date.
+        due_back: DateColumn({ label: 'Due back by' }),
         carrier: StringColumn({ label: 'Carrier', maxLength: 60 }),
         tracking_number: StringColumn({ label: 'Tracking number', maxLength: 100 }),
         work_order: ReferenceColumn({ label: 'Work order', referenceTable: 'wm_order' }),
@@ -53,7 +54,7 @@ export const x_daas_ham_return_order = Table({
     autoNumber: { prefix: 'NRET', number: 1000, numberOfDigits: 7 },
     index: [
         { name: 'x_daas_ham_ret_customer', unique: false, element: 'customer' },
-        { name: 'x_daas_ham_ret_due', unique: false, element: 'due_date' },
+        { name: 'x_daas_ham_ret_due', unique: false, element: 'due_back' },
     ],
 })
 

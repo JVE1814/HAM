@@ -93,7 +93,7 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
             number: str(ret, 'number'),
             site: ret.getDisplayValue('site'),
             trigger: ret.getDisplayValue('trigger'),
-            dueDate: str(ret, 'due_date'),
+            dueDate: str(ret, 'due_back'),
         })
     }
     const labels = returnLabels(returns.map((r) => r.id))

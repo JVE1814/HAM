@@ -69,7 +69,7 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
     const agreement = findById('x_daas_ham_agreement', request.agreementId)
     const allowance = agreement ? num(agreement, 'overdue_return_days') || 30 : 30
     order.setValue('agreement', request.agreementId)
-    order.setValue('due_date', returnDueDate(todayIso(), allowance))
+    order.setValue('due_back', returnDueDate(todayIso(), allowance))
     order.setValue('state', 2)
 
     let lines = 0

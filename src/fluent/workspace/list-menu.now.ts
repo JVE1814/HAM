@@ -379,7 +379,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 30,
                     table: 'x_daas_ham_return_order',
                     condition: 'active=true^EQ',
-                    columns: 'number,trigger,customer,site,method,due_date,escalated',
+                    columns: 'number,trigger,customer,site,method,due_back,escalated',
                     applicabilities: [{ $id: Now.ID['ws_returns_open_aud'], applicability: staffAudience }],
                 },
                 {
@@ -387,8 +387,8 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Overdue returns',
                     order: 40,
                     table: 'x_daas_ham_return_order',
-                    condition: 'active=true^due_date<javascript:gs.beginningOfToday()^EQ',
-                    columns: 'number,trigger,customer,site,due_date,escalated',
+                    condition: 'active=true^due_back<javascript:gs.beginningOfToday()^EQ',
+                    columns: 'number,trigger,customer,site,due_back,escalated',
                     applicabilities: [{ $id: Now.ID['ws_returns_overdue_aud'], applicability: staffAudience }],
                 },
                 {
