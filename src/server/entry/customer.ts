@@ -4,8 +4,8 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { awaitsSelfInstallConfirmation } from '../domain/install-confirmation.ts'
 import { returnRequesterRefusal, returnRequestFindings, type RequestedReturn } from '../domain/returns.ts'
-import { actsAsCustomerAdmin, customerEquipmentQuery, ROLE } from '../domain/visibility.ts'
-import { readStage } from '../platform/assets.ts'
+import { actsAsCustomerAdmin, customerEquipmentQuery, ROLE, SCOPE, visibilityFilter } from '../domain/visibility.ts'
+import { isFleetAsset, readStage } from '../platform/assets.ts'
 import { currentSession } from '../platform/session.ts'
 import { bool, exists, findById, refusal, str } from '../platform/records.ts'
 import { installedAssetIds, raiseReturn } from '../platform/returns.ts'
@@ -18,7 +18,10 @@ import { reply } from '../platform/rest-api.ts'
  * Customer self-service API (P2.9, D49). Every query runs as the signed-in customer contact, so the
  * before-query visibility rules (ADR 0005) limit it to their Customer (site contacts: their Sites).
  * Asset managers may open the page as a preview, which shows every Customer; the Customer-admin
- * actions stay with Customer admins.
+ * actions stay with Customer admins. A server read is not checked by the read ACLs, so a query with
+ * `^NQ` clauses carries the reader's filter in each one itself (customerEquipmentQuery). Only fleet
+ * assets (ADR 0016) are the Customer's equipment, so each read checks the Fleet flag: the rules keep a
+ * contact to their Customer's hardware, fleet or not, and show staff previewing the page all of it.
  */
 
 /** A Customer admin of their own Customer only (`actsAsCustomerAdmin`); staff raise returns via the record producer. */
@@ -43,7 +46,7 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
 
     const assets: object[] = []
     const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(customerEquipmentQuery())
+    asset.addEncodedQuery(customerEquipmentQuery(visibilityFilter(session.scope, SCOPE.assets, session)))
     asset.orderBy('x_daas_ham_site')
     asset.setLimit(5000)
     asset.query()
@@ -134,8 +137,9 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
 export function reportFault(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const input = data(request)
-    const asset = findById('alm_hardware', String(input.asset ?? '')) // visibility rules apply
-    if (!asset) return reply(response, 404, { error: 'Unknown device' })
+    // Visibility rules apply (a contact's Customer and Sites); only a fleet asset is replaced (ADR 0016).
+    const asset = findById('alm_hardware', String(input.asset ?? ''))
+    if (!asset || !isFleetAsset(asset)) return reply(response, 404, { error: 'Unknown device' })
     const kase = new GlideRecord('sn_customerservice_case')
     kase.initialize()
     kase.setValue('account', str(asset, 'company'))
@@ -207,13 +211,13 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
 /**
  * The Assets a return request covers (visibility rules apply): for a decommission everything installed or shipped at
  * the Site (domain/returns `SITE_RECOVERY_STAGES`), as the record producer does, whatever the request lists; otherwise
- * the listed devices that are at the Site.
+ * the listed fleet assets (ADR 0016) that are at the Site.
  */
 function returnedAssetIds(siteId: string, decommission: boolean, listed: unknown): string[] {
     if (decommission) return installedAssetIds({ siteId, wholeSite: true })
     return (Array.isArray(listed) ? (listed as unknown[]) : []).map(String).filter((id) => {
         const asset = findById('alm_hardware', id)
-        return !!asset && str(asset, 'x_daas_ham_site') === siteId
+        return !!asset && isFleetAsset(asset) && str(asset, 'x_daas_ham_site') === siteId
     })
 }
 

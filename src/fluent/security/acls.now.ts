@@ -14,6 +14,7 @@ import {
     noc,
     providerStaff,
 } from './roles.now'
+import { grantsFleetAsset } from '../../server/entry/visibility'
 
 /*
  * Access controls for app tables. Reads are also narrowed by the before-query rules in
@@ -21,7 +22,8 @@ import {
  * that the record's Site lists them as a contact, so neither a direct link nor a dot-walk from a visible record leaks
  * data. Return lines, attestation items and shipment events have no before-query rule: their ACL is the only check.
  * Inventory techs read only the tables of their stockroom work (providerStaff or a list naming inventoryTech); other
- * staff reads use broadStaff or a narrower list.
+ * staff reads use broadStaff or a narrower list. On the tables narrowed to an inventory tech's stockrooms, a
+ * Deny-Unless row check (acls-visibility.now.ts) re-checks the stockroom. Hardware's read ACLs sit on alm_asset (below).
  */
 
 const commercialEditors = [accountManager, assetManager]
@@ -717,22 +719,39 @@ Acl({
     roles: [admin],
 })
 
+/*
+ * Hardware is shared with the Provider's IT (ADR 0016), and the app's read ACLs for it sit on alm_asset, its parent
+ * (ADR 0005). The platform has no record read ACL on alm_hardware (the CRM Base Entities "alm_hardware" read ACL is a
+ * UI page ACL), so an ACL of the app's there would be the only one on hardware and take it away from every user
+ * without a NaaS role, as the app's ACLs did when they sat there. On alm_asset they are ORed with the platform's
+ * (Asset Management's for internal users, Customer Service's for contacts), and alm_hardware, having none, inherits
+ * both. They apply to hardware (Applies To) and grant only fleet assets (entry/visibility `grantsFleetAsset`, which
+ * also keeps an inventory tech to their stockrooms and a Customer contact to their Customer and Sites); who may not
+ * read a fleet asset is the Deny-Unless row check's to say (acls-visibility.now.ts). The keys are those of the ACLs
+ * that sat on alm_hardware, so an install moves those records rather than leaving them there.
+ */
 Acl({
     $id: Now.ID['acl_alm_hardware_read_staff'],
     type: 'record',
-    table: 'alm_hardware',
+    table: 'alm_asset',
     operation: 'read',
     roles: providerStaff,
+    appliesTo: 'sys_class_name=alm_hardware',
+    description: 'NaaS provider staff read fleet assets (inventory techs: those of their stockrooms).',
+    script: grantsFleetAsset,
 })
 
 Acl({
     $id: Now.ID['acl_alm_hardware_read_customer'],
     type: 'record',
-    table: 'alm_hardware',
+    table: 'alm_asset',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.getValue('company') == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.x_daas_ham_site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
+    appliesTo: 'sys_class_name=alm_hardware',
+    description: "NaaS Customer contacts read their Customer's fleet assets (site contacts: at the Sites listing them).",
+    script: grantsFleetAsset,
 })
+
 Acl({
     $id: Now.ID['acl_asn_import_read'],
     type: 'record',

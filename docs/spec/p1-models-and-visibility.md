@@ -36,9 +36,10 @@
 | User | Sees |
 |---|---|
 | asset manager, field tech, NOC, account manager, finance, admin | everything |
-| inventory tech only | Assets, stockrooms, transfer orders, staging tasks and audits (with their lines) of their stockrooms; plus, across all stockrooms and Customers, the ASN imports, staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and Disposal orders; no other app table |
-| customer admin | their Customer's Assets, Orders, lines, Return orders and lines, Shipments and events, Attestations and items, Agreements, subscription lines, catalog entries and Fee events; Site templates with their items, their Customer's and those offered to every Customer (checked by the read ACL, no before-query rule) |
-| site contact | their Customer's Assets, Orders and lines, Return orders and lines, Shipments and events, and Attestations and items at the Sites listing them as contacts; no Fee events |
+| inventory tech only | fleet assets, NaaS stockrooms, transfer orders from or to a NaaS stockroom, staging tasks and audits (with their lines) of their stockrooms; plus, across all stockrooms and Customers, the ASN imports, staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and Disposal orders; no other app table; the Provider IT's hardware, stockrooms and transfer orders as the platform allows |
+| customer admin | their Customer's fleet assets (and no other company's hardware), Orders, lines, Return orders and lines, Shipments and events, Attestations and items, Agreements, subscription lines, catalog entries and Fee events; Site templates with their items, their Customer's and those offered to every Customer (checked by the read ACL, no before-query rule) |
+| site contact | their Customer's fleet assets (and no other company's hardware), Orders and lines, Return orders and lines, Shipments and events, and Attestations and items at the Sites listing them as contacts; no Fee events |
+| anyone with no NaaS role | whatever the platform's ACLs and rules allow, fleet assets included |
 
 Before-query rules add the filter; for a site contact it checks the record's Customer as well as its
 Site, as the ACLs do, so another Customer's Site that lists them shows them nothing. Customer ACLs
@@ -50,5 +51,34 @@ Customer see nothing in the restricted tables. For inventory techs the rules onl
 may not read at all are closed by the read ACLs' role lists, not by a match-nothing filter, because a rule
 also applies to the server logic their actions set off (`INVENTORY_TECH_TABLES` in `domain/visibility.ts`
 lists what they read). For Customer contacts, a rule on a table with no Customer field (or no Site field,
-for Site contacts) matches nothing: Site contacts get no Stockrooms, Agreements, subscription lines,
-catalog entries or Fee events, and no Customer contact gets transfer orders or Staging tasks.
+for Site contacts) matches nothing: Site contacts get no NaaS Stockrooms, Agreements, subscription lines,
+catalog entries or Fee events, and no Customer contact gets Staging tasks or transfer orders of NaaS
+stockrooms.
+
+**Shared tables** (ADR 0016). On `alm_hardware`, `alm_stockroom` and `alm_transfer_order`, which hold the
+Provider IT's records too, the rules narrow an inventory tech's NaaS records only and keep the others in
+(`OUTSIDE_NAAS`): hardware outside the fleet (flag false or blank), stockrooms with no NaaS stockroom type, and
+transfer orders between two such stockrooms. An inventory tech, who holds the platform's `asset` and `inventory_user`
+roles, sees those as other asset users do. A Customer contact is kept to their Customer (and Sites) on every record of
+those tables, fleet or not, as before: Customer Service's own contact rules on `alm_asset` run in interactive sessions
+only, so they would not narrow a Table API read. Users with no NaaS role are narrowed by none of the app's rules.
+
+**Hardware ACLs.** The app's read ACLs for hardware sit on `alm_asset`, the parent table, applying to hardware
+(*Applies To* `sys_class_name=alm_hardware`). The platform has no record read ACL on `alm_hardware` (the CRM Base
+Entities one of that name is a UI page ACL), so `alm_hardware` inherits `alm_asset`'s, where the app's Allow-If ACLs are
+ORed with Asset Management's and Customer Service's: they grant NaaS provider staff and Customer contacts the fleet
+assets their scope keeps, and nothing else. When they sat on `alm_hardware` they were its only ACLs, and every user
+without a NaaS role lost all hardware.
+
+**Row checks.** A rule can only append conditions, and one appended after an `^NQ` binds to the last clause only,
+so a list query with `^NQ` clauses or a direct link could reach a record the rule hides. Each table the rules
+narrow to an inventory tech's stockrooms (`STOCKROOM_SCOPED_TABLES`) therefore has a Deny-Unless read ACL
+(`security/acls-visibility.now.ts`), hardware's on `alm_asset` so an `alm_asset` list is checked too. Its script checks
+the record with `rowVisible` on the same fields as the table's rule (`SCOPE`) and keeps exactly what the rule keeps: an
+inventory tech with no broader role reads a fleet asset, NaaS stockroom, transfer order touching a NaaS stockroom,
+staging task or audit only of their stockrooms, and a Customer contact hardware and the other records only of their
+Customer (and Sites). Staff who see everything and users with no NaaS role pass it, and so does a record that is not
+a saved row (a New form, a check of the whole table). It is Deny-Unless because the platform's own Allow-If read ACLs
+on `alm_asset`, `alm_stockroom` and `alm_transfer_order` already grant an inventory tech every row, and Allow-If ACLs
+of one name are ORed. A server read is not checked by ACLs: one with `^NQ` clauses that the app returns to a
+restricted user carries the user's filter in each clause itself (the customer page's equipment).

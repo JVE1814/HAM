@@ -1,4 +1,5 @@
-import { DEPLOYED_STAGES, stagesQuery } from './lifecycle.ts'
+import { fleetStagesQuery, NAAS_STOCKROOM_TYPES, outsideFleetCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
+import { DEPLOYED_STAGES } from './lifecycle.ts'
 
 /**
  * Which slice of the installed base a user may see (ADR 0005).
@@ -58,8 +59,9 @@ export const INVENTORY_TECH_TABLES: readonly string[] = [
 
 /**
  * The tables an inventory tech sees only for their assigned Stockrooms: stock, transfer orders, Staging tasks and
- * Audits with their lines. Each has a before-query rule that filters on a Stockroom field, and no other table does
- * (the rules are checked against this list).
+ * Audits with their lines. Each has a before-query rule that filters on a Stockroom field, and no other table does,
+ * and a Deny-Unless read ACL that checks each record the same way (rowVisible), alm_hardware's on its parent alm_asset
+ * (ADR 0005); the rules and the ACLs are checked against this list.
  */
 export const STOCKROOM_SCOPED_TABLES: readonly string[] = [
     'alm_hardware',
@@ -89,14 +91,14 @@ export function actsAsCustomerAdmin(hasRole: (role: string) => boolean): boolean
 }
 
 /**
- * The equipment the customer page lists (D49), as an encoded alm_hardware query: Customers' NaaS Assets, which are
- * those on an Agreement (going to a Site needs one, as the entitlement and attestation queries count them), shipped
- * to a Site, serving there or awaiting return. The platform's other hardware, such as out-of-box laptops, has no
- * Agreement, so a staff preview of every Customer leaves it out; for Customer contacts the before-query rules
- * narrow it further.
+ * The equipment the customer page lists (D49), as an encoded alm_hardware query: the fleet assets (ADR 0016) shipped to
+ * a Site, serving there or awaiting return. The Fleet flag tells them from the Provider IT's hardware, laptops in use
+ * included, whatever their Agreement: a deployed fleet unit missing its Agreement (a data gap) is still its Customer's
+ * equipment. `visible` (the reader's `visibilityFilter` on alm_hardware, null for staff who see every Customer) is put
+ * into every stage's clause: the before-query rule's filter would bind to the last clause only (ADR 0005).
  */
-export function customerEquipmentQuery(): string {
-    return stagesQuery(DEPLOYED_STAGES, 'x_daas_ham_agreementISNOTEMPTY')
+export function customerEquipmentQuery(visible: string | null = null): string {
+    return fleetStagesQuery(DEPLOYED_STAGES, visible ?? '')
 }
 
 /** Which field on a table carries each scoping key; omit a key the table has no field for. */
@@ -104,6 +106,59 @@ export interface ScopingFields {
     stockroom?: string | readonly string[]
     customer?: string
     site?: string
+}
+
+/** The scopes the before-query rules (entry/visibility) and the read ACLs' row checks apply, one per rule script. */
+export type ScopedRecords =
+    | 'assets'
+    | 'stockrooms'
+    | 'transferOrders'
+    | 'stagingTasks'
+    | 'audits'
+    | 'auditLines'
+    | 'orders'
+    | 'orderLines'
+    | 'customerRecords'
+    | 'customerSiteRecords'
+
+/**
+ * The fields each before-query rule filters on, and each read ACL's row check reads (ADR 0005), so the two never
+ * disagree on what a user may see.
+ */
+export const SCOPE: Readonly<Record<ScopedRecords, ScopingFields>> = {
+    assets: { stockroom: 'stockroom', customer: 'company', site: 'x_daas_ham_site' },
+    stockrooms: { stockroom: 'sys_id', customer: 'x_daas_ham_customer' },
+    transferOrders: { stockroom: ['from_stockroom', 'to_stockroom'] },
+    stagingTasks: { stockroom: 'asset.stockroom' },
+    // An inventory tech sees the blind counts of their Stockrooms; a site audit has no Stockroom, so it drops out.
+    audits: { stockroom: 'stockroom', customer: 'customer', site: 'site' },
+    auditLines: { stockroom: 'audit.stockroom', customer: 'audit.customer', site: 'audit.site' },
+    orders: { customer: 'customer', site: 'site' },
+    orderLines: { customer: 'order.customer', site: 'order.site' },
+    customerRecords: { customer: 'customer' },
+    customerSiteRecords: { customer: 'customer', site: 'site' },
+}
+
+/**
+ * Encoded condition matching stockrooms outside NaaS (through `via`, e.g. `from_stockroom.`): another type, or none,
+ * which is not left to how `NOT IN` treats an empty value. The complement of domain/fleet `naasStockroomCondition`.
+ */
+export function outsideNaasStockroomCondition(via = ''): string {
+    const type = `${via}${STOCKROOM_TYPE_FIELD}`
+    return `${type}NOT IN${NAAS_STOCKROOM_TYPES.join(',')}^OR${type}ISEMPTY`
+}
+
+/**
+ * The records of the tables the app shares with the Provider's IT (ADR 0016) that its visibility leaves to the
+ * platform for an inventory tech, as encoded conditions a record matches all of: hardware outside the fleet,
+ * stockrooms outside NaaS, and transfer orders between two of those. The before-query rules keep every such record in
+ * for them, and the read ACLs' row checks pass it, so the platform's own ACLs and rules alone decide whether they see
+ * it (see leavesOutsideNaas for Customer contacts).
+ */
+export const OUTSIDE_NAAS: Readonly<Partial<Record<ScopedRecords, readonly string[]>>> = {
+    assets: [outsideFleetCondition()],
+    stockrooms: [outsideNaasStockroomCondition()],
+    transferOrders: [outsideNaasStockroomCondition('from_stockroom.'), outsideNaasStockroomCondition('to_stockroom.')],
 }
 
 export interface ScopingIds {
@@ -114,6 +169,35 @@ export interface ScopingIds {
 
 const NOTHING = 'sys_id=-1'
 
+function columnsOf(stockroom: string | readonly string[]): readonly string[] {
+    return typeof stockroom === 'string' ? [stockroom] : stockroom
+}
+
+/** visibilityFilter as encoded OR groups, all of which a visible record matches; null for no restriction. */
+function visibilityConditions(scope: VisibilityScope, fields: ScopingFields, ids: ScopingIds): string[] | null {
+    switch (scope) {
+        case 'everything':
+        case 'unscoped':
+            return null
+        case 'assigned_stockrooms': {
+            if (!fields.stockroom) return null
+            const stockrooms = ids.stockroomIds()
+            if (stockrooms.length === 0) return [NOTHING]
+            return [columnsOf(fields.stockroom).map((column) => `${column}IN${stockrooms.join(',')}`).join('^OR')]
+        }
+        case 'own_customer':
+            if (!fields.customer || !ids.customerId) return [NOTHING]
+            return [`${fields.customer}=${ids.customerId}`]
+        case 'own_sites': {
+            // The Customer as well as the Site, as the read ACLs check: a Site of another Customer listing the
+            // contact shows them nothing.
+            if (!fields.customer || !fields.site || !ids.customerId) return [NOTHING]
+            const sites = ids.siteIds()
+            return sites.length === 0 ? [NOTHING] : [`${fields.customer}=${ids.customerId}`, `${fields.site}IN${sites.join(',')}`]
+        }
+    }
+}
+
 /**
  * The encoded query that restricts a table to what `scope` may see, or null for no restriction.
  * Ids are fetched lazily so unrestricted users never pay for the lookups.
@@ -123,28 +207,89 @@ const NOTHING = 'sys_id=-1'
  * closed by their read ACLs, not here: this filter also applies to the server logic a tech sets off, such as
  * receiving a returned Asset, which can end its Subscription line and record a late-return Fee event, so it must
  * not hide those records.
+ *
+ * `outside` (OUTSIDE_NAAS, for a table shared with the Provider's IT) matches the records the filter leaves in for a
+ * scope that leaves them to the platform (leavesOutsideNaas): each of its conditions is ORed into each condition of
+ * the filter, which keeps (outside) OR (filter) in the AND-of-ORs form an encoded query has.
  */
-export function visibilityFilter(scope: VisibilityScope, fields: ScopingFields, ids: ScopingIds): string | null {
+export function visibilityFilter(
+    scope: VisibilityScope,
+    fields: ScopingFields,
+    ids: ScopingIds,
+    outside: readonly string[] = [],
+): string | null {
+    const conditions = visibilityConditions(scope, fields, ids)
+    if (!conditions) return null
+    const left = leavesOutsideNaas(scope) ? outside : []
+    if (left.length === 0) return conditions.join('^')
+    return left.flatMap((record) => conditions.map((condition) => `${record}^OR${condition}`)).join('^')
+}
+
+/**
+ * Whether `scope` leaves the records of a shared table outside NaaS (OUTSIDE_NAAS) to the platform. An inventory tech
+ * does: a Provider user, whom the platform's own ACLs and rules govern on the Provider IT's hardware, stockrooms and
+ * transfer orders as any asset user. A Customer contact does not: the rules keep them to their Customer (and Sites)
+ * on every record of those tables, as they did before the fleet, so a contact's read never depends on another scope's
+ * narrowing (Customer Service's contact rules on alm_asset run in interactive sessions only, ADR 0005). Hiding another
+ * company's hardware from a contact hides nothing the Provider's IT needs.
+ */
+function leavesOutsideNaas(scope: VisibilityScope): boolean {
+    return scope === 'assigned_stockrooms'
+}
+
+/** One record a read ACL asks about, as rowVisible and grantsNaasRecord read it. */
+export interface ScopedRow {
+    /**
+     * Whether it is a saved row. The platform also asks about a new record (a New form) and about a GlideRecord on no
+     * row (a check of the whole table), which hold nothing to hide: those always pass.
+     */
+    saved: boolean
+    /** The value of one of the fields `fields` names ('' for blank). */
+    valueOf(field: string): string
+    /** Whether it is a record of a shared table outside NaaS (OUTSIDE_NAAS); omitted on the app's own tables. */
+    outsideNaas?(): boolean
+}
+
+/**
+ * Whether `scope` may see one record (`row`): the record-by-record check the read ACLs' row checks make, keeping
+ * exactly what visibilityFilter keeps (with the table's OUTSIDE_NAAS). A before-query rule can only append conditions,
+ * which an `^NQ` in the query binds to its last clause, so a list can carry records the filter would hide; the
+ * Deny-Unless read ACL (ADR 0005) removes them. Ids are fetched, and fields read, lazily, as for visibilityFilter.
+ */
+export function rowVisible(scope: VisibilityScope, fields: ScopingFields, row: ScopedRow, ids: ScopingIds): boolean {
+    if (!row.saved) return true
     switch (scope) {
         case 'everything':
         case 'unscoped':
-            return null
+            return true
         case 'assigned_stockrooms': {
-            if (!fields.stockroom) return null
+            if (!fields.stockroom) return true
+            // This scope leaves the records outside NaaS to the platform (leavesOutsideNaas).
+            if (row.outsideNaas?.()) return true
             const stockrooms = ids.stockroomIds()
-            if (stockrooms.length === 0) return NOTHING
-            const columns = typeof fields.stockroom === 'string' ? [fields.stockroom] : fields.stockroom
-            return columns.map((column) => `${column}IN${stockrooms.join(',')}`).join('^OR')
+            return columnsOf(fields.stockroom).some((column) => {
+                const stockroom = row.valueOf(column)
+                return stockroom !== '' && stockrooms.includes(stockroom)
+            })
         }
         case 'own_customer':
-            if (!fields.customer || !ids.customerId) return NOTHING
-            return `${fields.customer}=${ids.customerId}`
+            return !!fields.customer && !!ids.customerId && row.valueOf(fields.customer) === ids.customerId
         case 'own_sites': {
-            // The Customer as well as the Site, as the read ACLs check: a Site of another Customer listing the
-            // contact shows them nothing.
-            if (!fields.customer || !fields.site || !ids.customerId) return NOTHING
-            const sites = ids.siteIds()
-            return sites.length === 0 ? NOTHING : `${fields.customer}=${ids.customerId}^${fields.site}IN${sites.join(',')}`
+            if (!fields.customer || !fields.site || !ids.customerId) return false
+            if (row.valueOf(fields.customer) !== ids.customerId) return false
+            const site = row.valueOf(fields.site)
+            return site !== '' && ids.siteIds().includes(site)
         }
     }
+}
+
+/**
+ * Whether an Allow-If read ACL of the app on a shared table grants `scope` the record: a NaaS record (not
+ * `outsideNaas`) that rowVisible keeps, or a record that is not a saved row (the check of the whole table, which lets
+ * the reader open its list at all). The app grants only what it governs; the platform's own Allow-If ACLs, ORed with
+ * these, decide the rest.
+ */
+export function grantsNaasRecord(scope: VisibilityScope, fields: ScopingFields, row: ScopedRow, ids: ScopingIds): boolean {
+    if (!row.saved) return true
+    return !row.outsideNaas?.() && rowVisible(scope, fields, row, ids)
 }
