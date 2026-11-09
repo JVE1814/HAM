@@ -8,7 +8,8 @@ import { actsAsCustomerAdmin, customerEquipmentQuery, ROLE, SCOPE, visibilityFil
 import { isFleetAsset, readStage } from '../platform/assets.ts'
 import { currentSession } from '../platform/session.ts'
 import { bool, exists, findById, refusal, str } from '../platform/records.ts'
-import { installedAssetIds, raiseReturn } from '../platform/returns.ts'
+import { withLock } from '../platform/locks.ts'
+import { awaitsReturn, installedAssetIds, raiseReturn, returnRequestLockName } from '../platform/returns.ts'
 import { returnLabels } from '../platform/shipments.ts'
 import { completeAttestation } from './assurance.ts'
 import { completeInstall, installState } from './delivery.ts'
@@ -231,6 +232,11 @@ function requestedSite(site: GlideRecord): NonNullable<RequestedReturn['site']> 
  * record producer's rule (domain/returns `returnRequestFindings`) for the caller's own Customer: 403 when the Return
  * create rule leaves them out, 400 when the Site is not one of their Customer's Sites. Locations have no visibility
  * rule (ADR 0005), so any location's sys_id is found: the Site is checked here, before its devices are read.
+ *
+ * The Customer's requests are raised one at a time, under their return-request lock (platform/returns
+ * `returnRequestLockName`, ADR 0013), and only for devices not already awaiting a return: a request sent twice raises
+ * one Return order, with one de-install work order and change. One that finds the lock held raises nothing (503), nor
+ * does one whose devices all await a return already (409).
  */
 export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
@@ -243,12 +249,21 @@ export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPI
     const site = findById('cmn_location', String(input.site ?? ''))
     const findings = returnRequestFindings({ customerId, site: site ? requestedSite(site) : undefined }, requester)
     if (!site || findings.length > 0) return reply(response, 400, { error: findings.join('. ') })
+    const raised = withLock(returnRequestLockName(customerId), () => raiseCustomerReturn(response, customerId, site, input))
+    if (!raised) reply(response, 503, { error: 'Another return request of yours is being raised: try again in a moment' })
+}
+
+/** Raise the requested Return holding the Customer's return-request lock, and reply. */
+function raiseCustomerReturn(response: RESTAPIResponse, customerId: string, site: GlideRecord, input: Record<string, unknown>): void {
     const decommission = input.decommission === true
-    const assetIds = returnedAssetIds(site.getUniqueValue(), decommission, input.assets)
-    if (assetIds.length === 0) {
+    const requested = returnedAssetIds(site.getUniqueValue(), decommission, input.assets)
+    if (requested.length === 0) {
         const error = decommission ? 'The site has no installed devices' : "Choose at least one of the site's devices"
         return reply(response, 400, { error })
     }
+    // Read under the lock: a request sent again after the first was raised finds its devices awaiting that Return.
+    const assetIds = requested.filter((id) => !awaitsReturn(id))
+    if (assetIds.length === 0) return reply(response, 409, { error: 'Each device is already on a return' })
     const firstAsset = findById('alm_hardware', assetIds[0])
     const returnId = raiseReturn({
         trigger: decommission ? 'site_decommission' : 'device_removal',

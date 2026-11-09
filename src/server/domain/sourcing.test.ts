@@ -13,6 +13,8 @@ import {
     reservedSparesQuery,
     shortfallOutcome,
     sourcingLockName,
+    sparePoolLead,
+    sparePools,
     sparePoolShortfall,
     stockQueries,
     type OpenRma,
@@ -290,11 +292,52 @@ describe('sourcingLockName and orderLineLockName', () => {
     })
 })
 
+describe('sparePools', () => {
+    const share = (agreementId: string, modelId: string, deployed: number, ratio: number) => ({ agreementId, modelId, deployed, ratio })
+
+    it('sizes one pool per Model at the ratio of deployed assets, rounded up', () => {
+        expect(sparePools([share('a1', 'c9300', 41, 0.05)])).toEqual([{ modelId: 'c9300', size: 3, agreementId: 'a1' }])
+        expect(sparePools([share('a1', 'c9300', 40, 0.05)])).toEqual([{ modelId: 'c9300', size: 2, agreementId: 'a1' }])
+        expect(sparePools([share('a1', 'c9300', 0, 0.05)])).toEqual([{ modelId: 'c9300', size: 0, agreementId: 'a1' }])
+    })
+
+    it("sizes a Model's pool from the units of all the Customer's Agreements, each at its own ratio, rounded up once", () => {
+        // 10 × 0.05 + 10 × 0.05 = 1 spare, not one rounded up for each Agreement.
+        expect(sparePools([share('a1', 'c9300', 10, 0.05), share('a2', 'c9300', 10, 0.05)])).toEqual([{ modelId: 'c9300', size: 1, agreementId: 'a1' }])
+        // 20 × 0.05 + 30 × 0.1 = 4.
+        expect(sparePools([share('a1', 'c9300', 20, 0.05), share('a2', 'c9300', 30, 0.1)])).toEqual([{ modelId: 'c9300', size: 4, agreementId: 'a2' }])
+        // 1 × 0.05 + 1 × 0.1 = 0.15: one spare.
+        expect(sparePools([share('a1', 'mr46', 1, 0.05), share('a2', 'mr46', 1, 0.1)])[0].size).toBe(1)
+    })
+
+    it('keeps each Model in a pool of its own', () => {
+        const pools = sparePools([share('a1', 'c9300', 20, 0.05), share('a1', 'mr46', 30, 0.05), share('a2', 'mr46', 10, 0.1)])
+        expect(pools).toEqual([
+            { modelId: 'c9300', size: 1, agreementId: 'a1' },
+            { modelId: 'mr46', size: 3, agreementId: 'a1' },
+        ])
+    })
+
+    it('files new spares under the Agreement with the largest share, the first by sys_id on a tie', () => {
+        expect(sparePools([share('a1', 'c9300', 10, 0.05), share('a2', 'c9300', 30, 0.05)])[0].agreementId).toBe('a2')
+        expect(sparePools([share('b', 'c9300', 10, 0.1), share('a', 'c9300', 20, 0.05)])[0].agreementId).toBe('a')
+        expect(sparePools([share('a', 'c9300', 20, 0.05), share('b', 'c9300', 10, 0.1)])[0].agreementId).toBe('a')
+    })
+})
+
 describe('sparePoolShortfall', () => {
-    it('is the spares needed to reach the ratio of deployed assets, rounded up', () => {
-        expect(sparePoolShortfall({ deployed: 41, reserved: 1, ratio: 0.05 })).toBe(2)
-        expect(sparePoolShortfall({ deployed: 40, reserved: 5, ratio: 0.05 })).toBe(0)
-        expect(sparePoolShortfall({ deployed: 0, reserved: 0, ratio: 0.05 })).toBe(0)
+    it('is the spares a pool still needs, never below none', () => {
+        expect(sparePoolShortfall(3, 1)).toBe(2)
+        expect(sparePoolShortfall(2, 5)).toBe(0)
+        expect(sparePoolShortfall(0, 0)).toBe(0)
+    })
+})
+
+describe('sparePoolLead', () => {
+    it("is the first of the Customer's Agreements by sys_id, so one row of the pass tops up their pools", () => {
+        expect(sparePoolLead(['b2', 'a9', 'c1'])).toBe('a9')
+        expect(sparePoolLead(['a9'])).toBe('a9')
+        expect(sparePoolLead([])).toBe('')
     })
 })
 

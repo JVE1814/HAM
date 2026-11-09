@@ -12,7 +12,8 @@ import {
 import type { Stage } from '../domain/lifecycle.ts'
 import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
-import { exists, findById, num, refusal, str } from './records.ts'
+import { fire } from './events.ts'
+import { bool, exists, findById, num, refusal, str } from './records.ts'
 
 /** Keeps Order-line and Order stages in step with their Assets (derived, see domain/fulfilment). */
 
@@ -124,6 +125,12 @@ function deriveLine(line: GlideRecord, refill: boolean): LineStage | null {
     return next
 }
 
+/**
+ * Queued on a replacement Order once it is complete (registered in logic/aftersales.now.ts, whose script action calls
+ * noteReplacementComplete with the Order's sys_id).
+ */
+export const REPLACEMENT_COMPLETE_EVENT = 'x_daas_ham.replacement.complete'
+
 export function recomputeOrder(orderId: string): void {
     const order = findById('x_daas_ham_order', orderId)
     if (!order || !followsLines(str(order, 'stage'))) return
@@ -138,7 +145,35 @@ export function recomputeOrder(orderId: string): void {
     order.setValue('stage', next)
     if (next === 'complete') order.setValue('state', 3)
     if (next === 'cancelled') order.setValue('state', 7)
-    if (!order.update()) warnNotMoved(order, `${str(order, 'number')} not moved to ${next}`)
+    if (!order.update()) return warnNotMoved(order, `${str(order, 'number')} not moved to ${next}`)
+    // Its case is saved by the event's script action (noteReplacementComplete), not in this save.
+    if (next === 'complete' && str(order, 'case')) fire(REPLACEMENT_COMPLETE_EVENT, order)
+}
+
+/**
+ * A replacement Order completed: its case is saved with a work note. The replacement SLAs on the case stop once the Order
+ * it links is complete (logic/aftersales.now.ts), but the SLA engine weighs a case's SLAs only when the case is saved,
+ * and completing the Order does not save it. Only an open case that still links this Order, now complete, is saved. A
+ * case not found, or a refused save, leaves the SLA running, to breach: that is logged, to save the case by hand.
+ *
+ * Run from the event queue (REPLACEMENT_COMPLETE_EVENT), never in the save that completes the Order: that save is often
+ * made in a user's interactive session (an asset manager moving the unit to in service on the form, a customer contact
+ * confirming the install), where Customer Service's before-query rule 'Case query rules' narrows every read of a case to
+ * the CSM query rules of a user without case_admin: one whose rules do not grant them the case would not find it. A
+ * script action runs as system outside any interactive session, where that rule does not apply (it requires
+ * gs.isInteractive()).
+ */
+export function noteReplacementComplete(orderId: string): void {
+    const order = readPastRules('x_daas_ham_order', orderId)
+    if (!order || str(order, 'stage') !== 'complete') return
+    const caseId = str(order, 'case')
+    if (!caseId) return
+    const kase = findById('sn_customerservice_case', caseId)
+    if (!kase) return void gs.warn(`[x_daas_ham] ${str(order, 'number')} complete, but its case ${caseId} was not found: save the case to stop its SLA`)
+    if (!bool(kase, 'active') || str(kase, 'x_daas_ham_replacement_order') !== order.getUniqueValue()) return
+    kase.setValue('work_notes', `Replacement order ${str(order, 'number')} is complete: the replacement is installed.`)
+    if (kase.update()) return
+    gs.warn(`[x_daas_ham] ${str(kase, 'number')}: replacement SLA not stopped, the case save was refused: ${refusal(kase)}; save the case`)
 }
 
 /**

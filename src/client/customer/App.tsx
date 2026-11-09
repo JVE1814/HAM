@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { customerApi, type AttestationItem, type CustomerAsset, type Overview } from './api'
 
 type Tab = 'equipment' | 'orders' | 'attest'
@@ -16,8 +16,22 @@ export default function App() {
     }, [])
     useEffect(load, [load])
 
-    const run = (action: Promise<string>) =>
-        action.then((text) => setMessage({ ok: true, text })).catch((e: Error) => setMessage({ ok: false, text: e.message })).finally(load)
+    // One action at a time: a second click while one is on its way sends nothing (a return requested twice would raise two).
+    const inFlight = useRef(false)
+    const [busy, setBusy] = useState(false)
+    const run: Runner = (action) => {
+        if (inFlight.current) return
+        inFlight.current = true
+        setBusy(true)
+        action()
+            .then((text) => setMessage({ ok: true, text }))
+            .catch((e: Error) => setMessage({ ok: false, text: e.message }))
+            .finally(() => {
+                inFlight.current = false
+                setBusy(false)
+                load()
+            })
+    }
 
     if (!overview) return <main className="customer">{message ? <p className="error">{message.text}</p> : <p>Loading…</p>}</main>
 
@@ -41,16 +55,27 @@ export default function App() {
                 </nav>
             </header>
             {message && <p className={message.ok ? 'ok' : 'error'}>{message.text}</p>}
-            {tab === 'equipment' && <Equipment overview={overview} run={run} />}
-            {tab === 'orders' && <Orders overview={overview} run={run} />}
-            {tab === 'attest' && <Attestations overview={overview} run={run} />}
+            {tab === 'equipment' && <Equipment overview={overview} run={run} busy={busy} />}
+            {tab === 'orders' && <Orders overview={overview} run={run} busy={busy} />}
+            {tab === 'attest' && <Attestations overview={overview} run={run} busy={busy} />}
         </main>
     )
 }
 
-type Runner = (action: Promise<string>) => void
+/** Starts an action unless one is on its way, then shows its outcome and reloads the page's data. */
+type Runner = (action: () => Promise<string>) => void
 
-function Equipment({ overview, run }: { overview: Overview; run: Runner }) {
+interface ActionProps {
+    overview: Overview
+    run: Runner
+    /** An action is on its way: the buttons wait for it. */
+    busy: boolean
+}
+
+/** A device already awaiting a return is not offered for another. */
+const returnable = (asset: CustomerAsset) => asset.stage !== 'pending_return'
+
+function Equipment({ overview, run, busy }: ActionProps) {
     const [selected, setSelected] = useState<Set<string>>(new Set())
     const sites = useMemo(() => {
         const bySite = new Map<string, CustomerAsset[]>()
@@ -65,12 +90,18 @@ function Equipment({ overview, run }: { overview: Overview; run: Runner }) {
             else next.add(id)
             return next
         })
+    const unselect = (ids: readonly string[]) =>
+        setSelected((current) => {
+            const next = new Set(current)
+            for (const id of ids) next.delete(id)
+            return next
+        })
 
     return (
         <>
             {sites.map((assets) => {
                 const siteId = assets[0].siteId
-                const chosen = assets.filter((a) => selected.has(a.id)).map((a) => a.id)
+                const chosen = assets.filter((a) => returnable(a) && selected.has(a.id)).map((a) => a.id)
                 return (
                     <section key={siteId} className="card">
                         <h2>{assets[0].site || 'No site'}</h2>
@@ -90,7 +121,14 @@ function Equipment({ overview, run }: { overview: Overview; run: Runner }) {
                                     <tr key={asset.id}>
                                         {overview.isCustomerAdmin && (
                                             <td>
-                                                <input type="checkbox" checked={selected.has(asset.id)} onChange={() => toggle(asset.id)} aria-label={`Select ${asset.serial}`} />
+                                                {returnable(asset) && (
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selected.has(asset.id)}
+                                                        onChange={() => toggle(asset.id)}
+                                                        aria-label={`Select ${asset.serial}`}
+                                                    />
+                                                )}
                                             </td>
                                         )}
                                         <td>{asset.model}</td>
@@ -102,9 +140,11 @@ function Equipment({ overview, run }: { overview: Overview; run: Runner }) {
                                         <td>{asset.refreshDue}</td>
                                         <td>
                                             <button
+                                                disabled={busy}
                                                 onClick={() => {
                                                     const description = window.prompt(`What is wrong with ${asset.model} ${asset.serial}?`)
-                                                    if (description) run(customerApi.reportFault(asset.id, description).then((r) => `Fault reported as ${r.case}`))
+                                                    if (!description) return
+                                                    run(() => customerApi.reportFault(asset.id, description).then((r) => `Fault reported as ${r.case}`))
                                                 }}
                                             >
                                                 Report fault
@@ -117,12 +157,13 @@ function Equipment({ overview, run }: { overview: Overview; run: Runner }) {
                         {overview.isCustomerAdmin && siteId && (
                             <div className="actions">
                                 <button
-                                    disabled={chosen.length === 0}
+                                    disabled={busy || chosen.length === 0}
                                     onClick={() =>
-                                        run(
-                                            customerApi
-                                                .requestReturn({ site: siteId, assets: chosen, decommission: false, method: 'ship_back' })
-                                                .then((r) => `Return ${r.returnOrder} requested`),
+                                        run(() =>
+                                            customerApi.requestReturn({ site: siteId, assets: chosen, decommission: false, method: 'ship_back' }).then((r) => {
+                                                unselect(chosen)
+                                                return `Return ${r.returnOrder} requested`
+                                            }),
                                         )
                                     }
                                 >
@@ -130,12 +171,17 @@ function Equipment({ overview, run }: { overview: Overview; run: Runner }) {
                                 </button>
                                 <button
                                     className="danger"
+                                    disabled={busy}
                                     onClick={() => {
                                         if (window.confirm(`Decommission ${assets[0].site}? All equipment there will be collected.`)) {
-                                            run(
+                                            const all = assets.map((a) => a.id)
+                                            run(() =>
                                                 customerApi
-                                                    .requestReturn({ site: siteId, assets: assets.map((a) => a.id), decommission: true, method: 'fsm_deinstall' })
-                                                    .then((r) => `Decommission ${r.returnOrder} requested`),
+                                                    .requestReturn({ site: siteId, assets: all, decommission: true, method: 'fsm_deinstall' })
+                                                    .then((r) => {
+                                                        unselect(all)
+                                                        return `Decommission ${r.returnOrder} requested`
+                                                    }),
                                             )
                                         }
                                     }}
@@ -151,7 +197,7 @@ function Equipment({ overview, run }: { overview: Overview; run: Runner }) {
     )
 }
 
-function Orders({ overview, run }: { overview: Overview; run: Runner }) {
+function Orders({ overview, run, busy }: ActionProps) {
     return (
         <>
             <section className="card">
@@ -161,7 +207,12 @@ function Orders({ overview, run }: { overview: Overview; run: Runner }) {
                         <li key={order.id}>
                             <strong>{order.number}</strong> {order.type} · {order.site} · {order.stageLabel}
                             {order.canConfirmInstall && (
-                                <button onClick={() => run(customerApi.confirmInstalled(order.id).then((r) => `${r.order} confirmed installed`))}>Confirm installed</button>
+                                <button
+                                    disabled={busy}
+                                    onClick={() => run(() => customerApi.confirmInstalled(order.id).then((r) => `${r.order} confirmed installed`))}
+                                >
+                                    Confirm installed
+                                </button>
                             )}
                         </li>
                     ))}
@@ -192,7 +243,7 @@ function Orders({ overview, run }: { overview: Overview; run: Runner }) {
     )
 }
 
-function Attestations({ overview, run }: { overview: Overview; run: Runner }) {
+function Attestations({ overview, run, busy }: ActionProps) {
     const [answers, setAnswers] = useState<Record<string, AttestationItem['response']>>({})
     if (overview.attestations.length === 0) return <section className="card">Nothing to confirm right now.</section>
     return (
@@ -231,11 +282,15 @@ function Attestations({ overview, run }: { overview: Overview; run: Runner }) {
                         </table>
                         <div className="actions">
                             <button
-                                disabled={!complete}
+                                disabled={busy || !complete}
                                 onClick={() =>
-                                    run(
+                                    run(() =>
                                         customerApi
-                                            .answerAttestation(attestation.id, items.map((i) => ({ id: i.id, response: i.response })), true)
+                                            .answerAttestation(
+                                                attestation.id,
+                                                items.map((i) => ({ id: i.id, response: i.response })),
+                                                true,
+                                            )
                                             .then((r) => `${r.attestation} submitted, thank you`),
                                     )
                                 }

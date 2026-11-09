@@ -67,7 +67,8 @@ export function raiseReturn(request: ReturnRequest): string | null {
 
 /**
  * Fill in a saved Return order header: due date, lines, de-install work. Only fleet assets (ADR 0016) get a line: one
- * of the Provider IT's that a caller lists is left off (logged), so no app job ever chases, declares or charges it.
+ * of the Provider IT's that a caller lists is left off (logged), so no app job ever chases, declares or charges it. Each
+ * Asset is put on it under its return lock (`returnAssetLockName`), so it awaits one Return at a time.
  */
 export function completeReturn(order: GlideRecord, request: ReturnRequest): void {
     const agreement = findById('x_daas_ham_agreement', request.agreementId)
@@ -79,38 +80,9 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
     let lines = 0
     let refused = 0
     for (const assetId of request.assetIds) {
-        const asset = findById('alm_hardware', assetId)
-        if (!asset || latestReturnLine(assetId, 'awaiting')) continue
-        if (!isFleetAsset(asset)) {
-            gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left off return ${str(order, 'number')}: it is not a fleet asset`)
-            refused++
-            continue
-        }
-        // The line first: an Asset whose line is refused stays as it is, off this Return order.
-        const line = new GlideRecord('x_daas_ham_return_order_line')
-        line.initialize()
-        line.setValue('return_order', order.getUniqueValue())
-        line.setValue('asset', assetId)
-        if (!line.insert()) {
-            const reason = refusal(line)
-            gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left off return ${str(order, 'number')}: ${reason}`)
-            refused++
-            continue
-        }
-        const stage = readStage(asset)
-        const moving = isDeployed(stage) && stage !== 'pending_return'
-        // Leaving service closes the Asset's service interval (entry/assets.ts onAssetServiceChange). A refused move
-        // (moveAndSave warns) takes the line off again: it would await a unit still in service, later declared missing.
-        // One that cannot be taken off is logged, to remove by hand before the overdue job gets to it.
-        if (moving && !moveAndSave(asset, 'pending_return', `return ${str(order, 'number')}`)) {
-            if (line.deleteRecord()) {
-                refused++
-                continue
-            }
-            const kept = `${str(asset, 'serial_number')} not pending return but kept on return ${str(order, 'number')}`
-            gs.warn(`[x_daas_ham] ${kept}: ${refusal(line, 'delete refused')}; remove its line`)
-        }
-        lines++
+        const added = addUnderLock(order, assetId)
+        if (added === 'added') lines++
+        else if (added === 'refused') refused++
     }
 
     if (lines === 0) {
@@ -137,6 +109,103 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
     if (!order.update()) {
         gs.warn(`[x_daas_ham] Return ${str(order, 'number')} due date, state and links not saved: ${refusal(order)}`)
     }
+}
+
+/** What came of putting an Asset on a Return order: a line added, refused (logged), or none needed. */
+type LineResult = 'added' | 'refused' | 'skipped'
+
+/** Tries at an Asset's return lock, back to back: a holder holds it for one check, one line and one move. */
+const RETURN_LOCK_TRIES = 5
+
+/**
+ * The job lock (ADR 0013) an Asset is put on a Return order under. The check that it awaits no other return and the
+ * insert of its line are one critical section, so two Returns raised at once (a request sent twice, the record producer
+ * beside the customer page or an Agreement's end) never both take the unit, which would leave the line it is not
+ * received on to be declared missing and charged as lost. No unique index can hold it: an Asset is on one awaiting
+ * line at a time, but on any number of settled ones.
+ */
+function returnAssetLockName(assetId: string): string {
+    return `return_asset_${assetId}`
+}
+
+/**
+ * The job lock (ADR 0013) a Customer's return requests from the customer page are raised under, one at a time
+ * (entry/customer `requestCustomerReturn`): a request sent twice raises one Return order, with one de-install work
+ * order and change, not two.
+ */
+export function returnRequestLockName(customerId: string): string {
+    return `return_request_${customerId}`
+}
+
+/** Whether the Asset is on a Return order line still awaiting it. */
+export function awaitsReturn(assetId: string): boolean {
+    return latestReturnLine(assetId, 'awaiting') !== null
+}
+
+/**
+ * Put the Asset on the Return order under its return lock (`returnAssetLockName`); 'skipped' when it is not found,
+ * already awaits a return, or another Return holds its lock through every try and is taking it. A lock that cannot be
+ * taken (platform/locks throws) leaves the unit off the order, logged; the line's own errors escape.
+ */
+function addUnderLock(order: GlideRecord, assetId: string): LineResult {
+    let result = 'skipped' as LineResult
+    // Set inside the lock: only a lock that could not be taken is caught.
+    let started = false as boolean
+    try {
+        const ran = withLockTries(returnAssetLockName(assetId), RETURN_LOCK_TRIES, (lock) => {
+            started = true
+            const added = addLineHolding(lock, order, assetId)
+            // Lost before the line was written: the try is given up, and the next checks afresh.
+            if (added === null) return false
+            result = added
+            return true
+        })
+        if (!ran) gs.info(`[x_daas_ham] Asset ${assetId} left off return ${str(order, 'number')}: another return holds its lock and takes it`)
+        return result
+    } catch (error) {
+        if (started) throw error
+        gs.warn(`[x_daas_ham] Asset ${assetId} left off return ${str(order, 'number')}: ${errorText(error)}`)
+        return 'refused'
+    }
+}
+
+/**
+ * Add the Asset's line and make it pending return, holding its return `lock`. A holder that outlasts the lock (ADR
+ * 0013) and lost it before the insert writes nothing (null); one that lost it during the insert is logged, to check
+ * the unit is on one Return.
+ */
+function addLineHolding(lock: HeldLock, order: GlideRecord, assetId: string): LineResult | null {
+    const asset = findById('alm_hardware', assetId)
+    if (!asset || awaitsReturn(assetId)) return 'skipped'
+    if (!isFleetAsset(asset)) {
+        gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left off return ${str(order, 'number')}: it is not a fleet asset`)
+        return 'refused'
+    }
+    if (!lock.held()) return null
+    // The line first: an Asset whose line is refused stays as it is, off this Return order.
+    const line = new GlideRecord('x_daas_ham_return_order_line')
+    line.initialize()
+    line.setValue('return_order', order.getUniqueValue())
+    line.setValue('asset', assetId)
+    if (!line.insert()) {
+        const reason = refusal(line)
+        gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left off return ${str(order, 'number')}: ${reason}`)
+        return 'refused'
+    }
+    if (!lock.held()) {
+        gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} put on return ${str(order, 'number')} after its lock was lost: check it is on one return`)
+    }
+    const stage = readStage(asset)
+    const moving = isDeployed(stage) && stage !== 'pending_return'
+    // Leaving service closes the Asset's service interval (entry/assets.ts onAssetServiceChange). A refused move
+    // (moveAndSave warns) takes the line off again: it would await a unit still in service, later declared missing.
+    // One that cannot be taken off is logged, to remove by hand before the overdue job gets to it.
+    if (moving && !moveAndSave(asset, 'pending_return', `return ${str(order, 'number')}`)) {
+        if (line.deleteRecord()) return 'refused'
+        const kept = `${str(asset, 'serial_number')} not pending return but kept on return ${str(order, 'number')}`
+        gs.warn(`[x_daas_ham] ${kept}: ${refusal(line, 'delete refused')}; remove its line`)
+    }
+    return 'added'
 }
 
 export interface InstalledFilter {

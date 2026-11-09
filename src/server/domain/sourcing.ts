@@ -302,9 +302,54 @@ export function reservedSparesQuery(customerId: string): string {
     return [fleetStagesQuery(['spare_pool'], held), fleetStagesQuery(['in_transfer'], `${held}^x_daas_ham_order_lineISEMPTY`)].join('^NQ')
 }
 
-/** Spares a Customer still needs to reach `ratio` × deployed Assets. */
-export function sparePoolShortfall(input: { deployed: number; reserved: number; ratio: number }): number {
-    return Math.max(0, Math.ceil(input.deployed * input.ratio - 1e-9) - input.reserved)
+/** One Agreement's deployed fleet units of a Model, and that Agreement's spare-pool ratio. */
+export interface DeployedShare {
+    agreementId: string
+    modelId: string
+    deployed: number
+    ratio: number
+}
+
+/** A Customer's Spare pool of one Model: the spares it holds when full, and the Agreement the spares moved into it carry. */
+export interface SparePool {
+    modelId: string
+    size: number
+    agreementId: string
+}
+
+/**
+ * A Customer's Spare pools, from their Agreements' deployed fleet units (owner decision): one pool per Model, sized from
+ * all of the Customer's deployed units of that Model across their Agreements, each Agreement's ratio applied to its own
+ * units, `ceil(Σ deployed × ratio)`, rounded up once for the pool. Spares moved into it carry the Agreement with the
+ * largest share (the first by sys_id on a tie): sourcing gives a unit its line's Agreement when it is used.
+ */
+export function sparePools(shares: readonly DeployedShare[]): SparePool[] {
+    const byModel = new Map<string, { spares: number; lead: DeployedShare }>()
+    for (const share of shares) {
+        const spares = share.deployed * share.ratio
+        const pool = byModel.get(share.modelId)
+        if (!pool) {
+            byModel.set(share.modelId, { spares, lead: share })
+            continue
+        }
+        pool.spares += spares
+        const leadSpares = pool.lead.deployed * pool.lead.ratio
+        if (spares > leadSpares || (spares === leadSpares && share.agreementId < pool.lead.agreementId)) pool.lead = share
+    }
+    return [...byModel].map(([modelId, pool]) => ({ modelId, size: Math.max(0, Math.ceil(pool.spares - 1e-9)), agreementId: pool.lead.agreementId }))
+}
+
+/** Spares a Spare pool of `size` still needs, holding `reserved` (`reservedSparesQuery`). */
+export function sparePoolShortfall(size: number, reserved: number): number {
+    return Math.max(0, size - reserved)
+}
+
+/**
+ * The Agreement whose row of the top-up's pass tops up its Customer's Spare pools (the first by sys_id of their
+ * Agreements the top-up runs over), so each pool is topped up once a pass however many Agreements share it; '' for none.
+ */
+export function sparePoolLead(agreementIds: readonly string[]): string {
+    return agreementIds.reduce((first, id) => (first === '' || id < first ? id : first), '')
 }
 
 /** Free central stock of a model to move into a Customer's Spare pool (top-up). */

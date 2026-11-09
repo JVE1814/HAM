@@ -1,7 +1,15 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { dependentActions, dueStepsQuery, type ClaimAction, type ClaimOutcome, type ClaimStore, type ClaimTarget } from '../domain/oem/claims.ts'
+import {
+    CLAIM_PREREQUISITE,
+    dependentActions,
+    dueStepsQuery,
+    type ClaimAction,
+    type ClaimOutcome,
+    type ClaimStore,
+    type ClaimTarget,
+} from '../domain/oem/claims.ts'
 import type { OemVendor } from '../domain/oem/types.ts'
-import { num, pluck, recordsById, refusal, str } from './records.ts'
+import { bool, num, pluck, recordsById, refusal, str } from './records.ts'
 import { memoized } from '../domain/memo.ts'
 
 const STEP = 'x_daas_ham_staging_step'
@@ -63,9 +71,54 @@ export function releaseStepsWaitingOn(taskId: string, action: string): void {
     step.addQuery('automation', 'IN', dependents.join(','))
     step.addQuery('done', false)
     step.addQuery('automation_status', 'waiting')
-    // One set-based update: the staging step rules still run, and they react only to done changing.
+    step.query()
+    while (step.next()) release(step)
+}
+
+/** Waiting steps a claim run checks for a prerequisite no longer open, at most: the longest waiting first. */
+const STRANDED_LOAD = 200
+
+/**
+ * Release the waiting steps whose staging task (still active) has no open step of their prerequisite action
+ * (CLAIM_PREREQUISITE) left to wait on: its release was refused when it was ticked done (logged), or it is gone. A
+ * waiting step is never due, so left waiting it would never be sent. Run by each claim run, before it loads due steps.
+ */
+export function releaseStranded(): void {
+    const waiting = new GlideRecord(STEP)
+    waiting.addEncodedQuery('automation_status=waiting^done=false^staging_task.active=true')
+    waiting.orderBy('sys_updated_on')
+    waiting.setLimit(STRANDED_LOAD)
+    waiting.query()
+    const steps: Array<{ stepId: string; taskId: string; prerequisite: string }> = []
+    while (waiting.next()) {
+        const prerequisite = CLAIM_PREREQUISITE[str(waiting, 'automation') as ClaimAction] ?? ''
+        steps.push({ stepId: waiting.getUniqueValue(), taskId: str(waiting, 'staging_task'), prerequisite })
+    }
+    if (steps.length === 0) return
+    const open = new Set<string>()
+    const openStep = new GlideRecord(STEP)
+    openStep.addQuery('staging_task', 'IN', [...new Set(steps.map((s) => s.taskId))].join(','))
+    openStep.addQuery('automation', 'IN', [...new Set(Object.values(CLAIM_PREREQUISITE))].join(','))
+    openStep.addQuery('done', false)
+    openStep.query()
+    while (openStep.next()) open.add(`${str(openStep, 'staging_task')}|${str(openStep, 'automation')}`)
+    const stranded = steps.filter((s) => !open.has(`${s.taskId}|${s.prerequisite}`)).map((s) => s.stepId)
+    if (stranded.length === 0) return
+    const step = new GlideRecord(STEP)
+    step.addQuery('sys_id', 'IN', stranded.join(','))
+    step.query()
+    while (step.next()) release(step)
+}
+
+/**
+ * A waiting step goes to pending, due to the next run. Saved one at a time, so a refused save is logged: left waiting,
+ * the step is never sent, until a claim run releases it again (`releaseStranded`). The staging step rules run on the
+ * save and react only to done changing.
+ */
+function release(step: GlideRecord): void {
     step.setValue('automation_status', 'pending')
-    step.updateMultiple()
+    if (step.update()) return
+    gs.warn(`[x_daas_ham] OEM step "${str(step, 'label')}" of ${step.getDisplayValue('staging_task')} still waiting, not released: ${refusal(step)}`)
 }
 
 /** The Customer's OEM cloud account for `action`, looked up once per customer and action. */
@@ -76,8 +129,9 @@ function cloudAccount(key: string): string {
 
 /**
  * Tick each step of a run done, or count its failed attempt (it is left for a person after the last one); one query
- * for the run. A step the platform refuses stays due, so the next run sends it again: that is logged, as nothing else
- * would say why a claim repeats or a failing step is never left for a person.
+ * for the run. A step found done already (ticked by hand meanwhile, or by a run that took over the claim run's lock) is
+ * not marked failed. A step the platform refuses stays due, so the next run sends it again: that is logged, as nothing
+ * else would say why a claim repeats or a failing step is never left for a person.
  */
 function settle(outcomes: readonly ClaimOutcome[]): void {
     if (outcomes.length === 0) return
@@ -87,7 +141,7 @@ function settle(outcomes: readonly ClaimOutcome[]): void {
     step.query()
     while (step.next()) {
         const outcome = byStep.get(step.getUniqueValue())
-        if (!outcome) continue
+        if (!outcome || (!outcome.ok && bool(step, 'done'))) continue
         step.setValue('automation_message', outcome.message)
         if (outcome.ok) {
             step.setValue('automation_status', 'done')
