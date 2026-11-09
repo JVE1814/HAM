@@ -72,6 +72,14 @@ export const STOCKROOM_SCOPED_TABLES: readonly string[] = [
     'x_daas_ham_audit_line',
 ]
 
+/**
+ * The roles that may change a fleet asset by hand (security/roles.now.ts `assetEditors`, which the security tests check
+ * against this list): its lifecycle data, on a form, a list or the Table API. An inventory tech only of their
+ * Stockrooms. A Customer's Agreement, subscription line and lease, its company and its cost are the asset manager's
+ * alone (writesFleetCommercialField).
+ */
+export const ASSET_EDITOR_ROLES: readonly string[] = [ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech]
+
 export function resolveVisibility(hasRole: (role: string) => boolean): VisibilityScope {
     if (BROAD_STAFF_ROLES.some(hasRole)) return 'everything'
     if (hasRole(ROLE.inventoryTech)) return 'assigned_stockrooms'
@@ -237,6 +245,11 @@ function leavesOutsideNaas(scope: VisibilityScope): boolean {
     return scope === 'assigned_stockrooms'
 }
 
+/** Whether `scope` is a Customer contact's (a customer admin or a site contact), kept to their own Customer. */
+export function isCustomerContact(scope: VisibilityScope): boolean {
+    return scope === 'own_customer' || scope === 'own_sites'
+}
+
 /** One record a read ACL asks about, as rowVisible and grantsNaasRecord read it. */
 export interface ScopedRow {
     /**
@@ -292,4 +305,54 @@ export function rowVisible(scope: VisibilityScope, fields: ScopingFields, row: S
 export function grantsNaasRecord(scope: VisibilityScope, fields: ScopingFields, row: ScopedRow, ids: ScopingIds): boolean {
     if (!row.saved) return true
     return !row.outsideNaas?.() && rowVisible(scope, fields, row, ids)
+}
+
+/*
+ * Changes to hardware by hand (ADR 0005): the platform's `asset` role, which inventory and field techs hold, lets its
+ * holders save and delete every Asset, and change its company and cost, from a form, a list or the Table API. The
+ * app's Deny-Unless ACLs on alm_asset (security/acls-hardware.now.ts) keep fleet assets to the people who run them and
+ * leave every other Asset to the platform. A record that is not a saved row (a New form, a check of the whole table)
+ * passes, as for reads. The app's own server logic saves through GlideRecord, which no ACL checks.
+ */
+
+/**
+ * Whether the user may save a record of hardware by hand. A fleet asset only an asset editor (ASSET_EDITOR_ROLES)
+ * whose scope keeps it (an inventory tech: their Stockrooms), never a Customer contact or a NaaS role that runs no
+ * assets (the NOC, account managers, finance). Hardware outside the fleet, and users with no NaaS role, are left to
+ * the platform's ACLs, as for reads.
+ */
+export function writesFleetAsset(scope: VisibilityScope, hasRole: (role: string) => boolean, row: ScopedRow, ids: ScopingIds): boolean {
+    if (scope === 'unscoped' || !row.saved || row.outsideNaas?.()) return true
+    if (isCustomerContact(scope)) return false
+    return ASSET_EDITOR_ROLES.some(hasRole) && rowVisible(scope, SCOPE.assets, row, ids)
+}
+
+/**
+ * Whether the user may delete a record of hardware. A fleet asset leaves by disposal and keeps its record, its history
+ * being the app's (ADR 0016), so only an app administrator deletes one (a unit taken in by mistake). Hardware outside
+ * the fleet is left to the platform's ACLs.
+ */
+export function deletesFleetAsset(hasRole: (role: string) => boolean, row: ScopedRow): boolean {
+    return !row.saved || hasRole(ROLE.admin) || !!row.outsideNaas?.()
+}
+
+/**
+ * Whether the user may change, by hand, a field of hardware that ties it to a Customer or a cost (its company and
+ * cost; the app's own columns, the Agreement, subscription line, lease, Lessor and Legal owner, have their asset-manager
+ * ACLs). On a fleet asset only an asset manager (whom an app administrator holds) may: billing, margin and visibility
+ * follow them, and the app's flows set them. Hardware outside the fleet is left to the platform's ACLs.
+ */
+export function writesFleetCommercialField(hasRole: (role: string) => boolean, row: ScopedRow): boolean {
+    return !row.saved || hasRole(ROLE.assetManager) || !!row.outsideNaas?.()
+}
+
+/**
+ * Whether the user may read a field of hardware that is the Provider's own figure (its cost). A Customer contact may
+ * not on a fleet asset, though Customer Service's ACLs grant a contact holding its roles the cost of the Assets they
+ * see; hardware outside the fleet is left to the platform's ACLs. (The app's own Provider columns on hardware, the
+ * support cost, claim code, Lessor and lease, are read by provider staff alone.)
+ */
+export function readsFleetProviderField(scope: VisibilityScope, row: ScopedRow): boolean {
+    if (!row.saved || !isCustomerContact(scope)) return true
+    return !!row.outsideNaas?.()
 }

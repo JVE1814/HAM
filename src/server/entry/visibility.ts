@@ -1,11 +1,15 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { naasStockroomType, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import {
+    deletesFleetAsset,
     grantsNaasRecord,
     OUTSIDE_NAAS,
+    readsFleetProviderField,
     rowVisible,
     SCOPE,
     visibilityFilter,
+    writesFleetAsset,
+    writesFleetCommercialField,
     type ScopedRecords,
     type ScopedRow,
 } from '../domain/visibility.ts'
@@ -163,6 +167,40 @@ export function grantsFleetAsset(current: GlideRecord): boolean {
     if (otherAssetClass(current)) return false
     const session = currentSession()
     return grantsNaasRecord(session.scope, SCOPE.assets, scopedRow(current, hardwareSource(current)), session)
+}
+
+/*
+ * Changes to hardware by hand (security/acls-hardware.now.ts, ADR 0005): Deny-Unless ACLs on alm_asset, beside the
+ * platform's Allow-If ones there, which the platform's `asset` role (inventory and field techs hold it) passes for every
+ * Asset. On a fleet asset they keep saving to the asset editors whose scope keeps it, deleting to app administrators,
+ * and the company and cost to asset managers (domain/visibility); any other Asset passes, left to the platform.
+ */
+
+const hasRole = (role: string): boolean => gs.hasRole(role)
+
+/** Row check of the Deny-Unless write ACL on alm_asset: a fleet asset is saved only by an asset editor who sees it. */
+export function writesAsset(current: GlideRecord): boolean {
+    if (otherAssetClass(current)) return true
+    const session = currentSession()
+    return writesFleetAsset(session.scope, hasRole, scopedRow(current, hardwareSource(current)), session)
+}
+
+/** Check of the Deny-Unless delete ACL on alm_asset: a fleet asset is deleted only by an app administrator. */
+export function deletesAsset(current: GlideRecord): boolean {
+    if (otherAssetClass(current)) return true
+    return deletesFleetAsset(hasRole, scopedRow(current, hardwareSource(current)))
+}
+
+/** Check of the Deny-Unless write ACLs on alm_asset.company and alm_asset.cost: an asset manager's, on a fleet asset. */
+export function writesAssetCommercialField(current: GlideRecord): boolean {
+    if (otherAssetClass(current)) return true
+    return writesFleetCommercialField(hasRole, scopedRow(current, hardwareSource(current)))
+}
+
+/** Check of the Deny-Unless read ACL on alm_asset.cost: a fleet asset's cost is not a Customer contact's to read. */
+export function readsAssetCost(current: GlideRecord): boolean {
+    if (otherAssetClass(current)) return true
+    return readsFleetProviderField(currentSession().scope, scopedRow(current, hardwareSource(current)))
 }
 
 export function readsStockroom(current: GlideRecord): boolean {

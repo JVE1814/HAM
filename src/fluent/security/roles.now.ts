@@ -3,7 +3,8 @@ import { Role } from '@servicenow/sdk/core'
 
 /*
  * Base-platform roles contained below (asset, inventory_user, inventory_admin, procurement_user,
- * procurement_admin, report_user, snc_external) must exist on the instance; see README "Required plugins".
+ * procurement_admin, report_user, snc_external, canvas_user) must exist on the instance, as must
+ * sn_customerservice_agent, which the ACLs grant directly (serviceDesk); see README "Required plugins".
  */
 
 export const inventoryTech = Role({
@@ -72,8 +73,21 @@ export const providerStaff = [assetManager, inventoryTech, fieldTech, noc, accou
 /** Provider staff without inventory techs: the read list for customer, commercial and configuration tables. */
 export const broadStaff = [assetManager, fieldTech, noc, accountManager, finance]
 
-/** Roles that may change lifecycle data. */
+/**
+ * Roles that may change a fleet asset by hand: its lifecycle data (an inventory tech only in their stockrooms). The
+ * hardware write check (acls-hardware.now.ts, entry/visibility `writesAsset`) reads them as domain/visibility
+ * ASSET_EDITOR_ROLES, which the security tests check against this list.
+ */
 export const assetEditors = [assetManager, inventoryTech, fieldTech]
+
+/** Roles that read the money tables (service intervals, billing, cost facts and margin), the NaaS dashboard's Margin tab among them. */
+export const moneyReaders = [finance, accountManager, assetManager]
+
+/**
+ * The service desk (Customer Service agents, a platform role the ACLs name directly): raises Orders and Returns for any
+ * Customer, so it reads the Agreements, Site templates, Orders and Returns that work needs, and no other NaaS table.
+ */
+export const serviceDesk = 'sn_customerservice_agent'
 
 /** External customer roles; their reads are filtered to their own customer. */
 export const customerRoles = [customerAdmin, siteContact]

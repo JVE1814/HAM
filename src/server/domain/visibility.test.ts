@@ -4,16 +4,23 @@ import { fleetCondition, naasStockroomCondition } from './fleet'
 import { DEPLOYED_STAGES } from './lifecycle'
 import {
     actsAsCustomerAdmin,
+    ASSET_EDITOR_ROLES,
     customerEquipmentQuery,
+    deletesFleetAsset,
     grantsNaasRecord,
     INVENTORY_TECH_TABLES,
+    isCustomerContact,
     OUTSIDE_NAAS,
     outsideNaasStockroomCondition,
+    readsFleetProviderField,
     resolveVisibility,
+    ROLE,
     rowVisible,
     SCOPE,
     STOCKROOM_SCOPED_TABLES,
     visibilityFilter,
+    writesFleetAsset,
+    writesFleetCommercialField,
     type ScopedRecords,
     type ScopedRow,
     type ScopingFields,
@@ -119,6 +126,13 @@ describe('visibilityFilter', () => {
         expect(visibilityFilter('assigned_stockrooms', assetFields, none)).toBe('sys_id=-1')
         expect(visibilityFilter('own_customer', assetFields, none)).toBe('sys_id=-1')
         expect(visibilityFilter('own_sites', assetFields, none)).toBe('sys_id=-1')
+    })
+
+    it('shows a site contact nothing when their Customer is set but no Site lists them', () => {
+        const noSites = { customerId: 'cust1', stockroomIds: () => expect.unreachable('stockrooms fetched'), siteIds: () => [] }
+        expect(visibilityFilter('own_sites', assetFields, noSites)).toBe('sys_id=-1')
+        expect(visibilityFilter('own_sites', SCOPE.customerSiteRecords, noSites, OUTSIDE_NAAS.customerSiteRecords)).toBe('sys_id=-1')
+        expect(visibilityFilter('own_sites', SCOPE.assets, noSites, OUTSIDE_NAAS.assets)).toBe('sys_id=-1')
     })
 
     it('leaves inventory techs unfiltered on tables without a stockroom (read ACLs close the ones they may not read)', () => {
@@ -333,6 +347,75 @@ describe('grantsNaasRecord', () => {
     })
 })
 
+describe('changes to hardware by hand', () => {
+    const ids = IDS[0]
+    const asset = (values: Record<string, string>) => rowOf(values, OUTSIDE_NAAS.assets)
+    const fleet = (values: Record<string, string> = {}) => asset({ x_daas_ham_fleet: 'true', ...values })
+    const outside = asset({ x_daas_ham_fleet: 'false', stockroom: 'sr9', company: 'cust9' })
+    const unsaved: ScopedRow = { saved: false, valueOf: () => '', outsideNaas: () => false }
+    const holding = (...held: string[]) => (role: string) => held.includes(role)
+    const untouched: ScopingIds = {
+        customerId: 'cust1',
+        stockroomIds: () => expect.unreachable('stockrooms fetched'),
+        siteIds: () => expect.unreachable('sites fetched'),
+    }
+    const unread: ScopedRow = { saved: true, valueOf: () => expect.unreachable('field read'), outsideNaas: () => expect.unreachable('flag read') }
+
+    it('tell Customer contacts from staff and users the app does not scope', () => {
+        expect(SCOPES.filter(isCustomerContact)).toEqual(['own_customer', 'own_sites'])
+    })
+
+    it('let an asset editor save a fleet asset their scope keeps: an inventory tech only in their stockrooms', () => {
+        expect(ASSET_EDITOR_ROLES).toEqual([ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech])
+        expect(writesFleetAsset('everything', holding(ROLE.fieldTech), fleet({ stockroom: 'sr9' }), ids)).toBe(true)
+        expect(writesFleetAsset('assigned_stockrooms', holding(ROLE.inventoryTech), fleet({ stockroom: 'sr1' }), ids)).toBe(true)
+        expect(writesFleetAsset('assigned_stockrooms', holding(ROLE.inventoryTech), fleet({ stockroom: 'sr9' }), ids)).toBe(false)
+        expect(writesFleetAsset('assigned_stockrooms', holding(ROLE.inventoryTech), fleet(), ids)).toBe(false)
+    })
+
+    it('refuse a fleet asset to Customer contacts and to NaaS roles that run no assets', () => {
+        for (const role of [ROLE.noc, ROLE.accountManager, ROLE.finance]) expect(writesFleetAsset('everything', holding(role), fleet(), ids), role).toBe(false)
+        const contact = fleet({ company: 'cust1', x_daas_ham_site: 'site1' })
+        expect(writesFleetAsset('own_customer', holding(ROLE.customerAdmin, ROLE.assetManager), contact, ids)).toBe(false)
+        expect(writesFleetAsset('own_sites', holding(ROLE.siteContact), contact, ids)).toBe(false)
+    })
+
+    it("leave hardware outside the fleet, a record not yet saved and users with no NaaS role to the platform", () => {
+        for (const scope of SCOPES) {
+            expect(writesFleetAsset(scope, holding(), outside, ids), scope).toBe(true)
+            expect(writesFleetAsset(scope, holding(), unsaved, untouched), scope).toBe(true)
+        }
+        expect(writesFleetAsset('unscoped', holding(), unread, untouched)).toBe(true)
+    })
+
+    it('let only an app administrator delete a fleet asset, which leaves by disposal', () => {
+        expect(deletesFleetAsset(holding(ROLE.admin), fleet())).toBe(true)
+        expect(deletesFleetAsset(holding(ROLE.admin), unread)).toBe(true)
+        for (const role of [ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech, 'asset']) expect(deletesFleetAsset(holding(role), fleet()), role).toBe(false)
+        expect(deletesFleetAsset(holding('asset'), outside)).toBe(true)
+        expect(deletesFleetAsset(holding(), unsaved)).toBe(true)
+    })
+
+    it("keep a fleet asset's company and cost to asset managers, and leave other hardware's to the platform", () => {
+        expect(writesFleetCommercialField(holding(ROLE.assetManager), fleet())).toBe(true)
+        expect(writesFleetCommercialField(holding(ROLE.assetManager), unread)).toBe(true)
+        for (const role of [ROLE.inventoryTech, ROLE.fieldTech, ROLE.finance, 'asset']) {
+            expect(writesFleetCommercialField(holding(role), fleet()), role).toBe(false)
+        }
+        expect(writesFleetCommercialField(holding('asset'), outside)).toBe(true)
+        expect(writesFleetCommercialField(holding(), unsaved)).toBe(true)
+    })
+
+    it("keep a fleet asset's cost from Customer contacts, and read nothing for anyone else", () => {
+        for (const scope of ['own_customer', 'own_sites'] as const) {
+            expect(readsFleetProviderField(scope, fleet({ company: 'cust1' })), scope).toBe(false)
+            expect(readsFleetProviderField(scope, outside), scope).toBe(true)
+            expect(readsFleetProviderField(scope, unsaved), scope).toBe(true)
+        }
+        for (const scope of ['everything', 'assigned_stockrooms', 'unscoped'] as const) expect(readsFleetProviderField(scope, unread), scope).toBe(true)
+    })
+})
+
 describe('read ACLs for inventory techs', () => {
     const SECURITY = new URL('../../fluent/security/', import.meta.url)
     const source = (file: string) => readFileSync(new URL(file, SECURITY), 'utf8')
@@ -361,8 +444,8 @@ describe('read ACLs for inventory techs', () => {
             return text
                 .split('Acl({')
                 .slice(1)
-                // A Deny-Unless ACL (the row checks) grants nothing: it only takes access away.
-                .filter((acl) => acl.includes("operation: 'read'") && !acl.includes("decisionType: 'deny'"))
+                // A Deny-Unless ACL (the row checks) grants nothing: it only takes access away. A field ACL grants no table.
+                .filter((acl) => acl.includes("operation: 'read'") && !acl.includes("decisionType: 'deny'") && !/field: '/.test(acl))
                 .map((acl) => {
                     const granted = /roles: (\[[^\]]*\]|\w+)/.exec(acl)?.[1] ?? ''
                     const tokens = granted.startsWith('[') ? items(granted.slice(1, -1)) : [granted]

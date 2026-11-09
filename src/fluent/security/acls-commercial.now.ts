@@ -1,11 +1,10 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
-import { accountManager, admin, assetManager, broadStaff, finance } from './roles.now'
+import { admin, assetManager, broadStaff, finance, moneyReaders } from './roles.now'
 
 /* Access controls for the contracts and money tables (P3): leases, billing, costs and margin. */
 
 const leaseEditors = [assetManager, finance]
-const moneyReaders = [finance, accountManager, assetManager]
 
 Acl({
     $id: Now.ID['acl_lease_schedule_read'],

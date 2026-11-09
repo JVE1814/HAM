@@ -386,5 +386,19 @@ export const naasDashboard = Dashboard({
         },
     ],
     visibilities: [{ $id: Now.ID['dash_naas_visibility'], experience: naasWorkspace }],
-    permissions: [],
+    /*
+     * Read by the workspace's six roles (its route ACL in workspace.now.ts, security/roles.now.ts `providerStaff`); an app
+     * administrator holds them all. A dashboard's tabs take no permissions of their own, so each widget's data is its
+     * table's read ACL's: the Margin tab's margin and cost facts are `moneyReaders`' alone (acls-commercial.now.ts), and
+     * an inventory tech reads no subscription lines or reconciliation exceptions, so those widgets show the others
+     * nothing. The security tests check this list against the workspace's roles.
+     */
+    permissions: [
+        { $id: Now.ID['dash_naas_read_asset_manager'], role: Now.ref('sys_user_role', { name: 'x_daas_ham.asset_manager' }), canRead: true },
+        { $id: Now.ID['dash_naas_read_inventory_tech'], role: Now.ref('sys_user_role', { name: 'x_daas_ham.inventory_tech' }), canRead: true },
+        { $id: Now.ID['dash_naas_read_field_tech'], role: Now.ref('sys_user_role', { name: 'x_daas_ham.field_tech' }), canRead: true },
+        { $id: Now.ID['dash_naas_read_noc'], role: Now.ref('sys_user_role', { name: 'x_daas_ham.noc' }), canRead: true },
+        { $id: Now.ID['dash_naas_read_account_manager'], role: Now.ref('sys_user_role', { name: 'x_daas_ham.account_manager' }), canRead: true },
+        { $id: Now.ID['dash_naas_read_finance'], role: Now.ref('sys_user_role', { name: 'x_daas_ham.finance' }), canRead: true },
+    ],
 })

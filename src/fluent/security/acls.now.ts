@@ -13,6 +13,7 @@ import {
     inventoryTech,
     noc,
     providerStaff,
+    serviceDesk,
 } from './roles.now'
 import { grantsFleetAsset } from '../../server/entry/visibility'
 
@@ -22,13 +23,20 @@ import { grantsFleetAsset } from '../../server/entry/visibility'
  * that the record's Site lists them as a contact, so neither a direct link nor a dot-walk from a visible record leaks
  * data. Return lines, attestation items and shipment events have no before-query rule: their ACL is the only check.
  * Inventory techs read only the tables of their stockroom work (providerStaff or a list naming inventoryTech); other
- * staff reads use broadStaff or a narrower list. On the tables narrowed to an inventory tech's stockrooms, a
- * Deny-Unless row check (acls-visibility.now.ts) re-checks the stockroom. Hardware's read ACLs sit on alm_asset (below).
+ * staff reads use broadStaff or a narrower list, and the service desk reads what the Orders and Returns it raises need.
+ * On the tables narrowed to an inventory tech's stockrooms, a Deny-Unless row check (acls-visibility.now.ts) re-checks
+ * the stockroom. Hardware's read ACLs sit on alm_asset (below); who changes hardware by hand, and who reads its
+ * Provider fields, is in acls-hardware.now.ts.
  */
 
 const commercialEditors = [accountManager, assetManager]
-const orderRaisers = [assetManager, accountManager, noc, customerAdmin, 'sn_customerservice_agent']
-const orderWorkers = [assetManager, accountManager, noc, inventoryTech, fieldTech, 'sn_customerservice_agent']
+/*
+ * Provider roles and the service desk raise Orders and Returns for any Customer. A customer admin raises them for their
+ * own Customer only, through the record producers, and has create ACLs of its own that check the Customer (a Table API
+ * insert meets no producer); it creates no Order lines, which the producer's script adds (entry/orders), past ACLs.
+ */
+const orderRaisers = [assetManager, accountManager, noc, serviceDesk]
+const orderWorkers = [assetManager, accountManager, noc, inventoryTech, fieldTech, serviceDesk]
 const stagingWorkers = [inventoryTech, assetManager]
 
 Acl({
@@ -269,6 +277,68 @@ Acl({
     script: "answer = current.site_template.customer.nil() || current.site_template.customer.toString() == gs.getUser().getCompanyID();",
 })
 
+/*
+ * The service desk (serviceDesk) raises Orders and Returns for any Customer (orderRaisers): it reads the Agreements and
+ * Site templates the record producers offer, and the Orders, Order lines and Returns it raises, submits and follows.
+ * It holds no NaaS role, so the before-query rules leave it every Customer's (ADR 0005). Nothing else of the app's is
+ * its to read: not the commercial lines, catalog, fees or money tables.
+ */
+Acl({
+    $id: Now.ID['acl_agreement_read_service_desk'],
+    type: 'record',
+    table: 'x_daas_ham_agreement',
+    operation: 'read',
+    roles: [serviceDesk],
+})
+
+Acl({
+    $id: Now.ID['acl_site_template_read_service_desk'],
+    type: 'record',
+    table: 'x_daas_ham_site_template',
+    operation: 'read',
+    roles: [serviceDesk],
+})
+
+Acl({
+    $id: Now.ID['acl_site_template_item_read_service_desk'],
+    type: 'record',
+    table: 'x_daas_ham_site_template_item',
+    operation: 'read',
+    roles: [serviceDesk],
+})
+
+Acl({
+    $id: Now.ID['acl_order_read_service_desk'],
+    type: 'record',
+    table: 'x_daas_ham_order',
+    operation: 'read',
+    roles: [serviceDesk],
+})
+
+Acl({
+    $id: Now.ID['acl_order_line_read_service_desk'],
+    type: 'record',
+    table: 'x_daas_ham_order_line',
+    operation: 'read',
+    roles: [serviceDesk],
+})
+
+Acl({
+    $id: Now.ID['acl_return_order_read_service_desk'],
+    type: 'record',
+    table: 'x_daas_ham_return_order',
+    operation: 'read',
+    roles: [serviceDesk],
+})
+
+Acl({
+    $id: Now.ID['acl_return_order_line_read_service_desk'],
+    type: 'record',
+    table: 'x_daas_ham_return_order_line',
+    operation: 'read',
+    roles: [serviceDesk],
+})
+
 Acl({
     $id: Now.ID['acl_order_read'],
     type: 'record',
@@ -292,6 +362,20 @@ Acl({
     table: 'x_daas_ham_order',
     operation: 'create',
     roles: orderRaisers,
+})
+
+/*
+ * A customer admin creates an Order of their own Customer only. Every Order rule check of a customer admin is asked
+ * of an Order that names its Customer (the producer's, entry/orders `orderingUser`), so one naming none is refused.
+ */
+Acl({
+    $id: Now.ID['acl_order_create_customer'],
+    type: 'record',
+    table: 'x_daas_ham_order',
+    operation: 'create',
+    roles: [customerAdmin],
+    description: 'NaaS customer admins create Orders of their own Customer only.',
+    script: "var company = gs.getUser().getCompanyID(); answer = !!company && current.getValue('customer') == company;",
 })
 
 Acl({
@@ -327,6 +411,7 @@ Acl({
     script: "answer = current.order.customer.toString() == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.order.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
 })
 
+// No customer role: a customer admin's lines are the record producer's, which its script adds (entry/orders).
 Acl({
     $id: Now.ID['acl_order_line_create'],
     type: 'record',
@@ -1113,7 +1198,22 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_return_order',
     operation: 'create',
-    roles: [assetManager, accountManager, noc, customerAdmin, 'sn_customerservice_agent'],
+    roles: orderRaisers,
+})
+
+/*
+ * A customer admin creates a Return of their own Customer only. One that names no Customer yet passes: the customer
+ * page asks whether a Return may be raised at all (entry/customer, canCreate() of an empty record) before it names the
+ * Customer, and a Return with none is no Customer's, which no customer contact reads.
+ */
+Acl({
+    $id: Now.ID['acl_return_order_create_customer'],
+    type: 'record',
+    table: 'x_daas_ham_return_order',
+    operation: 'create',
+    roles: [customerAdmin],
+    description: 'NaaS customer admins create Returns of their own Customer only.',
+    script: "var company = gs.getUser().getCompanyID(); answer = !!company && (current.customer.nil() || current.getValue('customer') == company);",
 })
 
 Acl({
