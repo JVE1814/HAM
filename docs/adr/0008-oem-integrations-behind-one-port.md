@@ -8,7 +8,10 @@ are opened manually and only their status is synced (Cisco).
 
 The transport behind every port is one `HttpPort` (`domain/http.ts`): a named function of a REST
 message plus an optional JSON body. The shipping aggregator (P3) uses the same seam, so its label and
-tracking mapping is tested with fakes like the OEM adapters.
+tracking mapping is tested with fakes like the OEM adapters. A call that gets no answer
+(RESTMessageV2's status 0 for a timeout or a DNS, TLS or connection failure, or a thrown error) comes
+back as status 0 with the transport's reason in `HttpResponse.error`, logged by the transport;
+`failureText` reads it as *no response: <reason>*.
 
 Claim and provisioning calls run in a five-minute job with a per-vendor call budget (Meraki allows 10
 claim calls per 5 minutes), so a run loads only as many staging steps as its budget can send; the

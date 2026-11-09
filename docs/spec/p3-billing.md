@@ -131,8 +131,10 @@ fees).
 - A Service interval whose Asset is gone, or whose currency is not known, a work order whose currency
   is not known, and a shipment with a cost but no currency are left out of Cost facts and Margin and
   counted on the period with the others (*Records that failed to cost*, below).
-- Cost facts and Margin are rounded to the cent half away from zero (summed first, then rounded), and
-  margin % to one decimal the same way.
+- Amounts are rounded to the cent half away from zero. Each chunk of Service intervals adds its sums
+  to the Cost facts rounded to the cent, so a Cost fact may differ by a fraction of a cent from
+  rounding the month's total once. Margin sums the Cost facts and billing lines per Customer, Site
+  and currency, then rounds, and margin % is rounded to one decimal the same way.
 - Customer-owned Assets carry no capital cost.
 - Costs use the Assets' current ownership, cost and coverage: *Recompute margin* on an old period
   reflects today's data. A recompute started while another is running supersedes it: the new one

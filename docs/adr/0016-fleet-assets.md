@@ -42,10 +42,11 @@ the Legal owner; the demo data sets the others), and a blank Legal owner still c
 - The fleet is not filtered by a before-query rule. Such a rule can only append conditions, so it cannot constrain
   every `^NQ` branch of a query it is handed, and it would hide the Provider IT's equipment from IT's own users and
   processes. Each app read filters for itself.
-- `platform/assets` `findAssetByIdentifier` finds fleet assets only, so the warehouse look-up, put-away, pick and
-  the device-events API (where another identifier is reported unknown) never act on IT's units. A receipt, and the
-  serial check before an Asset is created, look at every Asset (`includeNonFleet`), so one physical unit never gets a
-  second record; an ASN row for a serial any Asset carries is refused as before.
+- `platform/assets` `identifyAsset` (and `findAssetByIdentifier` on it) finds fleet assets only, by serial, else
+  Provider tag, else Customer tag, refusing a code two Assets carry in that field, so the warehouse look-up, put-away,
+  pick and the device-events API (where another identifier is reported unknown) never act on IT's units. A receipt,
+  and the serial check before an Asset is created, look at every Asset (`includeNonFleet`), so one physical unit never
+  gets a second record; an ASN row for a serial any Asset carries is refused as before.
 - The app's business rules on `alm_hardware` act on fleet assets only: each condition tests the flag after its change
   test and before it loads a module (ADR 0002 and the 254-character condition limit).
 - Every Asset, Model and Stockroom reference on the app's tables and catalog items (a case's *Failed asset*, an Order

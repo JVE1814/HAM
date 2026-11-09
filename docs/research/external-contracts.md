@@ -33,7 +33,8 @@ Short file names used below:
 **Status (2026-11-07):** every change under "Changes needed in the app" has been applied, except the
 optional EoX pagination and SN2INFO `EXCEEDED_OUTPUT` handling (a batch that always errors would block
 the queue) and the speculative FortiZTP v2 / FortiCloud `accountId` changes, which wait for an FNDN
-check. What still needs an instance or a vendor login is listed in the README.
+check. What still needs an instance or a vendor login is listed in
+[verify-on-instance.md](../verify-on-instance.md).
 
 ## Cisco Support APIs
 
@@ -224,7 +225,7 @@ Notes:
   `asArray(json).find((d) => field(d, 'eox', 'endOfSaleAt') || field(d, 'eox', 'endOfSupportAt'))`.
   Otherwise an `eox` object with a null status and no dates is recorded as a fact with no dates, and
   the `break` at line 114 stops the search in the remaining orgs. Optionally append `&perPage=3` (the
-  documented minimum) at `oem-messages.now.ts:52`.
+  documented minimum) at `oem-messages.now.ts:52`. Done: `adapters.ts` `hasEoxDates`.
 - **Meraki EoX fields.** `status` is a nullable string with enum `endOfSale`, `endOfSupport`,
   `nearEndOfSupport`. `endOfSaleAt` ("End of sale date for the device product") and `endOfSupportAt`
   are date-time strings. Example: `"eox": {"status":"endOfSale","endOfSaleAt":"2031-07-29T02:00:00Z",
@@ -618,9 +619,10 @@ Notes:
 - **ShipEngine label response.** `create_label_response_body` requires `label_id`, `status`
   (processing, completed, error, voided), `tracking_number`, `carrier_id`, `carrier_code`,
   `service_code`, `shipment_cost {currency, amount}` and `label_download {href, pdf, png, zpl}`. The
-  sample has `"currency": "usd"`, which the app uppercases (default `EUR`). "The URL will remain valid
-  for 90 days." Operational note: `x_daas_ham_shipment.label_url` expires after 90 days, so download or
-  attach the PDF if it must be kept.
+  sample has `"currency": "usd"`, which the app uppercases (no default: blank when absent, and
+  Margin counts such a cost as failed). "The URL will remain valid for 90 days." Operational note:
+  `x_daas_ham_shipment.label_url` expires after 90 days, so download or attach the PDF if it must be
+  kept.
 - **ShipEngine track payload.** `resource_url` (e.g.
   `https://api.shipengine.com/v1/tracking?carrier_code=usps&tracking_number=...`), `resource_type`
   `API_TRACK` (event `track`), and `data`: `label_url`, `tracking_number` (required), `status_code`
@@ -795,7 +797,7 @@ Notes:
   number"; `getReferenceValue()` returns it in the reference currency; to set the session currency,
   "use a plain number"; for other currencies, "An unformatted number prefixed by a 3-letter currency
   code separated by a semicolon". Asset record fields: Cost is "The price at which the asset was
-  purchased." Billing amounts are Decimal fields in EUR or the line's currency (`billing.ts:59`).
+  purchased." Billing amounts are Decimal fields in their Agreement's currency.
 - **Procurement.** Brazil "Create a purchase order" lists Number, Due by, Vendor, Ship to ("This field is
   required"), PO date, Status (Canceled, Ordered, Received, Requested, Suspended), Short description and
   others; Vendor is not marked required. The status page: Requested when created, then Ordered, Pending
@@ -1309,7 +1311,7 @@ Other open points raised in the findings:
 
 - Transfer orders: Inventory's rules were read on the instance, not run with the app installed (N38,
   N39). Working a transfer order sourcing raised through its tasks as an inventory tech, and
-  cancelling one, are on the first-install checklist (README, Verify on the first install).
+  cancelling one, are checked in [verify-on-instance.md](../verify-on-instance.md#transfer-orders).
 - Cisco: how Cisco's path parsing handles PIDs containing `/` (e.g. `CISCO2901/K9`), which
   `rest-port.ts:27` sends as `%2F`; some servers reject encoded slashes.
 - Cisco: whether SN2INFO `service_contract_number` can hold several comma-separated numbers (the field

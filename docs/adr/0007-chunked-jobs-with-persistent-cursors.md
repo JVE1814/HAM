@@ -18,17 +18,20 @@ runner is used in two ways:
 
 Other scheduled jobs do not use the runner. Each bounds its work its own way, or not at all:
 
-- Refresh Orders (`entry/refresh.ts`) read at most 2000 due in-service fleet assets per run,
-  earliest due first, in one query, then skip those already on an open replacing line. The limit
-  applies before the skip, and raising a line changes nothing on the Asset it replaces, so Assets
-  on open Orders still take places in the 2000: while 2000 or more of the earliest due wait on open
-  Orders (a draft left for review, a replacement not yet installed), no later-due Asset is raised.
+- Refresh Orders (`entry/refresh.ts`) read due in-service fleet assets, earliest due first (then by
+  sys_id), a page of 2000 at a time after the last one read, skipping those already on an open
+  replacing line, until 2000 candidates are found, the Assets due run out, or the job time budget
+  (`x_daas_ham.job.budget_seconds`) is spent (`domain/refresh.ts` `firstCandidatesDue`). No cursor
+  is kept: each run starts from the earliest due, so Assets waiting on open Orders (a draft left for
+  review, a replacement not yet installed) cost reads but no longer block later-due ones.
 - OEM sync (`entry/oem-sync.ts`): the lifecycle sync reads every NaaS Model of each enabled vendor in
   one query; the coverage sync takes batches of stale Assets, oldest check first, until the time
   budget is spent, with no cursor since a checked Asset drops out of the query; the RMA status sync
   asks at most 200 open RMAs per vendor a run, least recently synced first.
 - OEM claim and provisioning (`runOemClaims`) makes at most `x_daas_ham.oem.claim.max_calls`
-  adapter calls per vendor a run, holding its run lock.
+  adapter calls per vendor a run, holding its run lock. Before them it checks 200 waiting steps for
+  stranded ones, in sys_id order from where the last run stopped (the `x_daas_ham_job_cursor` row
+  `oem_claim_stranded`, which holds only that position), starting over after the last.
 - Scheduled returns (`raiseScheduledReturns`) take at most 50 ended Agreements and 50 ending
   temporary Orders a run; each one raised is flagged and drops out.
 - Attestations (`raiseAttestations`) read every in-service or temporarily deployed fleet asset of

@@ -6,3 +6,9 @@ billing proration, ...) live in `src/server/domain/` as plain TypeScript that ne
 `src/server/entry/` wires platform triggers (business rules, scheduled scripts, REST) to the two.
 There is no instance in the development loop, so the domain core is the only part we can test
 quickly and exhaustively (Vitest); everything Glide-facing is kept thin and covered by ATF.
+
+## Consequences
+
+- The layering is enforced by `src/server/module-imports.test.ts`: the unit tests fail when a
+  `domain/` module imports `@servicenow/*` or anything under `platform/` or `entry/`, or when a
+  `platform/` module imports `entry/`, type-only imports included.

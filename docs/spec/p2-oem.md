@@ -4,8 +4,8 @@
 
 | Vendor (model `OEM data source`) | Lifecycle (EoX) | Coverage by serial | RMA status |
 |---|---|---|---|
-| Cisco | EoX v5 by PID, at most 20 per call and 250 characters comma-joined; end of support = end of life = Last Date of Support | SN2INFO v2 summary, 50 per call; end = `covered_product_line_end_date`, else `coverage_end_date` (v1.0), else `warranty_end_date`; no start date | Service Order Return (lookup only) |
-| Meraki | Dashboard inventory by model (`-HW` stripped) in each configured org | via Cisco SN2INFO | — |
+| Cisco | EoX v5 by PID, at most 20 per call and 250 characters comma-joined; end of support = end of life = Last Date of Support; each record is matched to the PID asked (`EOXInputValue`, else `EOLProductID`) ignoring case | SN2INFO v2 summary, 50 per call; end = `covered_product_line_end_date`, else `coverage_end_date` (v1.0), else `warranty_end_date`; no start date; a record without `is_covered` is logged and writes nothing, so the stored contract stands | Service Order Return (lookup only) |
+| Meraki | Dashboard inventory by model (`-HW` stripped) in each configured org; the first org with a device of the model whose `eox` has a date (`endOfSaleAt` or `endOfSupportAt`); an `eox` with a null status and no dates is passed over | via Cisco SN2INFO | — |
 | Fortinet | — (CSV) | Asset Management v3 `products/list`, one serial per call, at most 90 per run; entitlement ending last; contract number from the asset's `contracts[]` (the one with a term ending then, else the first); an API `status` other than 0 is an error | — |
 | HPE Mist | JSI inventory by model (`end_of_sale_time` → end of sale, `eos_time` → end of support) | JSI inventory by serial (`warranty_start` / `warranty_end`, else `contract_start_date` / `contract_end_date`; covered when `has_support` is true or an end date is given) | — |
 | HPE Aruba, Check Point | CSV | CSV | — |
@@ -13,6 +13,9 @@
 - Vendor responses are read leniently. A missing field means "unknown", never a failure.
 - Each HTTP failure is logged and the run continues. A FortiCloud HTTP 200 with an API `status` other
   than 0 counts as a failure.
+- A call that gets no answer (a timeout, or a DNS, TLS or connection failure: RESTMessageV2
+  status 0) is logged with the transport's reason, and its error reads *no response: <reason>*,
+  never *HTTP 0*.
 - Response shapes come from the vendors' public documentation. **Verify them against each vendor's
   sandbox or test tenant before enabling the vendor.**
 
@@ -55,6 +58,10 @@ and none of its serials is sent to an OEM, even a unit of a NaaS Model.
     all get that serial's coverage; its contracts point at the last of them. A serial whose coverage
     record is refused is neither summarised onto its Assets nor stamped checked, so it is asked
     again; so is an Asset whose own save is refused. Refusals are logged.
+  - A covering contract without an end date (Mist `has_support` without dates, a CSV row without an
+    end date) covers open-ended: the Asset's coverage end is 9999-12-31, so it reads as covered for
+    break-fix routing (OEM advance replacement), the rack risk view and the *no coverage* list, as
+    its support cost is counted.
   - When a vendor call fails, only the serials it was asked about are left unchecked (the answered
     ones are stamped), and that vendor waits for the next run. When the vendor answers with an
     error of its own (FortiCloud status other than 0, an SN2INFO answer without `serial_numbers`),
@@ -63,6 +70,10 @@ and none of its serials is sent to an OEM, even a unit of a NaaS Model.
   - Lifecycle answers are merged: a new date replaces the stored one, and dates a vendor does not
     give (for example an end of life from the CSV import) are kept. A coverage response without a
     start date keeps the stored one.
+  - Models are matched to a lifecycle answer by PID, ignoring case and surrounding spaces (each PID
+    is asked once; Models sharing it each get the dates). An answer for no Model, and a lifecycle
+    save the platform refuses, are logged. Each job logs its first 20 errors per run and one line
+    counting the rest.
   - Fortinet: one batch of at most 90 serials per run. FortiCloud allows 100 calls per minute and
     1000 per hour, and `products/list` takes one serial per call. Every 4 hours that is about 540
     serials a day, so a fleet above roughly 3,800 FortiGates is not fully refreshed within the
