@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { FLEET_FIELD, NAAS_STOCKROOM_TYPES, STOCKROOM_TYPE_FIELD } from './fleet.ts'
+import { FLEET_FIELD, NAAS_STOCKROOM_TYPES, OEM_PID_FIELD, STOCKROOM_TYPE_FIELD } from './fleet.ts'
 
 /*
  * The app's rules and actions on the shared tables act on fleet assets and NaaS stockrooms only (ADR 0016). Their
@@ -129,6 +129,17 @@ describe("the app's business rules on alm_hardware", () => {
                 `||((current.model.changes()||current.${FLEET_FIELD}.changes())&&current.x_daas_ham_rack!=''))`,
         )
         expect(fleet).toBe(FLEET_TEST)
+    })
+})
+
+describe("the app's business rule on cmdb_model_lifecycle", () => {
+    it('tests what changed, then keeps to NaaS Models: the table holds the milestones of the Provider IT’s Models too', () => {
+        const lifecycle = rule('br_model_lifecycle_changed')
+        expect(lifecycle.table).toBe('cmdb_model_lifecycle')
+        const [change, naasModel, ...more] = andTerms(lifecycle.condition)
+        expect(change).toMatch(/^\(current\.operation\(\)=='insert'(\|\|current\.\w+\.changes\(\))+\)$/)
+        expect(naasModel).toBe(`current.model.${OEM_PID_FIELD}!=''`)
+        expect(more).toEqual([])
     })
 })
 

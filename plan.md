@@ -325,7 +325,7 @@ Confidence tags:
   - ACLs back up every table and field. External contacts get explicit `snc_external` ACLs.
 - **Cross-scope:** we create `CrossScopePrivilege` records for every global table we read or write:
   - `alm_hardware`, `alm_asset`, `alm_consumable`, `alm_stockroom`, `alm_transfer_order(_line)`;
-  - `cmdb_model`, `cmdb_ci_*`, `cmn_location`, `cmn_schedule`, `ast_contract`;
+  - `cmdb_model`, `cmdb_model_lifecycle`, `cmdb_ci_*`, `cmn_location`, `cmn_schedule`, `ast_contract`;
   - Procurement tables;
   - `change_request` and standard change templates;
   - `wm_order` / `wm_task`;
@@ -348,6 +348,7 @@ Confidence tags:
 | Device (chassis, FRU, stack member) | `alm_hardware` (FRUs link to the chassis through `parent`) |
 | SFPs, cables, small parts | `alm_consumable` (unless the model is flagged track-as-asset) |
 | Model / product ID | `cmdb_model` / `cmdb_hardware_product_model` |
+| Model lifecycle milestones (end of sale, support, extended support, life) | `cmdb_model_lifecycle` / `cmdb_hardware_model_lifecycle`: one row per Model and milestone (ADR 0017) |
 | Customer | `customer_account` (extends `core_company`) |
 | Customer person | `customer_contact` |
 | Site / building / room | `cmn_location` (company = customer) |
@@ -376,7 +377,7 @@ Confidence tags:
 | | `last_seen` | date/time | P1 | Derived cache from CI or device events. Indexed. |
 | | `seen_source` | choice: discovery / sgc / nms | P1 | |
 | | `rack`, `ru_start`, `rack_face` | ref `cmdb_ci_rack`, integer, choice | P1 (data) / P2 (view) | |
-| | `lifecycle_phase` | choice: available / end_of_sale / end_of_support / end_of_extended_support / eol | P1 | Derived from `model_lifecycle` |
+| | `lifecycle_phase` | choice: available / end_of_sale / end_of_support / end_of_extended_support / eol | P1 | Derived from the Model's milestones in `cmdb_model_lifecycle` |
 | | `refresh_due` | date | P1 (field) / P2 (logic) | Indexed |
 | | `coverage_end` | date | P2 | Derived from `oem_coverage` |
 | `cmdb_model` | `track_as_asset` | boolean | P1 | For SFPs and other optics |
@@ -405,7 +406,6 @@ Confidence tags:
 | `stockroom_assignment` | — | user, stockroom (visibility for inventory techs) |
 | `manufacturer_alias` | — | alias_string, canonical manufacturer (`core_company`) |
 | `model_match_rule` | — | order, manufacturer, pattern (regex / prefix / exact on PID or model name), canonical model, active |
-| `model_lifecycle` | — | model, end_of_sale, end_of_support, end_of_extended_support, eol, source (cisco / meraki / fortinet / mist / csv), source_ref, last_refreshed |
 | `asn_import` (import set staging) | `sys_import_set_row` | distributor, po_number, ship date, carrier, tracking, serial, PID, MAC, quantity |
 | `device_event` | — | asset or CI, serial, event (seen / down / up), source, received_at. Stores **state changes only**, with a retention job. |
 | `job_cursor` | — | job name, last processed key, last run, status (used by the chunked-job helper) |
@@ -500,10 +500,10 @@ Phase 1 gives every persona a working path:
   - It looks up the manufacturer alias, then applies `model_match_rule` in order.
   - The result is the canonical `cmdb_model`, which gets `oem_pid` and `device_class`.
 - **Unmatched values** go to a workspace list of normalisation exceptions.
-- **`model_lifecycle` CSV import** uses an `ImportSet` with a transform map. Coalesce is on model +
-  source. OEM API adapters fill the same table in P2.
+- **Model lifecycle CSV import** loads rows into an import-set table; each row's milestones are
+  stored in the platform's `cmdb_model_lifecycle` (ADR 0017). OEM API adapters fill the same table in P2.
 - **Daily chunked job** recalculates `lifecycle_phase` and `refresh_due` on assets whose model's
-  lifecycle record changed. It is event-driven from `model_lifecycle` updates, not a full scan.
+  milestones changed. It is event-driven from `cmdb_model_lifecycle` updates, not a full scan.
 
 ### P1.3 Agreements, customer catalog and site templates
 - Agreement maintenance (account manager), quantities, subscription lines, customer catalog entries,

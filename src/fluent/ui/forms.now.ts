@@ -387,32 +387,6 @@ export const model_match_rule_form = Form({
     ],
 })
 
-export const model_lifecycle_form = Form({
-    table: 'x_daas_ham_model_lifecycle',
-    view: default_view,
-    sections: [
-        {
-            caption: 'Milestones',
-            content: [
-                {
-                    layout: 'two-column',
-                    leftElements: [{ field: 'model', type: 'table_field' }, { field: 'end_of_sale', type: 'table_field' }, { field: 'end_of_support', type: 'table_field' }],
-                    rightElements: [{ field: 'end_of_extended_support', type: 'table_field' }, { field: 'end_of_life', type: 'table_field' }],
-                },
-            ],
-        },
-        {
-            caption: 'Source',
-            content: [
-                {
-                    layout: 'one-column',
-                    elements: [{ field: 'source', type: 'table_field' }, { field: 'source_reference', type: 'table_field' }, { field: 'last_refreshed', type: 'table_field' }],
-                },
-            ],
-        },
-    ],
-})
-
 export const norm_exception_form = Form({
     table: 'x_daas_ham_norm_exception',
     view: default_view,
@@ -507,8 +481,6 @@ List({ table: 'x_daas_ham_site_template_item', view: default_view, columns: ['si
 List({ table: 'x_daas_ham_manufacturer_alias', view: default_view, columns: ['alias', 'manufacturer'] })
 
 List({ table: 'x_daas_ham_model_match_rule', view: default_view, columns: ['order', 'manufacturer', 'match_type', 'pattern', 'model', 'active'] })
-
-List({ table: 'x_daas_ham_model_lifecycle', view: default_view, columns: ['model', 'end_of_sale', 'end_of_support', 'end_of_extended_support', 'end_of_life', 'source'] })
 
 List({ table: 'x_daas_ham_norm_exception', view: default_view, columns: ['raw_manufacturer', 'raw_model', 'reason', 'occurrences', 'status', 'resolved_model'] })
 

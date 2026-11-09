@@ -544,38 +544,6 @@ Acl({
 })
 
 Acl({
-    $id: Now.ID['acl_model_lifecycle_read'],
-    type: 'record',
-    table: 'x_daas_ham_model_lifecycle',
-    operation: 'read',
-    roles: broadStaff,
-})
-
-Acl({
-    $id: Now.ID['acl_model_lifecycle_write'],
-    type: 'record',
-    table: 'x_daas_ham_model_lifecycle',
-    operation: 'write',
-    roles: [assetManager],
-})
-
-Acl({
-    $id: Now.ID['acl_model_lifecycle_create'],
-    type: 'record',
-    table: 'x_daas_ham_model_lifecycle',
-    operation: 'create',
-    roles: [assetManager],
-})
-
-Acl({
-    $id: Now.ID['acl_model_lifecycle_delete'],
-    type: 'record',
-    table: 'x_daas_ham_model_lifecycle',
-    operation: 'delete',
-    roles: [assetManager],
-})
-
-Acl({
     $id: Now.ID['acl_norm_exception_read'],
     type: 'record',
     table: 'x_daas_ham_norm_exception',

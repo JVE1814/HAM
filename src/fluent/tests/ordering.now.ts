@@ -3,6 +3,7 @@ import { Test, TestSuite } from '@servicenow/sdk/core'
 import { assetManager } from '../security/roles.now'
 import { inventoryTechAuditVisibilityTest } from './audit-visibility.now'
 import { addToFleetTest } from './fleet.now'
+import { lifecycleImportTest } from './models.now'
 import { transferStageTest } from './transfers.now'
 import { customerAdminVisibilityTest, inventoryTechVisibilityTest } from './visibility.now'
 
@@ -175,5 +176,6 @@ export const phase1Suite = TestSuite({
         offCatalogOrderTest,
         transferStageTest,
         addToFleetTest,
+        lifecycleImportTest,
     ],
 })

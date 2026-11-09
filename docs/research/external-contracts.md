@@ -758,6 +758,7 @@ Sources:
 | `current.setAbortAction(true)` in a before rule on a global table | No longer used there: the rules on `alm_hardware` and `wm_order` refuse with their Abort action (`assets.ts` refusesLifecycleChange, `delivery.ts` refusesWorkWindow, `racks.ts` refusesRackPlacement); the rules on `x_daas_ham_*` tables keep it | Refused on the instance: the save goes through. The rule's own Abort action refuses it, whoever saves, and its script still runs | matches | N35, N36 |
 | Business rule condition and filter | The check is the condition, behind a change test in the condition itself (`rules.now.ts`, `assurance.now.ts`) | The condition runs on every save the rule's table and action match, even when the filter does not; the rule fires only when both hold | matches | N36 |
 | Out-of-box transfer order line logic and the Asset | Inventory works the transfer orders sourcing raises, each unit handed over *In stock / Available* just before its line is inserted (`platform/transfers.ts` requestTransfer). Both combinations Inventory sets are one stage, *In transfer*, entered only while `active_to` is set and left only once it is cleared (`domain/lifecycle.ts`, `entry/assets.ts` refusesLifecycleChange); an Asset Inventory lets go takes back the stage it left (`entry/assets.ts` onTransferReleased) | *Push Status to Asset/Consumable* sets *In stock / Pending transfer* or *In transit / Reserved* with `active_to` set, and *In stock / Available* in the to-stockroom with it cleared at Received; *Release Asset on TOL cancel/delete* sets *In stock / Available* where the Asset is and clears it; *Validate TOL and check availibility* takes onto a line only an Asset *In stock / Available* with `active_to` clear. Each saves through `alm_asset` in the user's transaction, and the app's `alm_hardware` rules run on that save | matches | N38, N39 |
+| The platform's Model lifecycle table | A Model's manufacturer milestones are rows of `cmdb_model_lifecycle`, written as `cmdb_hardware_model_lifecycle` with lifecycle type `publisher`, source `internal`, the milestone as `lifecycle_phase` and its date as `start_date`; a write updates the active row of one Model, type, phase and source and never deletes; asset managers hold `model_manager` (`platform/model-lifecycle.ts`, ADR 0017) | Both tables are Model Management's (`com.snc.model`), with those columns and phase values; before rules refuse an insert without a start date, a second active row for one Model, type, phase and source, and a hardware lifecycle row for a Model that is not a hardware Model; this scope may read, create and update, not delete; create and write need `model_manager`, read `snc_internal` | matches (the app's use was not run on the instance) | N40 |
 
 Notes:
 
@@ -1000,6 +1001,27 @@ Sources:
   leaves the stage of a Cancelled line as it is, so a task closed after its line was cancelled saves
   neither the line nor its Asset. `alm_transfer_order_line.stage` holds `draft`, `requested`,
   `shipment_preparation`, `in_transit`, `received`, `delivered` and `cancelled`.
+- N40: Brazil instance, 2026-11-09, read through the Table API without saving anything (no Hardware
+  Asset Management Professional on it; both tables empty). `cmdb_model_lifecycle` (*Model
+  Lifecycle*, extendable) and its child `cmdb_hardware_model_lifecycle` (*Hardware Model Lifecycle*,
+  no column of its own) belong to `com.snc.model`. Columns: `model` (reference `cmdb_model`),
+  `lifecycle_phase` (default `availability`; choices `availability`, `end_of_sale`,
+  `end_of_support`, `end_of_extended_support`, `end_of_life`), `lifecycle_type` (default `internal`;
+  `internal`, `publisher`), `source` (read-only, default `internal`; `internal`, `service_now`),
+  `start_date` (*Phase start date*, a date, mandatory), `end_date`, `description` (string, 1000),
+  `risk`, `active` (default true), `current_lifecycle_phase` (read-only). Application access of
+  both tables: read, create and update from other scopes, not delete. Their active business rules
+  are four before rules on `cmdb_model_lifecycle`, all of order 100 and refusing with
+  `setAbortAction`: *Error message on invalid date format* (insert, filter `start_dateISEMPTY`),
+  *Unique lifecycle creation per model* (insert and update of an active row: another active row of
+  `cmdb_model_lifecycle` with the same `source`, `lifecycle_type`, `lifecycle_phase` and `model`),
+  *Verfiy model on lifecycle* (a row of a class whose Model's class is not the mapped one,
+  `cmdb_hardware_model_lifecycle` to `cmdb_hardware_product_model` and `cmdb_model_lifecycle` to
+  `cmdb_model`, or any row for a software Model) and *Phase start and end date validation* (an end
+  date not after the start date). ACLs on `cmdb_model_lifecycle`: read `snc_internal`; create, write
+  and delete `model_manager`; list edit `nobody`. `model_manager` is a `com.snc.model` role;
+  `procurement_user`, `sam` and `category_manager` contain it, `asset` does not. Default list of
+  both tables: `model`, `lifecycle_phase`, `lifecycle_type`, `source`, `start_date`.
 
 ## Changes needed in the app
 

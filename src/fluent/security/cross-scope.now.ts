@@ -184,6 +184,60 @@ CrossScopePrivilege({
 })
 
 CrossScopePrivilege({
+    $id: Now.ID['xsp_cmdb_model_lifecycle_read'],
+    operation: 'read',
+    status: 'allowed',
+    targetName: 'cmdb_model_lifecycle',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_cmdb_model_lifecycle_write'],
+    operation: 'write',
+    status: 'allowed',
+    targetName: 'cmdb_model_lifecycle',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_cmdb_model_lifecycle_create'],
+    operation: 'create',
+    status: 'allowed',
+    targetName: 'cmdb_model_lifecycle',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_cmdb_hardware_model_lifecycle_read'],
+    operation: 'read',
+    status: 'allowed',
+    targetName: 'cmdb_hardware_model_lifecycle',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_cmdb_hardware_model_lifecycle_write'],
+    operation: 'write',
+    status: 'allowed',
+    targetName: 'cmdb_hardware_model_lifecycle',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
+    $id: Now.ID['xsp_cmdb_hardware_model_lifecycle_create'],
+    operation: 'create',
+    status: 'allowed',
+    targetName: 'cmdb_hardware_model_lifecycle',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
+CrossScopePrivilege({
     $id: Now.ID['xsp_cmdb_ci_read'],
     operation: 'read',
     status: 'allowed',

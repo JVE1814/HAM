@@ -1,9 +1,10 @@
-import { GlideRecord } from '@servicenow/glide'
+import type { GlideRecord } from '@servicenow/glide'
 import { inFleet } from '../domain/fleet.ts'
 import { assetLifecycleStamp, type AssetLifecycleFacts, type LifecycleDates } from '../domain/model-lifecycle.ts'
 import { memoized } from '../domain/memo.ts'
 import { runEventTableJob, type EventTableJob } from './chunked.ts'
 import { glideToIsoDate, todayIso } from './clock.ts'
+import { readModelLifecycle } from './model-lifecycle.ts'
 import { findById, num, str } from './records.ts'
 
 /** Lifecycle phase and Refresh due date of an Asset, from its Model lifecycle, Agreement and Lease schedule. */
@@ -16,18 +17,6 @@ export interface LifecycleReaders {
     agreements: (agreementId: string) => AgreementRefreshTerms
     /** A Lease schedule's end terms (none without one). */
     leases: (leaseId: string) => AssetLifecycleFacts['lease']
-}
-
-/** Read a Model's lifecycle milestones (none when it has no Model lifecycle record). */
-export function modelLifecycle(modelId: string): LifecycleDates {
-    const gr = new GlideRecord('x_daas_ham_model_lifecycle')
-    if (!modelId || !gr.get('model', modelId)) return {}
-    return {
-        endOfSale: str(gr, 'end_of_sale') || undefined,
-        endOfSupport: str(gr, 'end_of_support') || undefined,
-        endOfExtendedSupport: str(gr, 'end_of_extended_support') || undefined,
-        endOfLife: str(gr, 'end_of_life') || undefined,
-    }
 }
 
 type AgreementRefreshTerms = Pick<AssetLifecycleFacts, 'refreshBasis' | 'refreshCycleMonths'>
@@ -50,7 +39,7 @@ function leaseTerms(leaseId: string): AssetLifecycleFacts['lease'] {
  * lifetime: create them once per job chunk or request, never at module scope.
  */
 export function lifecycleReaders(): LifecycleReaders {
-    return { models: memoized(modelLifecycle), agreements: memoized(agreementRefreshTerms), leases: memoized(leaseTerms) }
+    return { models: memoized(readModelLifecycle), agreements: memoized(agreementRefreshTerms), leases: memoized(leaseTerms) }
 }
 
 /** The Asset fields its lifecycle stamp is worked out from, with the stamp it carries now. */

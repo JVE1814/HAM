@@ -14,12 +14,12 @@ import {
     type SerialCoverage,
 } from '../domain/coverage.ts'
 import { fleetCondition, naasModelCondition } from '../domain/fleet.ts'
-import { mergeLifecycle, type LifecycleDates } from '../domain/model-lifecycle.ts'
 import { enabledRoute, type CoverageRoute } from '../domain/oem/adapters.ts'
 import type { CoverageFact } from '../domain/oem/types.ts'
 import { normalizeSerial } from '../domain/asn.ts'
 import type { CoverageSource, OemVendor } from '../domain/vocabulary.ts'
 import { msToGlide, nowMs, todayIso } from '../platform/clock.ts'
+import { writeModelLifecycle } from '../platform/model-lifecycle.ts'
 import { oemContext, oemEnabled } from '../platform/oem-http.ts'
 import { intProperty } from '../platform/properties.ts'
 import { addAnyOf, bool, num, refusal, str } from '../platform/records.ts'
@@ -52,39 +52,16 @@ export function syncOemLifecycle(): void {
 
         const result = route.run([...models.keys()], oemContext(route.via))
         report(`lifecycle ${vendor}`, result.errors)
+        // New dates win; dates the vendor does not give (e.g. a CSV end of life) are kept.
+        const refused: string[] = []
         for (const fact of result.facts) {
             const modelId = models.get(fact.pid)
-            if (modelId) upsertLifecycle(modelId, fact.dates, vendor, fact.reference)
+            if (!modelId) continue
+            const written = writeModelLifecycle(modelId, fact.dates, { source: vendor, reference: fact.reference })
+            refused.push(...written.refused.map((why) => `${fact.pid} not saved: ${why}`))
         }
+        report(`lifecycle ${vendor}`, refused)
     }
-}
-
-function upsertLifecycle(modelId: string, incoming: LifecycleDates, vendor: OemVendor, reference: string): void {
-    const lifecycle = new GlideRecord('x_daas_ham_model_lifecycle')
-    const exists = lifecycle.get('model', modelId)
-    if (!exists) {
-        lifecycle.initialize()
-        lifecycle.setValue('model', modelId)
-    }
-    // New dates win; dates the vendor does not give (e.g. a CSV end of life) are kept.
-    const merged = mergeLifecycle(
-        {
-            endOfSale: str(lifecycle, 'end_of_sale') || undefined,
-            endOfSupport: str(lifecycle, 'end_of_support') || undefined,
-            endOfExtendedSupport: str(lifecycle, 'end_of_extended_support') || undefined,
-            endOfLife: str(lifecycle, 'end_of_life') || undefined,
-        },
-        incoming,
-    )
-    lifecycle.setValue('end_of_sale', merged.endOfSale ?? '')
-    lifecycle.setValue('end_of_support', merged.endOfSupport ?? '')
-    lifecycle.setValue('end_of_extended_support', merged.endOfExtendedSupport ?? '')
-    lifecycle.setValue('end_of_life', merged.endOfLife ?? '')
-    lifecycle.setValue('source', vendor)
-    lifecycle.setValue('source_reference', reference)
-    lifecycle.setValue('last_refreshed', new GlideDateTime().getValue())
-    if (exists) lifecycle.update()
-    else lifecycle.insert()
 }
 
 /**

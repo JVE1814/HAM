@@ -261,9 +261,9 @@ export const naasListMenu = UxListMenuConfig({
                     $id: Now.ID['ws_models_lifecycle'],
                     title: 'Model lifecycle',
                     order: 20,
-                    table: 'x_daas_ham_model_lifecycle',
-                    condition: 'ORDERBYend_of_support^EQ',
-                    columns: 'model,end_of_sale,end_of_support,end_of_extended_support,end_of_life,source,last_refreshed',
+                    table: 'cmdb_model_lifecycle',
+                    condition: 'model.x_daas_ham_oem_pidISNOTEMPTY^lifecycle_type=publisher^ORDERBYmodel^ORDERBYstart_date^EQ',
+                    columns: 'model,lifecycle_phase,start_date,source,description,sys_updated_on',
                     applicabilities: [{ $id: Now.ID['ws_models_lifecycle_aud'], applicability: broadStaffAudience }],
                 },
                 {

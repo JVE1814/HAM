@@ -3,7 +3,8 @@ import { Role } from '@servicenow/sdk/core'
 
 /*
  * Base-platform roles contained below (asset, inventory_user, inventory_admin, procurement_user,
- * procurement_admin, report_user, snc_external) must exist on the instance; see README "Required plugins".
+ * procurement_admin, model_manager, report_user, snc_external) must exist on the instance; see README "Required
+ * plugins".
  */
 
 export const inventoryTech = Role({
@@ -39,7 +40,8 @@ export const finance = Role({
 export const assetManager = Role({
     name: 'x_daas_ham.asset_manager',
     description: 'Provider asset manager: full lifecycle management across all customers.',
-    containsRoles: ['asset', 'inventory_user', 'procurement_user', 'report_user', inventoryTech, noc],
+    // model_manager: the platform's ACLs let only it create and change Model lifecycle milestones (ADR 0017).
+    containsRoles: ['asset', 'inventory_user', 'procurement_user', 'model_manager', 'report_user', inventoryTech, noc],
 })
 
 export const admin = Role({

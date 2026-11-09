@@ -9,6 +9,7 @@ export const REQUIRED_TABLES: ReadonlyArray<{ table: string; provider: string }>
     { table: 'wm_order', provider: 'Field Service Management' },
     { table: 'change_request', provider: 'Change Management' },
     { table: 'cmdb_ci_rack', provider: 'CMDB' },
+    { table: 'cmdb_hardware_model_lifecycle', provider: 'Model Management' },
     { table: 'sysapproval_approver', provider: 'Approvals' },
 ]
 
@@ -18,6 +19,7 @@ export const REQUIRED_ROLES: readonly string[] = [
     'inventory_admin',
     'procurement_user',
     'procurement_admin',
+    'model_manager',
     'report_user',
     'snc_external',
     'canvas_user',

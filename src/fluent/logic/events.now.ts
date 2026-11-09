@@ -33,9 +33,9 @@ export const lifecycleChangedEvent = Record({
     data: {
         suffix: 'model.lifecycle',
         event_name: 'x_daas_ham.model.lifecycle',
-        table: 'x_daas_ham_model_lifecycle',
+        table: 'cmdb_model_lifecycle',
         description: "A model's lifecycle milestones changed or one was crossed; parm1 = model, parm2 = cursor.",
-        fired_by: 'entry/models.ts onModelLifecycleChanged, rollLifecyclePhases',
+        fired_by: 'platform/model-lifecycle.ts queueModelRefresh',
         priority: 200,
     },
 })

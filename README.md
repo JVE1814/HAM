@@ -24,7 +24,7 @@ an OEM PID ([ADR 0016](docs/adr/0016-fleet-assets.md)).
 | Staging | Staging tasks with per-customer / vendor / device-class checklists; distributor-staged units get a verification checklist |
 | Delivery | Ship → change request + FSM work order (inside change and site maintenance windows); self-install confirmation |
 | In service | Seen signals from Discovery / connectors (CI last discovered) and the provider NMS (REST) put installed assets in service and start their subscription line |
-| Models | Normalization of discovered models (PID, aliases, match rules, exceptions that teach rules); lifecycle (EoX) dates via CSV; lifecycle phase and refresh due date per asset |
+| Models | Normalization of discovered models (PID, aliases, match rules, exceptions that teach rules); lifecycle (EoX) dates via CSV, kept in the platform's Model lifecycle table ([ADR 0017](docs/adr/0017-model-lifecycle-in-the-platform-table.md)); lifecycle phase and refresh due date per asset |
 | Visibility | Customer admins see only their customer, site contacts their sites, inventory techs their stockrooms (of fleet assets and NaaS stockrooms; the Provider IT's equipment is left to the platform's access rules) |
 | UI | NaaS Asset Workspace (`/x/daas/naas-assets/home`) with dashboard; navigator menu; warehouse page (`x_daas_ham_warehouse.do`) |
 
@@ -60,6 +60,7 @@ on-demand job **NaaS - preflight check** (System Definition > Scheduled Jobs); i
 | Capability | Plugin / product | Used for |
 |---|---|---|
 | Asset Management | base platform | `alm_hardware`, stockrooms, transfer orders |
+| Model Management | `com.snc.model` (base platform) | Models and their lifecycle milestones (`cmdb_model_lifecycle`, `cmdb_hardware_model_lifecycle`) |
 | Procurement | `com.snc.procurement` | purchase orders (`proc_po`, `proc_po_item`) |
 | Customer Service Management | CSM (`com.sn_customerservice`) | `customer_account`, `customer_contact`, cases (P2), portal (P2) |
 | Field Service Management | FSM (`com.snc.work_management`) | `wm_order` work orders |
@@ -67,7 +68,7 @@ on-demand job **NaaS - preflight check** (System Definition > Scheduled Jobs); i
 | Discovery / Service Graph Connectors | ITOM | CI `last_discovered` as a Seen signal |
 
 Roles the app's roles contain and that must exist: `asset`, `inventory_user`, `inventory_admin`,
-`procurement_user`, `procurement_admin`, `report_user`, `snc_external`, `canvas_user`,
+`procurement_user`, `procurement_admin`, `model_manager`, `report_user`, `snc_external`, `canvas_user`,
 `sn_customerservice_agent`.
 
 Without these plugins the install fails and rolls back with only *Unable to install third party
@@ -169,7 +170,14 @@ moves forward. Only state changes are stored.
 OEM claim code), *Lifecycle import rows* (`x_daas_ham_eox_import`) and *OEM coverage import rows*
 (`x_daas_ham_coverage_import`, optionally with the contract's annual cost) with System Import Sets >
 Load Data; each row is processed on insert and its import state/comment shows the outcome. An ASN
-row's check that no Asset has its serial sees every Asset, past the importer's stockroom rule.
+row's check that no Asset has its serial sees every Asset, past the importer's stockroom rule. A
+lifecycle row's milestones are stored in the platform's Model lifecycle table, one row per Model and
+milestone ([ADR 0017](docs/adr/0017-model-lifecycle-in-the-platform-table.md)): a milestone the row
+leaves blank keeps the date stored, and a row with no date at all is marked *ignored*. Asset managers
+keep milestones by hand in *NaaS Asset Management > Model lifecycle* (the platform's `model_manager`
+role, which the asset manager role contains): lifecycle type *Publisher*, the phase, its start date.
+The list shows the *Publisher* rows of NaaS Models, the ones the app reads; a row left on the form's
+default type, *Internal*, is an organisation's own plan for the Model, which the app ignores.
 
 **Billing pull API** (role `x_daas_ham.finance` or `x_daas_ham.integration`):
 `GET /api/x_daas_ham/naas/billing_periods` and
@@ -256,6 +264,16 @@ What remains can only be confirmed on an instance or behind a vendor login:
   reports (`alm_hardware`, `change_request`, `wm_order`, `proc_po`, `sys_attachment`, ...), including
   delete on `alm_transfer_order`, its lines and `proc_po`, which sourcing uses to remove a transfer order
   or purchase order created only in part (otherwise the line's sourcing summary names it for cancelling).
+- **Model lifecycle** (ADR 0017; the platform's table and its rules were read on a Brazil instance, the
+  app's use of it was not run there): a lifecycle import row for a NaaS Model stores one active row
+  per milestone in `cmdb_model_lifecycle` (class *Hardware Model Lifecycle*, type *Publisher*, source
+  *Internal*, the provenance as its description), stamps the Model's fleet assets with their
+  Lifecycle phase, and queues `x_daas_ham.model.lifecycle` once; loaded again, it saves nothing. A
+  milestone an asset manager changes in *Model lifecycle* stamps them again, and one of a Model
+  without an OEM PID queues nothing. On an instance upgraded from a version that had
+  `x_daas_ham_model_lifecycle`, check that the table is still there with its rows (the build deletes
+  its ACLs, form, list and labels, not the table); the app no longer reads them: load them again
+  through the lifecycle import or enter them by hand.
 - **Fleet column** (ADR 0016): *Fleet* (`x_daas_ham_fleet`) on `alm_hardware` is a read-only
   boolean, default false, with the index `x_daas_ham_hw_fleet`, and the install sets it true on no
   row. The dictionary entries of *Legal owner* (`alm_hardware`), *Track as asset* (`cmdb_model`) and

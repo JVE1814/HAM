@@ -13,6 +13,7 @@ import { runTableJob } from '../platform/chunked.ts'
 import { todayIso } from '../platform/clock.ts'
 import { EVENT, fire } from '../platform/events.ts'
 import { refreshLifecycleDates } from '../platform/lifecycle-dates.ts'
+import { queueModelRefresh, queueModelsReachingMilestone, writingModelLifecycle } from '../platform/model-lifecycle.ts'
 import {
     closeNonNaasExceptions,
     learnFromResolution,
@@ -110,9 +111,13 @@ export function onNormalizationResolved(current: GlideRecord): void {
     current.update()
 }
 
-/** After insert/update rule on Model lifecycle: recompute that model's fleet assets in the background. */
+/**
+ * After insert/update rule on the platform's Model lifecycle table (ADR 0017), for a NaaS Model's row whose milestone
+ * changed (the rule's condition): recompute that Model's fleet assets in the background. A save the app's own write
+ * makes is left to that write, which queues the pass once for all the milestones it saves.
+ */
 export function onModelLifecycleChanged(current: GlideRecord): void {
-    fire(EVENT.lifecycleChanged, current, str(current, 'model'), '')
+    if (!writingModelLifecycle(str(current, 'model'))) queueModelRefresh(current)
 }
 
 /**
@@ -132,13 +137,7 @@ export function refreshModelAssets(event: GlideRecord, current: GlideRecord): vo
 
 /** Daily job: models crossing a milestone today change phase without any record changing. */
 export function rollLifecyclePhases(): void {
-    const today = todayIso()
-    const lifecycle = new GlideRecord('x_daas_ham_model_lifecycle')
-    lifecycle.addEncodedQuery(
-        `end_of_sale=${today}^ORend_of_support=${today}^ORend_of_extended_support=${today}^ORend_of_life=${today}`,
-    )
-    lifecycle.query()
-    while (lifecycle.next()) fire(EVENT.lifecycleChanged, lifecycle, str(lifecycle, 'model'), '')
+    queueModelsReachingMilestone(todayIso())
 }
 
 /** After-update rule on Agreements whose refresh terms changed. */

@@ -1,11 +1,12 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
-import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { normalizeSerial, receiveSerialLockName, validateAsnRows, type AsnRowCheck } from '../domain/asn.ts'
 import { parseLifecycleRow } from '../domain/model-lifecycle.ts'
 import { newAsset } from '../platform/assets.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { withLockTries, type HeldLock } from '../platform/locks.ts'
+import { writeModelLifecycle } from '../platform/model-lifecycle.ts'
 import { loadNormalizationData, recordNormalizationException, resolveModel } from '../platform/normalization.ts'
 import { PROPERTY, stringProperty } from '../platform/properties.ts'
 import { refusal, str } from '../platform/records.ts'
@@ -117,7 +118,11 @@ function serialExists(serial: string): boolean {
     return asset.hasNext()
 }
 
-/** After-insert rule on lifecycle import rows: upsert the Model lifecycle (source CSV). */
+/**
+ * After-insert rule on lifecycle import rows: store the row's milestones on its Model (platform/model-lifecycle,
+ * source CSV). A milestone the row leaves blank keeps what is stored. A row with a milestone the platform refuses is
+ * marked error with why, to load again once the cause is fixed: the milestones saved meanwhile are then found as given.
+ */
 export function processLifecycleRow(current: GlideRecord): void {
     const parsed = parseLifecycleRow({
         pid: str(current, 'pid'),
@@ -131,20 +136,9 @@ export function processLifecycleRow(current: GlideRecord): void {
     const resolution = resolveModel({ manufacturer: str(current, 'manufacturer'), model: parsed.pid }, loadNormalizationData())
     if (!resolution.modelId) return finish(current, 'error', `PID ${parsed.pid} does not map to a model`)
 
-    const lifecycle = new GlideRecord('x_daas_ham_model_lifecycle')
-    const exists = lifecycle.get('model', resolution.modelId)
-    if (!exists) {
-        lifecycle.initialize()
-        lifecycle.setValue('model', resolution.modelId)
-    }
-    lifecycle.setValue('end_of_sale', parsed.dates.endOfSale ?? '')
-    lifecycle.setValue('end_of_support', parsed.dates.endOfSupport ?? '')
-    lifecycle.setValue('end_of_extended_support', parsed.dates.endOfExtendedSupport ?? '')
-    lifecycle.setValue('end_of_life', parsed.dates.endOfLife ?? '')
-    lifecycle.setValue('source', 'csv')
-    lifecycle.setValue('source_reference', str(current, 'source_reference'))
-    lifecycle.setValue('last_refreshed', new GlideDateTime().getValue())
-    const saved = exists ? lifecycle.update() : lifecycle.insert()
-    if (!saved) return finish(current, 'error', `Lifecycle for ${parsed.pid} not saved: ${refusal(lifecycle)}`)
-    finish(current, exists ? 'updated' : 'inserted', `Lifecycle for ${parsed.pid}`)
+    const written = writeModelLifecycle(resolution.modelId, parsed.dates, { source: 'csv', reference: str(current, 'source_reference') })
+    if (written.refused.length > 0) return finish(current, 'error', `Lifecycle for ${parsed.pid} not saved: ${written.refused.join('; ')}`)
+    const known = written.updated + written.unchanged
+    if (known + written.inserted === 0) return finish(current, 'ignored', `No milestone date for ${parsed.pid}`)
+    finish(current, known > 0 ? 'updated' : 'inserted', `Lifecycle for ${parsed.pid}`)
 }

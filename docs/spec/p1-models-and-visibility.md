@@ -21,14 +21,22 @@
 
 ## Lifecycle (`domain/model-lifecycle.ts`)
 
-- One lifecycle record per Model. The CSV import accepts ISO dates of real calendar days (it refuses
-  2026-02-31) and refuses milestones that go backwards.
+- A Model's milestones are kept in the platform's Model lifecycle table (`cmdb_model_lifecycle`, ADR 0017), one
+  row per Model and milestone: lifecycle type *Publisher*, the milestone as the lifecycle phase, its date as the
+  phase start date. The app writes its rows as hardware lifecycle rows of source *Internal*, with where the date
+  comes from (manual, CSV import, a vendor's API, and the bulletin it names) as the description. It reads every
+  active Publisher row of the Model, so a milestone the Provider's IT keeps by hand or ServiceNow's content service
+  supplies counts too; where two rows give the same milestone, the *Internal* one wins.
+- The CSV import accepts ISO dates of real calendar days (it refuses 2026-02-31) and refuses milestones that go
+  backwards. A milestone a row leaves blank keeps the date stored; a row with no date at all is marked *ignored*.
+  No row is ever removed by the app: a milestone stored by mistake is deactivated or deleted in the list by hand.
 - **Lifecycle phase** on a day is the latest milestone reached: end of sale → end of support → end of
   extended support → end of life.
 - **Refresh due** = in-service date + the Agreement's refresh cycle, or the Model's end of support, or
   whichever is earlier, per the Agreement's refresh basis.
 - Recalculation runs in time-boxed chunks:
-  - for a Model, when its lifecycle record changes or a milestone date is reached (daily);
+  - for a NaaS Model, when a milestone of its changes (a rule on the platform's table, which leaves the Provider
+    IT's Models alone) or a milestone date is reached (daily);
   - for an Agreement's deployed Assets, when its refresh terms change.
 
 ## Visibility (`domain/visibility.ts`, ADR 0005)
@@ -36,7 +44,7 @@
 | User | Sees |
 |---|---|
 | asset manager, field tech, NOC, account manager, finance, admin | everything |
-| inventory tech only | fleet assets, NaaS stockrooms, transfer orders from or to a NaaS stockroom, staging tasks and audits (with their lines) of their stockrooms; plus, across all stockrooms and Customers, the ASN imports, staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and Disposal orders; no other app table; the Provider IT's hardware, stockrooms and transfer orders as the platform allows |
+| inventory tech only | fleet assets, NaaS stockrooms, transfer orders from or to a NaaS stockroom, staging tasks and audits (with their lines) of their stockrooms; plus, across all stockrooms and Customers, the ASN imports, staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and Disposal orders; no other app table; the Provider IT's hardware, stockrooms and transfer orders, and Model lifecycle milestones, as the platform allows |
 | customer admin | their Customer's fleet assets (and no other company's hardware), Orders, lines, Return orders and lines, Shipments and events, Attestations and items, Agreements, subscription lines, catalog entries and Fee events; Site templates with their items, their Customer's and those offered to every Customer (checked by the read ACL, no before-query rule) |
 | site contact | their Customer's fleet assets (and no other company's hardware), Orders and lines, Return orders and lines, Shipments and events, and Attestations and items at the Sites listing them as contacts; no Fee events |
 | anyone with no NaaS role | whatever the platform's ACLs and rules allow, fleet assets included |

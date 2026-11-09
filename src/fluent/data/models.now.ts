@@ -2,8 +2,6 @@ import '@servicenow/sdk/global'
 import {
     BooleanColumn,
     ChoiceColumn,
-    DateColumn,
-    DateTimeColumn,
     DocumentIdColumn,
     IntegerColumn,
     ReferenceColumn,
@@ -45,35 +43,6 @@ export const x_daas_ham_model_match_rule = Table({
         active: BooleanColumn({ label: 'Active', default: true }),
     },
     index: [{ name: 'x_daas_ham_mmr_mfr', unique: false, element: 'manufacturer' }],
-})
-
-/** A Model's manufacturer support milestones (one record per Model). */
-export const x_daas_ham_model_lifecycle = Table({
-    name: 'x_daas_ham_model_lifecycle',
-    label: 'Model lifecycle',
-    schema: {
-        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true, referenceQual: 'x_daas_ham_oem_pidISNOTEMPTY' }),
-        end_of_sale: DateColumn({ label: 'End of sale' }),
-        end_of_support: DateColumn({ label: 'End of support' }),
-        end_of_extended_support: DateColumn({ label: 'End of extended support' }),
-        end_of_life: DateColumn({ label: 'End of life' }),
-        source: ChoiceColumn({
-            label: 'Source',
-            choices: {
-                manual: { label: 'Manual', sequence: 0 },
-                csv: { label: 'CSV import', sequence: 1 },
-                cisco: { label: 'Cisco EoX API', sequence: 2 },
-                meraki: { label: 'Meraki Dashboard API', sequence: 3 },
-                fortinet: { label: 'Fortinet Asset Management API', sequence: 4 },
-                mist: { label: 'HPE Mist API', sequence: 5 },
-            },
-            default: 'manual',
-            dropdown: 'dropdown_without_none',
-        }),
-        source_reference: StringColumn({ label: 'Source reference', maxLength: 255 }),
-        last_refreshed: DateTimeColumn({ label: 'Last refreshed', readOnly: true }),
-    },
-    index: [{ name: 'x_daas_ham_ml_model', unique: true, element: 'model' }],
 })
 
 /** A raw manufacturer/model pair no Model match rule could map. */

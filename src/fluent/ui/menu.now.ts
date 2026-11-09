@@ -287,6 +287,8 @@ Record({
     },
 })
 
+// The platform's table (ADR 0017), kept to the rows the app reads: the manufacturer milestones (lifecycle type
+// Publisher) of NaaS Models. The form's default type, Internal, is an organisation's own plan, which the app ignores.
 Record({
     $id: Now.ID['module_model_lifecycle'],
     table: 'sys_app_module',
@@ -294,7 +296,8 @@ Record({
         title: 'Model lifecycle',
         application: naasMenu,
         link_type: 'LIST',
-        name: 'x_daas_ham_model_lifecycle',
+        name: 'cmdb_model_lifecycle',
+        filter: 'model.x_daas_ham_oem_pidISNOTEMPTY^lifecycle_type=publisher^ORDERBYmodel^ORDERBYstart_date',
         roles: ['x_daas_ham.asset_manager', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
         active: true,
         order: 510,

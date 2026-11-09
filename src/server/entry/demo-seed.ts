@@ -1,5 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { isFleetAsset, joinFleet, newAsset } from '../platform/assets.ts'
+import { writeModelLifecycle } from '../platform/model-lifecycle.ts'
 import { refusal, str } from '../platform/records.ts'
 import type { Stage } from '../domain/lifecycle.ts'
 import type { CatalogEntryType } from '../domain/vocabulary.ts'
@@ -95,12 +96,10 @@ export function loadDemoData(): void {
     model('QSFP-100G-SR4-S', '100GBASE-SR4 QSFP module', cisco, 'optic', true)
     ensure('cmdb_hardware_product_model', { name: 'C9300-48P', manufacturer: cisco }) // as Discovery would create it
 
-    const lifecycle = (modelId: string, endOfSale: string, endOfSupport: string) =>
-        ensure(
-            'x_daas_ham_model_lifecycle',
-            { model: modelId },
-            { end_of_sale: endOfSale, end_of_support: endOfSupport, source: 'manual', source_reference: 'Demo data: illustrative dates' },
-        )
+    const lifecycle = (modelId: string, endOfSale: string, endOfSupport: string) => {
+        const written = writeModelLifecycle(modelId, { endOfSale, endOfSupport }, { source: 'manual', reference: 'Demo data: illustrative dates' })
+        for (const why of written.refused) gs.warn(`[x_daas_ham] Demo model lifecycle not saved: ${why}`)
+    }
     lifecycle(c9300, '2028-10-31', '2033-10-31')
     lifecycle(isr4331, '2023-11-07', '2028-11-30')
     lifecycle(mr46, '2026-06-30', '2031-06-30')

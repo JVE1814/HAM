@@ -23,7 +23,7 @@ export const naasWorkspace = Workspace({
         'alm_hardware',
         'x_daas_ham_agreement',
         'x_daas_ham_subscription_line',
-        'x_daas_ham_model_lifecycle',
+        'cmdb_hardware_model_lifecycle',
         'x_daas_ham_norm_exception',
     ],
     listConfig: naasListMenu,

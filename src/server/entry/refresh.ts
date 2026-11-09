@@ -4,8 +4,8 @@ import type { LifecycleDates } from '../domain/model-lifecycle.ts'
 import { toIsoDate } from '../domain/calendar.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import { nowMs, todayIso } from '../platform/clock.ts'
-import { modelLifecycle } from '../platform/lifecycle-dates.ts'
 import { withLock, type HeldLock } from '../platform/locks.ts'
+import { readModelLifecycle } from '../platform/model-lifecycle.ts'
 import { intProperty, PROPERTY } from '../platform/properties.ts'
 import { pluck, refusal, str } from '../platform/records.ts'
 import { submitOrder } from './orders.ts'
@@ -83,7 +83,7 @@ function catalogModels(customerId: string): Array<{ modelId: string; deviceClass
 function raiseWave({ customerId, siteId, agreementId, assets }: RefreshWave): string {
     const catalog = catalogModels(customerId)
     const lifecycle = new Map<string, LifecycleDates>()
-    for (const modelId of new Set([...catalog.map((c) => c.modelId), ...assets.map((a) => a.modelId)])) lifecycle.set(modelId, modelLifecycle(modelId))
+    for (const modelId of new Set([...catalog.map((c) => c.modelId), ...assets.map((a) => a.modelId)])) lifecycle.set(modelId, readModelLifecycle(modelId))
 
     const order = new GlideRecord('x_daas_ham_order')
     order.initialize()

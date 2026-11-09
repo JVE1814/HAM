@@ -388,7 +388,6 @@ describe('read ACLs for inventory techs', () => {
                 'x_daas_ham_attestation',
                 'x_daas_ham_lease_schedule',
                 'x_daas_ham_cloud_account',
-                'x_daas_ham_model_lifecycle',
             ]),
         )
     })

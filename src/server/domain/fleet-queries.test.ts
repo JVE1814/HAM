@@ -25,6 +25,8 @@ const FILES = [...nowFiles('workspace/'), 'ui/menu.now.ts', ...nowFiles('ui/', '
 const REQUIRED: Readonly<Record<string, string>> = {
     alm_hardware: fleetCondition(),
     cmdb_model: naasModelCondition(),
+    // The platform's Model lifecycle table (ADR 0017) holds the milestones of the Provider IT's Models too.
+    cmdb_model_lifecycle: naasModelCondition('model.'),
     alm_stockroom: naasStockroomCondition(),
 }
 
@@ -117,7 +119,7 @@ describe('queries of the workspace, dashboard, navigator and forms on shared tab
         }
         // Not vacuous: the dashboard tiles, the workspace lists and the navigator modules are all found.
         expect(onShared.map((query) => query.id)).toEqual(
-            expect.arrayContaining(['unbilled', 'ended_line', 'dash_w_no_coverage_ds', 'ws_assets_in_service', 'ws_models_canonical', 'module_spare_pools']),
+            expect.arrayContaining(['unbilled', 'ended_line', 'dash_w_no_coverage_ds', 'ws_assets_in_service', 'ws_models_canonical', 'ws_models_lifecycle', 'module_model_lifecycle', 'module_spare_pools']),
         )
     })
 
