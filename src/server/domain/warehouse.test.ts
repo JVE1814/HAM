@@ -39,11 +39,26 @@ describe('receivingProblem', () => {
 })
 
 describe('allocationProblem', () => {
-    const waiting = { stage: 'awaiting_stock', quantity: 2, allocated: 1 } as const
+    const waiting = { stage: 'awaiting_stock', orderStage: 'preparing', quantity: 2, allocated: 1 } as const
 
     it('gives the unit to a line still awaiting stock with room for it', () => {
         expect(allocationProblem(waiting)).toBeNull()
         expect(allocationProblem({ ...waiting, allocated: 0 })).toBeNull()
+    })
+
+    it('gives it on any live Order', () => {
+        for (const orderStage of ['sourcing', 'preparing', 'delivering', 'installing']) {
+            expect(allocationProblem({ ...waiting, orderStage })).toBeNull()
+        }
+    })
+
+    it('leaves the unit free on a line still awaiting stock whose Order is cancelled or rejected (saved before its lines; a refused line cancel)', () => {
+        expect(allocationProblem({ ...waiting, orderStage: 'cancelled' })).toBe('its Order is cancelled')
+        expect(allocationProblem({ ...waiting, orderStage: 'rejected', allocated: 0 })).toBe('its Order is rejected')
+    })
+
+    it('names the ended Order before the line', () => {
+        expect(allocationProblem({ ...waiting, stage: 'cancelled', orderStage: 'cancelled' })).toBe('its Order is cancelled')
     })
 
     it('leaves the unit free once the line has all its units, as when two receipts raced for its last one', () => {

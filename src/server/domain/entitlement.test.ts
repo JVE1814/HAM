@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+    agreementUsageLockName,
     assessOrder,
     deployedUsageQuery,
     inFlightLinesQuery,
     OPEN_LINE_STAGES,
     ownershipFindings,
     raiserRefusal,
+    readsUsage,
     siteTemplateOffered,
     type EntitlementContext,
     type Orderer,
@@ -13,6 +15,7 @@ import {
 } from './entitlement'
 import { lineStageFor } from './fulfilment'
 import { DEPLOYED_STAGES } from './lifecycle'
+import { orderLineLockName, sourcingLockName } from './sourcing'
 
 const context: EntitlementContext = {
     catalog: [
@@ -89,6 +92,51 @@ describe('assessOrder', () => {
         )
         expect(result.verdict).toBe('over_quota')
         expect(result.findings).toHaveLength(2)
+    })
+})
+
+describe('an Order already submitted', () => {
+    it('counts against the next one, which the Agreement lock makes read it', () => {
+        const capped: EntitlementContext = { ...context, quantities: [{ deviceClass: 'switch', contracted: 1 }], usage: [] }
+        const request = { lines: [{ modelId: 'c9300', deviceClass: 'switch', quantity: 1 }] }
+        expect(assessOrder(request, capped).verdict).toBe('within_agreement')
+        const firstInFlight = { ...capped, usage: [{ deviceClass: 'switch', modelId: 'c9300', count: 1 }] }
+        expect(assessOrder(request, firstInFlight)).toEqual({
+            verdict: 'over_quota',
+            approvers: ['customer_admin', 'account_manager'],
+            findings: ['switch: 1 in use + 1 requested exceeds 1 contracted'],
+        })
+    })
+})
+
+describe('readsUsage', () => {
+    const replacing = { modelId: 'c9300', deviceClass: 'switch', quantity: 1, replacesAsset: true }
+    const adding = { modelId: 'c9300', deviceClass: 'switch', quantity: 1 }
+
+    it('is any line that adds a unit; an Order replacing Assets only reads none', () => {
+        expect(readsUsage([replacing, replacing])).toBe(false)
+        expect(readsUsage([replacing, adding])).toBe(true)
+        expect(readsUsage([adding])).toBe(true)
+        expect(readsUsage([])).toBe(false)
+    })
+
+    it('holds for assessOrder: an Order replacing Assets only is assessed the same whatever is in flight', () => {
+        const request = { lines: [replacing, { ...replacing, modelId: 'old-switch' }] }
+        const crowded = { ...context, usage: [{ deviceClass: 'switch', modelId: 'c9300', count: 1000 }, { deviceClass: 'ap', modelId: 'mr46', count: 1000 }] }
+        expect(assessOrder(request, crowded)).toEqual(assessOrder(request, { ...context, usage: [] }))
+    })
+})
+
+describe('agreementUsageLockName', () => {
+    const sysId = (c: string) => c.repeat(32)
+
+    it('locks each Agreement on its own, apart from the sourcing locks, within the job lock name length', () => {
+        const names = [sysId('a'), sysId('b')].map(agreementUsageLockName)
+        expect(new Set(names).size).toBe(2)
+        expect(names[0]).toBe(`agreement_usage_${sysId('a')}`)
+        expect(names[0]).not.toBe(sourcingLockName(sysId('a')))
+        expect(names[0]).not.toBe(orderLineLockName(sysId('a')))
+        for (const name of names) expect(name.length).toBeLessThanOrEqual(100)
     })
 })
 

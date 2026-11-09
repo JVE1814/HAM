@@ -218,9 +218,17 @@ function routedOutcome(route: ShortfallRoute, line: { planSummary: string; missi
 /** Order stages in which nothing is sourced, even for a line a refused save left open. */
 const ENDED_ORDER_STAGES: readonly string[] = ['cancelled', 'rejected']
 
+/**
+ * Whether an Order ended unfilled (cancelled or rejected): nothing is sourced, received or derived for its lines, even
+ * one a refused save left open. Its cancel or rejection saves it before its lines.
+ */
+export function orderEnded(orderStage: string): boolean {
+    return ENDED_ORDER_STAGES.includes(orderStage)
+}
+
 /** Whether an Order line still waits to be filled: not shipped or cancelled, its Order not cancelled or rejected. */
 export function lineStillOpen(line: { lineStage: string; orderStage: string }): boolean {
-    return OPEN_LINE_STAGES.includes(line.lineStage as LineStage) && !ENDED_ORDER_STAGES.includes(line.orderStage)
+    return OPEN_LINE_STAGES.includes(line.lineStage as LineStage) && !orderEnded(line.orderStage)
 }
 
 /** The states of an OEM RMA (x_daas_ham_oem_rma.state). */

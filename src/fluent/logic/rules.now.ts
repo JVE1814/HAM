@@ -126,7 +126,7 @@ BusinessRule({
     when: 'before',
     action: ['update'],
     order: 100,
-    condition: 'current.state.changes() && current.state == 3',
+    condition: 'current.state.changes() && (current.state == 3 || current.state == 4 || current.state == 7)',
     script: guardStagingClosure,
 })
 

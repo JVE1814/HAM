@@ -10,6 +10,7 @@ import {
     type OrderShipment,
 } from '../domain/fulfilment.ts'
 import type { Stage } from '../domain/lifecycle.ts'
+import { orderEnded } from '../domain/sourcing.ts'
 import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { fire } from './events.ts'
@@ -108,6 +109,12 @@ function takeOffLine(assetId: string, line: GlideRecord, to: Stage): boolean {
 /**
  * Derive `line`'s stage again (`refill`: domain/fulfilment `LineFacts`), save it and move its Order on: the stage it
  * now has, or null when the platform refused the save (logged).
+ *
+ * A cancel or rejection saves its Order before it cancels the lines, under their locks, but a derive takes no lock: one
+ * that read the line before the cancel could save its stage after, reopening the line. So a line read afresh as
+ * cancelled, or on an Order that ended (domain/sourcing `orderEnded`), is not moved on, and one whose Order ended while
+ * its stage was saved is cancelled again: either the cancel's save came after this one, or the Order was cancelled
+ * before this save and the line with it.
  */
 function deriveLine(line: GlideRecord, refill: boolean): LineStage | null {
     const current = str(line, 'line_stage') as LineStage
@@ -115,14 +122,27 @@ function deriveLine(line: GlideRecord, refill: boolean): LineStage | null {
     const assetStages = lineAssetStages(line.getUniqueValue())
     const next = lineStageFor({ current, quantity: num(line, 'quantity'), assetStages, refill })
     if (next !== current) {
+        if (closedNow(line)) return 'cancelled'
         line.setValue('line_stage', next)
+        const number = str(line, 'number')
         if (!line.update()) {
-            warnNotMoved(line, `${str(line, 'number')} not moved to ${next}`)
+            warnNotMoved(line, `${number} not moved to ${next}`)
             return null
+        }
+        if (next !== 'cancelled' && closedNow(line)) {
+            line.setValue('line_stage', 'cancelled')
+            if (!line.update()) warnNotMoved(line, `${number} moved to ${next} beside its Order's cancel, not cancelled again`)
+            return 'cancelled'
         }
     }
     recomputeOrder(str(line, 'order'))
     return next
+}
+
+/** Whether the line, read afresh past the user's rules, is cancelled or on an Order cancelled or rejected. */
+function closedNow(line: GlideRecord): boolean {
+    const fresh = readPastRules('x_daas_ham_order_line', line.getUniqueValue())
+    return !!fresh && (str(fresh, 'line_stage') === 'cancelled' || orderEnded(str(fresh, 'order.stage')))
 }
 
 /**

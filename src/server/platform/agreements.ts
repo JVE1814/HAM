@@ -12,6 +12,12 @@ import { bool, num, str } from './records.ts'
 
 /** Read models of an Agreement and its Customer catalog, as the entitlement module needs them. */
 
+/**
+ * What an Order is assessed against, read now. For an Order whose lines read usage (domain/entitlement `readsUsage`)
+ * it is read holding the Agreement's usage lock, with the save that takes the Order out of draft (entry/orders
+ * `submitAccepted`), so submissions of one Agreement each count the last. Usage that changes without a submission
+ * (lines added to an Order already submitted, Assets adopted into the Agreement) is not held back by it.
+ */
 export function entitlementContext(customerId: string, agreementId: string, excludeOrderId: string): EntitlementContext {
     return {
         catalog: catalogEntries(customerId),

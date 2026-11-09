@@ -1,6 +1,6 @@
 import type { LineStage } from './fulfilment.ts'
 import type { Stage } from './lifecycle.ts'
-import type { StockroomType } from './sourcing.ts'
+import { orderEnded, type StockroomType } from './sourcing.ts'
 
 /** What the warehouse scanning app (P1.5) may do with a scanned Asset, by its Lifecycle stage. */
 
@@ -29,17 +29,22 @@ export function receivingProblem(into: StockroomType): string | null {
 /** An Order line as a receipt reads it again under the line's lock, to decide whether the unit still goes to it. */
 export interface ReceivingLine {
     stage: LineStage | ''
+    /** Its Order's stage, read with the line. */
+    orderStage: string
     quantity: number
     /** Assets on the line, in any stage. */
     allocated: number
 }
 
 /**
- * Why a received unit no longer goes to the Order line it was found for, or null when it does: the line must still
- * await stock and have room (fewer Assets on it than ordered). It is found before its lock is taken, so another
- * receipt or a sourcing run may have filled it since, or it may have moved on (cancelled, say).
+ * Why a received unit no longer goes to the Order line it was found for, or null when it does: its Order must be
+ * neither cancelled nor rejected (domain/sourcing `orderEnded`), and the line must still await stock and have room
+ * (fewer Assets on it than ordered). It is found before its lock is taken, so another receipt or a sourcing run may
+ * have filled it since, or it may have moved on (cancelled, say). The Order comes first: a cancel or rejection saves the
+ * Order before its lines, and a line whose cancel was refused stays awaiting stock on its ended Order.
  */
 export function allocationProblem(line: ReceivingLine): string | null {
+    if (orderEnded(line.orderStage)) return `its Order is ${line.orderStage}`
     if (line.stage !== 'awaiting_stock') return `it is no longer awaiting stock (${line.stage || 'unknown stage'})`
     if (line.allocated >= line.quantity) return `it already has all ${line.quantity} unit(s)`
     return null

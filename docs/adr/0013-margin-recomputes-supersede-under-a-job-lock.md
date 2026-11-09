@@ -40,22 +40,40 @@ cancel and a pass take turns; a cancel that finds it held changes nothing and as
 again. Under it, *Cancel order* also takes the Order's Ship lock (`ship_order_<Order sys_id>`), so a
 Ship cannot run between its shipped check and its release of the lines; one that finds it held
 changes nothing and says a Ship of the Order is running, without retrying. It is the only holder of
-both, and Ship never takes `source_order_`, so `source_order` stays before `ship_order`. The daily
+both, and Ship never takes `source_order_`, so `source_order` stays before `ship_order`. Under its
+Ship lock, *Cancel order* also takes the `order_line_<line sys_id>` lock of each of the Order's lines
+not yet shipped, 10 tries each, and saves the Order, releases each line's units and cancels the line
+only once it holds them all; one that finds a line's lock held changes nothing and asks the user to
+try again. A receipt for a waiting line saves its unit, takes it off order, reserves it and stages it
+(its Staging task opened, the move into staging saved) under that line's lock, and reads the line and
+its Order again there: the unit goes only to a line still awaiting stock on an Order neither
+cancelled nor rejected. So a receipt lands wholly before the cancel reads the line's units, or finds
+the line and its Order cancelled. An Order's rejection holds the same line locks while it saves the
+Order rejected and cancels its lines; one that finds a line's lock held changes nothing, and the
+Order stays awaiting approval, to re-check. A line's stage derived from its Assets takes no lock, so
+a derive that read the line before a cancel is not saved once the line is cancelled or its Order has
+ended, and a line whose Order ended while its derived stage was saved is cancelled again
+(`platform/fulfilment.ts` `deriveLine`): a derive never reopens a cancelled line. The daily
 refresh run holds `refresh_orders`, a lock of the same kind, and, like *Cancel order*, does not
 retry: a run that finds its lock held raises nothing and leaves it to the run holding it. Short
-critical sections, such as an Order line, an ASN row's serial, the Provider tag counter, a stock
-change, a Service interval, a Subscription line's start, a sighting or a tracking update, take locks
-of the same kind and, finding one held, try again back to back a few times (`withLockTries` in
-`platform/locks.ts`) before they give up. A tracking update that gives up is not left to the
+critical sections, such as an Order line, an Agreement's submissions, an ASN row's serial, the
+Provider tag counter, a stock change, a Service interval, a Subscription line's start, a sighting or a
+tracking update, take locks of the same kind and, finding one held, try again back to back a few
+times (`withLockTries` in `platform/locks.ts`) before they give up. A tracking update that gives up is not left to the
 aggregator (ShipEngine resends it at most twice, typically 30 minutes apart, then drops it): it is
 queued as an event that tries the lock again, then a minute apart, at most 15 more times.
 
 Locks are not re-entrant: a holder that takes a lock it already holds is refused, as any other taker
 would be. A take never waits either: it tries and gives up. So locks are taken in one order, and a
-holder only takes locks later in it than those it holds:
+holder only takes locks later in it than those it holds. A holder that takes several locks of one
+kind takes them one under another in sys_id order. Only *Cancel order* and an Order's rejection do,
+holding the `order_line_` lock of each of the Order's open lines at once. A take never waits, so this
+cannot deadlock; the sys_id order only makes two such holders of one Order meet at the same line
+first. Every other holder of an `order_line_` lock holds one at a time and takes nothing earlier in
+the order under it, and two cancels of one Order exclude each other through `source_order_`.
 
-`refresh_orders` < `oem_claim_run` < `seen_asset` < `receive_serial` < `receive_asset` <
-`source_order` < `ship_order` < `track_shipment` < `return_label` < `order_line` <
+`refresh_orders` < `agreement_usage` < `oem_claim_run` < `seen_asset` < `receive_serial` <
+`receive_asset` < `source_order` < `ship_order` < `track_shipment` < `return_label` < `order_line` <
 `provider_tag_sequence` < `spare_pool` < `reserve_asset` < `return_request` < `return_asset` <
 `fee` < `recon_exception` < `subscription_line` < `service_interval` < job locks (the margin
 recompute's).
@@ -65,9 +83,31 @@ they hold no other lock when they do. The go-live under it starts its pending Su
 under `subscription_line_<line sys_id>` and releases it before the go-live save takes
 `service_interval_<sys_id>`. Nothing takes `subscription_line_` except that go-live, and nothing is
 taken under it. `refresh_orders` is held by the daily refresh run for the whole run, and the run
-holds no other lock when it takes it. The Orders it raises are inserted and submitted under it,
-which takes no lock today (sourcing runs from the queued event), so nothing is taken under it. It
-comes first all the same, ahead of anything a submit might come to take.
+holds no other lock when it takes it. The Orders it raises are inserted and submitted under it. Each
+of their lines replaces an Asset, so their submit reads no usage and takes no lock (below), and
+sourcing runs from the queued event: nothing is taken under it. It comes first all the same, ahead
+of `agreement_usage`, which a submit of an Order with a line that adds a unit takes.
+Submitting an Order assesses it against its Agreement's usage (deployed units plus the quantities of
+its other Orders in flight, `domain/entitlement.ts`) and then saves it out of draft, from which save
+on it counts in flight. Two submissions of one Agreement that both read before either saved would
+each miss the other, and could both go ahead within a Contracted quantity only one fits, with no
+over-quota approval. So a submission holds `agreement_usage_<Agreement sys_id>` from its fresh read of
+the Order, its lines and the Agreement's quantities and usage through the save that takes the Order
+out of draft, and goes on only from draft, under the Agreement and Customer it locked and checked:
+a second submission of the same Order finds it gone ahead and says so. *Submit*, the record
+producer, *Raise replacement* and a submission queued again take it holding no lock. An Order whose
+lines all replace Assets (break-fix, refresh) is assessed the same whatever is in flight, and its
+lines going into flight beside a holder's read of usage read as if it had come first or last, so its
+submit takes no lock. A submission that finds the lock held through 10 back-to-back tries leaves the
+Order a draft, noted, and queues it to be submitted again a minute later (the sourcing event with
+parm1 `submit`), at most 15 times, then logs it for staff to submit; the producer's raiser, who may
+have no *Submit*, is told it is submitted within minutes and not to raise it again. Under the lock a
+submit only reads, requests approvals (and cancels them when it cannot go ahead, which runs the
+approval rollup rule: it finds the Order a draft and takes nothing), saves the Order (no rule of the
+app is on it) and queues its sourcing, which takes `source_order_` in its own transaction holding
+nothing. A submit that outlasts the lock logs *submitted after its Agreement's usage lock was lost*.
+The lock orders submissions only: usage that changes without one (a line added to an Order already
+submitted, its Agreement changed, Assets adopted into the Agreement) is not assessed.
 The Asset rule that takes a unit lost in transit off its Order line takes no lock: it queues the
 Order's sourcing rather than take `source_order_<Order sys_id>` inside an Asset save. The rack
 re-check after an Asset's placement is saved takes `recon_exception_<type>_<rack sys_id>`. It holds

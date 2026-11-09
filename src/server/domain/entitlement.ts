@@ -192,6 +192,25 @@ export function deployedUsageQuery(agreementId: string): string {
     return fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}^${notInFlight}`)
 }
 
+/**
+ * Whether assessing these lines reads the Agreement's usage: only lines that add a unit do (`assessOrder` exempts those
+ * replacing an Asset). An Order with none gets the same verdict whatever is in flight, and its lines going into flight
+ * beside a submission that reads usage read as if it had come first or last, so its submission need not take turns
+ * (`agreementUsageLockName`).
+ */
+export function readsUsage(lines: readonly RequestedLine[]): boolean {
+    return lines.some((line) => !line.replacesAsset)
+}
+
+/**
+ * The job lock (ADR 0013) an Agreement's submissions take turns under: each reads the Agreement's usage, assesses its
+ * Order and saves it out of draft, which makes it count in flight, before the next reads. Two read at once would each
+ * miss the other and could both go ahead within a Contracted quantity only one fits.
+ */
+export function agreementUsageLockName(agreementId: string): string {
+    return `agreement_usage_${agreementId}`
+}
+
 /** Encoded query on x_daas_ham_order_line: the Agreement's open lines on live Orders other than `excludeOrderId`. */
 export function inFlightLinesQuery(agreementId: string, excludeOrderId: string): string {
     return `order.agreement=${agreementId}^order!=${excludeOrderId}^order.stageNOT INdraft,rejected,cancelled^line_stageIN${OPEN_LINE_STAGES.join(',')}`
