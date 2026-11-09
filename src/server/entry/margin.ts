@@ -107,9 +107,18 @@ function saveMarginStatus(period: GlideRecord, failed: number, error: string): v
     checkSaved(period.update(), period, 'Margin status')
 }
 
-/** Empty the period's Cost facts and Margin as a pass starts. */
+/** Empty the period's Cost facts and Margin as a pass starts. A row left throws (see clearRows). */
 function clearPeriod(periodId: string): void {
-    for (const table of ['x_daas_ham_cost_fact', 'x_daas_ham_margin']) deleteWhere(table, `billing_period=${periodId}`)
+    clearRows('x_daas_ham_cost_fact', periodId, 'Cost facts')
+    clearRows('x_daas_ham_margin', periodId, 'Margin rows')
+}
+
+/**
+ * Delete the period's rows of `table`, throwing when any is left (a rule can keep one), so that the pass stops and
+ * records why on the period (ADR 0013): the pass would add to a Cost fact left, and write Margin beside a row left.
+ */
+function clearRows(table: string, periodId: string, what: string): void {
+    if (!deleteWhere(table, `billing_period=${periodId}`)) throw new Error(`old ${what} not all removed`)
 }
 
 /** A Service interval as stored, with its Asset's sys_id. */
@@ -228,9 +237,9 @@ function sumsBy(table: string, encodedQuery: string): Amount[] {
     return sums
 }
 
-/** Replace the period's Margin rows with its revenue against its Cost facts. */
+/** Replace the period's Margin rows with its revenue against its Cost facts. A row left throws (see clearRows). */
 function writeMargin(periodId: string): void {
-    deleteWhere('x_daas_ham_margin', `billing_period=${periodId}`)
+    clearRows('x_daas_ham_margin', periodId, 'Margin rows')
     const revenue = sumsBy('x_daas_ham_billing_line', `billing_period=${periodId}`)
     const cost = sumsBy('x_daas_ham_cost_fact', `billing_period=${periodId}`)
     for (const row of marginRows(revenue, cost)) {

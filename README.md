@@ -227,7 +227,10 @@ What remains can only be confirmed on an instance or behind a vendor login:
   the lock); a lock row created over 10 minutes ago is cleared by the next recompute and a fresh one
   is not; a chunk that finds the lock held runs again about a minute later; a recompute whose lock was
   cleared while it was writing logs a *job lock lost while writing* warning and starts a fresh pass,
-  which recomputes the period from scratch; and no lock row is left once a recompute completes.
+  which recomputes the period from scratch; a recompute whose clearing of the period's old Cost
+  facts or Margin rows leaves a row (kept by a delete rule, say) stops with *Last margin error*
+  *stopped: old Cost facts not all removed* (or *old Margin rows not all removed*) and logs
+  *[x_daas_ham] Margin of <period> stopped: ...*; and no lock row is left once a recompute ends.
 - **Provider tag counter** (warehouse Receive): the counter is advanced under the job lock
   `provider_tag_sequence`, so two units received at the same moment get different tags. A receipt that
   finds the lock held 5 times in a row answers HTTP 503 *Other receipts are taking Provider tags: scan

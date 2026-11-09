@@ -103,7 +103,11 @@ Closing a period (or **Recompute margin** on a closed one) rebuilds its **Cost f
   recompute over, so the period is recomputed from scratch. Service intervals that fail to cost are
   left out, counted on the period (*Service intervals that failed to cost*) with the last error (*Last
   margin error*); both are cleared when a recompute starts. If the period refuses that clearing, the
-  pass stops (logged) before it clears the period's Cost facts and Margin.
+  pass stops (logged) before it clears the period's Cost facts and Margin. If clearing the period's
+  old Cost facts or Margin rows leaves a row behind (a rule can keep one), as the pass starts or as
+  it rewrites Margin at the end, the pass stops too: *Last margin error* reads *stopped: old Cost
+  facts not all removed* (or *old Margin rows not all removed*), the error is logged, and the next
+  *Recompute margin* clears the period again.
 - While a buyout transfer is still running, a lease's payment keeps being split over the Assets it
   covered when the buyout was decided.
 - Otherwise a lease's payment is split over the Assets it covers now: units the Lessor or the OEM has
