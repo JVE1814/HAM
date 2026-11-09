@@ -5,6 +5,8 @@ import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_in
 import {
     billingMonthProblem,
     billsFromIntervals,
+    chooseCurrency,
+    currencyTotals,
     decideGenerationReset,
     generationEventParm,
     isCurrentGeneration,
@@ -14,8 +16,13 @@ import {
     readGenerationEventParm,
     RESET_AFTER_IDLE_MINUTES,
     resetGenerationError,
+    singleCurrencyTotal,
     subscriptionCharges,
     toCsv,
+    totalsText,
+    type AgreementCurrency,
+    type CurrencyChoice,
+    type CurrencyTotal,
     type GenerationEventParm,
     type MonthBounds,
     type ServiceInterval,
@@ -171,6 +178,7 @@ function generateChunk(
 ): void {
     const bounds = monthBounds(str(period, 'period'))
     const siteName = memoized(siteNameOf)
+    const currencies = memoized(customerCurrencies)
     const result = runEventTableJob({
         eventName: EVENT.billingGenerate,
         record: current,
@@ -190,7 +198,7 @@ function generateChunk(
             },
             customerId: str(line, 'customer'),
             agreementId: str(line, 'agreement'),
-            currency: str(line, 'currency') || 'EUR',
+            agreement: agreementCurrencyOf(line, 'agreement'),
         }),
         prepare: (lines: readonly LineRow[]) => withIntervals(lines, bounds),
         // Before the next chunk is queued: a line that could not be billed must not vanish from the bill, so a count
@@ -203,7 +211,10 @@ function generateChunk(
             if (!period.update()) throw new Error(`${failures.failed} failed line(s) not counted: ${refusal(period)}`)
         },
         handle: (line, lineId) => {
-            for (const charge of subscriptionCharges(line.terms, bounds, { intervals: line.intervals, siteName })) {
+            // A line whose Agreement has no currency fails (counted on the period), so Close refuses until it is set.
+            const currency = currencyOrThrow(chooseCurrency(line.agreement, () => currencies(line.customerId)))
+            const terms = { ...line.terms, currency }
+            for (const charge of subscriptionCharges(terms, bounds, { intervals: line.intervals, siteName })) {
                 insertLine(period, {
                     kind: 'subscription',
                     customer: line.customerId,
@@ -214,7 +225,7 @@ function generateChunk(
                     units: charge.units,
                     monthly_rate: line.terms.monthlyRate,
                     amount: charge.amount,
-                    currency: line.currency,
+                    currency: charge.currency,
                 })
             }
         },
@@ -244,13 +255,42 @@ function siteNameOf(siteId: string): string {
     return site ? str(site, 'name') : ''
 }
 
-/** A Subscription line as read for billing: its terms, whom it bills and in which currency. */
+/** A Subscription line as read for billing: its terms, whom it bills, and its Agreement, whose currency it bills in. */
 interface LineRow {
     lineId: string
-    terms: SubscriptionLineTerms
+    terms: Omit<SubscriptionLineTerms, 'currency'>
     customerId: string
     agreementId: string
-    currency: string
+    agreement: AgreementCurrency | null
+}
+
+/** The Agreement `field` names on `record`, with its Currency as stored (domain/billing `chooseCurrency`); null for none. */
+export function agreementCurrencyOf(record: GlideRecord, field: string): AgreementCurrency | null {
+    const agreementId = str(record, field)
+    if (!agreementId) return null
+    return { name: str(record, `${field}.number`) || agreementId, currency: str(record, `${field}.currency`) }
+}
+
+/**
+ * The Currency of a Customer's Agreements as stored, one entry per value (an amount naming no Agreement takes theirs
+ * when they share one); a job reads each Customer's once.
+ */
+export function customerCurrencies(customerId: string): string[] {
+    if (!customerId) return []
+    const ga = new GlideAggregate('x_daas_ham_agreement')
+    ga.addQuery('customer', '=', customerId)
+    ga.addAggregate('COUNT', '')
+    ga.groupBy('currency')
+    ga.query()
+    const currencies: string[] = []
+    while (ga.next()) currencies.push(String(ga.getValue('currency') ?? ''))
+    return currencies
+}
+
+/** The currency chosen; throws with why there is none, so the line or cost fails (and is counted) instead of guessing one. */
+export function currencyOrThrow(choice: CurrencyChoice): string {
+    if ('problem' in choice) throw new Error(`no currency: ${choice.problem}`)
+    return choice.currency
 }
 
 /** A Subscription line ready to bill: its row, and its Service intervals in the month. */
@@ -318,17 +358,21 @@ function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
     fee.query()
     let failed = 0
     let lastError = ''
+    const currencies = memoized(customerCurrencies)
     while (fee.next()) {
         try {
+            const customer = str(fee, 'customer')
+            // Its Agreement's currency (the fee's own Currency field is not used): a fee without one fails to bill.
+            const currency = currencyOrThrow(chooseCurrency(agreementCurrencyOf(fee, 'agreement'), () => currencies(customer)))
             insertLine(period, {
                 kind: 'fee',
-                customer: str(fee, 'customer'),
+                customer,
                 agreement: str(fee, 'agreement'),
                 fee_event: fee.getUniqueValue(),
                 description: feeLabel(fee),
                 units: 1,
                 amount: num(fee, 'amount'),
-                currency: str(fee, 'currency') || 'EUR',
+                currency,
             })
         } catch (error) {
             // The fee stays open without a period, so a regeneration bills it.
@@ -352,16 +396,36 @@ function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
     }
 }
 
-/** Line count and total of the period (does not save). */
+/**
+ * Line count and totals of the period (does not save): Totals per currency, and Total only while every line is in one
+ * currency (blank when they are in several), so no two currencies are added.
+ */
 function setTotals(period: GlideRecord): void {
-    const totals = new GlideAggregate('x_daas_ham_billing_line')
-    totals.addEncodedQuery(`billing_period=${period.getUniqueValue()}`)
-    totals.addAggregate('COUNT', '')
-    totals.addAggregate('SUM', 'amount')
-    totals.query()
-    const hasTotals = totals.next()
-    period.setValue('line_count', hasTotals ? Number(totals.getAggregate('COUNT', '')) : 0)
-    period.setValue('total_amount', hasTotals ? Number(totals.getAggregate('SUM', 'amount')) || 0 : 0)
+    const totals = totalsOf([period.getUniqueValue()]).get(period.getUniqueValue()) ?? []
+    period.setValue('line_count', totals.reduce((lines, total) => lines + total.lines, 0))
+    period.setValue('totals', totalsText(totals))
+    period.setValue('total_amount', singleCurrencyTotal(totals) ?? '')
+}
+
+/** Each period's lines counted and summed per currency (domain/billing `currencyTotals`), with one aggregate. */
+function totalsOf(periodIds: readonly string[]): Map<string, CurrencyTotal[]> {
+    const groups = new Map<string, CurrencyTotal[]>()
+    if (periodIds.length === 0) return groups
+    const ga = new GlideAggregate('x_daas_ham_billing_line')
+    ga.addEncodedQuery(`billing_periodIN${periodIds.join(',')}`)
+    ga.addAggregate('COUNT', '')
+    ga.addAggregate('SUM', 'amount')
+    ga.groupBy('billing_period')
+    ga.groupBy('currency')
+    ga.query()
+    while (ga.next()) {
+        appendTo(groups, String(ga.getValue('billing_period') ?? ''), {
+            currency: String(ga.getValue('currency') ?? ''),
+            lines: Number(ga.getAggregate('COUNT', '')) || 0,
+            amount: Number(ga.getAggregate('SUM', 'amount')) || 0,
+        })
+    }
+    return new Map([...groups].map(([periodId, rows]) => [periodId, currencyTotals(rows)]))
 }
 
 /** How a Fee event reads on its billing line, and in the messages that name it. */
@@ -415,10 +479,16 @@ export function uiRegenerateBillingPeriod(current: GlideRecord): void {
     // Lines the delete left would be billed twice by the new generation.
     const lines = `billing_period=${current.getUniqueValue()}`
     if (!deleteWhere('x_daas_ham_billing_line', lines, { businessRules: false })) {
+        const name = str(current, 'period')
         current.setValue('status', 'ready')
         current.setValue('last_error', 'Regenerate could not remove all of the old lines; remove them and Regenerate again')
-        current.update()
-        return void gs.addErrorMessage(`${str(current, 'period')} not regenerated: some of its old lines could not be removed`)
+        if (current.update()) return void gs.addErrorMessage(`${name} not regenerated: some of its old lines could not be removed`)
+        // Refused, it stays generating with nothing queued, which Close and Regenerate refuse: say so, and how it ends.
+        const why = refusal(current)
+        gs.error(`[x_daas_ham] Billing period ${name}: Regenerate left old lines and the period was not held for review: ${why}`)
+        return void gs.addErrorMessage(
+            `${name} not regenerated: some of its old lines could not be removed, and it could not be held for review (${why}). It stays Generating with nothing queued: an admin can Reset generation once it has shown no activity for ${RESET_AFTER_IDLE_MINUTES} minutes, then Regenerate`,
+        )
     }
     // The period's open fees stay linked to it: the generation bills them again (finishGeneration).
     try {
@@ -496,14 +566,36 @@ export function uiCloseBillingPeriod(current: GlideRecord): void {
     current.setValue('closed_by', gs.getUserID())
     // Closed first: a refused form save (the platform says why) leaves its fees open, so a Regenerate still bills them.
     if (!current.update()) return
-    const fees = new GlideRecord('x_daas_ham_fee_event')
-    fees.addQuery('billing_period', current.getUniqueValue())
-    fees.addQuery('status', 'open')
-    fees.setValue('status', 'billed')
-    fees.updateMultiple()
+    const unmarked = markFeesBilled(current)
     fire(EVENT.billingExport, current, current.getUniqueValue())
     fire(EVENT.marginCompute, current, current.getUniqueValue())
     gs.addInfoMessage(`${str(current, 'period')} closed and locked; the CSV export and margin are being prepared`)
+    if (unmarked.length > 0) {
+        const named = unmarked.slice(0, 3).join('; ') + (unmarked.length > 3 ? `; and ${unmarked.length - 3} more (see the system log)` : '')
+        gs.addErrorMessage(`${unmarked.length} fee(s) billed in ${str(current, 'period')} could not be marked billed: ${named}. Set them to Billed by hand`)
+    }
+}
+
+/**
+ * Mark the closed period's open fees billed, saving each and checking it. A fee the platform refuses stays open but
+ * linked to the closed period, which no later generation bills (it bills unlinked fees) and Close cannot be run again
+ * for: it is returned named with why, and logged, to set to Billed by hand.
+ */
+function markFeesBilled(period: GlideRecord): string[] {
+    const refused: string[] = []
+    const fee = new GlideRecord('x_daas_ham_fee_event')
+    fee.addQuery('billing_period', period.getUniqueValue())
+    fee.addQuery('status', 'open')
+    fee.query()
+    while (fee.next()) {
+        fee.setValue('status', 'billed')
+        if (!fee.update()) refused.push(`${feeLabel(fee)}: ${refusal(fee)}`)
+    }
+    if (refused.length > 0) {
+        const unmarked = `${refused.length} fee(s) not marked billed; set them to Billed by hand`
+        gs.error(`[x_daas_ham] Billing period ${str(period, 'period')} closed, but ${unmarked}: ${refused.join('; ')}`)
+    }
+    return refused
 }
 
 /** UI action "Re-export CSV" on a closed period whose export is missing (never saves the period). */
@@ -649,17 +741,13 @@ export function listBillingPeriods(request: RESTAPIRequest, response: RESTAPIRes
     period.orderByDesc('period')
     period.setLimit(Math.min(Math.max(queryInt(request, 'limit', 24), 1), 120))
     period.query()
-    const periods: object[] = []
+    const periods: Array<{ id: string; period: string; status: string; lines: number }> = []
     while (period.next()) {
-        periods.push({
-            id: period.getUniqueValue(),
-            period: str(period, 'period'),
-            status: str(period, 'status'),
-            lines: num(period, 'line_count'),
-            total: num(period, 'total_amount'),
-        })
+        periods.push({ id: period.getUniqueValue(), period: str(period, 'period'), status: str(period, 'status'), lines: num(period, 'line_count') })
     }
-    reply(response, 200, { periods })
+    // Per currency, from the lines: amounts of two currencies are never added.
+    const totals = totalsOf(periods.map((row) => row.id))
+    reply(response, 200, { periods: periods.map((row) => ({ ...row, totals: totals.get(row.id) ?? [] })) })
 }
 
 /** GET /billing_periods/{id}/lines?offset&limit: one page of a period's lines (closed periods are final). */
@@ -694,7 +782,7 @@ export function getBillingLines(request: RESTAPIRequest, response: RESTAPIRespon
         period: str(period, 'period'),
         status: str(period, 'status'),
         final: str(period, 'status') === 'closed',
-        total: num(period, 'total_amount'),
+        totals: totalsOf([period.getUniqueValue()]).get(period.getUniqueValue()) ?? [],
         offset,
         lines,
         nextOffset: lines.length === limit ? offset + limit : null,

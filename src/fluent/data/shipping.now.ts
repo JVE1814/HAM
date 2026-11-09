@@ -20,6 +20,8 @@ export const x_daas_ham_shipment = Table({
     label: 'Shipment',
     display: 'tracking_number',
     schema: {
+        // The table extends no task table, so its number is declared here (as on Order lines) for autoNumber to fill.
+        number: StringColumn({ label: 'Number', default: 'javascript:global.getNextObjNumberPadded();', readOnly: true }),
         direction: ChoiceColumn({
             label: 'Direction',
             choices: { to_site: { label: 'To a Site', sequence: 0 }, return: { label: 'Return to the depot', sequence: 1 } },
@@ -43,6 +45,7 @@ export const x_daas_ham_shipment = Table({
         label_id: StringColumn({ label: 'Label ID', maxLength: 100, readOnly: true }),
         label_url: UrlColumn({ label: 'Label', readOnly: true }),
         cost: DecimalColumn({ label: 'Cost', readOnly: true }),
+        // The carrier's currency for the cost, as the aggregator gives it (no default): Margin counts the cost in it.
         currency: StringColumn({ label: 'Currency', maxLength: 3, readOnly: true }),
         status: ChoiceColumn({ label: 'Status', choices: statusChoices, default: 'label_created', readOnly: true, dropdown: 'dropdown_without_none' }),
         status_detail: StringColumn({ label: 'Latest update', maxLength: 255, readOnly: true }),

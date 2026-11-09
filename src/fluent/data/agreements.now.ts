@@ -33,6 +33,9 @@ export const x_daas_ham_agreement = Table({
         // accounts (customer_account extends core_company).
         customer: OverrideColumn({ mandatory: true, referenceQualifier: 'sys_class_name=customer_account' }),
         account_manager: ReferenceColumn({ label: 'Account manager', referenceTable: 'sys_user' }),
+        // The one currency the Agreement bills in (ISO 4217, e.g. EUR): its Billing lines and Cost facts are kept in it,
+        // and no amounts of two currencies are ever added. Mandatory, with no default (domain/billing `chooseCurrency`).
+        currency: StringColumn({ label: 'Currency', maxLength: 3, mandatory: true }),
         refresh_cycle_months: IntegerColumn({ label: 'Refresh cycle (months)', default: 60, min: 0 }),
         refresh_basis: ChoiceColumn({
             label: 'Refresh basis',
@@ -109,7 +112,8 @@ export const x_daas_ham_subscription_line = Table({
         site: ReferenceColumn({ label: 'Site', referenceTable: 'cmn_location' }),
         device_class: ChoiceColumn({ label: 'Device class', choices: deviceClassChoices }),
         monthly_rate: DecimalColumn({ label: 'Monthly rate', mandatory: true }),
-        currency: StringColumn({ label: 'Currency', maxLength: 3, default: 'EUR' }),
+        // Not billed: a line bills in its Agreement's currency. Kept (read-only, no default) for the values saved before.
+        currency: StringColumn({ label: 'Currency (unused: billed in the Agreement currency)', maxLength: 3, readOnly: true }),
         start_date: DateColumn({ label: 'Start date', readOnly: true }),
         end_date: DateColumn({ label: 'End date' }),
         status: ChoiceColumn({

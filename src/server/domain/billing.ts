@@ -58,9 +58,101 @@ export function activeDays(bounds: MonthBounds, from: string, to?: string): numb
     return end < start ? 0 : daysBetween(start, end) + 1
 }
 
-/** A monthly rate charged for `units` days (or device-days) of a month, to the cent. */
+/*
+ * Money is rounded in whole cents, half away from zero. Binary fractions cannot hold most decimal amounts (1.005 is
+ * stored as 1.00499...), so rounding `amount * 100` directly would round many half-cents down.
+ */
+
+/** An amount as whole cents, rounded half away from zero; the binary noise of a decimal amount is ignored (1.005 is 101). */
+export function toCents(amount: number): number {
+    if (!Number.isFinite(amount)) return 0
+    const rounded = Math.round(Number((Math.abs(amount) * 100).toPrecision(15)))
+    return (amount < 0 ? -rounded : rounded) || 0
+}
+
+/** Whole cents as an amount (what a Decimal field is given). */
+export function fromCents(cents: number): number {
+    return cents / 100
+}
+
+/** An amount rounded to the cent, half away from zero (toCents). */
+export function roundToCent(amount: number): number {
+    return fromCents(toCents(amount))
+}
+
+/**
+ * `numerator / denominator` for integers (denominator not 0), rounded half away from zero, exactly: the quotient a float
+ * division gives is corrected by its remainder, so a half is never lost to binary rounding.
+ */
+export function divideRounded(numerator: number, denominator: number): number {
+    const negative = numerator < 0 !== denominator < 0
+    const n = Math.abs(numerator)
+    const d = Math.abs(denominator)
+    let quotient = Math.floor(n / d)
+    let remainder = n - quotient * d
+    if (remainder < 0) {
+        quotient--
+        remainder += d
+    } else if (remainder >= d) {
+        quotient++
+        remainder -= d
+    }
+    const rounded = 2 * remainder >= d ? quotient + 1 : quotient
+    return (negative ? -rounded : rounded) || 0
+}
+
+/** Rates are taken to four decimals (ten-thousandths of the currency unit): a rate with more is rounded to four first. */
+const RATE_SCALE = 10000
+
+/**
+ * A monthly rate charged for `units` (whole) days, or device-days, of a month, to the cent: worked out in whole numbers,
+ * so a charge of exactly half a cent rounds up (0.29 a month for 14 of 28 days is 0.15).
+ */
 export function prorate(monthlyRate: number, units: number, daysInMonth: number): number {
-    return Math.round((monthlyRate * units * 100) / daysInMonth) / 100
+    if (daysInMonth <= 0) return 0
+    const rate = Math.round(monthlyRate * RATE_SCALE)
+    return fromCents(divideRounded(rate * Math.round(units), daysInMonth * (RATE_SCALE / 100)))
+}
+
+/*
+ * Currency (the owner's decision): each Agreement bills in one currency, a mandatory field with no default. Its Billing
+ * lines and Cost facts are kept in it, and no amounts of two currencies are ever added: totals and Margin are kept per
+ * currency. A shipment's cost is the exception: it stays in the carrier's currency, and Margin counts it in that one.
+ */
+
+/** A currency code as entered (ISO 4217: three letters, any case), upper-cased; '' for anything else. */
+export function currencyCode(value: string): string {
+    const code = value.trim()
+    return /^[A-Za-z]{3}$/.test(code) ? code.toUpperCase() : ''
+}
+
+/** An Agreement an amount names, for its currency: `name` (its number) for messages, and its Currency as stored. */
+export interface AgreementCurrency {
+    name: string
+    currency: string
+}
+
+/** The currency an amount is kept in, or why it has none. */
+export type CurrencyChoice = { currency: string } | { problem: string }
+
+/**
+ * The currency an amount is billed or costed in, never a default: its Agreement's, when it names one. One that names
+ * none (a fee entered by hand, a site audit's work order) takes the currency every Agreement of its Customer has
+ * (`customerCurrencies`, as stored, read only then); a Customer whose Agreements have several, or none, leaves it
+ * without one. A choice without a currency says why, to fix the Agreement (or name one) and run the job again.
+ */
+export function chooseCurrency(agreement: AgreementCurrency | null, customerCurrencies: () => readonly string[]): CurrencyChoice {
+    if (agreement) {
+        const currency = currencyCode(agreement.currency)
+        if (currency) return { currency }
+        const stored = agreement.currency.trim()
+        const why = stored ? `'${stored}' as its currency, not a three-letter code` : 'no currency'
+        return { problem: `its Agreement ${agreement.name} has ${why}: set the Agreement's currency` }
+    }
+    const codes = [...new Set(customerCurrencies().map(currencyCode))].sort()
+    if (codes.length === 1 && codes[0]) return { currency: codes[0] }
+    const has = codes.length === 0 ? 'none' : codes.map((code) => code || 'no currency').join(', ')
+    return { problem: `it names no Agreement, and its Customer's Agreements are in ${has}: set its Agreement` }
 }
 
 /** The days one Asset (or `count` Assets) delivered a Subscription line at a Site (end inclusive; none while still in service). */
@@ -98,6 +190,8 @@ export interface SubscriptionLineTerms {
     /** As stored. 'site_package' bills its own dates, 'device_class' its Service intervals; any other value bills nothing. */
     lineType: string
     monthlyRate: number
+    /** The currency it bills in: its Agreement's (chooseCurrency). */
+    currency: string
     /** The package's Site ('' on a per-device line). */
     siteId: string
     /** The Subscription line's own description. */
@@ -108,7 +202,7 @@ export interface SubscriptionLineTerms {
 }
 
 /** Whether a Subscription line is billed from its Service intervals (a per-device line). */
-export function billsFromIntervals(line: SubscriptionLineTerms): boolean {
+export function billsFromIntervals(line: Pick<SubscriptionLineTerms, 'lineType'>): boolean {
     return line.lineType === 'device_class'
 }
 
@@ -152,7 +246,10 @@ export interface Charge {
     description: string
     /** Days for a site package; device-days for a per-device line. */
     units: number
+    /** To the cent, in `currency`. */
     amount: number
+    /** The line's (its Agreement's) currency. */
+    currency: string
 }
 
 /** What a charge is drafted from beyond the line itself, used only when the line's type needs it. */
@@ -175,6 +272,7 @@ export function subscriptionCharges(line: SubscriptionLineTerms, bounds: MonthBo
             description: name ? `${line.description} - ${name}` : line.description,
             units,
             amount: prorate(line.monthlyRate, units, bounds.days),
+            currency: line.currency,
         }
     })
 }
@@ -257,11 +355,61 @@ export function isCurrentGeneration(currentToken: string, token: string): boolea
     return token !== '' && token === currentToken
 }
 
-/** RFC 4180 CSV: fields with commas, quotes or line breaks are quoted, quotes doubled. */
-export function toCsv(rows: ReadonlyArray<ReadonlyArray<string | number>>): string {
-    return rows.map((row) => row.map((value) => csvField(String(value))).join(',')).join('\r\n') + '\r\n'
+/** A Billing period's lines and their amount in one currency. */
+export interface CurrencyTotal {
+    /** As stored on the lines (currencyCode); '' for lines without one. */
+    currency: string
+    lines: number
+    /** To the cent. */
+    amount: number
 }
 
-function csvField(value: string): string {
-    return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
+/**
+ * A Billing period's totals per currency, in currency order, from its lines' counts and amounts grouped by currency
+ * (rows of one currency are merged, summed in whole cents). Amounts of two currencies are never added.
+ */
+export function currencyTotals(groups: Iterable<CurrencyTotal>): CurrencyTotal[] {
+    const byCurrency = new Map<string, { lines: number; cents: number }>()
+    for (const group of groups) {
+        const currency = currencyCode(group.currency) || group.currency.trim()
+        const total = byCurrency.get(currency) ?? { lines: 0, cents: 0 }
+        total.lines += group.lines
+        total.cents += toCents(group.amount)
+        byCurrency.set(currency, total)
+    }
+    return [...byCurrency.keys()].sort().map((currency) => {
+        const total = byCurrency.get(currency) ?? { lines: 0, cents: 0 }
+        return { currency, lines: total.lines, amount: fromCents(total.cents) }
+    })
+}
+
+/** The most a period's Totals text holds (its field's length). */
+const TOTALS_TEXT_LENGTH = 255
+
+/** A period's totals as its Totals field shows them, e.g. 'EUR 1234.56; USD 99.00' ('' without lines). */
+export function totalsText(totals: readonly CurrencyTotal[]): string {
+    const text = totals.map((total) => `${total.currency || 'no currency'} ${fromCents(toCents(total.amount)).toFixed(2)}`).join('; ')
+    return text.length > TOTALS_TEXT_LENGTH ? `${text.slice(0, TOTALS_TEXT_LENGTH - 4)} ...` : text
+}
+
+/** A period's Total: its lines' amount while they are all in one currency (0 without lines); null when in several. */
+export function singleCurrencyTotal(totals: readonly CurrencyTotal[]): number | null {
+    if (totals.length === 0) return 0
+    return totals.length === 1 ? totals[0].amount : null
+}
+
+/** RFC 4180 CSV: fields with commas, quotes or line breaks are quoted, quotes doubled. */
+export function toCsv(rows: ReadonlyArray<ReadonlyArray<string | number>>): string {
+    return rows.map((row) => row.map(csvField).join(',')).join('\r\n') + '\r\n'
+}
+
+/**
+ * Text a spreadsheet would read as a formula when it starts a cell (OWASP CSV injection): it is written with a leading
+ * apostrophe, so a description or a name such as '=HYPERLINK(...)' opens as text. Numbers are written as they are.
+ */
+const FORMULA_START = /^[=+\-@\t\r]/
+
+function csvField(value: string | number): string {
+    const text = typeof value === 'string' && FORMULA_START.test(value) ? `'${value}` : String(value)
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }

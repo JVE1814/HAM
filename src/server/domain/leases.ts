@@ -1,3 +1,4 @@
+import { fromCents, toCents } from './billing.ts'
 import { addDays, addMonths, endOfMonth, isMonthEnd } from './calendar.ts'
 import { inFleet } from './fleet.ts'
 import { INSTALL_STATUS, type Stage } from './lifecycle.ts'
@@ -55,9 +56,57 @@ export function leaseDecisionProblem(input: LeaseDecisionInput): string | null {
     return null
 }
 
-/** One share of `amount` split evenly over `count` Assets (0 without any): a lease payment's or a buyout price's. */
+/**
+ * One share of `amount` split evenly over `count` Assets (0 without any), unrounded: a lease payment's share for
+ * Margin, whose costs are summed before they are rounded. An amount to be stored per Asset is split by `evenSplit`.
+ */
 export function evenShare(amount: number, count: number): number {
     return count > 0 ? amount / count : 0
+}
+
+/** An amount split to the cent over a number of Assets: each gets `share`, and the first `extra` of them one cent more. */
+export interface EvenSplit {
+    share: number
+    extra: number
+}
+
+/**
+ * `amount` split over `count` Assets to the cent by largest remainder (nothing without Assets or a positive amount):
+ * the cents left over after an equal split go one each to the first Assets, so the shares add up to the amount
+ * (10000.00 over 3 is 3333.34, 3333.33 and 3333.33).
+ */
+export function evenSplit(amount: number, count: number): EvenSplit {
+    const total = toCents(amount)
+    if (count <= 0 || total <= 0) return { share: 0, extra: 0 }
+    const base = Math.floor(total / count)
+    return { share: fromCents(base), extra: total - base * count }
+}
+
+/** A buyout price split over the Assets covered at buyout: each costs `share`, and those up to `extraThrough` one cent more. */
+export interface BuyoutSplit {
+    share: number
+    /** The sys_id, in sys_id order, of the last Asset that costs one cent more ('' when none does). */
+    extraThrough: string
+}
+
+/**
+ * A buyout price split to the cent over the Assets it covers (`assetIds`, any order) by largest remainder, fixed once
+ * when the buyout is decided: the left-over cents go to the first Assets in sys_id order, the order the buyout's
+ * transfer runs in, so the Assets' costs add up to the price whichever chunk transfers each.
+ */
+export function buyoutSplit(price: number, assetIds: readonly string[]): BuyoutSplit {
+    const sorted = [...new Set(assetIds)].sort()
+    const split = evenSplit(price, sorted.length)
+    return { share: split.share, extraThrough: split.extra > 0 ? sorted[split.extra - 1] : '' }
+}
+
+/**
+ * What one Asset of a buyout costs (`buyoutSplit`), to the cent: its share, one cent more when its sys_id is up to
+ * `extraThrough`. A share stored unrounded (a buyout decided before shares were split to the cent) is rounded too.
+ */
+export function buyoutCost(split: BuyoutSplit, assetId: string): number {
+    const extra = split.extraThrough !== '' && assetId <= split.extraThrough
+    return fromCents(toCents(split.share) + (extra ? 1 : 0))
 }
 
 /**

@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { monthBounds } from './billing'
 import { addMonths } from './calendar'
-import { CostLedger, costFactKey, leaseShare, marginRows, serviceIntervalCosts, type AssetCostFacts, type LeaseTerms } from './margin'
+import {
+    cents,
+    CostLedger,
+    costFactKey,
+    labourCost,
+    leaseShare,
+    marginRows,
+    serviceIntervalCosts,
+    type AssetCostFacts,
+    type CostEntry,
+    type CostType,
+    type LeaseTerms,
+} from './margin'
 
 const november = monthBounds('2026-11')
 const wholeMonth = { start: '2026-01-15' }
@@ -142,71 +154,127 @@ describe('leaseShare', () => {
 })
 
 describe('costFactKey', () => {
-    it('tells Cost facts apart by customer, site and type', () => {
-        const keys = [costFactKey('acme', 'hq', 'lease'), costFactKey('acme', 'hq', 'purchase'), costFactKey('acme', '', 'lease'), costFactKey('globex', 'hq', 'lease')]
-        expect(new Set(keys).size).toBe(4)
-        expect(costFactKey('acme', 'hq', 'lease')).toBe(costFactKey('acme', 'hq', 'lease'))
+    it('tells Cost facts apart by customer, site, type and currency', () => {
+        const keys = [
+            costFactKey('acme', 'hq', 'lease', 'EUR'),
+            costFactKey('acme', 'hq', 'purchase', 'EUR'),
+            costFactKey('acme', '', 'lease', 'EUR'),
+            costFactKey('globex', 'hq', 'lease', 'EUR'),
+            costFactKey('acme', 'hq', 'lease', 'USD'),
+        ]
+        expect(new Set(keys).size).toBe(5)
+        expect(costFactKey('acme', 'hq', 'lease', 'EUR')).toBe(costFactKey('acme', 'hq', 'lease', 'EUR'))
     })
 })
 
 describe('CostLedger', () => {
-    it('sums per customer, site and type, by cost fact key, and empties on drain', () => {
+    const cost = (customerId: string, siteId: string, type: CostType, amount: number, currency = 'EUR'): CostEntry => ({ customerId, siteId, type, currency, amount })
+
+    it('sums per customer, site, type and currency, by cost fact key, and empties on drain', () => {
         const ledger = new CostLedger()
-        ledger.add('acme', 'hq', 'purchase', 10)
-        ledger.add('acme', 'hq', 'purchase', 5)
-        ledger.add('acme', 'hq', 'lease', 7)
-        ledger.add('acme', '', 'field_labour', 250)
-        ledger.add('', 'hq', 'purchase', 99)
+        ledger.add(cost('acme', 'hq', 'purchase', 10))
+        ledger.add(cost('acme', 'hq', 'purchase', 5))
+        ledger.add(cost('acme', 'hq', 'purchase', 8, 'USD'))
+        ledger.add(cost('acme', 'hq', 'lease', 7))
+        ledger.add(cost('acme', '', 'field_labour', 250))
+        ledger.add(cost('', 'hq', 'purchase', 99))
+        ledger.add(cost('acme', 'hq', 'shipping', 0, ''))
         expect(ledger.drain()).toEqual(
             new Map([
-                [costFactKey('acme', 'hq', 'purchase'), { customerId: 'acme', siteId: 'hq', type: 'purchase', amount: 15 }],
-                [costFactKey('acme', 'hq', 'lease'), { customerId: 'acme', siteId: 'hq', type: 'lease', amount: 7 }],
-                [costFactKey('acme', '', 'field_labour'), { customerId: 'acme', siteId: '', type: 'field_labour', amount: 250 }],
+                [costFactKey('acme', 'hq', 'purchase', 'EUR'), cost('acme', 'hq', 'purchase', 15)],
+                [costFactKey('acme', 'hq', 'purchase', 'USD'), cost('acme', 'hq', 'purchase', 8, 'USD')],
+                [costFactKey('acme', 'hq', 'lease', 'EUR'), cost('acme', 'hq', 'lease', 7)],
+                [costFactKey('acme', '', 'field_labour', 'EUR'), cost('acme', '', 'field_labour', 250)],
             ]),
         )
         expect(ledger.drain().size).toBe(0)
     })
 
+    it('refuses a cost without a currency, which no Cost fact may hold', () => {
+        expect(() => new CostLedger().add(cost('acme', 'hq', 'shipping', 12.5, ''))).toThrow('a shipping cost has no currency')
+    })
+
     it('leaves drained totals as they are when more is added', () => {
         const ledger = new CostLedger()
-        ledger.add('acme', 'hq', 'purchase', 10)
+        ledger.add(cost('acme', 'hq', 'purchase', 10))
         const drained = ledger.drain()
-        ledger.add('acme', 'hq', 'purchase', 5)
-        expect(drained.get(costFactKey('acme', 'hq', 'purchase'))?.amount).toBe(10)
-        expect(ledger.drain().get(costFactKey('acme', 'hq', 'purchase'))?.amount).toBe(5)
+        ledger.add(cost('acme', 'hq', 'purchase', 5))
+        expect(drained.get(costFactKey('acme', 'hq', 'purchase', 'EUR'))?.amount).toBe(10)
+        expect(ledger.drain().get(costFactKey('acme', 'hq', 'purchase', 'EUR'))?.amount).toBe(5)
     })
 })
 
 describe('marginRows', () => {
-    it('joins revenue and cost per customer and site, sorted by customer then site', () => {
+    it('joins revenue and cost per customer, site and currency, sorted by customer, site then currency', () => {
         const rows = marginRows(
             [
-                { customerId: 'acme', siteId: 'hq', amount: 4500 },
-                { customerId: 'acme', siteId: '', amount: 150 },
+                { customerId: 'acme', siteId: 'hq', currency: 'EUR', amount: 4500 },
+                { customerId: 'acme', siteId: '', currency: 'EUR', amount: 150 },
             ],
             [
-                { customerId: 'globex', siteId: 'dc', amount: 300 },
-                { customerId: 'acme', siteId: 'hq', amount: 1200.555 },
+                { customerId: 'globex', siteId: 'dc', currency: 'EUR', amount: 300 },
+                { customerId: 'acme', siteId: 'hq', currency: 'EUR', amount: 1200.555 },
             ],
         )
         expect(rows).toEqual([
-            { customerId: 'acme', siteId: '', revenue: 150, cost: 0, margin: 150, marginPct: 100 },
-            { customerId: 'acme', siteId: 'hq', revenue: 4500, cost: 1200.56, margin: 3299.44, marginPct: 73.3 },
-            { customerId: 'globex', siteId: 'dc', revenue: 0, cost: 300, margin: -300, marginPct: null },
+            { customerId: 'acme', siteId: '', currency: 'EUR', revenue: 150, cost: 0, margin: 150, marginPct: 100 },
+            { customerId: 'acme', siteId: 'hq', currency: 'EUR', revenue: 4500, cost: 1200.56, margin: 3299.44, marginPct: 73.3 },
+            { customerId: 'globex', siteId: 'dc', currency: 'EUR', revenue: 0, cost: 300, margin: -300, marginPct: null },
         ])
     })
 
-    it('sums amounts for the same customer and site before rounding', () => {
+    it('never sets revenue in one currency against cost in another', () => {
         const rows = marginRows(
+            [{ customerId: 'acme', siteId: 'hq', currency: 'EUR', amount: 1000 }],
             [
-                { customerId: 'acme', siteId: 'hq', amount: 100.004 },
-                { customerId: 'acme', siteId: 'hq', amount: 50.004 },
-            ],
-            [
-                { customerId: 'acme', siteId: 'hq', amount: 30 },
-                { customerId: 'acme', siteId: 'hq', amount: 15 },
+                { customerId: 'acme', siteId: 'hq', currency: 'EUR', amount: 400 },
+                { customerId: 'acme', siteId: 'hq', currency: 'USD', amount: 21.4 },
             ],
         )
-        expect(rows).toEqual([{ customerId: 'acme', siteId: 'hq', revenue: 150.01, cost: 45, margin: 105.01, marginPct: 70 }])
+        expect(rows).toEqual([
+            { customerId: 'acme', siteId: 'hq', currency: 'EUR', revenue: 1000, cost: 400, margin: 600, marginPct: 60 },
+            { customerId: 'acme', siteId: 'hq', currency: 'USD', revenue: 0, cost: 21.4, margin: -21.4, marginPct: null },
+        ])
+    })
+
+    it('sums amounts for the same customer, site and currency before rounding', () => {
+        const rows = marginRows(
+            [
+                { customerId: 'acme', siteId: 'hq', currency: 'EUR', amount: 100.004 },
+                { customerId: 'acme', siteId: 'hq', currency: 'EUR', amount: 50.004 },
+            ],
+            [
+                { customerId: 'acme', siteId: 'hq', currency: 'EUR', amount: 30 },
+                { customerId: 'acme', siteId: 'hq', currency: 'EUR', amount: 15 },
+            ],
+        )
+        expect(rows).toEqual([{ customerId: 'acme', siteId: 'hq', currency: 'EUR', revenue: 150.01, cost: 45, margin: 105.01, marginPct: 70 }])
+    })
+
+    it('rounds half-cents and the margin % half away from zero, in whole cents', () => {
+        const rows = marginRows([{ customerId: 'acme', siteId: 'hq', currency: 'EUR', amount: 1.005 }], [{ customerId: 'acme', siteId: 'hq', currency: 'EUR', amount: 0.1 + 0.2 }])
+        expect(rows).toEqual([{ customerId: 'acme', siteId: 'hq', currency: 'EUR', revenue: 1.01, cost: 0.3, margin: 0.71, marginPct: 70.3 }])
+        // A margin of 0.99 on 200.00 is 0.495%, which rounds to 0.5% (and -0.5% for a loss of 0.99).
+        expect(marginRows([{ customerId: 'a', siteId: '', currency: 'EUR', amount: 200 }], [{ customerId: 'a', siteId: '', currency: 'EUR', amount: 199.01 }])[0].marginPct).toBe(0.5)
+        expect(marginRows([{ customerId: 'a', siteId: '', currency: 'EUR', amount: 200 }], [{ customerId: 'a', siteId: '', currency: 'EUR', amount: 200.99 }])[0].marginPct).toBe(-0.5)
+    })
+})
+
+describe('cents', () => {
+    it('rounds to the cent half away from zero', () => {
+        expect(cents(1.005)).toBe(1.01)
+        expect(cents(2.675)).toBe(2.68)
+        expect(cents(-1.005)).toBe(-1.01)
+        expect(cents(0.1 + 0.2)).toBe(0.3)
+    })
+})
+
+describe('labourCost', () => {
+    it("takes a work order's own labour cost, an explicit 0 included, and the visit cost only when it is blank", () => {
+        expect(labourCost('180', 250)).toBe(180)
+        expect(labourCost('0', 250)).toBe(0)
+        expect(labourCost('0.00', 250)).toBe(0)
+        expect(labourCost('', 250)).toBe(250)
+        expect(labourCost('  ', 250)).toBe(250)
     })
 })

@@ -45,11 +45,17 @@ export const x_daas_ham_billing_period = Table({
         generated_at: DateTimeColumn({ label: 'Generated at', readOnly: true }),
         failed_lines: IntegerColumn({ label: 'Lines that failed to bill', default: 0, readOnly: true }),
         last_error: StringColumn({ label: 'Last generation error', maxLength: 255, readOnly: true }),
-        /** Service intervals the latest margin computation failed to cost (its Cost facts and Margin miss them), with the last error; both cleared as one starts. */
-        margin_failed: IntegerColumn({ label: 'Service intervals that failed to cost', default: 0, readOnly: true }),
+        /**
+         * Service intervals, work orders and shipments the latest margin computation failed to cost (its Cost facts and
+         * Margin miss them: e.g. an unknown Asset, or no currency), with the last error; both cleared as one starts.
+         */
+        margin_failed: IntegerColumn({ label: 'Records that failed to cost', default: 0, readOnly: true }),
         margin_error: StringColumn({ label: 'Last margin error', maxLength: 255, readOnly: true }),
         line_count: IntegerColumn({ label: 'Lines', readOnly: true }),
-        total_amount: DecimalColumn({ label: 'Total', readOnly: true }),
+        // Amounts of two currencies are never added: Totals holds one total per currency (e.g. 'EUR 1234.56; USD 99.00'),
+        // and Total only the one while every line is in one currency (blank when they are in several).
+        totals: StringColumn({ label: 'Totals per currency', maxLength: 255, readOnly: true }),
+        total_amount: DecimalColumn({ label: 'Total (lines in one currency)', readOnly: true }),
         closed_at: DateTimeColumn({ label: 'Closed at', readOnly: true }),
         closed_by: ReferenceColumn({ label: 'Closed by', referenceTable: 'sys_user', readOnly: true }),
     },
@@ -77,7 +83,8 @@ export const x_daas_ham_billing_line = Table({
         units: DecimalColumn({ label: 'Units (days or device-days)' }),
         monthly_rate: DecimalColumn({ label: 'Monthly rate' }),
         amount: DecimalColumn({ label: 'Amount', mandatory: true }),
-        currency: StringColumn({ label: 'Currency', maxLength: 3, default: 'EUR' }),
+        // Its Agreement's currency (a fee's too), set by the generation; no default.
+        currency: StringColumn({ label: 'Currency', maxLength: 3, mandatory: true }),
     },
     index: [
         { name: 'x_daas_ham_bl_period', unique: false, element: 'billing_period' },
