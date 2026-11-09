@@ -1,5 +1,5 @@
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
-import { groupDecisions, rollupApprovals } from '../domain/approvals'
+import { groupDecisions, rollupApprovals, type ApprovalDecision, type ApprovalOutcome } from '../domain/approvals'
 import { appendTo } from '../domain/collections'
 import {
     approversFor,
@@ -8,13 +8,14 @@ import {
     ownershipFindings,
     raiserRefusal,
     siteTemplateOffered,
+    type Approver,
     type EntitlementVerdict,
     type NamedRecord,
     type Orderer,
     type OrderParties,
     type RequestedLine,
 } from '../domain/entitlement'
-import type { LineStage } from '../domain/fulfilment'
+import { anythingShipped, approvalAwaited, type LineStage } from '../domain/fulfilment'
 import { shortfallRoute, type ShortfallRoute } from '../domain/returns'
 import {
     orderLineLockName,
@@ -35,7 +36,7 @@ import {
 } from '../platform/approvals'
 import { moveAndSave, readStage } from '../platform/assets'
 import { EVENT, fire } from '../platform/events'
-import { recomputeLine, recomputeOrder } from '../platform/fulfilment'
+import { orderShipment, recomputeLine, recomputeOrder } from '../platform/fulfilment'
 import { todayIso } from '../platform/clock'
 import { withLock, withLockTries, type HeldLock } from '../platform/locks'
 import { openOemRma, openRmaCount } from '../platform/oem-rma'
@@ -267,14 +268,49 @@ function startSourcing(order: GlideRecord): string {
 /** After-update rule on sysapproval_approver: roll the decisions up to the Order. */
 export function onOrderApprovalDecision(current: GlideRecord): void {
     const order = findById('x_daas_ham_order', str(current, 'document_id'))
-    if (!order || str(order, 'stage') !== 'awaiting_approval') return
+    if (order) rollUpApprovals(order)
+}
+
+/** What rolling an Order's approvals up found: the outcome, and why the platform refused to save it ('' once saved). */
+interface ApprovalRollup {
+    outcome: ApprovalOutcome
+    refused: string
+    required: Approver[]
+    decisions: ApprovalDecision[]
+}
+
+/**
+ * Roll the approvals of an Order awaiting approval up (null for any other Order) and save the outcome: approved and
+ * sourced, or rejected. The approval decision rule and Re-check approvals both run this.
+ */
+function rollUpApprovals(order: GlideRecord): ApprovalRollup | null {
+    if (str(order, 'stage') !== 'awaiting_approval') return null
+    const required = approversFor(str(order, 'entitlement_verdict') as EntitlementVerdict)
     const decisions = groupDecisions(approvalsOf(order.getUniqueValue()), customerAdminIds(str(order, 'customer')))
-    const outcome = rollupApprovals(approversFor(str(order, 'entitlement_verdict') as EntitlementVerdict), decisions)
-    if (outcome === 'requested') return
+    const outcome = rollupApprovals(required, decisions)
+    if (outcome === 'requested') return { outcome, refused: '', required, decisions }
     const refused = outcome === 'approved' ? startSourcing(order) : rejectOrder(order)
     // Each cancellation runs this rule again, which stops once the Order is saved out of awaiting approval. A refused
-    // save keeps it awaiting approval with its requests, so the next decision tries again.
+    // save keeps it awaiting approval with its requests, so the next decision (or Re-check approvals) tries again.
     if (!refused) cancelPendingApprovals(order.getUniqueValue())
+    return { outcome, refused, required, decisions }
+}
+
+/**
+ * UI action "Re-check approvals": roll an Order's approvals up again, as a decision does, for one whose last decision
+ * could not be saved and that no request is left to move on; the user is told the outcome, or why there is none yet.
+ * The Order is read afresh: a decision may have moved it since the form was opened.
+ */
+export function recheckApprovals(orderId: string): void {
+    const order = findById('x_daas_ham_order', orderId)
+    const rollup = order && rollUpApprovals(order)
+    if (!rollup) return void gs.addErrorMessage('The Order is no longer awaiting approval')
+    if (rollup.outcome === 'requested') {
+        const why = approvalAwaited(rollup.required, rollup.decisions)
+        return void gs.addErrorMessage(`Order still awaiting approval: ${why}`)
+    }
+    if (rollup.refused) return void gs.addErrorMessage(`Order not saved as ${rollup.outcome}: ${rollup.refused}`)
+    gs.addInfoMessage(rollup.outcome === 'approved' ? 'Order approved: sourcing has started' : 'Order rejected')
 }
 
 /**
@@ -679,8 +715,9 @@ function cancelOpenLines(orderId: string): boolean {
 }
 
 /**
- * UI action "Cancel order": only before anything has shipped; releases stock and staging work. The Order is saved
- * first, with the purchase orders to cancel: one the platform refuses keeps its lines, stock and approvals.
+ * UI action "Cancel order": only before anything has shipped (a Return order brings it back then); releases stock and
+ * staging work. The Order is saved first, with the purchase orders to cancel: one the platform refuses keeps its
+ * lines, stock and approvals.
  *
  * A sourcing pass running meanwhile would reserve stock for, or buy for, lines just cancelled, and its purchase orders
  * would not be listed to cancel. So the cancel holds the Order's sourcing lock (`sourceOrder`) and the two take turns;
@@ -692,16 +729,13 @@ export function cancelOrder(order: GlideRecord): void {
     if (!taken) gs.addErrorMessage('Order not cancelled: sourcing is running on it. Try again in a minute')
 }
 
-/** The cancel, holding the Order's sourcing `lock`. */
+/**
+ * The cancel, holding the Order's sourcing `lock`. It is refused once anything of the Order has shipped
+ * (domain/fulfilment `anythingShipped`), a unit of a line not delivered whole included, whoever presses it.
+ */
 function cancelHolding(lock: HeldLock, order: GlideRecord): void {
-    const shipped = new GlideRecord('x_daas_ham_order_line')
-    shipped.addQuery('order', order.getUniqueValue())
-    shipped.addQuery('line_stage', 'IN', 'shipped,installed,in_service')
-    shipped.setLimit(1)
-    shipped.query()
-    if (shipped.hasNext()) {
-        gs.addErrorMessage('Equipment has already shipped; return it with a return order instead of cancelling')
-        return
+    if (anythingShipped(orderShipment(order.getUniqueValue()))) {
+        return void gs.addErrorMessage('Order not cancelled: equipment has already shipped. Use a Return order instead')
     }
     const purchases = openPurchaseOrders(order.getUniqueValue())
     order.setValue('stage', 'cancelled')
@@ -724,7 +758,10 @@ function cancelHolding(lock: HeldLock, order: GlideRecord): void {
     cancelPendingApprovals(order.getUniqueValue())
 }
 
-/** Source the Order again for a line that lost an allocated Asset (failed staging) or a unit received for it. */
+/**
+ * Source the Order again for a line that lost an allocated Asset (failed staging, a unit that left in transit) or a
+ * unit received for it.
+ */
 export function resourceOrder(orderId: string): void {
     const order = findById('x_daas_ham_order', orderId)
     if (order) fire(EVENT.sourceOrder, order)

@@ -1,7 +1,22 @@
 import '@servicenow/sdk/global'
 import { UiAction } from '@servicenow/sdk/core'
-import { uiCancelOrder, uiConfirmInstalled, uiShipOrder, uiSubmitOrder } from '../../server/entry/ui-actions'
-import { accountManager, assetManager, customerAdmin, fieldTech, inventoryTech, noc, siteContact } from '../security/roles.now'
+import {
+    uiCancelOrder,
+    uiConfirmInstalled,
+    uiRecheckApprovals,
+    uiShipOrder,
+    uiSubmitOrder,
+} from '../../server/entry/ui-actions'
+import {
+    accountManager,
+    admin,
+    assetManager,
+    customerAdmin,
+    fieldTech,
+    inventoryTech,
+    noc,
+    siteContact,
+} from '../security/roles.now'
 
 /* Form buttons on Orders. Stage transitions after "Submit" are derived from asset stages. */
 
@@ -15,6 +30,22 @@ UiAction({
     form: { showButton: true, style: 'primary' },
     showUpdate: true,
     script: uiSubmitOrder,
+})
+
+UiAction({
+    $id: Now.ID['ua_order_recheck_approvals'],
+    name: 'Re-check approvals',
+    table: 'x_daas_ham_order',
+    actionName: 'x_daas_ham_recheck_approvals',
+    hint: 'Roll the approvals up again, for an Order whose last decision could not be saved.',
+    // Only while no request is waiting: a waiting request's decision rolls the approvals up itself. The condition
+    // column holds at most 254 characters (a longer one is cut off on the instance), hence the terse query.
+    condition:
+        "current.stage == 'awaiting_approval' && !(function (a) { a.addEncodedQuery('state=requested^sysapproval=' + current.getUniqueValue()); a.setLimit(1); a.query(); return a.hasNext() })(new GlideRecord('sysapproval_approver'))",
+    roles: [assetManager, accountManager, admin],
+    form: { showButton: true },
+    showUpdate: true,
+    script: uiRecheckApprovals,
 })
 
 UiAction({

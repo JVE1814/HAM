@@ -2,10 +2,11 @@ import { gs, type GlideRecord } from '@servicenow/glide'
 import { billingChange, checkTransition, voidsWipeEvidence } from '../domain/lifecycle'
 import { clearWipeEvidence, readStage, transitionFacts } from '../platform/assets'
 import { glideToIsoDate, todayIso } from '../platform/clock'
-import { recomputeLine } from '../platform/fulfilment'
+import { onLineAssetMoved } from '../platform/fulfilment'
 import { str } from '../platform/records'
 import { closeServiceIntervals, openServiceInterval } from '../platform/service-intervals'
 import { ROLE } from '../domain/visibility'
+import { resourceOrder } from './orders'
 
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
@@ -32,10 +33,17 @@ export function enforceLifecycle(current: GlideRecord, previous: GlideRecord): v
     }
 }
 
-/** After-update rule on alm_hardware: an allocated Asset changed stage, so its Order line may advance. */
-export function onAllocatedAssetStageChange(current: GlideRecord): void {
+/**
+ * After-update rule on alm_hardware: an allocated Asset changed stage, so its Order line may advance. A unit that left
+ * the line in transit is taken off it and the line goes back to awaiting stock (platform/fulfilment
+ * `onLineAssetMoved`): its Order is then sourced again, queued as after a failed staging, so this save takes no
+ * sourcing lock.
+ */
+export function onAllocatedAssetStageChange(current: GlideRecord, previous: GlideRecord): void {
     const lineId = str(current, 'x_daas_ham_order_line')
-    if (lineId) recomputeLine(lineId)
+    if (!lineId) return
+    const orderId = onLineAssetMoved(current, lineId, readStage(previous), readStage(current))
+    if (orderId) resourceOrder(orderId)
 }
 
 /**

@@ -2880,6 +2880,10 @@ declare global {
                         table: 'sys_ui_action'
                         id: '8a112dc5b1f648bea3d1fa1667f7b338'
                     }
+                    ua_order_recheck_approvals: {
+                        table: 'sys_ui_action'
+                        id: '88682e06ec7945578c9e5ecb2ac6558d'
+                    }
                     ua_order_ship: {
                         table: 'sys_ui_action'
                         id: '11a5a038729b42ba8af26144c152c48e'
@@ -26970,6 +26974,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_action_role'
+                        id: '817a913a800e4b53bd1c8bda95b76232'
+                        key: {
+                            sys_ui_action: '88682e06ec7945578c9e5ecb2ac6558d'
+                            sys_user_role: {
+                                id: '50893530c7b94924ba2610453d4ebd3e'
+                                key: {
+                                    name: 'x_daas_ham.asset_manager'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '817b53be45084f05bf63754f14863fbc'
                         key: {
@@ -33776,6 +33793,19 @@ declare global {
                                         }
                                     }
                                     sys_domain: 'global'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: 'a44d7edd3d404258b5ce092d9c351f2c'
+                        key: {
+                            sys_ui_action: '88682e06ec7945578c9e5ecb2ac6558d'
+                            sys_user_role: {
+                                id: 'b5e8a439671d4fd7ac1628ba1e558c28'
+                                key: {
+                                    name: 'x_daas_ham.admin'
                                 }
                             }
                         }
@@ -45144,6 +45174,19 @@ declare global {
                         key: {
                             document_key: 'ee7630b279d2440e9fa479811964f1c7'
                             variable: '1778a7480f20101091d0f00c97767e03'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_action_role'
+                        id: 'e81271aeb1ae4d8188ce9c94a7ee2487'
+                        key: {
+                            sys_ui_action: '88682e06ec7945578c9e5ecb2ac6558d'
+                            sys_user_role: {
+                                id: 'd33813ebacca4b79aad41517026036d8'
+                                key: {
+                                    name: 'x_daas_ham.account_manager'
+                                }
+                            }
                         }
                     },
                     {

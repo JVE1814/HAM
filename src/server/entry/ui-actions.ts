@@ -3,7 +3,7 @@ import { mayConfirmInstall } from '../domain/install-confirmation'
 import { str } from '../platform/records'
 import { currentSession } from '../platform/session'
 import { completeInstall, shipOrder } from './delivery'
-import { cancelOrder, submitOrder } from './orders'
+import { cancelOrder, recheckApprovals, submitOrder } from './orders'
 
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
@@ -23,6 +23,14 @@ export function uiCancelOrder(current: GlideRecord): void {
     // Cancel saves this same record again: going on after a refused save could store the values just refused.
     if (!current.update()) return
     cancelOrder(current)
+}
+
+/** "Re-check approvals": rolls an Order's approvals up again, as a decision does (entry/orders `recheckApprovals`). */
+export function uiRecheckApprovals(current: GlideRecord): void {
+    // A refused form save (the platform says why) re-checks nothing: the rollup reads the Order afresh, so it would
+    // decide without what the form did not save.
+    if (!current.update()) return
+    recheckApprovals(current.getUniqueValue())
 }
 
 export function uiShipOrder(current: GlideRecord): void {
