@@ -1,5 +1,6 @@
 import { GlideDateTime, GlideRecord, GlideSchedule, gs } from '@servicenow/glide'
 import { planShipment, replacementInstalled, type InstallMode, type OnSiteWork, type OrderType } from '../domain/delivery'
+import { awaitsInstall, type InstallState } from '../domain/install-confirmation'
 import { isDeployed, stagesQuery } from '../domain/lifecycle'
 import { checkJobWindow } from '../domain/scheduling'
 import { moveAndSave, moveAsset, readStage } from '../platform/assets'
@@ -21,6 +22,30 @@ function orderAssets(orderId: string): GlideRecord {
     asset.addQuery('x_daas_ham_order_line.order', orderId)
     asset.query()
     return asset
+}
+
+/**
+ * What the install confirmation rules read of `order` (domain/install-confirmation). Its shipped units are counted at
+ * most once, and as `completeInstall` finds them for the same user, so a confirmation offered has units to move.
+ */
+export function installState(order: GlideRecord): InstallState {
+    const orderId = order.getUniqueValue()
+    let shipped: number | undefined
+    return {
+        stage: str(order, 'stage'),
+        installMode: str(order, 'install_mode'),
+        shippedUnits: () => {
+            if (shipped === undefined) shipped = countShipped(orderId)
+            return shipped
+        },
+    }
+}
+
+function countShipped(orderId: string): number {
+    const asset = orderAssets(orderId)
+    let count = 0
+    while (asset.next()) if (awaitsInstall(readStage(asset))) count++
+    return count
 }
 
 /**
@@ -158,14 +183,16 @@ function openOnSiteWork(order: GlideRecord, work: OnSiteWork): void {
  * UI action "Confirm installed" and the FSM work-order completion rule. How many units the platform refused to move
  * (logged): they and their line stay where they were, and so does the Asset their line replaces, so confirming again
  * retries only them and then retires it.
+ *
+ * Only shipped units move (domain/install-confirmation `awaitsInstall`): on an Order held back by a line filled again
+ * after a unit was lost in transit, that line's new units, a hot spare allocated to it included, wait for Ship.
  */
 export function completeInstall(order: GlideRecord): number {
     const now = new GlideDateTime().getValue()
     const asset = orderAssets(order.getUniqueValue())
     let refused = 0
     while (asset.next()) {
-        const stage = readStage(asset)
-        if (stage !== 'shipped' && stage !== 'spare_pool') continue
+        if (!awaitsInstall(readStage(asset))) continue
         asset.setValue('x_daas_ham_install_completed', now)
         asset.setValue('x_daas_ham_site', str(order, 'site'))
         if (!moveAndSave(asset, 'pending_in_service', `install ${str(order, 'number')}`)) refused++

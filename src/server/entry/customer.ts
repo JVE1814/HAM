@@ -12,7 +12,7 @@ import { bool, exists, findById, refusal, str } from '../platform/records'
 import { installedAssetIds, raiseReturn } from '../platform/returns'
 import { returnLabels } from '../platform/shipments'
 import { completeAttestation } from './assurance'
-import { completeInstall } from './delivery'
+import { completeInstall, installState } from './delivery'
 import { reply } from '../platform/rest-api'
 
 /*
@@ -78,7 +78,7 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
             stage: str(order, 'stage'),
             stageLabel: order.getDisplayValue('stage'),
             installMode: str(order, 'install_mode'),
-            canConfirmInstall: awaitsSelfInstallConfirmation({ stage: str(order, 'stage'), installMode: str(order, 'install_mode') }),
+            canConfirmInstall: awaitsSelfInstallConfirmation(installState(order)),
         })
     }
 
@@ -151,11 +151,14 @@ export function reportFault(request: RESTAPIRequest, response: RESTAPIResponse):
     reply(response, 201, { case: str(kase, 'number') })
 }
 
-/** POST /customer/orders/{id}/installed: a site contact confirms a self-install. */
+/**
+ * POST /customer/orders/{id}/installed: a site contact confirms a self-install, also the units already shipped while a
+ * line filled again after a unit was lost in transit waits for its replacement (domain/install-confirmation).
+ */
 export function confirmInstalled(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const order = findById('x_daas_ham_order', String(request.pathParams.id ?? ''))
-    if (!order || !awaitsSelfInstallConfirmation({ stage: str(order, 'stage'), installMode: str(order, 'install_mode') })) {
+    if (!order || !awaitsSelfInstallConfirmation(installState(order))) {
         return reply(response, 409, { error: 'This order is not waiting for a self-install confirmation' })
     }
     // Refused units stay where they were, so the confirmation can be sent again.

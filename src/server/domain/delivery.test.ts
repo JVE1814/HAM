@@ -176,6 +176,12 @@ describe('replacementInstalled', () => {
         expect(replacementInstalled({ quantity: 1, assetStages: ['pending_return', 'pending_in_service'] })).toBe(true)
     })
 
+    it('keeps the replaced Asset while its line, filled again after a unit was lost in transit, waits to ship', () => {
+        // The lost unit is off the line; the units already shipped may be confirmed installed meanwhile.
+        expect(replacementInstalled({ quantity: 1, assetStages: ['staging'] })).toBe(false)
+        expect(replacementInstalled({ quantity: 2, assetStages: ['pending_in_service', 'reserved'] })).toBe(false)
+    })
+
     it('waits for every unit of a line replacing with more than one', () => {
         expect(replacementInstalled({ quantity: 2, assetStages: ['pending_in_service', 'shipped'] })).toBe(false)
         expect(replacementInstalled({ quantity: 2, assetStages: ['pending_in_service', 'in_service'] })).toBe(true)

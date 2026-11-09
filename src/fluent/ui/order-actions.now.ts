@@ -67,8 +67,13 @@ UiAction({
     table: 'x_daas_ham_order',
     actionName: 'x_daas_ham_confirm_installed',
     hint: 'Record that the shipped equipment is installed (self-install, or when the work order is closed elsewhere).',
-    // Customer contacts confirm only a self-install; staff any install (uiConfirmInstalled checks the same on the server).
-    condition: "current.stage == 'installing' && (current.install_mode == 'self_install' || gs.hasRole('x_daas_ham.asset_manager') || gs.hasRole('x_daas_ham.field_tech'))",
+    // Customer contacts confirm only a self-install, staff any install: one installing, or one a line filled again
+    // holds back while units already shipped wait at the Site (uiConfirmInstalled checks domain/install-confirmation
+    // on the server). The condition column holds at most 254 characters, hence the terse script: staff are told apart
+    // by the platform's asset role, which asset managers and field techs contain and Customer roles do not, and the
+    // stage of an Order held back goes unchecked, as only one preparing, delivering or installing has units shipped.
+    condition:
+        "(current.install_mode=='self_install'||gs.hasRole('asset'))&&(current.stage=='installing'||(function(a){a.addQuery('substatus','shipped_to_site');a.query('x_daas_ham_order_line.order',current.sys_id);return a.next()})(new GlideRecord('alm_hardware')))",
     roles: [assetManager, fieldTech, customerAdmin, siteContact],
     form: { showButton: true },
     showUpdate: true,

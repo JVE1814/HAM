@@ -1,8 +1,7 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { mayConfirmInstall } from '../domain/install-confirmation'
-import { str } from '../platform/records'
+import { beingInstalled, mayConfirmInstall } from '../domain/install-confirmation'
 import { currentSession } from '../platform/session'
-import { completeInstall, shipOrder } from './delivery'
+import { completeInstall, installState, shipOrder } from './delivery'
 import { cancelOrder, recheckApprovals, submitOrder } from './orders'
 
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
@@ -40,9 +39,15 @@ export function uiShipOrder(current: GlideRecord): void {
     shipOrder(current)
 }
 
-/** "Confirm installed" is also offered to Customer contacts, who may only confirm a self-install (as on the customer page). */
+/**
+ * "Confirm installed" is also offered to Customer contacts, who may only confirm a self-install (as on the customer
+ * page), and on an Order a line filled again holds back, for the units already shipped (domain/install-confirmation).
+ */
 export function uiConfirmInstalled(current: GlideRecord): void {
-    if (!mayConfirmInstall(currentSession().scope, { stage: str(current, 'stage'), installMode: str(current, 'install_mode') })) {
+    const order = installState(current)
+    if (!mayConfirmInstall(currentSession().scope, order)) {
+        // A form opened earlier still offers it after its units were confirmed (by a work order closed, say).
+        if (!beingInstalled(order)) return void gs.addErrorMessage('Nothing shipped is waiting to be installed')
         gs.addErrorMessage('Only a self-install can be confirmed here; other installs complete when their work order is closed')
         return
     }
