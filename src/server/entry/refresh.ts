@@ -1,5 +1,15 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { refreshWaves, replacementModel, type RefreshCandidate, type RefreshWave } from '../domain/refresh.ts'
+import {
+    dueAfter,
+    firstCandidatesDue,
+    REFRESH_DUE_FIELD,
+    refreshWaves,
+    replacementModel,
+    type DueKey,
+    type DueRow,
+    type RefreshCandidate,
+    type RefreshWave,
+} from '../domain/refresh.ts'
 import type { LifecycleDates } from '../domain/model-lifecycle.ts'
 import { toIsoDate } from '../domain/calendar.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
@@ -12,6 +22,9 @@ import { submitOrder } from './orders.ts'
 
 /** The job lock (ADR 0013) a refresh run holds from its read of the Assets due to its last Order. */
 const REFRESH_LOCK = 'refresh_orders'
+
+/** Candidates a run raises at most, and the Assets due it reads per query. */
+const CANDIDATES_PER_RUN = 2000
 
 /**
  * Daily: refresh Orders for in-service Assets due within the horizon (P2.2, D48: fully automatic). Two runs at once
@@ -41,31 +54,44 @@ function raiseHolding(lock: HeldLock): void {
 
 /**
  * In-service fleet assets (ADR 0016) of an Agreement due within the horizon and on no open replacing line, earliest
- * due first. The Provider IT's equipment in use is in service by its install status too, and is left out.
+ * due first. The Provider IT's equipment in use is in service by its install status too, and is left out. Read a page
+ * at a time past those on order (domain/refresh `firstCandidatesDue`), within the job time budget.
  */
 function dueCandidates(): RefreshCandidate[] {
     const horizon = toIsoDate(nowMs() + intProperty(PROPERTY.refreshHorizonDays, 90) * 86_400_000)
     const onOrder = new Set(
         pluck('x_daas_ham_order_line', 'replaces_assetISNOTEMPTY^order.stageNOT INcomplete,cancelled,rejected', 'replaces_asset'),
     )
-    const candidates: RefreshCandidate[] = []
-    const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(fleetStagesQuery(['in_service'], `x_daas_ham_refresh_due<=${horizon}^x_daas_ham_agreementISNOTEMPTY`))
-    asset.orderBy('x_daas_ham_refresh_due')
-    asset.setLimit(2000)
-    asset.query()
-    while (asset.next()) {
-        if (onOrder.has(asset.getUniqueValue())) continue
-        candidates.push({
-            assetId: asset.getUniqueValue(),
-            agreementId: str(asset, 'x_daas_ham_agreement'),
-            customerId: str(asset, 'company'),
-            siteId: str(asset, 'x_daas_ham_site'),
-            modelId: str(asset, 'model'),
-            deviceClass: str(asset, 'model.x_daas_ham_device_class'),
-        })
+    const due = fleetStagesQuery(['in_service'], `${REFRESH_DUE_FIELD}<=${horizon}^x_daas_ham_agreementISNOTEMPTY`)
+    const started = nowMs()
+    const budgetMs = intProperty(PROPERTY.jobBudgetSeconds, 120) * 1000
+    const readPage = (after: DueKey | null, size: number): DueRow[] => {
+        const asset = new GlideRecord('alm_hardware')
+        asset.addEncodedQuery(dueAfter(due, after))
+        asset.orderBy(REFRESH_DUE_FIELD)
+        asset.orderBy('sys_id')
+        asset.setLimit(size)
+        asset.query()
+        const rows: DueRow[] = []
+        while (asset.next()) {
+            const id = asset.getUniqueValue()
+            const key = { due: str(asset, REFRESH_DUE_FIELD), id }
+            rows.push({ key, candidate: onOrder.has(id) ? null : candidateOf(asset) })
+        }
+        return rows
     }
-    return candidates
+    return firstCandidatesDue(readPage, CANDIDATES_PER_RUN, () => nowMs() - started >= budgetMs)
+}
+
+function candidateOf(asset: GlideRecord): RefreshCandidate {
+    return {
+        assetId: asset.getUniqueValue(),
+        agreementId: str(asset, 'x_daas_ham_agreement'),
+        customerId: str(asset, 'company'),
+        siteId: str(asset, 'x_daas_ham_site'),
+        modelId: str(asset, 'model'),
+        deviceClass: str(asset, 'model.x_daas_ham_device_class'),
+    }
 }
 
 function catalogModels(customerId: string): Array<{ modelId: string; deviceClass: string }> {

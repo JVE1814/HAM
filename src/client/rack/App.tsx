@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { rackElevation, type PowerBudget } from '../../server/domain/rack'
+import { devicePlacement, rackElevation, type PowerBudget } from '../../server/domain/rack'
 import { rackApi, type Rack, type RackDevice, type Site } from './api'
 
 type ColourBy = 'stage' | 'customer' | 'risk'
@@ -31,9 +31,9 @@ function hashColour(text: string): string {
 }
 
 /**
- * The roles that open an Asset's form (roles.now.ts `providerStaff`, which alm_hardware's read ACLs admit). Customer
- * admins and site contacts are external users (snc_external) the platform UI does not open for, so their rack shows
- * no link.
+ * The roles that open an Asset's form (roles.now.ts `providerStaff`, which alm_hardware's read ACLs admit; named here,
+ * as the page cannot import Fluent records, and kept equal to it by staff-roles.test.ts). Customer admins and site
+ * contacts are external users (snc_external) the platform UI does not open for, so their rack shows no link.
  */
 const STAFF_ROLES = [
     'x_daas_ham.asset_manager',
@@ -97,7 +97,8 @@ export default function App() {
         return latest((signal) => rackApi.rack(rackId, signal), setDetail, setError)
     }, [rackId])
 
-    const byId = useMemo(() => new Map((detail?.devices ?? []).map((d) => [d.tag || d.serial, d])), [detail])
+    // Keyed by sys_id, as the elevation's rows are: two devices can share a tag, or have neither a tag nor a serial.
+    const byId = useMemo(() => new Map((detail?.devices ?? []).map((d) => [d.id, d])), [detail])
     const colour = (device: RackDevice) =>
         colourBy === 'customer' ? hashColour(device.customer) : colourBy === 'risk' ? RISK_COLOURS[riskOf(device, today)] : STAGE_COLOURS[device.stage] ?? 'var(--muted)'
 
@@ -146,11 +147,7 @@ export default function App() {
                                 {detail.rack.name} · {face}
                             </h2>
                             <ol className="units">
-                                {rackElevation(
-                                    detail.rack.units,
-                                    detail.devices.map((d) => ({ assetId: d.tag || d.serial, ruStart: d.ruStart, height: d.height, face: d.face })),
-                                    face,
-                                ).map((row) => {
+                                {rackElevation(detail.rack.units, detail.devices.map(devicePlacement), face).map((row) => {
                                     const device = row.assetId ? byId.get(row.assetId) : undefined
                                     return (
                                         <li key={row.unit} className={device ? 'device' : 'empty'} style={{ ['--span' as string]: row.span, ...(device ? { background: colour(device) } : {}) }}>
@@ -158,11 +155,11 @@ export default function App() {
                                             {device &&
                                                 (linkAssets ? (
                                                     <a href={`/alm_hardware.do?sys_id=${device.id}`} target="_blank" rel="noreferrer" title={`${device.serial} · ${device.stage}`}>
-                                                        {device.tag || device.serial} · {device.model}
+                                                        {row.label} · {device.model}
                                                     </a>
                                                 ) : (
                                                     <span className="device-name" title={`${device.serial} · ${device.stage}`}>
-                                                        {device.tag || device.serial} · {device.model}
+                                                        {row.label} · {device.model}
                                                     </span>
                                                 ))}
                                         </li>

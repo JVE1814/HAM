@@ -2,7 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { placementProblem, powerBudget, type Placement, type RackFace, type RackSpec } from '../domain/rack.ts'
+import { devicePlacement, placementProblem, powerBudget, RACK_FACES, type Placement, type RackFace, type RackSpec } from '../domain/rack.ts'
 import { fleetCondition } from '../domain/fleet.ts'
 import { RACK_EXCEPTION_TYPES, reconcileRack } from '../domain/reconciliation.ts'
 import { visibilityFilter } from '../domain/visibility.ts'
@@ -10,7 +10,7 @@ import { isFleetAsset, readStage } from '../platform/assets.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { openException, resolveCiExceptions } from '../platform/exceptions.ts'
 import { currentSession } from '../platform/session.ts'
-import { exists, findById, num, pluck, recordsById, str } from '../platform/records.ts'
+import { choice, exists, findById, num, pluck, recordsById, str } from '../platform/records.ts'
 import { queryParam, reply } from '../platform/rest-api.ts'
 import { reconcileInstalledBase } from './assurance.ts'
 
@@ -18,7 +18,10 @@ import { reconcileInstalledBase } from './assurance.ts'
 
 /** Where an Asset sits in its rack, and its Model (whose name, size and draw are read separately). */
 interface Slot {
-    assetId: string
+    /** The Asset's sys_id: the Placement's key, read the same way for the candidate and for the rack's other devices. */
+    id: string
+    tag: string
+    serial: string
     ruStart: number
     face: RackFace
     modelId: string
@@ -26,9 +29,11 @@ interface Slot {
 
 function slotOf(asset: GlideRecord): Slot {
     return {
-        assetId: str(asset, 'asset_tag') || str(asset, 'serial_number'),
+        id: asset.getUniqueValue(),
+        tag: str(asset, 'asset_tag'),
+        serial: str(asset, 'serial_number'),
         ruStart: num(asset, 'x_daas_ham_ru_start'),
-        face: (str(asset, 'x_daas_ham_rack_face') || 'front') as RackFace,
+        face: choice(asset, 'x_daas_ham_rack_face', RACK_FACES, 'front'),
         modelId: str(asset, 'model'),
     }
 }
@@ -54,7 +59,7 @@ function rackModels(modelIds: readonly string[]): Map<string, RackModel> {
 
 function placementOf(slot: Slot, models: ReadonlyMap<string, RackModel>): Placement {
     const model = models.get(slot.modelId) ?? NO_MODEL
-    return { assetId: slot.assetId, ruStart: slot.ruStart, height: Math.max(1, model.rackUnits), face: slot.face, powerW: model.powerW }
+    return devicePlacement({ ...slot, height: model.rackUnits, powerW: model.powerW })
 }
 
 /**
@@ -90,8 +95,8 @@ function placementRefusal(current: GlideRecord, previous: GlideRecord | null): s
     if (!rackId || !str(current, 'x_daas_ham_ru_start')) return null
     const rack = findById('cmdb_ci_rack', rackId)
     if (!rack) return null
-    const others = slotsIn(rackId, current.getUniqueValue())
-    const candidate = { ...slotOf(current), assetId: current.getUniqueValue() }
+    const candidate = slotOf(current)
+    const others = slotsIn(rackId, candidate.id)
     // The Model this device already had in this rack, as a fleet asset; undefined when it is new to the rack or to
     // the fleet.
     const previousModelId =
