@@ -20,7 +20,7 @@ routers and firewalls it installs at customer sites and bills as a service.
 | In service | Seen signals from Discovery / connectors (CI last discovered) and the provider NMS (REST) put installed assets in service and start their subscription line |
 | Models | Normalization of discovered models (PID, aliases, match rules, exceptions that teach rules); lifecycle (EoX) dates via CSV; lifecycle phase and refresh due date per asset |
 | Visibility | Customer admins see only their customer, site contacts their sites, inventory techs their stockrooms |
-| UI | NaaS Asset Workspace (`/now/naas-assets/home`) with dashboard; navigator menu; warehouse page (`x_daas_ham_warehouse.do`) |
+| UI | NaaS Asset Workspace (`/x/daas/naas-assets/home`) with dashboard; navigator menu; warehouse page (`x_daas_ham_warehouse.do`) |
 
 | Area | Phase 2 |
 |---|---|

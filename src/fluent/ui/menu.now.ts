@@ -21,7 +21,7 @@ Record({
         title: 'NaaS Asset Workspace',
         application: naasMenu,
         link_type: 'DIRECT',
-        query: 'now/naas-assets/home',
+        query: 'x/daas/naas-assets/home',
         roles: ['x_daas_ham.asset_manager', 'x_daas_ham.inventory_tech', 'x_daas_ham.field_tech', 'x_daas_ham.noc', 'x_daas_ham.account_manager', 'x_daas_ham.finance'],
         active: true,
         order: 100,
