@@ -315,8 +315,10 @@ What remains can only be confirmed on an instance or behind a vendor login:
   `x_daas_ham.order.source` for its Order: one *not reserved for <line>* warning is followed by a
   sourcing pass, not by a stalled line. *Cancel order* takes `source_order_<Order sys_id>` too: with
   a row of that name in *Job lock*, it says *Order not cancelled: sourcing is running on it. Try
-  again in a minute* and changes nothing. No `source_order_` or `order_line_` row is left once a run
-  or a cancel ends.
+  again in a minute* and changes nothing. Under it, it also takes `ship_order_<Order sys_id>`: with
+  a row of that name in place (and none for `source_order_`), it says *Order not cancelled: a Ship
+  of the Order is running. Try again once it is done* and changes nothing. No `source_order_`,
+  `ship_order_` or `order_line_` row is left once a run or a cancel ends.
 - **Units that leave in transit** (Order lines): a shipped unit of an Order moved to missing or
   pending return (a device removal) logs *[x_daas_ham] <serial> left <line> in transit (<stage>):
   taken off the line, which is filled again* (info), followed by a queued `x_daas_ham.order.source`
@@ -328,6 +330,12 @@ What remains can only be confirmed on an instance or behind a vendor login:
 - **Re-check approvals** (Order form, next to *Submit*, *Ship*, *Confirm installed* and *Cancel
   order*): its condition, an inline `sysapproval_approver` query kept under the 254-character
   condition limit, shows the button only on an Order awaiting approval with no requested approval.
+- **Confirm installed** (Order form): its condition, an inline `alm_hardware` query (substatus
+  `shipped_to_site`) kept under the 254-character limit, shows the button on an Order installing,
+  or on one with shipped units (back in preparing or delivering after a unit was lost in transit),
+  to holders of the platform `asset` role (asset managers, field techs), and to Customer contacts
+  only on self-install Orders. Check that a site contact sees it on a self-install Order back in
+  preparing with one shipped unit, and that confirming moves only that unit.
 - **Serial lock** (warehouse Receive without an ASN, and ASN import rows): the first scan of an
   unknown serial with its PID, or an ASN row, creates the Asset under the job lock
   `receive_serial_<serial>`, checking there that no Asset has the serial, so two first scans, or a
@@ -341,18 +349,19 @@ What remains can only be confirmed on an instance or behind a vendor login:
   `return_label_<Return order sys_id>` while it checks for an open label and buys one. A second press
   while one is being bought says *A return label is already being bought for this return* and buys
   nothing. *Ship* holds `ship_order_<Order sys_id>`: a second Ship says *Another Ship of this Order is
-  running* and ships, buys and opens nothing. Each refused take logs two *Unique Key violation*
-  errors. The tracking webhook holds `track_shipment_<Shipment sys_id>` while it saves the status and
-  inserts new events, and *Mark label voided* while it checks and saves the void. A busy lock is
-  retried inside the app, not by the aggregator. With a row of that name created by hand in *Job
-  lock*, a delivery answers HTTP 202 `{"matched": true, "queued": true}` within a second, logs two
-  *Unique Key violation* errors per try (up to 10) and *[x_daas_ham] Tracking update of Shipment
-  <number> (<tracking number>) queued in 1 event(s): another update held its lock* (info), and saves
-  nothing yet. The `x_daas_ham.shipment.track` event then tries again as soon as it is processed and
-  about every minute after, each try logging up to 10 more errors and *... tried again in 60 s:
-  another update held its lock*. Delete the row and the next try saves the status and events (and
-  notes a delivery on the Order once); left in place, the first try once the row is 10 minutes old
-  clears it as abandoned and saves them.
+  running* and ships, buys and opens nothing. *Cancel order* holds the same lock while it checks and
+  releases the Order's lines; a Ship pressed then says the same. Each refused take logs two *Unique
+  Key violation* errors. The tracking webhook holds `track_shipment_<Shipment sys_id>` while it
+  saves the status and inserts new events, and *Mark label voided* while it checks and saves the
+  void. A busy lock is retried inside the app, not by the aggregator. With a row of that name
+  created by hand in *Job lock*, a delivery answers HTTP 202 `{"matched": true, "queued": true}`
+  within a second, logs two *Unique Key violation* errors per try (up to 10) and *[x_daas_ham]
+  Tracking update of Shipment <number> (<tracking number>) queued in 1 event(s): another update held
+  its lock* (info), and saves nothing yet. The `x_daas_ham.shipment.track` event then tries again as
+  soon as it is processed and about every minute after, each try logging up to 10 more errors and
+  *... tried again in 60 s: another update held its lock*. Delete the row and the next try saves the
+  status and events (and notes a delivery on the Order once); left in place, the first try once the
+  row is 10 minutes old clears it as abandoned and saves them.
   A retry still held off after 15 re-queues logs *[x_daas_ham] Tracking update of Shipment <number>
   (<tracking number>) dropped after 15 tries (...): check the Shipment with the carrier* (warning).
   With the row in place, *Mark label voided* says *Label <tracking number> not marked voided: a

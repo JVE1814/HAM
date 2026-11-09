@@ -97,7 +97,7 @@ contacts: their Sites).
 
 | Who | Can |
 |---|---|
-| Everyone | see installed equipment by Site; report a faulty device (CSM case with the failed asset); see open orders and returns; confirm self-installed orders |
+| Everyone | see installed equipment by Site; report a faulty device (CSM case with the failed asset); see open orders and returns; confirm self-installed orders, including the units already shipped of an Order back in preparing after a unit was lost in transit |
 | Customer admins | request returns of selected devices or a site decommission; answer attestations |
 
 The page calls the app's REST API under `/api/x_daas_ham/naas`. A call the platform refuses answers
@@ -114,4 +114,5 @@ New equipment is ordered through the *Request network equipment* catalog item.
 
 On the Order form too, Customer contacts can use *Confirm installed* only on self-install Orders; asset
 managers and field techs confirm any Order being installed (for instance when its work order was closed
-elsewhere).
+elsewhere). An Order is being installed when it is installing, or held back in preparing or
+delivering by a line not shipped yet: confirming it then installs only the units already shipped.

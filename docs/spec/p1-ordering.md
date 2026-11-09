@@ -121,9 +121,10 @@
   line whose purchase order Procurement does not create, or creates without its line item (that PO is removed
   again, or named for cancelling), is treated the same way: the line waits for stock and its sourcing summary
   says why. The spare-pool top-up then buys nothing and logs a warning.
-- Re-sourcing a line only covers `quantity − allocated − on order − open OEM RMAs`, where on order
-  is units bought and not yet received. These figures are read together under the line's lock
-  (below), so a receipt for the line is counted whole or not at all.
+- Re-sourcing a line only covers `quantity − allocated − on order − OEM RMAs`, where on order is
+  units bought and not yet received, and the OEM RMAs are those whose replacement is still to come
+  (*to open*, *open*). These figures are read together under the line's lock (below), so a receipt
+  for the line is counted whole or not at all.
 - An Order's sourcing passes take turns under a job lock on the Order (`source_order_<sys_id>`, ADR
   0013), so two passes never count the same shortfall. **Cancel** holds it too (below). A pass that
   finds it held, by another pass or a cancel, runs again about a minute later, up to 15 times, then
@@ -156,7 +157,11 @@
   counts. Cancel does nothing when the form's save is refused (the platform says why). It runs
   under the Order's sourcing lock (`source_order_<sys_id>`), taking turns with sourcing passes:
   pressed while a pass holds it, it changes nothing and says *Order not cancelled: sourcing is
-  running on it. Try again in a minute*. Otherwise it:
+  running on it. Try again in a minute*. Under it, it also takes the Order's Ship lock
+  (`ship_order_<sys_id>`), so no Ship sends units between its shipped check and its release of the
+  lines: pressed while a Ship (or *Mark label voided* on one of the Order's outbound labels) holds
+  it, it changes nothing and says *Order not cancelled: a Ship of the Order is running. Try again
+  once it is done*. Otherwise it:
   - saves the Order as cancelled first, listing every purchase order of its lines in its work notes
     for cancelling in Procurement (if the platform refuses, the user is told and nothing is
     released);
@@ -176,7 +181,8 @@
   or saved, and the warning *<line> closed while it was sourced: nothing bought for it* names the
   units still on it to release and the transfer orders to cancel. A cancel that outlasted its lock
   (ADR 0013) logs *<Order> cancelled after its sourcing lock was lost*, to check its lines for stock
-  reserved or bought meanwhile.
+  reserved or bought meanwhile. One that outlasted the Ship lock logs *<Order> cancelled after its
+  Ship lock was lost*, to check for units shipped meanwhile.
 
 ## Spare-pool top-up (daily)
 

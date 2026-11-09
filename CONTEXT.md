@@ -199,7 +199,7 @@ Spare-pool stock kept in one of the Customer's customer-site stockrooms at a Sit
 _Avoid_: on-site spare
 
 **OEM RMA**:
-A return authorisation the Provider opens with the manufacturer for a defective Asset.
+A return authorisation the Provider opens with the manufacturer for a defective Asset; a replacement sourced again reuses the one already open for its defective Asset rather than opening another.
 
 **OEM coverage**:
 The manufacturer support contract covering one Asset's serial number, with its service level and end date.

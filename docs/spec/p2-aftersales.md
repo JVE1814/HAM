@@ -21,21 +21,29 @@
   stock.
 - If no stock is left:
   - a failed unit with **OEM coverage today** gets an **OEM RMA** record (advance replacement, *to
-    open*) instead of a purchase, when the line is for the failed unit's own Model (refresh lines
-    and replacements by a different Model are purchased). If the RMA record cannot be saved, a
-    warning is logged and the line's sourcing summary says to open it by hand; the line waits for
-    stock;
+    open*), or reuses the one already open for that unit (see the lost-in-transit bullet below),
+    instead of a purchase, when the line is for the failed unit's own Model (refresh lines and
+    replacements by a different Model are purchased). If the RMA record cannot be saved, a warning
+    is logged and the line's sourcing summary says to open it by hand; the line waits for stock;
   - the RMA is opened with the vendor manually;
   - the OEM's replacement unit is received with the RMA number in the PO field (ASN or warehouse
     app), allocated to the waiting line, and the RMA becomes *replacement received*.
 - SLAs on the case: next business day 24 h, same day 8 h, 24x7x4 4 h (wall clock). They stop when the
   replacement Order completes (in service). A replacement served from a hot spare at the Site reaches
   *installing* at Ship (the spare is handed over as shipped), so its install can then be confirmed or
-  its swap work order closed.
+  its swap work order closed. A hot spare that Ship refused stays in the spare pool: neither
+  *Confirm installed* nor closing the swap work order installs it until a later Ship hands it over.
 - On install completion the failed unit goes on a **defective return** once its replacement is
   installed, collected by the swap work order.
-- A replacement lost in transit is sourced again by the usual routes (P1 fulfilment spec). That may
-  open a second OEM RMA (*to open*) for the same defective unit, to check with the vendor.
+- A replacement lost in transit (or failed in staging) is sourced again by the usual routes (P1
+  fulfilment spec). When that would open an OEM RMA, the RMA already open for the same defective
+  unit (*to open*, *open* or *replacement received*) is reused instead (`domain/sourcing.ts`
+  `advanceReplacementRma`): it is put under the line, one whose replacement was received goes back
+  to *open*, and the line waits for its replacement. The line's own RMA comes first, then one whose
+  replacement is still to come; one another open line waits for is left to it. The sourcing summary
+  names it (*RMA <number> already open for <serial>*, adding *its replacement was received, ask the
+  vendor for another* when it was reopened). If the platform refuses the reuse, a warning is logged
+  and the summary says to do it by hand; no second RMA is opened.
 - **Defective returned to OEM** on the RMA retires the unit as *returned to OEM*. This needs wipe
   evidence recorded since the unit was last received back at the depot (receipt clears earlier
   evidence). When the unit cannot be retired, the user is told why and the RMA is left as it was.

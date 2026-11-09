@@ -37,14 +37,18 @@ Order sourcing takes a lock of the same kind on each Order but does not supersed
 it held is queued again about a minute later, at most 15 times, because a purchase already requested
 cannot be cleared the way a recompute clears its period. *Cancel order* takes the same lock, so a
 cancel and a pass take turns; a cancel that finds it held changes nothing and asks the user to try
-again. The daily refresh run holds `refresh_orders`, a lock of the same kind, and, like *Cancel
-order*, does not retry: a run that finds its lock held raises nothing and leaves it to the run
-holding it. Short critical sections, such as an Order line, an ASN row's serial, the Provider tag
-counter, a stock change, a Service interval, a Subscription line's start, a sighting or a tracking
-update, take locks of the same kind and, finding one held, try again back to back a few times
-(`withLockTries` in `platform/locks.ts`) before they give up. A tracking update that gives up is not
-left to the aggregator (ShipEngine resends it at most twice, typically 30 minutes apart, then drops
-it): it is queued as an event that tries the lock again, then a minute apart, at most 15 more times.
+again. Under it, *Cancel order* also takes the Order's Ship lock (`ship_order_<Order sys_id>`), so a
+Ship cannot run between its shipped check and its release of the lines; one that finds it held
+changes nothing and says a Ship of the Order is running, without retrying. It is the only holder of
+both, and Ship never takes `source_order_`, so `source_order` stays before `ship_order`. The daily
+refresh run holds `refresh_orders`, a lock of the same kind, and, like *Cancel order*, does not
+retry: a run that finds its lock held raises nothing and leaves it to the run holding it. Short
+critical sections, such as an Order line, an ASN row's serial, the Provider tag counter, a stock
+change, a Service interval, a Subscription line's start, a sighting or a tracking update, take locks
+of the same kind and, finding one held, try again back to back a few times (`withLockTries` in
+`platform/locks.ts`) before they give up. A tracking update that gives up is not left to the
+aggregator (ShipEngine resends it at most twice, typically 30 minutes apart, then drops it): it is
+queued as an event that tries the lock again, then a minute apart, at most 15 more times.
 
 Locks are not re-entrant: a holder that takes a lock it already holds is refused, as any other taker
 would be. A take never waits either: it tries and gives up. So locks are taken in one order, and a

@@ -43,10 +43,10 @@
   Order. An Order tracking another label (a later Ship's, one typed since, or the same number with a
   different carrier) is left as it is. No unit is un-shipped and nothing is bought.
 - The void and the Order's clearing run under the Order's Ship lock (`ship_order_<sys_id>`), so a
-  Ship buying a new label meanwhile cannot have its number cleared. A void pressed while a Ship of
-  the Order, or another void of its labels, is running changes nothing and says to try again once
-  it has finished. If the Order's save is refused, the label stays voided and the user is told to
-  clear the tracking number and carrier by hand.
+  Ship buying a new label meanwhile cannot have its number cleared. A void pressed while a Ship or a
+  *Cancel order* of the Order, or another void of its labels, is running changes nothing and says to
+  try again once it has finished. If the Order's save is refused, the label stays voided and the
+  user is told to clear the tracking number and carrier by hand.
 - Addresses need a name, street, city, postal code and country (U.S. and Canadian states as their
   two-letter codes), and the sender a phone number (ShipEngine requires `ship_from.phone`): the
   location's phone, else `x_daas_ham.shipping.sender_phone` for the depot or the first site

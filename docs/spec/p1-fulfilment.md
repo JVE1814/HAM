@@ -38,8 +38,10 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   still on their way into service (or in it), and a complete Order stays complete. A line whose
   every unit left before going into service keeps its stage. On a line sourced again, such a unit
   (on its way back, or received back) still counts toward the quantity and holds nothing up.
-- While a line filled again waits, its Order is back in preparing: *Ship* is offered again once the
-  Order is delivering, *Confirm installed* once it is installing.
+- While a line filled again waits, its Order is back in preparing (then delivering until Ship):
+  *Ship* is offered again once the Order is delivering. *Confirm installed* stays offered for the
+  units already shipped and confirms only those; the line filled again waits for its replacement
+  unit, and so does the Asset that line replaces.
 - A line's Assets are counted past the user's visibility rules (ADR 0005), so the stage does not
   depend on who moved an Asset (for example an inventory tech closing a Staging task while the hot
   spare sits in a customer-site stockroom).
@@ -100,13 +102,13 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   scan again (HTTP 503), and the rescan finds the Asset by serial.
 - A unit for a waiting line is saved, taken off its *On order* count (or its RMA marked received) and
   reserved under the line's job lock (`order_line_<sys_id>`, P1 ordering spec). So sourcing's count
-  of the line (allocated, *On order*, open OEM RMAs) sees all of a receipt or none of it. A receipt
-  that cannot take the lock after 10 tries saves nothing and answers HTTP 503 *Its order line is
-  being sourced or received: scan again*. Under the line's lock the line is read again. The unit is
-  allocated only while the line is still awaiting stock and has fewer Assets than its quantity.
-  Otherwise it stays received as free stock (available), the line's *On order* count and any OEM RMA
-  are left as they are, and a warning *Received <serial> left in stock, not given to <line>: ...* is
-  logged.
+  of the line (allocated, *On order*, OEM RMAs whose replacement is still to come) sees all of a
+  receipt or none of it. A receipt that cannot take the lock after 10 tries saves nothing and
+  answers HTTP 503 *Its order line is being sourced or received: scan again*. Under the line's lock
+  the line is read again. The unit is allocated only while the line is still awaiting stock and has
+  fewer Assets than its quantity. Otherwise it stays received as free stock (available), the line's
+  *On order* count and any OEM RMA are left as they are, and a warning *Received <serial> left in
+  stock, not given to <line>: ...* is logged.
 - **Put-away** records the stockroom an Asset now sits in (for an inventory tech, one of theirs):
   - available stock and returned units awaiting evaluation, wipe or disposal go into any stockroom;
   - a unit being staged (one received for a waiting PO line among them) goes only into a staging
@@ -149,21 +151,28 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   units shipped and the work opened, so it buys no second label and opens no second change and work
   order. *Mark label voided* on one of the Order's outbound labels (P3 integrations spec) holds the
   same lock for a moment while it voids the label and clears it from the Order; a Ship pressed then
-  says another Ship is running.
+  says another Ship is running. *Cancel order* holds the same lock while it checks and releases the
+  Order's lines (P1 ordering spec); a Ship pressed then says another Ship is running.
 - After an outbound label is marked voided and cleared from the Order, the Order has no tracking
   number until the replacement's is typed. A Ship after that counts the typed number as entered by
   hand, so it buys no label for Assets staged since.
 - After a line is filled again (above), a second Ship ships its new units. It uses the Order's
   tracking number when it was entered by hand (for one an earlier Ship bought, the shipping
   aggregator buys the new units a label of their own) and the Order's existing work order: it opens
-  no second change or work order. *Confirm installed* is offered again only once the Order is
-  installing.
+  no second change or work order. *Confirm installed* stays offered meanwhile for the units already
+  shipped.
 - A work order's planned start and end must lie inside the change window (once scheduled) and the
   Site's maintenance schedule (if any).
 - **Install completion** happens when the work order is closed complete or someone uses *Confirm
   installed* (Customer contacts only on self-install Orders; asset managers and field techs on any
-  Order being installed):
-  - shipped Assets (hot spares included) become pending in service with the install time;
+  Order being installed). An Order is being installed when it is installing, or preparing or
+  delivering with units already shipped: a line filled again holds it back in either, and units
+  Ship refused hold it in delivering. The form's condition queries the Order's shipped Assets as
+  the user, and the customer page applies the same rule (`domain/install-confirmation.ts`
+  `beingInstalled`). Then:
+  - only shipped Assets (hot spares handed over at Ship included) become pending in service with
+    the install time; units not shipped yet, including a hot spare allocated but not handed over,
+    wait for Ship;
   - the Asset a line replaces goes to pending return once that line's own replacement is installed
     (pending in service, in service or temporary).
 
@@ -171,9 +180,10 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   installed* says how many, and the customer page's call (`POST /customer/orders/{id}/installed`)
   answers HTTP 422, so the confirmation can be sent again. An Asset whose replacement was refused
   stays in service until confirming again installs the replacement; the other lines' replaced Assets
-  go to pending return at once. The refused unit's line stays shipped, so the Order stays installing
-  and *Confirm installed* stays offered for the retry. *Confirm installed* on the Order form stops,
-  like Ship, when the form's save is refused, so a Site typed but not saved is never used.
+  go to pending return at once. The refused unit stays shipped, so the Order keeps its stage
+  (installing, or preparing or delivering while a line not shipped yet holds it back) and *Confirm
+  installed* stays offered for the retry. *Confirm installed* on the Order form stops, like Ship,
+  when the form's save is refused, so a Site typed but not saved is never used.
 
 ## In service and billing start
 
