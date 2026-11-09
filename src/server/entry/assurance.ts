@@ -114,7 +114,7 @@ export function uiStartSiteAudit(current: GlideRecord): void {
         customerId: str(current, 'company'),
         siteId: current.getUniqueValue(),
         description: `Site audit ${str(audit, 'number')} at ${str(current, 'name')}`,
-        source: { field: 'x_daas_ham_audit' as const, id: auditId },
+        sourceId: auditId,
     }
     const work = openFieldWork(context, { changeType: 'standard', purpose: 'site_audit', subcontracted: false })
     audit.setValue('expected_count', expected)

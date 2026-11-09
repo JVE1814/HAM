@@ -336,6 +336,17 @@ CrossScopePrivilege({
     targetType: 'sys_db_object',
 })
 
+// A work order's Initiated from and a change's Parent reference task: the rules on wm_order read the class of the
+// task a work order was initiated from (ADR 0018).
+CrossScopePrivilege({
+    $id: Now.ID['xsp_task_read'],
+    operation: 'read',
+    status: 'allowed',
+    targetName: 'task',
+    targetScope: 'global',
+    targetType: 'sys_db_object',
+})
+
 CrossScopePrivilege({
     $id: Now.ID['xsp_wm_order_read'],
     operation: 'read',

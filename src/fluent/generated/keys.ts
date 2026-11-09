@@ -4011,6 +4011,10 @@ declare global {
                         table: 'sys_scope_privilege'
                         id: '695f090083914772826091884810323b'
                     }
+                    xsp_task_read: {
+                        table: 'sys_scope_privilege'
+                        id: '8b17b045ea604e15ac5a7c30035ab57e'
+                    }
                     xsp_wm_order_create: {
                         table: 'sys_scope_privilege'
                         id: '3fcd07d4a6024220b0e83e614577af7c'
@@ -4632,6 +4636,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: '0289a121ef7d460f9aa40da88fc3691f'
+                        deleted: true
                         key: {
                             name: 'wm_order'
                             element: 'x_daas_ham_return_order'
@@ -5175,6 +5180,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: '056077b86906435fb464635ee4aed306'
+                        deleted: true
                         key: {
                             name: 'wm_order'
                             element: 'x_daas_ham_order'
@@ -9146,6 +9152,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: '1b5d847af19d45e9ae5a30626d140eba'
+                        deleted: true
                         key: {
                             name: 'wm_order'
                             element: 'x_daas_ham_audit'
@@ -14209,6 +14216,7 @@ declare global {
                     {
                         table: 'ua_table_licensing_config'
                         id: '369e4a1bcfc54fb38605149dc901ed02'
+                        deleted: true
                         key: {
                             name: 'change_request'
                         }
@@ -15529,6 +15537,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: '3d777602cc2041c0966fd8bcccfaf9a8'
+                        deleted: true
                         key: {
                             name: 'change_request'
                             element: 'x_daas_ham_return_order'
@@ -26726,6 +26735,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: '784a4da256ae45f7a83ce5b82d1750c2'
+                        deleted: true
                         key: {
                             name: 'wm_order'
                             element: 'x_daas_ham_audit'
@@ -27238,6 +27248,7 @@ declare global {
                     {
                         table: 'sys_index'
                         id: '7af32436f1dc42dca9f48a48c8b820b6'
+                        deleted: true
                         key: {
                             logical_table_name: 'change_request'
                             col_name_string: 'x_daas_ham_order'
@@ -33979,6 +33990,7 @@ declare global {
                     {
                         table: 'sys_index'
                         id: '9d4041f64af246979d68dcbb557b08cb'
+                        deleted: true
                         key: {
                             logical_table_name: 'wm_order'
                             col_name_string: 'x_daas_ham_order'
@@ -39168,6 +39180,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: 'b949826f592c48798bc3602794fcb419'
+                        deleted: true
                         key: {
                             name: 'wm_order'
                             element: 'x_daas_ham_return_order'
@@ -39682,6 +39695,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: 'bcd2e73e77654b27aa8cf0bf1937c57f'
+                        deleted: true
                         key: {
                             name: 'change_request'
                             element: 'NULL'
@@ -43113,6 +43127,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: 'cdc54690f0e94dcaa98a5c52e377e0f3'
+                        deleted: true
                         key: {
                             name: 'wm_order'
                             element: 'x_daas_ham_order'
@@ -43308,6 +43323,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: 'ce9e308a13a546cc8fe18f5ca7247cc7'
+                        deleted: true
                         key: {
                             name: 'change_request'
                             element: 'x_daas_ham_order'
@@ -45411,6 +45427,7 @@ declare global {
                     {
                         table: 'sys_db_object'
                         id: 'dbd5e9e4c4f8422d9d3a374f206935cf'
+                        deleted: true
                         key: {
                             name: 'change_request'
                         }
@@ -45771,6 +45788,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: 'de373072c5bc4cd695cf87993d155f8b'
+                        deleted: true
                         key: {
                             name: 'change_request'
                             element: 'x_daas_ham_audit'
@@ -47344,6 +47362,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: 'e79ac790ea9e4213a7cef1bfc6792143'
+                        deleted: true
                         key: {
                             name: 'change_request'
                             element: 'x_daas_ham_order'
@@ -50156,6 +50175,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: 'f995660277914a6188ff5d63f942ffbb'
+                        deleted: true
                         key: {
                             name: 'change_request'
                             element: 'x_daas_ham_return_order'
@@ -51192,6 +51212,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: 'ffa1d2b8eb624ae1b9c62513086f170d'
+                        deleted: true
                         key: {
                             name: 'change_request'
                             element: 'x_daas_ham_audit'

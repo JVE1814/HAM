@@ -22,6 +22,10 @@ import { guardStagingClosure, onStagingClosed, releaseWaitingSteps, stampStaging
  *
  * alm_hardware also holds the Provider IT's own equipment, which the app leaves alone (ADR 0016): each rule on it
  * tests the Fleet flag right after its change test, before anything else it checks or loads.
+ *
+ * wm_order holds the Provider IT's own field work too. A work order of a NaaS Order is one initiated from it (the
+ * platform's Initiated from, a reference to any task, ADR 0018), so each rule on it tests the class of that task right
+ * after its change test.
  */
 
 // Ahead of the lifecycle rule, so that it checks the stage the Asset takes back, not Inventory's In stock / Available.
@@ -149,7 +153,7 @@ BusinessRule({
     action: ['insert', 'update'],
     order: 100,
     condition:
-        "current.x_daas_ham_order != '' && (current.expected_start.changes() || current.estimated_end.changes()) && require('x_daas_ham/naas-ham/0.1.0/src/server/entry/delivery.ts').refusesWorkWindow(current)",
+        "(current.expected_start.changes() || current.estimated_end.changes()) && current.initiated_from.sys_class_name == 'x_daas_ham_order' && require('x_daas_ham/naas-ham/0.1.0/src/server/entry/delivery.ts').refusesWorkWindow(current)",
     abortAction: true,
     script: explainWorkWindowRefusal,
 })
@@ -161,6 +165,6 @@ BusinessRule({
     when: 'after',
     action: ['update'],
     order: 200,
-    condition: "current.x_daas_ham_order != '' && current.state.changes() && current.state == 3",
+    condition: "current.state.changes() && current.state == 3 && current.initiated_from.sys_class_name == 'x_daas_ham_order'",
     script: onWorkOrderClosed,
 })

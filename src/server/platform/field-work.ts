@@ -12,8 +12,11 @@ export interface WorkContext {
     customerId: string
     siteId: string
     description: string
-    /** The app record the work belongs to, linked from the change and work order. */
-    source: { field: 'x_daas_ham_order' | 'x_daas_ham_return_order' | 'x_daas_ham_audit'; id: string }
+    /**
+     * The app record the work belongs to (an Order, a Return order or an Audit, each a task): the change's Parent and
+     * the work order's Initiated from, the platform's own references (ADR 0018).
+     */
+    sourceId: string
 }
 
 /** The job: the change type it runs under, what it is for and whether a subcontractor does it. */
@@ -37,6 +40,7 @@ export interface FieldWork {
 export function openFieldWork(context: WorkContext, job: FieldJob): FieldWork | null {
     const change = workRecord('change_request', context)
     change.setValue('type', job.changeType)
+    change.setValue('parent', context.sourceId)
     const changeId = change.insert()
     if (!changeId) {
         gs.warn(`[x_daas_ham] No change for ${context.description}: ${refusal(change)}`)
@@ -44,6 +48,7 @@ export function openFieldWork(context: WorkContext, job: FieldJob): FieldWork | 
     }
     const workOrder = workRecord('wm_order', context)
     workOrder.setValue('x_daas_ham_purpose', job.purpose)
+    workOrder.setValue('initiated_from', context.sourceId)
     workOrder.setValue('parent', changeId)
     if (job.subcontracted) workOrder.setValue('work_notes', 'Dispatch to subcontractor / remote hands.')
     const workOrderId = workOrder.insert()
@@ -55,13 +60,12 @@ export function openFieldWork(context: WorkContext, job: FieldJob): FieldWork | 
     return { changeId, workOrderId }
 }
 
-/** A new change or work order with the context's description, Customer, Site and source record (the caller saves). */
+/** A new change or work order with the context's description, Customer and Site (the caller links and saves it). */
 function workRecord(table: 'change_request' | 'wm_order', context: WorkContext): GlideRecord {
     const record = new GlideRecord(table)
     record.initialize()
     record.setValue('short_description', context.description)
     record.setValue('company', context.customerId)
     record.setValue('location', context.siteId)
-    record.setValue(context.source.field, context.source.id)
     return record
 }

@@ -97,8 +97,12 @@ npx now-sdk install --auth <alias>                  # dev/test: demo data includ
 
 The install log (*System Applications > Application install history*, `sys_upgrade_history_log`)
 lists one *Skipped Error* row per global table the app adds columns to
-(`sys_documentation_<table>__en`, eight of them): SDK 4.14 writes a table label for each augmented
-table, and the platform keeps the table's own. Any other *Skipped Error* row is a defect.
+(`sys_documentation_<table>__en`, seven of them): SDK 4.14 writes a table label for each augmented
+table, and the platform keeps the table's own. Any other *Skipped Error* row is a defect. The app
+no longer adds a column to `change_request` (ADR 0018), so the build now carries a delete for the
+label it used to write there (`sys_documentation_change_request__en`, under the app's own sys_id,
+which the platform never stored): after the install, check that the *Change Request* table still
+has its label (*System Definition > Tables*).
 
 Then configure (System Properties, `x_daas_ham.*`):
 
@@ -292,7 +296,14 @@ What remains can only be confirmed on an instance or behind a vendor login:
   columns: the old columns stay, unread. Fill in each lease's *Vendor* (its Lessor) and *Contract
   number* (until then a reference to the lease shows blank, and its return-to-lessor disposal order
   gets no vendor) and each racked Model's *Power (watts)* (until then it counts as 0 W in a rack's
-  power budget).
+  power budget). A work order opened by the earlier version has no *Initiated from*: set it to its
+  NaaS Order while the work is open, or closing it will not confirm the install and its planned
+  start is not checked against the change window (*Confirm installed* on the Order does the former).
+- **On-site work links** (ADR 0018; not run on an instance): shipping an Order with an engineer
+  install opens a change whose *Parent* is the Order and a work order whose *Initiated from* is the
+  Order and whose *Parent* is the change; closing that work order complete confirms the install. A
+  work order the Provider's IT initiated from another task (an incident, say) is left alone: closing
+  it runs nothing of the app's, and its planned dates are not checked.
 - **Fleet column** (ADR 0016): *Fleet* (`x_daas_ham_fleet`) on `alm_hardware` is a read-only
   boolean, default false, with the index `x_daas_ham_hw_fleet`, and the install sets it true on no
   row. The dictionary entries of *Legal owner* (`alm_hardware`) and *Stockroom type*

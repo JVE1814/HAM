@@ -170,7 +170,7 @@ function openOnSiteWork(order: GlideRecord, work: OnSiteWork): void {
         customerId: str(order, 'customer'),
         siteId: str(order, 'site'),
         description: `${str(order, 'number')}: ${str(order, 'order_type')} at ${str(order, 'site.name')}`,
-        source: { field: 'x_daas_ham_order', id: order.getUniqueValue() },
+        sourceId: order.getUniqueValue(),
     }
     const opened = openFieldWork(context, work)
     if (!opened) return void gs.addErrorMessage('On-site work not opened (see the system log): open it by hand')
@@ -225,9 +225,9 @@ function retireReplacedAssets(order: GlideRecord): void {
     returnReplacedAssets(order, replaced)
 }
 
-/** After-update rule on wm_order closed complete for a NaaS Order. */
+/** After-update rule on wm_order closed complete for a NaaS Order: the work order was initiated from it. */
 export function onWorkOrderClosed(current: GlideRecord): void {
-    const order = findById('x_daas_ham_order', str(current, 'x_daas_ham_order'))
+    const order = findById('x_daas_ham_order', str(current, 'initiated_from'))
     if (order && ['install', 'swap'].includes(str(current, 'x_daas_ham_purpose'))) completeInstall(order)
 }
 

@@ -27,13 +27,24 @@ Brazil instance without Hardware Asset Management Professional (2026-11-09).
   are tracked one by one is the platform's *Asset tracking strategy* (`cmdb_model.asset_tracking_strategy`: leave to
   category, track as consumable, do not track). The cross-scope privileges on `alm_consumable` and
   `std_change_record_producer`, which nothing used either, went with it.
+- **The record on-site work belongs to**: `wm_order` and `change_request` each carried three references
+  (`x_daas_ham_order`, `x_daas_ham_return_order`, `x_daas_ham_audit`) naming the Order, Return order or Audit the
+  work is for, one of them filled. All three are tasks, and the platform has a reference to a task on both: a work
+  order's *Initiated from* (`sm_order.initiated_from`) and a change's *Parent* (`task.parent`; the work order's own
+  Parent stays its change). The app's rules on `wm_order` act on a work order initiated from an Order, testing that
+  task's class. On a Brazil instance the only platform rule that reads *Initiated from* is a date check on
+  `sm_task` that reads a crew's, and the only one on a task's *Parent* runs the parent's workflows, of which an
+  Order, a Return order and an Audit have none.
 
 ## Consequences
 
 - **Upgrades**: the build carries no delete for a removed table or column, so an instance that had an earlier
   version keeps them with their values, unread. Nothing is migrated: stockroom members are entered again as group
-  members, and a Model's *Power (watts)* and a lease's *Vendor* and *Contract number* are filled in again (README,
-  *Verify on the first install*).
+  members, and a Model's *Power (watts)*, a lease's *Vendor* and *Contract number* and an open work order's
+  *Initiated from* are filled in again (README, *Verify on the first install*).
+- **`change_request` carries no column of the app any more.** For a table whose last app column goes, the build
+  carries a delete of the table label SDK 4.14 wrote for it, under the app's own sys_id; the platform kept its own
+  label then and should now (to confirm on the first install: README).
 - **Labels**: a lease's form and list read *Vendor* and *Contract number*, the platform's labels, where they read
   *Lessor* and *Schedule number*. The Contract number holds 40 characters (the schedule number held 60) and is
   required; the Vendor picker offers companies marked as vendors only.

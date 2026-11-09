@@ -117,7 +117,7 @@ export function completeReturn(order: GlideRecord, request: ReturnRequest): void
             customerId: request.customerId,
             siteId: request.siteId,
             description: request.description,
-            source: { field: 'x_daas_ham_return_order' as const, id: order.getUniqueValue() },
+            sourceId: order.getUniqueValue(),
         }
         const work = openFieldWork(context, { changeType: 'normal', purpose: 'de_install', subcontracted: false })
         if (work) {

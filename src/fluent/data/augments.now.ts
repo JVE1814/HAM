@@ -162,17 +162,15 @@ export const cmn_location = Table({
 
 export const wm_order = Table({
     augments: 'wm_order',
+    // The app record a work order belongs to (an Order, a Return order or an Audit) is the platform's Initiated from
+    // (sm_order.initiated_from); its change request names it as its Parent (ADR 0018).
     schema: {
-        x_daas_ham_order: ReferenceColumn({ label: 'NaaS order', referenceTable: 'x_daas_ham_order' }),
-        x_daas_ham_return_order: ReferenceColumn({ label: 'NaaS return order', referenceTable: 'x_daas_ham_return_order' }),
-        x_daas_ham_audit: ReferenceColumn({ label: 'NaaS audit', referenceTable: 'x_daas_ham_audit' }),
         x_daas_ham_purpose: ChoiceColumn({
             label: 'NaaS purpose',
             choices: FIELD_PURPOSE_CHOICES,
         }),
         x_daas_ham_labour_cost: DecimalColumn({ label: 'NaaS field labour cost (blank = standard visit cost)' }),
     },
-    index: [{ name: 'x_daas_ham_wm_order', unique: false, element: 'x_daas_ham_order' }],
 })
 
 export const sn_customerservice_case = Table({
@@ -197,16 +195,6 @@ export const sn_customerservice_case = Table({
         x_daas_ham_proactive: BooleanColumn({ label: 'Raised by NOC', default: false }),
     },
     index: [{ name: 'x_daas_ham_case_failed_asset', unique: false, element: 'x_daas_ham_failed_asset' }],
-})
-
-export const change_request = Table({
-    augments: 'change_request',
-    schema: {
-        x_daas_ham_order: ReferenceColumn({ label: 'NaaS order', referenceTable: 'x_daas_ham_order' }),
-        x_daas_ham_return_order: ReferenceColumn({ label: 'NaaS return order', referenceTable: 'x_daas_ham_return_order' }),
-        x_daas_ham_audit: ReferenceColumn({ label: 'NaaS audit', referenceTable: 'x_daas_ham_audit' }),
-    },
-    index: [{ name: 'x_daas_ham_chg_order', unique: false, element: 'x_daas_ham_order' }],
 })
 
 export const cmdb_ci_rack = Table({
