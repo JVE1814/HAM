@@ -27740,6 +27740,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: '7e5874b3fcea448985aea26df49c0b12'
+                        deleted: true
                         key: {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_lessor'
@@ -29162,6 +29163,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: '858e3296785a4a3cbaa425d5dba4069c'
+                        deleted: true
                         key: {
                             name: 'alm_hardware'
                             element: 'x_daas_ham_lessor'

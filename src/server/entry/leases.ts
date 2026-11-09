@@ -35,17 +35,16 @@ import { changeStock, stockUnit } from '../platform/stock.ts'
 const IN_STOCK: readonly Stage[] = ['available', 'spare_pool']
 
 /**
- * Before rule on alm_hardware (br_asset_lease): a fleet asset on a lease schedule is owned by that schedule's Lessor,
- * whether its lease is set or it joins the fleet with one already set (adoption and the warehouse receipt set a blank
- * Legal owner to the Provider, which this replaces in the same save). The rule's condition runs it on a fleet asset
- * only, once its Lease schedule or its Fleet flag changes: one of the Provider IT's is left as it is (ADR 0016). It
- * reads no previous value, so either change runs it the same way.
+ * Before rule on alm_hardware (br_asset_lease): a fleet asset on a lease schedule is owned by that schedule's Lessor
+ * (the lease's Vendor, which the Asset reaches through its Lease schedule), whether its lease is set or it joins the
+ * fleet with one already set (adoption and the warehouse receipt set a blank Legal owner to the Provider, which this
+ * replaces in the same save). The rule's condition runs it on a fleet asset only, once its Lease schedule or its Fleet
+ * flag changes: one of the Provider IT's is left as it is (ADR 0016). It reads no previous value, so either change
+ * runs it the same way.
  */
 export function onAssetLeaseChanged(current: GlideRecord): void {
-    const lease = findById('x_daas_ham_lease_schedule', str(current, 'x_daas_ham_lease'))
-    if (!lease) return
+    if (!findById('x_daas_ham_lease_schedule', str(current, 'x_daas_ham_lease'))) return
     current.setValue('x_daas_ham_legal_owner', 'lessor')
-    current.setValue('x_daas_ham_lessor', str(lease, 'vendor'))
 }
 
 /**
@@ -367,7 +366,6 @@ export function transferLeaseAssets(event: GlideRecord, current: GlideRecord): v
             const asset = findById('alm_hardware', assetId)
             if (!asset || str(asset, 'x_daas_ham_lease') !== leaseId || isRetired(readStage(asset))) return
             asset.setValue('x_daas_ham_lease', '')
-            asset.setValue('x_daas_ham_lessor', '')
             asset.setValue('x_daas_ham_legal_owner', 'provider')
             if (purchase) {
                 asset.setValue('cost', purchase.cost)

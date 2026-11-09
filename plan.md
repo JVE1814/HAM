@@ -367,7 +367,6 @@ Confidence tags:
 | Table | Column (`x_daas_ham_` + …) | Type | Phase | Notes |
 |---|---|---|---|---|
 | `alm_hardware` | `legal_owner` | choice: provider / customer / lessor | P1 | Indexed |
-| | `lessor` | ref `core_company` | P1 | When legal_owner = lessor |
 | | `agreement` | ref `x_daas_ham_agreement` | P1 | Indexed |
 | | `subscription_line` | ref `x_daas_ham_subscription_line` | P1 | Indexed |
 | | `site` | ref `cmn_location` | P1 | Site-level location. The base `location` field may point to a room. |

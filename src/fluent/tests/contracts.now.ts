@@ -12,7 +12,7 @@ export const leasedAssetOwnershipTest = Test(
     {
         $id: Now.ID['atf_leased_asset_owner'],
         name: 'NaaS - a fleet asset on a lease schedule is owned by its lessor',
-        description: "Setting a fleet asset's lease schedule makes its legal owner the lessor of that schedule.",
+        description: "Setting a fleet asset's lease schedule makes its legal owner the lessor, which is that schedule's vendor.",
         active: true,
         failOnServerError: true,
     },
@@ -46,7 +46,7 @@ export const leasedAssetOwnershipTest = Test(
             $id: Now.ID['atf_lao_validate'],
             table: 'alm_hardware',
             recordId: asset.record_id,
-            fieldValues: `x_daas_ham_legal_owner=lessor^x_daas_ham_lessor=${lessor.record_id}`,
+            fieldValues: `x_daas_ham_legal_owner=lessor^x_daas_ham_lease.vendor=${lessor.record_id}`,
             assert: 'record_validated',
         })
     },

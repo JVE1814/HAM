@@ -47,7 +47,6 @@ export const alm_hardware = Table({
             // owner (platform/assets newAsset, joinFleet), and a blank owner counts as the Provider's (domain/lifecycle).
             dropdown: 'dropdown_with_none',
         }),
-        x_daas_ham_lessor: ReferenceColumn({ label: 'Lessor', referenceTable: 'core_company' }),
         x_daas_ham_lease: ReferenceColumn({ label: 'Lease schedule', referenceTable: 'x_daas_ham_lease_schedule' }),
         x_daas_ham_agreement: ReferenceColumn({ label: 'Agreement', referenceTable: 'x_daas_ham_agreement' }),
         x_daas_ham_subscription_line: ReferenceColumn({

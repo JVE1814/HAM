@@ -20,6 +20,9 @@ Brazil instance without Hardware Asset Management Professional (2026-11-09).
   *Contract number* the vendor gives it; both are required of a lease. The platform shows a reference to a contract
   by its Contract number, so the override that made a lease's own *Number* its display value, needed only while a
   lease left the Contract number empty, is gone too. The app's messages still name a lease by its *Number*.
+- **An Asset's Lessor**: `alm_hardware.x_daas_ham_lessor`, a copy of its lease's Lessor that a rule stamped and no
+  logic read, is gone. An Asset's Lessor is its Lease schedule's Vendor (`x_daas_ham_lease.vendor`); its *Legal
+  owner* still says that a Lessor owns it.
 
 ## Consequences
 
