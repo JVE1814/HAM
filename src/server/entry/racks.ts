@@ -5,6 +5,7 @@ import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_in
 import { placementProblem, powerBudget, type Placement, type RackFace, type RackSpec } from '../domain/rack.ts'
 import { fleetCondition } from '../domain/fleet.ts'
 import { RACK_EXCEPTION_TYPES, reconcileRack } from '../domain/reconciliation.ts'
+import type { RackDevice, RackElevation, RackList, RackListing, Site, SiteList } from '../domain/rest-contracts.ts'
 import { visibilityFilter } from '../domain/visibility.ts'
 import { isFleetAsset, readStage } from '../platform/assets.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
@@ -228,11 +229,9 @@ export function listRacks(request: RESTAPIRequest, response: RESTAPIResponse): v
     atSite.addOrCondition('location.parent', siteId)
     rack.orderBy('name')
     rack.query()
-    const racks: Array<{ id: string; name: string; units: number; room: string }> = []
-    while (rack.next()) {
-        racks.push({ id: rack.getUniqueValue(), name: str(rack, 'name'), units: num(rack, 'rack_units') || 42, room: rack.getDisplayValue('location') })
-    }
-    reply(response, 200, { racks })
+    const racks: RackListing[] = []
+    while (rack.next()) racks.push({ id: rack.getUniqueValue(), name: str(rack, 'name'), room: rack.getDisplayValue('location') })
+    reply(response, 200, { racks } satisfies RackList)
 }
 
 /** GET /racks/{id}: the rack and the fleet assets placed in it (visibility rules apply to devices). */
@@ -249,7 +248,7 @@ export function getRack(request: RESTAPIRequest, response: RESTAPIResponse): voi
     asset.addEncodedQuery(fleetCondition())
     asset.addNotNullQuery('x_daas_ham_ru_start')
     asset.query()
-    const found: Array<{ slot: Slot; companyId: string; device: Record<string, unknown> }> = []
+    const found: Array<{ slot: Slot; companyId: string; device: Omit<RackDevice, 'customer' | 'model' | 'ruStart' | 'height' | 'face'> }> = []
     while (asset.next()) {
         found.push({
             slot: slotOf(asset),
@@ -259,7 +258,7 @@ export function getRack(request: RESTAPIRequest, response: RESTAPIResponse): voi
                 tag: str(asset, 'asset_tag'),
                 serial: str(asset, 'serial_number'),
                 stage: readStage(asset) ?? 'unknown',
-                lifecyclePhase: str(asset, 'x_daas_ham_lifecycle_phase'),
+                lifecyclePhase: str(asset, 'x_daas_ham_lifecycle_phase') as RackDevice['lifecyclePhase'],
                 coverageEnd: str(asset, 'x_daas_ham_coverage_end'),
                 refreshDue: str(asset, 'x_daas_ham_refresh_due'),
             },
@@ -269,7 +268,7 @@ export function getRack(request: RESTAPIRequest, response: RESTAPIResponse): voi
     const models = rackModels(found.map(({ slot }) => slot.modelId))
     const customerNames = recordsById('core_company', found.map(({ companyId }) => companyId), (company) => str(company, 'name'))
     const placements = found.map(({ slot }) => placementOf(slot, models))
-    const devices = found.map(({ slot, companyId, device }, i) => ({
+    const devices: RackDevice[] = found.map(({ slot, companyId, device }, i) => ({
         ...device,
         customer: customerNames.get(companyId) ?? '',
         model: (models.get(slot.modelId) ?? NO_MODEL).name,
@@ -279,7 +278,8 @@ export function getRack(request: RESTAPIRequest, response: RESTAPIResponse): voi
     }))
     // The budget counts the devices listed above, so the same visibility rules apply to it.
     const power = powerBudget(num(rack, 'x_daas_ham_power_capacity_w'), placements)
-    reply(response, 200, { rack: { id: rack.getUniqueValue(), name: str(rack, 'name'), units: num(rack, 'rack_units') || 42, power }, devices })
+    const units = num(rack, 'rack_units') || 42
+    reply(response, 200, { rack: { id: rack.getUniqueValue(), name: str(rack, 'name'), units, power }, devices } satisfies RackElevation)
 }
 
 /** GET /sites: customer Sites the user may see (customers only their own, site contacts only theirs). */
@@ -293,7 +293,7 @@ export function listSites(request: RESTAPIRequest, response: RESTAPIResponse): v
     site.orderBy('name')
     site.setLimit(1000)
     site.query()
-    const sites: Array<{ id: string; name: string; customer: string }> = []
+    const sites: Site[] = []
     while (site.next()) sites.push({ id: site.getUniqueValue(), name: str(site, 'name'), customer: site.getDisplayValue('company') })
-    reply(response, 200, { sites })
+    reply(response, 200, { sites } satisfies SiteList)
 }

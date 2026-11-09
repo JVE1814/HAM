@@ -1,52 +1,13 @@
-:root {
-    --bg: #f6f7f9;
-    --fg: #1d2330;
-    --muted: #5d6677;
-    --accent: #1f6feb;
-    --ok: #1a7f37;
-    --error: #b42318;
-    --card: #ffffff;
-    --border: #d7dbe2;
-    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-}
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg: #12151b;
-        --fg: #e6e9ef;
-        --muted: #9aa3b2;
-        --card: #1b2029;
-        --border: #2f3542;
-    }
-}
-body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--fg);
-}
 .customer {
     max-width: 1000px;
-    margin: 0 auto;
-    padding: 16px;
 }
 nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
     margin-bottom: 16px;
 }
 button {
     min-height: 40px;
     padding: 0 14px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    color: var(--fg);
     font-size: 0.95rem;
-}
-button.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
 }
 button.danger {
     border-color: var(--error);
@@ -100,10 +61,4 @@ td {
 }
 .radio {
     margin-right: 12px;
-}
-.ok {
-    color: var(--ok);
-}
-.error {
-    color: var(--error);
 }

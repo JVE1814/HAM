@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { customerApi, type AttestationItem, type CustomerAsset, type Overview } from './api'
+import type { AttestationAnswer, AttestationItem, CustomerAsset, CustomerOverview } from '../../server/domain/rest-contracts'
+import { stageText } from '../stage'
+import { customerApi } from './api'
 
 type Tab = 'equipment' | 'orders' | 'attest'
 
 export default function App() {
-    const [overview, setOverview] = useState<Overview | null>(null)
+    const [overview, setOverview] = useState<CustomerOverview | null>(null)
     const [tab, setTab] = useState<Tab>('equipment')
     const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
 
@@ -50,7 +52,7 @@ export default function App() {
 
 type Runner = (action: Promise<string>) => void
 
-function Equipment({ overview, run }: { overview: Overview; run: Runner }) {
+function Equipment({ overview, run }: { overview: CustomerOverview; run: Runner }) {
     const [selected, setSelected] = useState<Set<string>>(new Set())
     const sites = useMemo(() => {
         const bySite = new Map<string, CustomerAsset[]>()
@@ -98,7 +100,7 @@ function Equipment({ overview, run }: { overview: Overview; run: Runner }) {
                                             {asset.serial}
                                             {asset.customerTag ? ` · ${asset.customerTag}` : ''}
                                         </td>
-                                        <td>{asset.stage.replace(/_/g, ' ')}</td>
+                                        <td>{stageText(asset.stage)}</td>
                                         <td>{asset.refreshDue}</td>
                                         <td>
                                             <button
@@ -151,7 +153,7 @@ function Equipment({ overview, run }: { overview: Overview; run: Runner }) {
     )
 }
 
-function Orders({ overview, run }: { overview: Overview; run: Runner }) {
+function Orders({ overview, run }: { overview: CustomerOverview; run: Runner }) {
     return (
         <>
             <section className="card">
@@ -192,7 +194,10 @@ function Orders({ overview, run }: { overview: Overview; run: Runner }) {
     )
 }
 
-function Attestations({ overview, run }: { overview: Overview; run: Runner }) {
+const ANSWER_WORDING: Record<AttestationAnswer, string> = { confirmed: 'Present', missing: 'Not present', unknown: "Don't know" }
+const ANSWERS = Object.keys(ANSWER_WORDING) as AttestationAnswer[]
+
+function Attestations({ overview, run }: { overview: CustomerOverview; run: Runner }) {
     const [answers, setAnswers] = useState<Record<string, AttestationItem['response']>>({})
     if (overview.attestations.length === 0) return <section className="card">Nothing to confirm right now.</section>
     return (
@@ -213,7 +218,7 @@ function Attestations({ overview, run }: { overview: Overview; run: Runner }) {
                                         <td>{item.model}</td>
                                         <td>{item.serial}</td>
                                         <td>
-                                            {(['confirmed', 'missing', 'unknown'] as const).map((response) => (
+                                            {ANSWERS.map((response) => (
                                                 <label key={response} className="radio">
                                                     <input
                                                         type="radio"
@@ -221,7 +226,7 @@ function Attestations({ overview, run }: { overview: Overview; run: Runner }) {
                                                         checked={item.response === response}
                                                         onChange={() => setAnswers((a) => ({ ...a, [item.id]: response }))}
                                                     />
-                                                    {response === 'confirmed' ? 'Present' : response === 'missing' ? 'Not present' : "Don't know"}
+                                                    {ANSWER_WORDING[response]}
                                                 </label>
                                             ))}
                                         </td>

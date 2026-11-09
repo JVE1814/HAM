@@ -1,6 +1,6 @@
 import React from 'react'
 import { encodeCode128 } from './code128'
-import type { AssetSummary } from './api'
+import type { AssetSummary } from '../../server/domain/rest-contracts'
 
 /** A printable Provider-tag label (Code 128 + human-readable lines). */
 export default function Label({ asset }: { asset: AssetSummary }) {

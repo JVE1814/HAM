@@ -3,6 +3,18 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { awaitsSelfInstallConfirmation } from '../domain/install-confirmation.ts'
+import type {
+    Attestation,
+    AttestationItem,
+    AttestationReceipt,
+    CustomerAsset,
+    CustomerOrder,
+    CustomerOverview,
+    CustomerReturn,
+    FaultReport,
+    InstallConfirmation,
+    ReturnRequestReceipt,
+} from '../domain/rest-contracts.ts'
 import { returnRequesterRefusal, returnRequestFindings, type RequestedReturn } from '../domain/returns.ts'
 import { actsAsCustomerAdmin, customerEquipmentQuery, ROLE, SCOPE, visibilityFilter } from '../domain/visibility.ts'
 import { isFleetAsset, readStage } from '../platform/assets.ts'
@@ -44,7 +56,7 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
     if (!allowed(response)) return
     const session = currentSession()
 
-    const assets: object[] = []
+    const assets: CustomerAsset[] = []
     const asset = new GlideRecord('alm_hardware')
     asset.addEncodedQuery(customerEquipmentQuery(visibilityFilter(session.scope, SCOPE.assets, session)))
     asset.orderBy('x_daas_ham_site')
@@ -53,19 +65,17 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
     while (asset.next()) {
         assets.push({
             id: asset.getUniqueValue(),
-            tag: str(asset, 'asset_tag'),
             serial: str(asset, 'serial_number'),
             customerTag: str(asset, 'x_daas_ham_customer_tag'),
             model: asset.getDisplayValue('model'),
             site: asset.getDisplayValue('x_daas_ham_site'),
             siteId: str(asset, 'x_daas_ham_site'),
             stage: readStage(asset) ?? 'unknown',
-            inServiceDate: str(asset, 'x_daas_ham_in_service_date').slice(0, 10),
             refreshDue: str(asset, 'x_daas_ham_refresh_due'),
         })
     }
 
-    const orders: object[] = []
+    const orders: CustomerOrder[] = []
     const order = new GlideRecord('x_daas_ham_order')
     order.addQuery('stage', 'NOT IN', 'complete,cancelled,rejected')
     order.orderByDesc('sys_created_on')
@@ -77,47 +87,46 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
             number: str(order, 'number'),
             type: order.getDisplayValue('order_type'),
             site: order.getDisplayValue('site'),
-            stage: str(order, 'stage'),
             stageLabel: order.getDisplayValue('stage'),
-            installMode: str(order, 'install_mode'),
             canConfirmInstall: awaitsSelfInstallConfirmation(installState(order)),
         })
     }
 
-    const returns: Array<{ id: string; number: string; site: string; trigger: string; dueDate: string }> = []
+    const openReturns: Array<{ id: string; listed: Omit<CustomerReturn, 'labelUrl' | 'trackingNumber'> }> = []
     const ret = new GlideRecord('x_daas_ham_return_order')
     ret.addQuery('active', true)
     ret.setLimit(200)
     ret.query()
     while (ret.next()) {
-        returns.push({
+        openReturns.push({
             id: ret.getUniqueValue(),
-            number: str(ret, 'number'),
-            site: ret.getDisplayValue('site'),
-            trigger: ret.getDisplayValue('trigger'),
-            dueDate: str(ret, 'due_back'),
+            listed: {
+                number: str(ret, 'number'),
+                site: ret.getDisplayValue('site'),
+                trigger: ret.getDisplayValue('trigger'),
+                dueDate: str(ret, 'due_back'),
+            },
         })
     }
-    const labels = returnLabels(returns.map((r) => r.id))
-    const labelledReturns = returns.map((r) => ({ ...r, ...(labels.get(r.id) ?? { labelUrl: '', trackingNumber: '' }) }))
+    const labels = returnLabels(openReturns.map(({ id }) => id))
+    const returns: CustomerReturn[] = openReturns.map(({ id, listed }) => ({ ...listed, ...(labels.get(id) ?? { labelUrl: '', trackingNumber: '' }) }))
 
-    const attestations: object[] = []
+    const attestations: Attestation[] = []
     const attestation = new GlideRecord('x_daas_ham_attestation')
     attestation.addQuery('active', true)
     attestation.setLimit(50)
     attestation.query()
     while (attestation.next()) {
-        const items: object[] = []
+        const items: AttestationItem[] = []
         const item = new GlideRecord('x_daas_ham_attestation_item')
         item.addQuery('attestation', attestation.getUniqueValue())
         item.query()
         while (item.next()) {
             items.push({
                 id: item.getUniqueValue(),
-                tag: str(item, 'asset.asset_tag'),
                 serial: str(item, 'asset.serial_number'),
                 model: item.getDisplayValue('asset.model'),
-                response: str(item, 'response'),
+                response: str(item, 'response') as AttestationItem['response'],
             })
         }
         attestations.push({ id: attestation.getUniqueValue(), number: str(attestation, 'number'), site: attestation.getDisplayValue('site'), items })
@@ -128,9 +137,9 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
         isCustomerAdmin: isCustomerAdmin(),
         assets,
         orders,
-        returns: labelledReturns,
+        returns,
         attestations,
-    })
+    } satisfies CustomerOverview)
 }
 
 /** POST /customer/faults { asset, description }: report a faulty device as a CSM case. */
@@ -151,7 +160,7 @@ export function reportFault(request: RESTAPIRequest, response: RESTAPIResponse):
         gs.warn(`[x_daas_ham] No fault case for ${str(asset, 'serial_number')}: ${refusal(kase)}`)
         return reply(response, 422, { error: 'Fault not reported: the platform refused it' })
     }
-    reply(response, 201, { case: str(kase, 'number') })
+    reply(response, 201, { case: str(kase, 'number') } satisfies FaultReport)
 }
 
 /**
@@ -169,7 +178,7 @@ export function confirmInstalled(request: RESTAPIRequest, response: RESTAPIRespo
     if (refused > 0) {
         return reply(response, 422, { error: `${refused} device(s) not confirmed: the platform refused them` })
     }
-    reply(response, 200, { order: str(order, 'number') })
+    reply(response, 200, { order: str(order, 'number') } satisfies InstallConfirmation)
 }
 
 /** POST /customer/attestations/{id} { items: [{ id, response }], submit }: answer an attestation. */
@@ -205,7 +214,7 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
             return reply(response, 422, { error: 'Attestation not submitted: the platform refused it' })
         }
     }
-    reply(response, 200, { attestation: str(attestation, 'number') })
+    reply(response, 200, { attestation: str(attestation, 'number') } satisfies AttestationReceipt)
 }
 
 /**
@@ -266,5 +275,6 @@ export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPI
     if (!exists('x_daas_ham_return_order_line', `return_order=${returnId}`)) {
         return reply(response, 422, { error: 'No device could be added: each is already on a return or was refused' })
     }
-    reply(response, 201, { returnOrder: findById('x_daas_ham_return_order', returnId)?.getDisplayValue('number') ?? returnId })
+    const returnOrder = findById('x_daas_ham_return_order', returnId)?.getDisplayValue('number') ?? returnId
+    reply(response, 201, { returnOrder } satisfies ReturnRequestReceipt)
 }

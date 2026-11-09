@@ -67,7 +67,9 @@ export default function ScanField({ label, onScan, busy }: { label: string; onSc
 
     return (
         <form className="scan" onSubmit={submit}>
-            <label htmlFor="scan-input">{label}</label>
+            <label className="field" htmlFor="scan-input">
+                {label}
+            </label>
             <div className="scan-row">
                 <input
                     id="scan-input"

@@ -11,12 +11,15 @@
         "skipLibCheck": true,
         "strict": true,
         "noEmit": true,
+        "allowImportingTsExtensions": true,
         "types": []
     },
     "include": [
         "./**/*.ts",
         "./**/*.tsx",
-        "../server/domain/rack.ts"
+        "../server/domain/calendar.ts",
+        "../server/domain/rack.ts",
+        "../server/domain/rest-contracts.ts"
     ],
     "exclude": [
         "./**/*.test.ts"

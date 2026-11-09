@@ -4,6 +4,7 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { normalizeSerial, receiveSerialLockName } from '../domain/asn.ts'
 import { naasStockroomType, receiptProblem, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
+import type { AssetSummary, Stockroom, StockroomList } from '../domain/rest-contracts.ts'
 import type { StockroomType } from '../domain/sourcing.ts'
 import { ROLE } from '../domain/visibility.ts'
 import {
@@ -41,25 +42,11 @@ import { reply } from '../platform/rest-api.ts'
 
 /** Warehouse scanning API used by the warehouse React app (P1.5). */
 
-interface AssetSummary {
-    id: string
-    serial: string
-    providerTag: string
-    customerTag: string
-    model: string
-    pid: string
-    stage: string
-    stockroom: string
-    customer: string
-    orderLine: string
-}
-
 function summarise(asset: GlideRecord): AssetSummary {
     return {
         id: asset.getUniqueValue(),
         serial: str(asset, 'serial_number'),
         providerTag: str(asset, 'asset_tag'),
-        customerTag: str(asset, 'x_daas_ham_customer_tag'),
         model: asset.getDisplayValue('model'),
         pid: str(asset, 'model.x_daas_ham_oem_pid'),
         stage: readStage(asset) ?? 'unknown',
@@ -443,9 +430,7 @@ export function listStockrooms(request: RESTAPIRequest, response: RESTAPIRespons
     stockroom.orderBy('name')
     stockroom.setLimit(500)
     stockroom.query()
-    const list: Array<{ id: string; name: string; type: string }> = []
-    while (stockroom.next()) {
-        list.push({ id: stockroom.getUniqueValue(), name: str(stockroom, 'name'), type: str(stockroom, 'x_daas_ham_stockroom_type') })
-    }
-    reply(response, 200, { stockrooms: list })
+    const stockrooms: Stockroom[] = []
+    while (stockroom.next()) stockrooms.push({ id: stockroom.getUniqueValue(), name: str(stockroom, 'name') })
+    reply(response, 200, { stockrooms } satisfies StockroomList)
 }

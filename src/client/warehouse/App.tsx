@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { warehouseApi, type AssetSummary, type Stockroom } from './api'
+import type { AssetSummary, Stockroom } from '../../server/domain/rest-contracts'
+import { stageText } from '../stage'
+import { warehouseApi } from './api'
 import Label from './Label'
 import ScanField from './ScanField'
 
@@ -17,7 +19,6 @@ const MODES: Array<{ id: Mode; title: string; prompt: string; depot?: true }> = 
 interface Entry {
     ok: boolean
     message: string
-    asset?: AssetSummary
 }
 
 export default function App() {
@@ -52,7 +53,7 @@ export default function App() {
             setBusy(true)
             try {
                 const asset = await perform(mode, code, { stockroom, order, pid })
-                setLog((l) => [{ ok: true, message: describe(mode, asset), asset }, ...l].slice(0, 50))
+                setLog((l) => [{ ok: true, message: describe(mode, asset) }, ...l].slice(0, 50))
                 if (mode === 'receive' && asset.providerTag) setLabels((current) => [asset, ...current])
                 setPid('')
             } catch (error) {
@@ -81,7 +82,7 @@ export default function App() {
 
             <section className="context">
                 {(mode === 'receive' || mode === 'putaway') && (
-                    <label>
+                    <label className="field">
                         Stockroom
                         <select value={stockroom} onChange={(e) => setStockroom(e.target.value)}>
                             {stockrooms.map((s) => (
@@ -93,19 +94,19 @@ export default function App() {
                     </label>
                 )}
                 {mode === 'receive' && (
-                    <label>
+                    <label className="field">
                         PID (only for units without an ASN)
                         <input value={pid} onChange={(e) => setPid(e.target.value)} placeholder="e.g. C9300-48P-E" />
                     </label>
                 )}
                 {mode === 'audit' && (
-                    <label>
+                    <label className="field">
                         Audit number
                         <input value={order} onChange={(e) => setOrder(e.target.value.trim())} placeholder="NAUD0001000" />
                     </label>
                 )}
                 {mode === 'pick' && (
-                    <label>
+                    <label className="field">
                         Order number
                         <input value={order} onChange={(e) => setOrder(e.target.value.trim())} placeholder="NORD0001000" />
                     </label>
@@ -159,7 +160,7 @@ function perform(mode: Mode, code: string, context: { stockroom: string; order: 
 
 /** Audit scans are blind: nothing about the unit is shown back. */
 function scannedOnly(code: string): AssetSummary {
-    return { id: code, serial: code, providerTag: '', customerTag: '', model: '', pid: '', stage: '', stockroom: '', customer: '', orderLine: '' }
+    return { id: code, serial: code, providerTag: '', model: '', pid: '', stage: 'unknown', stockroom: '', customer: '', orderLine: '' }
 }
 
 function describe(mode: Mode, asset: AssetSummary): string {
@@ -174,6 +175,6 @@ function describe(mode: Mode, asset: AssetSummary): string {
         case 'audit':
             return `${asset.serial} counted`
         case 'lookup':
-            return `${name}: ${asset.stage}, ${asset.stockroom || asset.customer || 'no location'}${asset.providerTag ? `, tag ${asset.providerTag}` : ''}`
+            return `${name}: ${stageText(asset.stage)}, ${asset.stockroom || asset.customer || 'no location'}${asset.providerTag ? `, tag ${asset.providerTag}` : ''}`
     }
 }

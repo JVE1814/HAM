@@ -2756,6 +2756,10 @@ declare global {
                         table: 'sys_module'
                         id: 'fd1e31be05fa4ed8bbea0b137ba3cb52'
                     }
+                    'src_server_domain_rest-contracts_ts': {
+                        table: 'sys_module'
+                        id: 'eb27051e98b344199e66967fbf03b8ce'
+                    }
                     src_server_domain_returns_ts: {
                         table: 'sys_module'
                         id: '67756814d0ef4e529e29a655dfcb2bdf'

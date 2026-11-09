@@ -1,32 +1,10 @@
 :root {
-    --bg: #f6f7f9;
-    --fg: #1d2330;
-    --muted: #8a93a3;
-    --accent: #1f6feb;
-    --ok: #1a7f37;
-    --warn: #b7791f;
-    --error: #b42318;
-    --card: #ffffff;
-    --border: #d7dbe2;
-    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-}
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg: #12151b;
-        --fg: #e6e9ef;
-        --card: #1b2029;
-        --border: #2f3542;
-    }
-}
-body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--fg);
+    /* The fill of a device with no colour of its own. Its text is white in both themes, so it is not --muted, a text
+       colour that turns light in the dark theme. */
+    --neutral: #8a93a3;
 }
 .racks {
     max-width: 1100px;
-    margin: 0 auto;
-    padding: 16px;
 }
 .pickers {
     display: flex;
@@ -34,18 +12,9 @@ body {
     gap: 12px;
     margin-bottom: 16px;
 }
-label {
-    display: grid;
-    gap: 4px;
-    font-size: 0.9rem;
-}
 select {
     min-height: 40px;
     min-width: 200px;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    color: var(--fg);
 }
 .faces {
     display: grid;
@@ -81,9 +50,6 @@ select {
 .unit {
     width: 2.5em;
     font-family: ui-monospace, monospace;
-}
-.error {
-    color: var(--error);
 }
 
 .power {
