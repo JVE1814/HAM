@@ -31,8 +31,8 @@ export function transitionFacts(asset: GlideRecord): TransitionFacts {
 /**
  * Move an Asset to `to` if the lifecycle allows it (set its fields; the caller saves the record). A move into staging
  * also clears the wipe evidence (domain/lifecycle `voidsWipeEvidence`); a save that sets the stage some other way has
- * it cleared by the before-update rule (entry/assets `enforceLifecycle`). `force` lets administrators correct assets in
- * stages the app does not model.
+ * it cleared by a before-update rule (entry/assets `clearVoidedWipeEvidence`). `force` lets administrators correct
+ * assets in stages the app does not model.
  */
 export function moveAsset(asset: GlideRecord, to: Stage, options: { force?: boolean } = {}): TransitionVerdict {
     const from = readStage(asset)

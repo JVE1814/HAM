@@ -1,5 +1,5 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { billingChange, checkTransition, voidsWipeEvidence } from '../domain/lifecycle.ts'
+import { billingChange, stageChangeRefusal, voidsWipeEvidence } from '../domain/lifecycle.ts'
 import { clearWipeEvidence, readStage, transitionFacts } from '../platform/assets.ts'
 import { glideToIsoDate, todayIso } from '../platform/clock.ts'
 import { onLineAssetMoved } from '../platform/fulfilment.ts'
@@ -12,25 +12,41 @@ import { resourceOrder } from './orders.ts'
 // response) because the SDK's generated wrapper passes them by name.
 
 /**
- * Before-update rule on alm_hardware: people editing the stage on a form must follow the lifecycle
- * (ADR 0002). Background processes and administrators are not checked, but every save into staging
- * clears the wipe evidence, theirs too: one that sets the stage without moveAsset stages the Asset all the same.
+ * Why a save that changes the stage breaks the lifecycle (domain/lifecycle `stageChangeRefusal`), or null when it may
+ * be saved (docs/spec/p1-fulfilment.md, Lifecycle stages): a save a user without admin makes in their own transaction
+ * must follow it, a form edit or out-of-box logic that user's action runs (Inventory pushing a transfer order line's
+ * stage to its Asset, external-contracts N38); background processes and administrators are not checked. Only reads:
+ * the wipe evidence a save into staging voids is cleared by a rule of its own (clearVoidedWipeEvidence), and only a
+ * move out of the Provider reads that evidence, never one into staging.
  */
-export function enforceLifecycle(current: GlideRecord, previous: GlideRecord): void {
-    const from = readStage(previous)
+function lifecycleRefusal(current: GlideRecord, previous: GlideRecord): string | null {
+    if (!gs.isInteractive() || gs.hasRole(ROLE.admin)) return null
+    return stageChangeRefusal(readStage(previous), readStage(current), transitionFacts(current))
+}
+
+/**
+ * Condition of the before-update rule on alm_hardware (br_asset_enforce_lifecycle), once the stage changes: whether
+ * the save must be refused. The rule refuses it with its Abort action, not with current.setAbortAction, which the
+ * platform refuses from a scoped app on a record of a global table and saves anyway (as for racks.ts
+ * refusesRackPlacement).
+ */
+export function refusesLifecycleChange(current: GlideRecord, previous: GlideRecord): boolean {
+    return lifecycleRefusal(current, previous) !== null
+}
+
+/** Script of that rule, run only when its condition refuses the save: why, as the error message. */
+export function explainLifecycleRefusal(current: GlideRecord, previous: GlideRecord): void {
+    gs.addErrorMessage(lifecycleRefusal(current, previous) ?? 'This stage change is refused')
+}
+
+/**
+ * Before-update rule on alm_hardware stage changes: every save into staging clears the wipe evidence, whoever makes it
+ * (administrators and background processes too): one that sets the stage without moveAsset stages the Asset all the
+ * same. A save the lifecycle rule refuses is not written, so neither is this.
+ */
+export function clearVoidedWipeEvidence(current: GlideRecord, previous: GlideRecord): void {
     const to = readStage(current)
-    if (to !== null && voidsWipeEvidence(from, to)) clearWipeEvidence(current)
-    if (!gs.isInteractive() || gs.hasRole(ROLE.admin)) return
-    if (to === null) {
-        gs.addErrorMessage('This install status / substatus combination is not used by NaaS asset management')
-        current.setAbortAction(true)
-        return
-    }
-    const verdict = checkTransition(from, to, transitionFacts(current))
-    if (!verdict.allowed) {
-        gs.addErrorMessage(verdict.reason)
-        current.setAbortAction(true)
-    }
+    if (to !== null && voidsWipeEvidence(readStage(previous), to)) clearWipeEvidence(current)
 }
 
 /**

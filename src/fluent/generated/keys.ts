@@ -1277,6 +1277,10 @@ declare global {
                         table: 'sys_script'
                         id: 'f712caf500154d8ea81c399fe85d3247'
                     }
+                    br_asset_staging_voids_wipe: {
+                        table: 'sys_script'
+                        id: 'b281512e432a41eca1d9169becbb0b71'
+                    }
                     br_billing_line_locked: {
                         table: 'sys_script'
                         id: '216a1d5c79a84537958a483183e41d82'

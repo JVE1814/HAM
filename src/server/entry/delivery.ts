@@ -228,11 +228,15 @@ export function onWorkOrderClosed(current: GlideRecord): void {
     if (order && ['install', 'swap'].includes(str(current, 'x_daas_ham_purpose'))) completeInstall(order)
 }
 
-/** Before-update rule on wm_order: on-site work must fit its change window and the Site maintenance window. */
-export function guardWorkWindow(current: GlideRecord): void {
+/**
+ * Why the on-site work a NaaS Order's work order plans does not fit its change window and the Site's maintenance
+ * window (domain/scheduling `checkJobWindow`), or null when it fits. Only interactive saves are checked (background
+ * processes are not), and only once the work has a planned start. Only reads.
+ */
+function workWindowRefusal(current: GlideRecord): string | null {
     const jobStart = glideToMs(str(current, 'expected_start'))
     const jobEnd = glideToMs(str(current, 'estimated_end')) ?? jobStart
-    if (jobStart === undefined || jobEnd === undefined || !gs.isInteractive()) return
+    if (jobStart === undefined || jobEnd === undefined || !gs.isInteractive()) return null
     const change = findById('change_request', str(current, 'parent'))
     const changeStart = change ? glideToMs(str(change, 'start_date')) : undefined
     const changeEnd = change ? glideToMs(str(change, 'end_date')) : undefined
@@ -247,8 +251,20 @@ export function guardWorkWindow(current: GlideRecord): void {
             (schedule.isInSchedule(new GlideDateTime(str(current, 'expected_start'))) &&
                 schedule.isInSchedule(new GlideDateTime(str(current, 'estimated_end') || str(current, 'expected_start')))),
     })
-    if (!verdict.ok) {
-        gs.addErrorMessage(verdict.reason)
-        current.setAbortAction(true)
-    }
+    return verdict.ok ? null : verdict.reason
+}
+
+/**
+ * Condition of the before rule on wm_order (br_work_order_window), once a NaaS Order's planned start or end changes:
+ * whether the save must be refused. The rule refuses it with its Abort action, not with current.setAbortAction, which
+ * the platform refuses from a scoped app on a record of a global table and saves anyway (as for racks.ts
+ * refusesRackPlacement).
+ */
+export function refusesWorkWindow(current: GlideRecord): boolean {
+    return workWindowRefusal(current) !== null
+}
+
+/** Script of that rule, run only when its condition refuses the save: why, as the error message. */
+export function explainWorkWindowRefusal(current: GlideRecord): void {
+    gs.addErrorMessage(workWindowRefusal(current) ?? 'This work order schedule is refused')
 }

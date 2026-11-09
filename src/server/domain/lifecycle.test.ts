@@ -7,6 +7,7 @@ import {
     isBillable,
     isDeployed,
     SERVING_STAGES,
+    stageChangeRefusal,
     stageOf,
     stagesQuery,
     voidsWipeEvidence,
@@ -118,6 +119,29 @@ describe('checkTransition', () => {
 
     it('accepts a no-op move to the same stage', () => {
         expect(checkTransition('in_service', 'in_service', deployable)).toEqual({ allowed: true })
+    })
+})
+
+describe('stageChangeRefusal', () => {
+    it('lets a stage set by hand follow the lifecycle', () => {
+        expect(stageChangeRefusal('staged', 'shipped', deployable)).toBeNull()
+        expect(stageChangeRefusal('in_service', 'in_service', deployable)).toBeNull()
+    })
+
+    it('refuses a combination the app does not model, wherever the asset comes from', () => {
+        const reason = 'This install status / substatus combination is not used by NaaS asset management'
+        expect(stageChangeRefusal('available', null, deployable)).toBe(reason)
+        expect(stageChangeRefusal(null, null, deployable)).toBe(reason)
+    })
+
+    it('gives the lifecycle reason for a move it does not allow', () => {
+        expect(stageChangeRefusal('available', 'in_service', deployable)).toBe('Cannot move an asset from available to in_service')
+        expect(stageChangeRefusal(null, 'available', deployable)).toBe(
+            'The asset is in a stage this app does not model; an administrator must correct it',
+        )
+        expect(stageChangeRefusal('pending_disposal', 'disposed', deployable)).toBe(
+            'Record wipe evidence before the asset leaves the provider',
+        )
     })
 })
 

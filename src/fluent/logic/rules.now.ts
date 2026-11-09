@@ -1,12 +1,24 @@
 import '@servicenow/sdk/global'
 import { BusinessRule } from '@servicenow/sdk/core'
-import { enforceLifecycle, onAllocatedAssetStageChange, onAssetServiceChange } from '../../server/entry/assets'
-import { guardWorkWindow, onWorkOrderClosed } from '../../server/entry/delivery'
+import {
+    clearVoidedWipeEvidence,
+    explainLifecycleRefusal,
+    onAllocatedAssetStageChange,
+    onAssetServiceChange,
+} from '../../server/entry/assets'
+import { explainWorkWindowRefusal, onWorkOrderClosed } from '../../server/entry/delivery'
 import { onOrderApprovalDecision } from '../../server/entry/orders'
 import { guardStagingClosure, onStagingClosed, releaseWaitingSteps, stampStagingStep } from '../../server/entry/staging'
 
 /* Record-change rules driving the Order lifecycle (ADR 0004). */
 
+/*
+ * alm_hardware and wm_order are global tables: the platform refuses current.setAbortAction from this scope on their
+ * records and saves anyway. So a before rule there refuses with its Abort action when its condition (the module's
+ * check) holds, and its script only says why. The platform runs a condition on every save of the table, whether or not
+ * the rule's filter matches, so each condition starts with its change test: the module loads only when that holds. The
+ * condition field holds at most 254 characters.
+ */
 BusinessRule({
     $id: Now.ID['br_asset_enforce_lifecycle'],
     name: 'NaaS - enforce asset lifecycle',
@@ -14,8 +26,23 @@ BusinessRule({
     when: 'before',
     action: ['update'],
     order: 100,
+    condition:
+        "(current.install_status.changes() || current.substatus.changes()) && require('x_daas_ham/naas-ham/0.1.0/src/server/entry/assets.ts').refusesLifecycleChange(current, previous)",
+    abortAction: true,
+    script: explainLifecycleRefusal,
+})
+
+// Not part of the rule above, which runs its script only on a save it refuses: every save into staging, whoever makes
+// it, clears the wipe evidence.
+BusinessRule({
+    $id: Now.ID['br_asset_staging_voids_wipe'],
+    name: 'NaaS - staging voids wipe evidence',
+    table: 'alm_hardware',
+    when: 'before',
+    action: ['update'],
+    order: 100,
     condition: 'current.install_status.changes() || current.substatus.changes()',
-    script: enforceLifecycle,
+    script: clearVoidedWipeEvidence,
 })
 
 BusinessRule({
@@ -102,8 +129,10 @@ BusinessRule({
     when: 'before',
     action: ['insert', 'update'],
     order: 100,
-    condition: "current.x_daas_ham_order != '' && (current.expected_start.changes() || current.estimated_end.changes())",
-    script: guardWorkWindow,
+    condition:
+        "current.x_daas_ham_order != '' && (current.expected_start.changes() || current.estimated_end.changes()) && require('x_daas_ham/naas-ham/0.1.0/src/server/entry/delivery.ts').refusesWorkWindow(current)",
+    abortAction: true,
+    script: explainWorkWindowRefusal,
 })
 
 BusinessRule({

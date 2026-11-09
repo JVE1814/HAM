@@ -70,18 +70,51 @@ const { name: packageName, version: packageVersion } = JSON.parse(readFileSync(j
     version: string
 }
 
-function businessRuleConditions(): Array<{ rule: string; condition: string }> {
-    const found: Array<{ rule: string; condition: string }> = []
+interface BusinessRuleSource {
+    rule: string
+    table: string
+    /** The condition script as the platform stores it; '' when the rule has none. */
+    condition: string
+    abortAction: boolean
+    /** The module entry point the rule's script calls. */
+    script?: string
+}
+
+function businessRules(): BusinessRuleSource[] {
+    const found: BusinessRuleSource[] = []
     for (const file of files(join(root, 'fluent'), '.now.ts')) {
         for (const block of readFileSync(file, 'utf8').split('BusinessRule({').slice(1)) {
             const body = block.split('\n})')[0]
             const literal = body.match(/condition:\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/)?.[1]
-            if (!literal) continue
-            const condition = literal.startsWith('"') ? (JSON.parse(literal) as string) : literal.slice(1, -1).replace(/\\(.)/g, '$1')
-            found.push({ rule: body.match(/name:\s*'([^']+)'/)?.[1] ?? file, condition })
+            const condition = !literal
+                ? ''
+                : literal.startsWith('"')
+                  ? (JSON.parse(literal) as string)
+                  : literal.slice(1, -1).replace(/\\(.)/g, '$1')
+            found.push({
+                rule: body.match(/name:\s*'([^']+)'/)?.[1] ?? file,
+                table: body.match(/table:\s*'([^']+)'/)?.[1] ?? '',
+                condition,
+                abortAction: /abortAction:\s*true/.test(body),
+                script: body.match(/script:\s*([A-Za-z_]\w*)\s*[,\n]/)?.[1],
+            })
         }
     }
     return found
+}
+
+function businessRuleConditions(): Array<{ rule: string; condition: string }> {
+    return businessRules().filter((rule) => rule.condition)
+}
+
+/** The body of the exported server function `name`, up to its closing brace at the start of a line. */
+function functionBody(name: string): string | undefined {
+    for (const file of files(join(root, 'server'), '.ts')) {
+        const source = readFileSync(file, 'utf8')
+        const start = source.indexOf(`export function ${name}(`)
+        if (start >= 0) return source.slice(start, source.indexOf('\n}', start))
+    }
+    return undefined
 }
 
 describe('business rule conditions', () => {
@@ -100,6 +133,34 @@ describe('business rule conditions', () => {
                 const source = readFileSync(join(root, path.slice(prefix.length)), 'utf8')
                 expect(source, `${rule}: ${fn}`).toMatch(new RegExp(`export function ${fn}\\(`))
             }
+        }
+    })
+})
+
+/*
+ * From this scope the platform ignores current.setAbortAction on a record of another scope's table (alm_hardware,
+ * wm_order, sn_customerservice_case...) and writes it anyway: a before rule there refuses with its Abort action, its
+ * check being the condition. A rule that aborts must have one, or it would refuse every save.
+ */
+describe('refusing business rules', () => {
+    const rules = businessRules()
+
+    it("refuse a save on a table of another scope with the rule's Abort action", () => {
+        const elsewhere = rules.filter((rule) => !rule.table.startsWith('x_daas_ham_') && rule.script)
+        expect(elsewhere.length).toBeGreaterThan(0)
+        for (const { rule, script } of elsewhere) expect(functionBody(script ?? ''), `${rule}: ${script}`).not.toMatch(/setAbortAction/)
+    })
+
+    it('abort only when a condition holds', () => {
+        const aborting = rules.filter((rule) => rule.abortAction)
+        expect(aborting.length).toBeGreaterThan(0)
+        for (const { rule, condition } of aborting) expect(condition, rule).toMatch(/require\('[^']+'\)\.\w+\(/)
+    })
+
+    // The platform runs a condition on every save of the table and action, whether or not the rule's filter matches.
+    it('load their module only once a field they check changes', () => {
+        for (const { rule, condition } of rules.filter((rule) => rule.condition.includes('require('))) {
+            expect(condition.slice(0, condition.indexOf('require(')), rule).toMatch(/\.changes\(\)[\s\S]*&&\s*$/)
         }
     })
 })

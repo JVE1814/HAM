@@ -172,6 +172,17 @@ export function checkTransition(from: Stage | null, to: Stage, facts: Transition
     return { allowed: true }
 }
 
+/**
+ * Why a save that sets an Asset's stage by hand (from `from` to `to`, null for a combination the app does not model)
+ * breaks the lifecycle, or null when it follows it: a save into or out of a combination the app does not model is
+ * refused.
+ */
+export function stageChangeRefusal(from: Stage | null, to: Stage | null, facts: TransitionFacts): string | null {
+    if (to === null) return 'This install status / substatus combination is not used by NaaS asset management'
+    const verdict = checkTransition(from, to, facts)
+    return verdict.allowed ? null : verdict.reason
+}
+
 /** The legal owner decides how an Asset may leave; a Lessor's reaches the OEM only on an OEM RMA, not as a takeback. */
 function checkRetirement(from: Stage, to: Stage, facts: TransitionFacts): TransitionVerdict {
     const exitFor: Record<Exclude<LegalOwner, ''>, readonly Stage[]> = {
