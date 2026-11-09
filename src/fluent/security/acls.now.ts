@@ -14,13 +14,15 @@ import {
     noc,
     providerStaff,
 } from './roles.now'
-import { grantsFleetAsset } from '../../server/entry/visibility'
+import { grantsCustomerRecord, grantsFleetAsset } from '../../server/entry/visibility'
 
 /*
  * Access controls for app tables. Reads are also narrowed by the before-query rules in
  * visibility.now.ts (ADR 0005); customer ACLs re-check the customer, and for a site contact (no customer admin role)
  * that the record's Site lists them as a contact, so neither a direct link nor a dot-walk from a visible record leaks
- * data. Return lines, attestation items and shipment events have no before-query rule: their ACL is the only check.
+ * data. Their script is one function (entry/visibility `grantsCustomerRecord`), which decides on the table's entry in
+ * domain/visibility SCOPED_TABLES as its before-query rule does. Return lines, attestation items, shipment events and
+ * Site templates with their items have no before-query rule: their ACL is the only check.
  * Inventory techs read only the tables of their stockroom work (providerStaff or a list naming inventoryTech); other
  * staff reads use broadStaff or a narrower list. On the tables narrowed to an inventory tech's stockrooms, a
  * Deny-Unless row check (acls-visibility.now.ts) re-checks the stockroom. Hardware's read ACLs sit on alm_asset (below).
@@ -229,7 +231,7 @@ Acl({
     table: 'x_daas_ham_agreement',
     operation: 'read',
     roles: [customerAdmin],
-    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID();",
+    script: grantsCustomerRecord,
 })
 
 Acl({
@@ -238,7 +240,7 @@ Acl({
     table: 'x_daas_ham_subscription_line',
     operation: 'read',
     roles: [customerAdmin],
-    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID();",
+    script: grantsCustomerRecord,
 })
 
 Acl({
@@ -247,7 +249,7 @@ Acl({
     table: 'x_daas_ham_catalog_entry',
     operation: 'read',
     roles: [customerAdmin],
-    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID();",
+    script: grantsCustomerRecord,
 })
 
 Acl({
@@ -256,8 +258,8 @@ Acl({
     table: 'x_daas_ham_site_template',
     operation: 'read',
     roles: [customerAdmin],
-    // A Site template with no Customer is offered to every Customer.
-    script: "answer = current.customer.nil() || current.getValue('customer') == gs.getUser().getCompanyID();",
+    // A Site template with no Customer is offered to every Customer (SCOPED_TABLES `sharedWithoutCustomer`).
+    script: grantsCustomerRecord,
 })
 
 Acl({
@@ -266,7 +268,7 @@ Acl({
     table: 'x_daas_ham_site_template_item',
     operation: 'read',
     roles: [customerAdmin],
-    script: "answer = current.site_template.customer.nil() || current.site_template.customer.toString() == gs.getUser().getCompanyID();",
+    script: grantsCustomerRecord,
 })
 
 Acl({
@@ -283,7 +285,7 @@ Acl({
     table: 'x_daas_ham_order',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
+    script: grantsCustomerRecord,
 })
 
 Acl({
@@ -324,7 +326,7 @@ Acl({
     table: 'x_daas_ham_order_line',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.order.customer.toString() == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.order.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
+    script: grantsCustomerRecord,
 })
 
 Acl({
@@ -1038,7 +1040,7 @@ Acl({
     table: 'x_daas_ham_return_order',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
+    script: grantsCustomerRecord,
 })
 
 Acl({
@@ -1055,7 +1057,7 @@ Acl({
     table: 'x_daas_ham_attestation',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
+    script: grantsCustomerRecord,
 })
 
 Acl({
@@ -1073,7 +1075,7 @@ Acl({
     operation: 'read',
     // Fee events carry no Site, so site contacts get none (ADR 0005).
     roles: [customerAdmin],
-    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID();",
+    script: grantsCustomerRecord,
 })
 
 Acl({
@@ -1114,7 +1116,7 @@ Acl({
     table: 'x_daas_ham_return_order_line',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.return_order.customer.toString() == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.return_order.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
+    script: grantsCustomerRecord,
 })
 
 Acl({
@@ -1179,7 +1181,7 @@ Acl({
     table: 'x_daas_ham_attestation_item',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.attestation.customer.toString() == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.attestation.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
+    script: grantsCustomerRecord,
 })
 
 Acl({

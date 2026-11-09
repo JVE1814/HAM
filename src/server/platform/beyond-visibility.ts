@@ -7,7 +7,7 @@ import { createMarks } from '../domain/marks.ts'
  * device event names. On the app's own tables such a read may instead turn the business rules off (setWorkflow(false)); on a
  * table of another scope (alm_hardware) the platform refuses setWorkflow from this scope and runs the rules anyway, so
  * the read marks its GlideRecord here while its query runs and the app's rules leave that query as it is
- * (entry/visibility `restrict`). Rules of other scopes, such as the platform's or Customer Service's, still run.
+ * (entry/visibility `scopeRecords`). Rules of other scopes, such as the platform's or Customer Service's, still run.
  *
  * Why the mark is the GlideRecord, held in this module (Brazil instance, 2026-11-09, probes in docs/research/
  * external-contracts.md N37): a module's state is shared by every script of one transaction, the caller's and the

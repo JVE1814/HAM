@@ -1,11 +1,13 @@
 import { gs } from '@servicenow/glide'
 import { memoized } from '../domain/memo.ts'
-import { resolveVisibility, type VisibilityScope } from '../domain/visibility.ts'
+import { contactScope, resolveVisibility, type ContactScope, type VisibilityScope } from '../domain/visibility.ts'
 import { pluck } from './records.ts'
 
 /** The signed-in user's visibility and the identifiers it is scoped by (ADR 0005). */
 export interface SessionScope {
     scope: VisibilityScope
+    /** The scope the Customer contacts' read ACLs grant the user by (domain/visibility `contactScope`). */
+    contactScope(): ContactScope
     userId: string
     customerId: string
     stockroomIds(): string[]
@@ -20,6 +22,7 @@ export interface SessionScope {
  * new user's own.
  */
 const scopeOf = memoized(() => resolveVisibility((role) => gs.hasRole(role)))
+const contactScopeOf = memoized(() => contactScope((role) => gs.hasRole(role)))
 const customerOf = memoized(() => gs.getUser().getCompanyID())
 const stockroomsOf = memoized((userId) => pluck('x_daas_ham_stockroom_member', `user=${userId}`, 'stockroom'))
 // Contacts are a comma-separated list of 32-character sys_ids: a whole sys_id matches only its own entry.
@@ -29,6 +32,7 @@ export function currentSession(): SessionScope {
     const userId = gs.getUserID()
     return {
         scope: scopeOf(userId),
+        contactScope: () => contactScopeOf(userId),
         userId,
         customerId: customerOf(userId),
         stockroomIds: () => stockroomsOf(userId),

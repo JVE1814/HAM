@@ -4,20 +4,21 @@ import { fleetCondition, naasStockroomCondition } from './fleet'
 import { DEPLOYED_STAGES } from './lifecycle'
 import {
     actsAsCustomerAdmin,
+    contactScope,
     customerEquipmentQuery,
+    grantsContactRecord,
     grantsNaasRecord,
-    INVENTORY_TECH_TABLES,
-    OUTSIDE_NAAS,
+    outsideNaasConditions,
     outsideNaasStockroomCondition,
     resolveVisibility,
     rowVisible,
-    SCOPE,
-    STOCKROOM_SCOPED_TABLES,
+    SCOPED_TABLES,
+    scopingOf,
     visibilityFilter,
-    type ScopedRecords,
     type ScopedRow,
-    type ScopingFields,
+    type ScopedTable,
     type ScopingIds,
+    type TableScoping,
     type VisibilityScope,
 } from './visibility'
 
@@ -171,49 +172,220 @@ function records(values: Record<string, readonly string[]>): Array<Record<string
     )
 }
 
+/** A saved row of `record`'s values, as a read ACL's row check reads it. */
+function rowOf(record: Record<string, string>): ScopedRow {
+    return { saved: true, valueOf: (field) => record[field] ?? '' }
+}
+
 const SCOPES: readonly VisibilityScope[] = ['everything', 'unscoped', 'assigned_stockrooms', 'own_customer', 'own_sites']
+const TABLES = Object.keys(SCOPED_TABLES) as ScopedTable[]
+const scopingOfTable = (table: ScopedTable): TableScoping => SCOPED_TABLES[table]
+/** The tables the app shares with the Provider's IT: those with records outside NaaS. */
+const SHARED_TABLES = TABLES.filter((table) => outsideNaasConditions(scopingOfTable(table)).length > 0)
+
+/** The readers the rules narrow: an inventory tech of stockroom sr1, and Customer cust1's admin and its contact at site1. */
+type Reader = 'tech' | 'admin' | 'contact'
+const READERS: readonly Reader[] = ['tech', 'admin', 'contact']
+const READER_SCOPE: Record<Reader, VisibilityScope> = { tech: 'assigned_stockrooms', admin: 'own_customer', contact: 'own_sites' }
+const READER_IDS: ScopingIds = { customerId: 'cust1', stockroomIds: () => ['sr1'], siteIds: () => ['site1'] }
+
+/** A sample record (its field values) and which of the narrowed readers see it. */
+type Sample = [record: Record<string, string>, seenBy: readonly Reader[]]
+
+const TYPE = 'x_daas_ham_stockroom_type'
+/** Records with a Customer and a Site. An inventory tech is not narrowed on a table that names no Stockroom. */
+const CUSTOMER_SITE: Sample[] = [
+    [{ customer: 'cust1', site: 'site1' }, ['tech', 'admin', 'contact']],
+    [{ customer: 'cust1', site: 'site9' }, ['tech', 'admin']],
+    [{ customer: 'cust1', site: '' }, ['tech', 'admin']],
+    // Another Customer's Site that lists the contact shows them nothing.
+    [{ customer: 'cust9', site: 'site1' }, ['tech']],
+    [{ customer: '', site: '' }, ['tech']],
+]
+/** Records with a Customer and no Site: a site contact gets none. */
+const CUSTOMER: Sample[] = [
+    [{ customer: 'cust1' }, ['tech', 'admin']],
+    [{ customer: 'cust9' }, ['tech']],
+    [{ customer: '' }, ['tech']],
+]
+const AUDITS: Sample[] = [
+    [{ stockroom: 'sr1', customer: '', site: '' }, ['tech']],
+    [{ stockroom: 'sr9', customer: 'cust1', site: '' }, ['admin']],
+    // A site audit has no Stockroom, so an inventory tech does not see it.
+    [{ stockroom: '', customer: 'cust1', site: 'site1' }, ['admin', 'contact']],
+    [{ stockroom: '', customer: 'cust1', site: 'site9' }, ['admin']],
+    [{ stockroom: '', customer: 'cust9', site: 'site1' }, []],
+]
+/** `samples` on a line table, whose scoping fields are its parent's, reached through `parent`. */
+const through = (parent: string, samples: Sample[]): Sample[] =>
+    samples.map(([record, seenBy]) => [Object.fromEntries(Object.entries(record).map(([field, value]) => [`${parent}.${field}`, value])), seenBy])
+
+const SAMPLES: Record<ScopedTable, Sample[]> = {
+    alm_hardware: [
+        [{ x_daas_ham_fleet: 'true', stockroom: 'sr1', company: 'cust1', x_daas_ham_site: 'site1' }, ['tech', 'admin', 'contact']],
+        [{ x_daas_ham_fleet: 'true', stockroom: 'sr9', company: 'cust1', x_daas_ham_site: 'site9' }, ['admin']],
+        [{ x_daas_ham_fleet: 'true', stockroom: '', company: 'cust9', x_daas_ham_site: 'site1' }, []],
+        // The Provider IT's hardware: left to the platform for an inventory tech, another company's to a Customer contact.
+        [{ x_daas_ham_fleet: 'false', stockroom: 'sr9', company: 'cust9', x_daas_ham_site: '' }, ['tech']],
+        // A row from before the Fleet flag is outside the fleet too; a contact is kept to their Customer, fleet or not.
+        [{ x_daas_ham_fleet: '', stockroom: '', company: 'cust1', x_daas_ham_site: 'site1' }, ['tech', 'admin', 'contact']],
+    ],
+    alm_stockroom: [
+        [{ sys_id: 'sr1', [TYPE]: 'central_depot', x_daas_ham_customer: '' }, ['tech']],
+        [{ sys_id: 'sr9', [TYPE]: 'staging_centre', x_daas_ham_customer: '' }, []],
+        [{ sys_id: 'sr9', [TYPE]: 'customer_site', x_daas_ham_customer: 'cust1' }, ['admin']],
+        [{ sys_id: 'sr9', [TYPE]: '', x_daas_ham_customer: '' }, ['tech']],
+        [{ sys_id: 'sr9', [TYPE]: 'it_storeroom', x_daas_ham_customer: 'cust9' }, ['tech']],
+    ],
+    alm_transfer_order: [
+        [{ from_stockroom: 'sr9', to_stockroom: 'sr1', [`from_stockroom.${TYPE}`]: 'central_depot', [`to_stockroom.${TYPE}`]: 'staging_centre' }, ['tech']],
+        [{ from_stockroom: 'sr1', to_stockroom: 'sr9', [`from_stockroom.${TYPE}`]: 'central_depot', [`to_stockroom.${TYPE}`]: '' }, ['tech']],
+        // It touches a NaaS stockroom, and neither end is theirs.
+        [{ from_stockroom: 'sr8', to_stockroom: 'sr9', [`from_stockroom.${TYPE}`]: 'it_storeroom', [`to_stockroom.${TYPE}`]: 'central_depot' }, []],
+        [{ from_stockroom: 'sr8', to_stockroom: 'sr9', [`from_stockroom.${TYPE}`]: 'it_storeroom', [`to_stockroom.${TYPE}`]: '' }, ['tech']],
+        [{ from_stockroom: '', to_stockroom: 'sr9', [`from_stockroom.${TYPE}`]: '', [`to_stockroom.${TYPE}`]: 'customer_site' }, []],
+    ],
+    x_daas_ham_staging_task: [
+        [{ 'asset.stockroom': 'sr1' }, ['tech']],
+        [{ 'asset.stockroom': 'sr9' }, []],
+        [{ 'asset.stockroom': '' }, []],
+    ],
+    x_daas_ham_audit: AUDITS,
+    x_daas_ham_audit_line: through('audit', AUDITS),
+    x_daas_ham_order: CUSTOMER_SITE,
+    x_daas_ham_order_line: through('order', CUSTOMER_SITE),
+    x_daas_ham_return_order: CUSTOMER_SITE,
+    x_daas_ham_shipment: CUSTOMER_SITE,
+    x_daas_ham_attestation: CUSTOMER_SITE,
+    x_daas_ham_agreement: CUSTOMER,
+    x_daas_ham_subscription_line: CUSTOMER,
+    x_daas_ham_catalog_entry: CUSTOMER,
+    x_daas_ham_fee_event: CUSTOMER,
+    x_daas_ham_return_order_line: through('return_order', CUSTOMER_SITE),
+    x_daas_ham_shipment_event: through('shipment', CUSTOMER_SITE),
+    x_daas_ham_attestation_item: through('attestation', CUSTOMER_SITE),
+    // A Site template with no Customer is offered to every Customer.
+    x_daas_ham_site_template: [
+        [{ customer: 'cust1' }, ['tech', 'admin']],
+        [{ customer: 'cust9' }, ['tech']],
+        [{ customer: '' }, ['tech', 'admin']],
+    ],
+    x_daas_ham_site_template_item: [
+        [{ 'site_template.customer': 'cust1' }, ['tech', 'admin']],
+        [{ 'site_template.customer': 'cust9' }, ['tech']],
+        [{ 'site_template.customer': '' }, ['tech', 'admin']],
+    ],
+}
+
+/** Every combination of the values a table's samples give each of its fields. */
+function recordsLike(table: ScopedTable): Array<Record<string, string>> {
+    const values: Record<string, Set<string>> = {}
+    for (const [record] of SAMPLES[table]) {
+        for (const [field, value] of Object.entries(record)) (values[field] ??= new Set()).add(value)
+    }
+    return records(Object.fromEntries(Object.entries(values).map(([field, options]) => [field, [...options]])))
+}
+
 const IDS: readonly ScopingIds[] = [
-    { customerId: 'cust1', stockroomIds: () => ['sr1', 'sr2'], siteIds: () => ['site1'] },
+    READER_IDS,
+    { customerId: 'cust1', stockroomIds: () => ['sr1', 'sr9'], siteIds: () => ['site1', 'site9'] },
     { customerId: '', stockroomIds: () => [], siteIds: () => [] },
     { customerId: 'cust1', stockroomIds: () => ['sr1'], siteIds: () => [] },
 ]
-const ASSET_VALUES = {
-    stockroom: ['', 'sr1', 'sr9'],
-    company: ['', 'cust1', 'cust9'],
-    x_daas_ham_site: ['', 'site1', 'site9'],
-    x_daas_ham_fleet: ['', 'false', 'true'],
-}
-const TRANSFER_VALUES = {
-    from_stockroom: ['', 'sr1', 'sr9'],
-    to_stockroom: ['sr2', 'sr9'],
-    'from_stockroom.x_daas_ham_stockroom_type': ['', 'central_depot', 'it_storeroom'],
-    'to_stockroom.x_daas_ham_stockroom_type': ['', 'staging_centre', 'it_storeroom'],
-}
+
+describe('every scoped table', () => {
+    it.each(TABLES)('%s: the before-query filter keeps the sample records each narrowed reader may see, and no other', (table) => {
+        for (const [record, seenBy] of SAMPLES[table]) {
+            const kept = READERS.filter((reader) => matches(visibilityFilter(READER_SCOPE[reader], scopingOfTable(table), READER_IDS) ?? '', record))
+            expect(kept, JSON.stringify(record)).toEqual(seenBy)
+        }
+    })
+
+    it.each(TABLES)('%s: the row check passes the same sample records', (table) => {
+        for (const [record, seenBy] of SAMPLES[table]) {
+            const passed = READERS.filter((reader) => rowVisible(READER_SCOPE[reader], scopingOfTable(table), rowOf(record), READER_IDS))
+            expect(passed, JSON.stringify(record)).toEqual(seenBy)
+        }
+    })
+
+    it.each(TABLES)('%s: staff who see every Customer, and users with no NaaS role, are not narrowed', (table) => {
+        for (const scope of ['everything', 'unscoped'] as const) {
+            expect(visibilityFilter(scope, scopingOfTable(table), READER_IDS), scope).toBeNull()
+            for (const [record] of SAMPLES[table]) expect(rowVisible(scope, scopingOfTable(table), rowOf(record), READER_IDS), scope).toBe(true)
+        }
+    })
+
+    it.each(TABLES)('%s: the row check keeps exactly what the filter keeps, whatever the record and the reader', (table) => {
+        const scoping = scopingOfTable(table)
+        for (const scope of SCOPES) {
+            for (const ids of IDS) {
+                const filter = visibilityFilter(scope, scoping, ids) ?? ''
+                for (const record of recordsLike(table)) {
+                    expect(rowVisible(scope, scoping, rowOf(record), ids), `${scope} ${JSON.stringify(record)}`).toBe(matches(filter, record))
+                }
+            }
+        }
+    })
+})
+
+describe('a reader with no stockroom, Site or Customer', () => {
+    const none: ScopingIds = { customerId: '', stockroomIds: () => [], siteIds: () => [] }
+    const sees = (reader: Reader, table: ScopedTable) =>
+        SAMPLES[table].filter(([record]) => matches(visibilityFilter(READER_SCOPE[reader], scopingOfTable(table), none) ?? '', record)).map(([record]) => record)
+
+    it('is shown nothing of the tables the rules narrow them on', () => {
+        for (const table of TABLES.filter((table) => !SHARED_TABLES.includes(table))) {
+            const scoping = scopingOfTable(table)
+            if (scoping.stockroom) expect(sees('tech', table), table).toEqual([])
+            if (!scoping.sharedWithoutCustomer) expect(sees('admin', table), table).toEqual([])
+            expect(sees('contact', table), table).toEqual([])
+        }
+    })
+
+    it("is shown, as an inventory tech, the Provider IT's records of a shared table and no NaaS record", () => {
+        expect(sees('tech', 'alm_hardware').map((record) => record.x_daas_ham_fleet)).toEqual(['false', ''])
+        expect(sees('tech', 'alm_stockroom').map((record) => record[TYPE])).toEqual(['', 'it_storeroom'])
+        for (const table of SHARED_TABLES) {
+            expect(sees('admin', table), table).toEqual([])
+            expect(sees('contact', table), table).toEqual([])
+        }
+    })
+
+    it('is shown, as a Customer admin, the Site templates offered to every Customer', () => {
+        expect(sees('admin', 'x_daas_ham_site_template')).toEqual([{ customer: '' }])
+    })
+})
 
 describe('visibilityFilter on a table shared with the Provider IT', () => {
-    const ids = IDS[0]
+    const ids = IDS[1]
 
     it("ORs into each of an inventory tech's conditions the records it leaves to the platform", () => {
-        expect(visibilityFilter('assigned_stockrooms', SCOPE.assets, ids, OUTSIDE_NAAS.assets)).toBe(
-            'x_daas_ham_fleet=false^ORx_daas_ham_fleetISEMPTY^ORstockroomINsr1,sr2',
+        expect(visibilityFilter('assigned_stockrooms', SCOPED_TABLES.alm_hardware, ids)).toBe(
+            'x_daas_ham_fleet=false^ORx_daas_ham_fleetISEMPTY^ORstockroomINsr1,sr9',
         )
-        expect(visibilityFilter('everything', SCOPE.assets, ids, OUTSIDE_NAAS.assets)).toBeNull()
+        expect(visibilityFilter('everything', SCOPED_TABLES.alm_hardware, ids)).toBeNull()
+    })
+
+    it('is hardware, stockrooms and transfer orders, and no table of the app', () => {
+        expect(SHARED_TABLES).toEqual(['alm_hardware', 'alm_stockroom', 'alm_transfer_order'])
     })
 
     it('keeps a Customer contact to their Customer (and Sites) on every record, fleet or not', () => {
         for (const scope of ['own_customer', 'own_sites'] as const) {
-            for (const [records, outside] of Object.entries(OUTSIDE_NAAS) as Array<[ScopedRecords, readonly string[]]>) {
-                expect(visibilityFilter(scope, SCOPE[records], ids, outside), `${scope} ${records}`).toBe(visibilityFilter(scope, SCOPE[records], ids))
+            for (const table of SHARED_TABLES) {
+                const withoutNaas: TableScoping = { ...scopingOfTable(table), naas: undefined }
+                expect(visibilityFilter(scope, scopingOfTable(table), ids), `${scope} ${table}`).toBe(visibilityFilter(scope, withoutNaas, ids))
             }
         }
-        expect(visibilityFilter('own_sites', SCOPE.assets, ids, OUTSIDE_NAAS.assets)).toBe('company=cust1^x_daas_ham_siteINsite1')
+        expect(visibilityFilter('own_sites', SCOPED_TABLES.alm_hardware, ids)).toBe('company=cust1^x_daas_ham_siteINsite1,site9')
     })
 
     it("narrows an inventory tech's fleet assets only: the Provider IT's hardware, flag false or blank, passes", () => {
+        const withoutNaas: TableScoping = { ...SCOPED_TABLES.alm_hardware, naas: undefined }
         for (const scopeIds of IDS) {
-            const filter = visibilityFilter('assigned_stockrooms', SCOPE.assets, scopeIds, OUTSIDE_NAAS.assets) ?? ''
-            const narrowed = visibilityFilter('assigned_stockrooms', SCOPE.assets, scopeIds) ?? ''
-            for (const record of records(ASSET_VALUES)) {
+            const filter = visibilityFilter('assigned_stockrooms', SCOPED_TABLES.alm_hardware, scopeIds) ?? ''
+            const narrowed = visibilityFilter('assigned_stockrooms', withoutNaas, scopeIds) ?? ''
+            for (const record of recordsLike('alm_hardware')) {
                 const outside = record.x_daas_ham_fleet !== 'true'
                 expect(matches(filter, record), JSON.stringify(record)).toBe(outside || matches(narrowed, record))
             }
@@ -226,114 +398,161 @@ describe('visibilityFilter on a table shared with the Provider IT', () => {
         for (const type of types) {
             expect(matches(outsideNaasStockroomCondition(), { x_daas_ham_stockroom_type: type }), type).toBe(!naas(type))
         }
-        const filter = visibilityFilter('assigned_stockrooms', SCOPE.transferOrders, ids, OUTSIDE_NAAS.transferOrders) ?? ''
-        for (const record of records(TRANSFER_VALUES)) {
-            const touchesNaas =
-                naas(record['from_stockroom.x_daas_ham_stockroom_type']) || naas(record['to_stockroom.x_daas_ham_stockroom_type'])
+        const filter = visibilityFilter('assigned_stockrooms', SCOPED_TABLES.alm_transfer_order, ids) ?? ''
+        for (const record of recordsLike('alm_transfer_order')) {
+            const touchesNaas = naas(record[`from_stockroom.${TYPE}`]) || naas(record[`to_stockroom.${TYPE}`])
             const mine = [record.from_stockroom, record.to_stockroom].some((stockroom) => ids.stockroomIds().includes(stockroom))
             expect(matches(filter, record), JSON.stringify(record)).toBe(!touchesNaas || mine)
         }
     })
 })
 
-/** A saved row of `record`'s values, outside NaaS when it matches every one of `outside` (OUTSIDE_NAAS). */
-function rowOf(record: Record<string, string>, outside?: readonly string[]): ScopedRow {
-    return {
-        saved: true,
-        valueOf: (field) => record[field] ?? '',
-        outsideNaas: outside ? () => outside.every((condition) => matches(condition, record)) : undefined,
-    }
-}
-
 describe('rowVisible', () => {
-    const tables: Array<[ScopedRecords, Record<string, readonly string[]>]> = [
-        ['assets', ASSET_VALUES],
-        ['stockrooms', { sys_id: ['sr1', 'sr9'], x_daas_ham_customer: ['', 'cust1', 'cust9'], x_daas_ham_stockroom_type: ['', 'central_depot', 'it_storeroom'] }],
-        ['transferOrders', TRANSFER_VALUES],
-        ['stagingTasks', { 'asset.stockroom': ['', 'sr1', 'sr9'] }],
-        ['auditLines', { 'audit.stockroom': ['', 'sr2', 'sr9'], 'audit.customer': ['', 'cust1'], 'audit.site': ['', 'site1', 'site9'] }],
-        ['customerRecords', { customer: ['', 'cust1', 'cust9'] }],
-        ['customerSiteRecords', { customer: ['', 'cust1', 'cust9'], site: ['', 'site1', 'site9'] }],
-    ]
-
-    it("keeps exactly the records the table's before-query filter keeps, for every scope and table", () => {
-        for (const [table, values] of tables) {
-            const fields: ScopingFields = SCOPE[table]
-            const outside = OUTSIDE_NAAS[table]
-            for (const scope of SCOPES) {
-                for (const ids of IDS) {
-                    const filter = visibilityFilter(scope, fields, ids, outside) ?? ''
-                    for (const record of records(values)) {
-                        const visible = rowVisible(scope, fields, rowOf(record, outside), ids)
-                        expect(visible, `${table} ${scope} ${JSON.stringify(record)}`).toBe(matches(filter, record))
-                    }
-                }
-            }
-        }
-    })
+    const untouched: ScopingIds = {
+        customerId: 'cust1',
+        stockroomIds: () => expect.unreachable('stockrooms fetched'),
+        siteIds: () => expect.unreachable('sites fetched'),
+    }
 
     it('passes a record that is not a saved row (a New form, a check of the whole table), for every scope', () => {
-        const untouched: ScopingIds = {
-            customerId: 'cust1',
-            stockroomIds: () => expect.unreachable('stockrooms fetched'),
-            siteIds: () => expect.unreachable('sites fetched'),
-        }
         const unsaved: ScopedRow = { saved: false, valueOf: () => '' }
         for (const scope of SCOPES) {
-            for (const [table] of tables) expect(rowVisible(scope, SCOPE[table], unsaved, untouched), `${scope} ${table}`).toBe(true)
+            for (const table of TABLES) expect(rowVisible(scope, scopingOfTable(table), unsaved, untouched), `${scope} ${table}`).toBe(true)
         }
     })
 
     it('reads no fields and fetches no ids for staff who see everything or users left to the platform', () => {
-        const untouched: ScopingIds = {
-            customerId: 'cust1',
-            stockroomIds: () => expect.unreachable('stockrooms fetched'),
-            siteIds: () => expect.unreachable('sites fetched'),
+        const unread: ScopedRow = { saved: true, valueOf: () => expect.unreachable('field read'), missing: () => expect.unreachable('record read') }
+        for (const scope of ['everything', 'unscoped'] as const) expect(rowVisible(scope, SCOPED_TABLES.alm_hardware, unread, untouched)).toBe(true)
+    })
+
+    it("reads the Fleet flag as a GlideRecord gives it: '1' is a fleet asset, '0' the Provider IT's", () => {
+        const hardware = (flag: string) => rowOf({ x_daas_ham_fleet: flag, stockroom: 'sr9' })
+        expect(rowVisible('assigned_stockrooms', SCOPED_TABLES.alm_hardware, hardware('1'), READER_IDS)).toBe(false)
+        expect(rowVisible('assigned_stockrooms', SCOPED_TABLES.alm_hardware, hardware('0'), READER_IDS)).toBe(true)
+    })
+
+    it('refuses a narrowed reader an Asset whose hardware record cannot be read: it is not taken for one outside the fleet', () => {
+        const missing: ScopedRow = { saved: true, valueOf: () => '', missing: () => true }
+        for (const reader of READERS) expect(rowVisible(READER_SCOPE[reader], SCOPED_TABLES.alm_hardware, missing, READER_IDS), reader).toBe(false)
+        expect(rowVisible('everything', SCOPED_TABLES.alm_hardware, missing, READER_IDS)).toBe(true)
+    })
+})
+
+describe('a table the app cannot place', () => {
+    it('is one with no entry of its own that extends no table with one', () => {
+        expect(scopingOf(['x_daas_ham_order'])).toBe(SCOPED_TABLES.x_daas_ham_order)
+        expect(scopingOf(['u_rack_hardware', 'alm_hardware', 'alm_asset'])).toBe(SCOPED_TABLES.alm_hardware)
+        expect(scopingOf(['alm_consumable', 'alm_asset'])).toBeNull()
+        expect(scopingOf([])).toBeNull()
+        expect(scopingOf(['constructor', 'toString'])).toBeNull()
+    })
+
+    it('shows a reader the rules narrow nothing, in the filter and in the row check, and narrows no one else', () => {
+        const row = rowOf({ customer: 'cust1', site: 'site1', stockroom: 'sr1' })
+        for (const reader of READERS) {
+            expect(visibilityFilter(READER_SCOPE[reader], null, READER_IDS), reader).toBe('sys_id=-1')
+            expect(rowVisible(READER_SCOPE[reader], null, row, READER_IDS), reader).toBe(false)
+            expect(rowVisible(READER_SCOPE[reader], null, { saved: false, valueOf: () => '' }, READER_IDS), reader).toBe(true)
         }
-        const unread: ScopedRow = { saved: true, valueOf: () => expect.unreachable('field read'), outsideNaas: () => expect.unreachable('flag read') }
-        for (const scope of ['everything', 'unscoped'] as const) expect(rowVisible(scope, SCOPE.assets, unread, untouched)).toBe(true)
-    })
-
-    it("refuses an inventory tech a record of another stockroom, or of none, and a site contact another Customer's Site", () => {
-        const ids = IDS[0]
-        const fleet = (values: Record<string, string>) => rowOf({ x_daas_ham_fleet: 'true', ...values }, OUTSIDE_NAAS.assets)
-        expect(rowVisible('assigned_stockrooms', SCOPE.assets, fleet({ stockroom: 'sr2' }), ids)).toBe(true)
-        expect(rowVisible('assigned_stockrooms', SCOPE.assets, fleet({ stockroom: 'sr9' }), ids)).toBe(false)
-        expect(rowVisible('assigned_stockrooms', SCOPE.audits, rowOf({ site: 'site1' }), ids)).toBe(false)
-        expect(rowVisible('own_sites', SCOPE.assets, fleet({ company: 'cust9', x_daas_ham_site: 'site1' }), ids)).toBe(false)
-    })
-
-    it("passes an inventory tech the Provider IT's hardware, but keeps a Customer contact from another company's", () => {
-        const ids = IDS[0]
-        const it = rowOf({ x_daas_ham_fleet: 'false', stockroom: 'sr9', company: 'cust9' }, OUTSIDE_NAAS.assets)
-        expect(rowVisible('assigned_stockrooms', SCOPE.assets, it, ids)).toBe(true)
-        expect(rowVisible('own_customer', SCOPE.assets, it, ids)).toBe(false)
-        expect(rowVisible('own_sites', SCOPE.assets, it, ids)).toBe(false)
+        for (const scope of ['everything', 'unscoped'] as const) {
+            expect(visibilityFilter(scope, null, READER_IDS), scope).toBeNull()
+            expect(rowVisible(scope, null, row, READER_IDS), scope).toBe(true)
+        }
+        expect(grantsContactRecord('own_customer', null, row, READER_IDS)).toBe(false)
     })
 })
 
 describe('grantsNaasRecord', () => {
-    const ids = IDS[0]
-    const asset = (values: Record<string, string>) => rowOf(values, OUTSIDE_NAAS.assets)
+    const ids = READER_IDS
+    const hardware = SCOPED_TABLES.alm_hardware
 
     it("grants a fleet asset the reader's scope keeps, and nothing outside the fleet, which the platform's ACLs decide", () => {
         for (const scope of SCOPES) {
-            for (const record of records(ASSET_VALUES)) {
-                const expected = record.x_daas_ham_fleet === 'true' && rowVisible(scope, SCOPE.assets, asset(record), ids)
-                expect(grantsNaasRecord(scope, SCOPE.assets, asset(record), ids), `${scope} ${JSON.stringify(record)}`).toBe(expected)
+            for (const record of recordsLike('alm_hardware')) {
+                const expected = record.x_daas_ham_fleet === 'true' && rowVisible(scope, hardware, rowOf(record), ids)
+                expect(grantsNaasRecord(scope, hardware, rowOf(record), ids), `${scope} ${JSON.stringify(record)}`).toBe(expected)
             }
         }
-        expect(grantsNaasRecord('everything', SCOPE.assets, asset({ x_daas_ham_fleet: 'true' }), ids)).toBe(true)
-        expect(grantsNaasRecord('everything', SCOPE.assets, asset({ x_daas_ham_fleet: 'false' }), ids)).toBe(false)
-        expect(grantsNaasRecord('own_customer', SCOPE.assets, asset({ x_daas_ham_fleet: 'true', company: 'cust9' }), ids)).toBe(false)
+        expect(grantsNaasRecord('everything', hardware, rowOf({ x_daas_ham_fleet: 'true' }), ids)).toBe(true)
+        expect(grantsNaasRecord('everything', hardware, rowOf({ x_daas_ham_fleet: 'false' }), ids)).toBe(false)
+        expect(grantsNaasRecord('own_customer', hardware, rowOf({ x_daas_ham_fleet: 'true', company: 'cust9' }), ids)).toBe(false)
     })
 
     it('grants a record that is not a saved row, so the reader may open the list at all', () => {
-        for (const scope of SCOPES) expect(grantsNaasRecord(scope, SCOPE.assets, { saved: false, valueOf: () => '' }, ids)).toBe(true)
+        for (const scope of SCOPES) expect(grantsNaasRecord(scope, hardware, { saved: false, valueOf: () => '' }, ids)).toBe(true)
+    })
+
+    it('grants no one an Asset whose hardware record cannot be read, but staff who see everything', () => {
+        const missing: ScopedRow = { saved: true, valueOf: () => '', missing: () => true }
+        for (const reader of READERS) expect(grantsNaasRecord(READER_SCOPE[reader], hardware, missing, ids), reader).toBe(false)
+        expect(grantsNaasRecord('everything', hardware, missing, ids)).toBe(true)
+    })
+})
+
+describe("the Customer contacts' read ACLs", () => {
+    it('grant by the customer admin role alone: a Customer admin their Customer, any other contact their Sites', () => {
+        expect(contactScope(roles('x_daas_ham.customer_admin'))).toBe('own_customer')
+        expect(contactScope(roles('x_daas_ham.site_contact', 'x_daas_ham.customer_admin'))).toBe('own_customer')
+        expect(contactScope(roles('x_daas_ham.site_contact'))).toBe('own_sites')
+        // A staff role widens nothing here: staff read through their own ACLs.
+        expect(contactScope(roles('x_daas_ham.site_contact', 'x_daas_ham.noc'))).toBe('own_sites')
+        expect(contactScope(roles('x_daas_ham.customer_admin', 'x_daas_ham.inventory_tech'))).toBe('own_customer')
+    })
+
+    it.each(TABLES)('%s: grant a contact the sample records their before-query filter keeps', (table) => {
+        for (const [record, seenBy] of SAMPLES[table]) {
+            for (const contact of ['admin', 'contact'] as const) {
+                const scope = contactScope(roles(contact === 'admin' ? 'x_daas_ham.customer_admin' : 'x_daas_ham.site_contact'))
+                expect(grantsContactRecord(scope, scopingOfTable(table), rowOf(record), READER_IDS), `${contact} ${JSON.stringify(record)}`).toBe(seenBy.includes(contact))
+            }
+        }
+    })
+
+    it("judge a record that is not a saved row by its values: a blank one is no Customer's, a Site template for all excepted", () => {
+        const blank: ScopedRow = { saved: false, valueOf: () => '' }
+        const filled: ScopedRow = { saved: false, valueOf: (field) => (field === 'customer' ? 'cust1' : '') }
+        expect(grantsContactRecord('own_customer', SCOPED_TABLES.x_daas_ham_order, blank, READER_IDS)).toBe(false)
+        expect(grantsContactRecord('own_customer', SCOPED_TABLES.x_daas_ham_order, filled, READER_IDS)).toBe(true)
+        expect(grantsContactRecord('own_customer', SCOPED_TABLES.x_daas_ham_site_template, blank, READER_IDS)).toBe(true)
+    })
+
+    it('grant a contact whose user has no Company nothing but a Site template for all', () => {
+        const none: ScopingIds = { customerId: '', stockroomIds: () => [], siteIds: () => ['site1'] }
+        for (const table of TABLES) {
+            const granted = SAMPLES[table].filter(([record]) => grantsContactRecord('own_customer', scopingOfTable(table), rowOf(record), none))
+            expect(granted.length, table).toBe(scopingOfTable(table).sharedWithoutCustomer ? 1 : 0)
+            for (const [record] of SAMPLES[table]) expect(grantsContactRecord('own_sites', scopingOfTable(table), rowOf(record), none), table).toBe(false)
+        }
     })
 })
 
 describe('read ACLs for inventory techs', () => {
+    /**
+     * The app tables an inventory tech with no broader role may read: the Assets, Staging tasks and Audits of their
+     * Stockrooms, and the ASN imports, Staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and
+     * Disposal orders they work on, which are not narrowed to their Stockrooms. Every other table's read ACL leaves
+     * inventory techs out: the before-query rules do not hide those from them (ADR 0005).
+     */
+    const INVENTORY_TECH_TABLES = [
+        'alm_hardware',
+        'x_daas_ham_asn_import',
+        'x_daas_ham_staging_task',
+        'x_daas_ham_staging_step',
+        'x_daas_ham_staging_template',
+        'x_daas_ham_staging_tmpl_item',
+        'x_daas_ham_order',
+        'x_daas_ham_order_line',
+        'x_daas_ham_shipment',
+        'x_daas_ham_shipment_event',
+        'x_daas_ham_return_order',
+        'x_daas_ham_return_order_line',
+        'x_daas_ham_audit',
+        'x_daas_ham_audit_line',
+        'x_daas_ham_oem_rma',
+        'x_daas_ham_disposal_order',
+        'x_daas_ham_disposal_line',
+    ]
     const SECURITY = new URL('../../fluent/security/', import.meta.url)
     const source = (file: string) => readFileSync(new URL(file, SECURITY), 'utf8')
     const roles = source('roles.now.ts')
@@ -390,29 +609,5 @@ describe('read ACLs for inventory techs', () => {
                 'x_daas_ham_cloud_account',
             ]),
         )
-    })
-})
-
-describe('before-query rules for inventory techs', () => {
-    const rulesSource = readFileSync(new URL('../../fluent/security/visibility.now.ts', import.meta.url), 'utf8')
-    const entrySource = readFileSync(new URL('../entry/visibility.ts', import.meta.url), 'utf8')
-    /** The SCOPE each before-query entry point restricts by, by function name. */
-    const scopeOf = new Map(
-        [...entrySource.matchAll(/export function (\w+)\(current: GlideRecord\): void \{\s*restrict\(current, '(\w+)'\)/g)].map((m) => [m[1], m[2]]),
-    )
-    const rules = rulesSource
-        .split('BusinessRule({')
-        .slice(1)
-        .map((rule) => ({ table: /table: '([^']+)'/.exec(rule)?.[1] ?? '', scope: scopeOf.get(/script: (\w+)/.exec(rule)?.[1] ?? '') as ScopedRecords }))
-
-    it('narrow an inventory tech to their stockrooms on exactly the stock, transfer order, staging and audit tables', () => {
-        expect(rules.filter((rule) => !rule.scope || !SCOPE[rule.scope])).toEqual([])
-        const narrowed = rules.filter((rule) => SCOPE[rule.scope].stockroom).map((rule) => rule.table)
-        expect(narrowed.sort()).toEqual([...STOCKROOM_SCOPED_TABLES].sort())
-    })
-
-    it("leave the Provider IT's hardware and stockrooms, and transfer orders between them, to the platform", () => {
-        const shared = rules.filter((rule) => OUTSIDE_NAAS[rule.scope]).map((rule) => rule.table)
-        expect(shared.sort()).toEqual(['alm_hardware', 'alm_stockroom', 'alm_transfer_order'])
     })
 })

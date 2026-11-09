@@ -1,23 +1,17 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
-import {
-    readsAsset,
-    readsAudit,
-    readsAuditLine,
-    readsStagingTask,
-    readsStockroom,
-    readsTransferOrder,
-} from '../../server/entry/visibility'
+import { readsRecord } from '../../server/entry/visibility'
 
 /*
  * Row checks behind the before-query rules that narrow an inventory tech to their stockrooms (ADR 0005), one for each
- * table the rules narrow (STOCKROOM_SCOPED_TABLES in domain/visibility.ts). A rule can only append conditions, and a
- * condition appended after an `^NQ` binds to the last clause only, so a list query with `^NQ`, or a direct link, can
- * reach a record the rule would hide. Each ACL here denies such a record: its script (entry/visibility) checks the
- * fields of the same SCOPE as the table's rule and keeps exactly what the rule keeps, on every record of the table. So
- * it passes every user the rule does not narrow (staff who see every Customer, and users with no NaaS role, who are
- * left to the platform), passes an inventory tech the shared tables' records outside NaaS, re-checks a Customer
- * contact's Customer and Site, and passes a record that is not a saved row (a New form, a check of the whole table).
+ * table the rules narrow (those whose entry in domain/visibility SCOPED_TABLES names a Stockroom). A rule can only
+ * append conditions, and a condition appended after an `^NQ` binds to the last clause only, so a list query with
+ * `^NQ`, or a direct link, can reach a record the rule would hide. Each ACL here denies such a record: the one script
+ * (entry/visibility `readsRecord`) decides on the same entry as the table's rule and keeps exactly what the rule keeps,
+ * on every record of the table. So it passes every user the rule does not narrow (staff who see every Customer, and
+ * users with no NaaS role, who are left to the platform), passes an inventory tech the shared tables' records outside
+ * NaaS, re-checks a Customer contact's Customer and Site, and passes a record that is not a saved row (a New form, a
+ * check of the whole table).
  *
  * Deny-Unless, not Allow-If: Allow-If ACLs of one name are ORed, so a row condition on one is undone by any other that
  * grants the reader, and the platform's read ACLs on alm_asset, alm_stockroom and alm_transfer_order grant an inventory
@@ -39,7 +33,7 @@ Acl({
     decisionType: 'deny',
     appliesTo: 'sys_class_name=alm_hardware',
     description: "NaaS row check: an inventory tech reads a fleet asset only of their stockrooms; a Customer contact hardware only of their Customer.",
-    script: readsAsset,
+    script: readsRecord,
 })
 
 Acl({
@@ -49,7 +43,7 @@ Acl({
     operation: 'read',
     decisionType: 'deny',
     description: 'NaaS row check: an inventory tech reads a NaaS stockroom only when they are a member of it.',
-    script: readsStockroom,
+    script: readsRecord,
 })
 
 Acl({
@@ -59,7 +53,7 @@ Acl({
     operation: 'read',
     decisionType: 'deny',
     description: 'NaaS row check: an inventory tech reads a transfer order touching a NaaS stockroom only from or to one of theirs.',
-    script: readsTransferOrder,
+    script: readsRecord,
 })
 
 Acl({
@@ -69,7 +63,7 @@ Acl({
     operation: 'read',
     decisionType: 'deny',
     description: "NaaS row check: an inventory tech reads a staging task only when its asset is in one of their stockrooms.",
-    script: readsStagingTask,
+    script: readsRecord,
 })
 
 Acl({
@@ -79,7 +73,7 @@ Acl({
     operation: 'read',
     decisionType: 'deny',
     description: 'NaaS row check: an inventory tech reads the blind counts of their stockrooms only (a site audit has none).',
-    script: readsAudit,
+    script: readsRecord,
 })
 
 Acl({
@@ -89,5 +83,5 @@ Acl({
     operation: 'read',
     decisionType: 'deny',
     description: "NaaS row check: an inventory tech reads an audit line only of their stockrooms' blind counts.",
-    script: readsAuditLine,
+    script: readsRecord,
 })

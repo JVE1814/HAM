@@ -54,18 +54,20 @@ Site, as the ACLs do, so another Customer's Site that lists them shows them noth
 re-check the Customer and, for a site contact without the customer admin role, that the record's
 Site lists them as a contact, so neither a direct link nor a dot-walk from a visible record shows
 another Site's records. Return lines, attestation items and shipment events have no before-query
-rule: their ACL is the only check. Users with no stockroom, Site or
+rule: their ACL is the only check. Each table's scoping fields are written once, in `SCOPED_TABLES`
+(`domain/visibility.ts`); the rules' one script (`scopeRecords`) and the ACLs' (`readsRecord`,
+`grantsCustomerRecord`, `grantsFleetAsset`, all in `entry/visibility.ts`) find them by the record's table. Users with no stockroom, Site or
 Customer see nothing in the restricted tables. For inventory techs the rules only narrow rows: tables they
 may not read at all are closed by the read ACLs' role lists, not by a match-nothing filter, because a rule
-also applies to the server logic their actions set off (`INVENTORY_TECH_TABLES` in `domain/visibility.ts`
-lists what they read). For Customer contacts, a rule on a table with no Customer field (or no Site field,
+also applies to the server logic their actions set off (`domain/visibility.test.ts` lists what they
+read and checks the ACLs against it). For Customer contacts, a rule on a table with no Customer field (or no Site field,
 for Site contacts) matches nothing: Site contacts get no NaaS Stockrooms, Agreements, subscription lines,
 catalog entries or Fee events, and no Customer contact gets Staging tasks or transfer orders of NaaS
 stockrooms.
 
 **Shared tables** (ADR 0016). On `alm_hardware`, `alm_stockroom` and `alm_transfer_order`, which hold the
 Provider IT's records too, the rules narrow an inventory tech's NaaS records only and keep the others in
-(`OUTSIDE_NAAS`): hardware outside the fleet (flag false or blank), stockrooms with no NaaS stockroom type, and
+(`outsideNaasConditions`): hardware outside the fleet (flag false or blank), stockrooms with no NaaS stockroom type, and
 transfer orders between two such stockrooms. An inventory tech, who holds the platform's `asset` and `inventory_user`
 roles, sees those as other asset users do. A Customer contact is kept to their Customer (and Sites) on every record of
 those tables, fleet or not, as before: Customer Service's own contact rules on `alm_asset` run in interactive sessions
@@ -80,9 +82,9 @@ without a NaaS role lost all hardware.
 
 **Row checks.** A rule can only append conditions, and one appended after an `^NQ` binds to the last clause only,
 so a list query with `^NQ` clauses or a direct link could reach a record the rule hides. Each table the rules
-narrow to an inventory tech's stockrooms (`STOCKROOM_SCOPED_TABLES`) therefore has a Deny-Unless read ACL
+narrow to an inventory tech's stockrooms (those whose `SCOPED_TABLES` entry names a Stockroom) therefore has a Deny-Unless read ACL
 (`security/acls-visibility.now.ts`), hardware's on `alm_asset` so an `alm_asset` list is checked too. Its script checks
-the record with `rowVisible` on the same fields as the table's rule (`SCOPE`) and keeps exactly what the rule keeps: an
+the record with `rowVisible` on the same `SCOPED_TABLES` entry as the table's rule and keeps exactly what the rule keeps: an
 inventory tech with no broader role reads a fleet asset, NaaS stockroom, transfer order touching a NaaS stockroom,
 staging task or audit only of their stockrooms, and a Customer contact hardware and the other records only of their
 Customer (and Sites). Staff who see everything and users with no NaaS role pass it, and so does a record that is not

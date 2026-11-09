@@ -1,19 +1,12 @@
 import '@servicenow/sdk/global'
 import { BusinessRule } from '@servicenow/sdk/core'
-import {
-    scopeAssets,
-    scopeAuditLines,
-    scopeAudits,
-    scopeCustomerRecords,
-    scopeCustomerSiteRecords,
-    scopeOrderLines,
-    scopeOrders,
-    scopeStagingTasks,
-    scopeStockrooms,
-    scopeTransferOrders,
-} from '../../server/entry/visibility'
+import { scopeRecords } from '../../server/entry/visibility'
 
-/* Before-query rules that scope lists and lookups by customer, site or stockroom (ADR 0005). */
+/*
+ * Before-query rules that scope lists and lookups by customer, site or stockroom (ADR 0005). Every rule runs the one
+ * script, which finds the scoping of the table queried in domain/visibility SCOPED_TABLES: a table is scoped by a rule
+ * here and its entry there.
+ */
 
 BusinessRule({
     $id: Now.ID['br_scope_alm_hardware'],
@@ -22,7 +15,7 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeAssets,
+    script: scopeRecords,
 })
 
 BusinessRule({
@@ -32,7 +25,7 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeStockrooms,
+    script: scopeRecords,
 })
 
 BusinessRule({
@@ -42,7 +35,7 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeTransferOrders,
+    script: scopeRecords,
 })
 
 BusinessRule({
@@ -52,7 +45,7 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeStagingTasks,
+    script: scopeRecords,
 })
 
 BusinessRule({
@@ -62,7 +55,7 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeAudits,
+    script: scopeRecords,
 })
 
 BusinessRule({
@@ -72,7 +65,7 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeAuditLines,
+    script: scopeRecords,
 })
 
 BusinessRule({
@@ -82,7 +75,7 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeOrders,
+    script: scopeRecords,
 })
 
 BusinessRule({
@@ -92,7 +85,7 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeOrderLines,
+    script: scopeRecords,
 })
 
 BusinessRule({
@@ -102,7 +95,7 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeCustomerRecords,
+    script: scopeRecords,
 })
 
 BusinessRule({
@@ -112,7 +105,7 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeCustomerRecords,
+    script: scopeRecords,
 })
 
 BusinessRule({
@@ -122,7 +115,7 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeCustomerRecords,
+    script: scopeRecords,
 })
 
 BusinessRule({
@@ -132,7 +125,7 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeCustomerSiteRecords,
+    script: scopeRecords,
 })
 
 BusinessRule({
@@ -142,7 +135,7 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeCustomerSiteRecords,
+    script: scopeRecords,
 })
 
 BusinessRule({
@@ -152,7 +145,7 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeCustomerSiteRecords,
+    script: scopeRecords,
 })
 
 BusinessRule({
@@ -162,5 +155,5 @@ BusinessRule({
     when: 'before',
     action: ['query'],
     order: 50,
-    script: scopeCustomerRecords,
+    script: scopeRecords,
 })

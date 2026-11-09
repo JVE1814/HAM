@@ -10,7 +10,7 @@ import { accountManager, admin, assetManager, fieldTech, finance, inventoryTech,
  * (`naasModelCondition()`). The conditions are literals that domain/fleet-queries.test.ts checks.
  */
 
-/** Every provider-staff role, for the lists of tables inventory techs also read: INVENTORY_TECH_TABLES in domain/visibility.ts, and the platform's cmdb_model. */
+/** Every provider-staff role, for the lists of tables inventory techs also read (those whose read ACL names providerStaff or inventoryTech), and the platform's cmdb_model. */
 export const staffAudience = Applicability({
     $id: Now.ID['ws_audience_staff'],
     name: 'NaaS provider staff',

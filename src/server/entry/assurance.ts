@@ -161,7 +161,7 @@ export function scanAudit(request: RESTAPIRequest, response: RESTAPIResponse): v
 /**
  * The open audit with this sys_id or number, if the user may work on it: an inventory tech only the blind counts
  * of their stockrooms (a site audit has no stockroom), other staff every audit. The audit before-query rule
- * (scopeAudits) already narrows this query the same way; the filter is kept so the check that guards scanning and
+ * (scopeRecords) already narrows this query the same way; the filter is kept so the check that guards scanning and
  * closing does not depend on that rule being active, and applying it twice changes nothing.
  */
 function findOpenVisibleAudit(key: string): GlideRecord | null {

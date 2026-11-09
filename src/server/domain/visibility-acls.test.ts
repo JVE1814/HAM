@@ -1,134 +1,131 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { SCOPE, STOCKROOM_SCOPED_TABLES, type ScopedRecords } from './visibility'
+import { SCOPED_TABLES, type TableScoping } from './visibility'
 
 /*
- * The before-query rules (ADR 0005) narrow lists, but a record reached another way (a dot-walk from a visible record,
- * an `^NQ` clause the rule's filter does not reach, or a table with no rule) is guarded only by its read ACL. So every
- * read ACL a site contact passes re-checks the Site, on the same field as the table's before-query rule, and on the
- * tables the rules narrow to an inventory tech's stockrooms a Deny-Unless ACL re-checks the stockroom. Hardware's read
- * ACLs sit on alm_asset, its parent, applying to hardware only.
+ * What a reader may see is decided in one place (domain/visibility SCOPED_TABLES, tested in visibility.test.ts) and
+ * reached through three scripts (entry/visibility `scopeRecords`, `readsRecord`, `grantsCustomerRecord`, and
+ * `grantsFleetAsset` for hardware), each of which finds the table of the record it is handed. What code cannot say
+ * is which records call them: these tests read the security Fluent files for that. A before-query rule (ADR 0005)
+ * narrows lists, but a record reached another way (a dot-walk from a visible record, an `^NQ` clause the rule's filter
+ * does not reach, or a table with no rule) is guarded only by its read ACL.
  */
 
 const SECURITY = new URL('../../fluent/security/', import.meta.url)
 const source = (file: string) => readFileSync(new URL(file, SECURITY), 'utf8')
-const entrySource = readFileSync(new URL('../entry/visibility.ts', import.meta.url), 'utf8')
+const SCOPINGS: Readonly<Record<string, TableScoping>> = SCOPED_TABLES
+const scopedTables = Object.keys(SCOPINGS)
 
-/** The class an ACL on a parent table applies to alone (Applies To `sys_class_name=<class>`), if any. */
-const appliedClass = (acl: string) => /appliesTo: 'sys_class_name=(\w+)'/.exec(acl)?.[1]
+const items = (list: string) => list.split(',').map((item) => item.trim().replace(/"/g, "'")).filter(Boolean)
+const namedLists = (text: string) => new Map([...text.matchAll(/const (\w+) = \[([^\]]*)\]/g)].map((m) => [m[1], items(m[2])]))
+const roleLists = namedLists(source('roles.now.ts'))
 
-/** Every ACL of the app's security files, as the fields these tests read; `records` is the table of its records. */
+/** Every ACL of the app's security files, as the fields these tests read. */
 const acls = readdirSync(SECURITY)
     .filter((file) => /^acls.*\.now\.ts$/.test(file))
-    .flatMap((file) => source(file).split('Acl({').slice(1))
-    .map((acl) => ({
-        table: /table: '([^']+)'/.exec(acl)?.[1] ?? '',
-        records: appliedClass(acl) ?? /table: '([^']+)'/.exec(acl)?.[1] ?? '',
-        operation: /operation: '([^']+)'/.exec(acl)?.[1] ?? '',
-        deny: acl.includes("decisionType: 'deny'"),
-        roles: /roles: (\[[^\]]*\]|\w+)/.exec(acl)?.[1] ?? '',
-        appliesTo: /appliesTo:\s*'([^']*)'/.exec(acl)?.[1] ?? '',
-        script: /script: (\w+)/.exec(acl)?.[1] ?? '',
-    }))
-
-/** The SCOPE each before-query rule's entry point restricts by, by the rule's table. */
-const ruleScope = (() => {
-    const scopeOf = new Map(
-        [...entrySource.matchAll(/export function (\w+)\(current: GlideRecord\): void \{\s*restrict\(current, '(\w+)'\)/g)].map((m) => [m[1], m[2]]),
-    )
-    return new Map(
-        source('visibility.now.ts')
-            .split('BusinessRule({')
+    .flatMap((file) => {
+        const text = source(file)
+        const lists = new Map([...roleLists, ...namedLists(text)])
+        const expand = (token: string): string[] => {
+            const name = token.replace(/^\.\.\./, '')
+            return lists.has(name) ? (lists.get(name) ?? []).flatMap(expand) : [token]
+        }
+        return text
+            .split('Acl({')
             .slice(1)
-            .map((rule): [string, ScopedRecords] => [
-                /table: '([^']+)'/.exec(rule)?.[1] ?? '',
-                scopeOf.get(/script: (\w+)/.exec(rule)?.[1] ?? '') as ScopedRecords,
-            ]),
-    )
-})()
-
-/**
- * Every read ACL a site contact passes (customerRoles holds the site contact role), as the table of its records and
- * its script: inline, or (`entryPoint`) an entry/visibility function.
- */
-const siteContactReads = readdirSync(SECURITY)
-    .filter((file) => /^acls.*\.now\.ts$/.test(file))
-    .flatMap((file) => source(file).split('Acl({').slice(1))
-    .filter((acl) => acl.includes("operation: 'read'") && /roles: (customerRoles\b|\[[^\]]*\bsiteContact\b)/.test(acl))
-    .map((acl) => ({
-        table: appliedClass(acl) ?? /table: '([^']+)'/.exec(acl)?.[1] ?? '',
-        script: /script: "([^"]*)"/.exec(acl)?.[1] ?? '',
-        entryPoint: /script: (\w+)/.exec(acl)?.[1],
-    }))
-
-/** The SCOPE an entry/visibility row check or grant reads, from its body. */
-const checkedScope = (name: string) =>
-    new RegExp(`export function ${name}\\(current: GlideRecord\\): boolean \\{[^}]*?(?:readable\\(current, '(\\w+)'|SCOPE\\.(\\w+))`)
-        .exec(entrySource)
-        ?.slice(1)
-        .find(Boolean)
-
-/** The Site field each before-query rule filters a site contact on, by table; null for a rule with none. */
-const ruleSiteField = new Map([...ruleScope].map(([table, scope]): [string, string | null] => [table, SCOPE[scope]?.site ?? null]))
-
-/** The record path whose Site contacts the script checks, unless the reader is a customer admin. */
-const SITE_CHECK = /\(gs\.hasRole\('x_daas_ham\.customer_admin'\) \|\| \(',' \+ current\.([\w.]+)\.x_daas_ham_site_contacts \+ ','\)\.indexOf\(',' \+ gs\.getUserID\(\) \+ ','\) > -1\)/
-
-describe('read ACLs for site contacts', () => {
-    it('cover the tables a site contact reads', () => {
-        expect(siteContactReads.map((acl) => acl.table).sort()).toEqual(
-            expect.arrayContaining(['alm_hardware', 'x_daas_ham_order', 'x_daas_ham_order_line', 'x_daas_ham_return_order', 'x_daas_ham_shipment']),
-        )
+            .map((acl) => {
+                const table = /table: '([^']+)'/.exec(acl)?.[1] ?? ''
+                const granted = /roles: (\[[^\]]*\]|\w+)/.exec(acl)?.[1] ?? ''
+                const appliesTo = /appliesTo:\s*'([^']*)'/.exec(acl)?.[1] ?? ''
+                return {
+                    table,
+                    /** The table of its records: its own, or the one class an ACL on a parent table applies to. */
+                    records: /^sys_class_name=(\w+)$/.exec(appliesTo)?.[1] ?? table,
+                    operation: /operation: '([^']+)'/.exec(acl)?.[1] ?? '',
+                    deny: acl.includes("decisionType: 'deny'"),
+                    /** The roles it names, with named role lists expanded. */
+                    roles: (granted.startsWith('[') ? items(granted.slice(1, -1)) : granted ? [granted] : []).flatMap(expand),
+                    appliesTo,
+                    /** The entry function its script is, or `inline` for a script written in the ACL. */
+                    script: /script: (\w+),/.exec(acl)?.[1] ?? (/script:/.test(acl) ? 'inline' : ''),
+                }
+            })
     })
+const reads = acls.filter((acl) => acl.operation === 'read')
 
-    it("check the Customer and that the record's Site lists the site contact", () => {
-        for (const acl of siteContactReads.filter((acl) => !acl.entryPoint)) {
-            expect(acl.script, acl.table).toContain('== gs.getUser().getCompanyID() && ')
-            expect(acl.script, acl.table).toMatch(SITE_CHECK)
+const rules = source('visibility.now.ts')
+    .split('BusinessRule({')
+    .slice(1)
+    .map((rule) => ({ table: /table: '([^']+)'/.exec(rule)?.[1] ?? '', script: /script: (\w+),/.exec(rule)?.[1] ?? '' }))
+const ruledTables = rules.map((rule) => rule.table)
+
+describe('before-query rules', () => {
+    it('run the one script, each on a table that has a scoping for it to find', () => {
+        expect(rules.length).toBeGreaterThan(0)
+        for (const rule of rules) {
+            expect(rule.script, rule.table).toBe('scopeRecords')
+            expect(scopedTables, rule.table).toContain(rule.table)
         }
+        expect(new Set(ruledTables).size).toBe(ruledTables.length)
     })
 
-    it("check the same Site as the table's before-query rule", () => {
-        for (const acl of siteContactReads.filter((acl) => ruleSiteField.has(acl.table))) {
-            if (acl.entryPoint) expect(SCOPE[checkedScope(acl.entryPoint) as ScopedRecords]?.site, acl.table).toBe(ruleSiteField.get(acl.table))
-            else expect(SITE_CHECK.exec(acl.script)?.[1], acl.table).toBe(ruleSiteField.get(acl.table))
-        }
-    })
-
-    it("check a record with an entry point only through the table's rule's own SCOPE", () => {
-        const viaEntryPoint = siteContactReads.filter((acl) => acl.entryPoint)
-        expect(viaEntryPoint.map((acl) => acl.table)).toContain('alm_hardware')
-        for (const acl of viaEntryPoint) expect(checkedScope(acl.entryPoint ?? ''), acl.table).toBe(ruleScope.get(acl.table))
-    })
-
-    it('grant no table whose before-query rule has no Site field (it shows site contacts nothing)', () => {
-        const siteless = [...ruleSiteField].filter(([, site]) => site === null).map(([table]) => table)
-        expect(siteless).toEqual(expect.arrayContaining(['x_daas_ham_agreement', 'x_daas_ham_fee_event']))
-        expect(siteContactReads.filter((acl) => siteless.includes(acl.table))).toEqual([])
+    it('narrow every scoped table but the lines and Site templates, which their read ACL alone guards', () => {
+        expect(scopedTables.filter((table) => !ruledTables.includes(table)).sort()).toEqual([
+            'x_daas_ham_attestation_item',
+            'x_daas_ham_return_order_line',
+            'x_daas_ham_shipment_event',
+            'x_daas_ham_site_template',
+            'x_daas_ham_site_template_item',
+        ])
     })
 })
 
 describe('row checks of the read ACLs', () => {
-    const rowChecks = acls.filter((acl) => acl.operation === 'read' && acl.deny)
+    const rowChecks = reads.filter((acl) => acl.deny)
+    const stockroomScoped = scopedTables.filter((table) => SCOPINGS[table].stockroom)
 
     it('deny, on each table the rules narrow to stockrooms, what its rule would hide', () => {
-        expect(rowChecks.map((acl) => acl.records).sort()).toEqual([...STOCKROOM_SCOPED_TABLES].sort())
-        for (const acl of rowChecks) {
-            expect(ruleScope.get(acl.records), acl.records).toBeDefined()
-            expect(checkedScope(acl.script), `${acl.records}: ${acl.script}`).toBe(ruleScope.get(acl.records))
-        }
+        expect(stockroomScoped).toContain('alm_hardware')
+        expect(rowChecks.map((acl) => acl.records).sort()).toEqual([...stockroomScoped].sort())
+        for (const table of stockroomScoped) expect(ruledTables, table).toContain(table)
+        for (const acl of rowChecks) expect(acl.script, acl.records).toBe('readsRecord')
     })
 
     it('take no role: every reader passes them, as the rules narrow whoever reads', () => {
-        for (const acl of rowChecks) expect(acl.roles, acl.records).toBe('')
+        for (const acl of rowChecks) expect(acl.roles, acl.records).toEqual([])
     })
 
     it('apply to every record of their table: the script, not Applies To, tells what a reader leaves to the platform', () => {
         for (const acl of rowChecks.filter((acl) => acl.table === acl.records)) expect(acl.appliesTo, acl.table).toBe('')
     })
+})
 
-    it('pass a record that is not a saved row, which holds nothing to hide (a New form, a check of the whole table)', () => {
-        expect(entrySource).toMatch(/saved: !current\.isNewRecord\(\) && !!current\.getUniqueValue\(\)/)
+describe('read ACLs for Customer contacts', () => {
+    const contactReads = reads.filter((acl) => !acl.deny && acl.roles.some((role) => role === 'customerAdmin' || role === 'siteContact'))
+
+    it('cover the tables a Customer contact reads', () => {
+        expect(contactReads.map((acl) => acl.records).sort()).toEqual(
+            expect.arrayContaining(['alm_hardware', 'x_daas_ham_order', 'x_daas_ham_order_line', 'x_daas_ham_return_order', 'x_daas_ham_shipment']),
+        )
+    })
+
+    it("grant a record only through the shared decision: no ACL lets a contact in without it, or decides for itself", () => {
+        for (const acl of contactReads) {
+            expect(acl.script, acl.records).toBe(acl.records === 'alm_hardware' ? 'grantsFleetAsset' : 'grantsCustomerRecord')
+        }
+        expect(acls.filter((acl) => acl.script === 'inline')).toEqual([])
+    })
+
+    it('sit on a scoped table with a Customer field, and with a Site field where they admit site contacts', () => {
+        for (const acl of contactReads) {
+            expect(SCOPINGS[acl.records]?.customer, acl.records).toBeTruthy()
+            if (acl.roles.includes('siteContact')) expect(SCOPINGS[acl.records]?.site, acl.records).toBeTruthy()
+        }
+    })
+
+    it('are the only check on a scoped table with no before-query rule, so each of those has one', () => {
+        const granted = contactReads.map((acl) => acl.records)
+        for (const table of scopedTables.filter((table) => !ruledTables.includes(table))) expect(granted, table).toContain(table)
     })
 })
 
@@ -142,16 +139,7 @@ describe('ACLs on the hardware the app shares with the Provider IT', () => {
         expect(acls.filter((acl) => acl.table === 'alm_asset' && acl.records !== 'alm_hardware')).toEqual([])
     })
 
-    it('check the class again in their script, in case Applies To is not applied', () => {
-        for (const acl of hardware) {
-            expect(acl.script, `${acl.operation} ${acl.roles}`).toMatch(/^\w+$/)
-            const body = new RegExp(`export function ${acl.script}\\(current: GlideRecord\\): boolean \\{[^}]*`).exec(entrySource)?.[0]
-            expect(body, acl.script).toContain('otherAssetClass(current)')
-        }
-    })
-
     it('grant only fleet assets: the Allow-If ones leave other hardware to the platform', () => {
-        for (const acl of hardware.filter((acl) => !acl.deny)) expect(acl.script, acl.roles).toBe('grantsFleetAsset')
-        expect(entrySource).toMatch(/outsideNaas: \(hardware\) => !isFleetAsset\(hardware\)/)
+        for (const acl of hardware.filter((acl) => !acl.deny)) expect(acl.script, `${acl.roles}`).toBe('grantsFleetAsset')
     })
 })

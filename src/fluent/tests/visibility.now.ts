@@ -107,7 +107,7 @@ export const inventoryTechVisibilityTest = Test(
             fieldValues: { serial_number: 'ATF-ITV-OUT-0001', stockroom: other.record_id, install_status: 6, quantity: 1, x_daas_ham_fleet: true },
             enforceSecurity: false,
         })
-        // The same unit outside the fleet: the rule keeps it in (domain/visibility OUTSIDE_NAAS), for the platform to decide.
+        // The same unit outside the fleet: the rule keeps it in (domain/visibility `outsideNaasConditions`), for the platform to decide.
         atf.server.recordInsert({
             $id: Now.ID['atf_itv_asset_outside'],
             table: 'alm_hardware',

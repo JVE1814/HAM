@@ -16,7 +16,7 @@ import type {
     ReturnRequestReceipt,
 } from '../domain/rest-contracts.ts'
 import { returnRequesterRefusal, returnRequestFindings, type RequestedReturn } from '../domain/returns.ts'
-import { actsAsCustomerAdmin, customerEquipmentQuery, ROLE, SCOPE, visibilityFilter } from '../domain/visibility.ts'
+import { actsAsCustomerAdmin, customerEquipmentQuery, ROLE, SCOPED_TABLES, visibilityFilter } from '../domain/visibility.ts'
 import { ATTESTATION_RESPONSE_CHOICES } from '../domain/vocabulary.ts'
 import { isFleetAsset, readStage } from '../platform/assets.ts'
 import { currentSession } from '../platform/session.ts'
@@ -59,7 +59,7 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
 
     const assets: CustomerAsset[] = []
     const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(customerEquipmentQuery(visibilityFilter(session.scope, SCOPE.assets, session)))
+    asset.addEncodedQuery(customerEquipmentQuery(visibilityFilter(session.scope, SCOPED_TABLES.alm_hardware, session)))
     asset.orderBy('x_daas_ham_site')
     asset.setLimit(5000)
     asset.query()

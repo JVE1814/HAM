@@ -1,6 +1,7 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
 import { admin, assetManager, broadStaff, customerRoles, inventoryTech, providerStaff } from './roles.now'
+import { grantsCustomerRecord } from '../../server/entry/visibility'
 
 /*
  * Access controls for shipping (P3.26) and OEM cloud accounts (P3.27). Customer admins see their own Customer's shipments,
@@ -47,7 +48,7 @@ Acl({
     table: 'x_daas_ham_shipment',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.getValue('customer') == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
+    script: grantsCustomerRecord,
 })
 
 Acl({
@@ -88,7 +89,7 @@ Acl({
     table: 'x_daas_ham_shipment_event',
     operation: 'read',
     roles: customerRoles,
-    script: "answer = current.shipment.customer.toString() == gs.getUser().getCompanyID() && (gs.hasRole('x_daas_ham.customer_admin') || (',' + current.shipment.site.x_daas_ham_site_contacts + ',').indexOf(',' + gs.getUserID() + ',') > -1);",
+    script: grantsCustomerRecord,
 })
 
 Acl({
