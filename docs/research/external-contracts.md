@@ -757,7 +757,7 @@ Sources:
 | `setWorkflow(false)` on a global table from the scoped app | No longer relied on there: a read past the visibility rules on `alm_hardware` marks its GlideRecord while its query runs and the app's before-query rules skip a marked record (`platform/beyond-visibility.ts`, `entry/visibility.ts` restrict); `setWorkflow(false)` stays on `x_daas_ham_*` tables | "This method can't be set for cross-scoped applications"; refused on the instance, so the rules still run. Module state reaches the rules the query sets off, within that transaction only | matches | N30, N35, N37 |
 | `current.setAbortAction(true)` in a before rule on a global table | No longer used there: the rules on `alm_hardware` and `wm_order` refuse with their Abort action (`assets.ts` refusesLifecycleChange, `delivery.ts` refusesWorkWindow, `racks.ts` refusesRackPlacement); the rules on `x_daas_ham_*` tables keep it | Refused on the instance: the save goes through. The rule's own Abort action refuses it, whoever saves, and its script still runs | matches | N35, N36 |
 | Business rule condition and filter | The check is the condition, behind a change test in the condition itself (`rules.now.ts`, `assurance.now.ts`) | The condition runs on every save the rule's table and action match, even when the filter does not; the rule fires only when both hold | matches | N36 |
-| Out-of-box transfer order line logic and the Asset | Inventory works the transfer orders sourcing raises (`transfers.ts`); the lifecycle rule checks the Asset save that sets off (`assets.ts` refusesLifecycleChange) | *Push Status to Asset/Consumable* sets *In stock / Pending transfer* or *In transit / Reserved* in the user's transaction and saves through `alm_asset` without checking; the app's `alm_hardware` rules run on that save | differs | N38 |
+| Out-of-box transfer order line logic and the Asset | Inventory works the transfer orders sourcing raises, each unit handed over *In stock / Available* just before its line is inserted (`platform/transfers.ts` requestTransfer). Both combinations Inventory sets are one stage, *In transfer*, entered only while `active_to` is set and left only once it is cleared (`domain/lifecycle.ts`, `entry/assets.ts` refusesLifecycleChange); an Asset Inventory lets go takes back the stage it left (`entry/assets.ts` onTransferReleased) | *Push Status to Asset/Consumable* sets *In stock / Pending transfer* or *In transit / Reserved* with `active_to` set, and *In stock / Available* in the to-stockroom with it cleared at Received; *Release Asset on TOL cancel/delete* sets *In stock / Available* where the Asset is and clears it; *Validate TOL and check availibility* takes onto a line only an Asset *In stock / Available* with `active_to` clear. Each saves through `alm_asset` in the user's transaction, and the app's `alm_hardware` rules run on that save | matches | N38, N39 |
 
 Notes:
 
@@ -967,6 +967,39 @@ Sources:
   `GlideRecord('alm_asset')` (`getRecordClassName()` `alm_hardware`) cleared its wipe evidence, as
   moving the other through `GlideRecord('alm_hardware')` did. So the app's before rule on
   `alm_hardware` ran on both saves.
+- N39: Brazil instance, 2026-11-09, read through the Table API without saving anything: the
+  dictionary and the scripts of Inventory's transfer order rules (package *Asset Management*, scope
+  global). `alm_asset.active_to` (*Active transfer order*) is a boolean, read-only, default false.
+  *Push Status to Asset/Consumable* (N38) sets it true with 6 / `pending_transfer` (Draft,
+  Requested, Shipment Preparation) and 9 / `reserved` (In Transit), and false at Received, with
+  install status 6 in the to-stockroom and substatus `available`, or `reserved` when the Asset was
+  reserved and the line's request line names a Requested for. It keeps a `defective` or
+  `pre_allocated` substatus at every stage. When the line's last closed task was Closed Skipped it
+  sets no stage, and at Received or Delivered only clears the flag. On a line under a work order
+  task or service order, Received keeps 6 / `pending_transfer` with the flag set and Delivered
+  clears it; sourcing's transfer orders have neither. On a line's insert this before rule saves the
+  Asset, so the Asset is saved, and the app's rules on `alm_hardware` run, before the line is
+  written. The before rule *Release Asset on TOL cancel/delete* on `alm_transfer_order_line` (order
+  10, update and delete, condition `(current.stage.changes() && current.stage == "cancelled" &&
+  String(previous.stage) !== "received") || current.operation() == "delete"`) reads the line's Asset
+  through `GlideRecord('alm_asset')`, sets 6 / `available` (unless `pre_allocated` or `defective`),
+  clears `active_to` and `reserved_for`, and calls `update()`. It does not set `stockroom`, which
+  Inventory sets only at Received, so the Asset is released where it was. On a cancel it then
+  empties the line's `asset` and quantities. *Delete all Transfer Order Lines* (before delete on
+  `alm_transfer_order`) deletes each line with `deleteRecord()`, so deleting a transfer order
+  releases every Asset on it. The before rule *Validate TOL and check availibility* (order 50,
+  insert and update, condition `current.operation() == 'insert' ||
+  (current.quantity_requested.changes() || current.from_stockroom.changes() ||
+  current.asset.changes() || current.model.changes())`) refuses with `current.setAbortAction(true)`
+  the insert of a line whose Asset has `active_to` set (*You have attempted to add an asset already
+  on an active transfer order line*), and a line whose Asset is of another Model, not in the
+  transfer order's from-stockroom, not install status 6, or of a substatus other than `available`
+  (`AssetUtils.determineAvailableStatus`, outside Field Service returns and drop-offs),
+  `pre_allocated` or `defective` (*Severe inconsistency between asset and transfer order line*).
+  After Draft it refuses any change to a line but its stage. *Push stages of TO and TOL* (N38)
+  leaves the stage of a Cancelled line as it is, so a task closed after its line was cancelled saves
+  neither the line nor its Asset. `alm_transfer_order_line.stage` holds `draft`, `requested`,
+  `shipment_preparation`, `in_transit`, `received`, `delivered` and `cancelled`.
 
 ## Changes needed in the app
 
@@ -1214,12 +1247,12 @@ recommended hardening are described in the notes of their area.
   staging voids is cleared by a rule of its own, `assets.ts` clearVoidedWipeEvidence) and `NaaS -
   work inside change and maintenance window` (`wm_order`, `delivery.ts` refusesWorkWindow). No other
   rule refuses a save on another scope's table: the before rule on `sn_customerservice_case`
-  (`breakfix.ts` onCaseFailedAsset) and the lease rule on `alm_hardware` (`leases.ts`
-  onAssetLeaseChanged) only set fields, and the rest that refuse run on `x_daas_ham_*` tables, where
-  `setAbortAction` works (`entry-points.test.ts` keeps it that way).
-  Now that the lifecycle rule's refusal holds, it also refuses the Asset saves Inventory's transfer
-  order logic makes for an inventory tech working a line, which set combinations the app does not
-  model (N38, ADR 0002); whether its exemption should widen is listed below.
+  (`breakfix.ts` onCaseFailedAsset) and the lease rule and transfer release rule on `alm_hardware`
+  (`leases.ts` onAssetLeaseChanged, `entry/assets.ts` onTransferReleased) only set fields, and the
+  rest that refuse run on `x_daas_ham_*` tables, where `setAbortAction` works
+  (`entry-points.test.ts` keeps it that way). With the lifecycle rule's refusal holding, it also
+  checks the Asset saves Inventory's transfer order logic makes for an inventory tech working a line
+  (N38); the next item models them.
   The reads ADR 0005 runs past the visibility rules on `alm_hardware` no longer call `setWorkflow`:
   each marks its GlideRecord while its query runs (`platform/beyond-visibility.ts`) and the app's
   before-query rules leave a marked record's query as it is (N37). **Done** for `racks.ts` slotsIn,
@@ -1233,6 +1266,18 @@ recommended hardening are described in the notes of their area.
   platform's *user query* rule only hides inactive users, which it asks for anyway. No app logic
   saves a record of another scope's table with the rules off: each read above that is saved runs
   every rule on the save, as it did when `setWorkflow(true)` came before it.
+- **Out-of-box transfer order line logic and the Asset (differs).** The lifecycle rule refused, for
+  an inventory tech, the combinations Inventory sets on a line's Asset (N38), and Inventory takes
+  onto a line only an Asset *In stock / Available* (N39), which the reserved units sourcing
+  transfers are not. **Done** (owner decision, 2026-11-09; ADR 0002): both combinations are one
+  stage, *In transfer* (`domain/lifecycle.ts`), which an Asset enters only while `active_to` is set
+  and leaves only once it is cleared (`entry/assets.ts` refusesLifecycleChange,
+  `platform/transfers.ts` onTransferOrderLine). A before rule ahead of the lifecycle rule gives an
+  Asset Inventory lets go the stage it left, in the stockroom Inventory set (`entry/assets.ts`
+  onTransferReleased, `domain/lifecycle.ts` stageAfterTransfer). Sourcing hands each reserved unit
+  over *In stock / Available* just before it inserts the unit's line (`platform/transfers.ts`
+  requestTransfer), and a unit whose line is cancelled or deleted short of the staging centre is put
+  back as free stock and its Order sourced again (`entry/orders.ts` putBackUntransferred).
 
 ## Still needs an instance or vendor login
 
@@ -1262,9 +1307,9 @@ Items with verdict unverifiable:
 
 Other open points raised in the findings:
 
-- Transfer orders: whether the lifecycle rule's refusing, for an inventory tech, the Asset saves
-  Inventory's transfer order logic makes (N38) gets in the way of the transfer orders sourcing
-  raises, so that its exemption should widen (README, Verify on the first install).
+- Transfer orders: Inventory's rules were read on the instance, not run with the app installed (N38,
+  N39). Working a transfer order sourcing raised through its tasks as an inventory tech, and
+  cancelling one, are on the first-install checklist (README, Verify on the first install).
 - Cisco: how Cisco's path parsing handles PIDs containing `/` (e.g. `CISCO2901/K9`), which
   `rest-port.ts:27` sends as `%2F`; some servers reject encoded slashes.
 - Cisco: whether SN2INFO `service_contract_number` can hold several comma-separated numbers (the field

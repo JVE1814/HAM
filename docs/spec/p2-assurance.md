@@ -2,17 +2,26 @@
 
 ## Audits (D63)
 
-- **Start blind count** on a stockroom lists everything in stock there as expected.
-- **Start site audit** on a Site lists its installed Assets and dispatches a site-audit work order
-  under a standard change.
+- **Start blind count** is offered on NaaS stockrooms, those with a stockroom type: one with none is
+  the Provider IT's (ADR 0016). Pressed on a form opened before its type was cleared, it is refused
+  with *Blind count not started: this is not a NaaS stockroom (it has no stockroom type)*.
+- A blind count lists as expected every fleet asset on the stockroom's shelves: *In stock* by
+  install status and available, reserved, spare pool, staging, staged, pending evaluation, pending
+  wipe, pending disposal or in transfer. A unit on a transfer order line stays on the shelf of the
+  stockroom it leaves until the line is In Transit: Inventory keeps it *In stock / Pending transfer*
+  and sets the stockroom it goes to only once the line is received (ADR 0002). At In Transit it is
+  *In transit*, on no shelf, and is not expected. The Provider IT's equipment in the stockroom is
+  not expected either, so a scan of it is marked unexpected.
+- **Start site audit** on a Site lists its installed fleet assets (pending in service, in service,
+  temporary deployment) and dispatches a site-audit work order under a standard change.
 - An Asset whose audit line the platform refuses is left out of the expected count (logged), and the
   user is told how many.
-- Technicians scan in the warehouse app's **Audit** mode. Scans are blind: no unit details are shown.
-  A scan the platform refuses to record answers HTTP 422, to scan again.
-- An inventory tech sees, scans and closes only the blind counts of their Stockrooms; site audits are
-  for field techs. Field techs and asset managers scan and close any open audit; other staff (NOC,
-  account managers, finance) only read audits. An audit the user may not see answers *No open audit
-  with that number*.
+- Technicians scan in the warehouse app's **Audit** mode. Scans are blind: no unit details are
+  shown. A scan the platform refuses to record answers HTTP 422, to scan again.
+- An inventory tech sees, scans and closes only the blind counts of their Stockrooms; site audits
+  are for field techs. Field techs and asset managers scan and close any open audit; other staff
+  (NOC, account managers, finance) only read audits. An audit the user may not see answers *No open
+  audit with that number*.
 - **Close audit**:
   - scans are matched to expected Assets by serial, provider tag or customer tag (case-insensitive);
   - unmatched expected Assets become *missing in audit* exceptions;
@@ -100,10 +109,15 @@ contacts: their Sites).
 | Everyone | see installed equipment by Site; report a faulty device (CSM case with the failed asset); see open orders and returns; confirm self-installed orders, including the units already shipped of an Order back in preparing after a unit was lost in transit |
 | Customer admins | request returns of selected devices or a site decommission; answer attestations |
 
-The equipment listed is the NaaS Assets, those on an Agreement (`domain/visibility.ts`
+The equipment listed is the Customer's fleet assets (ADR 0016; `domain/visibility.ts`
 `customerEquipmentQuery`), from shipped to a Site to awaiting return, grouped by Site; one with no
-Site (a data gap) is listed under *No site*. The platform's other hardware, such as out-of-box
-laptops, has no Agreement and is not listed, in the staff preview either.
+Site (a data gap) is listed under *No site*, and one that has lost its Agreement (another) is listed
+all the same. The Provider IT's hardware, such as laptops in use, is outside the fleet and is not
+listed, in the staff preview either: the Fleet flag tells it apart, where the Agreement only stood in
+for it. The query carries the reader's Customer (site contacts: and Sites) in each stage's clause, as a
+before-query rule's filter reaches only the last clause of a query with `^NQ` (ADR 0005). A fault is
+reported, and a return requested, for fleet assets only: another device answers HTTP 404 *Unknown
+device* on `POST /customer/faults`, and is left out of the devices a return request lists.
 
 The page calls the app's REST API under `/api/x_daas_ham/naas`. A call the platform refuses answers
 HTTP 422, so it can be sent again:
