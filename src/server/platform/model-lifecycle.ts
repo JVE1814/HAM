@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { naasModelCondition } from '../domain/fleet.ts'
+import { isNaasModel, naasModelCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
 import { createMarks } from '../domain/marks.ts'
 import { mergeLifecycle, type LifecycleDates } from '../domain/model-lifecycle.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
@@ -134,7 +134,7 @@ export function writeModelLifecycle(modelId: string, dates: LifecycleDates, prov
     }
     if (!modelId || pending.size === 0) return result
     const description = provenanceLine(provenance)
-    let dated = ''
+    let dated = false
     const save = (row: GlideRecord, phase: string, date: string, stored: boolean): void => {
         const moved = str(row, 'start_date') !== date
         row.setValue('start_date', date)
@@ -144,7 +144,7 @@ export function writeModelLifecycle(modelId: string, dates: LifecycleDates, prov
         }
         if (stored) result.updated++
         else result.inserted++
-        if (moved) dated = row.getUniqueValue()
+        if (moved) dated = true
     }
     writing.during(modelId, () => {
         const stored = new GlideRecord(TABLE)
@@ -170,8 +170,7 @@ export function writeModelLifecycle(modelId: string, dates: LifecycleDates, prov
             save(fresh, phase, date, false)
         }
     })
-    const row = findById(TABLE, dated)
-    if (row) queueModelRefresh(row)
+    if (dated) queueModelRefresh(modelId)
     return result
 }
 
@@ -186,9 +185,13 @@ export function writingModelLifecycle(modelId: string): boolean {
     return writing.has(modelId)
 }
 
-/** Queue the recomputation of the fleet assets of a lifecycle row's Model (entry/models `refreshModelAssets`). */
-export function queueModelRefresh(row: GlideRecord): void {
-    fire(EVENT.lifecycleChanged, row, str(row, 'model'), '')
+/**
+ * Queue the recomputation of a NaaS Model's fleet assets (entry/models `refreshModelAssets`). The event is the
+ * Model's: a milestone row may be gone by the time it runs. A Model that is not a NaaS Model (ADR 0016) queues nothing.
+ */
+export function queueModelRefresh(modelId: string): void {
+    const model = findById('cmdb_model', modelId)
+    if (model && isNaasModel(str(model, OEM_PID_FIELD))) fire(EVENT.lifecycleChanged, model, modelId, '')
 }
 
 /**
@@ -204,6 +207,6 @@ export function queueModelsReachingMilestone(day: string): void {
         const modelId = str(row, 'model')
         if (queued.has(modelId)) continue
         queued.add(modelId)
-        queueModelRefresh(row)
+        queueModelRefresh(modelId)
     }
 }

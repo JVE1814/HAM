@@ -21,9 +21,11 @@ licensed its rows are read without any import.
 ## Consequences
 
 - **Shared table** (ADR 0016): the table holds the milestones of the Provider IT's Models too. The app's rule on it
-  acts for NaaS Models only (the Model has an OEM PID) and only when what a Model's milestones are read from changed
-  (start date, active, phase, type, Model, or a new row), testing that first; the daily roll and the navigator and
-  workspace lists keep to NaaS Models the same way. The app adds no ACL, form or list layout to the table.
+  runs only when what a Model's milestones are read from changed (start date, active, phase, type, source, Model, or
+  a row added or deleted), and its script queues the recomputation for NaaS Models only (the Model has an OEM PID):
+  the row's Model, and the Model a row left when it moved to another. The recomputation event is the Model's, as a
+  deleted row no longer exists when it runs. The daily roll and the navigator and workspace lists keep to NaaS Models
+  the same way. The app adds no ACL, form or list layout to the table.
 - **No delete from the app's scope**: the platform lets this scope read, create and update rows, not delete them. A
   write therefore never removes a milestone: one a source does not give keeps what is stored, for the CSV import as
   for the vendor APIs (the import used to blank it). A milestone stored by mistake is deactivated or deleted by hand.

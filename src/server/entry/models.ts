@@ -112,12 +112,16 @@ export function onNormalizationResolved(current: GlideRecord): void {
 }
 
 /**
- * After insert/update rule on the platform's Model lifecycle table (ADR 0017), for a NaaS Model's row whose milestone
- * changed (the rule's condition): recompute that Model's fleet assets in the background. A save the app's own write
- * makes is left to that write, which queues the pass once for all the milestones it saves.
+ * After rule on the platform's Model lifecycle table (ADR 0017), for a row inserted, deleted or changed in what a
+ * Model's milestones are read from (the rule's condition): recompute the fleet assets of its Model in the background,
+ * and of the Model it left when the row moved to another. A save the app's own write makes is left to that write,
+ * which queues the pass once for all the milestones it saves.
  */
-export function onModelLifecycleChanged(current: GlideRecord): void {
-    if (!writingModelLifecycle(str(current, 'model'))) queueModelRefresh(current)
+export function onModelLifecycleChanged(current: GlideRecord, previous: GlideRecord | null): void {
+    const modelIds = new Set([str(current, 'model'), previous ? str(previous, 'model') : ''])
+    for (const modelId of modelIds) {
+        if (modelId && !writingModelLifecycle(modelId)) queueModelRefresh(modelId)
+    }
 }
 
 /**

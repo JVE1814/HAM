@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EVENT } from './events.ts'
-import { queueModelsReachingMilestone, readModelLifecycle, writeModelLifecycle, writingModelLifecycle } from './model-lifecycle.ts'
+import {
+    queueModelRefresh,
+    queueModelsReachingMilestone,
+    readModelLifecycle,
+    writeModelLifecycle,
+    writingModelLifecycle,
+} from './model-lifecycle.ts'
 
 /*
  * The repository run against an in-memory stand-in for the platform's Model lifecycle table, which applies the
@@ -33,6 +39,9 @@ vi.mock('@servicenow/glide', () => {
         const [field, value] = term.split('=')
         return valueOf(row, field ?? '') === value
     }
+    /** The Models as cmdb_model rows: every one the test names, with its OEM PID. */
+    const models = (): Row[] =>
+        Object.entries(platform.pids).map(([sysId, pid]) => ({ sys_id: sysId, sys_class_name: 'cmdb_model', x_daas_ham_oem_pid: pid }))
     const refusal = (row: Row): string => {
         if (!row.start_date) return 'Phase start date is invalid or not provided'
         const twin = platform.rows.find(
@@ -62,7 +71,8 @@ vi.mock('@servicenow/glide', () => {
             this.order = field
         }
         query(): void {
-            this.found = platform.rows
+            const rows = this.table === 'cmdb_model' ? models() : platform.rows
+            this.found = rows
                 .filter((row) => (this.table === PARENT || row.sys_class_name === this.table) && this.terms.every((term) => holds(row, term)))
                 .sort((a, b) => valueOf(a, this.order).localeCompare(valueOf(b, this.order)))
             this.at = -1
@@ -169,7 +179,7 @@ describe('writeModelLifecycle', () => {
         writeModelLifecycle(MODEL, { endOfSale: '2028-10-31', endOfSupport: '2033-10-31', endOfLife: '2035-10-31' }, { source: 'csv' })
         expect(marked).toEqual([true, true, true])
         expect(writingModelLifecycle(MODEL)).toBe(false)
-        expect(platform.events).toEqual([{ name: EVENT.lifecycleChanged, row: expect.stringMatching(/^row/), parm1: MODEL }])
+        expect(platform.events).toEqual([{ name: EVENT.lifecycleChanged, row: MODEL, parm1: MODEL }])
     })
 
     it('leaves a milestone stored as given alone, and queues nothing', () => {
@@ -264,5 +274,15 @@ describe('queueModelsReachingMilestone', () => {
         queueModelsReachingMilestone('2026-11-09')
         expect(platform.events.map((event) => event.parm1).sort()).toEqual([MODEL, 'model2'])
         expect(platform.events.every((event) => event.name === EVENT.lifecycleChanged)).toBe(true)
+    })
+})
+
+describe('queueModelRefresh', () => {
+    it('queues the event on the Model, for a NaaS Model only', () => {
+        platform.pids = { [MODEL]: 'C9300-48P-E', laptop: '' }
+        queueModelRefresh(MODEL)
+        queueModelRefresh('laptop')
+        queueModelRefresh('gone')
+        expect(platform.events).toEqual([{ name: EVENT.lifecycleChanged, row: MODEL, parm1: MODEL }])
     })
 })
