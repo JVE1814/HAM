@@ -2,7 +2,14 @@ import '@servicenow/sdk/global'
 import { Dashboard } from '@servicenow/sdk/core'
 import { naasWorkspace } from './workspace.now'
 
-/* Workspace landing dashboard: operations, billing integrity (P1), lifecycle risk (P2) and margin (P3). */
+/*
+ * Workspace landing dashboard: operations, billing integrity (P1), lifecycle risk (P2) and margin (P3).
+ *
+ * alm_hardware also holds the Provider IT's equipment (ADR 0016), so every source on it counts fleet assets only: its
+ * filter carries domain/fleet `fleetCondition()` in each ^NQ clause, as `inFleet` builds it (a condition after ^NQ
+ * binds to the last clause only). Fluent metadata cannot call domain code, so the queries are literals that
+ * domain/fleet-queries.test.ts checks.
+ */
 
 export const naasDashboard = Dashboard({
     $id: Now.ID['dash_naas'],
@@ -78,10 +85,10 @@ export const naasDashboard = Dashboard({
                     componentProps: {
                         dataSources: [
                             {
-                                label: 'Hardware',
+                                label: 'Fleet asset',
                                 sourceType: 'table',
                                 tableOrViewName: 'alm_hardware',
-                                filterQuery: 'install_status=1^substatus=pending_in_service',
+                                filterQuery: 'install_status=1^substatus=pending_in_service^x_daas_ham_fleet=true',
                                 id: 'pending_in_service',
                             },
                         ],
@@ -120,10 +127,10 @@ export const naasDashboard = Dashboard({
                     componentProps: {
                         dataSources: [
                             {
-                                label: 'Hardware',
+                                label: 'Fleet asset',
                                 sourceType: 'table',
                                 tableOrViewName: 'alm_hardware',
-                                filterQuery: 'install_status=6^substatus=reserved_spare_pool',
+                                filterQuery: 'install_status=6^substatus=reserved_spare_pool^x_daas_ham_fleet=true',
                                 id: 'spares_by_customer',
                             },
                         ],
@@ -148,10 +155,10 @@ export const naasDashboard = Dashboard({
                     componentProps: {
                         dataSources: [
                             {
-                                label: 'Hardware',
+                                label: 'Fleet asset',
                                 sourceType: 'table',
                                 tableOrViewName: 'alm_hardware',
-                                filterQuery: 'install_status=1^substatusISEMPTY^x_daas_ham_subscription_lineISEMPTY',
+                                filterQuery: 'install_status=1^substatusISEMPTY^x_daas_ham_subscription_lineISEMPTY^x_daas_ham_fleet=true',
                                 id: 'unbilled',
                             },
                         ],
@@ -163,16 +170,17 @@ export const naasDashboard = Dashboard({
                     position: { x: 0, y: 0 },
                 },
                 {
-                    // Not billed past the line's end date (domain/billing IN_SERVICE_ON_ENDED_LINE): flagged, never moved.
+                    // Not billed past the line's end date (domain/billing IN_SERVICE_ON_ENDED_LINE, in the fleet): flagged,
+                    // never moved.
                     $id: Now.ID['dash_w_ended_line_in_service'],
                     component: 'single-score',
                     componentProps: {
                         dataSources: [
                             {
-                                label: 'Hardware',
+                                label: 'Fleet asset',
                                 sourceType: 'table',
                                 tableOrViewName: 'alm_hardware',
-                                filterQuery: 'install_status=1^substatusISEMPTY^x_daas_ham_subscription_line.status=ended^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()^NQinstall_status=1^substatus=temporary_deployment^x_daas_ham_subscription_line.status=ended^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()',
+                                filterQuery: 'install_status=1^substatusISEMPTY^x_daas_ham_subscription_line.status=ended^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()^x_daas_ham_fleet=true^NQinstall_status=1^substatus=temporary_deployment^x_daas_ham_subscription_line.status=ended^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()^x_daas_ham_fleet=true',
                                 id: 'ended_line',
                             },
                         ],
@@ -234,7 +242,7 @@ export const naasDashboard = Dashboard({
                     $id: Now.ID['dash_w_past_support'],
                     component: 'single-score',
                     componentProps: {
-                        dataSources: [{ label: 'alm_hardware', sourceType: 'table', tableOrViewName: 'alm_hardware', filterQuery: 'install_status=1^x_daas_ham_lifecycle_phaseINend_of_support,end_of_extended_support,end_of_life', id: 'dash_w_past_support_ds' }],
+                        dataSources: [{ label: 'Fleet asset', sourceType: 'table', tableOrViewName: 'alm_hardware', filterQuery: 'install_status=1^x_daas_ham_lifecycle_phaseINend_of_support,end_of_extended_support,end_of_life^x_daas_ham_fleet=true', id: 'dash_w_past_support_ds' }],
                         headerTitle: 'Installed past end of support',
                         metrics: [{ dataSource: 'dash_w_past_support_ds', id: 'dash_w_past_support_m', aggregateFunction: 'COUNT', axisId: 'primary' }],
                     },
@@ -243,10 +251,11 @@ export const naasDashboard = Dashboard({
                     position: { x: 0, y: 0 },
                 },
                 {
+                    // No current coverage: none recorded, or it ended before today (an end date of today still covers).
                     $id: Now.ID['dash_w_no_coverage'],
                     component: 'single-score',
                     componentProps: {
-                        dataSources: [{ label: 'alm_hardware', sourceType: 'table', tableOrViewName: 'alm_hardware', filterQuery: 'install_status=1^x_daas_ham_coverage_endISEMPTY', id: 'dash_w_no_coverage_ds' }],
+                        dataSources: [{ label: 'Fleet asset', sourceType: 'table', tableOrViewName: 'alm_hardware', filterQuery: 'install_status=1^x_daas_ham_coverage_endISEMPTY^ORx_daas_ham_coverage_end<javascript:gs.beginningOfToday()^x_daas_ham_fleet=true', id: 'dash_w_no_coverage_ds' }],
                         headerTitle: 'Installed without OEM coverage',
                         metrics: [{ dataSource: 'dash_w_no_coverage_ds', id: 'dash_w_no_coverage_m', aggregateFunction: 'COUNT', axisId: 'primary' }],
                     },
@@ -282,7 +291,7 @@ export const naasDashboard = Dashboard({
                     $id: Now.ID['dash_w_phase'],
                     component: 'vertical-bar',
                     componentProps: {
-                        dataSources: [{ label: 'alm_hardware', sourceType: 'table', tableOrViewName: 'alm_hardware', filterQuery: 'install_status=1', id: 'dash_w_phase_ds' }],
+                        dataSources: [{ label: 'Fleet asset', sourceType: 'table', tableOrViewName: 'alm_hardware', filterQuery: 'install_status=1^x_daas_ham_fleet=true', id: 'dash_w_phase_ds' }],
                         headerTitle: 'Installed base by lifecycle phase',
                         metrics: [{ dataSource: 'dash_w_phase_ds', id: 'dash_w_phase_m', aggregateFunction: 'COUNT', axisId: 'primary' }],
                         groupBy: [{ groupBy: [{ dataSource: 'dash_w_phase_ds', groupByField: 'x_daas_ham_lifecycle_phase' }], maxNumberOfGroups: 10, showOthers: true }],
