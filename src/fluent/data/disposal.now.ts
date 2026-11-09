@@ -1,6 +1,7 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DecimalColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 import { DISPOSAL_LINE_STATUS_CHOICES, DISPOSAL_METHOD_CHOICES, DISPOSAL_STAGE_CHOICES } from '../../server/domain/vocabulary'
+import { FLEET_CONDITION } from '../../server/domain/fleet'
 
 /* Disposal orders (P2.5, D61). */
 
@@ -35,8 +36,7 @@ export const x_daas_ham_disposal_line = Table({
             mandatory: true,
             cascadeRule: 'delete',
         }),
-        // Fleet assets only (ADR 0016): domain/fleet `fleetCondition()`.
-        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true, referenceQual: 'x_daas_ham_fleet=true' }),
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true, referenceQual: FLEET_CONDITION }),
         method: ChoiceColumn({ label: 'Method (blank = order method)', choices: DISPOSAL_METHOD_CHOICES }),
         sale_amount: DecimalColumn({ label: 'Sale amount' }),
         credit_amount: DecimalColumn({ label: 'OEM credit' }),

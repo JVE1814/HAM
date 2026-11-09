@@ -1,0 +1,485 @@
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative } from 'node:path'
+import { beforeAll, describe, expect, it } from 'vitest'
+import {
+    CURRENT_IS_FLEET,
+    FLEET_CONDITION,
+    FLEET_FIELD,
+    NAAS_MODEL_CONDITION,
+    NAAS_STOCKROOM_CONDITION,
+    OEM_PID_FIELD,
+    STOCKROOM_TYPE_FIELD,
+} from './domain/fleet'
+import { STAGE_FIELDS } from './domain/vocabulary'
+
+/*
+ * What the instance is given: the metadata `now-sdk build` writes to dist/app, read as built. The Fluent sources import
+ * their vocabulary from the server code, so a copy can no longer drift; what is left to check is what the build and the
+ * instance do not: a value the SDK's evaluator could not read (it writes a placeholder and builds on), a text longer
+ * than the column the instance stores it in (cut off without a warning), and the conventions the app's metadata keeps
+ * on the tables it shares with the Provider's IT (ADR 0016).
+ */
+
+const ROOT = new URL('../../', import.meta.url).pathname
+const BUILT = join(ROOT, 'dist/app')
+const UPDATES = join(BUILT, 'update')
+
+function filesUnder(dir: string): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(dir, entry.name)
+        return entry.isDirectory() ? filesUnder(path) : [path]
+    })
+}
+
+/** What the metadata is built from: the Fluent sources, the server code they import, and the two files that name the package. */
+function sources(): string[] {
+    const fluent = filesUnder(join(ROOT, 'src/fluent')).filter((path) => !path.includes('/generated/'))
+    const server = filesUnder(join(ROOT, 'src/server')).filter((path) => path.endsWith('.ts') && !path.endsWith('.test.ts'))
+    return [...fluent, ...server, join(ROOT, 'package.json'), join(ROOT, 'now.config.json')]
+}
+
+/** Why the built output cannot be trusted, or null when it is there and no source is newer than it. */
+function staleness(): string | null {
+    const instruction = 'Run `npx now-sdk build` first (`npm run check` does)'
+    if (!existsSync(UPDATES)) return `${instruction}: dist/app is missing.`
+    const builtAt = statSync(UPDATES).mtimeMs
+    const newer = sources().find((source) => statSync(source).mtimeMs > builtAt)
+    return newer ? `${instruction}: dist/app is older than ${relative(ROOT, newer)}.` : null
+}
+
+// A stale or missing build fails every test here instead of passing unseen.
+beforeAll(() => {
+    const stale = staleness()
+    if (stale) throw new Error(stale)
+})
+
+const unescapeXml = (text: string) =>
+    text
+        .replace(/^<!\[CDATA\[([\s\S]*)\]\]>$/, '$1')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'")
+        .replace(/&amp;/g, '&')
+
+/** One built record: the table it is a record of (`$table`), and each of its fields as the instance stores it ('' for an empty one). */
+interface BuiltRecord {
+    $table: string
+    [field: string]: string
+}
+
+let allRecords: BuiltRecord[] | undefined
+
+/** Every record of the update set, read from the one-record files the build writes (`<record_update table="...">`). */
+function builtRecords(): BuiltRecord[] {
+    allRecords ??= readdirSync(UPDATES).flatMap((name) => {
+        const xml = readFileSync(join(UPDATES, name), 'utf8')
+        const table = /<record_update table="(\w+)">/.exec(xml)?.[1]
+        if (!table) return []
+        const record: BuiltRecord = { $table: table }
+        for (const [, field, value] of xml.matchAll(/^ {4}<(\w+)(?: [^>]*)?(?:\/>|>([\s\S]*?)<\/\1>)$/gm)) {
+            if (field) record[field] = unescapeXml(value ?? '')
+        }
+        return [record]
+    })
+    return allRecords
+}
+
+const records = (table: string): BuiltRecord[] => builtRecords().filter((record) => record.$table === table)
+
+describe('the built metadata', () => {
+    // The SDK evaluates the Fluent sources without running them. A value it cannot read (a function call, an array
+    // element, an object where a text is expected) is no build error: the record is built with a placeholder in it.
+    it('holds no value the SDK could not evaluate', () => {
+        // The client bundles (sys_ux_lib_asset) are code, which may well hold such a text.
+        const placeholders = filesUnder(BUILT)
+            .filter((path) => path.endsWith('.xml') && !path.includes('/sys_ux_lib_asset_'))
+            .filter((path) => /Symbol\(|\[object Object\]/.test(readFileSync(path, 'utf8')))
+            .map((path) => relative(BUILT, path))
+        expect(placeholders).toEqual([])
+    })
+})
+
+/*
+ * The instance stores a text in a column of fixed length and cuts a longer one off without a warning: the build and
+ * the install pass, and the rule list then shows "NaaS - start or stop billing on service " with no way to tell two
+ * such rules apart, or a condition that never holds because its script was cut short. The lengths are the instance's
+ * (sys_dictionary).
+ */
+const TEXT_LIMITS: ReadonlyArray<{ table: string; field: string; limit: number }> = [
+    { table: 'sys_script', field: 'name', limit: 40 },
+    { table: 'sys_ui_action', field: 'name', limit: 40 },
+    { table: 'sysevent_script_action', field: 'name', limit: 40 },
+    { table: 'sysevent_email_action', field: 'name', limit: 40 },
+    { table: 'contract_sla', field: 'name', limit: 40 },
+    { table: 'sys_rest_message', field: 'name', limit: 40 },
+    { table: 'sys_ws_definition', field: 'name', limit: 40 },
+    { table: 'sys_ws_operation', field: 'name', limit: 40 },
+    { table: 'sysauto_script', field: 'name', limit: 100 },
+    { table: 'sys_properties', field: 'name', limit: 100 },
+    { table: 'sysevent_register', field: 'description', limit: 100 },
+    // A condition is a script the platform runs as written: one cut off never holds, and its rule or action is gone.
+    { table: 'sys_script', field: 'condition', limit: 254 },
+    { table: 'sys_ui_action', field: 'condition', limit: 254 },
+]
+
+describe('texts of the built records', () => {
+    it('fit the column the instance stores them in', () => {
+        const tooLong = TEXT_LIMITS.flatMap(({ table, field, limit }) => {
+            const found = records(table)
+            expect(found.length, table).toBeGreaterThan(0)
+            return found
+                .filter((record) => (record[field] ?? '').length > limit)
+                .map((record) => `${table}.${field} '${record[field]}' (${(record[field] ?? '').length} > ${limit})`)
+        })
+        expect(tooLong).toEqual([])
+    })
+})
+
+/** The server module and function a built script calls, from the header the SDK writes on the wrapper it generates. */
+function wrapped(script: string): { fn: string; path: string; call: string } | null {
+    const header = /^\/\/ @fluent-module (\w+);\w+;(\S+)$/m.exec(script)
+    if (!header) return null
+    const call = new RegExp(`^${header[1]}\\(([^)]*)\\);?$`, 'm').exec(script)?.[1] ?? ''
+    return { fn: header[1] ?? '', path: header[2] ?? '', call }
+}
+
+/** The terms a condition ANDs at its top level, outside parentheses and string literals, without spaces. */
+function andTerms(condition: string): string[] {
+    const terms: string[] = []
+    let depth = 0
+    let quote = ''
+    let term = ''
+    for (let i = 0; i < condition.length; i++) {
+        const char = condition[i] ?? ''
+        if (quote) {
+            if (char === quote) quote = ''
+        } else if (char === "'" || char === '"') quote = char
+        else if (char === '(') depth++
+        else if (char === ')') depth--
+        else if (depth === 0 && condition.startsWith('&&', i)) {
+            terms.push(term)
+            term = ''
+            i++
+            continue
+        }
+        term += char
+    }
+    return [...terms, term].map((found) => found.replace(/\s+/g, ''))
+}
+
+describe('andTerms', () => {
+    it('splits at the top level only, outside parentheses and string literals', () => {
+        expect(andTerms("(a.changes() || b.changes()) && c == true && d != '&&' && f(x && y)")).toEqual([
+            '(a.changes()||b.changes())',
+            'c==true',
+            "d!='&&'",
+            'f(x&&y)',
+        ])
+    })
+})
+
+describe('scripts wired to server modules', () => {
+    const SCRIPTED = ['sys_script', 'sys_ui_action', 'sysevent_script_action', 'sysauto_script', 'sys_ws_operation', 'sys_security_acl']
+    const SCRIPT_FIELDS = ['script', 'operation_script', 'post_insert_script']
+    const calls = () =>
+        SCRIPTED.flatMap((table) => records(table)).flatMap((record) =>
+            SCRIPT_FIELDS.flatMap((field) => {
+                const call = wrapped(record[field] ?? '')
+                return call ? [{ record: `${record.$table} ${record.name ?? record.sys_id}`, ...call }] : []
+            }),
+        )
+
+    /*
+     * The SDK's generated wrapper calls a module entry point with the function's own parameter names (e.g.
+     * `sourceOrder(event, current)`), so they must be the globals the platform provides to that script.
+     */
+    it('call each entry point with the globals the platform provides', () => {
+        const PLATFORM_GLOBALS = new Set(['current', 'previous', 'event', 'producer', 'request', 'response'])
+        const found = calls()
+        expect(found.length).toBeGreaterThan(100)
+        const unknown = found.flatMap(({ record, fn, call }) =>
+            call
+                .split(',')
+                .map((argument) => argument.trim())
+                .filter((argument) => argument && !PLATFORM_GLOBALS.has(argument))
+                .map((argument) => `${record}: ${fn}(${argument})`),
+        )
+        expect(unknown).toEqual([])
+    })
+})
+
+/*
+ * alm_hardware and wm_order are other scopes' tables: from this scope the platform ignores current.setAbortAction on
+ * their records and writes them anyway, so a before rule there refuses with its Abort action, its check being the
+ * condition, a script the platform runs as written on every save of the table. A condition loads the module that holds
+ * its check by the path the SDK installs it under.
+ */
+describe('business rule conditions', () => {
+    const rules = () => records('sys_script')
+    const loading = () => rules().filter((rule) => (rule.condition ?? '').includes('require('))
+    const modules = () => new Map(records('sys_module').map((module) => [module.path ?? '', module.content ?? '']))
+
+    it('load a module by its installed path and call what it exports', () => {
+        expect(loading().length).toBeGreaterThan(0)
+        for (const { name, condition } of loading()) {
+            for (const [, path, fn] of (condition ?? '').matchAll(/require\('([^']+)'\)\.(\w+)\(/g)) {
+                expect(modules().has(path ?? ''), `${name}: ${path}`).toBe(true)
+                expect(modules().get(path ?? ''), `${name}: ${fn}`).toMatch(new RegExp(`^export function ${fn}\\(`, 'm'))
+            }
+        }
+    })
+
+    it('load a module only once a field they check has changed', () => {
+        for (const { name, condition = '' } of loading()) {
+            expect(condition.slice(0, condition.indexOf('require(')), name).toMatch(/\.changes\(\)[\s\S]*&&\s*$/)
+        }
+    })
+
+    it('are what an aborting rule checks: one without a condition would refuse every save', () => {
+        const aborting = rules().filter((rule) => rule.abort_action === 'true')
+        expect(aborting.length).toBeGreaterThan(0)
+        for (const { name, condition } of aborting) expect(condition, name).toMatch(/require\('[^']+'\)\.\w+\(/)
+    })
+
+    it("leave refusing a save on another scope's table to the rule's Abort action", () => {
+        const elsewhere = rules().filter((rule) => !(rule.collection ?? '').startsWith('x_daas_ham_'))
+        expect(elsewhere.length).toBeGreaterThan(0)
+        for (const rule of elsewhere) {
+            const call = wrapped(rule.script ?? '')
+            if (!call) continue
+            const source = modules().get(call.path) ?? ''
+            const start = source.search(new RegExp(`^export function ${call.fn}\\(`, 'm'))
+            expect(start, `${rule.name}: ${call.fn}`).toBeGreaterThanOrEqual(0)
+            expect(source.slice(start, source.indexOf('\n}', start)), `${rule.name}: ${call.fn}`).not.toMatch(/setAbortAction/)
+        }
+    })
+
+    // alm_hardware also holds the Provider IT's equipment, which the app leaves alone (ADR 0016).
+    it('test the Fleet flag right after their change test on alm_hardware, before anything else they check or load', () => {
+        const onSaves = rules().filter((rule) => rule.collection === 'alm_hardware' && rule.action_query !== 'true')
+        expect(onSaves.length).toBeGreaterThanOrEqual(9)
+        for (const { name, condition } of onSaves) {
+            const [change, fleet] = andTerms(condition ?? '')
+            expect({ name, change: /\.changes\(\)/.test(change ?? '') }).toEqual({ name, change: true })
+            expect({ name, fleet }).toEqual({ name, fleet: CURRENT_IS_FLEET.replace(/\s+/g, '') })
+        }
+    })
+})
+
+/** A term that is ORed to the one before it (`^OR`), unlike an ordering (`^ORDERBY`). */
+const isOrTerm = (term: string) => term.startsWith('OR') && !term.startsWith('ORDERBY')
+
+/**
+ * Whether `condition` holds in every ^NQ clause of `query`: one of the clause's AND terms, not one side of an `^OR`.
+ * A condition after an ^NQ binds to the last clause only.
+ */
+function holdsInEveryClause(query: string, condition: string): boolean {
+    return query.split('^NQ').every((clause) => {
+        const terms = clause.split('^')
+        return terms.some((term, i) => term === condition && !isOrTerm(terms[i + 1] ?? ''))
+    })
+}
+
+describe('holdsInEveryClause', () => {
+    it('takes a condition ANDed into every clause', () => {
+        expect(holdsInEveryClause(FLEET_CONDITION, FLEET_CONDITION)).toBe(true)
+        expect(holdsInEveryClause(`install_status=1^${FLEET_CONDITION}^NQinstall_status=6^${FLEET_CONDITION}`, FLEET_CONDITION)).toBe(true)
+        expect(holdsInEveryClause(`install_status=1^${FLEET_CONDITION}^ORDERBYasset_tag^EQ`, FLEET_CONDITION)).toBe(true)
+    })
+
+    it('refuses a condition missing from a clause, bound to the last clause only, or ORed', () => {
+        expect(holdsInEveryClause('install_status=1', FLEET_CONDITION)).toBe(false)
+        expect(holdsInEveryClause(`install_status=1^NQinstall_status=6^${FLEET_CONDITION}`, FLEET_CONDITION)).toBe(false)
+        expect(holdsInEveryClause(`install_status=1^${FLEET_CONDITION}^ORinstall_status=6`, FLEET_CONDITION)).toBe(false)
+        expect(holdsInEveryClause(`install_status=1^OR${FLEET_CONDITION}`, FLEET_CONDITION)).toBe(false)
+        expect(holdsInEveryClause('install_status=1^x_daas_ham_fleet=false', FLEET_CONDITION)).toBe(false)
+    })
+})
+
+/*
+ * The platform tables the app shares with the Provider's IT (ADR 0016) hold its records too. So whatever lists or
+ * counts one of them (a navigator module, a workspace list, a dashboard tile) keeps to fleet assets, NaaS Models or
+ * NaaS stockrooms in every ^NQ clause of its query, and a picker on one (a reference column of the app's tables, a
+ * catalog variable) offers only those: a qualifier only filters what a picker offers, so a column the app itself
+ * writes takes one as well.
+ */
+const SHARED: Readonly<Record<string, string>> = {
+    alm_hardware: FLEET_CONDITION,
+    cmdb_model: NAAS_MODEL_CONDITION,
+    // The platform's Model lifecycle table (ADR 0017) holds the milestones of the Provider IT's Models too.
+    cmdb_model_lifecycle: `model.${NAAS_MODEL_CONDITION}`,
+    alm_stockroom: NAAS_STOCKROOM_CONDITION,
+}
+
+interface SharedQuery {
+    what: string
+    table: string
+    /** The encoded query read; undefined where there is none. */
+    query: string | undefined
+}
+
+function dashboardSources(): SharedQuery[] {
+    return records('par_dashboard_widget').flatMap((widget) => {
+        const props = JSON.parse(widget.component_props || '{}') as {
+            dataSources?: Array<{ id?: string; tableOrViewName?: string; filterQuery?: string }>
+        }
+        return (props.dataSources ?? []).map((source) => ({
+            what: `dashboard source ${source.id}`,
+            table: source.tableOrViewName ?? '',
+            query: source.filterQuery,
+        }))
+    })
+}
+
+/**
+ * The encoded query a reference qualifier applies. A `javascript:` one applies the string literal it starts with,
+ * followed by a value of the form (such as `current.variables.site`) that completes the literal's last term, which is
+ * therefore never a condition; a script of any other shape counts as no query.
+ */
+function qualifierQuery(qualifier: string): string {
+    if (!qualifier.startsWith('javascript:')) return qualifier
+    const script = /^javascript:\s*'([^']*)'\s*(\+?)/.exec(qualifier)
+    if (!script) return ''
+    return script[2] ? `${script[1]}<form value>` : (script[1] ?? '')
+}
+
+/** One column of the built dictionary: its attributes as the instance takes them, a missing one undefined. */
+interface BuiltColumn {
+    table: string
+    name: string
+    indexed: boolean
+    [attribute: string]: string | boolean | undefined
+}
+
+/** Every column the app declares, on its own tables and on the platform's (dist/app/dictionary, one file per table). */
+function builtColumns(): BuiltColumn[] {
+    return filesUnder(join(BUILT, 'dictionary')).flatMap((path) => {
+        const xml = readFileSync(path, 'utf8')
+        const table = /<element name="(\w+)" type="collection"/.exec(xml)?.[1] ?? relative(BUILT, path)
+        return [...xml.matchAll(/<element name="(\w+)" type="(?!collection)([^>]*)>/g)].map(([, name = '', attributes = '']) => ({
+            ...Object.fromEntries([...` type="${attributes}`.matchAll(/ (\w+)="([^"]*)"/g)].map(([, key, value = '']) => [key, unescapeXml(value)])),
+            table,
+            name,
+            indexed: new RegExp(`<index[^>]*>\\s*<element name="${name}"/>`).test(xml),
+        }))
+    })
+}
+
+function references(): SharedQuery[] {
+    const columns = builtColumns().flatMap((column) => {
+        if (typeof column.reference !== 'string') return []
+        const qualifier = column.reference_qual
+        return [{ what: `${column.table}.${column.name}`, table: column.reference, query: typeof qualifier === 'string' ? qualifier : undefined }]
+    })
+    const variables = records('item_option_new').map((variable) => ({
+        what: `catalog variable ${variable.name}`,
+        table: variable.reference || variable.list_table || variable.lookup_table || '',
+        query: variable.reference_qual_condition || variable.reference_qual || undefined,
+    }))
+    return [...columns, ...variables].map((found) => ({ ...found, query: found.query === undefined ? undefined : qualifierQuery(found.query) }))
+}
+
+describe('what the metadata reads of the tables shared with the Provider IT', () => {
+    const outside = (found: SharedQuery[]) =>
+        found
+            .filter(({ table }) => table in SHARED)
+            .filter(({ table, query }) => !holdsInEveryClause(query ?? '', SHARED[table] ?? ''))
+            .map(({ what, table, query }) => `${what} (${table}): ${query === undefined ? 'no query' : `'${query}'`}`)
+    const onShared = (found: SharedQuery[]) => found.filter(({ table }) => table in SHARED).map(({ what }) => what)
+
+    it('lists fleet assets, NaaS Models and NaaS stockrooms only, in the navigator and the workspace', () => {
+        // A module's `name` is the table it opens: one on a shared table with no filter would open it whole.
+        const modules = records('sys_app_module').map((module) => ({ what: `module ${module.title}`, table: module.name ?? '', query: module.filter }))
+        const lists = records('sys_ux_list').map((list) => ({ what: `workspace list ${list.title}`, table: list.table ?? '', query: list.condition }))
+        expect(onShared(modules).length).toBeGreaterThanOrEqual(4)
+        expect(onShared(lists).length).toBeGreaterThanOrEqual(10)
+        expect(outside([...modules, ...lists])).toEqual([])
+    })
+
+    it('counts fleet assets only on the dashboard', () => {
+        expect(onShared(dashboardSources()).length).toBeGreaterThanOrEqual(7)
+        expect(outside(dashboardSources())).toEqual([])
+    })
+
+    it('offers fleet assets, NaaS Models and NaaS stockrooms only in the pickers of the app’s tables and catalog items', () => {
+        expect(onShared(references())).toEqual(
+            expect.arrayContaining([
+                'x_daas_ham_order_line.replaces_asset',
+                'x_daas_ham_oem_rma.defective_asset',
+                'sn_customerservice_case.x_daas_ham_failed_asset',
+                'x_daas_ham_site_template_item.model',
+                'cmdb_model.x_daas_ham_normalized_to',
+                'x_daas_ham_audit.stockroom',
+                'x_daas_ham_shipment.stockroom',
+                'catalog variable model',
+                'catalog variable assets',
+            ]),
+        )
+        expect(outside(references())).toEqual([])
+    })
+
+    it('never takes the term a form value completes, or a script of another shape, for a condition', () => {
+        expect(qualifierQuery(`javascript:'a=1^b=' + current.variables.site`)).toBe('a=1^b=<form value>')
+        expect(holdsInEveryClause(qualifierQuery(`javascript:'${FLEET_CONDITION}' + current.variables.x`), FLEET_CONDITION)).toBe(false)
+        expect(holdsInEveryClause(qualifierQuery(`javascript:'${FLEET_CONDITION}^OR' + current.variables.x`), FLEET_CONDITION)).toBe(false)
+        expect(qualifierQuery(`javascript:new Qualifier().get('${FLEET_CONDITION}')`)).toBe('')
+    })
+})
+
+describe('the columns the app adds to the shared tables', () => {
+    const column = (table: string, name: string) => builtColumns().find((found) => found.table === table && found.name === name)
+
+    it('flag an Asset as outside the fleet until the app takes it in: default false, read-only and indexed', () => {
+        expect(column('alm_hardware', FLEET_FIELD)).toMatchObject({ type: 'boolean', default_value: 'false', read_only: 'true', indexed: true })
+    })
+
+    it('stamp no NaaS value on the rows the Provider IT creates', () => {
+        expect(column('alm_hardware', 'x_daas_ham_legal_owner')).toMatchObject({ type: 'choice' })
+        expect(column('alm_hardware', 'x_daas_ham_legal_owner')?.default_value).toBeUndefined()
+        expect(column('alm_stockroom', STOCKROOM_TYPE_FIELD)).toMatchObject({ type: 'choice' })
+        expect(column('alm_stockroom', STOCKROOM_TYPE_FIELD)?.default_value).toBeUndefined()
+        expect(column('cmdb_model', OEM_PID_FIELD)).toMatchObject({ type: 'string' })
+        expect(column('cmdb_model', OEM_PID_FIELD)?.default_value).toBeUndefined()
+    })
+})
+
+/*
+ * The substatus values the app adds to alm_asset.substatus, a field it does not own: the build writes them as one
+ * choice set, which must add its own values and delete nothing else of the field's.
+ */
+describe('built substatus choice set', () => {
+    /** Where now-sdk build writes the choice set of a field the app does not own. */
+    const SET = join(BUILT, 'author_elective_update/sys_choice_alm_asset_substatus.xml')
+    /** Where the build wrote each sys_choice on its own before the sys_choice_set parent existed. */
+    const WITHOUT_PARENT = join(UPDATES, 'sys_choice_alm_asset_substatus.xml')
+
+    /** One per Lifecycle stage whose STAGE_FIELDS entry carries a `choice`. */
+    const ADDED = Object.values(STAGE_FIELDS).flatMap((fields) =>
+        'choice' in fields ? [{ value: fields.substatus, label: fields.choice.label, dependentValue: fields.installStatus }] : [],
+    )
+    const ADDED_VALUES = ADDED.map((choice) => choice.value).sort()
+
+    it('holds every substatus the app adds and deletes nothing else', () => {
+        const xml = readFileSync(SET, 'utf8')
+        const wrapper = /<(sys_choice_v2|sys_choice_set) action="INSERT_OR_UPDATE" field="([^"]*)" table="([^"]*)" version="(\d+)"/.exec(xml)
+        const tag = (body: string, name: string) => new RegExp(`<${name}>([^<]*)</${name}>`).exec(body)?.[1] ?? ''
+        const inserted = [...xml.matchAll(/<sys_choice action="INSERT_OR_UPDATE"[^>]*>([\s\S]*?)<\/sys_choice>/g)].map(([, body = '']) => ({
+            value: tag(body, 'value'),
+            label: tag(body, 'label'),
+            dependentValue: tag(body, 'dependent_value'),
+        }))
+        const deleted = [...xml.matchAll(/<sys_choice action="delete_multiple" query="([^"]*)"\s*\/>/g)]
+            .flatMap(([, query = '']) => query.split('^NQ'))
+            .map((clause) => Object.fromEntries(clause.split('^').map((part) => part.split('=', 2))) as Record<string, string>)
+
+        // The v3 sys_choice_set wrapper deletes every choice of the field before inserting; the v4 sys_choice_v2 one
+        // deletes only what its delete_multiple queries match.
+        expect(wrapper?.slice(1)).toEqual(['sys_choice_v2', 'substatus', 'alm_asset', '4'])
+        expect(inserted.map((choice) => choice.value).sort()).toEqual(ADDED_VALUES)
+        for (const choice of ADDED) expect(inserted, choice.value).toContainEqual(choice)
+        expect(deleted.map((choice) => choice.value).sort()).toEqual(ADDED_VALUES)
+        expect(deleted.every((choice) => choice.name === 'alm_asset' && choice.element === 'substatus')).toBe(true)
+        expect(existsSync(WITHOUT_PARENT)).toBe(false)
+    })
+})

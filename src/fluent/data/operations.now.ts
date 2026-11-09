@@ -1,14 +1,14 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DateTimeColumn, IntegerColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 import { DEVICE_EVENT_KIND_CHOICES, DEVICE_EVENT_SOURCE_CHOICES } from '../../server/domain/vocabulary'
+import { FLEET_CONDITION } from '../../server/domain/fleet'
 
 /** A Seen signal (state change only) from monitoring for one Asset. */
 export const x_daas_ham_device_event = Table({
     name: 'x_daas_ham_device_event',
     label: 'Device event',
     schema: {
-        // Fleet assets only (ADR 0016): domain/fleet `fleetCondition()`.
-        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', referenceQual: 'x_daas_ham_fleet=true' }),
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', referenceQual: FLEET_CONDITION }),
         identifier: StringColumn({ label: 'Identifier', maxLength: 100, mandatory: true }),
         event: ChoiceColumn({
             label: 'Event',

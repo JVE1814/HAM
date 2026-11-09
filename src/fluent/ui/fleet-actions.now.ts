@@ -2,6 +2,7 @@ import '@servicenow/sdk/global'
 import { UiAction } from '@servicenow/sdk/core'
 import { uiAddToFleet } from '../../server/entry/fleet'
 import { admin, assetManager } from '../security/roles.now'
+import { FLEET_FIELD } from '../../server/domain/fleet'
 
 /*
  * Adopting the Provider's existing equipment into the fleet (ADR 0016). The Fleet flag is read-only on forms, so this
@@ -14,7 +15,7 @@ UiAction({
     table: 'alm_hardware',
     actionName: 'x_daas_ham_add_to_fleet',
     hint: 'Make this asset part of the NaaS fleet, so NaaS asset management sources, stages, tracks and bills it.',
-    condition: 'current.x_daas_ham_fleet != true',
+    condition: `current.${FLEET_FIELD} != true`,
     roles: [assetManager, admin],
     form: { showButton: true },
     list: { showListChoice: true },

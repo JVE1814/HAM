@@ -1,6 +1,7 @@
 import '@servicenow/sdk/global'
 import { BooleanColumn, ChoiceColumn, DateColumn, DateTimeColumn, DecimalColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 import { COVERAGE_SOURCE_CHOICES, OEM_VENDOR_CHOICES, RMA_STATE_CHOICES } from '../../server/domain/vocabulary'
+import { FLEET_CONDITION } from '../../server/domain/fleet'
 
 /* OEM coverage contracts and RMAs (P2.1, P2.3). */
 
@@ -9,8 +10,7 @@ export const x_daas_ham_oem_coverage = Table({
     name: 'x_daas_ham_oem_coverage',
     label: 'OEM coverage',
     schema: {
-        // Fleet assets only (ADR 0016), as the RMA's Defective asset: domain/fleet `fleetCondition()`.
-        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', referenceQual: 'x_daas_ham_fleet=true' }),
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', referenceQual: FLEET_CONDITION }),
         serial_number: StringColumn({ label: 'Serial number', maxLength: 100, mandatory: true }),
         vendor: ChoiceColumn({ label: 'Vendor', choices: OEM_VENDOR_CHOICES, mandatory: true }),
         contract_number: StringColumn({ label: 'Contract number', maxLength: 100 }),
@@ -46,7 +46,7 @@ export const x_daas_ham_oem_rma = Table({
             label: 'Defective asset',
             referenceTable: 'alm_hardware',
             mandatory: true,
-            referenceQual: 'x_daas_ham_fleet=true',
+            referenceQual: FLEET_CONDITION,
         }),
         order_line: ReferenceColumn({ label: 'Replacement order line', referenceTable: 'x_daas_ham_order_line' }),
         case: ReferenceColumn({ label: 'Case', referenceTable: 'sn_customerservice_case' }),

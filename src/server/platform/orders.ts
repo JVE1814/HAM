@@ -34,6 +34,7 @@ import { bool, findById, num, refusal, str, warnRefused } from './records.ts'
 import { currentSession } from './session.ts'
 import { skipOpenStagingTasks } from './staging-tasks.ts'
 import { releaseToProviderStock } from './stock.ts'
+import { SITE_FIELD } from '../domain/fleet.ts'
 
 /**
  * Orders up to sourcing (ADR 0004): raise an Order with its lines, submit it (entitlement, then approval or sourcing),
@@ -192,7 +193,7 @@ function orderParties(order: GlideRecord): OrderParties {
     return {
         customerId: str(order, 'customer'),
         agreement: named('agreement', 'x_daas_ham_agreement', 'customer'),
-        site: site && { ...site, isSite: bool(order, 'site.x_daas_ham_is_site') },
+        site: site && { ...site, isSite: bool(order, `site.${SITE_FIELD}`) },
         siteTemplate: named('site_template', 'x_daas_ham_site_template', 'customer'),
     }
 }

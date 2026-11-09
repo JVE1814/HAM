@@ -12,6 +12,7 @@ import {
     warnRenewals,
 } from '../../server/entry/leases'
 import { accountManager, admin, assetManager, finance } from '../security/roles.now'
+import { CURRENT_IS_FLEET, FLEET_FIELD } from '../../server/domain/fleet'
 
 /* Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
 
@@ -26,7 +27,7 @@ BusinessRule({
     action: ['insert', 'update'],
     order: 90,
     condition:
-        "(current.x_daas_ham_lease.changes() || current.x_daas_ham_fleet.changes()) && current.x_daas_ham_fleet == true && current.x_daas_ham_lease != ''",
+        `(current.x_daas_ham_lease.changes() || current.${FLEET_FIELD}.changes()) && ${CURRENT_IS_FLEET} && current.x_daas_ham_lease != ''`,
     script: onAssetLeaseChanged,
 })
 

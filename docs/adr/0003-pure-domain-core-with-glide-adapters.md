@@ -17,7 +17,7 @@ quickly and exhaustively (Vitest); everything Glide-facing is kept thin and cove
 - The SDK's generated wrapper passes an entry function its arguments by name, so its parameters are
   named after the platform's globals for its trigger: `current` and `previous` (business rule),
   `event` and `current` (script action), `producer` and `current` (record producer), `request` and
-  `response` (REST), `current` (UI action). `src/server/entry/entry-points.test.ts` checks every
+  `response` (REST), `current` (UI action). `src/server/built-metadata.test.ts` checks every
   function wired from Fluent.
 - The layering is linted (`eslint.config.js`): the domain imports neither Glide nor the layers above
   it, platform never imports entry, and no entry module imports another (the files still listed there

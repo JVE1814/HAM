@@ -6,6 +6,7 @@ import { readStage } from '../platform/assets.ts'
 import { lookUp, pick, putAway, receive, receivingStockrooms, type Scan, type ScanRefusal } from '../platform/receiving.ts'
 import { str } from '../platform/records.ts'
 import { reply } from '../platform/rest-api.ts'
+import { OEM_PID_FIELD } from '../domain/fleet.ts'
 
 /** Warehouse scanning API used by the warehouse React app (P1.5): platform/receiving. */
 
@@ -15,7 +16,7 @@ function summarise(asset: GlideRecord): AssetSummary {
         serial: str(asset, 'serial_number'),
         providerTag: str(asset, 'asset_tag'),
         model: asset.getDisplayValue('model'),
-        pid: str(asset, 'model.x_daas_ham_oem_pid'),
+        pid: str(asset, `model.${OEM_PID_FIELD}`),
         stage: readStage(asset) ?? 'unknown',
         stockroom: asset.getDisplayValue('stockroom'),
         customer: asset.getDisplayValue('company'),

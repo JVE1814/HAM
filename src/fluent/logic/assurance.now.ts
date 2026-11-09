@@ -4,18 +4,23 @@ import { raiseAttestations, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudi
 import { explainRackRefusal, reconcileInstalledBaseAndRacks, recheckRackPlacement } from '../../server/entry/racks'
 import rackPage from '../../client/rack.html'
 import { accountManager, assetManager, customerAdmin, fieldTech, finance, inventoryTech, noc, siteContact } from '../security/roles.now'
+import { CURRENT_IS_FLEET, CURRENT_IS_NAAS_STOCKROOM, FLEET_FIELD, SITE_FIELD } from '../../server/domain/fleet'
+import { PLACEMENT_FIELDS } from '../../server/domain/rack'
+import { ENTRY_MODULES } from './server-modules.now'
 
 /* Audits, attestations, reconciliation and racks (P2.7–P2.8). */
 
-// Offered on NaaS stockrooms only, those with a NaaS stockroom type (domain/fleet NAAS_STOCKROOM_TYPES): one with
-// none is the Provider IT's storeroom (ADR 0016), as "Start site audit" below is offered on Sites only.
+/** A save sets an Asset's rack placement (its rack, lowest unit or face); written without spaces, as the rack rules' conditions are. */
+const PLACEMENT_SET = `current.${PLACEMENT_FIELDS.rack}.changes()||current.${PLACEMENT_FIELDS.ruStart}.changes()||current.${PLACEMENT_FIELDS.face}.changes()`
+
+// Offered on NaaS stockrooms only, those with a NaaS stockroom type: one with none is the Provider IT's storeroom
+// (ADR 0016), as "Start site audit" below is offered on Sites only.
 UiAction({
     $id: Now.ID['ua_stockroom_blind_count'],
     name: 'Start blind count',
     table: 'alm_stockroom',
     actionName: 'x_daas_ham_start_blind_count',
-    condition:
-        "current.x_daas_ham_stockroom_type == 'central_depot' || current.x_daas_ham_stockroom_type == 'staging_centre' || current.x_daas_ham_stockroom_type == 'customer_site'",
+    condition: CURRENT_IS_NAAS_STOCKROOM,
     roles: [inventoryTech, assetManager],
     form: { showButton: true },
     showUpdate: true,
@@ -27,7 +32,7 @@ UiAction({
     name: 'Start site audit',
     table: 'cmn_location',
     actionName: 'x_daas_ham_start_site_audit',
-    condition: 'current.x_daas_ham_is_site == true',
+    condition: `current.${SITE_FIELD} == true`,
     roles: [assetManager, fieldTech],
     form: { showButton: true },
     showUpdate: true,
@@ -64,7 +69,7 @@ BusinessRule({
     action: ['insert', 'update'],
     order: 150,
     condition:
-        "(current.x_daas_ham_rack.changes()||current.x_daas_ham_ru_start.changes()||current.x_daas_ham_rack_face.changes())&&current.x_daas_ham_fleet==true&&require('x_daas_ham/naas-ham/0.1.0/src/server/entry/racks.ts').refusesRackPlacement(current,previous)",
+        `(${PLACEMENT_SET})&&current.${FLEET_FIELD}==true&&require('${ENTRY_MODULES}/racks.ts').refusesRackPlacement(current,previous)`,
     abortAction: true,
     script: explainRackRefusal,
 })
@@ -81,7 +86,7 @@ BusinessRule({
     action: ['update'],
     order: 150,
     condition:
-        "(current.model.changes() || current.x_daas_ham_fleet.changes()) && current.x_daas_ham_fleet == true && current.x_daas_ham_rack != '' && require('x_daas_ham/naas-ham/0.1.0/src/server/entry/racks.ts').refusesKeptPlacement(current, previous)",
+        `(current.model.changes() || current.${FLEET_FIELD}.changes()) && ${CURRENT_IS_FLEET} && current.${PLACEMENT_FIELDS.rack} != '' && require('${ENTRY_MODULES}/racks.ts').refusesKeptPlacement(current, previous)`,
     abortAction: true,
     script: explainRackRefusal,
 })
@@ -97,7 +102,7 @@ BusinessRule({
     action: ['insert', 'update'],
     order: 150,
     condition:
-        "(current.x_daas_ham_rack.changes()||current.x_daas_ham_ru_start.changes()||current.x_daas_ham_rack_face.changes()||((current.model.changes()||current.x_daas_ham_fleet.changes())&&current.x_daas_ham_rack!=''))&&current.x_daas_ham_fleet==true",
+        `(${PLACEMENT_SET}||((current.model.changes()||current.${FLEET_FIELD}.changes())&&current.${PLACEMENT_FIELDS.rack}!=''))&&current.${FLEET_FIELD}==true`,
     script: recheckRackPlacement,
 })
 

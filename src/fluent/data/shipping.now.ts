@@ -1,6 +1,7 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DateColumn, DateTimeColumn, DecimalColumn, IntegerColumn, ReferenceColumn, StringColumn, Table, UrlColumn } from '@servicenow/sdk/core'
 import { SHIPMENT_DIRECTION_CHOICES, SHIPMENT_STATUS_CHOICES } from '../../server/domain/vocabulary'
+import { NAAS_STOCKROOM_CONDITION } from '../../server/domain/fleet'
 
 /* Shipments bought through the shipping aggregator and their tracking events (P3.26, D73). */
 
@@ -19,11 +20,10 @@ export const x_daas_ham_shipment = Table({
         order: ReferenceColumn({ label: 'Order', referenceTable: 'x_daas_ham_order' }),
         return_order: ReferenceColumn({ label: 'Return order', referenceTable: 'x_daas_ham_return_order' }),
         site: ReferenceColumn({ label: 'Site', referenceTable: 'cmn_location' }),
-        // NaaS stockrooms only (ADR 0016): domain/fleet `naasStockroomCondition()`.
         stockroom: ReferenceColumn({
             label: 'Depot',
             referenceTable: 'alm_stockroom',
-            referenceQual: 'x_daas_ham_stockroom_typeINcentral_depot,staging_centre,customer_site',
+            referenceQual: NAAS_STOCKROOM_CONDITION,
         }),
         carrier: StringColumn({ label: 'Carrier', maxLength: 60, readOnly: true }),
         service_code: StringColumn({ label: 'Service', maxLength: 60, readOnly: true }),

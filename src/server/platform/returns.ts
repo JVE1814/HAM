@@ -38,6 +38,7 @@ import { bool, exists, findById, num, refusal, str, warnRefused } from './record
 import { currentSession } from './session.ts'
 import { releaseToProviderStock } from './stock.ts'
 import { endSitePackageIfEmpty } from './subscriptions.ts'
+import { SITE_FIELD } from '../domain/fleet.ts'
 
 /**
  * Return orders and their lines (P2.4): raising one, by request or for a job, and what each line then goes through.
@@ -230,7 +231,7 @@ export function requestReturn(request: RequestedEquipment): RequestOutcome {
 /** The location a request names, as domain/returns reads it: whose it is and whether it is a Site at all. */
 function requestedSite(siteId: string, site: GlideRecord | null): RequestedReturn['site'] {
     if (!siteId) return undefined
-    return { id: siteId, customerId: site ? str(site, 'company') : null, isSite: !!site && bool(site, 'x_daas_ham_is_site') }
+    return { id: siteId, customerId: site ? str(site, 'company') : null, isSite: !!site && bool(site, SITE_FIELD) }
 }
 
 /** The signed-in user as a Return requester: one the Return create rule lets create a Return order. */

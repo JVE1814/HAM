@@ -16,6 +16,7 @@ import {
     ORDER_STAGE_CHOICES,
     ORDER_TYPE_CHOICES,
 } from '../../server/domain/vocabulary'
+import { FLEET_CONDITION, NAAS_MODEL_CONDITION } from '../../server/domain/fleet'
 
 /** A request to deliver equipment to a Site. */
 export const x_daas_ham_order = Table({
@@ -86,10 +87,9 @@ export const x_daas_ham_order_line = Table({
             mandatory: true,
             cascadeRule: 'delete',
         }),
-        // NaaS Models and fleet assets only (ADR 0016): domain/fleet `naasModelCondition()`, `fleetCondition()`.
-        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true, referenceQual: 'x_daas_ham_oem_pidISNOTEMPTY' }),
+        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true, referenceQual: NAAS_MODEL_CONDITION }),
         quantity: IntegerColumn({ label: 'Quantity', mandatory: true, default: 1, min: 1 }),
-        replaces_asset: ReferenceColumn({ label: 'Replaces asset', referenceTable: 'alm_hardware', referenceQual: 'x_daas_ham_fleet=true' }),
+        replaces_asset: ReferenceColumn({ label: 'Replaces asset', referenceTable: 'alm_hardware', referenceQual: FLEET_CONDITION }),
         from_site_template: BooleanColumn({ label: 'From site template', default: false, readOnly: true }),
         line_stage: ChoiceColumn({
             label: 'Line stage',

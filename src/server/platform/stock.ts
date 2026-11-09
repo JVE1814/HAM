@@ -1,6 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { messageOf } from '../domain/errors.ts'
-import { naasStockroomType, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
+import { naasStockroomType, SITE_FIELD, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import { LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import type { Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
@@ -67,7 +67,7 @@ function candidateOf(asset: GlideRecord, modelId: string): StockCandidate | null
 /** The Site the Asset's stockroom stands at: its location when that is a Site, else the Site of the Room it is in. */
 function stockroomSite(asset: GlideRecord): string {
     const location = str(asset, 'stockroom.location')
-    return bool(asset, 'stockroom.location.x_daas_ham_is_site') ? location : str(asset, 'stockroom.location.parent')
+    return bool(asset, `stockroom.location.${SITE_FIELD}`) ? location : str(asset, 'stockroom.location.parent')
 }
 
 export interface Reservation {

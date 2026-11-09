@@ -6,7 +6,7 @@ import { STAGE_FIELDS } from '../../server/domain/vocabulary'
  * Substatus values this app adds to alm_asset.substatus (ADR 0002). The SDK refuses ChoiceSet on
  * global tables from a scoped app, so each value ships as a sys_choice record: one per Lifecycle stage
  * whose STAGE_FIELDS entry carries a `choice`, every value read from that entry. Fluent has no loops,
- * so a stage given a `choice` there needs its Record here (substatus-choices.test.ts compares the
+ * so a stage given a `choice` there needs its Record here (built-metadata.test.ts compares the
  * built set with STAGE_FIELDS).
  *
  * All sys_choice records for one field share the update name sys_choice_alm_asset_substatus, so

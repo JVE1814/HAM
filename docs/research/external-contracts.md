@@ -1299,7 +1299,7 @@ recommended hardening are described in the notes of their area.
   (`breakfix.ts` onCaseFailedAsset) and the lease rule and transfer release rule on `alm_hardware`
   (`leases.ts` onAssetLeaseChanged, `entry/assets.ts` onTransferReleased) only set fields, and the
   rest that refuse run on `x_daas_ham_*` tables, where `setAbortAction` works
-  (`entry-points.test.ts` keeps it that way). With the lifecycle rule's refusal holding, it also
+  (`built-metadata.test.ts` keeps it that way). With the lifecycle rule's refusal holding, it also
   checks the Asset saves Inventory's transfer order logic makes for an inventory tech working a line
   (N38); the next item models them.
   The reads ADR 0005 runs past the visibility rules on `alm_hardware` no longer call `setWorkflow`:

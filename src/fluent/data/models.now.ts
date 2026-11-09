@@ -10,6 +10,7 @@ import {
     Table,
 } from '@servicenow/sdk/core'
 import { MATCH_TYPE_CHOICES, NORM_EXCEPTION_STATUS_CHOICES } from '../../server/domain/vocabulary'
+import { NAAS_MODEL_CONDITION } from '../../server/domain/fleet'
 
 /** A raw manufacturer string seen in discovery, connectors or ASNs, mapped to the canonical manufacturer. */
 export const x_daas_ham_manufacturer_alias = Table({
@@ -38,8 +39,7 @@ export const x_daas_ham_model_match_rule = Table({
             dropdown: 'dropdown_without_none',
         }),
         pattern: StringColumn({ label: 'Pattern', maxLength: 255, mandatory: true }),
-        // NaaS Models only (ADR 0016), on every Model reference here: domain/fleet `naasModelCondition()`.
-        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true, referenceQual: 'x_daas_ham_oem_pidISNOTEMPTY' }),
+        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true, referenceQual: NAAS_MODEL_CONDITION }),
         active: BooleanColumn({ label: 'Active', default: true }),
     },
     index: [{ name: 'x_daas_ham_mmr_mfr', unique: false, element: 'manufacturer' }],
@@ -62,7 +62,7 @@ export const x_daas_ham_norm_exception = Table({
             default: 'open',
             dropdown: 'dropdown_without_none',
         }),
-        resolved_model: ReferenceColumn({ label: 'Resolved model', referenceTable: 'cmdb_model', referenceQual: 'x_daas_ham_oem_pidISNOTEMPTY' }),
+        resolved_model: ReferenceColumn({ label: 'Resolved model', referenceTable: 'cmdb_model', referenceQual: NAAS_MODEL_CONDITION }),
     },
     index: [{ name: 'x_daas_ham_ne_raw', unique: false, element: ['raw_manufacturer', 'raw_model'] }],
 })

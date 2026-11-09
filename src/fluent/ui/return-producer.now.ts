@@ -1,6 +1,8 @@
 import '@servicenow/sdk/global'
 import { CatalogItemRecordProducer, ListCollectorVariable, ReferenceVariable, SelectBoxVariable, SingleLineTextVariable } from '@servicenow/sdk/core'
 import { afterReturnProduced } from '../../server/entry/returns'
+import { FLEET_CONDITION, SITES_OF_CUSTOMER_QUERY } from '../../server/domain/fleet'
+import { INSTALL_STATUS } from '../../server/domain/vocabulary'
 
 /*
  * "Return or decommission equipment": customer admins and the service desk raise returns (D60). The Site choices follow
@@ -28,7 +30,7 @@ export const requestReturn = CatalogItemRecordProducer({
             question: 'Site',
             referenceTable: 'cmn_location',
             useReferenceQualifier: 'advanced',
-            referenceQual: "javascript:'x_daas_ham_is_site=true^company=' + current.variables.customer",
+            referenceQual: `javascript:'${SITES_OF_CUSTOMER_QUERY}' + current.variables.customer`,
             attributes: 'ref_qual_elements=customer',
             mandatory: true,
             mapToField: true,
@@ -49,9 +51,9 @@ export const requestReturn = CatalogItemRecordProducer({
         assets: ListCollectorVariable({
             question: 'Devices to return (selected devices only)',
             listTable: 'alm_hardware',
-            // The fleet assets installed at the chosen Site (none before a Site is chosen), domain/fleet fleetCondition: the
-            // Provider IT's equipment shares the table (ADR 0016). Submitting checks the fleet and the Site again.
-            referenceQual: "javascript:'x_daas_ham_fleet=true^install_status=1^x_daas_ham_siteISNOTEMPTY^x_daas_ham_site=' + current.variables.site",
+            // The fleet assets installed at the chosen Site (none before a Site is chosen): the Provider IT's equipment
+            // shares the table (ADR 0016). Submitting checks the fleet and the Site again.
+            referenceQual: `javascript:'${FLEET_CONDITION}^install_status=${INSTALL_STATUS.inUse}^x_daas_ham_siteISNOTEMPTY^x_daas_ham_site=' + current.variables.site`,
             attributes: 'ref_qual_elements=site',
             order: 400,
         }),

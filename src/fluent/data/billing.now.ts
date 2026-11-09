@@ -1,6 +1,7 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DateColumn, DateTimeColumn, DecimalColumn, IntegerColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 import { BILLING_LINE_KIND_CHOICES, BILLING_PERIOD_STATUS_CHOICES } from '../../server/domain/vocabulary'
+import { FLEET_CONDITION } from '../../server/domain/fleet'
 
 /* Service intervals, billing periods and their lines (P3.25, D52, D66). */
 
@@ -9,8 +10,7 @@ export const x_daas_ham_service_interval = Table({
     name: 'x_daas_ham_service_interval',
     label: 'Service interval',
     schema: {
-        // Fleet assets only (ADR 0016): domain/fleet `fleetCondition()`.
-        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true, referenceQual: 'x_daas_ham_fleet=true' }),
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true, referenceQual: FLEET_CONDITION }),
         subscription_line: ReferenceColumn({ label: 'Subscription line', referenceTable: 'x_daas_ham_subscription_line', mandatory: true }),
         customer: ReferenceColumn({ label: 'Customer', referenceTable: 'customer_account' }),
         site: ReferenceColumn({ label: 'Site', referenceTable: 'cmn_location' }),

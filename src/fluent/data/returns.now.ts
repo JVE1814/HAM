@@ -18,6 +18,7 @@ import {
     RETURN_METHOD_CHOICES,
     RETURN_TRIGGER_CHOICES,
 } from '../../server/domain/vocabulary'
+import { FLEET_CONDITION } from '../../server/domain/fleet'
 
 /** Bringing Assets back from a Site (P2.4). */
 export const x_daas_ham_return_order = Table({
@@ -68,8 +69,7 @@ export const x_daas_ham_return_order_line = Table({
             mandatory: true,
             cascadeRule: 'delete',
         }),
-        // Fleet assets only (ADR 0016), here and on the Fee event: domain/fleet `fleetCondition()`.
-        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true, referenceQual: 'x_daas_ham_fleet=true' }),
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true, referenceQual: FLEET_CONDITION }),
         status: ChoiceColumn({
             label: 'Status',
             choices: RETURN_LINE_STATUS_CHOICES,
@@ -106,7 +106,7 @@ export const x_daas_ham_fee_event = Table({
         }),
         customer: ReferenceColumn({ label: 'Customer', referenceTable: 'customer_account', mandatory: true }),
         agreement: ReferenceColumn({ label: 'Agreement', referenceTable: 'x_daas_ham_agreement' }),
-        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', referenceQual: 'x_daas_ham_fleet=true' }),
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', referenceQual: FLEET_CONDITION }),
         return_order: ReferenceColumn({ label: 'Return order', referenceTable: 'x_daas_ham_return_order' }),
         amount: DecimalColumn({ label: 'Amount', mandatory: true }),
         currency: StringColumn({ label: 'Currency', maxLength: 3, default: 'EUR' }),

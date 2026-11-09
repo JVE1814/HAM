@@ -18,6 +18,15 @@ import type { StockroomType } from './vocabulary.ts'
 /** The alm_hardware boolean that marks a fleet asset. */
 export const FLEET_FIELD = 'x_daas_ham_fleet'
 
+/**
+ * Encoded condition matching fleet assets only, on alm_hardware itself. A constant, like the two NaaS conditions below,
+ * because Fluent metadata reads constants only: its reference qualifiers, list filters and dashboard queries import it.
+ */
+export const FLEET_CONDITION = `${FLEET_FIELD}=true`
+
+/** The same as a script condition on `current`, an Asset: what a business rule's or UI action's condition tests. */
+export const CURRENT_IS_FLEET = `current.${FLEET_FIELD} == true`
+
 /** The Fleet flag, dot-walked from another table through `via` (e.g. `asset.`, `x_daas_ham_failed_asset.`). */
 export function fleetField(via = ''): string {
     return `${via}${FLEET_FIELD}`
@@ -25,7 +34,7 @@ export function fleetField(via = ''): string {
 
 /** Encoded condition matching fleet assets only (through `via` from another table). */
 export function fleetCondition(via = ''): string {
-    return `${fleetField(via)}=true`
+    return `${via}${FLEET_CONDITION}`
 }
 
 /**
@@ -55,8 +64,21 @@ export function fleetStagesQuery(stages: readonly Stage[], base = '', via = ''):
 /** The Stockroom field that holds its type (alm_stockroom.x_daas_ham_stockroom_type). */
 export const STOCKROOM_TYPE_FIELD = 'x_daas_ham_stockroom_type'
 
+/** The stockroom types by name: every one is a NaaS stockroom's. */
+export const STOCKROOM_TYPE = {
+    centralDepot: 'central_depot',
+    stagingCentre: 'staging_centre',
+    customerSite: 'customer_site',
+} as const satisfies Record<string, StockroomType>
+
 /** The types of NaaS stockrooms. A stockroom with no type (or another) is the Provider IT's, not NaaS. */
-export const NAAS_STOCKROOM_TYPES: readonly StockroomType[] = ['central_depot', 'staging_centre', 'customer_site']
+export const NAAS_STOCKROOM_TYPES: readonly StockroomType[] = Object.values(STOCKROOM_TYPE)
+
+/** Encoded condition matching NaaS stockrooms, on alm_stockroom itself (domain/fleet.test.ts holds it to the list above). */
+export const NAAS_STOCKROOM_CONDITION = `${STOCKROOM_TYPE_FIELD}IN${STOCKROOM_TYPE.centralDepot},${STOCKROOM_TYPE.stagingCentre},${STOCKROOM_TYPE.customerSite}`
+
+/** The same as a script condition on `current`, a Stockroom (domain/fleet.test.ts holds it to the list above too). */
+export const CURRENT_IS_NAAS_STOCKROOM = `current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.centralDepot}' || current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.stagingCentre}' || current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.customerSite}'`
 
 /** The NaaS stockroom type `value` (a stored type) names, or null for a stockroom outside NaaS. */
 export function naasStockroomType(value: string): StockroomType | null {
@@ -65,11 +87,14 @@ export function naasStockroomType(value: string): StockroomType | null {
 
 /** Encoded condition matching NaaS stockrooms (through `via`, e.g. `stockroom.` from an Asset). */
 export function naasStockroomCondition(via = ''): string {
-    return `${via}${STOCKROOM_TYPE_FIELD}IN${NAAS_STOCKROOM_TYPES.join(',')}`
+    return `${via}${NAAS_STOCKROOM_CONDITION}`
 }
 
 /** The Model field that holds its OEM PID (cmdb_model.x_daas_ham_oem_pid). */
 export const OEM_PID_FIELD = 'x_daas_ham_oem_pid'
+
+/** Encoded condition matching NaaS Models, on cmdb_model itself. */
+export const NAAS_MODEL_CONDITION = `${OEM_PID_FIELD}ISNOTEMPTY`
 
 /** Whether a Model with this OEM PID is a NaaS Model: it has one. */
 export function isNaasModel(oemPid: string): boolean {
@@ -78,8 +103,20 @@ export function isNaasModel(oemPid: string): boolean {
 
 /** Encoded condition matching NaaS Models (through `via`, e.g. `model.` from an Asset). */
 export function naasModelCondition(via = ''): string {
-    return `${via}${OEM_PID_FIELD}ISNOTEMPTY`
+    return `${via}${NAAS_MODEL_CONDITION}`
 }
+
+/**
+ * The Location field that marks a customer Site (cmn_location.x_daas_ham_is_site): what tells a Site from the Provider
+ * IT's locations on the shared table.
+ */
+export const SITE_FIELD = 'x_daas_ham_is_site'
+
+/** Encoded condition matching customer Sites, on cmn_location itself. */
+export const SITE_CONDITION = `${SITE_FIELD}=true`
+
+/** A Customer's Sites, once the Customer's sys_id is appended: what a Site picker's qualifier completes. */
+export const SITES_OF_CUSTOMER_QUERY = `${SITE_CONDITION}^company=`
 
 /** An Asset as adoption into the fleet (or a receipt taking it in) judges it. */
 export interface FleetCandidate {

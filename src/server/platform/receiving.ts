@@ -346,7 +346,7 @@ export function pick(code: string, orderNumber: string): Scan {
 /** The stockrooms the user may receive into (visibility rules apply), by name. */
 export function receivingStockrooms(): Array<{ id: string; name: string }> {
     const stockroom = new GlideRecord('alm_stockroom')
-    stockroom.addQuery('x_daas_ham_stockroom_type', 'IN', RECEIVING_STOCKROOM_TYPES.join(','))
+    stockroom.addQuery(STOCKROOM_TYPE_FIELD, 'IN', RECEIVING_STOCKROOM_TYPES.join(','))
     stockroom.orderBy('name')
     stockroom.setLimit(500)
     stockroom.query()

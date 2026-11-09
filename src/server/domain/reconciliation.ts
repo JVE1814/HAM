@@ -1,4 +1,4 @@
-import { outsideFleetCondition } from './fleet.ts'
+import { outsideFleetCondition, SITE_CONDITION } from './fleet.ts'
 import { overlaps, powerBudget, type Placement, type RackSpec } from './rack.ts'
 import { normalizeSerial } from './serials.ts'
 import type { ExceptionType } from './vocabulary.ts'
@@ -38,7 +38,7 @@ const CI_HARDWARE = 'asset.ref_alm_hardware.'
  * NaaS's to report. The caller adds how recently it was discovered.
  */
 export function seenWithoutFleetAssetQuery(): string {
-    const atSite = ['location.', 'location.parent.', 'location.parent.parent.'].map((via) => `${via}x_daas_ham_is_site=true`)
+    const atSite = ['location.', 'location.parent.', 'location.parent.parent.'].map((via) => `${via}${SITE_CONDITION}`)
     return `assetISEMPTY^OR${outsideFleetCondition(CI_HARDWARE)}^${atSite.join('^OR')}`
 }
 

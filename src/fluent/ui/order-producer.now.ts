@@ -10,6 +10,7 @@ import {
 } from '@servicenow/sdk/core'
 import { afterOrderProduced } from '../../server/entry/orders'
 import { INSTALL_MODE_CHOICES, ORDER_TYPE_CHOICES } from '../../server/domain/vocabulary'
+import { NAAS_MODEL_CONDITION, SITES_OF_CUSTOMER_QUERY } from '../../server/domain/fleet'
 
 /*
  * "Request network equipment": the one catalog entry point for Orders (D42/D50). The Agreement, Site and Site template
@@ -27,8 +28,8 @@ export const deviceRows = VariableSet({
         model: ReferenceVariable({
             question: 'Model',
             referenceTable: 'cmdb_model',
-            // NaaS Models (domain/fleet naasModelCondition, ADR 0016) of a device class other than optic.
-            referenceQualCondition: 'x_daas_ham_oem_pidISNOTEMPTY^x_daas_ham_device_classISNOTEMPTY^x_daas_ham_device_class!=optic',
+            // NaaS Models (ADR 0016) of a device class other than optic.
+            referenceQualCondition: `${NAAS_MODEL_CONDITION}^x_daas_ham_device_classISNOTEMPTY^x_daas_ham_device_class!=optic`,
             mandatory: true,
             order: 100,
         }),
@@ -74,7 +75,7 @@ export const requestNetworkEquipment = CatalogItemRecordProducer({
             question: 'Site',
             referenceTable: 'cmn_location',
             useReferenceQualifier: 'advanced',
-            referenceQual: "javascript:'x_daas_ham_is_site=true^company=' + current.variables.customer",
+            referenceQual: `javascript:'${SITES_OF_CUSTOMER_QUERY}' + current.variables.customer`,
             attributes: 'ref_qual_elements=customer',
             mandatory: true,
             mapToField: true,

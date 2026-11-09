@@ -89,7 +89,7 @@ to install third party application* error. Add `daas` to the system property
 
 ```bash
 npm install
-npm run check                      # typecheck, lint, unit tests, build
+npm run check                      # typecheck, lint, build, unit tests
 npx now-sdk auth --add <alias>     # once per instance
 npx now-sdk install --auth <alias> --no-demoData   # production: demo data loads unless turned off
 npx now-sdk install --auth <alias>                  # dev/test: demo data included
@@ -219,7 +219,7 @@ documentation in [docs/research/external-contracts.md](docs/research/external-co
 |---|---|
 | `npm run typecheck` | server modules, client app and tests |
 | `npm run lint` | ESLint |
-| `npm test` | Vitest unit tests for the domain core and client helpers |
+| `npm test` | Vitest unit tests for the domain core and client helpers, and the checks of the built metadata (build first) |
 | `npm run build` | `now-sdk build` (Fluent type check, client bundle, app package) |
 | `npx now-sdk cicd testsuite run ...` | ATF suites **NaaS - P1**, **NaaS - P2** and **NaaS - P3** on an instance |
 
@@ -236,16 +236,23 @@ src/client/      React UI pages (warehouse, rack elevation, customer self-servic
 
 Conventions that the build or tests enforce:
 
-- `.now.ts` files are literal: no helper functions, loops or string concatenation.
+- `.now.ts` files are evaluated by the SDK, not run: they hold constants, template literals over
+  constants and property access, and imports of constants (from `src/server/domain` and
+  `src/server/platform` too), but no function call, loop, spread or array element. A value the SDK
+  cannot read is no build error: the record is built with `Symbol(...)` or `[object Object]` in it,
+  which `built-metadata.test.ts` finds in the built output (so it needs `npx now-sdk build` first;
+  `npm run check` builds before it tests).
+- What a query, qualifier or condition tells NaaS records by (the Fleet flag, a NaaS stockroom type,
+  an OEM PID, a customer Site) is a constant of `domain/fleet.ts`, which the Fluent metadata imports.
 - Entry-point parameters must be named after the platform globals (`current`, `previous`, `event`,
-  `producer`, `request`, `response`): the SDK wrapper passes them by name (`entry-points.test.ts`).
+  `producer`, `request`, `response`): the SDK wrapper passes them by name (`built-metadata.test.ts`).
 - A business rule condition fits the 254-character field and loads a module by its installed path,
   `x_daas_ham/<package name>/<version>/src/...`, calling a function it exports
-  (`entry-points.test.ts`). A before rule on a table of another scope (`alm_hardware`, `wm_order`)
+  (`built-metadata.test.ts`). A before rule on a table of another scope (`alm_hardware`, `wm_order`)
   refuses that way, with its Abort action, and its script only adds the reason: the platform ignores
   `current.setAbortAction` and `setWorkflow` called from this scope on such a table. So no entry
   point wired on one calls `setAbortAction`, and a rule with an Abort action has a condition
-  (`entry-points.test.ts`). The platform runs a condition on every save of the table, whatever the
+  (`built-metadata.test.ts`). The platform runs a condition on every save of the table, whatever the
   rule's filter, so it starts with the change test that keeps the module unloaded on other saves
   ([external-contracts.md](docs/research/external-contracts.md#servicenow-platform)).
 - Every stored choice value is defined once, in `domain/vocabulary.ts`: a Fluent column imports the
@@ -253,7 +260,7 @@ Conventions that the build or tests enforce:
   statically, so it holds constants and types only (no imports, calls, spread or `satisfies` on a
   list).
 - Substatus values added to `alm_asset` are the `choice` entries of `STAGE_FIELDS` there, which
-  `fluent/data/substatus-choices.now.ts` ships one Record each (`substatus-choices.test.ts` compares
+  `fluent/data/substatus-choices.now.ts` ships one Record each (`built-metadata.test.ts` compares
   the built choice set with them).
 - Commit `src/fluent/generated/keys.ts`. Deleting Fluent code that was installed generates delete
   records; see the SDK's `fluent-overview` before removing metadata.

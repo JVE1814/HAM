@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { overlaps, PLACEMENT_FIELDS, placementProblem, powerBudget, rackElevation } from './rack'
+import { overlaps, placementProblem, powerBudget, rackElevation } from './rack'
 
 const rack42 = { units: 42, powerCapacityW: 0 }
 const placed = [
@@ -127,24 +126,5 @@ describe('rackElevation', () => {
             { unit: 3, assetId: 'a', span: 2 },
             { unit: 1, assetId: null, span: 1 },
         ])
-    })
-})
-
-/*
- * The rack rules' conditions are script text the platform runs as written (fluent/logic/assurance.now.ts), so they
- * spell the placement fields themselves: this ties them to the fields the checks read.
- */
-describe('the rack rules', () => {
-    const source = readFileSync(new URL('../../fluent/logic/assurance.now.ts', import.meta.url), 'utf8')
-    const conditionOf = (id: string) => /condition:\s*\n?\s*"([^"]+)"/.exec(source.slice(source.indexOf(`Now.ID['${id}']`)))?.[1] ?? ''
-
-    it('fire when any placement field changes', () => {
-        for (const id of ['br_rack_placement', 'br_rack_recheck']) {
-            for (const field of Object.values(PLACEMENT_FIELDS)) expect(conditionOf(id), `${id} ${field}`).toContain(`current.${field}.changes()`)
-        }
-    })
-
-    it('check a kept placement only on an Asset that is in a rack', () => {
-        expect(conditionOf('br_rack_placement_model')).toContain(`current.${PLACEMENT_FIELDS.rack} != ''`)
     })
 })

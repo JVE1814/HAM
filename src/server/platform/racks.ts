@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { fleetCondition } from '../domain/fleet.ts'
+import { fleetCondition, SITE_CONDITION } from '../domain/fleet.ts'
 import {
     DEFAULT_RACK_FACE,
     DEFAULT_RACK_UNITS,
@@ -172,9 +172,6 @@ export function recheckFlaggedRacks(): void {
  */
 const LOCATION_SCOPING: TableScoping = { customer: 'company', site: 'sys_id' }
 
-/** A Location that is a customer Site, the app's discriminator on cmn_location (ADR 0016). */
-const SITE = 'x_daas_ham_is_site=true'
-
 /** The reader's visibility filter on Locations, or null for staff, who see every Site. */
 function siteFilter(): string | null {
     const session = currentSession()
@@ -193,7 +190,7 @@ function seesSite(locationIds: readonly string[]): boolean {
     const ids = locationIds.filter(Boolean)
     if (ids.length === 0) return false
     const filter = siteFilter()
-    return exists('cmn_location', [`sys_idIN${ids.join(',')}`, SITE, ...(filter ? [filter] : [])].join('^'))
+    return exists('cmn_location', [`sys_idIN${ids.join(',')}`, SITE_CONDITION, ...(filter ? [filter] : [])].join('^'))
 }
 
 /** The most Sites the page's picker lists. */
@@ -202,7 +199,7 @@ const SITES_LISTED = 1000
 /** The customer Sites the user may see, by name (customers only their own, site contacts only theirs). */
 export function visibleSites(): Site[] {
     const site = new GlideRecord('cmn_location')
-    site.addEncodedQuery(SITE)
+    site.addEncodedQuery(SITE_CONDITION)
     const filter = siteFilter()
     if (filter) site.addEncodedQuery(filter)
     site.orderBy('name')

@@ -10,8 +10,13 @@ import {
 import { explainWorkWindowRefusal, onWorkOrderClosed } from '../../server/entry/delivery'
 import { onOrderApprovalDecision } from '../../server/entry/orders'
 import { guardStagingClosure, onStagingClosed, releaseWaitingSteps, stampStagingStep } from '../../server/entry/staging'
+import { CURRENT_IS_FLEET } from '../../server/domain/fleet'
+import { ENTRY_MODULES } from './server-modules.now'
 
 /* Record-change rules driving the Order lifecycle (ADR 0004). */
+
+/** A fleet asset changed its stage: the change test and the Fleet flag every stage rule on alm_hardware starts with. */
+const FLEET_ASSET_STAGE_CHANGED = `(current.install_status.changes() || current.substatus.changes()) && ${CURRENT_IS_FLEET}`
 
 /*
  * alm_hardware and wm_order are global tables: the platform refuses current.setAbortAction from this scope on their
@@ -36,7 +41,7 @@ BusinessRule({
     when: 'before',
     action: ['update'],
     order: 80,
-    condition: 'current.active_to.changes() && current.x_daas_ham_fleet == true',
+    condition: `current.active_to.changes() && ${CURRENT_IS_FLEET}`,
     script: onTransferReleased,
 })
 
@@ -48,7 +53,7 @@ BusinessRule({
     action: ['update'],
     order: 100,
     condition:
-        "(current.install_status.changes() || current.substatus.changes()) && current.x_daas_ham_fleet == true && require('x_daas_ham/naas-ham/0.1.0/src/server/entry/assets.ts').refusesLifecycleChange(current, previous)",
+`${FLEET_ASSET_STAGE_CHANGED} && require('${ENTRY_MODULES}/assets.ts').refusesLifecycleChange(current, previous)`,
     abortAction: true,
     script: explainLifecycleRefusal,
 })
@@ -62,7 +67,7 @@ BusinessRule({
     when: 'before',
     action: ['update'],
     order: 100,
-    condition: '(current.install_status.changes() || current.substatus.changes()) && current.x_daas_ham_fleet == true',
+    condition: FLEET_ASSET_STAGE_CHANGED,
     script: clearVoidedWipeEvidence,
 })
 
@@ -74,8 +79,7 @@ BusinessRule({
     when: 'after',
     action: ['update'],
     order: 200,
-    condition:
-        "(current.install_status.changes() || current.substatus.changes()) && current.x_daas_ham_fleet == true && current.x_daas_ham_order_line != ''",
+    condition: `${FLEET_ASSET_STAGE_CHANGED} && current.x_daas_ham_order_line != ''`,
     script: onAllocatedAssetStageChange,
 })
 
@@ -86,7 +90,7 @@ BusinessRule({
     when: 'after',
     action: ['update'],
     order: 210,
-    condition: '(current.install_status.changes() || current.substatus.changes()) && current.x_daas_ham_fleet == true',
+    condition: FLEET_ASSET_STAGE_CHANGED,
     script: onAssetServiceChange,
 })
 
@@ -153,7 +157,7 @@ BusinessRule({
     action: ['insert', 'update'],
     order: 100,
     condition:
-        "(current.expected_start.changes() || current.estimated_end.changes()) && current.initiated_from.sys_class_name == 'x_daas_ham_order' && require('x_daas_ham/naas-ham/0.1.0/src/server/entry/delivery.ts').refusesWorkWindow(current)",
+        `(current.expected_start.changes() || current.estimated_end.changes()) && current.initiated_from.sys_class_name == 'x_daas_ham_order' && require('${ENTRY_MODULES}/delivery.ts').refusesWorkWindow(current)`,
     abortAction: true,
     script: explainWorkWindowRefusal,
 })

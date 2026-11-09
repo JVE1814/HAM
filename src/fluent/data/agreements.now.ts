@@ -19,6 +19,7 @@ import {
     SUBSCRIPTION_LINE_STATUS_CHOICES,
     SUBSCRIPTION_LINE_TYPE_CHOICES,
 } from '../../server/domain/vocabulary'
+import { NAAS_MODEL_CONDITION } from '../../server/domain/fleet'
 
 /** The commercial Agreement between the Provider and a Customer. */
 export const x_daas_ham_agreement = Table({
@@ -70,8 +71,7 @@ export const x_daas_ham_agreement_quantity = Table({
             cascadeRule: 'delete',
         }),
         device_class: ChoiceColumn({ label: 'Device class', choices: DEVICE_CLASS_CHOICES, mandatory: true }),
-        // NaaS Models only (ADR 0016), on every Model reference here: domain/fleet `naasModelCondition()`.
-        model: ReferenceColumn({ label: 'Model (optional)', referenceTable: 'cmdb_model', referenceQual: 'x_daas_ham_oem_pidISNOTEMPTY' }),
+        model: ReferenceColumn({ label: 'Model (optional)', referenceTable: 'cmdb_model', referenceQual: NAAS_MODEL_CONDITION }),
         contracted_quantity: IntegerColumn({ label: 'Contracted quantity', mandatory: true, min: 0 }),
     },
     index: [{ name: 'x_daas_ham_aq_agreement', unique: false, element: 'agreement' }],
@@ -124,7 +124,7 @@ export const x_daas_ham_catalog_entry = Table({
             default: 'model',
             dropdown: 'dropdown_without_none',
         }),
-        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', referenceQual: 'x_daas_ham_oem_pidISNOTEMPTY' }),
+        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', referenceQual: NAAS_MODEL_CONDITION }),
         site_template: ReferenceColumn({ label: 'Site template', referenceTable: 'x_daas_ham_site_template' }),
         monthly_rate: DecimalColumn({ label: 'Monthly rate' }),
         active: BooleanColumn({ label: 'Active', default: true }),
@@ -157,7 +157,7 @@ export const x_daas_ham_site_template_item = Table({
             mandatory: true,
             cascadeRule: 'delete',
         }),
-        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true, referenceQual: 'x_daas_ham_oem_pidISNOTEMPTY' }),
+        model: ReferenceColumn({ label: 'Model', referenceTable: 'cmdb_model', mandatory: true, referenceQual: NAAS_MODEL_CONDITION }),
         quantity: IntegerColumn({ label: 'Quantity', mandatory: true, default: 1, min: 1 }),
         optional: BooleanColumn({ label: 'Optional', default: false }),
     },

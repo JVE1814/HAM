@@ -1,24 +1,30 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
     adoptionProblem,
+    CURRENT_IS_FLEET,
+    CURRENT_IS_NAAS_STOCKROOM,
+    FLEET_CONDITION,
     FLEET_FIELD,
     fleetCondition,
     fleetField,
     fleetStagesQuery,
     inFleet,
     isNaasModel,
+    NAAS_MODEL_CONDITION,
+    NAAS_STOCKROOM_CONDITION,
     NAAS_STOCKROOM_TYPES,
     naasModelCondition,
     naasStockroomCondition,
     naasStockroomType,
-    OEM_PID_FIELD,
     outsideFleetCondition,
     receiptProblem,
+    SITE_CONDITION,
+    SITES_OF_CUSTOMER_QUERY,
     STOCKROOM_TYPE_FIELD,
     type FleetCandidate,
 } from './fleet'
 import { ALL_STAGES, stagesQuery, type Stage } from './lifecycle'
+import { STOCKROOM_TYPE_CHOICES } from './vocabulary'
 
 describe('the fleet condition', () => {
     it('names the Fleet flag, dot-walked from another table when asked', () => {
@@ -41,6 +47,36 @@ describe('the fleet condition', () => {
 
     it('stands alone on an empty query', () => {
         expect(inFleet('')).toBe('x_daas_ham_fleet=true')
+    })
+})
+
+/*
+ * Fluent metadata reads constants only, so each condition it takes exists as a constant text beside the list or the
+ * function the server code uses: the two forms must say the same.
+ */
+describe('the conditions the metadata imports', () => {
+    /** Whether a script condition holds for `current`, a record with these field values. */
+    const holds = (condition: string, current: Record<string, unknown>) => new Function('current', `return ${condition}`)(current) as boolean
+
+    it('are the conditions the server code builds', () => {
+        expect(FLEET_CONDITION).toBe(fleetCondition())
+        expect(NAAS_MODEL_CONDITION).toBe(naasModelCondition())
+        expect(NAAS_STOCKROOM_CONDITION).toBe(`${STOCKROOM_TYPE_FIELD}IN${NAAS_STOCKROOM_TYPES.join(',')}`)
+        expect(NAAS_STOCKROOM_CONDITION).toBe(naasStockroomCondition())
+        expect(SITES_OF_CUSTOMER_QUERY).toBe(`${SITE_CONDITION}^company=`)
+    })
+
+    it('name every stockroom type as a NaaS stockroom’s', () => {
+        expect([...NAAS_STOCKROOM_TYPES].sort()).toEqual(Object.keys(STOCKROOM_TYPE_CHOICES).sort())
+    })
+
+    it('test the same in a script: the Fleet flag, and each NaaS stockroom type', () => {
+        expect(holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: true })).toBe(true)
+        expect(holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: false })).toBe(false)
+        expect(holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: '' })).toBe(false)
+        for (const type of NAAS_STOCKROOM_TYPES) expect(holds(CURRENT_IS_NAAS_STOCKROOM, { [STOCKROOM_TYPE_FIELD]: type }), type).toBe(true)
+        expect(holds(CURRENT_IS_NAAS_STOCKROOM, { [STOCKROOM_TYPE_FIELD]: '' })).toBe(false)
+        expect(holds(CURRENT_IS_NAAS_STOCKROOM, { [STOCKROOM_TYPE_FIELD]: 'it_storeroom' })).toBe(false)
     })
 })
 
@@ -153,45 +189,5 @@ describe('receiptProblem', () => {
             'it is not a fleet asset: an asset manager adds it to the fleet first',
         )
         expect(receiptProblem(outside, false)).toMatch(/not a fleet asset/)
-    })
-})
-
-/* The Fluent metadata spells the fields out as literals; they must be the ones this module names. */
-describe('the Fluent metadata', () => {
-    const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
-    const augments = source('../../fluent/data/augments.now.ts')
-    const table = (name: string) => augments.split(`export const ${name} = Table({`)[1]?.split('\n})')[0] ?? ''
-    const column = (body: string, field: string) => body.split(`${field}:`)[1]?.split('}),')[0] ?? ''
-
-    it('declares the Fleet flag on alm_hardware, default false, read-only and indexed', () => {
-        const hardware = table('alm_hardware')
-        const fleet = column(hardware, FLEET_FIELD)
-        expect(fleet).toMatch(/^\s*BooleanColumn\(/)
-        expect(fleet).toMatch(/label: 'Fleet'/)
-        expect(fleet).toMatch(/default: false/)
-        expect(fleet).toMatch(/readOnly: true/)
-        expect(fleet).toMatch(/hint: '/)
-        expect(hardware).toMatch(new RegExp(`element: '${FLEET_FIELD}'`))
-    })
-
-    it('stamps no NaaS value on the rows the Provider IT creates', () => {
-        const DEFAULT = /^\s*default:|[{,]\s*default:/m
-        expect(column(table('alm_hardware'), 'x_daas_ham_legal_owner')).not.toMatch(DEFAULT)
-        expect(column(table('alm_hardware'), 'x_daas_ham_legal_owner')).not.toMatch(/dropdown_without_none/)
-        expect(column(table('alm_stockroom'), STOCKROOM_TYPE_FIELD)).not.toMatch(DEFAULT)
-        // The check itself finds a default where there is one.
-        expect(column(table('alm_hardware'), FLEET_FIELD)).toMatch(DEFAULT)
-        expect(table('cmdb_model')).toMatch(new RegExp(`${OEM_PID_FIELD}: StringColumn`))
-    })
-
-    it('offers only fleet assets as a case’s failed asset', () => {
-        const failed = column(table('sn_customerservice_case'), 'x_daas_ham_failed_asset')
-        expect(failed).toMatch(new RegExp(`referenceQual: '${fleetCondition()}'`))
-    })
-
-    it('offers Add to fleet only on an Asset not yet in the fleet', () => {
-        const action = source('../../fluent/ui/fleet-actions.now.ts')
-        expect(action).toMatch(new RegExp(`condition: 'current\\.${FLEET_FIELD} != true'`))
-        expect(action).toMatch(/roles: \[assetManager, admin\]/)
     })
 })

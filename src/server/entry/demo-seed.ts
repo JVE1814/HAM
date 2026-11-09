@@ -4,6 +4,7 @@ import { writeModelLifecycle } from '../platform/model-lifecycle.ts'
 import { refusal, str } from '../platform/records.ts'
 import type { Stage } from '../domain/lifecycle.ts'
 import type { CatalogEntryType } from '../domain/vocabulary.ts'
+import { OEM_PID_FIELD, SITE_FIELD, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 
 /**
  * Demo data for dev/test instances: two Customers with Sites, racks and stockrooms, models from the
@@ -46,7 +47,7 @@ export function loadDemoData(): void {
     const globex = customer('Globex Logistics (demo)', 'ACCT-DEMO-GLOBEX')
 
     const site = (name: string, company: string, city: string) =>
-        ensure('cmn_location', { name }, { company, city, x_daas_ham_is_site: true })
+        ensure('cmn_location', { name }, { company, city, [SITE_FIELD]: true })
     const acmeHq = site('Acme HQ Amsterdam', acme, 'Amsterdam')
     site('Acme Store 042 Utrecht', acme, 'Utrecht')
     const globexDc = site('Globex DC Frankfurt', globex, 'Frankfurt')
@@ -56,7 +57,7 @@ export function loadDemoData(): void {
     ensure('cmdb_ci_rack', { name: 'GLX-FRA-A-R12' }, { location: globexHall, company: globex, rack_units: 47, x_daas_ham_power_capacity_w: 6000 })
 
     const stockroom = (name: string, type: string, extra: Fields = {}) =>
-        ensure('alm_stockroom', { name }, { x_daas_ham_stockroom_type: type, ...extra })
+        ensure('alm_stockroom', { name }, { [STOCKROOM_TYPE_FIELD]: type, ...extra })
     const depot = stockroom('Central Depot Utrecht', 'central_depot')
     const stagingCentre = stockroom('Staging Centre Utrecht', 'staging_centre')
     const acmeSpares = stockroom('Acme HQ hot spares', 'customer_site', { x_daas_ham_customer: acme, location: acmeMdf })
@@ -66,7 +67,7 @@ export function loadDemoData(): void {
     const model = (pid: string, name: string, manufacturer: string, deviceClass: string, power = 0) =>
         ensure(
             'cmdb_hardware_product_model',
-            { x_daas_ham_oem_pid: pid },
+            { [OEM_PID_FIELD]: pid },
             {
                 name,
                 model_number: pid,
