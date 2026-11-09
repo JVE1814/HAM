@@ -34,7 +34,6 @@ export const x_daas_ham_order = Table({
         site: ReferenceColumn({ label: 'Site', referenceTable: 'cmn_location', mandatory: true }),
         agreement: ReferenceColumn({ label: 'Agreement', referenceTable: 'x_daas_ham_agreement', mandatory: true }),
         site_template: ReferenceColumn({ label: 'Site template', referenceTable: 'x_daas_ham_site_template' }),
-        requested_by_contact: ReferenceColumn({ label: 'Requested by', referenceTable: 'customer_contact' }),
         install_mode: ChoiceColumn({
             label: 'Install mode',
             choices: INSTALL_MODE_CHOICES,

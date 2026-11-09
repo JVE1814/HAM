@@ -20,7 +20,6 @@ import {
     RACK_FACE_CHOICES,
     REPLACEMENT_TIER_CHOICES,
     SEEN_SOURCE_CHOICES,
-    SITE_TIER_CHOICES,
     STAGING_SOURCE_CHOICES,
     STOCKROOM_TYPE_CHOICES,
 } from '../../server/domain/vocabulary'
@@ -147,11 +146,6 @@ export const cmn_location = Table({
     augments: 'cmn_location',
     schema: {
         x_daas_ham_is_site: BooleanColumn({ label: 'Customer site', default: false }),
-        x_daas_ham_site_tier: ChoiceColumn({
-            label: 'Site tier',
-            choices: SITE_TIER_CHOICES,
-            default: 'standard',
-        }),
         x_daas_ham_maintenance_schedule: ReferenceColumn({
             label: 'Maintenance window',
             referenceTable: 'cmn_schedule',
@@ -192,7 +186,6 @@ export const sn_customerservice_case = Table({
             readOnly: true,
             choices: REPLACEMENT_TIER_CHOICES,
         }),
-        x_daas_ham_proactive: BooleanColumn({ label: 'Raised by NOC', default: false }),
     },
     index: [{ name: 'x_daas_ham_case_failed_asset', unique: false, element: 'x_daas_ham_failed_asset' }],
 })

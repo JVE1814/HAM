@@ -759,6 +759,7 @@ Sources:
 | Business rule condition and filter | The check is the condition, behind a change test in the condition itself (`rules.now.ts`, `assurance.now.ts`) | The condition runs on every save the rule's table and action match, even when the filter does not; the rule fires only when both hold | matches | N36 |
 | Out-of-box transfer order line logic and the Asset | Inventory works the transfer orders sourcing raises, each unit handed over *In stock / Available* just before its line is inserted (`platform/transfers.ts` requestTransfer). Both combinations Inventory sets are one stage, *In transfer*, entered only while `active_to` is set and left only once it is cleared (`domain/lifecycle.ts`, `entry/assets.ts` refusesLifecycleChange); an Asset Inventory lets go takes back the stage it left (`entry/assets.ts` onTransferReleased) | *Push Status to Asset/Consumable* sets *In stock / Pending transfer* or *In transit / Reserved* with `active_to` set, and *In stock / Available* in the to-stockroom with it cleared at Received; *Release Asset on TOL cancel/delete* sets *In stock / Available* where the Asset is and clears it; *Validate TOL and check availibility* takes onto a line only an Asset *In stock / Available* with `active_to` clear. Each saves through `alm_asset` in the user's transaction, and the app's `alm_hardware` rules run on that save | matches | N38, N39 |
 | The platform's Model lifecycle table | A Model's manufacturer milestones are rows of `cmdb_model_lifecycle`, written as `cmdb_hardware_model_lifecycle` with lifecycle type `publisher`, source `internal`, the milestone as `lifecycle_phase` and its date as `start_date`; a write updates the active row of one Model, type, phase and source and never deletes; asset managers hold `model_manager` (`platform/model-lifecycle.ts`, ADR 0017) | Both tables are Model Management's (`com.snc.model`), with those columns and phase values; before rules refuse an insert without a start date, a second active row for one Model, type, phase and source, and a hardware lifecycle row for a Model that is not a hardware Model; this scope may read, create and update, not delete; create and write need `model_manager`, read `snc_internal` | matches (the app's use was not run on the instance) | N40 |
+| Platform fields the app uses in place of its own | An inventory tech's Stockrooms from `alm_stockroom.assignment_group` and `sys_user_grmember` (`platform/session.ts`); a Model's typical power from `cmdb_model.power_consumption` (`entry/racks.ts`); a lease's Lessor and schedule number in `ast_contract.vendor` and `vendor_contract`; on-site work linked through `wm_order.initiated_from` and `change_request.parent` (`platform/field-work.ts`, the rules on `wm_order`); ADR 0018 | The columns exist with those types; `sys_user_group` lets other scopes read only, `sys_user_grmember` read, create and update; no platform rule reads a contract's vendor fields, a work order's *Initiated from* or (beyond running the parent's workflows) a task's *Parent* | matches (the app's use was not run on the instance) | N41 |
 
 Notes:
 
@@ -1022,6 +1023,32 @@ Sources:
   and delete `model_manager`; list edit `nobody`. `model_manager` is a `com.snc.model` role;
   `procurement_user`, `sam` and `category_manager` contain it, `asset` does not. Default list of
   both tables: `model`, `lifecycle_phase`, `lifecycle_type`, `source`, `start_date`.
+- N41: Brazil instance, 2026-11-09, read through the Table API without saving anything (no Hardware
+  Asset Management Professional on it).
+  - Stockrooms and groups. `alm_stockroom.assignment_group` (*Assignment group*) references
+    `sys_user_group` and is the second field of the stockroom's default form. ACLs: create and write
+    on `alm_stockroom` take `inventory_admin`; create and write on `sys_user_grmember` take
+    `user_admin`. Application access: `sys_user_grmember` and `alm_stockroom` allow read, create and
+    update from other scopes, not delete; `task` allows read; `sys_user_group` allows read only.
+    Active before-query rules: none on `sys_user_grmember`; on `sys_user_group` the platform's *group
+    query* (active groups only, for an interactive user without `admin` or `user_admin`); on
+    `alm_stockroom` only the app's.
+  - Models. `cmdb_model.power_consumption` is an integer labelled *Power (watts)*, on the hardware
+    Model's default form. `cmdb_model.asset_tracking_strategy` (*Asset tracking strategy*, default
+    `leave_to_category`) has the choices `leave_to_category` (*Leave to category*),
+    `track_as_consumable` (*Create consumable asset*) and `do_not_track` (*Don't create assets*).
+  - Contracts. `ast_contract.vendor` (*Vendor*) references `core_company` with the qualifier
+    `vendor=true`; `vendor_contract` (*Contract number*) is a string of 40, mandatory and the table's
+    display field; `number` is read-only with a number default. None of the 23 active business rules
+    on `ast_contract` names `vendor` in its script.
+  - Task references. `sm_order.initiated_from` (*Initiated from*, which `wm_order` inherits) and
+    `task.parent` (*Parent*) reference `task`. No active business rule on `task`, `change_request`,
+    `sm_order` or `wm_order` names `initiated_from`; *Date Checks* on `sm_task` reads an assigned
+    crew's. The script includes that name it are `WorkManagementInitiation`, `SMDateValidation`,
+    `QueryRangeACLAuditor` and Customer Service's `CaseReportUtils`. The active rules on `task` and
+    `change_request` whose script names `.parent` are the three async *Affected group / location /
+    cost center notifications* and *SNC - Run parent workflows* (after insert and update), which
+    broadcasts an update to the workflow contexts of the parent record.
 
 ## Changes needed in the app
 

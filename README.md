@@ -353,7 +353,7 @@ What remains can only be confirmed on an instance or behind a vendor login:
     NaaS central depots (the demo's *Central Depot Utrecht* is one), so do not use *Update All*.
     Select the Provider IT's storerooms only and clear *Stockroom type* with *Update Selected*.
     Until then a Provider IT storeroom counts as a central depot: it is offered for receiving and a
-    blind count, and an inventory tech who is not its member does not see it. A NaaS depot cleared
+    blind count, and an inventory tech who is not in its Assignment group does not see it. A NaaS depot cleared
     by mistake is no longer offered for receiving or a blind count, receiving there answers HTTP
     400 and sourcing does not draw on its stock, until its type is set back to *Central depot*.
   - `alm_hardware`, filter

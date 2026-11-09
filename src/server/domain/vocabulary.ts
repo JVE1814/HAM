@@ -235,12 +235,6 @@ export const STOCKROOM_TYPE_CHOICES = {
 } as const
 export type StockroomType = keyof typeof STOCKROOM_TYPE_CHOICES
 
-export const SITE_TIER_CHOICES = {
-    standard: { label: 'Standard', sequence: 0 },
-    critical: { label: 'Critical', sequence: 1 },
-} as const
-export type SiteTier = keyof typeof SITE_TIER_CHOICES
-
 /** wm_order.x_daas_ham_purpose: what an FSM work order the app opened is for. */
 export const FIELD_PURPOSE_CHOICES = {
     install: { label: 'Install', sequence: 0 },

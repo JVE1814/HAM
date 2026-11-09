@@ -53,11 +53,11 @@ export function loadDemoData(): void {
     const acme = customer('Acme Retail (demo)', 'ACCT-DEMO-ACME')
     const globex = customer('Globex Logistics (demo)', 'ACCT-DEMO-GLOBEX')
 
-    const site = (name: string, company: string, tier: string, city: string) =>
-        ensure('cmn_location', { name }, { company, city, x_daas_ham_is_site: true, x_daas_ham_site_tier: tier })
-    const acmeHq = site('Acme HQ Amsterdam', acme, 'critical', 'Amsterdam')
-    site('Acme Store 042 Utrecht', acme, 'standard', 'Utrecht')
-    const globexDc = site('Globex DC Frankfurt', globex, 'critical', 'Frankfurt')
+    const site = (name: string, company: string, city: string) =>
+        ensure('cmn_location', { name }, { company, city, x_daas_ham_is_site: true })
+    const acmeHq = site('Acme HQ Amsterdam', acme, 'Amsterdam')
+    site('Acme Store 042 Utrecht', acme, 'Utrecht')
+    const globexDc = site('Globex DC Frankfurt', globex, 'Frankfurt')
     const acmeMdf = ensure('cmn_location', { name: 'Acme HQ Amsterdam - MDF' }, { parent: acmeHq, company: acme })
     const globexHall = ensure('cmn_location', { name: 'Globex DC Frankfurt - Hall A' }, { parent: globexDc, company: globex })
     const acmeRack = ensure('cmdb_ci_rack', { name: 'ACME-HQ-MDF-R01' }, { location: acmeMdf, company: acme, rack_units: 42, x_daas_ham_power_capacity_w: 3000 })

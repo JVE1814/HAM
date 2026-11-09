@@ -2,7 +2,7 @@
 
 Where the platform already has a field or a table for something, the app uses it and keeps none of its own
 (ADR 0001; a Model's milestones, ADR 0017). The columns and the table below duplicated one; each was checked on a
-Brazil instance without Hardware Asset Management Professional (2026-11-09).
+Brazil instance without Hardware Asset Management Professional (2026-11-09, external-contracts N41).
 
 ## Replaced
 
@@ -25,7 +25,7 @@ Brazil instance without Hardware Asset Management Professional (2026-11-09).
   owner* still says that a Lessor owns it.
 - **Track as asset**: `cmdb_model.x_daas_ham_track_as_asset`, which no code read, is gone. Whether a Model's units
   are tracked one by one is the platform's *Asset tracking strategy* (`cmdb_model.asset_tracking_strategy`: leave to
-  category, track as consumable, do not track). The cross-scope privileges on `alm_consumable` and
+  category, create consumable asset, don't create assets). The cross-scope privileges on `alm_consumable` and
   `std_change_record_producer`, which nothing used either, went with it.
 - **The record on-site work belongs to**: `wm_order` and `change_request` each carried three references
   (`x_daas_ham_order`, `x_daas_ham_return_order`, `x_daas_ham_audit`) naming the Order, Return order or Audit the
@@ -35,6 +35,39 @@ Brazil instance without Hardware Asset Management Professional (2026-11-09).
   task's class. On a Brazil instance the only platform rule that reads *Initiated from* is a date check on
   `sm_task` that reads a crew's, and the only one on a task's *Parent* runs the parent's workflows, of which an
   Order, a Return order and an Audit have none.
+
+## Removed with nothing in their place
+
+Columns nothing read or showed: a case's *Raised by NOC* (`sn_customerservice_case.x_daas_ham_proactive`),
+a Site's *Site tier* (`cmn_location.x_daas_ham_site_tier`; the replacement service level is the Agreement's) and an
+Order's *Requested by* contact (`x_daas_ham_order.requested_by_contact`; the task's *Opened by* says who raised it).
+
+## Kept custom
+
+- **Lease schedule table**: the platform's `ast_lease` cannot be extended and is shared with the Provider IT's own
+  leases; the app's lease columns and jobs would land on it. It stays a child of `ast_contract`.
+- **A lease's monthly payment**: `ast_contract.payment_amount` is a currency field that the platform's cost rules
+  roll up.
+- **An Asset's install completed**: `alm_asset.install_date` is synchronised with the CI and feeds the platform's
+  depreciation.
+- **Customer and Site on the app's task tables**: `task.company` and `task.location` would name the same thing two
+  ways, as the app's twelve tables that are not tasks keep `customer` and `site`.
+- **Stockroom type, Customer site, OEM PID**: the markers that tell NaaS records from the Provider IT's (ADR 0016),
+  where a blank marker means not NaaS; the platform's own stockroom type is filled on IT's stockrooms too.
+- **An Agreement's account manager and renewal lead days**: `ast_contract`'s contract administrator and renewal
+  fields mean something else.
+- **Site templates**: the platform's model components (`cmdb_m2m_model_component`) have no quantity.
+- **Staging steps**: the platform's checklist items have a name and a done flag only, no mandatory step and no step
+  an integration completes.
+- **OEM coverage**: one row per serial number, which a contract is not.
+- **Cost facts**: `fm_expense_line` has no Customer, Site or period.
+- **Imports through rules**, not transform maps: one row makes several records.
+- **The billing pull API**: asked for as such (D66).
+- **ASN import columns no code reads** (distributor, ship date, carrier, tracking number): they are the layout of
+  the distributor's file, and the import row is where an operator reads them.
+- **An Order line's allocated quantity and latest purchase order**: written only, but shown on the line's form and
+  lists.
+- Anything whose platform equivalent needs Hardware Asset Management Professional, which is not licensed.
 
 ## Consequences
 

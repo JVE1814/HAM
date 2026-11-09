@@ -383,8 +383,7 @@ Confidence tags:
 | | `oem_pid` | string | P1 | Canonical vendor product ID. Indexed. |
 | `alm_stockroom` | `stockroom_type` | choice: central depot / staging centre / customer site | P1 | |
 | | `account` | ref `customer_account` | P1 | For customer-site stockrooms |
-| `cmn_location` | `site_tier` | choice | P1 | Drives replacement SLA |
-| | `maintenance_schedule` | ref `cmn_schedule` | P1 | Change scheduling |
+| `cmn_location` | `maintenance_schedule` | ref `cmn_schedule` | P1 | Change scheduling |
 | | `site_contacts` | glide_list `customer_contact` | P1 | |
 
 ### 9.3 Scoped tables — Phase 1
@@ -397,7 +396,7 @@ Confidence tags:
 | `customer_catalog_entry` | — | account, model **or** site_template, monthly_rate, active, valid_from/to |
 | `site_template` | — | name, account (blank = global), description, active |
 | `site_template_item` | — | site_template, model or device_class, quantity, optional (bool), kit (optics/PSU) |
-| `order` | `task` | order_type (site rollout / device add / device replace), account, site, agreement, requested_by (contact), install_mode, requested_date, ritm, approval_reason, stage |
+| `order` | `task` | order_type (site rollout / device add / device replace), account, site, agreement, install_mode, requested_date, ritm, approval_reason, stage |
 | `order_line` | — | order, model, quantity, sourcing_result (reserved spare / central stock / PO), transfer_order, po_line, staging_task(s), fsm_work_order, change_request, stage |
 | `staging_task` | `task` | asset, order_line, staging_source, checklist_template, firmware_target, verified_by, result |
 | `staging_checklist_template` | — | account (optional), device_class / model family, vendor, items (child table `staging_checklist_item`) |

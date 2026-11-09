@@ -7167,6 +7167,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: '104e258d26234b8c96fa76fb43479dd2'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham_order'
                             element: 'requested_by_contact'
@@ -8873,6 +8874,7 @@ declare global {
                     {
                         table: 'sys_choice'
                         id: '1950694a3c24495f95a6eac394cc6a0e'
+                        deleted: true
                         key: {
                             name: 'cmn_location'
                             element: 'x_daas_ham_site_tier'
@@ -17135,6 +17137,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: '468ab66d644f41cf930d5f50f7e9964a'
+                        deleted: true
                         key: {
                             name: 'sn_customerservice_case'
                             element: 'x_daas_ham_proactive'
@@ -21593,6 +21596,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: '5eefa3252f904b3f9e911d7de9d1fc78'
+                        deleted: true
                         key: {
                             name: 'sn_customerservice_case'
                             element: 'x_daas_ham_proactive'
@@ -24163,6 +24167,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: '6c8f19ef0ba1437281145d2505b5fcd6'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham_order'
                             element: 'requested_by_contact'
@@ -33046,6 +33051,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: '992e5cbc3a404cda97c86418f00f55df'
+                        deleted: true
                         key: {
                             name: 'cmn_location'
                             element: 'x_daas_ham_site_tier'
@@ -33455,6 +33461,7 @@ declare global {
                     {
                         table: 'sys_choice'
                         id: '9ae92e73f8464fcab003a8e3067b915a'
+                        deleted: true
                         key: {
                             name: 'cmn_location'
                             element: 'x_daas_ham_site_tier'
@@ -35974,6 +35981,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: 'a69b1018c5d34003b3c2a44aadc9eeae'
+                        deleted: true
                         key: {
                             name: 'cmn_location'
                             element: 'x_daas_ham_site_tier'
@@ -42246,6 +42254,7 @@ declare global {
                     {
                         table: 'sys_choice_set'
                         id: 'c95fb601270f4d2e93a5fa491e85b5c6'
+                        deleted: true
                         key: {
                             name: 'cmn_location'
                             element: 'x_daas_ham_site_tier'
