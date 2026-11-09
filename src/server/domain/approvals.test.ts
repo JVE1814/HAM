@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupDecisions, rollupApprovals } from './approvals'
+import { approversToAsk, groupDecisions, rollupApprovals } from './approvals'
 
 describe('rollupApprovals', () => {
     it('is approved once every required approver group has an approval', () => {
@@ -60,5 +60,28 @@ describe('groupDecisions', () => {
             { group: 'account_manager', state: 'approved' },
             { group: 'customer_admin', state: 'approved' },
         ])
+    })
+})
+
+describe('approversToAsk', () => {
+    it('asks nobody when no group must approve', () => {
+        expect(approversToAsk([], ['ca'], ['am'])).toEqual([])
+    })
+
+    it('asks the customer admins for the customer-admin group', () => {
+        expect(approversToAsk(['customer_admin'], ['ca1', 'ca2'], ['am'])).toEqual(['ca1', 'ca2'])
+    })
+
+    it('asks the provider approvers in place of the admins of a customer that has none', () => {
+        expect(approversToAsk(['customer_admin'], [], ['am'])).toEqual(['am'])
+    })
+
+    it('asks the customer admins and the provider approvers when both groups must approve', () => {
+        expect(approversToAsk(['customer_admin', 'account_manager'], ['ca'], ['am'])).toEqual(['ca', 'am'])
+    })
+
+    it('asks each approver once', () => {
+        expect(approversToAsk(['customer_admin', 'account_manager'], [], ['am1', 'am2'])).toEqual(['am1', 'am2'])
+        expect(approversToAsk(['customer_admin', 'account_manager'], ['both'], ['both'])).toEqual(['both'])
     })
 })

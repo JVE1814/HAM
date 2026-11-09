@@ -1,3 +1,5 @@
+import type { Stage } from './lifecycle.ts'
+import { INSTALLED_STAGES } from './returns.ts'
 import type { OrderStage } from './vocabulary.ts'
 
 /** Break-fix (P2.3, D58): what "Raise replacement" does on a case that may already link a replacement Order. */
@@ -19,4 +21,14 @@ export const ENDED_UNFULFILLED: readonly string[] = ['rejected', 'cancelled']
 export function replacementStep(linkedStage: OrderStage | null): ReplacementStep {
     if (linkedStage === null || ENDED_UNFULFILLED.includes(linkedStage)) return 'raise'
     return linkedStage === 'draft' ? 'submit_draft' : 'keep'
+}
+
+/**
+ * Why "Raise replacement" raises no Order for the case's failed Asset, or null when it does: only a fleet asset (ADR
+ * 0016) installed at a Site is replaced like-for-like.
+ */
+export function replacementProblem(failed: { fleet: boolean; stage: Stage | null }): string | null {
+    if (!failed.fleet) return 'Only a fleet asset is replaced: the failed asset is not one'
+    if (failed.stage === null || !INSTALLED_STAGES.includes(failed.stage)) return 'Only installed assets can be replaced'
+    return null
 }

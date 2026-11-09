@@ -34,3 +34,21 @@ export function groupDecisions(
         return customerAdminIds.length === 0 ? [provider, { group: 'customer_admin', state }] : [provider]
     })
 }
+
+/**
+ * Who is asked to decide for the `required` groups: the Customer's admins for the customer-admin group, the
+ * provider-side approvers for the account-manager group, and those too in place of the admins of a Customer that has
+ * none (`groupDecisions` then counts their decision for both groups). Each is asked once.
+ */
+export function approversToAsk(
+    required: readonly Approver[],
+    customerAdminIds: readonly string[],
+    providerApproverIds: readonly string[],
+): string[] {
+    const ids = new Set<string>()
+    for (const group of required) {
+        const admins = group === 'customer_admin' ? customerAdminIds : []
+        for (const id of admins.length > 0 ? admins : providerApproverIds) ids.add(id)
+    }
+    return [...ids]
+}

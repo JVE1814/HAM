@@ -72,3 +72,11 @@ function parseTimestamp(value: string): number {
     const offset = (match[8] === '-' ? -1 : 1) * (offsetHours * 60 + offsetMinutes) * 60_000
     return date.getTime() - offset
 }
+
+/**
+ * Whether an event is stored: device events keep state changes only, so a sighting that follows a stored sighting adds
+ * nothing. `lastStored` (the kind of the Asset's newest stored event, '' for none) is read only for a sighting.
+ */
+export function isStateChange(kind: DeviceEventKind, lastStored: () => string): boolean {
+    return kind !== 'seen' || lastStored() !== 'seen'
+}

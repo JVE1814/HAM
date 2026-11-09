@@ -1,5 +1,5 @@
 import type { Stage } from './lifecycle.ts'
-import type { SubscriptionLineStatus, SubscriptionLineType } from './vocabulary.ts'
+import type { SeenSource, SubscriptionLineStatus, SubscriptionLineType } from './vocabulary.ts'
 
 /**
  * In service: an Asset installed at a Site and seen by monitoring after the install. That instant
@@ -23,6 +23,14 @@ export function decideInService(facts: InServiceFacts): InServiceDecision {
         return { goesLive: false, reason: 'not seen since install' }
     }
     return { goesLive: true, at: facts.lastSeenAt, stage: facts.temporary ? 'temporary_deployment' : 'in_service' }
+}
+
+/**
+ * The Seen source of a sighting read from the Asset's CI: Discovery's own (it writes the discovery source
+ * `ServiceNow`), or a connector's for any other source.
+ */
+export function seenSourceOf(discoverySource: string): Extract<SeenSource, 'discovery' | 'connector'> {
+    return discoverySource === 'ServiceNow' ? 'discovery' : 'connector'
 }
 
 export interface SubscriptionLineView {

@@ -1,8 +1,8 @@
 import { OPEN_LINE_STAGES } from './entitlement.ts'
 import { fleetStagesQuery, naasStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
 import type { Stage } from './lifecycle.ts'
-import type { ShortfallRoute } from './returns.ts'
-import type { LeaseEndAction, LineStage, RmaState, StockroomType } from './vocabulary.ts'
+import { shortfallRoute, type ShortfallRoute } from './returns.ts'
+import type { LeaseEndAction, LineStage, OrderType, RmaState, StockroomType } from './vocabulary.ts'
 
 /**
  * Sourcing: where an Order line's Assets come from.
@@ -57,6 +57,86 @@ function sourceOf(candidate: StockCandidate, seeker: Seeker): Source | null {
 const PRIORITY: Record<SourcingRequest['purpose'], readonly Source[]> = {
     new: ['spare_pool', 'central_stock'],
     replace: ['customer_site_stock', 'spare_pool', 'central_stock'],
+}
+
+/** What a line of an Order of this type is sourced for: a device replace takes the hot spare at its Site first. */
+export function sourcingPurpose(orderType: OrderType | ''): SourcingRequest['purpose'] {
+    return orderType === 'device_replace' ? 'replace' : 'new'
+}
+
+/**
+ * How many candidates to read per Source for a shortfall: more than are needed, as a claim may find a candidate taken
+ * since it was read, yet bounded, so a large stock is not read whole for a small need.
+ */
+export function candidateLimit(shortfall: number): number {
+    return shortfall * 5 + 50
+}
+
+/** An Order line as sourcing counts it. */
+export interface LineNeed {
+    quantity: number
+    /** Assets on the line, in any stage. */
+    allocated: number
+    /** Units bought for it and not yet received (its On order count). */
+    onOrder: number
+    /** OEM advance replacements still to come for it (`RMA_AWAITED`). */
+    awaitedRmas: number
+}
+
+/** Units the line still needs: not allocated, on order or under an OEM RMA whose replacement is still to come. */
+export function lineShortfall(line: LineNeed): number {
+    return line.quantity - line.allocated - line.onOrder - line.awaitedRmas
+}
+
+/**
+ * Units to buy when the line is saved: what the pass planned (`toPurchase`), less any need met since it read the line,
+ * as when a receipt is allocated with nothing left on order to take it off. `shortfall` is read afresh at the save and
+ * counts the stock the pass `putBack` (not bought). A need grown meanwhile is left to a later pass, which picks stock
+ * before it buys.
+ */
+export function stillToBuy(toPurchase: number, shortfall: number, putBack: number): number {
+    return Math.max(0, Math.min(toPurchase, shortfall - putBack))
+}
+
+/**
+ * Whether stock picked in `fromStockroomId` needs a transfer order to the staging centre before it is staged: it sits
+ * in another stockroom. Stock already there, or in no stockroom, is staged where it is, and so is all of it while no
+ * staging centre is set.
+ */
+export function needsTransfer(fromStockroomId: string, stagingStockroomId: string): boolean {
+    return !!stagingStockroomId && !!fromStockroomId && fromStockroomId !== stagingStockroomId
+}
+
+/** The Asset a break-fix line replaces, as sourcing weighs an OEM advance replacement for the line's shortfall. */
+export interface ReplacedUnit {
+    modelId: string
+    /** The day its OEM coverage ends; '' with none. */
+    coverageEnd: string
+}
+
+/**
+ * Where what a line of `modelId` still misses goes (domain/returns `shortfallRoute`). Only a break-fix line for the same
+ * Model as the unit it replaces, covered by the OEM today, can be served by an advance replacement; pass `replaced`
+ * for a break-fix line only (null otherwise): a refresh line also names the Asset it replaces, but that Asset is healthy.
+ */
+export function shortfallRouteFor(modelId: string, replaced: ReplacedUnit | null, today: string, missing: number): ShortfallRoute {
+    const sameModel = !!replaced && replaced.modelId === modelId
+    const coveredToday = !!replaced && sameModel && replaced.coverageEnd >= today
+    return shortfallRoute({ missing, purpose: sameModel ? 'replace' : 'new', coveredToday })
+}
+
+/**
+ * What Cancel order does with a unit it takes off its line, by the stage the unit is in:
+ * - `stays_spare`: a hot spare stays in its Customer's Spare pool, only unlinked from the line;
+ * - `stays_in_transfer`: a unit in transfer is the Provider's again but stays in transfer (domain/lifecycle
+ *   `checkTransition`), free stock once Inventory lets it go;
+ * - `free_stock`: any other unit becomes the Provider's free stock, available.
+ */
+export type CancelledUnit = 'stays_spare' | 'stays_in_transfer' | 'free_stock'
+
+export function cancelledUnit(stage: Stage | null): CancelledUnit {
+    if (stage === 'spare_pool') return 'stays_spare'
+    return stage === 'in_transfer' ? 'stays_in_transfer' : 'free_stock'
 }
 
 /** What a sourcing run looks for: the line's request less its quantity; a customerId of '' wants free stock only. */

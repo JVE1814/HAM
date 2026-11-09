@@ -3,15 +3,22 @@ import { andEachClause } from './encoded-query'
 import { stagesQuery } from './lifecycle'
 import {
     advanceReplacementRma,
+    cancelledUnit,
+    candidateLimit,
     freeStockOf,
     isClaimable,
     isFree,
+    lineShortfall,
     lineStillOpen,
+    needsTransfer,
     pickForSparePool,
     planSourcing,
     reservedSparesQuery,
     shortfallOutcome,
+    shortfallRouteFor,
+    sourcingPurpose,
     sparePoolShortfall,
+    stillToBuy,
     stockQueries,
     type OpenRma,
     type PurchaseResult,
@@ -322,5 +329,107 @@ describe('pickForSparePool', () => {
     it('takes free central stock only, never reserved or customer-site stock', () => {
         expect(pickForSparePool(stock, 'c9300', 5)).toEqual(['central-1', 'central-2', 'staging-1'])
         expect(pickForSparePool(stock, 'c9300', 1)).toEqual(['central-1'])
+    })
+})
+
+describe('sourcingPurpose', () => {
+    it('sources a device replace as a replacement and every other Order as a new install', () => {
+        expect(sourcingPurpose('device_replace')).toBe('replace')
+        for (const type of ['site_rollout', 'device_add', 'temporary', 'refresh', ''] as const) expect(sourcingPurpose(type)).toBe('new')
+    })
+})
+
+describe('candidateLimit', () => {
+    it('reads more candidates than the shortfall, so claims lost to another run leave enough', () => {
+        expect(candidateLimit(1)).toBe(55)
+        expect(candidateLimit(20)).toBe(150)
+    })
+})
+
+describe('lineShortfall', () => {
+    it('is what the line asks for less its units, its units on order and its awaited OEM replacements', () => {
+        expect(lineShortfall({ quantity: 10, allocated: 3, onOrder: 2, awaitedRmas: 1 })).toBe(4)
+    })
+
+    it('is zero or less for a line with nothing left to source', () => {
+        expect(lineShortfall({ quantity: 2, allocated: 2, onOrder: 0, awaitedRmas: 0 })).toBe(0)
+        expect(lineShortfall({ quantity: 2, allocated: 2, onOrder: 1, awaitedRmas: 0 })).toBe(-1)
+    })
+})
+
+describe('stillToBuy', () => {
+    it('buys what the pass planned while the line still misses it', () => {
+        expect(stillToBuy(3, 3, 0)).toBe(3)
+    })
+
+    it('buys less when a receipt met part of the need since the line was counted', () => {
+        expect(stillToBuy(3, 2, 0)).toBe(2)
+        expect(stillToBuy(3, 0, 0)).toBe(0)
+    })
+
+    it('does not buy the stock the pass put back for want of a transfer order', () => {
+        expect(stillToBuy(1, 3, 2)).toBe(1)
+        expect(stillToBuy(1, 2, 2)).toBe(0)
+    })
+
+    it('leaves a need grown meanwhile to a later pass', () => {
+        expect(stillToBuy(1, 5, 0)).toBe(1)
+    })
+
+    it('never buys a negative quantity', () => {
+        expect(stillToBuy(2, -1, 0)).toBe(0)
+        expect(stillToBuy(-1, 3, 0)).toBe(0)
+    })
+})
+
+describe('needsTransfer', () => {
+    it('transfers stock picked outside the staging centre', () => {
+        expect(needsTransfer('depot', 'lab')).toBe(true)
+    })
+
+    it('stages stock where it is at the staging centre, in no stockroom, or while no staging centre is set', () => {
+        expect(needsTransfer('lab', 'lab')).toBe(false)
+        expect(needsTransfer('', 'lab')).toBe(false)
+        expect(needsTransfer('depot', '')).toBe(false)
+    })
+})
+
+describe('shortfallRouteFor', () => {
+    const today = '2026-11-09'
+
+    it('asks the OEM for an advance replacement of a covered unit of the same Model', () => {
+        expect(shortfallRouteFor('c9300', { modelId: 'c9300', coverageEnd: '2026-11-09' }, today, 1)).toBe('oem_advance_replacement')
+    })
+
+    it('purchases when the coverage has ended, or the unit has none', () => {
+        expect(shortfallRouteFor('c9300', { modelId: 'c9300', coverageEnd: '2026-11-08' }, today, 1)).toBe('purchase')
+        expect(shortfallRouteFor('c9300', { modelId: 'c9300', coverageEnd: '' }, today, 1)).toBe('purchase')
+    })
+
+    it('purchases a replacement of another Model, covered or not', () => {
+        expect(shortfallRouteFor('c9300', { modelId: 'c9200', coverageEnd: '2030-01-01' }, today, 1)).toBe('purchase')
+    })
+
+    it('purchases for a line that replaces no failed unit', () => {
+        expect(shortfallRouteFor('c9300', null, today, 2)).toBe('purchase')
+    })
+
+    it('routes nothing when nothing is missing', () => {
+        expect(shortfallRouteFor('c9300', { modelId: 'c9300', coverageEnd: '2030-01-01' }, today, 0)).toBe('none')
+        expect(shortfallRouteFor('c9300', null, today, -1)).toBe('none')
+    })
+})
+
+describe('cancelledUnit', () => {
+    it('leaves a hot spare in its Spare pool', () => {
+        expect(cancelledUnit('spare_pool')).toBe('stays_spare')
+    })
+
+    it('leaves a unit in transfer where it is, to be free stock once Inventory lets it go', () => {
+        expect(cancelledUnit('in_transfer')).toBe('stays_in_transfer')
+    })
+
+    it('makes any other unit free stock', () => {
+        for (const stage of ['reserved', 'staging', 'staged', 'available', null] as const) expect(cancelledUnit(stage)).toBe('free_stock')
     })
 })

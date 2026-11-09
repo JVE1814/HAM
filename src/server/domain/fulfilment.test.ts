@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
     anythingShipped,
     approvalAwaited,
+    closedStateFor,
     followsLines,
     leftInTransit,
     lineStageFor,
@@ -218,5 +219,19 @@ describe('followsLines', () => {
 
     it('keeps a complete Order complete when its assets later leave service', () => {
         expect(followsLines('complete')).toBe(false)
+    })
+})
+
+describe('closedStateFor', () => {
+    it('closes the task of an Order that ends: complete, rejected (incomplete) or cancelled (skipped)', () => {
+        expect(closedStateFor('complete')).toBe(3)
+        expect(closedStateFor('rejected')).toBe(4)
+        expect(closedStateFor('cancelled')).toBe(7)
+    })
+
+    it('leaves the task open in every other stage', () => {
+        for (const stage of ['draft', 'awaiting_approval', 'sourcing', 'preparing', 'delivering', 'installing'] as const) {
+            expect(closedStateFor(stage)).toBeUndefined()
+        }
     })
 })

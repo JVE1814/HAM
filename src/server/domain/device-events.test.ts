@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseDeviceEvents } from './device-events'
+import { isStateChange, parseDeviceEvents } from './device-events'
 
 const NOW = Date.parse('2026-11-06T12:00:00Z')
 
@@ -104,5 +104,23 @@ describe('parseDeviceEvents', () => {
         if ('error' in result) throw new Error(result.error)
         expect(result.events.map((e) => e.identifier)).toEqual(['A'])
         expect(result.rejected).toEqual([{ index: 1, reason: 'observed_at is in the future' }])
+    })
+})
+
+describe('isStateChange', () => {
+    it('stores a first sighting and one that follows a down or an up', () => {
+        for (const last of ['', 'down', 'up']) expect(isStateChange('seen', () => last)).toBe(true)
+    })
+
+    it('does not store a sighting that follows a sighting', () => {
+        expect(isStateChange('seen', () => 'seen')).toBe(false)
+    })
+
+    it('stores every down and up without reading the last event', () => {
+        const unread = () => {
+            throw new Error('read')
+        }
+        expect(isStateChange('down', unread)).toBe(true)
+        expect(isStateChange('up', unread)).toBe(true)
     })
 })

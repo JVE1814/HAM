@@ -155,6 +155,17 @@ export function approvalAwaited(required: readonly Approver[], decisions: readon
     return waiting ? `waiting for ${who} to decide` : `no approval from ${who} and none still requested`
 }
 
+/**
+ * The platform's task states an Order takes: Work in Progress from its approval on, and the state it closes with as
+ * it ends complete (Closed Complete), rejected (Closed Incomplete) or cancelled (Closed Skipped).
+ */
+export const ORDER_TASK_STATE = { inProgress: 2, complete: 3, rejected: 4, cancelled: 7 } as const
+
+/** The task state an Order is closed with as it enters `stage`; undefined for a stage that leaves it open. */
+export function closedStateFor(stage: OrderStage): number | undefined {
+    return stage === 'complete' || stage === 'rejected' || stage === 'cancelled' ? ORDER_TASK_STATE[stage] : undefined
+}
+
 /** Order stages its lines no longer move: before approval, and once rejected, cancelled or complete. */
 const SETTLED_ORDER_STAGES: readonly string[] = ['draft', 'awaiting_approval', 'rejected', 'cancelled', 'complete']
 

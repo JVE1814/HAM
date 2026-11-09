@@ -2,6 +2,9 @@ import type { StagingSource } from './vocabulary.ts'
 
 /** Staging: choosing the checklist for an Asset and telling when it is done. */
 
+/** How an Asset is staged when nothing says otherwise: by the Provider, in house. */
+export const DEFAULT_STAGING_SOURCE: StagingSource = 'in_house'
+
 export interface StagingTemplateView {
     id: string
     name: string

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { ENDED_UNFULFILLED, replacementStep } from './breakfix'
+import { ENDED_UNFULFILLED, replacementProblem, replacementStep } from './breakfix'
 
 describe('replacementStep', () => {
     it('raises a replacement for a case that links none', () => {
@@ -33,5 +33,23 @@ describe('the Raise replacement action', () => {
         const stages = /\[([^\]]*)\]\.indexOf\(String\(current\.x_daas_ham_replacement_order\.stage\)\)/.exec(condition)?.[1]
         expect(stages?.split(',').map((stage) => stage.trim().replace(/'/g, ''))).toEqual([...ENDED_UNFULFILLED])
         expect(condition).toContain("current.x_daas_ham_replacement_order == ''")
+    })
+})
+
+describe('replacementProblem', () => {
+    it('replaces no equipment outside the fleet, whatever its stage', () => {
+        expect(replacementProblem({ fleet: false, stage: 'in_service' })).toBe('Only a fleet asset is replaced: the failed asset is not one')
+    })
+
+    it('replaces an installed fleet asset', () => {
+        for (const stage of ['in_service', 'temporary_deployment', 'pending_in_service'] as const) {
+            expect(replacementProblem({ fleet: true, stage })).toBeNull()
+        }
+    })
+
+    it('replaces no fleet asset that is not installed', () => {
+        for (const stage of ['available', 'staged', 'shipped', 'pending_return', 'pending_evaluation', null] as const) {
+            expect(replacementProblem({ fleet: true, stage })).toBe('Only installed assets can be replaced')
+        }
     })
 })
