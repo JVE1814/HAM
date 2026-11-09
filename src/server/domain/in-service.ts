@@ -32,7 +32,10 @@ export interface SubscriptionLineView {
     status: 'pending' | 'active' | 'ended'
 }
 
-/** The open Subscription line an in-service Asset delivers: its Site's package, else its Device-class line. */
+/**
+ * The open Subscription line an in-service Asset delivers: its Site's package, else its Device-class line. A Device-class
+ * line for the Asset's Site is chosen before one with no Site, whatever order the lines are read in.
+ */
 export function chooseSubscriptionLine(
     lines: readonly SubscriptionLineView[],
     asset: { siteId: string; deviceClass: string },
@@ -40,8 +43,7 @@ export function chooseSubscriptionLine(
     const open = lines.filter((l) => l.status !== 'ended')
     const sitePackage = open.find((l) => l.lineType === 'site_package' && l.siteId === asset.siteId)
     if (sitePackage) return sitePackage.id
-    const classLine = open.find(
-        (l) => l.lineType === 'device_class' && l.deviceClass === asset.deviceClass && (!l.siteId || l.siteId === asset.siteId),
-    )
+    const classLines = open.filter((l) => l.lineType === 'device_class' && l.deviceClass === asset.deviceClass)
+    const classLine = classLines.find((l) => l.siteId && l.siteId === asset.siteId) ?? classLines.find((l) => !l.siteId)
     return classLine?.id ?? null
 }

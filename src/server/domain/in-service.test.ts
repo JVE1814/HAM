@@ -44,4 +44,30 @@ describe('chooseSubscriptionLine', () => {
     it('finds nothing when no open line fits', () => {
         expect(chooseSubscriptionLine(lines, { siteId: 'site-b', deviceClass: 'ap' })).toBeNull()
     })
+
+    describe('with a site-less and a Site-specific line for the device class', () => {
+        const siteLess = { id: 'switches', lineType: 'device_class' as const, siteId: '', deviceClass: 'switch', status: 'active' as const }
+        const siteA = { id: 'switches-a', lineType: 'device_class' as const, siteId: 'site-a', deviceClass: 'switch', status: 'active' as const }
+
+        it('chooses the line for the asset site when it is read after the site-less one', () => {
+            expect(chooseSubscriptionLine([siteLess, siteA], { siteId: 'site-a', deviceClass: 'switch' })).toBe('switches-a')
+        })
+
+        it('chooses the line for the asset site when it is read before the site-less one', () => {
+            expect(chooseSubscriptionLine([siteA, siteLess], { siteId: 'site-a', deviceClass: 'switch' })).toBe('switches-a')
+        })
+
+        it('chooses the site-less line for an asset at another site, in either order', () => {
+            expect(chooseSubscriptionLine([siteA, siteLess], { siteId: 'site-b', deviceClass: 'switch' })).toBe('switches')
+            expect(chooseSubscriptionLine([siteLess, siteA], { siteId: 'site-b', deviceClass: 'switch' })).toBe('switches')
+        })
+
+        it('passes over an ended line for the asset site', () => {
+            expect(chooseSubscriptionLine([{ ...siteA, status: 'ended' }, siteLess], { siteId: 'site-a', deviceClass: 'switch' })).toBe('switches')
+        })
+
+        it('never gives a Site-specific line to an asset without a site', () => {
+            expect(chooseSubscriptionLine([siteA], { siteId: '', deviceClass: 'switch' })).toBeNull()
+        })
+    })
 })
