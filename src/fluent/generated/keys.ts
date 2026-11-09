@@ -3022,6 +3022,10 @@ declare global {
                         table: 'sys_module'
                         id: '4e4940e10cae4ead97e954f646da0aaf'
                     }
+                    src_server_platform_disposal_ts: {
+                        table: 'sys_module'
+                        id: '763c246e16324aa499fa4fe7dad4ceb0'
+                    }
                     src_server_platform_events_ts: {
                         table: 'sys_module'
                         id: '33a35be1761245e380a76999fa5bd4fa'
