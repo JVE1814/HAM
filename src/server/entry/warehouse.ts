@@ -58,7 +58,15 @@ function summarise(asset: GlideRecord): AssetSummary {
     }
 }
 
+/** Receive, put away, pick and the stockroom list are depot work: inventory techs (asset managers and admins too). */
 function allowed(response: RESTAPIResponse): boolean {
+    if (gs.hasRole(ROLE.inventoryTech)) return true
+    reply(response, 403, { error: 'Requires the inventory tech role' })
+    return false
+}
+
+/** A look-up only reads the Asset, so field techs, who read every Asset, may look up too. */
+function allowedLookup(response: RESTAPIResponse): boolean {
     if (gs.hasRole(ROLE.inventoryTech) || gs.hasRole(ROLE.fieldTech)) return true
     reply(response, 403, { error: 'Requires the inventory tech or field tech role' })
     return false
@@ -81,7 +89,7 @@ function body(request: RESTAPIRequest): Record<string, string> {
 
 /** GET /assets/{code}: look an asset up by serial, Provider tag or Customer tag. */
 export function lookupAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
-    if (!allowed(response)) return
+    if (!allowedLookup(response)) return
     const asset = findAssetByIdentifier(String(request.pathParams.code ?? ''))
     if (!asset) return reply(response, 404, { error: 'No asset with that serial or tag' })
     reply(response, 200, summarise(asset))
@@ -106,7 +114,7 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
 
     const stockroom = visibleStockroom(input.stockroom)
     if (!stockroom) return reply(response, 400, { error: 'Choose one of your stockrooms' })
-    // A visible stockroom may be a customer site (field techs see them all); units arrive only at the Provider's own.
+    // A visible stockroom may be a customer site (asset managers see them all); units arrive only at the Provider's own.
     const wrongStockroom = receivingProblem(stockroomType(stockroom))
     if (wrongStockroom) return reply(response, 400, { error: wrongStockroom })
 

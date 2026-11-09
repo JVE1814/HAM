@@ -23,6 +23,16 @@ export interface Stockroom {
 
 const BASE = '/api/x_daas_ham/naas'
 
+/** A failed call, with its HTTP status. */
+export class ApiError extends Error {
+    status: number
+
+    constructor(message: string, status: number) {
+        super(message)
+        this.status = status
+    }
+}
+
 async function call<T>(method: 'GET' | 'POST', path: string, body?: object): Promise<T> {
     const response = await fetch(`${BASE}${path}`, {
         method,
@@ -31,7 +41,7 @@ async function call<T>(method: 'GET' | 'POST', path: string, body?: object): Pro
     })
     const payload = await response.json().catch(() => ({}))
     const result = payload.result ?? payload
-    if (!response.ok) throw new Error(restErrorMessage(result.error, response.status))
+    if (!response.ok) throw new ApiError(restErrorMessage(result.error, response.status), response.status)
     return result as T
 }
 
@@ -43,5 +53,13 @@ export const warehouseApi = {
     pick: (input: { code: string; order: string }) => call<AssetSummary>('POST', '/pick', input),
     auditScan: (input: { audit: string; code: string }) =>
         call<{ audit: string; scanned: string }>('POST', `/audits/${encodeURIComponent(input.audit)}/scan`, { code: input.code }),
-    stockrooms: () => call<{ stockrooms: Stockroom[] }>('GET', '/stockrooms').then((r) => r.stockrooms),
+    /** Stockrooms to receive into and put away to; null when the user may not do depot work (HTTP 403: field techs). */
+    stockrooms: () =>
+        call<{ stockrooms: Stockroom[] }>('GET', '/stockrooms').then(
+            (r): Stockroom[] | null => r.stockrooms,
+            (error: unknown) => {
+                if (error instanceof ApiError && error.status === 403) return null
+                throw error
+            },
+        ),
 }

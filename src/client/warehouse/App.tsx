@@ -5,10 +5,11 @@ import ScanField from './ScanField'
 
 type Mode = 'receive' | 'putaway' | 'pick' | 'audit' | 'lookup'
 
-const MODES: Array<{ id: Mode; title: string; prompt: string }> = [
-    { id: 'receive', title: 'Receive', prompt: 'Scan the serial of each arriving unit' },
-    { id: 'putaway', title: 'Put away', prompt: 'Scan the asset, it moves to the selected stockroom' },
-    { id: 'pick', title: 'Pick', prompt: 'Scan each asset for the order' },
+/** `depot`: stockroom work, for inventory techs only (a field tech audits and looks up). */
+const MODES: Array<{ id: Mode; title: string; prompt: string; depot?: true }> = [
+    { id: 'receive', title: 'Receive', prompt: 'Scan the serial of each arriving unit', depot: true },
+    { id: 'putaway', title: 'Put away', prompt: 'Scan the asset, it moves to the selected stockroom', depot: true },
+    { id: 'pick', title: 'Pick', prompt: 'Scan each asset for the order', depot: true },
     { id: 'audit', title: 'Audit', prompt: 'Scan every unit you can see (blind count / site audit)' },
     { id: 'lookup', title: 'Look up', prompt: 'Scan any serial, provider tag or customer tag' },
 ]
@@ -22,6 +23,7 @@ interface Entry {
 export default function App() {
     const [mode, setMode] = useState<Mode>('receive')
     const [stockrooms, setStockrooms] = useState<Stockroom[]>([])
+    const [depotWork, setDepotWork] = useState(true)
     const [stockroom, setStockroom] = useState('')
     const [order, setOrder] = useState('')
     const [pid, setPid] = useState('')
@@ -33,6 +35,12 @@ export default function App() {
         warehouseApi
             .stockrooms()
             .then((list) => {
+                if (!list) {
+                    // Not an inventory tech: only Audit and Look up are offered.
+                    setDepotWork(false)
+                    setMode((m) => (MODES.find((d) => d.id === m)?.depot ? 'audit' : m))
+                    return
+                }
                 setStockrooms(list)
                 if (list.length > 0) setStockroom(list[0].id)
             })
@@ -57,12 +65,13 @@ export default function App() {
     )
 
     const current = MODES.find((m) => m.id === mode)!
+    const modes = depotWork ? MODES : MODES.filter((m) => !m.depot)
     return (
         <main className="warehouse">
             <header>
                 <h1>NaaS Warehouse</h1>
                 <nav>
-                    {MODES.map((m) => (
+                    {modes.map((m) => (
                         <button key={m.id} className={m.id === mode ? 'active' : ''} onClick={() => setMode(m.id)}>
                             {m.title}
                         </button>

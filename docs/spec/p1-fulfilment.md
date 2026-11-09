@@ -64,6 +64,10 @@ pending_wipe ─► pending_disposal ─► disposed | sold | returned_to_oem | 
   serial create one Asset. A row that finds the lock held through 5 tries, or cannot take it, is
   marked error *serial <serial> not imported: ...; load this row again*. Loaded again, it imports, or
   is refused as a serial that already exists.
+- **Warehouse app access**: Receive, Put away, Pick and the app's stockroom list are depot work, for
+  inventory techs (asset managers and admins hold the role); anyone else gets HTTP 403 *Requires the
+  inventory tech role*. Look up only reads the Asset and is open to inventory and field techs. Audit
+  scans follow the audit rules (P2 assurance spec). A field tech is offered only Audit and Look up.
 - **Receiving** (warehouse app) confirms only in-transit / on-order Assets as available in the chosen
   stockroom (for an inventory tech, one of theirs). It assigns the next Provider tag (unless the Asset
   has one). A unit whose ASN PO number is one of the *Purchase orders* of a line awaiting stock (same

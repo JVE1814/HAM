@@ -386,7 +386,9 @@ What remains can only be confirmed on an instance or behind a vendor login:
   in `sys_security_acl_role`. Impersonating an inventory-tech-only user, the Agreements list is denied,
   other stockrooms' blind counts and site audits are not listed, and in the warehouse app receiving one
   returned unit of a multi-unit site package keeps its subscription line active, receiving the last one
-  ends it, and a late one records the late-return fee.
+  ends it, and a late one records the late-return fee. Impersonating a field-tech-only user, the
+  warehouse app offers only Audit and Look up, and `POST /api/x_daas_ham/naas/receive` (and
+  `/putaway`, `/pick`, `GET /stockrooms`) answers HTTP 403.
 - **Returns and site packages**: when an Agreement with equipment at two Sites ends, the daily job
   raises one Return order per Site, each with a normal change and a de-install work order located at
   that Site. A site package whose last outstanding unit is declared missing ends that day. With every
