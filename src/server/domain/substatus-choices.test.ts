@@ -76,7 +76,9 @@ describe('substatus sys_choice records', () => {
 })
 
 describe('built substatus choice set', () => {
-    it.skipIf(!newerThanSources(BUILT))('holds every substatus the app adds and deletes nothing else (last now-sdk build)', () => {
+    it('holds every substatus the app adds and deletes nothing else', () => {
+        // The shipped records are checked as built, so a stale or missing build fails here instead of passing unseen.
+        expect(newerThanSources(BUILT), 'run `npx now-sdk build` first (npm run check does): the build is missing or older than its sources').toBe(true)
         const set = readChoiceSetXml(readFileSync(BUILT, 'utf8'))
         expect(set).toMatchObject({ wrapper: 'sys_choice_v2', version: '4', table: 'alm_asset', field: 'substatus' })
         expect(set.inserted.map((c) => c.value).sort()).toEqual(ADDED_VALUES)
