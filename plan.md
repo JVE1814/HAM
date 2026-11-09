@@ -429,7 +429,7 @@ Confidence tags:
 
 | Table | Extends | Key fields |
 |---|---|---|
-| Lease schedule | `ast_contract` (contract model "Lease") | lessor, schedule number, covered assets, end date, buyout price |
+| Lease schedule | `ast_contract` (contract model "Lease") | lessor (the contract's vendor), schedule number (its contract number), covered assets, end date, buyout price |
 | `end_of_lease_decision` | `task` | lease, decision (buyout / extend / return), due date, mismatch flag (lease end before subscription end) |
 | `billing_period` | — | month, status (open / closed / locked), generated_at, CSV attachment |
 | `billing_line` | — | period, account, subscription_line, days, prorated amount, fee events |

@@ -263,8 +263,8 @@ export function loadDemoData(): void {
     }
     // A lease ending before the Acme agreement it serves: the daily review flags it and raises a decision
     const lessor = ensure('core_company', { name: 'Demo Capital Leasing' }, { vendor: true })
-    const lease = ensure('x_daas_ham_lease_schedule', { schedule_number: 'DEMO-LS-001' }, {
-        lessor,
+    const lease = ensure('x_daas_ham_lease_schedule', { vendor_contract: 'DEMO-LS-001' }, {
+        vendor: lessor,
         short_description: 'Demo lease of the Acme HQ core switches',
         starts: '2024-02-01',
         ends: '2027-01-31',

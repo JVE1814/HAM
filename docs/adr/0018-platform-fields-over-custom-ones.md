@@ -15,9 +15,18 @@ Brazil instance without Hardware Asset Management Professional (2026-11-09).
   a record. Parent groups are not followed.
 - **A Model's typical power**: `cmdb_model.x_daas_ham_typical_power_w` is gone. The rack power budget reads the
   platform's *Power (watts)* (`cmdb_model.power_consumption`), which the Provider's IT may already have filled.
+- **A lease's Lessor and schedule number**: `x_daas_ham_lease_schedule.lessor` and `.schedule_number` are gone. A
+  Lease schedule is a contract (`ast_contract`), which has a *Vendor* (a company marked as a vendor) and the
+  *Contract number* the vendor gives it; both are required of a lease. The platform shows a reference to a contract
+  by its Contract number, so the override that made a lease's own *Number* its display value, needed only while a
+  lease left the Contract number empty, is gone too. The app's messages still name a lease by its *Number*.
 
 ## Consequences
 
 - **Upgrades**: the build carries no delete for a removed table or column, so an instance that had an earlier
   version keeps them with their values, unread. Nothing is migrated: stockroom members are entered again as group
-  members (README, *Verify on the first install*).
+  members, and a Model's *Power (watts)* and a lease's *Vendor* and *Contract number* are filled in again (README,
+  *Verify on the first install*).
+- **Labels**: a lease's form and list read *Vendor* and *Contract number*, the platform's labels, where they read
+  *Lessor* and *Schedule number*. The Contract number holds 40 characters (the schedule number held 60) and is
+  required; the Vendor picker offers companies marked as vendors only.

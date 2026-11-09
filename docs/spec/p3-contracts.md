@@ -2,8 +2,11 @@
 
 ## Lease schedules (D65)
 
-- A **Lease schedule** extends `ast_contract`: Lessor, schedule number, monthly payment (all its
-  Assets), buyout price, end date, and how many days ahead the decision is due (default 120).
+- A **Lease schedule** extends `ast_contract`: Lessor (the contract's *Vendor*), the number the
+  Lessor gives the schedule (its *Contract number*, which a reference to the lease shows), monthly
+  payment (all its Assets), buyout price, end date, and how many days ahead the decision is due
+  (default 120). Vendor and Contract number are the platform's own fields (ADR 0018), required of a
+  lease.
 - A fleet asset is covered by setting its *Lease schedule*, while it is not retired. Its Legal owner
   becomes *lessor* and its Lessor the schedule's Lessor. A unit returned to the Lessor or the OEM (or
   disposed of) keeps its Lease schedule as history, but is no longer counted (*Covered assets* on the

@@ -45,7 +45,7 @@ export function onAssetLeaseChanged(current: GlideRecord): void {
     const lease = findById('x_daas_ham_lease_schedule', str(current, 'x_daas_ham_lease'))
     if (!lease) return
     current.setValue('x_daas_ham_legal_owner', 'lessor')
-    current.setValue('x_daas_ham_lessor', str(lease, 'lessor'))
+    current.setValue('x_daas_ham_lessor', str(lease, 'vendor'))
 }
 
 /**
@@ -126,7 +126,7 @@ function raiseDecision(lease: GlideRecord, mismatch: boolean): void {
     decision.setValue('assignment_group', stringProperty(PROPERTY.leaseDecisionGroup))
     decision.setValue(
         'short_description',
-        `Decide on lease ${str(lease, 'number')} (${lease.getDisplayValue('lessor')}) ending ${str(lease, 'ends')}: buy out, extend or return`,
+        `Decide on lease ${str(lease, 'number')} (${lease.getDisplayValue('vendor')}) ending ${str(lease, 'ends')}: buy out, extend or return`,
     )
     decision.insert()
 }
@@ -310,7 +310,7 @@ function lessorDisposal(lease: GlideRecord): GlideRecord | null {
     const order = new GlideRecord('x_daas_ham_disposal_order')
     order.initialize()
     order.setValue('method', 'return_to_lessor')
-    order.setValue('disposal_vendor', str(lease, 'lessor'))
+    order.setValue('disposal_vendor', str(lease, 'vendor'))
     order.setValue('short_description', `Return stock to the lessor at the end of lease ${str(lease, 'number')}`)
     if (order.insert()) return order
     gs.warn(`[x_daas_ham] Lease return: no disposal order for ${str(lease, 'number')}: ${refusal(order)}`)

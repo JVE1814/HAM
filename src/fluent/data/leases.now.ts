@@ -1,5 +1,5 @@
 import '@servicenow/sdk/global'
-import { BooleanColumn, ChoiceColumn, DateColumn, DecimalColumn, IntegerColumn, OverrideColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
+import { BooleanColumn, ChoiceColumn, DateColumn, DecimalColumn, IntegerColumn, OverrideColumn, ReferenceColumn, Table } from '@servicenow/sdk/core'
 import { LEASE_END_ACTION_CHOICES } from '../../server/domain/vocabulary'
 
 /* Lease schedules and end-of-lease decisions (P3.23, D65). */
@@ -10,10 +10,11 @@ export const x_daas_ham_lease_schedule = Table({
     label: 'Lease schedule',
     extends: 'ast_contract',
     schema: {
-        // A reference to a lease shows its number: ast_contract displays vendor_contract, which a lease leaves empty.
-        number: OverrideColumn({ display: true }),
-        lessor: ReferenceColumn({ label: 'Lessor', referenceTable: 'core_company', mandatory: true }),
-        schedule_number: StringColumn({ label: 'Schedule number', maxLength: 60 }),
+        // Inherited from ast_contract (ADR 0018), required here: the Lessor is the contract's Vendor (a company marked
+        // as a vendor), and the number the Lessor gives the schedule its Contract number, which the platform shows a
+        // reference to a contract by.
+        vendor: OverrideColumn({ mandatory: true }),
+        vendor_contract: OverrideColumn({ mandatory: true }),
         monthly_payment: DecimalColumn({ label: 'Monthly payment (all assets)' }),
         buyout_price: DecimalColumn({ label: 'Buyout price' }),
         buyout_share: DecimalColumn({ label: 'Buyout cost per asset', readOnly: true, scale: 6 }),
@@ -29,7 +30,6 @@ export const x_daas_ham_lease_schedule = Table({
         mismatch: BooleanColumn({ label: 'Ends before the service it supports', default: false, readOnly: true }),
     },
     autoNumber: { prefix: 'NLS', number: 1000, numberOfDigits: 7 },
-    index: [{ name: 'x_daas_ham_ls_lessor', unique: false, element: 'lessor' }],
 })
 
 /** The buy-out / extend / return decision raised ahead of a lease end. */

@@ -10161,6 +10161,7 @@ declare global {
                     {
                         table: 'sys_index'
                         id: '2135b7c50925425482b9597cf0c86867'
+                        deleted: true
                         key: {
                             logical_table_name: 'x_daas_ham_lease_schedule'
                             col_name_string: 'lessor'
@@ -16332,6 +16333,28 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '42e51bdf82884518b6cdb24fb82e121f'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd9ef4007f7724454a17f742cc182488b'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Lease schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'vendor'
+                            position: '2'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '4303742c30c74a7a847ad627807409ee'
                         key: {
@@ -20077,6 +20100,7 @@ declare global {
                     {
                         table: 'sys_dictionary_override'
                         id: '58147900888c4906a21ce43783a2d59d'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham_lease_schedule'
                             element: 'number'
@@ -21611,6 +21635,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: '5f48f353969b4e4fa8b9d912d55a8d56'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham_lease_schedule'
                             element: 'schedule_number'
@@ -24223,6 +24248,7 @@ declare global {
                     {
                         table: 'sys_documentation'
                         id: '6d0ea74555ad4742a8e624ea40cebca8'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham_lease_schedule'
                             element: 'lessor'
@@ -25866,6 +25892,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '74d33a0717344cc28ee8f5df71b41f3e'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'd9ef4007f7724454a17f742cc182488b'
@@ -28334,6 +28361,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: '81bd6fa8df1b474980fbec56cfb1b567'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham_lease_schedule'
                             element: 'lessor'
@@ -28521,6 +28549,28 @@ declare global {
                                 }
                             }
                             element: 'monthly_rate'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '8261d01138b5466bbea02c4b1e68c7f9'
+                        key: {
+                            sys_ui_section: {
+                                id: 'd9ef4007f7724454a17f742cc182488b'
+                                key: {
+                                    name: 'x_daas_ham_lease_schedule'
+                                    caption: 'Lease schedule'
+                                    view: {
+                                        id: 'Default view'
+                                        key: {
+                                            name: 'NULL'
+                                        }
+                                    }
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'vendor_contract'
+                            position: '3'
                         }
                     },
                     {
@@ -31201,6 +31251,7 @@ declare global {
                     {
                         table: 'sys_dictionary'
                         id: '90d6e33e3ffb4de5941e429d39812805'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham_lease_schedule'
                             element: 'schedule_number'
@@ -37262,6 +37313,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary_override'
+                        id: 'afd112dd087a4cb7b0e602886f682274'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'vendor'
+                        }
+                    },
+                    {
                         table: 'sys_ui_form'
                         id: 'afd7930f88964c8a96e9bd168bdd3d7d'
                         key: {
@@ -39852,6 +39911,14 @@ declare global {
                                 }
                             }
                             sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary_override'
+                        id: 'be7c2e5c5c9a453785290f23958cddfc'
+                        key: {
+                            name: 'x_daas_ham_lease_schedule'
+                            element: 'vendor_contract'
                         }
                     },
                     {
@@ -50722,6 +50789,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: 'fd76d888821e450d82dd1cc64b5eaa62'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'd9ef4007f7724454a17f742cc182488b'

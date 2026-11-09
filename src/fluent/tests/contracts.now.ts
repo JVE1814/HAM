@@ -27,7 +27,7 @@ export const leasedAssetOwnershipTest = Test(
         const lease = atf.server.recordInsert({
             $id: Now.ID['atf_lao_lease'],
             table: 'x_daas_ham_lease_schedule',
-            fieldValues: { lessor: lessor.record_id, schedule_number: 'ATF-LS-1', short_description: 'ATF lease', starts: '2024-07-01', ends: '2027-06-30' },
+            fieldValues: { vendor: lessor.record_id, vendor_contract: 'ATF-LS-1', short_description: 'ATF lease', starts: '2024-07-01', ends: '2027-06-30' },
         })
         const asset = atf.server.recordInsert({
             $id: Now.ID['atf_lao_asset'],
@@ -71,8 +71,8 @@ export const leaseExtensionTest = Test(
             table: 'x_daas_ham_lease_schedule',
             // A start date too: ast_contract refuses an end date without one (see the test above).
             fieldValues: {
-                lessor: lessor.record_id,
-                schedule_number: 'ATF-LS-2',
+                vendor: lessor.record_id,
+                vendor_contract: 'ATF-LS-2',
                 short_description: 'ATF lease to extend',
                 starts: '2024-02-01',
                 ends: '2027-01-31',

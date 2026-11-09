@@ -333,7 +333,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 50,
                     table: 'x_daas_ham_lease_schedule',
                     condition: 'ORDERBYends^EQ',
-                    columns: 'number,lessor,schedule_number,ends,monthly_payment,buyout_price,end_action,mismatch',
+                    columns: 'number,vendor,vendor_contract,ends,monthly_payment,buyout_price,end_action,mismatch',
                     applicabilities: [{ $id: Now.ID['ws_lease_schedules_aud'], applicability: broadStaffAudience }],
                 },
                 {

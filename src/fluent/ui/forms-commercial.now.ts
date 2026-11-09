@@ -12,7 +12,7 @@ export const lease_schedule_form = Form({
             content: [
                 {
                     layout: 'two-column',
-                    leftElements: [{ field: 'number', type: 'table_field' }, { field: 'lessor', type: 'table_field' }, { field: 'schedule_number', type: 'table_field' }, { field: 'short_description', type: 'table_field' }],
+                    leftElements: [{ field: 'number', type: 'table_field' }, { field: 'vendor', type: 'table_field' }, { field: 'vendor_contract', type: 'table_field' }, { field: 'short_description', type: 'table_field' }],
                     rightElements: [{ field: 'state', type: 'table_field' }, { field: 'starts', type: 'table_field' }, { field: 'ends', type: 'table_field' }, { field: 'decision_lead_days', type: 'table_field' }],
                 },
             ],

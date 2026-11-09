@@ -166,7 +166,7 @@ EmailNotification({
     emailContent: {
         subject: 'Lease ${number} ends before the service it supports',
         messageHtml:
-            '<p>Lease schedule ${number} with ${lessor} ends on ${ends}, but some of its equipment serves agreements that run longer (or have no end date).</p><p>Plan a buyout, an extension or a refresh before the lease end.</p>',
+            '<p>Lease schedule ${number} with ${vendor} ends on ${ends}, but some of its equipment serves agreements that run longer (or have no end date).</p><p>Plan a buyout, an extension or a refresh before the lease end.</p>',
         importance: 'high',
     },
 })

@@ -288,6 +288,11 @@ What remains can only be confirmed on an instance or behind a vendor login:
   Centre Utrecht*; if the system log says the group was not found, create it by that name and run
   the job again. On an instance upgraded from a version that had `x_daas_ham_stockroom_member`, the
   app no longer reads its rows: give each NaaS stockroom an *Assignment group* holding its techs.
+- **Platform fields** (ADR 0018), on an instance upgraded from a version that had the app's own
+  columns: the old columns stay, unread. Fill in each lease's *Vendor* (its Lessor) and *Contract
+  number* (until then a reference to the lease shows blank, and its return-to-lessor disposal order
+  gets no vendor) and each racked Model's *Power (watts)* (until then it counts as 0 W in a rack's
+  power budget).
 - **Fleet column** (ADR 0016): *Fleet* (`x_daas_ham_fleet`) on `alm_hardware` is a read-only
   boolean, default false, with the index `x_daas_ham_hw_fleet`, and the install sets it true on no
   row. The dictionary entries of *Legal owner* (`alm_hardware`), *Track as asset* (`cmdb_model`) and
