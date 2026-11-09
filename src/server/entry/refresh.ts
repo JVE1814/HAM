@@ -3,25 +3,26 @@ import { refreshWaves, replacementModel, type RefreshCandidate, type RefreshWave
 import type { LifecycleDates } from '../domain/model-lifecycle.ts'
 import { toIsoDate } from '../domain/calendar.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
+import type { HeldLock } from '../domain/job-lock.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { nowMs, todayIso } from '../platform/clock.ts'
-import { withLock, type HeldLock } from '../platform/locks.ts'
+import { withLock } from '../platform/locks.ts'
 import { readModelLifecycle } from '../platform/model-lifecycle.ts'
 import { intProperty, PROPERTY } from '../platform/properties.ts'
 import { pluck, refusal, str } from '../platform/records.ts'
 import { submitOrder } from './orders.ts'
 
-/** The job lock (ADR 0013) a refresh run holds from its read of the Assets due to its last Order. */
-const REFRESH_LOCK = 'refresh_orders'
-
 /**
  * Daily: refresh Orders for in-service Assets due within the horizon (P2.2, D48: fully automatic). Two runs at once
  * (the scheduled job and an *Execute now*) would both read an Asset as on no open replacing line and raise it twice, so
- * a run holds a job lock; one that finds it held raises nothing and logs so. Taking the lock throws only when an insert
- * is refused with no lock row (platform/locks): that error escapes.
+ * a run holds a job lock (ADR 0013) from its read of the Assets due to its last Order; one that finds it held raises
+ * nothing and logs so. Taking the lock throws only when an insert is refused with no lock row (platform/locks): that
+ * error escapes.
  */
 export function raiseRefreshOrders(): void {
-    if (withLock(REFRESH_LOCK, raiseHolding)) return
-    gs.info(`[x_daas_ham] Refresh Orders not raised: another run holds the ${REFRESH_LOCK} lock and raises them`)
+    const lockName = LOCK.refreshOrders()
+    if (withLock(lockName, raiseHolding).ran) return
+    gs.info(`[x_daas_ham] Refresh Orders not raised: another run holds the ${lockName} lock and raises them`)
 }
 
 /**

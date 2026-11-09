@@ -1,3 +1,6 @@
+import { messageOf } from './errors.ts'
+import { writeHoldingLock, type LockedWrite } from './job-lock.ts'
+
 /**
  * Bulk work in bounded chunks with a persistent cursor (ADR 0007).
  *
@@ -95,33 +98,21 @@ export interface LockedChunkPorts {
 export function writeChunkUnderLock(ports: LockedChunkPorts, last: boolean): ChunkWrite {
     if (!ports.isCurrent()) return { outcome: 'superseded' }
     const held = () => ports.held()
-    const lostInFlush = writeHoldingLock(held, () => ports.flush())
+    const lostInFlush = lockLostIn(writeHoldingLock(held, () => ports.flush()))
     if (lostInFlush) return lostInFlush
     if (!last) {
         ports.queueNext()
         return { outcome: 'written' }
     }
-    return writeHoldingLock(held, () => ports.complete()) ?? { outcome: 'written' }
+    return lockLostIn(writeHoldingLock(held, () => ports.complete())) ?? { outcome: 'written' }
 }
 
 /**
- * Make a write under a job's lock and check that it held the lock throughout: null when it did. A taker
- * that judges the lock abandoned clears it even from a holder still writing, and what that holder wrote
- * may then sit beside a fresh pass's, so a write that lost the lock gives LockLost even when it threw:
- * only another fresh pass clears both. A write that throws while still holding the lock throws on, so
- * its pass stops as on any other error.
+ * A job's write that lost its lock (domain/job-lock `writeHoldingLock`), or null when it held the lock throughout. What
+ * it wrote may sit beside a fresh pass's, even when it threw: only another fresh pass clears both. A write that throws
+ * while still holding the lock throws on, so its pass stops as on any other error.
  */
-export function writeHoldingLock(held: () => boolean, write: () => void): LockLost | null {
-    try {
-        write()
-    } catch (error) {
-        if (held()) throw error
-        return { outcome: 'lost', error: messageOf(error) }
-    }
-    return held() ? null : { outcome: 'lost', error: '' }
-}
-
-/** What a record or write threw, as text. */
-function messageOf(error: unknown): string {
-    return error instanceof Error ? error.message : String(error)
+export function lockLostIn(write: LockedWrite<void>): LockLost | null {
+    if (write.lock === 'held') return null
+    return { outcome: 'lost', error: write.threw ? messageOf(write.error) : '' }
 }

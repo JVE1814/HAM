@@ -1,10 +1,12 @@
 import { GlideAggregate, gs } from '@servicenow/glide'
 import { andEachClause } from '../domain/encoded-query.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
+import type { HeldLock } from '../domain/job-lock.ts'
 import { DEPLOYED_STAGES } from '../domain/lifecycle.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { freeStockOf, pickForSparePool, reservedSparesQuery, sparePoolShortfall } from '../domain/sourcing.ts'
 import { runTableJob } from '../platform/chunked.ts'
-import { withLockTries, type HeldLock } from '../platform/locks.ts'
+import { withLockTries } from '../platform/locks.ts'
 import { openPurchaseQuantity, requestPurchase } from '../platform/procurement.ts'
 import { boolProperty, PROPERTY, stagingStockroom } from '../platform/properties.ts'
 import { num, str } from '../platform/records.ts'
@@ -44,17 +46,12 @@ function canPurchase(): boolean {
 }
 
 /**
- * Tries at a Spare pool's lock (`spare_pool_<Customer sys_id>_<Model sys_id>`, ADR 0013), back to back. Two runs at once
- * (the scheduled job and an *Execute now*) would both count the same shortfall and no open purchase, and each buy all
- * of it, so a pool is counted, filled and bought for holding its lock. One held through every try is left to the run
- * holding it, which counted it afresh.
- */
-const POOL_LOCK_TRIES = 5
-
-/**
  * Move free central stock into the Customer's Spare pool, and buy what is still missing when `autoPurchase`, one Model
- * at a time under that pool's lock. Taking it throws only when an insert is refused with no lock row (platform/locks):
- * that error escapes, and the Agreement fails as a record of the run.
+ * at a time under that pool's lock (ADR 0013). Two runs at once (the scheduled job and an *Execute now*) would both
+ * count the same shortfall and no open purchase, and each buy all of it, so a pool is counted, filled and bought for
+ * holding its lock. One held through every try, back to back, is left to the run holding it, which counted it afresh.
+ * Taking it throws only when an insert is refused with no lock row (platform/locks): that error escapes, and the
+ * Agreement fails as a record of the run.
  */
 function topUpAgreement(agreementId: string, customerId: string, ratio: number, autoPurchase: boolean): void {
     const deployed = countByModel(fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}`))
@@ -63,8 +60,8 @@ function topUpAgreement(agreementId: string, customerId: string, ratio: number, 
         // A pool these counts show full is left without its lock: another run's top-up meanwhile only fills it.
         if (sparePoolShortfall({ deployed: deployedCount, reserved: reserved.get(modelId) ?? 0, ratio }) === 0) continue
         const pool = { agreementId, customerId, modelId, deployed: deployedCount, ratio }
-        const lockName = `spare_pool_${customerId}_${modelId}`
-        if (withLockTries(lockName, POOL_LOCK_TRIES, (lock) => topUpPool(pool, autoPurchase, lock))) continue
+        const lockName = LOCK.sparePool(customerId, modelId)
+        if (withLockTries(lockName, (lock) => topUpPool(pool, autoPurchase, lock)).ran) continue
         gs.info(`[x_daas_ham] Spare pool of ${customerId} for ${modelId} not topped up: another run holds the ${lockName} lock and tops it up`)
     }
 }

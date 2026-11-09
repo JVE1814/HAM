@@ -15,6 +15,7 @@ import {
     type ExpiringCoverage,
 } from '../domain/leases.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
+import type { HeldLock } from '../domain/job-lock.ts'
 import { isRetired, SERVING_STAGES, stagesQuery, type Stage } from '../domain/lifecycle.ts'
 import { isFree } from '../domain/sourcing.ts'
 import type { LeaseEndAction } from '../domain/vocabulary.ts'
@@ -24,7 +25,6 @@ import { runEventTableJob } from '../platform/chunked.ts'
 import { todayIso } from '../platform/clock.ts'
 import { EVENT, fire } from '../platform/events.ts'
 import { refreshLifecycleDates } from '../platform/lifecycle-dates.ts'
-import type { HeldLock } from '../platform/locks.ts'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties.ts'
 import { bool, count, exists, findById, num, refusal, str } from '../platform/records.ts'
 import { changeStock, stockUnit } from '../platform/stock.ts'
@@ -269,15 +269,14 @@ function disposeStockToLessor(lease: GlideRecord): StockReturn {
  * 'refused' (logged) when a move is refused or the lock cannot be taken.
  */
 function withdrawFromStock(found: GlideRecord): GlideRecord | 'taken' | 'refused' {
-    // Set inside the Asset's stock lock.
-    let withdrawn = 'refused' as GlideRecord | 'taken' | 'refused'
-    const ran = changeStock(found.getUniqueValue(), 'withdrawn for its lessor', (asset, lock) => {
-        if (!asset || !isFree(stockUnit(asset), IN_STOCK)) withdrawn = 'taken'
-        else if (moveOutOfStock(lock, asset)) withdrawn = asset
+    const withdrawn = changeStock(found.getUniqueValue(), 'withdrawn for its lessor', (asset, lock) => {
+        if (!asset || !isFree(stockUnit(asset), IN_STOCK)) return 'taken'
+        return moveOutOfStock(lock, asset) ? asset : 'refused'
     })
+    if (withdrawn.ran) return withdrawn.value
     const serial = str(found, 'serial_number')
-    if (!ran) gs.warn(`[x_daas_ham] Lease return: ${serial} not withdrawn: its stock lock could not be taken`)
-    return withdrawn
+    gs.warn(`[x_daas_ham] Lease return: ${serial} not withdrawn: its stock lock could not be taken`)
+    return 'refused'
 }
 
 /**
@@ -294,8 +293,9 @@ function moveOutOfStock(lock: HeldLock, asset: GlideRecord): boolean {
         }
         const verdict = moveAsset(asset, to)
         if (!verdict.allowed) return notMoved(asset, to, verdict.reason)
-        if (!lock.held()) return notMoved(asset, to, 'its stock lock was lost')
-        if (!asset.update()) return notMoved(asset, to, refusal(asset))
+        const saved = lock.save(`Lease return: ${str(asset, 'serial_number')} moved to ${to}`, () => asset.update())
+        if (saved === 'lock lost') return notMoved(asset, to, 'its stock lock was lost')
+        if (saved === 'refused') return notMoved(asset, to, refusal(asset))
     }
     return moves.length > 0
 }

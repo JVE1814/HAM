@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { runChunked, writeChunkUnderLock, writeHoldingLock, type ChunkedJobPorts, type LockedChunkPorts } from './chunked-job'
+import { lockLostIn, runChunked, writeChunkUnderLock, type ChunkedJobPorts, type LockedChunkPorts } from './chunked-job'
 
 function fakePorts(keys: string[], opts: { cursor?: string; tickMs?: number; failOn?: string[] } = {}) {
     let clock = 0
@@ -162,33 +162,20 @@ describe('writeChunkUnderLock', () => {
     })
 })
 
-describe('writeHoldingLock', () => {
+describe('lockLostIn', () => {
     it('gives nothing for a write that held the lock throughout', () => {
-        expect(writeHoldingLock(() => true, () => {})).toBeNull()
+        expect(lockLostIn({ lock: 'held', value: undefined })).toBeNull()
     })
 
     it('reports a write that finished after losing the lock', () => {
-        let held = true
-        expect(writeHoldingLock(() => held, () => (held = false))).toEqual({ outcome: 'lost', error: '' })
+        expect(lockLostIn({ lock: 'lost', threw: false, value: undefined })).toEqual({ outcome: 'lost', error: '' })
     })
 
     it('reports a write that threw after losing the lock, with what it threw', () => {
-        let held = true
-        const write = () => {
-            held = false
-            throw 'deadlock'
-        }
-        expect(writeHoldingLock(() => held, write)).toEqual({ outcome: 'lost', error: 'deadlock' })
-    })
-
-    it('throws on from a write that threw still holding the lock', () => {
-        expect(() =>
-            writeHoldingLock(
-                () => true,
-                () => {
-                    throw new Error('insert refused')
-                },
-            ),
-        ).toThrow('insert refused')
+        expect(lockLostIn({ lock: 'lost', threw: true, error: 'deadlock' })).toEqual({ outcome: 'lost', error: 'deadlock' })
+        expect(lockLostIn({ lock: 'lost', threw: true, error: new Error('insert refused') })).toEqual({
+            outcome: 'lost',
+            error: 'insert refused',
+        })
     })
 })

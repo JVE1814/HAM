@@ -1,11 +1,13 @@
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
+import { messageOf } from '../domain/errors.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
+import type { HeldLock } from '../domain/job-lock.ts'
 import { isDeployed } from '../domain/lifecycle.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import {
     chargedFeeQuery,
     feeAmount,
-    feeLockName,
     INSTALLED_STAGES,
     returnDueDate,
     SITE_RECOVERY_STAGES,
@@ -15,7 +17,7 @@ import type { FeeType, ReturnMethod, ReturnTrigger } from '../domain/vocabulary.
 import { isFleetAsset, moveAndSave, readStage } from './assets.ts'
 import { todayIso } from './clock.ts'
 import { openFieldWork } from './field-work.ts'
-import { withLockTries, type HeldLock } from './locks.ts'
+import { attemptLock } from './locks.ts'
 import { exists, findById, num, refusal, str } from './records.ts'
 
 /** Return orders, their lines and Fee events (P2.4). */
@@ -202,18 +204,16 @@ export function waiveOpenFees(type: FeeType, assetId: string, returnOrderId: str
     }
 }
 
-/** Tries at taking a fee's lock before leaving the fee to the holder: it holds it for one check and one insert. */
-const FEE_LOCK_ATTEMPTS = 5
-
 /**
  * Charge a Fee event of `type` for the Asset on the Return order, once (domain/returns `chargedFeeQuery`): a step
  * retried after a refused save (an evaluation chosen again, a line declared missing again) does not charge it twice.
  * Two runs may also charge it at the same time (two users saving one line's evaluation, overlapping overdue runs; two
  * scans of one unit already take turns under its receive lock, entry/warehouse). A unique index on the fee's identity
  * would also refuse a fee charged after a waived one, so the check and the insert are made under a lock on the fee,
- * re-checking there (as platform/exceptions `openException`). A run that finds the lock held through every try leaves
- * the fee to the holder, which is charging it. A fee that is refused, that the holder has still not charged when this
- * run gives up, or whose lock cannot be taken (platform/locks throws) is logged, not thrown.
+ * re-checking there (as platform/exceptions `openException`). A run that finds the lock held through every try (a
+ * holder keeps it for one check and one insert) leaves the fee to the holder, which is charging it. A fee that is
+ * refused, that the holder has still not charged when this run gives up, or whose lock cannot be taken is logged, not
+ * thrown.
  */
 export function recordFee(type: FeeType, asset: GlideRecord, returnOrderId: string): void {
     const fee: FeeIdentity = { type, assetId: asset.getUniqueValue(), returnOrderId }
@@ -226,26 +226,14 @@ export function recordFee(type: FeeType, asset: GlideRecord, returnOrderId: stri
         late_return: agreement ? num(agreement, 'late_return_fee') : 0,
     })
     if (amount <= 0) return
-    // Set inside the lock: the fee's own errors escape, and only a lock that could not be taken is logged.
-    let started = false as boolean
-    let why = 'left to a run holding its lock, which has not recorded it yet'
-    try {
-        const ran = withLockTries(feeLockName(fee), FEE_LOCK_ATTEMPTS, (lock) => {
-            started = true
-            if (!isCharged(fee)) chargeHolding(lock, fee, asset, amount)
-        })
-        if (ran) return
-    } catch (error) {
-        if (started) throw error
-        why = errorText(error)
-    }
+    const attempt = attemptLock(LOCK.fee(fee), (lock) => {
+        if (!isCharged(fee)) chargeHolding(lock, fee, asset, amount)
+    })
+    if (attempt.ran) return
+    const why = attempt.held ? 'left to a run holding its lock, which has not recorded it yet' : messageOf(attempt.error)
     // The holder has normally charged it by now; one that has not may be slow, or have died holding the lock.
     if (isCharged(fee)) return
     gs.warn(`[x_daas_ham] ${type} fee for ${str(asset, 'serial_number')} not recorded: ${why}; check its Fee events`)
-}
-
-function errorText(error: unknown): string {
-    return error instanceof Error ? error.message : String(error)
 }
 
 function isCharged(fee: FeeIdentity): boolean {
@@ -258,7 +246,6 @@ function isCharged(fee: FeeIdentity): boolean {
  * insert is logged.
  */
 function chargeHolding(lock: HeldLock, fee: FeeIdentity, asset: GlideRecord, amount: number): void {
-    if (!lock.held()) return
     const record = new GlideRecord('x_daas_ham_fee_event')
     record.initialize()
     record.setValue('fee_type', fee.type)
@@ -269,8 +256,8 @@ function chargeHolding(lock: HeldLock, fee: FeeIdentity, asset: GlideRecord, amo
     record.setValue('amount', amount)
     record.setValue('occurred_on', todayIso())
     const what = `${fee.type} fee for ${str(asset, 'serial_number')}`
-    if (!record.insert()) gs.warn(`[x_daas_ham] ${what} not recorded: ${refusal(record)}`)
-    else if (!lock.held()) gs.warn(`[x_daas_ham] ${what} recorded after its lock was lost: check it is charged once`)
+    const saved = lock.save(`${what} recorded`, () => record.insert(), { check: 'check it is charged once' })
+    if (saved === 'refused') gs.warn(`[x_daas_ham] ${what} not recorded: ${refusal(record)}`)
 }
 
 /** Close a Return order once every line is evaluated or declared missing. */

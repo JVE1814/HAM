@@ -1,7 +1,9 @@
 import { GlideDateTime, GlideRecord, GlideSchedule, gs } from '@servicenow/glide'
 import { planShipment, replacementInstalled, type OnSiteWork } from '../domain/delivery.ts'
 import { awaitsInstall, type InstallState } from '../domain/install-confirmation.ts'
+import type { HeldLock } from '../domain/job-lock.ts'
 import { isDeployed, stagesQuery } from '../domain/lifecycle.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { checkJobWindow } from '../domain/scheduling.ts'
 import type { InstallMode, OrderStage, OrderType } from '../domain/vocabulary.ts'
 import { moveAndSave, moveAsset, readStage } from '../platform/assets.ts'
@@ -9,7 +11,7 @@ import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { glideToMs } from '../platform/clock.ts'
 import { openFieldWork, type WorkContext } from '../platform/field-work.ts'
 import { lineAssetStages, recomputeOrder } from '../platform/fulfilment.ts'
-import { withLock, type HeldLock } from '../platform/locks.ts'
+import { withLock } from '../platform/locks.ts'
 import { findById, num, refusal, str } from '../platform/records.ts'
 import { returnReplacedAssets } from './returns.ts'
 import { labelOrder, shippingEnabled } from './shipping.ts'
@@ -62,13 +64,13 @@ function countShipped(orderId: string): number {
  */
 export function shipOrder(order: GlideRecord): void {
     const orderId = order.getUniqueValue()
-    const taken = withLock(`ship_order_${orderId}`, (lock) => {
+    const ship = withLock(LOCK.shipOrder(orderId), (lock) => {
         // A Ship that ran meanwhile has put its tracking number and work order on the Order, and shipped its units.
         const fresh = findById('x_daas_ham_order', orderId)
         if (!fresh) return void gs.addErrorMessage('Order not found')
         shipHolding(lock, fresh)
     })
-    if (!taken) gs.addErrorMessage('Another Ship of this Order is running: reload the Order to see what it shipped')
+    if (!ship.ran) gs.addErrorMessage('Another Ship of this Order is running: reload the Order to see what it shipped')
 }
 
 /** Ship, holding the Order's `lock` (the label is bought only while it is held, entry/shipping). */

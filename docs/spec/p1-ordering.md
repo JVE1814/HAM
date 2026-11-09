@@ -193,9 +193,9 @@
   was refused stays open. For a line that closed while the pass picked stock for it, nothing is bought
   or saved, and the warning *<line> closed while it was sourced: nothing bought for it* names the
   units still on it to release and the transfer orders to cancel. A cancel that outlasted its lock
-  (ADR 0013) logs *<Order> cancelled after its sourcing lock was lost*, to check its lines for stock
-  reserved or bought meanwhile. One that outlasted the Ship lock logs *<Order> cancelled after its
-  Ship lock was lost*, to check for units shipped meanwhile.
+  (ADR 0013) logs *<Order> cancelled after its lock source_order_<sys_id> was lost*, to check its
+  lines for stock reserved or bought meanwhile. One that outlasted the Ship lock logs *<Order>
+  cancelled after its lock ship_order_<sys_id> was lost*, to check for units shipped meanwhile.
 
 ## Spare-pool top-up (daily)
 

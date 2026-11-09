@@ -262,23 +262,6 @@ export function advanceReplacementRma(lineId: string, rmas: readonly OpenRma[]):
 }
 
 /**
- * The job lock (ADR 0013) an Order's sourcing passes take turns under, so two never count the same shortfall, and that
- * Cancel order holds, so a pass never reserves or buys for lines being cancelled.
- */
-export function sourcingLockName(orderId: string): string {
-    return `source_order_${orderId}`
-}
-
-/**
- * The job lock (ADR 0013) an Order line's need is read and changed under: sourcing reads its units and on-order count
- * there and saves what it bought, and a receipt takes its unit off order and allocates it. So neither change is lost,
- * and sourcing's count never sees half a receipt.
- */
-export function orderLineLockName(lineId: string): string {
-    return `order_line_${lineId}`
-}
-
-/**
  * An encoded alm_hardware query for the Customer's Spare pool as the top-up counts it: its fleet assets (ADR 0016) in
  * the pool, and those of its spares on a transfer order line. In transfer and on no Order line, a unit held for the
  * Customer (its company) goes back to the pool once Inventory lets it go, received or not (domain/lifecycle

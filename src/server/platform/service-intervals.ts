@@ -1,16 +1,16 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { intervalEnd, restartInterval } from '../domain/billing.ts'
+import { messageOf } from '../domain/errors.ts'
+import type { HeldLock } from '../domain/job-lock.ts'
 import { isBillable } from '../domain/lifecycle.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { todayIso } from './clock.ts'
-import { withLockTries, type HeldLock } from './locks.ts'
+import { attemptLock } from './locks.ts'
 import { exists, refusal, str } from './records.ts'
 
 /** Service intervals: the days each Asset delivered a Subscription line (P3.25). */
-
-/** Tries at taking an Asset's interval lock: a holder keeps it for a few reads and a save or two. */
-const LOCK_ATTEMPTS = 5
 
 /**
  * Start billing an Asset on a Subscription line from `startIso`, unless an interval is already open for
@@ -24,7 +24,7 @@ const LOCK_ATTEMPTS = 5
  * It runs after the Asset's save, which it cannot undo, and no later stage change retries it, so an interval not open
  * is logged for an asset manager or finance to open by hand: a refused save as a warning, like every refusal, and as an
  * error one the lock kept from opening (the holder had still not opened it when this save gave up, and may have died
- * holding the lock, ADR 0013; or the lock could not be taken, platform/locks throws).
+ * holding the lock, ADR 0013; or the lock could not be taken, platform/locks `attemptLock`).
  */
 export function openServiceInterval(asset: GlideRecord, lineId: string, startIso: string): void {
     const assetId = asset.getUniqueValue()
@@ -36,26 +36,16 @@ export function openServiceInterval(asset: GlideRecord, lineId: string, startIso
 }
 
 /**
- * Run `work` holding the Asset's interval lock, trying again while another save holds it. Null once it ran, else why it
- * did not (held through every try, or the lock could not be taken), for the caller to log; `work`'s own errors escape.
+ * Run `work` holding the Asset's interval lock, trying again while another save holds it (a holder keeps it for a few
+ * reads and a save or two). Null once it ran, else why it did not (held through every try, or the lock could not be
+ * taken), for the caller to log; `work`'s own errors escape.
  */
 function underIntervalLock(assetId: string, work: (lock: HeldLock) => void): string | null {
-    // Set inside the lock: `work`'s errors escape, and only a lock that could not be taken is reported.
-    let started = false as boolean
-    try {
-        const ran = withLockTries(`service_interval_${assetId}`, LOCK_ATTEMPTS, (lock) => {
-            started = true
-            work(lock)
-        })
-        return ran ? null : 'left to another save holding its lock, which has not finished'
-    } catch (error) {
-        if (started) throw error
-        return errorText(error)
-    }
-}
-
-function errorText(error: unknown): string {
-    return error instanceof Error ? error.message : String(error)
+    const attempt = attemptLock(LOCK.serviceInterval(assetId), (lock) => {
+        work(lock)
+    })
+    if (attempt.ran) return null
+    return attempt.held ? 'left to another save holding its lock, which has not finished' : messageOf(attempt.error)
 }
 
 /**
@@ -79,15 +69,13 @@ function openInterval(lock: HeldLock, asset: GlideRecord, lineId: string, startI
         end: str(latest, 'end_date'),
     }
     const restart = restartInterval(closed, place, startIso)
-    if (!lock.held()) return false
+    const reopen = 'reopen' in restart
     let interval: GlideRecord
-    let saved: string | null
-    if ('reopen' in restart) {
+    if (reopen) {
         // restartInterval only reopens the latest interval, so it exists here.
         if (!latest) return false
         interval = latest
         interval.setValue('end_date', '')
-        saved = interval.update()
     } else {
         interval = new GlideRecord('x_daas_ham_service_interval')
         interval.initialize()
@@ -96,18 +84,13 @@ function openInterval(lock: HeldLock, asset: GlideRecord, lineId: string, startI
         interval.setValue('customer', str(asset, 'company'))
         interval.setValue('site', place.siteId)
         interval.setValue('start_date', restart.start)
-        saved = interval.insert()
     }
     const opened = `${str(asset, 'serial_number')} in service from ${startIso}`
-    if (!saved) {
-        gs.warn(`[x_daas_ham] ${opened}, no interval open: ${refusal(interval)}`)
-        return false
-    }
-    // The save that took the lock over may have opened one too.
-    if (!lock.held()) {
-        gs.error(`[x_daas_ham] ${opened}, interval opened after its lock was lost: check only one is open`)
-    }
-    return true
+    // The save that took a lost lock over may have opened one too.
+    const late = { check: 'check only one is open', level: 'error' } as const
+    const saved = lock.save(`${opened}, interval opened`, () => (reopen ? interval.update() : interval.insert()), late)
+    if (saved === 'refused') gs.warn(`[x_daas_ham] ${opened}, no interval open: ${refusal(interval)}`)
+    return saved === 'saved'
 }
 
 function hasOpenInterval(assetId: string): boolean {
@@ -173,10 +156,8 @@ function closeHolding(lock: HeldLock, assetId: string, endIso: string): void {
         const reason = refusal(interval)
         gs.warn(`[x_daas_ham] ${serial} left service on ${endIso}, its Service interval did not close: ${reason}`)
     }
-    // The save that took the lock over may have put the Asset back in service and found the interval still open.
-    if (closed && !lock.held()) {
-        gs.error(`[x_daas_ham] ${closed} interval closed after its lock was lost: check it matches the Asset's stage`)
-    }
+    // The save that took a lost lock over may have put the Asset back in service and found the interval still open.
+    if (closed) lock.lostAfter(`${closed} interval closed`, { check: "check it matches the Asset's stage", level: 'error' })
 }
 
 function openIntervals(assetId: string): GlideRecord {

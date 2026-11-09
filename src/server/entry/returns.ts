@@ -2,7 +2,9 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import { toIsoDate } from '../domain/calendar.ts'
+import type { HeldLock } from '../domain/job-lock.ts'
 import { isDeployed } from '../domain/lifecycle.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import {
     evaluationTarget,
     overdueStep,
@@ -17,7 +19,7 @@ import { customerAdminIds } from '../platform/approvals.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { runTableJob } from '../platform/chunked.ts'
 import { EVENT } from '../platform/events.ts'
-import { withLock, type HeldLock } from '../platform/locks.ts'
+import { withLock } from '../platform/locks.ts'
 import { nowMs, todayIso } from '../platform/clock.ts'
 import { intProperty, PROPERTY, stringProperty } from '../platform/properties.ts'
 import { bool, findById, refusal, str } from '../platform/records.ts'
@@ -262,11 +264,8 @@ interface OverdueLine {
  * counts that line as failed and goes on.
  */
 function declareMissing(overdue: OverdueLine): void {
-    let declared = false as boolean
-    withLock(`receive_asset_${overdue.assetId}`, (lock) => {
-        declared = declareHolding(lock, overdue)
-    })
-    if (declared) closeReturnIfDone(overdue.returnOrderId)
+    const declared = withLock(LOCK.receiveAsset(overdue.assetId), (lock) => declareHolding(lock, overdue))
+    if (declared.ran && declared.value) closeReturnIfDone(overdue.returnOrderId)
 }
 
 /**

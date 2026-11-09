@@ -1,11 +1,14 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
-import { GlideRecord, gs } from '@servicenow/glide'
-import { normalizeSerial, receiveSerialLockName, validateAsnRows, type AsnRowCheck } from '../domain/asn.ts'
+import { GlideRecord } from '@servicenow/glide'
+import { normalizeSerial, validateAsnRows, type AsnRowCheck } from '../domain/asn.ts'
+import { messageOf } from '../domain/errors.ts'
+import type { HeldLock } from '../domain/job-lock.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { parseLifecycleRow } from '../domain/model-lifecycle.ts'
 import { newAsset } from '../platform/assets.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
-import { withLockTries, type HeldLock } from '../platform/locks.ts'
+import { attemptLock } from '../platform/locks.ts'
 import { writeModelLifecycle } from '../platform/model-lifecycle.ts'
 import { loadNormalizationData, recordNormalizationException, resolveModel } from '../platform/normalization.ts'
 import { PROPERTY, stringProperty } from '../platform/properties.ts'
@@ -27,17 +30,14 @@ function finish(row: GlideRecord, state: ImportState, comment: string): void {
     row.update()
 }
 
-/** Tries at a serial's lock before the row is left to load again: a holder keeps it for one check and one insert. */
-const SERIAL_LOCK_TRIES = 5
-
 /**
  * After-insert rule on ASN import rows: create the in-transit Asset (ASN = scan-to-confirm receiving).
  *
  * A first scan of the serial without an ASN (entry/warehouse) could create its Asset between this row's check and its
  * insert, and both would stand. So the check and the insert are made under the serial's lock, which that scan takes
- * too (domain/asn `receiveSerialLockName`), checking again there. A row that finds the lock held through every try, or
- * whose lock cannot be taken (platform/locks throws), is marked error with why, to load again; loaded again once the
- * scan has created the Asset, it is refused as a serial that already exists.
+ * too, checking again there. A row that finds the lock held through every try (a holder keeps it for one check and one
+ * insert), or whose lock cannot be taken, is marked error with why, to load again; loaded again once the scan has
+ * created the Asset, it is refused as a serial that already exists.
  */
 export function processAsnRow(current: GlideRecord): void {
     const serial = normalizeSerial(str(current, 'serial'))
@@ -56,19 +56,10 @@ export function processAsnRow(current: GlideRecord): void {
         return finish(current, 'error', `PID ${raw.model} does not map to a model; see normalization exceptions`)
     }
 
-    // Set inside the serial's lock: the insert's own errors escape, and only a lock that could not be taken is marked.
-    let started = false as boolean
-    let outcome = loadAgain(serial, 'a scan or another row is receiving it')
-    try {
-        withLockTries(receiveSerialLockName(serial), SERIAL_LOCK_TRIES, (lock) => {
-            started = true
-            outcome = insertHolding(lock, current, serial, modelId)
-        })
-    } catch (error) {
-        if (started) throw error
-        outcome = loadAgain(serial, error instanceof Error ? error.message : String(error))
-    }
-    finish(current, outcome.state, outcome.comment)
+    const attempt = attemptLock(LOCK.receiveSerial(serial), (lock) => insertHolding(lock, current, serial, modelId))
+    if (attempt.ran) return finish(current, attempt.value.state, attempt.value.comment)
+    const unloaded = loadAgain(serial, attempt.held ? 'a scan or another row is receiving it' : messageOf(attempt.error))
+    finish(current, unloaded.state, unloaded.comment)
 }
 
 /** A row the serial's lock kept from importing, marked error with why: loading it again imports or refuses it. */
@@ -90,7 +81,6 @@ function checkAsnRow(row: GlideRecord, serial: string): AsnRowCheck {
 function insertHolding(lock: HeldLock, row: GlideRecord, serial: string, modelId: string): RowOutcome {
     const check = checkAsnRow(row, serial)
     if (!check.ok) return { state: 'error', comment: check.reason }
-    if (!lock.held()) return loadAgain(serial, 'its lock was lost while checking it')
     const asset = newAsset(modelId, 'in_transit')
     asset.setValue('serial_number', serial)
     asset.setValue('po_number', str(row, 'po_number'))
@@ -100,8 +90,9 @@ function insertHolding(lock: HeldLock, row: GlideRecord, serial: string, modelId
     asset.setValue('x_daas_ham_claim_code', str(row, 'claim_code'))
     const stagingSource = str(row, 'staging_source') === 'distributor' ? 'distributor' : 'in_house'
     asset.setValue('x_daas_ham_staging_source', stagingSource)
-    if (!asset.insert()) return { state: 'error', comment: `Asset insert failed: ${refusal(asset)}` }
-    if (!lock.held()) gs.warn(`[x_daas_ham] Asset ${serial} created after its lock was lost: check it exists once`)
+    const saved = lock.save(`Asset ${serial} created`, () => asset.insert(), { check: 'check it exists once' })
+    if (saved === 'lock lost') return loadAgain(serial, 'its lock was lost while checking it')
+    if (saved === 'refused') return { state: 'error', comment: `Asset insert failed: ${refusal(asset)}` }
     return { state: 'inserted', comment: `Asset ${serial} in transit` }
 }
 

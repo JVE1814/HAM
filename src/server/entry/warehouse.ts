@@ -2,8 +2,10 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { normalizeSerial, receiveSerialLockName } from '../domain/asn.ts'
+import { normalizeSerial } from '../domain/asn.ts'
 import { naasStockroomType, receiptProblem, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
+import type { HeldLock } from '../domain/job-lock.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import type { AssetSummary, Stockroom, StockroomList } from '../domain/rest-contracts.ts'
 import { ROLE } from '../domain/visibility.ts'
 import {
@@ -27,7 +29,7 @@ import {
 } from '../platform/assets.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { lineAssetStages } from '../platform/fulfilment.ts'
-import { withLock, type HeldLock } from '../platform/locks.ts'
+import { withLock } from '../platform/locks.ts'
 import { loadNormalizationData, resolveModel } from '../platform/normalization.ts'
 import { PROPERTY, stringProperty } from '../platform/properties.ts'
 import { lineAwaitingRma } from '../platform/oem-rma.ts'
@@ -136,10 +138,10 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
     }
     const assetId = asset.getUniqueValue()
     // Not the stock lock (platform/stock) the allocation's reservation takes: a second take of a lock is refused.
-    const taken = withLock(`receive_asset_${assetId}`, (lock) => {
+    const receipt = withLock(LOCK.receiveAsset(assetId), (lock) => {
         receiveHolding(lock, response, assetId, input.stockroom)
     })
-    if (!taken) refuse(response, SCAN_AGAIN)
+    if (!receipt.ran) refuse(response, SCAN_AGAIN)
 }
 
 /** Why a receipt saved nothing: the HTTP status and error it answers with. */
@@ -191,11 +193,8 @@ function receiveHolding(lock: HeldLock, response: RESTAPIResponse, assetId: stri
     // count (entry/orders), so that count sees all of the receipt or none of it. A scan that cannot take it is told to
     // scan again and saves nothing, so the rescan finds the unit still awaiting receipt.
     const lineId = waiting.line.getUniqueValue()
-    // Set inside the line's lock.
-    let received = LINE_BUSY as Unsaved | Allocation
-    withOrderLineLock(lineId, (lineLock) => {
-        received = saveReceipt(lock, asset) ?? allocateHolding(lineLock, asset, waiting)
-    })
+    const underLine = withOrderLineLock(lineId, (lineLock) => saveReceipt(lock, asset) ?? allocateHolding(lineLock, asset, waiting))
+    const received = underLine.ran ? underLine.value : LINE_BUSY
     if ('error' in received) return refuse(response, received)
     // Received as free stock: the line it was found for no longer waits for it (logged).
     if ('leftFree' in received) return reply(response, 200, summarise(asset))
@@ -213,9 +212,10 @@ function receiveHolding(lock: HeldLock, response: RESTAPIResponse, assetId: stri
 /** Save the receipt holding the Asset's `lock`: null once saved, or why not. */
 function saveReceipt(lock: HeldLock, asset: GlideRecord): Unsaved | null {
     // A holder that outlasted the lock (ADR 0013) may overlap the next scan's receipt: it saves only while it holds it.
-    if (!lock.held()) return SCAN_AGAIN
+    const saved = lock.save(`${str(asset, 'serial_number')} received`, () => asset.update())
+    if (saved === 'lock lost') return SCAN_AGAIN
     // A refused save leaves the unit in transit or on order for a rescan, and allocates nothing.
-    return asset.update() ? null : { status: 422, error: `Not received: ${refusal(asset)}` }
+    return saved === 'refused' ? { status: 422, error: `Not received: ${refusal(asset)}` } : null
 }
 
 /**
@@ -231,23 +231,21 @@ function arrivingAsset(assetId: string): GlideRecord | null {
 
 /**
  * The Asset of an unknown serial scanned with its PID. The check that no Asset has the serial and the insert are made
- * under a lock on the serial (domain/asn `receiveSerialLockName`), checking again there, so two first scans of one
- * unit, or a scan and its ASN row, create it once; a scan that finds the lock held is told to scan again, and the
- * rescan finds the Asset by serial.
+ * under a lock on the serial, which an ASN row for the serial takes too (entry/imports), checking again there, so two
+ * first scans of one unit, or a scan and its ASN row, create it once; a scan that finds the lock held is told to scan
+ * again, and the rescan finds the Asset by serial.
  */
 function createReceivedAsset(input: Record<string, string>): { asset: GlideRecord } | Unsaved {
     const resolution = resolveModel({ manufacturer: input.manufacturer ?? '', model: input.pid }, loadNormalizationData())
     const modelId = resolution.modelId
     if (!modelId) return { status: 422, error: `PID ${input.pid} does not map to a model` }
     const serial = normalizeSerial(input.code)
-    // Set inside the serial's lock, which an ASN row for the serial takes too (entry/imports).
-    let created = SCAN_AGAIN as { asset: GlideRecord } | Unsaved
-    withLock(receiveSerialLockName(serial), (lock) => {
+    const created = withLock(LOCK.receiveSerial(serial), (lock) => {
         // Any Asset with the serial, the Provider IT's too: the receipt refuses it rather than create a second one.
         const found = findAssetByIdentifier(input.code, { beyondVisibility: true, includeNonFleet: true })
-        created = found ? { asset: found } : insertReceivedAsset(lock, modelId, serial)
+        return found ? { asset: found } : insertReceivedAsset(lock, modelId, serial)
     })
-    return created
+    return created.ran ? created.value : SCAN_AGAIN
 }
 
 /**
@@ -255,12 +253,12 @@ function createReceivedAsset(input: Record<string, string>): { asset: GlideRecor
  * by `newAsset`, it is a fleet asset the Provider owns.
  */
 function insertReceivedAsset(lock: HeldLock, modelId: string, serial: string): { asset: GlideRecord } | Unsaved {
-    if (!lock.held()) return SCAN_AGAIN
     const asset = newAsset(modelId, 'on_order')
     asset.setValue('serial_number', serial)
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
-    if (!asset.insert()) return { status: 422, error: `Not received: ${refusal(asset)}` }
-    if (!lock.held()) gs.warn(`[x_daas_ham] Asset ${serial} created after its lock was lost: check it exists once`)
+    const saved = lock.save(`Asset ${serial} created`, () => asset.insert(), { check: 'check it exists once' })
+    if (saved === 'lock lost') return SCAN_AGAIN
+    if (saved === 'refused') return { status: 422, error: `Not received: ${refusal(asset)}` }
     return { asset }
 }
 
@@ -352,7 +350,7 @@ function takeOffOrder(lineLock: HeldLock, line: GlideRecord): void {
     const number = str(line, 'number')
     if (!line.update()) return void gs.warn(`[x_daas_ham] ${number} keeps a unit on order: ${refusal(line)}`)
     // A holder that outlasted the lock (ADR 0013) may have counted beside a sourcing pass that took it over.
-    if (!lineLock.held()) gs.warn(`[x_daas_ham] ${number} counted after its lock was lost: check its On order count`)
+    lineLock.lostAfter(`${number} counted`, { check: 'check its On order count' })
 }
 
 /** Stage a unit reserved on receipt for `lineId`; the Asset as it now stands, for the reply. */
@@ -380,11 +378,10 @@ export function putAwayAsset(request: RESTAPIRequest, response: RESTAPIResponse)
     // A fleet asset only: the Provider IT's are not found.
     const found = findAssetByIdentifier(input.code ?? '')
     if (!found) return refuse(response, NOT_FOUND)
-    // Set inside the Asset's stock lock.
-    let putAway = STOCK_BUSY as Unsaved | { asset: GlideRecord }
-    changeStock(found.getUniqueValue(), 'put away', (asset, lock) => {
-        putAway = asset ? putAwayHolding(lock, asset, stockroom, type) : NOT_FOUND
-    })
+    const change = changeStock(found.getUniqueValue(), 'put away', (asset, lock) =>
+        asset ? putAwayHolding(lock, asset, stockroom, type) : NOT_FOUND,
+    )
+    const putAway = change.ran ? change.value : STOCK_BUSY
     if ('error' in putAway) return refuse(response, putAway)
     reply(response, 200, summarise(putAway.asset))
 }
@@ -401,10 +398,11 @@ function putAwayHolding(
 ): Unsaved | { asset: GlideRecord } {
     const problem = putAwayProblem(readStage(asset), type)
     if (problem) return { status: 409, error: problem }
-    // A holder that outlasted the lock (ADR 0013) may overlap a claim: it saves only while it holds it.
-    if (!lock.held()) return STOCK_BUSY
     asset.setValue('stockroom', stockroom.getUniqueValue())
-    if (!asset.update()) return { status: 422, error: `Not put away: ${refusal(asset)}` }
+    // A holder that outlasted the lock (ADR 0013) may overlap a claim: it saves only while it holds it.
+    const saved = lock.save(`${str(asset, 'serial_number')} put away`, () => asset.update())
+    if (saved === 'lock lost') return STOCK_BUSY
+    if (saved === 'refused') return { status: 422, error: `Not put away: ${refusal(asset)}` }
     return { asset }
 }
 

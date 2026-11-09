@@ -1,4 +1,4 @@
-import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { groupDecisions, rollupApprovals, type ApprovalDecision, type ApprovalOutcome } from '../domain/approvals.ts'
 import { appendTo } from '../domain/collections.ts'
 import {
@@ -15,14 +15,14 @@ import {
     type RequestedLine,
 } from '../domain/entitlement.ts'
 import { anythingShipped, approvalAwaited } from '../domain/fulfilment.ts'
+import { LONG_HOLD_LOCK_TRIES, REQUEUE, type HeldLock } from '../domain/job-lock.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { shortfallRoute, type ShortfallRoute } from '../domain/returns.ts'
 import {
     advanceReplacementRma,
     lineStillOpen,
-    orderLineLockName,
     planSourcing,
     shortfallOutcome,
-    sourcingLockName,
     type Source,
     type SourcingRequest,
     type UnmovedStock,
@@ -38,10 +38,10 @@ import {
 } from '../platform/approvals.ts'
 import { moveAndSave, readStage } from '../platform/assets.ts'
 import { beyondVisibility } from '../platform/beyond-visibility.ts'
-import { EVENT, fire } from '../platform/events.ts'
+import { EVENT, fire, requeue } from '../platform/events.ts'
 import { orderShipment, recomputeLine, recomputeOrder } from '../platform/fulfilment.ts'
 import { todayIso } from '../platform/clock.ts'
-import { withLock, withLockTries, type HeldLock } from '../platform/locks.ts'
+import { withLock, withLockTries, type LockRun } from '../platform/locks.ts'
 import { openOemRma, openRmaCount, openRmasFor, reuseOemRma } from '../platform/oem-rma.ts'
 import { requestPurchase } from '../platform/procurement.ts'
 import { PROPERTY, stagingStockroom, stringProperty } from '../platform/properties.ts'
@@ -329,17 +329,6 @@ function rejectOrder(order: GlideRecord): string {
     return ''
 }
 
-/** How many times a request to source an Order is queued again, a minute apart, while it cannot run (`sourceOrder`). */
-const SOURCING_TRIES = 15
-
-const SOURCING_RETRY_SECONDS = 60
-
-/**
- * Tries at taking an Order line's lock before giving up: a holder keeps it for a receipt (the Asset, the line and the
- * reservation saved) or for sourcing's read of the line or its purchase and save, so a few more than a counter's.
- */
-const LINE_LOCK_ATTEMPTS = 10
-
 /** How sourcing left a line: done (sourced, or a refused save logged), or for a pass queued again to finish. */
 type LineSourcing = 'done' | 'line busy' | 'lock lost'
 
@@ -356,16 +345,15 @@ const AGAIN_BECAUSE: Record<Exclude<LineSourcing, 'done'>, string> = {
  * count the same shortfall, and one would buy what the other claimed. So a pass holds a lock on the Order, which Cancel
  * order holds too (`cancelOrder`). One that finds it held runs again a minute later rather than leave its work to the
  * holder, which may have counted before the change that queued it; so does a pass that left a line whose lock stayed
- * held, or that lost the Order's lock. A request is queued again SOURCING_TRIES times at most, past the lock's
- * ten-minute abandonment, then dropped with a warning: a lock still held by then was taken after the request was
+ * held, or that lost the Order's lock. A request is queued again a minute apart and past the lock's abandonment
+ * (domain/job-lock `REQUEUE`), then dropped with a warning: a lock still held by then was taken after the request was
  * queued, by a pass that counted its change. Taking the lock throws only when an insert is refused with no lock row
  * (platform/locks): that error escapes.
  */
 export function sourceOrder(event: GlideRecord, current: GlideRecord): void {
     const orderId = current.getUniqueValue()
-    // Set inside the Order's lock.
-    let again = null as Exclude<LineSourcing, 'done'> | null
-    const taken = withLock(sourcingLockName(orderId), (lock) => {
+    const pass = withLock(LOCK.sourceOrder(orderId), (lock) => {
+        let again: Exclude<LineSourcing, 'done'> | null = null
         const line = new GlideRecord('x_daas_ham_order_line')
         line.addQuery('order', orderId)
         line.addQuery('line_stage', 'IN', 'new,awaiting_stock')
@@ -374,37 +362,35 @@ export function sourceOrder(event: GlideRecord, current: GlideRecord): void {
             const sourced = sourceLine(lock, current, line)
             if (sourced !== 'done') again = sourced
         }
+        return again
     })
-    if (!taken || again) {
+    const again = pass.ran ? pass.value : null
+    if (!pass.ran || again) {
         const why = again ? AGAIN_BECAUSE[again] : 'another pass or a cancel holds its lock'
         sourceAgain(current, Number(str(event, 'parm2')) || 0, why)
     }
-    if (taken) recomputeOrder(orderId)
+    if (pass.ran) recomputeOrder(orderId)
 }
 
 /** Queue the request to source `order` again a minute later, unless it was already queued again `tries` times. */
 function sourceAgain(order: GlideRecord, tries: number, why: string): void {
     const number = str(order, 'number')
-    if (tries >= SOURCING_TRIES) {
+    if (tries >= REQUEUE.times) {
         return void gs.warn(`[x_daas_ham] ${number} not sourced again after ${tries} tries (${why}): check its lines`)
     }
-    gs.info(`[x_daas_ham] ${number} sourced again in ${SOURCING_RETRY_SECONDS} s: ${why}`)
-    const when = new GlideDateTime()
-    when.addSeconds(SOURCING_RETRY_SECONDS)
-    gs.eventQueueScheduled(EVENT.sourceOrder, order, '', String(tries + 1), when)
+    gs.info(`[x_daas_ham] ${number} sourced again in ${REQUEUE.delaySeconds} s: ${why}`)
+    requeue(EVENT.sourceOrder, order, '', String(tries + 1))
 }
 
 /**
- * Run `work` holding the Order line's lock (domain/sourcing `orderLineLockName`) and return true, or false when other
- * holders kept it through every try. Taking the lock throws only when an insert is refused with no lock row
+ * Run `work` holding the Order line's lock and give what it returned, or `ran: false` when other holders kept it through
+ * every try: a holder keeps it for a receipt (the Asset, the line and the reservation saved) or for sourcing's read of
+ * the line or its purchase and save. Taking the lock throws only when an insert is refused with no lock row
  * (platform/locks `withLockTries` tries again, and that error escapes only when every try threw), as does an error
  * from `work`.
  */
-export function withOrderLineLock(lineId: string, work: (lock: HeldLock) => void): boolean {
-    // What `work` did counts once it ran, so whatever it returns never gives the try up (platform/locks).
-    return withLockTries(orderLineLockName(lineId), LINE_LOCK_ATTEMPTS, (lock) => {
-        work(lock)
-    })
+export function withOrderLineLock<T>(lineId: string, work: (lock: HeldLock) => T): LockRun<T> {
+    return withLockTries(LOCK.orderLine(lineId), work, LONG_HOLD_LOCK_TRIES)
 }
 
 /** What sourcing found and did for a line outside its lock: what `settleHolding` routes, buys and saves. */
@@ -430,11 +416,9 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
     if (!orderLock.held()) return leftUnsaved(line, 'lock lost', [])
     const lineId = line.getUniqueValue()
     // Read under the line's lock, where a receipt takes its unit off order and allocates it: seen whole or not at all.
-    let shortfall = null as number | null
-    const read = withOrderLineLock(lineId, () => {
-        shortfall = lineShortfall(lineId)
-    })
-    if (!read) return 'line busy'
+    const read = withOrderLineLock(lineId, () => lineShortfall(lineId))
+    if (!read.ran) return 'line busy'
+    const shortfall = read.value
     if (shortfall === null || shortfall <= 0) return 'done'
 
     const modelId = str(line, 'model')
@@ -499,11 +483,8 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
     const route = (missing: number) => shortfallRoute({ missing, purpose: sameModel ? 'replace' : 'new', coveredToday })
     const planSummary = plan.summary
     const sourced: Sourced = { lineId, modelId, route, replaced, toPurchase, putBack, planSummary, unmoved, transfers }
-    // Set inside the line's lock.
-    let settled = 'line busy' as Exclude<LineSourcing, 'done'> | 'saved' | 'unsaved' | 'closed'
-    withOrderLineLock(lineId, (lineLock) => {
-        settled = settleHolding(orderLock, lineLock, order, sourced)
-    })
+    const settling = withOrderLineLock(lineId, (lineLock) => settleHolding(orderLock, lineLock, order, sourced))
+    const settled = settling.ran ? settling.value : 'line busy'
     if (settled === 'saved') recomputeLine(lineId)
     if (settled === 'closed') leftClosed(line, transfers)
     if (settled === 'saved' || settled === 'unsaved' || settled === 'closed') return 'done'
@@ -603,7 +584,7 @@ function settleHolding(
         return 'unsaved'
     }
     // A holder that outlasted the line's lock (ADR 0013) may have saved beside a receipt that took it over.
-    if (!lineLock.held()) gs.warn(`[x_daas_ham] ${number} saved after its lock was lost: check its On order count`)
+    lineLock.lostAfter(`${number} saved`, { check: 'check its On order count' })
     return 'saved'
 }
 
@@ -781,19 +762,20 @@ function cancelOpenLines(orderId: string): boolean {
  * would not be listed to cancel. So the cancel holds the Order's sourcing lock (`sourceOrder`) and the two take turns;
  * a cancel that finds it held changes nothing and tells the user to try again. A Ship running between the cancel's
  * shipped check and its release of the lines would send units of lines being cancelled, so the cancel holds the
- * Order's Ship lock too (`ship_order_<sys_id>`, entry/delivery `shipOrder`), taken under the sourcing lock as in ADR
- * 0013's order (Ship never takes the sourcing lock); one that finds it held changes nothing and says a Ship is running.
- * Taking either lock throws only when an insert is refused with no lock row (platform/locks): that error escapes.
+ * Order's Ship lock too (entry/delivery `shipOrder`), taken under the sourcing lock as in ADR 0013's order (Ship never
+ * takes the sourcing lock); one that finds it held changes nothing and says a Ship is running. Taking either lock
+ * throws only when an insert is refused with no lock row (platform/locks): that error escapes.
  */
 export function cancelOrder(order: GlideRecord): void {
     const orderId = order.getUniqueValue()
-    // Set inside the sourcing lock.
-    let shipping = false as boolean
-    const taken = withLock(sourcingLockName(orderId), (sourcing) => {
-        shipping = !withLock(`ship_order_${orderId}`, (ship) => cancelHolding({ sourcing, ship }, order))
+    const underSourcing = withLock(LOCK.sourceOrder(orderId), (sourcing) => {
+        return withLock(LOCK.shipOrder(orderId), (ship) => cancelHolding({ sourcing, ship }, order))
     })
-    if (!taken) return void gs.addErrorMessage('Order not cancelled: sourcing is running on it. Try again in a minute')
-    if (shipping) gs.addErrorMessage('Order not cancelled: a Ship of the Order is running. Try again once it is done')
+    if (!underSourcing.ran) {
+        return void gs.addErrorMessage('Order not cancelled: sourcing is running on it. Try again in a minute')
+    }
+    const underShip = underSourcing.value
+    if (!underShip.ran) gs.addErrorMessage('Order not cancelled: a Ship of the Order is running. Try again once it is done')
 }
 
 /**
@@ -818,14 +800,9 @@ function cancelHolding(locks: { sourcing: HeldLock; ship: HeldLock }, order: Gli
     // A cancel that outlasted a lock (ADR 0013) may have overlapped the pass or Ship that took it over. A pass skips
     // the lines it reads after the Order was saved cancelled (`openLine`), not those it reached first; a Ship may have
     // sent units before the cancel released them.
-    const number = str(order, 'number')
-    if (!locks.sourcing.held()) {
-        const check = 'check its lines for stock reserved or bought meanwhile'
-        gs.warn(`[x_daas_ham] ${number} cancelled after its sourcing lock was lost: ${check}`)
-    }
-    if (!locks.ship.held()) {
-        gs.warn(`[x_daas_ham] ${number} cancelled after its Ship lock was lost: check for units shipped meanwhile`)
-    }
+    const cancelled = `${str(order, 'number')} cancelled`
+    locks.sourcing.lostAfter(cancelled, { check: 'check its lines for stock reserved or bought meanwhile' })
+    locks.ship.lostAfter(cancelled, { check: 'check for units shipped meanwhile' })
     // After the save, so the approval rule each cancellation runs finds the Order no longer awaiting approval.
     cancelPendingApprovals(order.getUniqueValue())
 }

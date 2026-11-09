@@ -7,12 +7,10 @@ import {
     isClaimable,
     isFree,
     lineStillOpen,
-    orderLineLockName,
     pickForSparePool,
     planSourcing,
     reservedSparesQuery,
     shortfallOutcome,
-    sourcingLockName,
     sparePoolShortfall,
     stockQueries,
     type OpenRma,
@@ -277,16 +275,6 @@ describe('advanceReplacementRma', () => {
         const newer = rma({ rmaId: 'newer', state: 'to_open' })
         expect(advanceReplacementRma('line-1', [older, newer])?.rma).toBe(older)
         expect(advanceReplacementRma('line-1', [newer, older])?.rma).toBe(newer)
-    })
-})
-
-describe('sourcingLockName and orderLineLockName', () => {
-    const sysId = (c: string) => c.repeat(32)
-
-    it('lock each Order and each line on its own, within the job lock name length', () => {
-        const names = [sysId('a'), sysId('b')].flatMap((id) => [sourcingLockName(id), orderLineLockName(id)])
-        expect(new Set(names).size).toBe(names.length)
-        for (const name of names) expect(name.length).toBeLessThanOrEqual(100)
     })
 })
 

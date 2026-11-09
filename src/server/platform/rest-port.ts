@@ -1,5 +1,6 @@
 import { gs } from '@servicenow/glide'
 import { RESTMessageV2 } from '@servicenow/glide/sn_ws'
+import { messageOf } from '../domain/errors.ts'
 import type { HttpPort } from '../domain/http.ts'
 import { stringProperty } from './properties.ts'
 
@@ -52,7 +53,7 @@ export function restMessagePort(message: string): HttpPort {
             const response = rest.execute()
             return { status: response.getStatusCode(), body: response.getBody() }
         } catch (error) {
-            gs.warn(`[x_daas_ham] ${message}.${request.fn} failed: ${error instanceof Error ? error.message : String(error)}`)
+            gs.warn(`[x_daas_ham] ${message}.${request.fn} failed: ${messageOf(error)}`)
             return { status: 0, body: '' }
         }
     }

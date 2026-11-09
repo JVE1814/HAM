@@ -122,11 +122,6 @@ export function chargedFeeQuery(fee: FeeIdentity): string {
     return `fee_type=${fee.type}^asset=${fee.assetId}^return_order=${fee.returnOrderId}^status!=waived`
 }
 
-/** The job lock (ADR 0013) a fee is charged under: one per fee identity, within the lock name's 100 characters. */
-export function feeLockName(fee: FeeIdentity): string {
-    return `fee_${fee.type}_${fee.assetId}_${fee.returnOrderId}`
-}
-
 export type ShortfallRoute = 'none' | 'purchase' | 'oem_advance_replacement'
 
 /** A covered unit that fails with no stock left is replaced by the OEM in advance; anything else is purchased. */

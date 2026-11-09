@@ -1,9 +1,12 @@
 import { GlideRecord, gs } from '@servicenow/glide'
+import { messageOf } from '../domain/errors.ts'
 import { naasStockroomType, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
+import { LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import type { Stage } from '../domain/lifecycle.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { isClaimable, stockQueries, type StockCandidate, type StockScope, type StockUnit } from '../domain/sourcing.ts'
 import { moveAsset, readStage } from './assets.ts'
-import { withLockTries, type HeldLock } from './locks.ts'
+import { attemptLock, type LockRun } from './locks.ts'
 import { bool, str } from './records.ts'
 
 /** Stock that can serve an Order line, claiming it for one, and changing it where a claim could race. */
@@ -112,52 +115,41 @@ interface Claim {
  * read and one save, and the unit then counts as short just as one another run claimed.
  */
 function claim(assetId: string, wanted: Claim): GlideRecord | null {
-    let claimed: GlideRecord | null = null
-    underStockLock(assetId, 1, 'claimed', (asset, lock) => {
-        claimed = asset && claimHolding(lock, asset, wanted)
-    })
-    return claimed
+    const claimed = underStockLock(assetId, 1, 'claimed', (asset, lock) => asset && claimHolding(lock, asset, wanted))
+    return claimed.ran ? claimed.value : null
 }
-
-/**
- * Tries at an Asset's stock lock for a change someone waits on (a put-away scan, a lease return): a claim holds it for
- * one read and one save.
- */
-const CHANGE_TRIES = 5
 
 /**
  * Change an in-stock Asset that a claim could take meanwhile (withdrawing it for its Lessor, putting it away), under
  * the lock claims take, so a claim lands wholly before `change` reads the Asset or after it saves. `change` gets the
  * Asset read afresh there (null when it is gone), to check again before it saves; a holder that outlasts the lock (ADR
- * 0013) may overlap a claim, so it saves only while `lock.held()`. False when other holders kept the lock through every
- * try, or it could not be taken (logged with `what`): `change` did not run. Its own errors escape.
+ * 0013) may overlap a claim, so it saves through `lock`. What `change` returned, or `ran: false` when other holders
+ * kept the lock through every try (a claim holds it for one read and one save, and someone waits on the change), or
+ * it could not be taken (logged with `what`): `change` did not run. Its own errors escape.
  */
-export function changeStock(assetId: string, what: string, change: StockWork): boolean {
-    return underStockLock(assetId, CHANGE_TRIES, what, change)
+export function changeStock<T>(assetId: string, what: string, change: StockWork<T>): LockRun<T> {
+    return underStockLock(assetId, LOCK_TRIES, what, change)
 }
 
 /** Work on an Asset read afresh holding its stock `lock`; null when the Asset is gone. */
-type StockWork = (asset: GlideRecord | null, lock: HeldLock) => void
+type StockWork<T> = (asset: GlideRecord | null, lock: HeldLock) => T
 
 /**
- * Run `work` holding the Asset's stock lock (`reserve_asset_<sys_id>`), which every claim and every change a claim
- * could race takes. Taking the lock throws only when an insert is refused with no lock row (platform/locks); that is
- * logged as the Asset not `what`, and it is left as it is.
+ * Run `work` holding the Asset's stock lock, which every claim and every change a claim could race takes. A lock that
+ * cannot be taken (the insert is refused with no lock row, platform/locks) is logged as the Asset not `what`, and it is
+ * left as it is.
  */
-function underStockLock(assetId: string, tries: number, what: string, work: StockWork): boolean {
-    let started = false
-    try {
-        return withLockTries(`reserve_asset_${assetId}`, tries, (lock) => {
-            started = true
+function underStockLock<T>(assetId: string, tries: number, what: string, work: StockWork<T>): LockRun<T> {
+    const attempt = attemptLock(
+        LOCK.reserveAsset(assetId),
+        (lock) => {
             const asset = new GlideRecord('alm_hardware')
-            work(asset.get(assetId) ? asset : null, lock)
-        })
-    } catch (error) {
-        // An error from the work itself is the caller's to report; one from taking the lock leaves the Asset as it is.
-        if (started) throw error
-        gs.warn(`[x_daas_ham] Asset ${assetId} not ${what}: ${error instanceof Error ? error.message : String(error)}`)
-        return false
-    }
+            return work(asset.get(assetId) ? asset : null, lock)
+        },
+        tries,
+    )
+    if (!attempt.ran && !attempt.held) gs.warn(`[x_daas_ham] Asset ${assetId} not ${what}: ${messageOf(attempt.error)}`)
+    return attempt
 }
 
 /**
@@ -170,9 +162,10 @@ function claimHolding(lock: HeldLock, asset: GlideRecord, wanted: Claim): GlideR
     if (!isClaimable(stockUnit(asset), wanted.from)) return null
     if (!moveAsset(asset, wanted.to).allowed) return null
     for (const [field, value] of Object.entries(wanted.values)) asset.setValue(field, value)
-    if (!lock.held()) return lockLost(assetId)
-    if (!asset.update()) return null
-    if (lock.held()) return asset
+    const saved = lock.write(() => asset.update())
+    if (!saved.written) return lockLost(assetId)
+    if (!saved.value) return null
+    if (!saved.lockLost) return asset
     const fresh = new GlideRecord('alm_hardware')
     return fresh.get(assetId) && shows(fresh, wanted) ? fresh : lockLost(assetId)
 }

@@ -3,6 +3,8 @@ import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_in
 import { parseDeviceEvents, type DeviceEvent } from '../domain/device-events.ts'
 import { decideInService } from '../domain/in-service.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
+import { LONG_HOLD_LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { ROLE } from '../domain/visibility.ts'
 import type { SeenSource } from '../domain/vocabulary.ts'
 import { findAssetByIdentifier, moveAndSave, readStage } from '../platform/assets.ts'
@@ -10,7 +12,7 @@ import { beyondVisibility } from '../platform/beyond-visibility.ts'
 import { runTableJob } from '../platform/chunked.ts'
 import { glideToMs, msToGlide, nowMs } from '../platform/clock.ts'
 import { applyLifecycleDates, lifecycleReaders, type LifecycleReaders } from '../platform/lifecycle-dates.ts'
-import { withLockTries, type HeldLock } from '../platform/locks.ts'
+import { withLockTries } from '../platform/locks.ts'
 import { intProperty, PROPERTY } from '../platform/properties.ts'
 import { deleteWhere, refusal, str } from '../platform/records.ts'
 import { reply } from '../platform/rest-api.ts'
@@ -60,29 +62,26 @@ function goLiveIfSeen(lock: HeldLock, asset: GlideRecord, readers: LifecycleRead
 }
 
 /**
- * Tries at taking an Asset's sighting lock: a holder keeps it for one event and, on a go-live, the Asset's save and its
- * rules, so as many as an Order line's.
- */
-const SEEN_LOCK_TRIES = 10
-
-/**
- * Run `see` on the Asset read afresh, holding its sighting lock `seen_asset_<sys_id>`: true once `see` applied the
- * sighting (or the Asset is gone), false when another sighting held the lock through every try, or `see` found it lost
- * before saving or had its save refused. Two NMS batches, or a batch and the detection job, can see one Asset at once;
- * each reading it before the other saved, the later save would put back an older last_seen and in-service date, or move
- * an Asset the other had put in service (and since moved on) into service again. Taken before any other lock, by these
- * entry points only: a go-live starts its Subscription line under the line's lock (platform/subscriptions) and its
- * save's rule takes the Asset's interval lock (platform/service-intervals), and a second take of a lock is refused. A
- * lock that cannot be taken throws (platform/locks); that error escapes.
+ * Run `see` on the Asset read afresh, holding its sighting lock: true once `see` applied the sighting (or the Asset is
+ * gone), false when another sighting held the lock through every try, or `see` found it lost before saving or had its
+ * save refused. Two NMS batches, or a batch and the detection job, can see one Asset at once; each reading it before
+ * the other saved, the later save would put back an older last_seen and in-service date, or move an Asset the other had
+ * put in service (and since moved on) into service again. Taken before any other lock, by these entry points only: a
+ * go-live starts its Subscription line under the line's lock (platform/subscriptions) and its save's rule takes the
+ * Asset's interval lock (platform/service-intervals), and a second take of a lock is refused. A holder keeps it for one
+ * event and, on a go-live, the Asset's save and its rules. A lock that cannot be taken throws (platform/locks); that
+ * error escapes.
  */
 function underSeenLock(assetId: string, see: (lock: HeldLock, asset: GlideRecord) => boolean): boolean {
-    // Set inside the lock.
-    let applied = false as boolean
-    const ran = withLockTries(`seen_asset_${assetId}`, SEEN_LOCK_TRIES, (lock) => {
-        const asset = freshAsset(assetId)
-        applied = !asset || see(lock, asset)
-    })
-    return ran && applied
+    const seen = withLockTries(
+        LOCK.seenAsset(assetId),
+        (lock) => {
+            const asset = freshAsset(assetId)
+            return !asset || see(lock, asset)
+        },
+        LONG_HOLD_LOCK_TRIES,
+    )
+    return seen.ran && seen.value
 }
 
 /** The Asset read past the visibility rules, as the identifier lookup finds it; its save runs every rule. */

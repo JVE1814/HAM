@@ -1,4 +1,5 @@
-import { gs, type GlideRecord } from '@servicenow/glide'
+import { GlideDateTime, gs, type GlideRecord } from '@servicenow/glide'
+import { REQUEUE } from '../domain/job-lock.ts'
 
 /** Events this app fires (registered in src/fluent/logic/events.now.ts). */
 export const EVENT = {
@@ -19,4 +20,14 @@ export const EVENT = {
 
 export function fire(event: string, record: GlideRecord, parm1 = '', parm2 = ''): void {
     gs.eventQueue(event, record, parm1, parm2)
+}
+
+/**
+ * Queue `event` on `record` again, to run `seconds` from now: a request that could not run under its lock (domain/job-lock
+ * `REQUEUE`, which also bounds how often a counted request is queued again).
+ */
+export function requeue(event: string, record: GlideRecord, parm1: string, parm2: string, seconds: number = REQUEUE.delaySeconds): void {
+    const when = new GlideDateTime()
+    when.addSeconds(seconds)
+    gs.eventQueueScheduled(event, record, parm1, parm2, when)
 }

@@ -1,4 +1,5 @@
 import { GlideRecord, gs } from '@servicenow/glide'
+import { LOCK } from '../domain/lock-names.ts'
 import { msToGlide, nowMs } from './clock.ts'
 import { withLockTries } from './locks.ts'
 import { refusal, str } from './records.ts'
@@ -13,21 +14,18 @@ interface ExceptionSubject {
     detail: string
 }
 
-/** Tries at taking the subject's lock before leaving the exception to the holder: it holds it for one read and one insert. */
-const LOCK_ATTEMPTS = 5
-
 /**
  * Open an exception of `type` for the subject unless one is already open. Two runs (an overlapping reconciliation, two
  * audits closing at once) may raise the same one, and a unique index cannot allow closed duplicates beside the open
  * one, so the check and the insert are made under a lock on the type and subject, re-checking there. A run that finds
- * the lock held through every try leaves the exception to the holder, which is raising it. Taking the lock throws only
- * when an insert is refused with no lock row (platform/locks `withLockTries` tries again, and that error escapes only
- * when every try threw), as does an error from the insert.
+ * the lock held through every try (a holder keeps it for one read and one insert) leaves the exception to the holder,
+ * which is raising it. Taking the lock throws only when an insert is refused with no lock row (platform/locks
+ * `withLockTries` tries again, and that error escapes only when every try threw), as does an error from the insert.
  */
 export function openException(type: ExceptionType, subject: ExceptionSubject): void {
     // Most calls find the exception already open from an earlier run: those need no lock.
     if (isOpen(type, subject)) return
-    withLockTries(`recon_exception_${type}_${subject.assetId || subject.ciId || ''}`, LOCK_ATTEMPTS, () => {
+    withLockTries(LOCK.reconException(type, subject.assetId || subject.ciId || ''), () => {
         if (!isOpen(type, subject)) insertException(type, subject)
     })
 }

@@ -2695,6 +2695,10 @@ declare global {
                         table: 'sys_module'
                         id: 'a466182b22e144d0bef3523185c6cb68'
                     }
+                    src_server_domain_errors_ts: {
+                        table: 'sys_module'
+                        id: 'f33b2acd720947b6a2d6c27ec9812534'
+                    }
                     src_server_domain_fleet_ts: {
                         table: 'sys_module'
                         id: 'ec4a1353f8304437a353f3e3ec413fd0'
@@ -2715,6 +2719,10 @@ declare global {
                         table: 'sys_module'
                         id: '93359a6240154c30b248d80a93ea7418'
                     }
+                    'src_server_domain_job-lock_ts': {
+                        table: 'sys_module'
+                        id: 'd541054d515241f8a288b606f6096183'
+                    }
                     src_server_domain_json_ts: {
                         table: 'sys_module'
                         id: 'dd36dd93290c419983953ef50a0f60db'
@@ -2726,6 +2734,10 @@ declare global {
                     src_server_domain_lifecycle_ts: {
                         table: 'sys_module'
                         id: '66118dbddb2b499e9ec71d75e49c9d34'
+                    }
+                    'src_server_domain_lock-names_ts': {
+                        table: 'sys_module'
+                        id: 'e41068b0a74748579ec6866eed70dd20'
                     }
                     src_server_domain_margin_ts: {
                         table: 'sys_module'

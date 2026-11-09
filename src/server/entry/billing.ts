@@ -22,6 +22,7 @@ import {
     type SubscriptionLineTerms,
 } from '../domain/billing.ts'
 import { appendTo } from '../domain/collections.ts'
+import { messageOf } from '../domain/errors.ts'
 import { memoized } from '../domain/memo.ts'
 import { ROLE } from '../domain/visibility.ts'
 import { RowFailure, runEventTableJob } from '../platform/chunked.ts'
@@ -80,10 +81,6 @@ export function generateBillingLines(event: GlideRecord, current: GlideRecord): 
         if (!isCurrentPass(pass)) return void dropChunk(period)
         stopGeneration(period, messageOf(error))
     }
-}
-
-function messageOf(error: unknown): string {
-    return error instanceof Error ? error.message : String(error)
 }
 
 /*
@@ -333,7 +330,7 @@ function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
         } catch (error) {
             // The fee stays open without a period, so a regeneration bills it.
             failed++
-            lastError = `${fee.getUniqueValue()}: ${error instanceof Error ? error.message : String(error)}`
+            lastError = `${fee.getUniqueValue()}: ${messageOf(error)}`
             continue
         }
         fee.setValue('billing_period', period.getUniqueValue())
@@ -534,7 +531,7 @@ export function exportBillingPeriod(event: GlideRecord): void {
         new GlideSysAttachment().write(period, fileName, 'text/csv', toCsv(rows))
         keepOldestExport(period, fileName)
     } catch (error) {
-        gs.error(`[x_daas_ham] CSV export of billing period ${str(period, 'period')} failed: ${error instanceof Error ? error.message : String(error)}`)
+        gs.error(`[x_daas_ham] CSV export of billing period ${str(period, 'period')} failed: ${messageOf(error)}`)
     }
 }
 

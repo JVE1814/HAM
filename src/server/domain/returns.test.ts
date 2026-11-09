@@ -4,7 +4,6 @@ import {
     chargedFeeQuery,
     evaluationTarget,
     feeAmount,
-    feeLockName,
     INSTALLED_STAGES,
     overdueStep,
     returnDueDate,
@@ -188,17 +187,6 @@ describe('fee identity', () => {
     it('counts every charge of the same type, Asset and Return order but a waived one', () => {
         const charged = `fee_type=late_return^asset=${sysId('a')}^return_order=${sysId('r')}^status!=waived`
         expect(chargedFeeQuery(fee)).toBe(charged)
-    })
-
-    it('locks each fee identity on its own, within the job lock name length', () => {
-        const names = [
-            fee,
-            { ...fee, type: 'lost' as const },
-            { ...fee, assetId: sysId('b') },
-            { ...fee, returnOrderId: sysId('s') },
-        ].map(feeLockName)
-        expect(new Set(names).size).toBe(names.length)
-        for (const name of names) expect(name.length).toBeLessThanOrEqual(100)
     })
 })
 

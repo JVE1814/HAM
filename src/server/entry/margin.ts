@@ -2,6 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
 import { monthBounds, overlapsMonth, type MonthBounds } from '../domain/billing.ts'
+import { messageOf } from '../domain/errors.ts'
 import { stillCovered } from '../domain/leases.ts'
 import { cents, CostLedger, costFactKey, marginRows, serviceIntervalCosts, type Amount, type AssetCostFacts, type CostEntry, type LeaseTerms } from '../domain/margin.ts'
 import { memoized } from '../domain/memo.ts'
@@ -31,7 +32,7 @@ export function computeMargin(event: GlideRecord, current: GlideRecord): void {
         computeMarginChunk(period, str(event, 'parm2'), current)
     } catch (error) {
         // The pass stops (the runner records it on the period through `stopped` while the pass is current).
-        gs.error(`[x_daas_ham] Margin of ${str(period, 'period')} stopped: ${error instanceof Error ? error.message : String(error)}`)
+        gs.error(`[x_daas_ham] Margin of ${str(period, 'period')} stopped: ${messageOf(error)}`)
     }
 }
 
