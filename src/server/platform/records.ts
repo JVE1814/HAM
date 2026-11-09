@@ -1,4 +1,4 @@
-import { GlideAggregate, GlideRecord } from '@servicenow/glide'
+import { GlideAggregate, type GlideElement, GlideRecord } from '@servicenow/glide'
 
 /** Small Glide helpers shared by repositories and gateways. Keep this module free of business rules. */
 
@@ -85,17 +85,29 @@ export function refusal(record: GlideRecord, fallback = 'the save was refused'):
     return record.getLastErrorMessage() || fallback
 }
 
+/**
+ * The value of `field`, which may be dot-walked ('reference.field'). In a scoped script a GlideRecord's getValue does
+ * not dot-walk: it gives null for a dotted name, so those are read through getElement, whose value is null when the path
+ * crosses an empty reference (and which is null itself for an unknown field). Not for a GlideAggregate: scoped scripts
+ * may not call its getElement, and its getValue does give a dotted group-by.
+ */
+function valueOf(gr: GlideRecord, field: string): string | null {
+    if (!field.includes('.')) return gr.getValue(field)
+    const element: GlideElement | null = gr.getElement(field)
+    return element ? element.getValue() : null
+}
+
 export function str(gr: GlideRecord, field: string): string {
-    const value = gr.getValue(field)
+    const value = valueOf(gr, field)
     return value === null || value === undefined ? '' : String(value)
 }
 
 export function num(gr: GlideRecord, field: string): number {
-    const value = Number(gr.getValue(field))
+    const value = Number(valueOf(gr, field))
     return Number.isFinite(value) ? value : 0
 }
 
 export function bool(gr: GlideRecord, field: string): boolean {
-    const value = gr.getValue(field)
+    const value = valueOf(gr, field)
     return value === '1' || value === 'true' || value === (true as unknown)
 }
