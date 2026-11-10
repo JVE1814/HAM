@@ -1,5 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { LOCK } from '../domain/lock-names.ts'
+import { OPEN_EXCEPTIONS_QUERY } from '../domain/reconciliation.ts'
 import { nowGlide } from './clock.ts'
 import { withLockTries } from './locks.ts'
 import { exists, pluck, refusal, str } from './records.ts'
@@ -46,7 +47,7 @@ export function openException(type: ExceptionType, subject: ExceptionSubject, fa
 
 function isOpen(type: ExceptionType, subject: ExceptionSubject): boolean {
     const { field, id } = fieldOf(subject)
-    return exists(TABLE, `exception_type=${type}^status=${EXCEPTION_STATUS.open}^${field}=${id}`)
+    return exists(TABLE, `exception_type=${type}^${OPEN_EXCEPTIONS_QUERY}^${field}=${id}`)
 }
 
 function insertException(type: ExceptionType, subject: ExceptionSubject, facts: ExceptionFacts): void {
@@ -112,5 +113,5 @@ function resolveEach(exception: GlideRecord): void {
 
 /** The CIs (racks, network gear) with an open exception of one of `types`, each once. */
 export function cisWithOpenException(types: readonly ExceptionType[]): string[] {
-    return [...new Set(pluck(TABLE, `status=${EXCEPTION_STATUS.open}^exception_typeIN${types.join(',')}^ciISNOTEMPTY`, 'ci'))]
+    return [...new Set(pluck(TABLE, `${OPEN_EXCEPTIONS_QUERY}^exception_typeIN${types.join(',')}^ciISNOTEMPTY`, 'ci'))]
 }

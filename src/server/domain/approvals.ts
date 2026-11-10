@@ -4,6 +4,9 @@ export type Approver = 'customer_admin' | 'account_manager'
 export type ApprovalState = 'requested' | 'approved' | 'rejected' | 'cancelled' | 'not_required' | 'not_yet_requested'
 export type ApprovalOutcome = 'requested' | 'approved' | 'rejected'
 
+/** The state of an approval request (sysapproval_approver.state) nobody has decided yet. */
+export const APPROVAL_REQUESTED = 'requested'
+
 export interface ApprovalDecision {
     group: Approver
     state: ApprovalState

@@ -162,6 +162,9 @@ export const ENDED_ORDER_STAGES: readonly OrderStage[] = [ORDER_STAGE.complete, 
  */
 export const OPEN_ORDERS_QUERY = `stageNOT IN${ORDER_STAGE.complete},${ORDER_STAGE.cancelled},${ORDER_STAGE.rejected}`
 
+/** Encoded query on x_daas_ham_order: the Orders waiting for an approval, which the workspace lists and the dashboard counts. */
+export const ORDERS_AWAITING_APPROVAL_QUERY = `stage=${ORDER_STAGE.awaiting_approval}`
+
 /**
  * Stages in which Cancel order is offered: from a draft until Ship, before any of the Order's equipment is at its Site
  * (the action's condition is written from these; the built action is checked against them).

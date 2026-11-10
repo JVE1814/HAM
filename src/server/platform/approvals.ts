@@ -1,5 +1,6 @@
 import { GlideRecord } from '@servicenow/glide'
 import {
+    APPROVAL_REQUESTED,
     groupDecisions,
     rollupApprovals,
     type ApprovalDecision,
@@ -147,7 +148,7 @@ function requestApproval(task: GlideRecord, approverId: string): string {
     approval.setValue('source_table', task.getTableName())
     approval.setValue('document_id', task.getUniqueValue())
     approval.setValue('approver', approverId)
-    approval.setValue('state', 'requested')
+    approval.setValue('state', APPROVAL_REQUESTED)
     if (approval.insert()) return ''
     return warnRefused(approval, `No approval request for ${str(task, 'number')} to ${approverId}`)
 }
@@ -169,7 +170,7 @@ export function approvalsOf(taskId: string): Array<{ approverId: string; state: 
 export function cancelPendingApprovals(taskId: string): void {
     const approval = new GlideRecord('sysapproval_approver')
     approval.addQuery('sysapproval', taskId)
-    approval.addQuery('state', 'requested')
+    approval.addQuery('state', APPROVAL_REQUESTED)
     approval.query()
     while (approval.next()) {
         approval.setValue('state', 'cancelled')

@@ -69,6 +69,9 @@ export const RETURN_TASK_STATE = { inProgress: 2, closed: 3 } as const
 /** The stages of a temporary deployment whose end date is watched: its equipment is being installed or is installed. */
 export const TEMPORARY_RETURN_STAGES: readonly OrderStage[] = [ORDER_STAGE.installing, ORDER_STAGE.complete]
 
+/** Encoded query on Fee events: the open ones, not yet billed nor waived, which the workspace lists. */
+export const OPEN_FEES_QUERY = `status=${FEE_STATUS.open}`
+
 /** The status of a Return line whose unit is still expected back: not at the depot yet, nor declared missing. */
 export const AWAITED: ReturnLineStatus = 'awaiting'
 

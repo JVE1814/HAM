@@ -1,8 +1,8 @@
 import '@servicenow/sdk/global'
 import { CatalogItemRecordProducer, ListCollectorVariable, ReferenceVariable, SelectBoxVariable, SingleLineTextVariable } from '@servicenow/sdk/core'
 import { afterReturnProduced } from '../../server/entry/returns'
-import { FLEET_CONDITION, SITES_OF_CUSTOMER_QUERY } from '../../server/domain/fleet'
-import { INSTALL_STATUS } from '../../server/domain/vocabulary'
+import { FLEET_INSTALLED, SITES_OF_CUSTOMER_QUERY } from '../../server/domain/fleet'
+import { SERVICE_CATALOG } from './order-producer.now'
 
 /*
  * "Return or decommission equipment": customer admins and the service desk raise returns (D60). The Site choices follow
@@ -15,7 +15,7 @@ export const requestReturn = CatalogItemRecordProducer({
     name: 'Return or decommission network equipment',
     shortDescription: 'Decommission a whole site or remove individual devices; equipment is collected or shipped back.',
     table: 'x_daas_ham_return_order',
-    catalogs: ['e0d08b13c3330100c8b837659bba8fb4'],
+    catalogs: [SERVICE_CATALOG],
     redirectUrl: 'generatedRecord',
     variables: {
         customer: ReferenceVariable({
@@ -53,7 +53,7 @@ export const requestReturn = CatalogItemRecordProducer({
             listTable: 'alm_hardware',
             // The fleet assets installed at the chosen Site (none before a Site is chosen): the Provider IT's equipment
             // shares the table (ADR 0016). Submitting checks the fleet and the Site again.
-            referenceQual: `javascript:'${FLEET_CONDITION}^install_status=${INSTALL_STATUS.inUse}^x_daas_ham_siteISNOTEMPTY^x_daas_ham_site=' + current.variables.site`,
+            referenceQual: `javascript:'${FLEET_INSTALLED}^x_daas_ham_siteISNOTEMPTY^x_daas_ham_site=' + current.variables.site`,
             attributes: 'ref_qual_elements=site',
             order: 400,
         }),

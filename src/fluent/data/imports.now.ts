@@ -3,7 +3,7 @@ import { StringColumn, Table } from '@servicenow/sdk/core'
 
 /*
  * Import-set staging tables. Load a CSV into them with System Import Sets > Load Data; rows are
- * processed by rules in logic/import-rules.now.ts (no transform map), which set the row's import
+ * processed by the rules in logic/model-rules.now.ts (no transform map), which set the row's import
  * state and comment.
  */
 

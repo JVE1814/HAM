@@ -1,13 +1,26 @@
 import '@servicenow/sdk/global'
 import { Applicability, UxListMenuConfig } from '@servicenow/sdk/core'
 import { admin, broadStaffRecords, moneyReaderRecords, providerStaffRecords } from '../security/roles.now'
-import { OPEN_ORDERS_QUERY } from '../../server/domain/fulfilment'
+import { OPEN_ORDERS_QUERY, ORDERS_AWAITING_APPROVAL_QUERY } from '../../server/domain/fulfilment'
 import { FLEET_CONDITION, FLEET_IN_STAGE, FLEET_INSTALLED, NAAS_MODEL_CONDITION, NAAS_MODEL_MILESTONES } from '../../server/domain/fleet'
 import { OPEN_SHIPMENTS } from '../../server/domain/shipping'
 import { OPEN_RMAS_QUERY } from '../../server/domain/sourcing'
 import { INSTALLED_PAST_SUPPORT } from '../../server/domain/model-lifecycle'
 import { INSTALLED_WITHOUT_COVERAGE } from '../../server/domain/coverage'
-import { INSTALL_STATUS, SHIPMENT_STATUS } from '../../server/domain/vocabulary'
+import { OPEN_NORM_EXCEPTIONS_QUERY } from '../../server/domain/normalization'
+import { STEP_STATUS } from '../../server/domain/oem/claims'
+import { OPEN_EXCEPTIONS_QUERY } from '../../server/domain/reconciliation'
+import { OPEN_FEES_QUERY } from '../../server/domain/returns'
+import {
+    DISPOSAL_STAGE,
+    INSTALL_STATUS,
+    LINE_STAGE,
+    ORDER_STAGE,
+    ORDER_TYPE,
+    RETURN_LINE_STATUS,
+    SHIPMENT_STATUS,
+    SUBSCRIPTION_LINE_STATUS,
+} from '../../server/domain/vocabulary'
 import { PROPERTY } from '../../server/platform/properties'
 
 /*
@@ -45,6 +58,11 @@ export const adminAudience = Applicability({
     roles: [admin],
 })
 
+/** What every list of Orders shows. */
+const ORDER_COLUMNS = 'number,customer,site,order_type,stage,entitlement_verdict,install_mode,requested_date'
+
+/** What every list of installed Assets starts with. */
+const INSTALLED_ASSET_COLUMNS = 'asset_tag,serial_number,model,company,x_daas_ham_site,install_status,substatus,x_daas_ham_last_seen'
 
 export const naasListMenu = UxListMenuConfig({
     $id: Now.ID['ws_list_menu'],
@@ -62,7 +80,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 10,
                     table: 'x_daas_ham_order',
                     condition: `${OPEN_ORDERS_QUERY}^ORDERBYDESCsys_created_on^EQ`,
-                    columns: 'number,customer,site,order_type,stage,entitlement_verdict,install_mode,requested_date',
+                    columns: ORDER_COLUMNS,
                     applicabilities: [{ $id: Now.ID['ws_orders_open_aud'], applicability: staffAudience }],
                 },
                 {
@@ -70,8 +88,8 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Awaiting approval',
                     order: 20,
                     table: 'x_daas_ham_order',
-                    condition: 'stage=awaiting_approval^EQ',
-                    columns: 'number,customer,site,order_type,stage,entitlement_verdict,install_mode,requested_date',
+                    condition: `${ORDERS_AWAITING_APPROVAL_QUERY}^EQ`,
+                    columns: ORDER_COLUMNS,
                     applicabilities: [{ $id: Now.ID['ws_orders_approval_aud'], applicability: staffAudience }],
                 },
                 {
@@ -79,8 +97,8 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Ready to ship',
                     order: 30,
                     table: 'x_daas_ham_order',
-                    condition: 'stage=delivering^EQ',
-                    columns: 'number,customer,site,order_type,stage,entitlement_verdict,install_mode,requested_date',
+                    condition: `stage=${ORDER_STAGE.delivering}^EQ`,
+                    columns: ORDER_COLUMNS,
                     applicabilities: [{ $id: Now.ID['ws_orders_to_ship_aud'], applicability: staffAudience }],
                 },
                 {
@@ -88,8 +106,8 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Installing',
                     order: 40,
                     table: 'x_daas_ham_order',
-                    condition: 'stage=installing^EQ',
-                    columns: 'number,customer,site,order_type,stage,entitlement_verdict,install_mode,requested_date',
+                    condition: `stage=${ORDER_STAGE.installing}^EQ`,
+                    columns: ORDER_COLUMNS,
                     applicabilities: [{ $id: Now.ID['ws_orders_installing_aud'], applicability: staffAudience }],
                 },
                 {
@@ -98,7 +116,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 90,
                     table: 'x_daas_ham_order',
                     condition: 'ORDERBYDESCsys_created_on^EQ',
-                    columns: 'number,customer,site,order_type,stage,entitlement_verdict,install_mode,requested_date',
+                    columns: ORDER_COLUMNS,
                     applicabilities: [{ $id: Now.ID['ws_orders_all_aud'], applicability: staffAudience }],
                 },
             ],
@@ -113,7 +131,7 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Lines awaiting stock',
                     order: 10,
                     table: 'x_daas_ham_order_line',
-                    condition: 'line_stage=awaiting_stock^EQ',
+                    condition: `line_stage=${LINE_STAGE.awaiting_stock}^EQ`,
                     columns: 'number,order,model,quantity,quantity_allocated,quantity_to_purchase,purchase_order,purchase_orders',
                     applicabilities: [{ $id: Now.ID['ws_lines_awaiting_stock_aud'], applicability: staffAudience }],
                 },
@@ -140,7 +158,7 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'OEM claims to do by hand',
                     order: 85,
                     table: 'x_daas_ham_staging_step',
-                    condition: 'automation_status=failed^done=false^staging_task.active=true^ORDERBYDESCsys_updated_on^EQ',
+                    condition: `automation_status=${STEP_STATUS.failed}^done=false^staging_task.active=true^ORDERBYDESCsys_updated_on^EQ`,
                     columns: 'staging_task,label,automation,automation_message,attempts',
                     applicabilities: [{ $id: Now.ID['ws_claims_failed_aud'], applicability: staffAudience }],
                 },
@@ -175,7 +193,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 10,
                     table: 'alm_hardware',
                     condition: `${FLEET_IN_STAGE.in_service}^EQ`,
-                    columns: 'asset_tag,serial_number,model,company,x_daas_ham_site,install_status,substatus,x_daas_ham_last_seen,x_daas_ham_in_service_date,x_daas_ham_refresh_due',
+                    columns: `${INSTALLED_ASSET_COLUMNS},x_daas_ham_in_service_date,x_daas_ham_refresh_due`,
                     applicabilities: [{ $id: Now.ID['ws_assets_in_service_aud'], applicability: staffAudience }],
                 },
                 {
@@ -184,7 +202,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 20,
                     table: 'alm_hardware',
                     condition: `${FLEET_IN_STAGE.pending_in_service}^EQ`,
-                    columns: 'asset_tag,serial_number,model,company,x_daas_ham_site,install_status,substatus,x_daas_ham_last_seen,x_daas_ham_install_completed',
+                    columns: `${INSTALLED_ASSET_COLUMNS},x_daas_ham_install_completed`,
                     applicabilities: [{ $id: Now.ID['ws_assets_pending_aud'], applicability: staffAudience }],
                 },
                 {
@@ -194,7 +212,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 30,
                     table: 'alm_hardware',
                     condition: `x_daas_ham_refresh_dueRELATIVELT@dayofweek@ahead@${PROPERTY.refreshHorizonDays.default}^${FLEET_INSTALLED}^EQ`,
-                    columns: 'asset_tag,serial_number,model,company,x_daas_ham_site,install_status,substatus,x_daas_ham_last_seen,x_daas_ham_refresh_due,x_daas_ham_lifecycle_phase',
+                    columns: `${INSTALLED_ASSET_COLUMNS},x_daas_ham_refresh_due,x_daas_ham_lifecycle_phase`,
                     applicabilities: [{ $id: Now.ID['ws_assets_refresh_aud'], applicability: staffAudience }],
                 },
                 {
@@ -203,7 +221,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 40,
                     table: 'alm_hardware',
                     condition: `install_status=${INSTALL_STATUS.missing}^${FLEET_CONDITION}^EQ`,
-                    columns: 'asset_tag,serial_number,model,company,x_daas_ham_site,install_status,substatus,x_daas_ham_last_seen',
+                    columns: INSTALLED_ASSET_COLUMNS,
                     applicabilities: [{ $id: Now.ID['ws_assets_missing_aud'], applicability: staffAudience }],
                 },
                 {
@@ -212,7 +230,7 @@ export const naasListMenu = UxListMenuConfig({
                     order: 50,
                     table: 'alm_hardware',
                     condition: `install_status=${INSTALL_STATUS.inUse}^asset_tagISEMPTY^ORserial_numberISEMPTY^ORx_daas_ham_agreementISEMPTY^ORx_daas_ham_siteISEMPTY^${FLEET_CONDITION}^EQ`,
-                    columns: 'asset_tag,serial_number,model,company,x_daas_ham_site,install_status,substatus,x_daas_ham_last_seen,x_daas_ham_agreement',
+                    columns: `${INSTALLED_ASSET_COLUMNS},x_daas_ham_agreement`,
                     applicabilities: [{ $id: Now.ID['ws_assets_gaps_aud'], applicability: staffAudience }],
                 },
             ],
@@ -279,7 +297,7 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Normalization exceptions',
                     order: 30,
                     table: 'x_daas_ham_norm_exception',
-                    condition: 'status=open^ORDERBYDESCoccurrences^EQ',
+                    condition: `${OPEN_NORM_EXCEPTIONS_QUERY}^ORDERBYDESCoccurrences^EQ`,
                     columns: 'raw_manufacturer,raw_model,reason,occurrences,resolved_model',
                     applicabilities: [{ $id: Now.ID['ws_models_exceptions_aud'], applicability: broadStaffAudience }],
                 },
@@ -313,7 +331,7 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Subscription lines',
                     order: 20,
                     table: 'x_daas_ham_subscription_line',
-                    condition: 'status!=ended^EQ',
+                    condition: `status!=${SUBSCRIPTION_LINE_STATUS.ended}^EQ`,
                     columns: 'description,customer,agreement,line_type,site,device_class,monthly_rate,status,start_date',
                     applicabilities: [{ $id: Now.ID['ws_subscription_lines_aud'], applicability: broadStaffAudience }],
                 },
@@ -374,7 +392,7 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Open replacement orders',
                     order: 10,
                     table: 'x_daas_ham_order',
-                    condition: `order_type=device_replace^${OPEN_ORDERS_QUERY}^EQ`,
+                    condition: `order_type=${ORDER_TYPE.device_replace}^${OPEN_ORDERS_QUERY}^EQ`,
                     columns: 'number,case,customer,site,stage,install_mode',
                     applicabilities: [{ $id: Now.ID['ws_replacements_open_aud'], applicability: staffAudience }],
                 },
@@ -383,7 +401,7 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Open refresh orders',
                     order: 20,
                     table: 'x_daas_ham_order',
-                    condition: `order_type=refresh^${OPEN_ORDERS_QUERY}^EQ`,
+                    condition: `order_type=${ORDER_TYPE.refresh}^${OPEN_ORDERS_QUERY}^EQ`,
                     columns: 'number,customer,site,stage,sys_created_on',
                     applicabilities: [{ $id: Now.ID['ws_refresh_open_aud'], applicability: staffAudience }],
                 },
@@ -410,7 +428,7 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Returned, awaiting evaluation',
                     order: 50,
                     table: 'x_daas_ham_return_order_line',
-                    condition: 'status=received^EQ',
+                    condition: `status=${RETURN_LINE_STATUS.received}^EQ`,
                     columns: 'return_order,asset,received_at,condition,evaluation',
                     applicabilities: [{ $id: Now.ID['ws_returns_to_evaluate_aud'], applicability: staffAudience }],
                 },
@@ -428,7 +446,7 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Disposal orders',
                     order: 70,
                     table: 'x_daas_ham_disposal_order',
-                    condition: 'stage!=completed^EQ',
+                    condition: `stage!=${DISPOSAL_STAGE.completed}^EQ`,
                     columns: 'number,method,disposal_vendor,stage,approval',
                     applicabilities: [{ $id: Now.ID['ws_disposals_aud'], applicability: staffAudience }],
                 },
@@ -437,7 +455,7 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Open fee events',
                     order: 80,
                     table: 'x_daas_ham_fee_event',
-                    condition: 'status=open^EQ',
+                    condition: `${OPEN_FEES_QUERY}^EQ`,
                     columns: 'occurred_on,fee_type,customer,asset,amount,currency',
                     applicabilities: [{ $id: Now.ID['ws_fees_open_aud'], applicability: broadStaffAudience }],
                 },
@@ -462,7 +480,7 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Open reconciliation exceptions',
                     order: 20,
                     table: 'x_daas_ham_recon_exception',
-                    condition: 'status=open^ORDERBYDESCdetected_at^EQ',
+                    condition: `${OPEN_EXCEPTIONS_QUERY}^ORDERBYDESCdetected_at^EQ`,
                     columns: 'detected_at,exception_type,asset,ci,customer,detail',
                     applicabilities: [{ $id: Now.ID['ws_exceptions_open_aud'], applicability: broadStaffAudience }],
                 },
@@ -541,7 +559,7 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Unbilled fees',
                     order: 30,
                     table: 'x_daas_ham_fee_event',
-                    condition: 'status=open^ORDERBYoccurred_on^EQ',
+                    condition: `${OPEN_FEES_QUERY}^ORDERBYoccurred_on^EQ`,
                     columns: 'fee_type,customer,asset,return_order,amount,occurred_on,billing_period',
                     applicabilities: [{ $id: Now.ID['ws_fees_unbilled_aud'], applicability: broadStaffAudience }],
                 },

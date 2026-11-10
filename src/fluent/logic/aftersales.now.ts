@@ -50,6 +50,10 @@ UiAction({
     script: uiDefectiveReturnedToOem,
 })
 
+/** The replacement SLAs stop once the case's replacement Order is complete, and are cancelled when the case closes without that. */
+const REPLACEMENT_COMPLETE = `x_daas_ham_replacement_order.stage=${ORDER_STAGE.complete}`
+const CASE_CLOSED_UNREPLACED = `active=false^x_daas_ham_replacement_order.stage!=${ORDER_STAGE.complete}`
+
 Sla({
     $id: Now.ID['sla_replace_nbd'],
     name: 'NaaS replacement - next business day',
@@ -59,8 +63,8 @@ Sla({
     scheduleSource: 'no_schedule',
     conditions: {
         start: 'x_daas_ham_failed_assetISNOTEMPTY^x_daas_ham_replacement_tier=nbd',
-        stop: `x_daas_ham_replacement_order.stage=${ORDER_STAGE.complete}`,
-        cancel: `active=false^x_daas_ham_replacement_order.stage!=${ORDER_STAGE.complete}`,
+        stop: REPLACEMENT_COMPLETE,
+        cancel: CASE_CLOSED_UNREPLACED,
     },
 })
 
@@ -73,8 +77,8 @@ Sla({
     scheduleSource: 'no_schedule',
     conditions: {
         start: 'x_daas_ham_failed_assetISNOTEMPTY^x_daas_ham_replacement_tier=same_day',
-        stop: `x_daas_ham_replacement_order.stage=${ORDER_STAGE.complete}`,
-        cancel: `active=false^x_daas_ham_replacement_order.stage!=${ORDER_STAGE.complete}`,
+        stop: REPLACEMENT_COMPLETE,
+        cancel: CASE_CLOSED_UNREPLACED,
     },
 })
 
@@ -87,8 +91,8 @@ Sla({
     scheduleSource: 'no_schedule',
     conditions: {
         start: 'x_daas_ham_failed_assetISNOTEMPTY^x_daas_ham_replacement_tier=four_hour',
-        stop: `x_daas_ham_replacement_order.stage=${ORDER_STAGE.complete}`,
-        cancel: `active=false^x_daas_ham_replacement_order.stage!=${ORDER_STAGE.complete}`,
+        stop: REPLACEMENT_COMPLETE,
+        cancel: CASE_CLOSED_UNREPLACED,
     },
 })
 

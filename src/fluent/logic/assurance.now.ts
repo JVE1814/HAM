@@ -3,7 +3,7 @@ import { Acl, BusinessRule, ScheduledScript, UiAction, UiPage } from '@serviceno
 import { raiseAttestations, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudit } from '../../server/entry/assurance'
 import { explainRackRefusal, reconcileInstalledBaseAndRacks, recheckRackPlacement } from '../../server/entry/racks'
 import rackPage from '../../client/rack.html'
-import { accountManager, assetManager, customerAdmin, fieldTech, finance, inventoryTech, noc, siteContact, stockroomWorkers } from '../security/roles.now'
+import { assetManager, fieldTech, scanners, staffAndCustomers, stockroomWorkers } from '../security/roles.now'
 import { CURRENT_IS_FLEET, CURRENT_IS_NAAS_STOCKROOM, FLEET_FIELD, SITE_FIELD } from '../../server/domain/fleet'
 import { PLACEMENT_FIELDS } from '../../server/domain/rack'
 import { ENTRY_MODULES } from './server-modules.now'
@@ -46,7 +46,7 @@ UiAction({
     actionName: 'x_daas_ham_close_audit',
     hint: 'Compare the scans with the expected assets; missing assets become reconciliation exceptions.',
     condition: 'current.active == true',
-    roles: [inventoryTech, fieldTech, assetManager],
+    roles: scanners,
     form: { showButton: true, style: 'primary' },
     showUpdate: true,
     script: uiCloseAudit,
@@ -140,5 +140,5 @@ Acl({
     type: 'ui_page',
     name: 'x_daas_ham_racks',
     operation: 'read',
-    roles: [assetManager, inventoryTech, fieldTech, noc, accountManager, finance, customerAdmin, siteContact],
+    roles: staffAndCustomers,
 })

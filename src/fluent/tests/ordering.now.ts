@@ -7,7 +7,7 @@ import { lifecycleImportTest } from './models.now'
 import { transferStageTest } from './transfers.now'
 import { customerAdminVisibilityTest, inventoryTechVisibilityTest } from './visibility.now'
 
-/* ATF: order entitlement routing (D35). */
+/* ATF: order entitlement routing. */
 
 export const withinAgreementOrderTest = Test(
     {

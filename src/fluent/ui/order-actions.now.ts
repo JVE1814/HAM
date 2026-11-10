@@ -2,7 +2,19 @@ import '@servicenow/sdk/global'
 import { UiAction } from '@servicenow/sdk/core'
 import { uiConfirmInstalled, uiShipOrder } from '../../server/entry/delivery'
 import { uiCancelOrder, uiRecheckApprovals, uiSubmitOrder } from '../../server/entry/orders'
-import { accountManager, admin, assetManager, customerAdmin, fieldTech, siteContact, staffOrderRaisers, stockroomWorkers } from '../security/roles.now'
+import {
+    accountManager,
+    admin,
+    assetManager,
+    commercialEditors,
+    customerAdmin,
+    fieldTech,
+    siteContact,
+    staffOrderRaisers,
+    stockroomWorkers,
+} from '../security/roles.now'
+import { APPROVAL_REQUESTED } from '../../server/domain/approvals'
+import { PLATFORM_ROLE } from '../../server/domain/visibility'
 import { INSTALL_MODE, ORDER_STAGE, STAGE_FIELDS } from '../../server/domain/vocabulary'
 
 /* Form buttons on Orders. Stage transitions after "Submit" are derived from asset stages. */
@@ -28,7 +40,7 @@ UiAction({
     // Only while no request is waiting: a waiting request's decision rolls the approvals up itself. The condition
     // column holds at most 254 characters (a longer one is cut off on the instance), hence the terse query.
     condition:
-        `current.stage == '${ORDER_STAGE.awaiting_approval}' && !(function (a) { a.addEncodedQuery('state=requested^sysapproval=' + current.getUniqueValue()); a.setLimit(1); a.query(); return a.hasNext() })(new GlideRecord('sysapproval_approver'))`,
+        `current.stage == '${ORDER_STAGE.awaiting_approval}' && !(function (a) { a.addEncodedQuery('state=${APPROVAL_REQUESTED}^sysapproval=' + current.getUniqueValue()); a.setLimit(1); a.query(); return a.hasNext() })(new GlideRecord('sysapproval_approver'))`,
     roles: [assetManager, accountManager, admin],
     form: { showButton: true },
     showUpdate: true,
@@ -60,7 +72,7 @@ UiAction({
     // by the platform's asset role, which asset managers and field techs contain and Customer roles do not, and the
     // stage of an Order held back goes unchecked, as only one preparing, delivering or installing has units shipped.
     condition:
-        `(current.install_mode=='${INSTALL_MODE.self_install}'||gs.hasRole('asset'))&&(current.stage=='${ORDER_STAGE.installing}'||(function(a){a.addQuery('substatus','${STAGE_FIELDS.shipped.substatus}');a.query('x_daas_ham_order_line.order',current.sys_id);return a.next()})(new GlideRecord('alm_hardware')))`,
+        `(current.install_mode=='${INSTALL_MODE.self_install}'||gs.hasRole('${PLATFORM_ROLE.asset}'))&&(current.stage=='${ORDER_STAGE.installing}'||(function(a){a.addQuery('substatus','${STAGE_FIELDS.shipped.substatus}');a.query('x_daas_ham_order_line.order',current.sys_id);return a.next()})(new GlideRecord('alm_hardware')))`,
     roles: [assetManager, fieldTech, customerAdmin, siteContact],
     form: { showButton: true },
     showUpdate: true,
@@ -74,7 +86,7 @@ UiAction({
     actionName: 'x_daas_ham_cancel_order',
     // domain/fulfilment CANCELLABLE_ORDER_STAGES, which built-metadata.test.ts holds the built condition to.
     condition: `['${ORDER_STAGE.draft}','${ORDER_STAGE.awaiting_approval}','${ORDER_STAGE.sourcing}','${ORDER_STAGE.preparing}','${ORDER_STAGE.delivering}'].indexOf(current.stage + '') >= 0`,
-    roles: [assetManager, accountManager],
+    roles: commercialEditors,
     form: { showButton: true, style: 'destructive' },
     showUpdate: true,
     script: uiCancelOrder,

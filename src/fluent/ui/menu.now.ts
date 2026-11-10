@@ -5,6 +5,8 @@ import { ROLE } from '../../server/domain/visibility'
 import { requestNetworkEquipment } from './order-producer.now'
 import { requestReturn } from './return-producer.now'
 import { OPEN_ORDERS_QUERY } from '../../server/domain/fulfilment'
+import { OPEN_NORM_EXCEPTIONS_QUERY } from '../../server/domain/normalization'
+import { OPEN_EXCEPTIONS_QUERY } from '../../server/domain/reconciliation'
 import { FLEET_IN_STAGE, NAAS_MODEL_MILESTONES } from '../../server/domain/fleet'
 import { WORKSPACE_HOME } from '../workspace/workspace.now'
 
@@ -316,7 +318,7 @@ Record({
         application: naasMenu,
         link_type: 'FILTER',
         name: 'x_daas_ham_norm_exception',
-        filter: 'status=open',
+        filter: OPEN_NORM_EXCEPTIONS_QUERY,
         roles: broadStaff,
         active: true,
         order: 520,
@@ -651,7 +653,7 @@ Record({
         application: naasMenu,
         link_type: 'FILTER',
         name: 'x_daas_ham_recon_exception',
-        filter: 'status=open',
+        filter: OPEN_EXCEPTIONS_QUERY,
         roles: broadStaff,
         active: true,
         order: 386,

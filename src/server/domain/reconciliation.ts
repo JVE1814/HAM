@@ -54,6 +54,9 @@ export function stillSeenWithoutFleetAssetQuery(ciIds: readonly string[]): strin
     return ids.length > 0 ? `sys_idIN${ids.join(',')}^${seenWithoutFleetAssetQuery()}` : null
 }
 
+/** Encoded query on reconciliation exceptions: the open ones, which the navigator, the workspace and the dashboard list and count. */
+export const OPEN_EXCEPTIONS_QUERY = `status=${EXCEPTION_STATUS.open}`
+
 /**
  * Encoded query on reconciliation exceptions: the open ones of `types` on an Asset outside the fleet (ADR 0016). The
  * daily reconciliation checks fleet assets only, so it would never find these cleared: raised before the Fleet flag on
@@ -61,7 +64,7 @@ export function stillSeenWithoutFleetAssetQuery(ciIds: readonly string[]): strin
  * deleted) counts as outside.
  */
 export function outsideFleetExceptionsQuery(types: readonly ExceptionType[]): string {
-    return `status=${EXCEPTION_STATUS.open}^exception_typeIN${types.join(',')}^assetISNOTEMPTY^${outsideFleetCondition('asset.')}`
+    return `${OPEN_EXCEPTIONS_QUERY}^exception_typeIN${types.join(',')}^assetISNOTEMPTY^${outsideFleetCondition('asset.')}`
 }
 
 /** Disagreements between an installed Asset and what monitoring reports. */

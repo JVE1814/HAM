@@ -1,11 +1,13 @@
 import '@servicenow/sdk/global'
 import { Dashboard } from '@servicenow/sdk/core'
 import { naasWorkspace } from './workspace.now'
-import { OPEN_ORDERS_QUERY } from '../../server/domain/fulfilment'
+import { OPEN_ORDERS_QUERY, ORDERS_AWAITING_APPROVAL_QUERY } from '../../server/domain/fulfilment'
 import { FLEET_IN_STAGE, FLEET_INSTALLED } from '../../server/domain/fleet'
 import { IN_SERVICE_ON_ENDED_LINE, IN_SERVICE_UNBILLED } from '../../server/domain/billing'
 import { INSTALLED_PAST_SUPPORT } from '../../server/domain/model-lifecycle'
 import { INSTALLED_WITHOUT_COVERAGE } from '../../server/domain/coverage'
+import { OPEN_EXCEPTIONS_QUERY } from '../../server/domain/reconciliation'
+import { SUBSCRIPTION_LINE_STATUS } from '../../server/domain/vocabulary'
 
 /*
  * Workspace landing dashboard: operations, billing integrity (P1), lifecycle risk (P2) and margin (P3).
@@ -55,7 +57,7 @@ export const naasDashboard = Dashboard({
                                 label: 'Order',
                                 sourceType: 'table',
                                 tableOrViewName: 'x_daas_ham_order',
-                                filterQuery: 'stage=awaiting_approval',
+                                filterQuery: ORDERS_AWAITING_APPROVAL_QUERY,
                                 id: 'awaiting_approval',
                             },
                         ],
@@ -207,7 +209,7 @@ export const naasDashboard = Dashboard({
                                 label: 'Subscription line',
                                 sourceType: 'table',
                                 tableOrViewName: 'x_daas_ham_subscription_line',
-                                filterQuery: 'status=pending',
+                                filterQuery: `status=${SUBSCRIPTION_LINE_STATUS.pending}`,
                                 id: 'pending_lines',
                             },
                         ],
@@ -227,7 +229,7 @@ export const naasDashboard = Dashboard({
                                 label: 'Subscription line',
                                 sourceType: 'table',
                                 tableOrViewName: 'x_daas_ham_subscription_line',
-                                filterQuery: 'status=active',
+                                filterQuery: `status=${SUBSCRIPTION_LINE_STATUS.active}`,
                                 id: 'lines_by_customer',
                             },
                         ],
@@ -274,7 +276,7 @@ export const naasDashboard = Dashboard({
                     $id: Now.ID['dash_w_open_exceptions'],
                     component: 'single-score',
                     componentProps: {
-                        dataSources: [{ label: 'x_daas_ham_recon_exception', sourceType: 'table', tableOrViewName: 'x_daas_ham_recon_exception', filterQuery: 'status=open', id: 'dash_w_open_exceptions_ds' }],
+                        dataSources: [{ label: 'x_daas_ham_recon_exception', sourceType: 'table', tableOrViewName: 'x_daas_ham_recon_exception', filterQuery: OPEN_EXCEPTIONS_QUERY, id: 'dash_w_open_exceptions_ds' }],
                         headerTitle: 'Open reconciliation exceptions',
                         metrics: [{ dataSource: 'dash_w_open_exceptions_ds', id: 'dash_w_open_exceptions_m', aggregateFunction: 'COUNT', axisId: 'primary' }],
                     },
@@ -311,7 +313,7 @@ export const naasDashboard = Dashboard({
                     $id: Now.ID['dash_w_exception_types'],
                     component: 'donut',
                     componentProps: {
-                        dataSources: [{ label: 'x_daas_ham_recon_exception', sourceType: 'table', tableOrViewName: 'x_daas_ham_recon_exception', filterQuery: 'status=open', id: 'dash_w_exception_types_ds' }],
+                        dataSources: [{ label: 'x_daas_ham_recon_exception', sourceType: 'table', tableOrViewName: 'x_daas_ham_recon_exception', filterQuery: OPEN_EXCEPTIONS_QUERY, id: 'dash_w_exception_types_ds' }],
                         headerTitle: 'Open exceptions by type',
                         metrics: [{ dataSource: 'dash_w_exception_types_ds', id: 'dash_w_exception_types_m', aggregateFunction: 'COUNT', axisId: 'primary' }],
                         groupBy: [{ groupBy: [{ dataSource: 'dash_w_exception_types_ds', groupByField: 'exception_type' }], maxNumberOfGroups: 10, showOthers: true }],

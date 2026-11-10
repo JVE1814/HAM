@@ -11,7 +11,7 @@ import {
     uiRenewAgreement,
     warnRenewals,
 } from '../../server/entry/leases'
-import { accountManager, admin, assetManager, finance } from '../security/roles.now'
+import { admin, commercialEditors, leaseEditors } from '../security/roles.now'
 import { CURRENT_IS_FLEET, FLEET_FIELD } from '../../server/domain/fleet'
 import { LEASE_END_ACTION } from '../../server/domain/vocabulary'
 import { EVENT } from '../../server/platform/events'
@@ -41,7 +41,7 @@ UiAction({
     actionName: 'x_daas_ham_lease_apply_decision',
     hint: 'Buy out (the Provider owns the assets), extend (the lease runs to the new end date) or return (stock to pending wipe for the lessor, deployed assets refreshed before the lease end). A lease being bought out or returned takes no further decision.',
     condition: 'current.active == true',
-    roles: [assetManager, finance],
+    roles: leaseEditors,
     form: { showButton: true, style: 'primary' },
     showUpdate: true,
     script: uiApplyLeaseDecision,
@@ -76,7 +76,7 @@ UiAction({
     actionName: 'x_daas_ham_agreement_renew',
     hint: 'Extend the end date by the renewal term.',
     condition: "current.ends != ''",
-    roles: [accountManager, assetManager],
+    roles: commercialEditors,
     form: { showButton: true },
     showUpdate: true,
     script: uiRenewAgreement,

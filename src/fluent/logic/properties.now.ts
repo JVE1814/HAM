@@ -2,6 +2,7 @@ import '@servicenow/sdk/global'
 import { Property } from '@servicenow/sdk/core'
 import { admin } from '../security/roles.now'
 import { PROPERTY } from '../../server/platform/properties'
+import { REST_MESSAGE } from '../../server/domain/rest-message-names'
 
 /* The app's general settings; each takes its name and value from platform/properties PROPERTY, as every other Property record does. */
 
@@ -100,7 +101,7 @@ Property({
     name: PROPERTY.oemEnabled.cisco.name,
     type: 'boolean',
     value: PROPERTY.oemEnabled.cisco.default,
-    description: 'Call the Cisco Support APIs (EoX, coverage, RMA status). Attach an OAuth profile to the "NaaS Cisco Support" REST message first.',
+    description: `Call the Cisco Support APIs (EoX, coverage, RMA status). Attach an OAuth profile to the "${REST_MESSAGE.ciscoSupport.name}" REST message first.`,
     roles: { read: [admin], write: [admin] },
 })
 
@@ -118,7 +119,7 @@ Property({
     name: PROPERTY.oemEnabled.fortinet.name,
     type: 'boolean',
     value: PROPERTY.oemEnabled.fortinet.default,
-    description: 'Call the FortiCloud Asset Management API for coverage. Attach an OAuth profile to "NaaS FortiCare" first.',
+    description: `Call the FortiCloud Asset Management API for coverage. Attach an OAuth profile to "${REST_MESSAGE.fortiCare.name}" first.`,
     roles: { read: [admin], write: [admin] },
 })
 
@@ -165,7 +166,7 @@ Property({
     type: 'string',
     value: PROPERTY.mistApiHost.default,
     description:
-        'HPE Mist API host of the cloud the orgs are on: the portal host with "manage" replaced by "api" (e.g. api.mist.com Global 01, api.gc1.mist.com Global 02, api.eu.mist.com EMEA 01, api.ac5.mist.com APAC 01). All orgs in x_daas_ham.mist.org_ids must be on this cloud.',
+        `HPE Mist API host of the cloud the orgs are on: the portal host with "manage" replaced by "api" (e.g. api.mist.com Global 01, api.gc1.mist.com Global 02, api.eu.mist.com EMEA 01, api.ac5.mist.com APAC 01). All orgs in ${PROPERTY.oemOrgIds.mist.name} must be on this cloud.`,
     roles: { read: [admin], write: [admin] },
 })
 

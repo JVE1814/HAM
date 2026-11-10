@@ -8,7 +8,7 @@ import {
     uiSubmitDisposal,
 } from '../../server/entry/disposal'
 import { raiseRefreshOrders } from '../../server/entry/refresh'
-import { assetManager, inventoryTech } from '../security/roles.now'
+import { stockroomWorkers } from '../security/roles.now'
 import { DISPOSAL_STAGE } from '../../server/domain/vocabulary'
 
 /* Hardware refresh (D48) and disposal (D61). */
@@ -29,7 +29,7 @@ UiAction({
     table: 'x_daas_ham_disposal_order',
     actionName: 'x_daas_ham_submit_disposal',
     condition: `current.stage == '${DISPOSAL_STAGE.draft}'`,
-    roles: [assetManager, inventoryTech],
+    roles: stockroomWorkers,
     form: { showButton: true, style: 'primary' },
     showUpdate: true,
     script: uiSubmitDisposal,
@@ -42,7 +42,7 @@ UiAction({
     actionName: 'x_daas_ham_complete_disposal',
     hint: 'Retire every wiped asset by its method; lines that are not ready are marked blocked with the reason.',
     condition: `current.stage == '${DISPOSAL_STAGE.approved}'`,
-    roles: [assetManager, inventoryTech],
+    roles: stockroomWorkers,
     form: { showButton: true, style: 'primary' },
     showUpdate: true,
     script: uiCompleteDisposal,

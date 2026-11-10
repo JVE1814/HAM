@@ -174,6 +174,16 @@ export const DEVICE_CLASS_CHOICES = {
     other: { label: 'Other', sequence: 7 },
 } as const
 export type DeviceClass = keyof typeof DEVICE_CLASS_CHOICES
+export const DEVICE_CLASS = {
+    switch: 'switch',
+    ap: 'ap',
+    router: 'router',
+    firewall: 'firewall',
+    module: 'module',
+    psu: 'psu',
+    optic: 'optic',
+    other: 'other',
+} as const satisfies Named<DeviceClass>
 
 export const MATCH_TYPE_CHOICES = {
     exact: { label: 'Exact (case-insensitive)', sequence: 0 },
@@ -330,6 +340,13 @@ export const ORDER_TYPE_CHOICES = {
     refresh: { label: 'Refresh', sequence: 4 },
 } as const
 export type OrderType = keyof typeof ORDER_TYPE_CHOICES
+export const ORDER_TYPE = {
+    site_rollout: 'site_rollout',
+    device_add: 'device_add',
+    device_replace: 'device_replace',
+    temporary: 'temporary',
+    refresh: 'refresh',
+} as const satisfies Named<OrderType>
 
 export const INSTALL_MODE_CHOICES = {
     fsm_engineer: { label: 'Provider field engineer', sequence: 0 },

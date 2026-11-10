@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { Acl, UiPage } from '@servicenow/sdk/core'
 import warehousePage from '../../client/warehouse.html'
-import { assetManager, fieldTech, inventoryTech } from '../security/roles.now'
+import { scanners } from '../security/roles.now'
 
 /* The warehouse scanning app (receive, put away, pick, look up, print labels). */
 
@@ -19,5 +19,5 @@ Acl({
     type: 'ui_page',
     name: 'x_daas_ham_warehouse',
     operation: 'read',
-    roles: [inventoryTech, fieldTech, assetManager],
+    roles: scanners,
 })

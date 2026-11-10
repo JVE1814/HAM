@@ -9,15 +9,16 @@ import {
     VariableSet,
 } from '@servicenow/sdk/core'
 import { afterOrderProduced } from '../../server/entry/orders'
-import { INSTALL_MODE_CHOICES, ORDER_TYPE_CHOICES } from '../../server/domain/vocabulary'
+import { DEVICE_CLASS, INSTALL_MODE_CHOICES, ORDER_TYPE_CHOICES } from '../../server/domain/vocabulary'
 import { NAAS_MODEL_CONDITION, SITES_OF_CUSTOMER_QUERY } from '../../server/domain/fleet'
 
 /*
- * "Request network equipment": the one catalog entry point for Orders (D42/D50). The Agreement, Site and Site template
+ * "Request network equipment": the one catalog entry point for Orders. The Agreement, Site and Site template
  * choices follow the chosen Customer; submitting checks the same again (domain/entitlement ownershipFindings).
  */
 
-const SERVICE_CATALOG = 'e0d08b13c3330100c8b837659bba8fb4'
+/** The platform's Service Catalog (sc_catalog), which the app's catalog items are listed in. */
+export const SERVICE_CATALOG = 'e0d08b13c3330100c8b837659bba8fb4'
 
 export const deviceRows = VariableSet({
     $id: Now.ID['vs_order_devices'],
@@ -29,7 +30,7 @@ export const deviceRows = VariableSet({
             question: 'Model',
             referenceTable: 'cmdb_model',
             // NaaS Models (ADR 0016) of a device class other than optic.
-            referenceQualCondition: `${NAAS_MODEL_CONDITION}^x_daas_ham_device_classISNOTEMPTY^x_daas_ham_device_class!=optic`,
+            referenceQualCondition: `${NAAS_MODEL_CONDITION}^x_daas_ham_device_classISNOTEMPTY^x_daas_ham_device_class!=${DEVICE_CLASS.optic}`,
             mandatory: true,
             order: 100,
         }),

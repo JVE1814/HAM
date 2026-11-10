@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { Property, Record, RestMessage, ScriptAction, UiAction } from '@servicenow/sdk/core'
 import { retryTrackingUpdate, uiCreateReturnLabel, uiMarkLabelVoided } from '../../server/entry/shipping'
-import { admin, assetManager, inventoryTech, noc } from '../security/roles.now'
+import { admin, returnWorkers } from '../security/roles.now'
 import { RETURN_METHOD, SHIPMENT_DIRECTION, SHIPMENT_STATUS } from '../../server/domain/vocabulary'
 import { EVENT } from '../../server/platform/events'
 import { PROPERTY } from '../../server/platform/properties'
@@ -43,7 +43,7 @@ UiAction({
     actionName: 'x_daas_ham_return_label',
     hint: 'Buy a prepaid label from the Site back to the depot for the awaited equipment.',
     condition: `current.method == '${RETURN_METHOD.ship_back}' && current.active == true && gs.getProperty('${PROPERTY.shippingEnabled.name}') == 'true'`,
-    roles: [assetManager, inventoryTech, noc],
+    roles: returnWorkers,
     form: { showButton: true },
     showUpdate: true,
     script: uiCreateReturnLabel,
@@ -61,7 +61,7 @@ UiAction({
     // condition to it).
     condition:
         `(current.direction == '${SHIPMENT_DIRECTION.return}' || current.direction == '${SHIPMENT_DIRECTION.to_site}') && (current.status == '${SHIPMENT_STATUS.label_created}' || current.status == '${SHIPMENT_STATUS.exception}')`,
-    roles: [assetManager, inventoryTech, noc],
+    roles: returnWorkers,
     form: { showButton: true, style: 'destructive' },
     showUpdate: true,
     script: uiMarkLabelVoided,
@@ -130,7 +130,7 @@ Property({
     name: PROPERTY.shippingServiceCode.name,
     type: 'string',
     value: PROPERTY.shippingServiceCode.default,
-    description: 'Aggregator service code used for labels (service level of the carrier account in x_daas_ham.shipping.carrier_id).',
+    description: `Aggregator service code used for labels (service level of the carrier account in ${PROPERTY.shippingCarrierId.name}).`,
     roles: { read: [admin], write: [admin] },
 })
 

@@ -2,7 +2,6 @@ import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
 import {
     accountManager,
-    finance,
     admin,
     assetManager,
     broadStaff,
@@ -12,10 +11,13 @@ import {
     fieldTech,
     integration,
     inventoryTech,
+    leaseEditors,
     noc,
     orderRaisers,
     orderWorkers,
     providerStaff,
+    returnWorkers,
+    scanners,
     stockroomWorkers,
 } from './roles.now'
 import { grantsCustomerRecord, grantsFleetAsset } from '../../server/entry/visibility'
@@ -782,7 +784,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_oem_rma',
     operation: 'create',
-    roles: [assetManager, inventoryTech, noc],
+    roles: returnWorkers,
 })
 
 Acl({
@@ -790,7 +792,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_oem_rma',
     operation: 'write',
-    roles: [assetManager, inventoryTech, noc],
+    roles: returnWorkers,
 })
 
 Acl({
@@ -910,7 +912,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_audit',
     operation: 'create',
-    roles: [assetManager, inventoryTech, fieldTech],
+    roles: scanners,
 })
 
 Acl({
@@ -918,7 +920,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_audit',
     operation: 'write',
-    roles: [assetManager, inventoryTech, fieldTech],
+    roles: scanners,
 })
 
 Acl({
@@ -942,7 +944,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_audit_line',
     operation: 'create',
-    roles: [assetManager, inventoryTech, fieldTech],
+    roles: scanners,
 })
 
 Acl({
@@ -950,7 +952,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_audit_line',
     operation: 'write',
-    roles: [assetManager, inventoryTech, fieldTech],
+    roles: scanners,
 })
 
 Acl({
@@ -1091,7 +1093,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_return_order_line',
     operation: 'create',
-    roles: [assetManager, inventoryTech, noc],
+    roles: returnWorkers,
 })
 
 Acl({
@@ -1123,7 +1125,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_attestation',
     operation: 'write',
-    roles: [assetManager, accountManager],
+    roles: commercialEditors,
 })
 
 Acl({
@@ -1180,7 +1182,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_fee_event',
     operation: 'create',
-    roles: [finance, assetManager],
+    roles: leaseEditors,
 })
 
 Acl({
@@ -1188,7 +1190,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_fee_event',
     operation: 'write',
-    roles: [finance, assetManager],
+    roles: leaseEditors,
 })
 
 Acl({

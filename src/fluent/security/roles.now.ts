@@ -94,11 +94,29 @@ export const orderWorkers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, R
 /** Who does the stockroom's work: receiving, staging, shipping, blind counts. */
 export const stockroomWorkers = [ROLE.inventoryTech, ROLE.assetManager]
 
+/** Who scans equipment: the warehouse page, and Audits with their lines. */
+export const scanners = [ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech]
+
+/** Who sends equipment back: opens OEM RMAs and Return lines, buys and voids labels. */
+export const returnWorkers = [ROLE.assetManager, ROLE.inventoryTech, ROLE.noc]
+
 /** Who writes Lease schedules and their decisions. */
 export const leaseEditors = [ROLE.assetManager, ROLE.finance]
 
 /** The roles that read billing and margin data. */
 export const moneyReaders = [ROLE.finance, ROLE.accountManager, ROLE.assetManager]
+
+/** Every person the app serves, provider staff and Customer contacts: the rack elevations are open to them all. */
+export const staffAndCustomers = [
+    ROLE.assetManager,
+    ROLE.inventoryTech,
+    ROLE.fieldTech,
+    ROLE.noc,
+    ROLE.accountManager,
+    ROLE.finance,
+    ROLE.customerAdmin,
+    ROLE.siteContact,
+]
 
 /*
  * Three of the groups again as role records, for the workspace's audiences: an Applicability stores role ids, which a
