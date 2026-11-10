@@ -13,9 +13,13 @@ export interface HttpRequest {
     body?: string
 }
 
+/** A function's answer; status 0 when none came (a timeout, or a DNS, TLS or connection failure). */
 export interface HttpResponse {
     status: number
+    /** The body as received; '' when there is none. */
     body: string
+    /** Why no answer came (status 0), as the transport reports it. */
+    error?: string
 }
 
 /** Transport: the platform adapter calls sn_ws.RESTMessageV2; tests use fakes. */
@@ -27,7 +31,8 @@ export function isSuccess(status: number): boolean {
 
 /**
  * "HTTP 400: <first error>" from the common error shapes: errors[] of strings or objects, message,
- * detail, and the OAuth-style {error, error_description} used by FortiCloud and FortiZTP.
+ * detail, and the OAuth-style {error, error_description} used by FortiCloud and FortiZTP. Status 0 is
+ * "no response" (failureText adds the transport's reason).
  */
 export function errorText(status: number, body: string): string {
     const json = parseJson(body)
@@ -39,5 +44,11 @@ export function errorText(status: number, body: string): string {
         text(field(json, 'detail')) ||
         text(field(json, 'error_description')) ||
         text(field(json, 'error'))
-    return `HTTP ${status}${detail ? `: ${detail}` : ''}`
+    return `${status === 0 ? 'no response' : `HTTP ${status}`}${detail ? `: ${detail}` : ''}`
+}
+
+/** Why a call failed: errorText of its answer, or "no response: <the transport's reason>" when none came. */
+export function failureText(response: HttpResponse): string {
+    if (response.status === 0 && response.error) return `no response: ${response.error}`
+    return errorText(response.status, response.body)
 }

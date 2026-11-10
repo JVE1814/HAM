@@ -2,9 +2,9 @@ import '@servicenow/sdk/global'
 import { ChoiceColumn, DecimalColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 import { COST_TYPE_CHOICES } from '../../server/domain/vocabulary'
 
-/* Cost facts and Margin per Customer and Site (P3.28, D72). */
+/* Cost facts and Margin per Customer, Site and currency (P3.28, D72). */
 
-/** A cost attributed to a Customer and Site for one Billing period. */
+/** A cost attributed to a Customer and Site, in one currency, for one Billing period. */
 export const x_daas_ham_cost_fact = Table({
     name: 'x_daas_ham_cost_fact',
     label: 'Cost fact',
@@ -19,7 +19,8 @@ export const x_daas_ham_cost_fact = Table({
             dropdown: 'dropdown_without_none',
         }),
         amount: DecimalColumn({ label: 'Amount', mandatory: true }),
-        currency: StringColumn({ label: 'Currency', maxLength: 3, default: 'EUR' }),
+        // Its Agreement's (a shipment's, its carrier's), set by the margin pass: never a default.
+        currency: StringColumn({ label: 'Currency', maxLength: 3, mandatory: true }),
     },
     index: [
         { name: 'x_daas_ham_cf_period', unique: false, element: 'billing_period' },
@@ -27,7 +28,7 @@ export const x_daas_ham_cost_fact = Table({
     ],
 })
 
-/** Subscription and fee revenue minus Cost facts, per Customer and Site, for one Billing period. */
+/** Subscription and fee revenue minus Cost facts, per Customer, Site and currency, for one Billing period (two currencies are never added). */
 export const x_daas_ham_margin = Table({
     name: 'x_daas_ham_margin',
     label: 'Margin',
@@ -35,6 +36,8 @@ export const x_daas_ham_margin = Table({
         billing_period: ReferenceColumn({ label: 'Billing period', referenceTable: 'x_daas_ham_billing_period', mandatory: true, cascadeRule: 'delete' }),
         customer: ReferenceColumn({ label: 'Customer', referenceTable: 'customer_account', mandatory: true }),
         site: ReferenceColumn({ label: 'Site (blank = customer-level fees and costs)', referenceTable: 'cmn_location' }),
+        // A Customer and Site with amounts in two currencies get a row for each.
+        currency: StringColumn({ label: 'Currency', maxLength: 3, mandatory: true }),
         revenue: DecimalColumn({ label: 'Revenue' }),
         cost: DecimalColumn({ label: 'Cost' }),
         margin: DecimalColumn({ label: 'Margin' }),

@@ -327,14 +327,19 @@ export const naasDashboard = Dashboard({
         {
             $id: Now.ID['dash_tab_margin'],
             name: 'Margin',
+            /*
+             * Amounts of two currencies are never added (owner decision (b)): every widget groups by currency, as its own
+             * bar or its own cell, and none stacks, totals or slices them into one whole.
+             */
             widgets: [
                 {
                     $id: Now.ID['dash_w_revenue_last_month'],
-                    component: 'single-score',
+                    component: 'vertical-bar',
                     componentProps: {
                         dataSources: [{ label: 'Revenue last month', sourceType: 'table', tableOrViewName: 'x_daas_ham_margin', filterQuery: LAST_MONTH, id: 'dash_w_revenue_last_month_ds' }],
-                        headerTitle: 'Revenue last month',
+                        headerTitle: 'Revenue last month (per currency)',
                         metrics: [{ dataSource: 'dash_w_revenue_last_month_ds', id: 'dash_w_revenue_last_month_m', aggregateFunction: 'SUM', field: 'revenue', axisId: 'primary' }],
+                        groupBy: [{ groupBy: [{ dataSource: 'dash_w_revenue_last_month_ds', groupByField: 'currency' }], maxNumberOfGroups: 10, showOthers: false }],
                     },
                     height: 12,
                     width: 16,
@@ -342,11 +347,12 @@ export const naasDashboard = Dashboard({
                 },
                 {
                     $id: Now.ID['dash_w_cost_last_month'],
-                    component: 'single-score',
+                    component: 'vertical-bar',
                     componentProps: {
                         dataSources: [{ label: 'Cost last month', sourceType: 'table', tableOrViewName: 'x_daas_ham_margin', filterQuery: LAST_MONTH, id: 'dash_w_cost_last_month_ds' }],
-                        headerTitle: 'Cost last month',
+                        headerTitle: 'Cost last month (per currency)',
                         metrics: [{ dataSource: 'dash_w_cost_last_month_ds', id: 'dash_w_cost_last_month_m', aggregateFunction: 'SUM', field: 'cost', axisId: 'primary' }],
+                        groupBy: [{ groupBy: [{ dataSource: 'dash_w_cost_last_month_ds', groupByField: 'currency' }], maxNumberOfGroups: 10, showOthers: false }],
                     },
                     height: 12,
                     width: 16,
@@ -354,11 +360,12 @@ export const naasDashboard = Dashboard({
                 },
                 {
                     $id: Now.ID['dash_w_margin_last_month'],
-                    component: 'single-score',
+                    component: 'vertical-bar',
                     componentProps: {
                         dataSources: [{ label: 'Margin last month', sourceType: 'table', tableOrViewName: 'x_daas_ham_margin', filterQuery: LAST_MONTH, id: 'dash_w_margin_last_month_ds' }],
-                        headerTitle: 'Margin last month',
+                        headerTitle: 'Margin last month (per currency)',
                         metrics: [{ dataSource: 'dash_w_margin_last_month_ds', id: 'dash_w_margin_last_month_m', aggregateFunction: 'SUM', field: 'margin', axisId: 'primary' }],
+                        groupBy: [{ groupBy: [{ dataSource: 'dash_w_margin_last_month_ds', groupByField: 'currency' }], maxNumberOfGroups: 10, showOthers: false }],
                     },
                     height: 12,
                     width: 16,
@@ -366,13 +373,22 @@ export const naasDashboard = Dashboard({
                 },
                 {
                     $id: Now.ID['dash_w_margin_by_customer'],
-                    component: 'horizontal-bar',
+                    component: 'heatmap',
                     componentProps: {
                         dataSources: [{ label: 'Margin', sourceType: 'table', tableOrViewName: 'x_daas_ham_margin', filterQuery: 'billing_period.period_start>=javascript:gs.beginningOfLast12Months()', id: 'dash_w_margin_by_customer_ds' }],
-                        headerTitle: 'Margin by customer (12 months)',
+                        headerTitle: 'Margin by customer and currency (12 months)',
                         metrics: [{ dataSource: 'dash_w_margin_by_customer_ds', id: 'dash_w_margin_by_customer_m', aggregateFunction: 'SUM', field: 'margin', axisId: 'primary' }],
-                        groupBy: [{ groupBy: [{ dataSource: 'dash_w_margin_by_customer_ds', groupByField: 'customer' }], maxNumberOfGroups: 15, showOthers: true }],
-                        sortBy: 'value',
+                        groupBy: [
+                            {
+                                groupBy: [
+                                    { dataSource: 'dash_w_margin_by_customer_ds', groupByField: 'customer' },
+                                    { dataSource: 'dash_w_margin_by_customer_ds', groupByField: 'currency' },
+                                ],
+                                maxNumberOfGroups: 15,
+                                showOthers: false,
+                                sortBy: 'value',
+                            },
+                        ],
                     },
                     height: 16,
                     width: 24,
@@ -380,12 +396,21 @@ export const naasDashboard = Dashboard({
                 },
                 {
                     $id: Now.ID['dash_w_cost_by_type'],
-                    component: 'donut',
+                    component: 'heatmap',
                     componentProps: {
                         dataSources: [{ label: 'Cost fact', sourceType: 'table', tableOrViewName: 'x_daas_ham_cost_fact', filterQuery: LAST_MONTH, id: 'dash_w_cost_by_type_ds' }],
-                        headerTitle: 'Cost last month by type',
+                        headerTitle: 'Cost last month by type and currency',
                         metrics: [{ dataSource: 'dash_w_cost_by_type_ds', id: 'dash_w_cost_by_type_m', aggregateFunction: 'SUM', field: 'amount', axisId: 'primary' }],
-                        groupBy: [{ groupBy: [{ dataSource: 'dash_w_cost_by_type_ds', groupByField: 'cost_type', isChoice: true }], maxNumberOfGroups: 10, showOthers: false }],
+                        groupBy: [
+                            {
+                                groupBy: [
+                                    { dataSource: 'dash_w_cost_by_type_ds', groupByField: 'cost_type', isChoice: true },
+                                    { dataSource: 'dash_w_cost_by_type_ds', groupByField: 'currency' },
+                                ],
+                                maxNumberOfGroups: 10,
+                                showOthers: false,
+                            },
+                        ],
                     },
                     height: 16,
                     width: 24,

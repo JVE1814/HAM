@@ -3,6 +3,7 @@ import { fleetStagesQuery } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { withinLead } from '../domain/calendar.ts'
 import {
+    buyoutCost,
     buyoutPurchase,
     buyoutTerms,
     decidedLease,
@@ -23,7 +24,7 @@ import { addDisposalLine, draftLessorDisposal } from './disposal.ts'
 import { EVENT, fire, queueJob, type JobEvent } from './events.ts'
 import { queueRefresh } from './lifecycle-dates.ts'
 import { PROPERTY, stringProperty } from './properties.ts'
-import { bool, count, exists, findById, num, refusal, str, warnRefused } from './records.ts'
+import { bool, count, exists, findById, num, pluck, refusal, str, warnRefused } from './records.ts'
 import { changeStock, releaseToProviderStock, stockUnit } from './stock.ts'
 
 /**
@@ -180,12 +181,15 @@ export function applyLeaseDecision(decisionRecord: GlideRecord): DecisionOutcome
     if (decided.ends !== undefined) lease.setValue('ends', decided.ends)
     lease.setValue('end_action', decided.endAction)
     if (decided.mismatch !== undefined) lease.setValue('mismatch', decided.mismatch)
+    const leaseId = lease.getUniqueValue()
     const terms = buyoutTerms(decision, { fixedAssets: num(lease, 'buyout_assets'), price: num(lease, 'buyout_price') }, () =>
-        countAssets(lease.getUniqueValue()),
+        // Every covered Asset's sys_id (as many as are counted, not pluck's default limit), so none is left out of the split.
+        pluck('alm_hardware', stillCovered(`x_daas_ham_lease=${leaseId}`), 'sys_id', Math.max(countAssets(leaseId), 1)),
     )
     if (terms) {
         lease.setValue('buyout_assets', terms.assets)
         lease.setValue('buyout_share', terms.share)
+        lease.setValue('buyout_extra_through', terms.extraThrough)
     }
     if (!lease.update()) {
         // Refused: no transfer or return may act on a decision the lease does not record, so the decision opens again.
@@ -306,9 +310,9 @@ function notMoved(asset: GlideRecord, to: Stage, reason: string): false {
 }
 
 /**
- * The Provider owns the Assets the bought-out `lease` covers, each costing the lease's Buyout cost per asset (for
- * Margin), a chunk at a time: the job of the event `queueBuyout` queues. Retired units, which the Lessor or the OEM
- * holds, keep their lease link and are not transferred.
+ * The Provider owns the Assets the bought-out `lease` covers, each costing its share of the buyout price to the cent
+ * (domain/leases `buyoutCost`, for Margin), a chunk at a time: the job of the event `queueBuyout` queues. Retired
+ * units, which the Lessor or the OEM holds, keep their lease link and are not transferred.
  *
  * Every transferred Asset leaves the query set. The cursor (sys_id > last handled) still holds:
  * batches run in ascending sys_id order, so the Assets that were on the lease when the pass reached
@@ -321,8 +325,11 @@ export function transferToProvider(queued: JobEvent, lease: GlideRecord): void {
     const leaseId = queued.subject
     // Never run with a blank lease: the query would match every Asset that has no lease.
     if (!leaseId) return
+    // Each Asset's cost is its share of the price to the cent, fixed when the buyout was decided (domain/leases
+    // `buyoutCost`); a share stored before shares were split to the cent is rounded, with no cent left over to place.
+    const split = { share: num(lease, 'buyout_share'), extraThrough: str(lease, 'buyout_extra_through') }
     // Every Asset the chunk transfers is bought today.
-    const purchase = buyoutPurchase(num(lease, 'buyout_share'), todayIso())
+    const today = todayIso()
     runEventTableJob(queued, {
         table: 'alm_hardware',
         query: stillCovered(`x_daas_ham_lease=${leaseId}`),
@@ -332,6 +339,7 @@ export function transferToProvider(queued: JobEvent, lease: GlideRecord): void {
             if (!asset || str(asset, 'x_daas_ham_lease') !== leaseId || isRetired(readStage(asset))) return
             asset.setValue('x_daas_ham_lease', '')
             asset.setValue('x_daas_ham_legal_owner', LEGAL_OWNER.provider)
+            const purchase = buyoutPurchase(buyoutCost(split, assetId), today)
             if (purchase) {
                 asset.setValue('cost', purchase.cost)
                 asset.setValue('purchase_date', purchase.date)

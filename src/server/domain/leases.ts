@@ -77,17 +77,19 @@ export function decidedLease(decision: LeaseEndAction, newEndDate: string): Deci
 
 /**
  * The buyout's terms to fix on a lease as `decision` is applied, or null when it fixes none: how many Assets it covers
- * (`covered`) and what each costs, its even share of `price`. They are fixed once, while every Asset is still covered
- * (`fixedAssets` is 0 until then): Margin keeps splitting the lease payment over that many while the transfer runs.
+ * (`covered`, their sys_ids) and what each costs, its share of `price` to the cent, the cents left over going one each
+ * to the first Assets in sys_id order (`buyoutSplit`), so the costs add up to it. They are fixed once, while every
+ * Asset is still covered (`fixedAssets` is 0 until then): Margin keeps splitting the lease payment over that many while
+ * the transfer runs.
  */
 export function buyoutTerms(
     decision: LeaseEndAction,
     lease: { fixedAssets: number; price: number },
-    covered: () => number,
-): { assets: number; share: number } | null {
+    covered: () => readonly string[],
+): ({ assets: number } & BuyoutSplit) | null {
     if (decision !== 'buyout' || lease.fixedAssets) return null
-    const assets = covered()
-    return { assets, share: evenShare(lease.price, assets) }
+    const assetIds = covered()
+    return { assets: assetIds.length, ...buyoutSplit(lease.price, assetIds) }
 }
 
 /**

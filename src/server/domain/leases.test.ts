@@ -33,10 +33,13 @@ describe('decidedLease', () => {
 })
 
 describe('buyoutTerms', () => {
-    it('fixes the covered count and the even share of the price when a buyout is first applied', () => {
-        expect(buyoutTerms('buyout', { fixedAssets: 0, price: 1000 }, () => 4)).toEqual({ assets: 4, share: 250 })
-        expect(buyoutTerms('buyout', { fixedAssets: 0, price: 0 }, () => 4)).toEqual({ assets: 4, share: 0 })
-        expect(buyoutTerms('buyout', { fixedAssets: 0, price: 1000 }, () => 0)).toEqual({ assets: 0, share: 0 })
+    it('fixes the covered count and the split of the price to the cent when a buyout is first applied', () => {
+        const four = () => ['a4', 'a2', 'a3', 'a1']
+        expect(buyoutTerms('buyout', { fixedAssets: 0, price: 1000 }, four)).toEqual({ assets: 4, share: 250, extraThrough: '' })
+        expect(buyoutTerms('buyout', { fixedAssets: 0, price: 0 }, four)).toEqual({ assets: 4, share: 0, extraThrough: '' })
+        expect(buyoutTerms('buyout', { fixedAssets: 0, price: 1000 }, () => [])).toEqual({ assets: 0, share: 0, extraThrough: '' })
+        // 10000.00 over 3 leaves one cent, which the first Asset by sys_id takes.
+        expect(buyoutTerms('buyout', { fixedAssets: 0, price: 10000 }, () => ['a3', 'a1', 'a2'])).toEqual({ assets: 3, share: 3333.33, extraThrough: 'a1' })
     })
 
     it('keeps terms already fixed, without counting the Assets again', () => {
@@ -47,8 +50,8 @@ describe('buyoutTerms', () => {
     })
 
     it('fixes none for any other decision', () => {
-        expect(buyoutTerms('return', { fixedAssets: 0, price: 1000 }, () => 4)).toBeNull()
-        expect(buyoutTerms('extend', { fixedAssets: 0, price: 1000 }, () => 4)).toBeNull()
+        expect(buyoutTerms('return', { fixedAssets: 0, price: 1000 }, () => ['a1'])).toBeNull()
+        expect(buyoutTerms('extend', { fixedAssets: 0, price: 1000 }, () => ['a1'])).toBeNull()
     })
 })
 

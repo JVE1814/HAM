@@ -1,5 +1,5 @@
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
-import { chooseCurrency, currencyCode, currencyOrThrow, monthBounds, overlapsMonth, type AgreementCurrency, type MonthBounds } from '../domain/billing.ts'
+import { chooseCurrency, currencyCode, currencyKey, currencyOrThrow, monthBounds, overlapsMonth, type AgreementCurrency, type MonthBounds } from '../domain/billing.ts'
 import { messageOf } from '../domain/errors.ts'
 import { stillCovered } from '../domain/leases.ts'
 import {
@@ -270,7 +270,7 @@ function workOrderAgreement(workOrder: GlideRecord): AgreementCurrency | null {
 /**
  * Shipments whose label was bought in the month, as Cost facts of their Customer and Site in the carrier's currency
  * (domain/shipping `buyLabel`), never converted. A voided label is refunded, so it is left out; one with a cost but no
- * currency is left out and counted.
+ * currency or no Customer (a Cost fact needs both) is left out and counted.
  */
 function addShippingCosts(periodId: string, bounds: MonthBounds): Failed {
     const ledger = new CostLedger()
@@ -280,19 +280,26 @@ function addShippingCosts(periodId: string, bounds: MonthBounds): Failed {
     shipment.query()
     while (shipment.next()) {
         const currency = currencyCode(str(shipment, 'currency'))
-        if (!currency) {
+        const customerId = str(shipment, 'customer')
+        // CostLedger.add drops a cost without a Customer, so it is counted here rather than lost without a word.
+        const missing = !currency ? 'its cost has no currency' : !customerId ? 'it has no Customer to cost it to' : ''
+        if (missing) {
             result.failed++
             const name = str(shipment, 'number') || str(shipment, 'tracking_number') || shipment.getUniqueValue()
-            result.lastError = `shipment ${name}: its cost has no currency`
+            result.lastError = `shipment ${name}: ${missing}`
             continue
         }
-        ledger.add({ customerId: str(shipment, 'customer'), siteId: str(shipment, 'site'), type: 'shipping', currency, amount: num(shipment, 'cost') })
+        ledger.add({ customerId, siteId: str(shipment, 'site'), type: 'shipping', currency, amount: num(shipment, 'cost') })
     }
     writeCostFacts(periodId, ledger.drain())
     return result
 }
 
-/** The amounts of a table's records matching an encoded query, summed per Customer, Site and currency. */
+/**
+ * The amounts of a table's records matching an encoded query, summed per Customer, Site and currency. The currency is
+ * read as Billing period totals read it (domain/billing `currencyKey`): a line edited during review to 'eur' is set
+ * against the 'EUR' costs of its Customer and Site (marginRows merges the rows of one key).
+ */
 function sumsBy(table: string, encodedQuery: string): Amount[] {
     const ga = new GlideAggregate(table)
     ga.addEncodedQuery(encodedQuery)
@@ -306,7 +313,7 @@ function sumsBy(table: string, encodedQuery: string): Amount[] {
         sums.push({
             customerId: String(ga.getValue('customer') ?? ''),
             siteId: String(ga.getValue('site') ?? ''),
-            currency: String(ga.getValue('currency') ?? ''),
+            currency: currencyKey(String(ga.getValue('currency') ?? '')),
             amount: Number(ga.getAggregate('SUM', 'amount')) || 0,
         })
     }

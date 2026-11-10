@@ -5,7 +5,6 @@ import {
     DateColumn,
     DecimalColumn,
     IntegerColumn,
-    MultiLineTextColumn,
     OverrideColumn,
     ReferenceColumn,
     StringColumn,
@@ -27,6 +26,8 @@ export const x_daas_ham_agreement = Table({
     label: 'Agreement',
     extends: 'ast_contract',
     schema: {
+        // A reference to an Agreement shows its number: ast_contract displays vendor_contract, which an Agreement leaves empty.
+        number: OverrideColumn({ display: true }),
         // Inherited from ast_contract, where it references core_company: required here and limited to Customer
         // accounts (customer_account extends core_company).
         customer: OverrideColumn({ mandatory: true, referenceQualifier: 'sys_class_name=customer_account' }),
@@ -146,7 +147,8 @@ export const x_daas_ham_site_template = Table({
     schema: {
         name: StringColumn({ label: 'Name', maxLength: 100, mandatory: true }),
         customer: ReferenceColumn({ label: 'Customer (blank = all)', referenceTable: 'customer_account' }),
-        description: MultiLineTextColumn({ label: 'Description', maxLength: 2000 }),
+        // A string column (see Order entitlement_findings): the form draws it inside its field container.
+        description: StringColumn({ label: 'Description', maxLength: 2000 }),
         active: BooleanColumn({ label: 'Active', default: true }),
     },
 })

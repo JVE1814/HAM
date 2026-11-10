@@ -698,6 +698,6 @@ export const COST_TYPE_CHOICES = {
     lease: { label: 'Lease payment', sequence: 1 },
     oem_support: { label: 'OEM support', sequence: 2 },
     field_labour: { label: 'Field labour', sequence: 3 },
+    shipping: { label: 'Shipping (carrier labels)', sequence: 4 },
 } as const
-/** A Cost fact's type: one of the list's, or the cost of a Shipment's label, which the margin pass also writes. */
-export type CostType = keyof typeof COST_TYPE_CHOICES | 'shipping'
+export type CostType = keyof typeof COST_TYPE_CHOICES

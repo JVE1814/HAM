@@ -197,6 +197,8 @@ describe('buyLabel', () => {
 
     it('reports aggregator errors and incomplete addresses without calling out', () => {
         expect(buyLabel(() => ({ status: 400, body: '{"errors":[{"message":"Invalid postal code"}]}' }), input)).toEqual({ ok: false, error: 'HTTP 400: Invalid postal code' })
+        // No answer at all: the transport's reason is kept, as the OEM adapters keep it (domain/http `failureText`).
+        expect(buyLabel(() => ({ status: 0, body: '', error: 'Read timed out' }), input)).toEqual({ ok: false, error: 'no response: Read timed out' })
         let called = false
         const http = () => {
             called = true
