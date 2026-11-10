@@ -1,6 +1,13 @@
 import { addMonths, earliest, isIsoDate } from './calendar.ts'
 import { FLEET_CONDITION } from './fleet.ts'
-import { INSTALL_STATUS, LIFECYCLE_PHASE, type LifecyclePhase } from './vocabulary.ts'
+import {
+    INSTALL_STATUS,
+    LEASE_END_ACTION,
+    type LeaseEndAction,
+    LIFECYCLE_PHASE,
+    type LifecyclePhase,
+    type RefreshBasis,
+} from './vocabulary.ts'
 
 /** A Model's manufacturer support milestones (ISO dates). */
 export interface LifecycleDates {
@@ -24,15 +31,21 @@ export const MILESTONES: ReadonlyArray<{ field: keyof LifecycleDates; phase: Lif
 
 /** What an Asset contributes to its Lifecycle phase and Refresh due date. */
 export interface AssetLifecycleFacts {
-    /** The Asset's Agreement refresh basis as stored: 'cycle' | 'end_of_support' | 'earliest', or '' when the Asset has no Agreement (treated as 'earliest'). Any other value gives no basis date. */
-    refreshBasis: string
+    /**
+     * The Asset's Agreement refresh basis as stored, or '' when the Asset has no Agreement (`NO_AGREEMENT_BASIS`). A
+     * value stored past the list gives no basis date.
+     */
+    refreshBasis: RefreshBasis | ''
     /** YYYY-MM-DD the Asset went into service; absent until it has. */
     inServiceDate?: string
     /** The Agreement's refresh cycle; 0 (or no Agreement) means no cycle date. */
     refreshCycleMonths: number
-    /** The Asset's Lease schedule, when it is on one. */
-    lease?: { endAction: string; ends: string }
+    /** The Asset's Lease schedule, when it is on one: its end action ('' when none is stored) and its end, a date or date-time as stored. */
+    lease?: { endAction: LeaseEndAction | ''; ends: string }
 }
+
+/** An Asset without an Agreement has no basis stored, and refreshes on whichever comes first. */
+const NO_AGREEMENT_BASIS: RefreshBasis = 'earliest'
 
 export interface AssetLifecycleStamp {
     phase: LifecyclePhase
@@ -66,8 +79,8 @@ function refreshDueDate(asset: AssetLifecycleFacts, model: LifecycleDates): stri
 function byBasis(asset: AssetLifecycleFacts, inServiceDate: string, endOfSupport: string | undefined): string | undefined {
     const byCycle = asset.refreshCycleMonths > 0 ? addMonths(inServiceDate, asset.refreshCycleMonths) : undefined
     const bySupport = endOfSupport || undefined
-    // An Asset without an Agreement has no basis stored, and refreshes on whichever comes first.
-    switch (asset.refreshBasis || 'earliest') {
+    const basis: RefreshBasis = asset.refreshBasis || NO_AGREEMENT_BASIS
+    switch (basis) {
         case 'cycle':
             return byCycle
         case 'end_of_support':
@@ -81,7 +94,7 @@ function byBasis(asset: AssetLifecycleFacts, inServiceDate: string, endOfSupport
 
 /** The date a leased Asset must be off the network: its lease end, once the decision is to return it. */
 function returnBy(lease: AssetLifecycleFacts['lease']): string | undefined {
-    return lease?.endAction === 'return' && lease.ends ? lease.ends.slice(0, 10) : undefined
+    return lease?.endAction === LEASE_END_ACTION.return && lease.ends ? lease.ends.slice(0, 10) : undefined
 }
 
 export type LifecycleRow = { pid: string } & { [K in keyof LifecycleDates]?: string }

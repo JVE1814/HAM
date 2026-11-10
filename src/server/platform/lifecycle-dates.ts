@@ -3,11 +3,12 @@ import { inFleet } from '../domain/fleet.ts'
 import { DEPLOYED_STAGES, notRetiredCondition, SERVING_STAGES, stagesQuery } from '../domain/lifecycle.ts'
 import { assetLifecycleStamp, type AssetLifecycleFacts, type LifecycleDates } from '../domain/model-lifecycle.ts'
 import { memoized } from '../domain/memo.ts'
+import type { LeaseEndAction, RefreshBasis } from '../domain/vocabulary.ts'
 import { runEventTableJob } from './chunked.ts'
 import { glideToIsoDate, todayIso } from './clock.ts'
 import { EVENT, jobEvent, queueJob } from './events.ts'
 import { readModelLifecycle } from './model-lifecycle.ts'
-import { findById, num, str, warnRefused } from './records.ts'
+import { choice, findById, num, str, warnRefused } from './records.ts'
 
 /**
  * Lifecycle phase and Refresh due date of an Asset, from its Model lifecycle, Agreement and Lease schedule: the stamp
@@ -30,14 +31,14 @@ type AgreementRefreshTerms = Pick<AssetLifecycleFacts, 'refreshBasis' | 'refresh
 function agreementRefreshTerms(agreementId: string): AgreementRefreshTerms {
     const agreement = findById('x_daas_ham_agreement', agreementId)
     return {
-        refreshBasis: agreement ? str(agreement, 'refresh_basis') : '',
+        refreshBasis: agreement ? choice<RefreshBasis>(agreement, 'refresh_basis') : '',
         refreshCycleMonths: agreement ? num(agreement, 'refresh_cycle_months') : 0,
     }
 }
 
 function leaseTerms(leaseId: string): AssetLifecycleFacts['lease'] {
     const lease = findById('x_daas_ham_lease_schedule', leaseId)
-    return lease ? { endAction: str(lease, 'end_action'), ends: str(lease, 'ends') } : undefined
+    return lease ? { endAction: choice<LeaseEndAction>(lease, 'end_action'), ends: str(lease, 'ends') } : undefined
 }
 
 /**

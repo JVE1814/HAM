@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { assetLifecycleStamp, mergeLifecycle, parseLifecycleRow, type AssetLifecycleFacts, type LifecycleDates } from './model-lifecycle'
+import type { RefreshBasis } from './vocabulary'
 
 const cisco = {
     endOfSale: '2024-04-30',
@@ -11,7 +12,7 @@ const cisco = {
 describe('assetLifecycleStamp', () => {
     const inService: AssetLifecycleFacts = { refreshBasis: 'cycle', inServiceDate: '2026-03-31', refreshCycleMonths: 36 }
     const shipped: AssetLifecycleFacts = { refreshBasis: 'cycle', refreshCycleMonths: 36 }
-    const returned = { endAction: 'return', ends: '2027-06-30' }
+    const returned = { endAction: 'return', ends: '2027-06-30' } as const
     const refreshDue = (asset: AssetLifecycleFacts, model: LifecycleDates = {}) => assetLifecycleStamp(asset, model, '2026-11-07').refreshDue
 
     it("gives the Model's Lifecycle phase and the Asset's Refresh due date", () => {
@@ -64,15 +65,16 @@ describe('assetLifecycleStamp', () => {
     })
 
     it('caps at the lease end only once the decision is to return it', () => {
-        for (const endAction of ['extend', 'buyout', 'undecided']) {
+        for (const endAction of ['extend', 'buyout', 'undecided', ''] as const) {
             expect(refreshDue({ ...inService, lease: { endAction, ends: '2027-06-30' } }), endAction).toBe('2029-03-31')
         }
         expect(refreshDue({ ...inService, lease: { endAction: 'return', ends: '' } })).toBe('2029-03-31')
     })
 
-    it('gives only the lease cap for an unknown refresh basis', () => {
-        expect(refreshDue({ ...inService, refreshBasis: 'quarterly', lease: returned }, cisco)).toBe('2027-06-30')
-        expect(refreshDue({ ...inService, refreshBasis: 'quarterly' }, cisco)).toBe('')
+    it('gives only the lease cap for a refresh basis stored past the list', () => {
+        const refreshBasis = 'quarterly' as RefreshBasis
+        expect(refreshDue({ ...inService, refreshBasis, lease: returned }, cisco)).toBe('2027-06-30')
+        expect(refreshDue({ ...inService, refreshBasis }, cisco)).toBe('')
     })
 
     it('has no due date for an asset not yet in service or without the needed data', () => {
