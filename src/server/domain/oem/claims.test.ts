@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HttpRequest, HttpResponse } from '../http'
 import {
-    CLAIM_PREREQUISITE,
     CLAIM_ROUTES,
     CLAIM_VENDORS,
     dependentActions,
@@ -288,6 +287,9 @@ describe('Check Point Zero Touch', () => {
         const { http, calls } = fake([reply(claimed)])
         expect(run(many('Z', 5).map((t) => ({ ...t, account: '1/2' })), http, 4)).toMatchObject({ calls: 4 })
         expect(calls.map((c) => c.fn)).toEqual(['login', 'claim_gateway', 'claim_gateway', 'logout'])
+        const three = fake([succeed])
+        expect(run([target('A', { account: '1/2' }), target('B', { account: '1/2' })], three.http, 3).calls).toBe(3)
+        expect(three.calls.map((c) => c.fn)).toEqual(['login', 'claim_gateway', 'logout'])
         const idle = fake([reply(claimed)])
         expect(run([target('A', { account: '1/2' })], idle.http, 2)).toEqual({ outcomes: [], calls: 0 })
         expect(idle.calls).toHaveLength(0)
@@ -307,12 +309,6 @@ describe('Check Point Zero Touch', () => {
         expect(result).toEqual({ outcomes: [{ stepId: 'A', ok: false, message: 'Zero Touch login failed: no session id returned' }], calls: 1 })
     })
 
-    it('needs room for login, one claim and logout (three calls)', () => {
-        const { http, calls } = fake([succeed])
-        expect(run([target('A', { account: '1/2' }), target('B', { account: '1/2' })], http, 3).calls).toBe(3)
-        expect(calls.map((c) => c.fn)).toEqual(['login', 'claim_gateway', 'logout'])
-    })
-
     it('refuses an account that is not "<account id>/<template id>" and a missing MAC without logging in', () => {
         const { http, calls } = fake([reply(claimed)])
         const result = run([target('A', { account: 'branch-tpl' }), target('B', { account: '1/2', mac: '' }), target('C', { account: '' })], http, 5)
@@ -325,16 +321,16 @@ describe('Check Point Zero Touch', () => {
     })
 })
 
-/** A ClaimStore over fixed due steps per action (cut to `limit`), recording what is loaded and settled (each settle call's step ids in `settles`). */
+/** A ClaimStore over fixed due steps per action (cut to `limit`), recording the actions loaded and what is settled (each settle call's step ids in `settles`). */
 function fakeStore(due: Partial<Record<ClaimAction, ClaimTarget[]>> = {}) {
-    const loads: Array<[ClaimAction, number]> = []
+    const loads: ClaimAction[] = []
     const vendors: string[] = []
     const settled: ClaimOutcome[] = []
     const settles: string[][] = []
     const store: ClaimStore = {
         due: (vendor, action, limit) => {
             vendors.push(vendor)
-            loads.push([action, limit])
+            loads.push(action)
             return (due[action] ?? []).slice(0, limit)
         },
         settle: (outcomes) => {
@@ -365,25 +361,27 @@ const succeed = (request: HttpRequest): HttpResponse =>
           : { status: 200, body: JSON.stringify({ status: 0 }) }
 
 describe('runVendorClaims', () => {
-    it('loads the steps of the vendor it runs, sized for Mist and Check Point too', () => {
+    it('loads the steps of the vendor it runs, for the actions that vendor has', () => {
         const { store, loads, vendors } = fakeStore()
         runVendorClaims('mist', store, fakeTransport([succeed]).transport, 1)
         runVendorClaims('checkpoint', store, fakeTransport([succeed]).transport, 8)
         expect(vendors).toEqual(['mist', 'checkpoint'])
-        expect(loads).toEqual([
-            ['oem_claim', 100],
-            ['oem_ztp', 8],
-        ])
+        expect(loads).toEqual(['oem_claim', 'oem_ztp'])
     })
 
-    it('loads as many steps as the budget can carry, at most 200', () => {
-        const { store, loads } = fakeStore()
-        runVendorClaims('meraki', store, fakeTransport([succeed]).transport, 8)
-        runVendorClaims('meraki', store, fakeTransport([succeed]).transport, 1)
-        expect(loads).toEqual([
-            ['oem_claim', 200],
-            ['oem_claim', 50],
-        ])
+    it.each([
+        ['meraki', 'oem_claim', 3],
+        ['mist', 'oem_claim', 2],
+        ['aruba', 'oem_claim', 8],
+        ['aruba', 'oem_licence', 8],
+        ['fortinet', 'oem_claim', 8],
+        ['fortinet', 'oem_ztp', 8],
+        ['checkpoint', 'oem_ztp', 8],
+    ] as const)('loads enough of the due steps to make every call it is allowed (%s %s, %i calls)', (vendor, action, maxCalls) => {
+        const { store } = fakeStore({ [action]: many('S', 300).map((t) => ({ ...t, account: '1/2' })) })
+        const { transport, calls } = fakeTransport([succeed])
+        expect(runVendorClaims(vendor, store, transport, maxCalls)).toBe(maxCalls)
+        expect(calls).toHaveLength(maxCalls)
     })
 
     it('adds Aruba devices before assigning subscriptions, from one shared budget', () => {
@@ -393,10 +391,7 @@ describe('runVendorClaims', () => {
         })
         const { transport, messages, calls } = fakeTransport([succeed])
         expect(runVendorClaims('aruba', store, transport, 8)).toBe(7)
-        expect(loads).toEqual([
-            ['oem_claim', 40],
-            ['oem_licence', 4],
-        ])
+        expect(loads).toEqual(['oem_claim', 'oem_licence'])
         expect(messages).toEqual(['NaaS HPE GreenLake', 'NaaS HPE GreenLake'])
         expect(calls.map((c) => c.fn)).toEqual(['add_devices', ...Array(3).fill(['find_device', 'assign_subscription']).flat()])
         expect(settled.map((o) => o.stepId)).toEqual(['A', 'B', 'L0', 'L1', 'L2'])
@@ -410,10 +405,7 @@ describe('runVendorClaims', () => {
         const { store, loads } = fakeStore({ oem_claim: [target('A', { account: '' })], oem_ztp: [target('B', { account: 'FMG-1' })] })
         const { transport, messages } = fakeTransport([succeed])
         expect(runVendorClaims('fortinet', store, transport, 8)).toBe(2)
-        expect(loads).toEqual([
-            ['oem_claim', 80],
-            ['oem_ztp', 7],
-        ])
+        expect(loads).toEqual(['oem_claim', 'oem_ztp'])
         expect(messages).toEqual(['NaaS FortiCare', 'NaaS FortiZTP'])
     })
 
@@ -421,17 +413,14 @@ describe('runVendorClaims', () => {
         const { store, loads } = fakeStore()
         const { transport, messages } = fakeTransport([succeed])
         expect(runVendorClaims('aruba', store, transport, 8)).toBe(0)
-        expect(loads).toEqual([
-            ['oem_claim', 40],
-            ['oem_licence', 4],
-        ])
+        expect(loads).toEqual(['oem_claim', 'oem_licence'])
         expect(messages).toEqual([])
     })
 
     it('does not load later actions once the budget is spent', () => {
         const { store, loads } = fakeStore({ oem_claim: [target('A')], oem_ztp: [target('B')] })
         expect(runVendorClaims('fortinet', store, fakeTransport([succeed]).transport, 1)).toBe(1)
-        expect(loads).toEqual([['oem_claim', 10]])
+        expect(loads).toEqual(['oem_claim'])
     })
 
     it('loads nothing when no calls are allowed', () => {
@@ -509,12 +498,7 @@ describe('dueStepsQuery', () => {
     })
 })
 
-describe('CLAIM_PREREQUISITE', () => {
-    it('makes licensing and zero-touch wait for the claim; the claim waits for nothing', () => {
-        expect(CLAIM_PREREQUISITE).toEqual({ oem_licence: 'oem_claim', oem_ztp: 'oem_claim' })
-        expect(CLAIM_PREREQUISITE.oem_claim).toBeUndefined()
-    })
-
+describe('dependentActions', () => {
     it('lists the actions that wait on each action', () => {
         expect(dependentActions('oem_claim')).toEqual(['oem_licence', 'oem_ztp'])
         expect(dependentActions('oem_licence')).toEqual([])

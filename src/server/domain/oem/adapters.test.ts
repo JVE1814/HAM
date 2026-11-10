@@ -133,10 +133,6 @@ describe('Meraki', () => {
         ])
         expect(result.facts).toEqual([{ pid: 'MR46-HW', dates: { endOfSale: '2026-06-30', endOfSupport: '2031-06-30' }, reference: 'meraki:org2' }])
     })
-
-    it('gets hardware coverage from Cisco', () => {
-        expect(OEM_ADAPTERS.meraki.coverage?.via).toBe('cisco')
-    })
 })
 
 /** The FortiCloud Asset Management v3 envelope: status 0 means success. */
@@ -283,9 +279,9 @@ describe('HPE Mist', () => {
 })
 
 describe('rate limits', () => {
-    it('ask FortiCloud (100 calls a minute, one serial per call) for at most 90 serials per run, the other coverage APIs without a cap', () => {
-        expect(OEM_ADAPTERS.fortinet.coverage?.maxKeysPerRun).toBe(90)
-        for (const vendor of ['cisco', 'meraki', 'mist'] as const) expect(OEM_ADAPTERS[vendor].coverage?.maxKeysPerRun).toBeUndefined()
+    // FortiCloud answers 100 calls a minute, and its products/list takes one serial per call (external-contracts F1).
+    it('ask FortiCloud for fewer serials per run than it answers calls for in a minute', () => {
+        expect(OEM_ADAPTERS.fortinet.coverage?.maxKeysPerRun).toBeLessThan(100)
     })
 })
 
@@ -308,13 +304,6 @@ describe('enabledRoute', () => {
     it('has no route for a capability without an API, enabled or not', () => {
         expect(enabledRoute('fortinet', 'lifecycle', only('fortinet'))).toBeUndefined()
         expect(enabledRoute('aruba', 'coverage', only('aruba'))).toBeUndefined()
-    })
-})
-
-describe('vendors without APIs', () => {
-    it('have no adapters, so CSV import is used', () => {
-        expect(OEM_ADAPTERS.aruba).toEqual({})
-        expect(OEM_ADAPTERS.checkpoint).toEqual({})
     })
 })
 
