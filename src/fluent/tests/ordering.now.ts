@@ -4,6 +4,7 @@ import { assetManager } from '../security/roles.now'
 import { inventoryTechAuditVisibilityTest } from './audit-visibility.now'
 import { addToFleetTest } from './fleet.now'
 import { lifecycleImportTest } from './models.now'
+import { sparePoolTopUpTest } from './spare-pool.now'
 import { transferStageTest } from './transfers.now'
 import { customerAdminVisibilityTest, inventoryTechVisibilityTest } from './visibility.now'
 import { DEVICE_CLASS, INSTALL_MODE, ORDER_TYPE } from '../../server/domain/vocabulary'
@@ -37,10 +38,23 @@ export const withinAgreementOrderTest = Test(
             table: 'cmn_location',
             fieldValues: { name: 'ATF Order Site', x_daas_ham_is_site: true, company: customer.record_id },
         })
+        // No stock holds the Model, so sourcing buys it, and Procurement refuses a line item for a Model without a Model
+        // category. The platform's own Network Gear (base system data), looked up by name: no sys_id is written here.
+        const category = atf.server.recordQuery({
+            $id: Now.ID['atf_owa_category'],
+            table: 'cmdb_model_category',
+            fieldValues: 'name=Network Gear',
+            assert: 'records_match_query',
+        })
         const model = atf.server.recordInsert({
             $id: Now.ID['atf_owa_model'],
             table: 'cmdb_model',
-            fieldValues: { name: 'ATF Switch', x_daas_ham_oem_pid: 'ATF-SW-48', x_daas_ham_device_class: SWITCH },
+            fieldValues: {
+                name: 'ATF Switch',
+                x_daas_ham_oem_pid: 'ATF-SW-48',
+                x_daas_ham_device_class: SWITCH,
+                cmdb_model_category: category.first_record,
+            },
         })
         const agreement = atf.server.recordInsert({
             $id: Now.ID['atf_owa_agreement'],
@@ -186,5 +200,6 @@ export const phase1Suite = TestSuite({
         transferStageTest,
         addToFleetTest,
         lifecycleImportTest,
+        sparePoolTopUpTest,
     ],
 })

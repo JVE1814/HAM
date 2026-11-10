@@ -39,10 +39,23 @@ export const replacementWithinAgreementTest = Test(
             table: 'cmn_location',
             fieldValues: { name: 'ATF Replacement Site', x_daas_ham_is_site: true, company: customer.record_id },
         })
+        // Sourcing buys the replacement (no stock holds the Model, and the failed unit has no OEM coverage), and
+        // Procurement refuses a line item for a Model without a Model category: Network Gear, looked up by name.
+        const category = atf.server.recordQuery({
+            $id: Now.ID['atf_rwa_category'],
+            table: 'cmdb_model_category',
+            fieldValues: 'name=Network Gear',
+            assert: 'records_match_query',
+        })
         const model = atf.server.recordInsert({
             $id: Now.ID['atf_rwa_model'],
             table: 'cmdb_model',
-            fieldValues: { name: 'ATF Legacy Switch', x_daas_ham_oem_pid: 'ATF-LEGACY-24', x_daas_ham_device_class: SWITCH },
+            fieldValues: {
+                name: 'ATF Legacy Switch',
+                x_daas_ham_oem_pid: 'ATF-LEGACY-24',
+                x_daas_ham_device_class: SWITCH,
+                cmdb_model_category: category.first_record,
+            },
         })
         const agreement = atf.server.recordInsert({
             $id: Now.ID['atf_rwa_agreement'],

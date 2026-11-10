@@ -21,8 +21,8 @@ const SWITCH = DEVICE_CLASS.switch
  *
  * Not tested here: that the same move off any transfer order line is refused. The lifecycle rule checks only a save
  * that a user without admin makes in an interactive session (entry/assets lifecycleRefusal), and ATF's server steps run
- * outside one. Like the lifecycle rule's other refusals, it is left to the manual checks of a first install (README,
- * Verify on the first install).
+ * outside one. Like the lifecycle rule's other refusals, it is left to the manual checks of a first install
+ * (docs/verify-on-instance.md, Transfer refusals).
  */
 
 export const transferStageTest = Test(

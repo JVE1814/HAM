@@ -278,6 +278,33 @@ describe('scripts wired to server modules', () => {
 })
 
 /*
+ * An ATF "Run Server Side Script" step (fluent/tests) loads a server module by the path the SDK installs it under, as
+ * the generated wrappers do, and calls what it exports. One of them runs a scheduled job by the entry function its
+ * schedule runs, so the suites test a job too.
+ */
+describe('ATF server-side scripts', () => {
+    /** What the built step scripts call on the modules they require, each as `<module path>#<function>`. */
+    const called = () =>
+        readdirSync(UPDATES)
+            .filter((name) => name.startsWith('sys_atf_step_'))
+            .flatMap((name) => {
+                const xml = unescapeXml(readFileSync(join(UPDATES, name), 'utf8'))
+                return [...xml.matchAll(/\bvar\s+(\w+)\s*=\s*require\('([^']+)'\)/g)].flatMap(([, binding = '', path = '']) =>
+                    [...xml.matchAll(new RegExp(`\\b${binding}\\.(\\w+)\\(`, 'g'))].map(([, fn = '']) => `${path}#${fn}`),
+                )
+            })
+
+    it('run at least one scheduled job by the entry function its schedule runs', () => {
+        const scheduled = records('sysauto_script').flatMap((job) => {
+            const call = wrapped(job.script ?? '')
+            return call ? [`${call.path}#${call.fn}`] : []
+        })
+        expect(scheduled.length).toBeGreaterThan(10)
+        expect(called().filter((entry) => scheduled.includes(entry))).not.toEqual([])
+    })
+})
+
+/*
  * alm_hardware and wm_order are other scopes' tables: from this scope the platform ignores current.setAbortAction on
  * their records and writes them anyway, so a before rule there refuses with its Abort action, its check being the
  * condition, a script the platform runs as written on every save of the table. A condition loads the module that holds
