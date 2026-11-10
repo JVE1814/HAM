@@ -1,8 +1,8 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { transferFellThrough, type TransferContext } from '../domain/lifecycle.ts'
+import { stageAfterTransfer, transferFellThrough, type TransferContext } from '../domain/lifecycle.ts'
 import { createMarks } from '../domain/marks.ts'
 import type { TransferResult } from '../domain/sourcing.ts'
-import { moveRefusal } from './assets.ts'
+import { moveAsset, moveRefusal, readStage } from './assets.ts'
 import { PROPERTY, stagingStockroom, stringProperty } from './properties.ts'
 import { bool, deleteWhere, refusal, str } from './records.ts'
 import { hasOpenStagingTask } from './staging-tasks.ts'
@@ -10,7 +10,7 @@ import { hasOpenStagingTask } from './staging-tasks.ts'
 /**
  * Transfer orders (alm_transfer_order) moving stock between the Provider's stockrooms, one line per Asset. While a
  * line is open, Inventory keeps its Asset In transfer (domain/lifecycle; external-contracts N38); once it lets the
- * Asset go, the Asset takes back the stage it left (entry/assets `onTransferReleased`).
+ * Asset go, the Asset takes back the stage it left (`takeBackStageAfterTransfer`).
  */
 
 /**
@@ -93,6 +93,26 @@ function withdrawing<R>(assets: readonly GlideRecord[], remove: () => R): R {
  */
 export function onTransferOrderLine(asset: GlideRecord): boolean {
     return bool(asset, 'active_to')
+}
+
+/**
+ * In the save by which Inventory lets `asset` go from its transfer order line (`before`: the Asset as stored), give it
+ * back the stage it left; the save under way carries it. Inventory clears its flag and saves the Asset In stock:
+ * Available (Reserved for a line requested for a user) in the transfer order's to-stockroom once received, Available
+ * where it was when the line is cancelled or deleted (external-contracts N38, N39). The Asset takes back the stage it
+ * left instead (domain/lifecycle `stageAfterTransfer`); the stockroom Inventory set is kept. Any other save is left as
+ * it is: one putting the Asset onto a line, or one leaving it in transfer with the flag cleared (its line received
+ * after its last task was closed skipped), for its stage to be set by hand. A stage the lifecycle refuses is logged.
+ */
+export function takeBackStageAfterTransfer(asset: GlideRecord, before: GlideRecord): void {
+    const now = readStage(asset)
+    const released = readStage(before) === 'in_transfer' && now !== 'in_transfer' && !onTransferOrderLine(asset)
+    if (!released) return
+    const stage = stageAfterTransfer(transferContext(asset))
+    // From the stock Inventory made it: each stage it can take back is a move the matrix allows from there.
+    const verdict = moveAsset(asset, stage)
+    if (verdict.allowed) return
+    gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left its transfer as ${now}, not ${stage}: ${verdict.reason}`)
 }
 
 /**
