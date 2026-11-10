@@ -16,7 +16,7 @@ import type { RackFace } from '../domain/vocabulary.ts'
 import { isFleetAsset, readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { cisWithOpenException, settleExceptions } from './exceptions.ts'
-import { exists, findById, num, recordsById, str } from './records.ts'
+import { exists, findById, num, recordsById, str, type ForeignRecord } from './records.ts'
 import { currentSession } from './session.ts'
 
 /**
@@ -32,7 +32,7 @@ interface Slot {
     modelId: string
 }
 
-function slotOf(asset: GlideRecord): Slot {
+function slotOf(asset: ForeignRecord): Slot {
     return {
         assetId: str(asset, 'asset_tag') || str(asset, 'serial_number'),
         ruStart: num(asset, PLACEMENT_FIELDS.ruStart),
@@ -106,7 +106,7 @@ function slotsIn(rackId: string, exceptAssetId = ''): Slot[] {
  * written. A rack no longer there holds nothing, as for the re-check. A unit joining the fleet with its placement is
  * new to the rack as the checks count it (slotsIn counts fleet assets only), so its whole draw is added.
  */
-export function placementRefusal(current: GlideRecord, previous: GlideRecord | null): string | null {
+export function placementRefusal(current: ForeignRecord, previous: ForeignRecord | null): string | null {
     const rackId = str(current, PLACEMENT_FIELDS.rack)
     if (!rackId || !str(current, PLACEMENT_FIELDS.ruStart)) return null
     const rack = findById('cmdb_ci_rack', rackId)
@@ -127,7 +127,7 @@ export function placementRefusal(current: GlideRecord, previous: GlideRecord | n
 }
 
 /** Whether the save leaves the Asset where it was placed: not an insert, and its rack, lowest unit and face unchanged. */
-export function keepsPlacement(current: GlideRecord, previous: GlideRecord | null): boolean {
+export function keepsPlacement(current: ForeignRecord, previous: ForeignRecord | null): boolean {
     return !!previous && Object.values(PLACEMENT_FIELDS).every((field) => str(current, field) === str(previous, field))
 }
 
@@ -150,7 +150,7 @@ function recheckRack(rackId: string): void {
 }
 
 /** Re-check the rack a saved Asset is placed in, and the one the save took it out of (`recheckRack`), each once. */
-export function recheckRacksOf(current: GlideRecord, previous: GlideRecord | null): void {
+export function recheckRacksOf(current: ForeignRecord, previous: ForeignRecord | null): void {
     const left = previous ? str(previous, PLACEMENT_FIELDS.rack) : ''
     for (const rackId of new Set([str(current, PLACEMENT_FIELDS.rack), left])) if (rackId) recheckRack(rackId)
 }

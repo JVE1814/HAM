@@ -4,7 +4,7 @@ import { messageOf } from '../domain/errors.ts'
 import type { NewLine } from '../platform/order-lines.ts'
 import { cancelOrder, rollUpOrderApprovals, submitOrder, submitProducedOrder, type Submission } from '../platform/orders.ts'
 import { timesRequeued } from '../platform/events.ts'
-import { str } from '../platform/records.ts'
+import { str, type ForeignRecord } from '../platform/records.ts'
 import { runSourcingPass } from '../platform/sourcing.ts'
 
 /*
@@ -63,7 +63,7 @@ export function uiSubmitOrder(current: GlideRecord): void {
 }
 
 /** After-update rule on sysapproval_approver: roll the decisions up to the Order. */
-export function onOrderApprovalDecision(current: GlideRecord): void {
+export function onOrderApprovalDecision(current: ForeignRecord): void {
     rollUpOrderApprovals(str(current, 'document_id'))
 }
 

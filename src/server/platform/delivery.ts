@@ -12,7 +12,7 @@ import { nowGlide } from './clock.ts'
 import { openFieldWork, type WorkContext } from './field-work.ts'
 import { lineAssetStages, recomputeOrder } from './fulfilment.ts'
 import { withLock } from './locks.ts'
-import { choice, findById, num, refusal, str } from './records.ts'
+import { choice, findById, num, refusal, str, type ForeignRecord } from './records.ts'
 import { raiseReturn } from './returns.ts'
 import { labelOrder, orderLabelBought, shippingEnabled } from './shipping.ts'
 
@@ -202,7 +202,7 @@ export function completeInstall(order: GlideRecord): number {
  * A work order was closed complete: when it is the on-site work of the NaaS Order it was initiated from (domain/delivery
  * `installsOrder`; a de-install or audit job is not), that Order's install is complete.
  */
-export function completeInstallOfWork(workOrder: GlideRecord): void {
+export function completeInstallOfWork(workOrder: ForeignRecord): void {
     const order = findById('x_daas_ham_order', str(workOrder, 'initiated_from'))
     if (order && installsOrder(str(workOrder, 'x_daas_ham_purpose'))) completeInstall(order)
 }

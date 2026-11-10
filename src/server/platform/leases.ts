@@ -24,7 +24,7 @@ import { addDisposalLine, draftLessorDisposal } from './disposal.ts'
 import { EVENT, fire, queueJob, type JobEvent } from './events.ts'
 import { queueRefresh } from './lifecycle-dates.ts'
 import { PROPERTY, stringProperty } from './properties.ts'
-import { bool, count, exists, findById, num, pluck, refusal, str, warnRefused } from './records.ts'
+import { bool, count, exists, findById, num, pluck, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
 import { changeStock, releaseToProviderStock, stockUnit } from './stock.ts'
 
 /**
@@ -42,7 +42,7 @@ const DECISION_CLOSED = TASK_STATE.closedComplete
  * An Asset on a Lease schedule is owned by that schedule's Lessor (the lease's Vendor, which the Asset reaches through
  * its Lease schedule): set its Legal owner (the caller saves). One on no lease is left as it is.
  */
-export function giveToLessor(asset: GlideRecord): void {
+export function giveToLessor(asset: ForeignRecord): void {
     if (findById(LEASE, str(asset, 'x_daas_ham_lease'))) asset.setValue('x_daas_ham_legal_owner', LEGAL_OWNER.lessor)
 }
 

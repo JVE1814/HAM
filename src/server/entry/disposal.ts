@@ -7,7 +7,7 @@ import {
     rollUpDisposalApprovals,
     submitDisposal,
 } from '../platform/disposal.ts'
-import { str } from '../platform/records.ts'
+import { str, type ForeignRecord } from '../platform/records.ts'
 import { abortWith } from '../platform/rule-api.ts'
 
 /** Disposal orders: approve, then retire each wiped Asset by its method (P2.5, D61): platform/disposal. */
@@ -21,7 +21,7 @@ export function uiSubmitDisposal(current: GlideRecord): void {
 }
 
 /** After-update rule on sysapproval_approver for disposal orders: roll the decisions up to the order. */
-export function onDisposalApprovalDecision(current: GlideRecord): void {
+export function onDisposalApprovalDecision(current: ForeignRecord): void {
     rollUpDisposalApprovals(str(current, 'document_id'))
 }
 

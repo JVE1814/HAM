@@ -6,6 +6,7 @@ import { warnExpiringCoverage } from '../platform/coverage-warnings.ts'
 import { EVENT, jobEvent } from '../platform/events.ts'
 import { applyLeaseDecision, giveToLessor, runLeaseReview, transferToProvider } from '../platform/leases.ts'
 import { queueRefresh, runRefreshPass } from '../platform/lifecycle-dates.ts'
+import type { ForeignRecord } from '../platform/records.ts'
 import { rearmForNewEnd, renewAgreement, warnAgreementRenewals } from '../platform/renewals.ts'
 
 /** Leases, end-of-lease decisions and renewals (P3.23–P3.24): platform/leases, platform/renewals. */
@@ -17,7 +18,7 @@ import { rearmForNewEnd, renewAgreement, warnAgreementRenewals } from '../platfo
  * only, once its Lease schedule or its Fleet flag changes: one of the Provider IT's is left as it is (ADR 0016). It
  * reads no previous value, so either change runs it the same way.
  */
-export function onAssetLeaseChanged(current: GlideRecord): void {
+export function onAssetLeaseChanged(current: ForeignRecord): void {
     giveToLessor(current)
 }
 

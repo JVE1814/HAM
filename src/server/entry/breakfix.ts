@@ -2,7 +2,7 @@ import { gs, type GlideRecord } from '@servicenow/glide'
 import { isFleetAsset } from '../platform/assets.ts'
 import { raiseReplacement } from '../platform/breakfix.ts'
 import { returnDefectiveToOem } from '../platform/oem-rma.ts'
-import { findById, str } from '../platform/records.ts'
+import { findById, str, type ForeignRecord } from '../platform/records.ts'
 
 /** Break-fix: a CSM case about a failed Asset drives a device-replace Order (P2.3, D58). */
 
@@ -10,7 +10,7 @@ import { findById, str } from '../platform/records.ts'
  * Before insert/update rule on cases naming a failed Asset: take the customer and service level from it. A failed
  * asset outside the fleet (ADR 0016), set by a script past the field's reference qualifier, gives the case nothing.
  */
-export function onCaseFailedAsset(current: GlideRecord): void {
+export function onCaseFailedAsset(current: ForeignRecord): void {
     const asset = findById('alm_hardware', str(current, 'x_daas_ham_failed_asset'))
     if (!asset || !isFleetAsset(asset)) return
     current.setValue('x_daas_ham_replacement_tier', str(asset, 'x_daas_ham_agreement.replacement_tier'))

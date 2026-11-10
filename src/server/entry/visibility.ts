@@ -11,7 +11,7 @@ import {
     type TableScoping,
 } from '../domain/visibility.ts'
 import { beyondVisibility, readsBeyondVisibility } from '../platform/beyond-visibility.ts'
-import { str } from '../platform/records.ts'
+import { str, type ForeignRecord } from '../platform/records.ts'
 import { currentSession } from '../platform/session.ts'
 
 
@@ -75,7 +75,7 @@ const warnUnplaced = memoized((table: string) => {
  * A table with no scoping cannot be queried here unless a rule is put on a table that has no entry: it is then shown
  * to no reader the rules narrow, and logged, so the mistake hides records and never shows them.
  */
-export function scopeRecords(current: GlideRecord): void {
+export function scopeRecords(current: ForeignRecord): void {
     if (readsBeyondVisibility(current)) return
     const table = current.getTableName()
     const { scoping } = placementOf(table)

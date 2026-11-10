@@ -3,7 +3,7 @@ import type { OnSiteWork } from '../domain/delivery.ts'
 import { checkJobWindow } from '../domain/scheduling.ts'
 import type { FieldPurpose } from '../domain/vocabulary.ts'
 import { glideToMs } from './clock.ts'
-import { findById, str, warnRefused } from './records.ts'
+import { findById, str, warnRefused, type ForeignRecord } from './records.ts'
 
 /**
  * On-site work: an FSM work order (wm_order) and the change request it runs under (D57), and whether the work as
@@ -77,7 +77,7 @@ function workRecord(table: 'change_request' | 'wm_order', context: WorkContext):
  * window (domain/scheduling `checkJobWindow`), or null when it fits. Only interactive saves are checked (background
  * processes are not), and only once the work has a planned start. Only reads.
  */
-export function workWindowRefusal(workOrder: GlideRecord): string | null {
+export function workWindowRefusal(workOrder: ForeignRecord): string | null {
     const jobStart = glideToMs(str(workOrder, 'expected_start'))
     const jobEnd = glideToMs(str(workOrder, 'estimated_end')) ?? jobStart
     if (jobStart === undefined || jobEnd === undefined || !gs.isInteractive()) return null

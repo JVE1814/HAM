@@ -19,7 +19,7 @@ import { createMarks } from '../domain/marks.ts'
  * outer one ends, and a transaction that dies before then takes it along. Should the platform ever hand the rules
  * another object, or share modules across transactions, the rules would narrow the read again, never skip another.
  */
-const reading = createMarks<GlideRecord>()
+const reading = createMarks<object>()
 
 /** `read` (the record's query() or get()) run past the app's before-query visibility rules; what it returns. */
 export function beyondVisibility<T>(record: GlideRecord, read: () => T): T {
@@ -27,6 +27,6 @@ export function beyondVisibility<T>(record: GlideRecord, read: () => T): T {
 }
 
 /** Whether `record`'s query is being run past the visibility rules: the before-query rules' check. */
-export function readsBeyondVisibility(record: GlideRecord): boolean {
+export function readsBeyondVisibility(record: object): boolean {
     return reading.has(record)
 }

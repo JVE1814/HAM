@@ -21,15 +21,15 @@ import { PLACEMENT_FIELDS } from '../domain/rack.ts'
 import { LEGAL_OWNER, type LegalOwner } from '../domain/vocabulary.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { PROPERTY, stringProperty } from './properties.ts'
-import { bool, refusal, str, warnRefused, type ReadOptions } from './records.ts'
+import { bool, refusal, str, warnRefused, type ForeignRecord, type ReadOptions } from './records.ts'
 
 /** Reading and moving Assets (alm_hardware) through their Lifecycle stage (ADR 0002). */
 
-export function readStage(asset: GlideRecord): Stage | null {
+export function readStage(asset: ForeignRecord): Stage | null {
     return stageOf({ installStatus: str(asset, 'install_status'), substatus: str(asset, 'substatus') })
 }
 
-export function transitionFacts(asset: GlideRecord): TransitionFacts {
+export function transitionFacts(asset: ForeignRecord): TransitionFacts {
     return {
         hasSite: !!str(asset, 'x_daas_ham_site'),
         hasAgreement: !!str(asset, 'x_daas_ham_agreement'),
@@ -43,7 +43,7 @@ export function transitionFacts(asset: GlideRecord): TransitionFacts {
  * also clears the wipe evidence (domain/lifecycle `voidsWipeEvidence`); a save that sets the stage some other way has
  * it cleared by a before-update rule (entry/assets `clearVoidedWipeEvidence`).
  */
-export function moveAsset(asset: GlideRecord, to: Stage): TransitionVerdict {
+export function moveAsset(asset: ForeignRecord, to: Stage): TransitionVerdict {
     const from = readStage(asset)
     const verdict = checkTransition(from, to, transitionFacts(asset))
     if (verdict.allowed) {
@@ -53,14 +53,14 @@ export function moveAsset(asset: GlideRecord, to: Stage): TransitionVerdict {
     return verdict
 }
 
-function writeStage(asset: GlideRecord, stage: Stage): void {
+function writeStage(asset: ForeignRecord, stage: Stage): void {
     const fields = fieldsOf(stage)
     asset.setValue('install_status', fields.installStatus)
     asset.setValue('substatus', fields.substatus ?? '')
 }
 
 /** Clear the Asset's wipe evidence (the caller saves): a wipe recorded before no longer covers the unit. */
-export function clearWipeEvidence(asset: GlideRecord): void {
+export function clearWipeEvidence(asset: ForeignRecord): void {
     asset.setValue('x_daas_ham_wiped_on', '')
     asset.setValue('x_daas_ham_wipe_certificate', '')
 }
@@ -115,7 +115,7 @@ export function newAsset(modelId: string, stage: Stage): GlideRecord {
 }
 
 /** Whether the Asset is a fleet asset (ADR 0016). */
-export function isFleetAsset(asset: GlideRecord): boolean {
+export function isFleetAsset(asset: ForeignRecord): boolean {
     return bool(asset, FLEET_FIELD)
 }
 

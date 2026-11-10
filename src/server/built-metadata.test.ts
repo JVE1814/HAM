@@ -30,9 +30,26 @@ import {
     type RmaState,
     type ShipmentStatus,
 } from './domain/vocabulary'
+import {
+    clearVoidedWipeEvidence,
+    explainLifecycleRefusal,
+    onAllocatedAssetStageChange,
+    onAssetServiceChange,
+    onTransferReleased,
+    refusesLifecycleChange,
+} from './entry/assets'
+import { onCaseFailedAsset } from './entry/breakfix'
+import { explainWorkWindowRefusal, onWorkOrderClosed, refusesWorkWindow } from './entry/delivery'
+import { onDisposalApprovalDecision } from './entry/disposal'
+import { onAssetLeaseChanged } from './entry/leases'
+import { onModelLifecycleChanged } from './entry/models'
+import { onOrderApprovalDecision } from './entry/orders'
+import { explainRackRefusal, recheckRackPlacement, refusesKeptPlacement, refusesRackPlacement } from './entry/racks'
+import { scopeRecords } from './entry/visibility'
 import { EVENT } from './platform/events'
 import { oemContext } from './platform/oem-http'
 import { PROPERTY, type PropertyOf } from './platform/properties'
+import type { ForeignRecord } from './platform/records'
 import { restMessagePort } from './platform/rest-messages'
 
 // The registries the metadata imports from platform modules are plain constants; Glide itself is not needed to read
@@ -266,6 +283,32 @@ describe('scripts wired to server modules', () => {
  * condition, a script the platform runs as written on every save of the table. A condition loads the module that holds
  * its check by the path the SDK installs it under.
  */
+
+/**
+ * The entry points the rules on other scopes' tables call, from their script or their condition, by module. Each takes
+ * its record as a ForeignRecord (platform/records): a GlideRecord without setAbortAction and setWorkflow. Neither it
+ * nor a helper it hands the record to can then call one, as the compiler follows the record; an entry point that takes
+ * a GlideRecord does not compile here.
+ */
+const ON_FOREIGN_TABLES = {
+    'entry/assets.ts': {
+        clearVoidedWipeEvidence,
+        explainLifecycleRefusal,
+        onAllocatedAssetStageChange,
+        onAssetServiceChange,
+        onTransferReleased,
+        refusesLifecycleChange,
+    },
+    'entry/breakfix.ts': { onCaseFailedAsset },
+    'entry/delivery.ts': { explainWorkWindowRefusal, onWorkOrderClosed, refusesWorkWindow },
+    'entry/disposal.ts': { onDisposalApprovalDecision },
+    'entry/leases.ts': { onAssetLeaseChanged },
+    'entry/models.ts': { onModelLifecycleChanged },
+    'entry/orders.ts': { onOrderApprovalDecision },
+    'entry/racks.ts': { explainRackRefusal, recheckRackPlacement, refusesKeptPlacement, refusesRackPlacement },
+    'entry/visibility.ts': { scopeRecords },
+} satisfies Record<string, Record<string, (current: ForeignRecord, previous: ForeignRecord) => unknown>>
+
 describe('business rule conditions', () => {
     const rules = () => records('sys_script')
     const loading = () => rules().filter((rule) => (rule.condition ?? '').includes('require('))
@@ -293,17 +336,18 @@ describe('business rule conditions', () => {
         for (const { name, condition } of aborting) expect(condition, name).toMatch(/require\('[^']+'\)\.\w+\(/)
     })
 
-    it("leave refusing a save on another scope's table to the rule's Abort action", () => {
+    it("call only entry points that cannot abort a save on another scope's table, which is left to the rule's Abort action", () => {
         const elsewhere = rules().filter((rule) => !(rule.collection ?? '').startsWith('x_daas_ham_'))
-        expect(elsewhere.length).toBeGreaterThan(0)
-        for (const rule of elsewhere) {
-            const call = wrapped(rule.script ?? '')
-            if (!call) continue
-            const source = modules().get(call.path) ?? ''
-            const start = source.search(new RegExp(`^export function ${call.fn}\\(`, 'm'))
-            expect(start, `${rule.name}: ${call.fn}`).toBeGreaterThanOrEqual(0)
-            expect(source.slice(start, source.indexOf('\n}', start)), `${rule.name}: ${call.fn}`).not.toMatch(/setAbortAction/)
-        }
+        const entryPoint = (path: string, fn: string) => `${path.slice(path.indexOf('entry/'))} ${fn}`
+        const called = elsewhere.flatMap((rule) => {
+            const script = wrapped(rule.script ?? '')
+            // An inline script would be read by no compiler.
+            expect(script, rule.name).not.toBeNull()
+            const inCondition = [...(rule.condition ?? '').matchAll(/require\('([^']+)'\)\.(\w+)\(/g)]
+            return [entryPoint(script?.path ?? '', script?.fn ?? ''), ...inCondition.map(([, path = '', fn = '']) => entryPoint(path, fn))]
+        })
+        const typed = Object.entries(ON_FOREIGN_TABLES).flatMap(([module, entryPoints]) => Object.keys(entryPoints).map((fn) => `${module} ${fn}`))
+        expect([...new Set(called)].sort()).toEqual(typed.sort())
     })
 
     // alm_hardware also holds the Provider IT's equipment, which the app leaves alone (ADR 0016).

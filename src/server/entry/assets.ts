@@ -1,9 +1,9 @@
-import { gs, type GlideRecord } from '@servicenow/glide'
+import { gs } from '@servicenow/glide'
 import { billingChange, stageChangeRefusal, voidsWipeEvidence } from '../domain/lifecycle.ts'
 import { clearWipeEvidence, readStage, transitionFacts } from '../platform/assets.ts'
 import { glideToIsoDate, todayIso } from '../platform/clock.ts'
 import { onLineAssetMoved } from '../platform/fulfilment.ts'
-import { str } from '../platform/records.ts'
+import { str, type ForeignRecord } from '../platform/records.ts'
 import { closeServiceIntervals, openServiceInterval } from '../platform/service-intervals.ts'
 import { putBackUntransferred } from '../platform/sourcing.ts'
 import { fellShortOfStagingCentre, onTransferOrderLine, takeBackStageAfterTransfer } from '../platform/transfers.ts'
@@ -18,7 +18,7 @@ import { ROLE } from '../domain/visibility.ts'
  * a rule of its own (clearVoidedWipeEvidence), and only a move out of the Provider reads that evidence, never one into
  * staging.
  */
-function lifecycleRefusal(current: GlideRecord, previous: GlideRecord): string | null {
+function lifecycleRefusal(current: ForeignRecord, previous: ForeignRecord): string | null {
     if (!gs.isInteractive() || gs.hasRole(ROLE.admin)) return null
     const facts = { ...transitionFacts(current), onTransferOrderLine: onTransferOrderLine(current) }
     return stageChangeRefusal(readStage(previous), readStage(current), facts)
@@ -30,12 +30,12 @@ function lifecycleRefusal(current: GlideRecord, previous: GlideRecord): string |
  * platform refuses from a scoped app on a record of a global table and saves anyway (as for racks.ts
  * refusesRackPlacement).
  */
-export function refusesLifecycleChange(current: GlideRecord, previous: GlideRecord): boolean {
+export function refusesLifecycleChange(current: ForeignRecord, previous: ForeignRecord): boolean {
     return lifecycleRefusal(current, previous) !== null
 }
 
 /** Script of that rule, run only when its condition refuses the save: why, as the error message. */
-export function explainLifecycleRefusal(current: GlideRecord, previous: GlideRecord): void {
+export function explainLifecycleRefusal(current: ForeignRecord, previous: ForeignRecord): void {
     gs.addErrorMessage(lifecycleRefusal(current, previous) ?? 'This stage change is refused')
 }
 
@@ -46,7 +46,7 @@ export function explainLifecycleRefusal(current: GlideRecord, previous: GlideRec
  * after rules see it. A unit whose transfer to the staging centre fell through is reserved again there and put back by
  * the after rule (`onAllocatedAssetStageChange`).
  */
-export function onTransferReleased(current: GlideRecord, previous: GlideRecord): void {
+export function onTransferReleased(current: ForeignRecord, previous: ForeignRecord): void {
     takeBackStageAfterTransfer(current, previous)
 }
 
@@ -55,7 +55,7 @@ export function onTransferReleased(current: GlideRecord, previous: GlideRecord):
  * (administrators and background processes too): one that sets the stage without moveAsset stages the Asset all the
  * same. A save the lifecycle rule refuses is not written, so neither is this.
  */
-export function clearVoidedWipeEvidence(current: GlideRecord, previous: GlideRecord): void {
+export function clearVoidedWipeEvidence(current: ForeignRecord, previous: ForeignRecord): void {
     const to = readStage(current)
     if (to !== null && voidsWipeEvidence(readStage(previous), to)) clearWipeEvidence(current)
 }
@@ -67,7 +67,7 @@ export function clearVoidedWipeEvidence(current: GlideRecord, previous: GlideRec
  * sourcing lock. So is the Order of a unit whose transfer to the staging centre fell through, once it is put back
  * (platform/sourcing `putBackUntransferred`).
  */
-export function onAllocatedAssetStageChange(current: GlideRecord, previous: GlideRecord): void {
+export function onAllocatedAssetStageChange(current: ForeignRecord, previous: ForeignRecord): void {
     const lineId = str(current, 'x_daas_ham_order_line')
     if (!lineId) return
     const from = readStage(previous)
@@ -79,7 +79,7 @@ export function onAllocatedAssetStageChange(current: GlideRecord, previous: Glid
  * After-update rule on alm_hardware stage changes: billing (the Service interval) starts when an Asset
  * enters service and stops when it leaves, on the day billingChange gives (D52, ADR 0009).
  */
-export function onAssetServiceChange(current: GlideRecord, previous: GlideRecord): void {
+export function onAssetServiceChange(current: ForeignRecord, previous: ForeignRecord): void {
     const change = billingChange(readStage(previous), readStage(current), {
         inServiceDate: glideToIsoDate(str(current, 'x_daas_ham_in_service_date')),
         today: todayIso(),

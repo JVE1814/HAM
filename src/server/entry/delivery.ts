@@ -2,6 +2,7 @@ import { gs, type GlideRecord } from '@servicenow/glide'
 import { beingInstalled, mayConfirmInstall } from '../domain/install-confirmation.ts'
 import { completeInstall, completeInstallOfWork, installState, shipOrder } from '../platform/delivery.ts'
 import { workWindowRefusal } from '../platform/field-work.ts'
+import type { ForeignRecord } from '../platform/records.ts'
 import { currentSession } from '../platform/session.ts'
 
 /*
@@ -40,7 +41,7 @@ export function uiConfirmInstalled(current: GlideRecord): void {
 }
 
 /** After-update rule on wm_order closed complete for a NaaS Order (platform/delivery `completeInstallOfWork`). */
-export function onWorkOrderClosed(current: GlideRecord): void {
+export function onWorkOrderClosed(current: ForeignRecord): void {
     completeInstallOfWork(current)
 }
 
@@ -50,11 +51,11 @@ export function onWorkOrderClosed(current: GlideRecord): void {
  * the platform refuses from a scoped app on a record of a global table and saves anyway (as for racks.ts
  * refusesRackPlacement).
  */
-export function refusesWorkWindow(current: GlideRecord): boolean {
+export function refusesWorkWindow(current: ForeignRecord): boolean {
     return workWindowRefusal(current) !== null
 }
 
 /** Script of that rule, run only when its condition refuses the save: why, as the error message. */
-export function explainWorkWindowRefusal(current: GlideRecord): void {
+export function explainWorkWindowRefusal(current: ForeignRecord): void {
     gs.addErrorMessage(workWindowRefusal(current) ?? 'This work order schedule is refused')
 }

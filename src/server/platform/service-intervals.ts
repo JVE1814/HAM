@@ -7,7 +7,7 @@ import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { todayIso } from './clock.ts'
 import { attemptLock, whyNotRun } from './locks.ts'
-import { exists, str, warnRefused } from './records.ts'
+import { exists, str, warnRefused, type ForeignRecord } from './records.ts'
 
 /** Service intervals: the days each Asset delivered a Subscription line (P3.25). */
 
@@ -25,7 +25,7 @@ import { exists, str, warnRefused } from './records.ts'
  * error one the lock kept from opening (the holder had still not opened it when this save gave up, and may have died
  * holding the lock, ADR 0013; or the lock could not be taken, platform/locks `attemptLock`).
  */
-export function openServiceInterval(asset: GlideRecord, lineId: string, startIso: string): void {
+export function openServiceInterval(asset: ForeignRecord, lineId: string, startIso: string): void {
     const assetId = asset.getUniqueValue()
     const why = underIntervalLock(assetId, (lock) => openHolding(lock, asset, lineId, startIso))
     // The holder has normally opened it by now; one that has not may be slow, or have died holding the lock.
@@ -52,13 +52,13 @@ function underIntervalLock(assetId: string, work: (lock: HeldLock) => void): str
  * outlasts the lock (ADR 0013) may overlap the save that took it over and opens the interval too: one that lost it
  * before saving leaves the interval to that save, one that lost it during the save is logged.
  */
-function openHolding(lock: HeldLock, asset: GlideRecord, lineId: string, startIso: string): void {
+function openHolding(lock: HeldLock, asset: ForeignRecord, lineId: string, startIso: string): void {
     if (!hasOpenInterval(asset.getUniqueValue()) && !openInterval(lock, asset, lineId, startIso)) return
     closeHolding(lock, asset.getUniqueValue(), todayIso())
 }
 
 /** Open the interval (see openHolding); false when it is not saved or the lock was lost before saving it. */
-function openInterval(lock: HeldLock, asset: GlideRecord, lineId: string, startIso: string): boolean {
+function openInterval(lock: HeldLock, asset: ForeignRecord, lineId: string, startIso: string): boolean {
     const assetId = asset.getUniqueValue()
     const place = { lineId, siteId: str(asset, 'x_daas_ham_site') }
     const latest = latestClosedInterval(assetId)

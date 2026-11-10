@@ -15,7 +15,7 @@ import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { EVENT, fire } from './events.ts'
 import { saveLineStage } from './order-lines.ts'
-import { exists, findById, num, str, warnRefused } from './records.ts'
+import { exists, findById, num, str, warnRefused, type ForeignRecord } from './records.ts'
 import { takeOffOrderLine } from './stock.ts'
 
 /**
@@ -111,7 +111,7 @@ export function lineLostUnit(lineId: string): void {
  * receipt counting the reopened line never counts it (each counts only a line awaiting stock). The sourcing is queued,
  * not run in this save, whose own after rule takes the Asset's service-interval lock (ADR 0013).
  */
-export function onLineAssetMoved(asset: GlideRecord, lineId: string, from: Stage | null, to: Stage | null): void {
+export function onLineAssetMoved(asset: ForeignRecord, lineId: string, from: Stage | null, to: Stage | null): void {
     // Read past the user's rules: unlike a derived stage, a line not filled again now never is.
     const line = leftInTransit(from, to) ? findById('x_daas_ham_order_line', lineId, { beyondVisibility: true }) : null
     if (!line) return recomputeLine(lineId)

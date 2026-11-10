@@ -4,7 +4,7 @@ import { createMarks } from '../domain/marks.ts'
 import type { TransferResult } from '../domain/sourcing.ts'
 import { moveAsset, moveRefusal, readStage } from './assets.ts'
 import { PROPERTY, stagingStockroom, stringProperty } from './properties.ts'
-import { bool, deleteWhere, refusal, str } from './records.ts'
+import { bool, deleteWhere, refusal, str, type ForeignRecord } from './records.ts'
 import { hasOpenStagingTask } from './staging-tasks.ts'
 
 /**
@@ -91,7 +91,7 @@ function withdrawing<R>(assets: readonly GlideRecord[], remove: () => R): R {
  * onto a line and clears with In stock / Available when the line is received, cancelled or deleted, in the same save.
  * The flag, not a query of the lines: on a line's insert the Asset is saved before the line is written.
  */
-export function onTransferOrderLine(asset: GlideRecord): boolean {
+export function onTransferOrderLine(asset: ForeignRecord): boolean {
     return bool(asset, 'active_to')
 }
 
@@ -104,7 +104,7 @@ export function onTransferOrderLine(asset: GlideRecord): boolean {
  * it is: one putting the Asset onto a line, or one leaving it in transfer with the flag cleared (its line received
  * after its last task was closed skipped), for its stage to be set by hand. A stage the lifecycle refuses is logged.
  */
-export function takeBackStageAfterTransfer(asset: GlideRecord, before: GlideRecord): void {
+export function takeBackStageAfterTransfer(asset: ForeignRecord, before: ForeignRecord): void {
     const now = readStage(asset)
     const released = readStage(before) === 'in_transfer' && now !== 'in_transfer' && !onTransferOrderLine(asset)
     if (!released) return
@@ -119,7 +119,7 @@ export function takeBackStageAfterTransfer(asset: GlideRecord, before: GlideReco
  * What the Asset Inventory let go carries, and where it was left (domain/lifecycle `TransferContext`): what tells the
  * stage it left (`stageAfterTransfer`) and whether its transfer fell through (`transferFellThrough`).
  */
-export function transferContext(asset: GlideRecord): TransferContext {
+export function transferContext(asset: ForeignRecord): TransferContext {
     const company = str(asset, 'company')
     const staging = stagingStockroom()
     return {
@@ -136,6 +136,6 @@ export function transferContext(asset: GlideRecord): TransferContext {
  * cancelled or deleted (domain/lifecycle `transferFellThrough`): read once the save that let it go is made, from the
  * Asset as saved.
  */
-export function fellShortOfStagingCentre(asset: GlideRecord): boolean {
+export function fellShortOfStagingCentre(asset: ForeignRecord): boolean {
     return !onTransferOrderLine(asset) && transferFellThrough(transferContext(asset))
 }

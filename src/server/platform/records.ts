@@ -112,6 +112,17 @@ export function countBy(table: string, encodedQuery: string, field: string): Map
     return counts
 }
 
+/**
+ * A record of a table of another scope (alm_hardware, wm_order, a platform table) as a business rule there is handed
+ * it. From this scope the platform refuses setAbortAction and setWorkflow on such a record and goes on as if neither
+ * was called: the save is written, the rules run (rule-api `abortWith`, platform/beyond-visibility). The type leaves
+ * both out, so a rule there, and every helper it hands its record to, fails to compile when it calls one. Any
+ * GlideRecord is one. (Spelled out key by key: `Omit` on a GlideRecord keeps its field index only, and no method.)
+ */
+export type ForeignRecord = {
+    [Key in keyof GlideRecord as string extends Key ? never : number extends Key ? never : Key extends 'setAbortAction' | 'setWorkflow' ? never : Key]: GlideRecord[Key]
+}
+
 /** Why the platform refused to save (or delete) `record`: its last error message, or `fallback` when it gave none. */
 export function refusal(record: GlideRecord, fallback = 'the save was refused'): string {
     return record.getLastErrorMessage() || fallback
@@ -141,13 +152,13 @@ export function throwRefused(record: GlideRecord, undone: string): never {
  * crosses an empty reference (and which is null itself for an unknown field). Not for a GlideAggregate: scoped scripts
  * may not call its getElement, and its getValue does give a dotted group-by.
  */
-function valueOf(gr: GlideRecord, field: string): string | null {
+function valueOf(gr: ForeignRecord, field: string): string | null {
     if (!field.includes('.')) return gr.getValue(field)
     const element: GlideElement | null = gr.getElement(field)
     return element ? element.getValue() : null
 }
 
-export function str(gr: GlideRecord, field: string): string {
+export function str(gr: ForeignRecord, field: string): string {
     const value = valueOf(gr, field)
     return value === null || value === undefined ? '' : String(value)
 }
@@ -160,12 +171,12 @@ export function choice<Value extends string>(gr: GlideRecord, field: string): Va
     return str(gr, field) as Value | ''
 }
 
-export function num(gr: GlideRecord, field: string): number {
+export function num(gr: ForeignRecord, field: string): number {
     const value = Number(valueOf(gr, field))
     return Number.isFinite(value) ? value : 0
 }
 
-export function bool(gr: GlideRecord, field: string): boolean {
+export function bool(gr: ForeignRecord, field: string): boolean {
     const value = valueOf(gr, field)
     return value === '1' || value === 'true' || value === (true as unknown)
 }

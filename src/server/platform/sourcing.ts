@@ -28,7 +28,7 @@ import { saveLineSourcing } from './order-lines.ts'
 import { openOemRma, openRmaCount, openRmasFor, reuseOemRma } from './oem-rma.ts'
 import { requestPurchase } from './procurement.ts'
 import { stagingStockroom } from './properties.ts'
-import { findById, num, str, warnRefused } from './records.ts'
+import { findById, num, str, warnRefused, type ForeignRecord } from './records.ts'
 import { openStagingTask, skipOpenStagingTasks, startStaging } from './staging-tasks.ts'
 import { linkHotSpare, releaseToProviderStock, reserveAsset, stockCandidates, takeOffOrderLine } from './stock.ts'
 import { requestTransfer } from './transfers.ts'
@@ -336,7 +336,7 @@ function unreserve(asset: GlideRecord, source: Source, why = 'no transfer order'
  * new transfer order for the same unit (platform/fulfilment `lineLostUnit`). Logged. A unit the platform refuses to
  * put back stays reserved for its line (logged), which is then not sourced again.
  */
-export function putBackUntransferred(current: GlideRecord, lineId: string): void {
+export function putBackUntransferred(current: ForeignRecord, lineId: string): void {
     const where = current.getDisplayValue('stockroom')
     const what = `${str(current, 'serial_number')} left its transfer to the staging centre in ${where}`
     // A fresh record, read past the user's rules: saving `current` again from its own after rule would run its rules

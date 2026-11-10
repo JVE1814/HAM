@@ -3,7 +3,7 @@ import { todayIso } from '../platform/clock.ts'
 import { queueRefresh, runRefreshPass } from '../platform/lifecycle-dates.ts'
 import { queueModelRefresh, queueModelsReachingMilestone, writingModelLifecycle } from '../platform/model-lifecycle.ts'
 import { normalizeNaasRawModels, resolveNormalizationException } from '../platform/normalization.ts'
-import { str } from '../platform/records.ts'
+import { str, type ForeignRecord } from '../platform/records.ts'
 
 /** Model normalization and Lifecycle phase / Refresh due date upkeep (P1.2), for fleet assets only (ADR 0016). */
 
@@ -28,7 +28,7 @@ export function onNormalizationResolved(current: GlideRecord): void {
  * and of the Model it left when the row moved to another. A save the app's own write makes is left to that write,
  * which queues the pass once for all the milestones it saves.
  */
-export function onModelLifecycleChanged(current: GlideRecord, previous: GlideRecord | null): void {
+export function onModelLifecycleChanged(current: ForeignRecord, previous: ForeignRecord | null): void {
     const modelIds = new Set([str(current, 'model'), previous ? str(previous, 'model') : ''])
     for (const modelId of modelIds) {
         if (modelId && !writingModelLifecycle(modelId)) queueModelRefresh(modelId)

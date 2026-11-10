@@ -1,8 +1,9 @@
-import { gs, type GlideRecord } from '@servicenow/glide'
+import { gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import type { RackList, SiteList } from '../domain/rest-contracts.ts'
 import { keepsPlacement, placementRefusal, rackElevation, racksAtSite, recheckFlaggedRacks, recheckRacksOf, visibleSites } from '../platform/racks.ts'
 import { reconcileInstalledBase } from '../platform/reconciliation.ts'
+import type { ForeignRecord } from '../platform/records.ts'
 import { pathParam, queryParam, reply } from '../platform/rest-api.ts'
 import { currentSession } from '../platform/session.ts'
 
@@ -14,7 +15,7 @@ import { currentSession } from '../platform/session.ts'
  * record of a global table ("Security restricted" in the script's output, nothing in the system log) and writes the
  * record anyway.
  */
-export function refusesRackPlacement(current: GlideRecord, previous: GlideRecord | null): boolean {
+export function refusesRackPlacement(current: ForeignRecord, previous: ForeignRecord | null): boolean {
     return placementRefusal(current, previous) !== null
 }
 
@@ -26,7 +27,7 @@ export function refusesRackPlacement(current: GlideRecord, previous: GlideRecord
  * save that also sets the placement (an insert, or a new rack, lowest unit or face) is br_rack_placement's, which
  * checks it with the new Model and the flag as saved, so each save is checked, and refused with its message, once.
  */
-export function refusesKeptPlacement(current: GlideRecord, previous: GlideRecord | null): boolean {
+export function refusesKeptPlacement(current: ForeignRecord, previous: ForeignRecord | null): boolean {
     return keepsPlacement(current, previous) && refusesRackPlacement(current, previous)
 }
 
@@ -34,7 +35,7 @@ export function refusesKeptPlacement(current: GlideRecord, previous: GlideRecord
  * Script of those rules, run only when a condition refuses the save: why, as the error message. The condition's
  * answer does not reach the script, so the placement is checked again for its reason.
  */
-export function explainRackRefusal(current: GlideRecord, previous: GlideRecord | null): void {
+export function explainRackRefusal(current: ForeignRecord, previous: ForeignRecord | null): void {
     gs.addErrorMessage(placementRefusal(current, previous) ?? 'This rack placement is refused')
 }
 
@@ -44,7 +45,7 @@ export function explainRackRefusal(current: GlideRecord, previous: GlideRecord |
  * rack's power) at the same moment can both pass it. Each after rule runs once its own save is written, so the later
  * of the two reads both and raises the exception; a later save that clears it resolves it.
  */
-export function recheckRackPlacement(current: GlideRecord, previous: GlideRecord): void {
+export function recheckRackPlacement(current: ForeignRecord, previous: ForeignRecord): void {
     recheckRacksOf(current, previous)
 }
 
