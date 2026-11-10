@@ -1,3 +1,4 @@
+import { PROVIDER_STOCKROOM_TYPES } from './fleet.ts'
 import type { Stage } from './lifecycle.ts'
 import type { LineStage, StockroomType } from './vocabulary.ts'
 
@@ -13,12 +14,12 @@ export function awaitsReceipt(stage: Stage | null): boolean {
 }
 
 /**
- * Stockroom types arriving units (bought or returned) are received into: the Provider's central depots and staging
- * centres. A customer-site stockroom holds that Customer's own site stock: a bought unit received there would be
- * sourced only for that Customer's replacements, as a hot spare that skips staging, and a returned unit would await
+ * Stockroom types arriving units (bought or returned) are received into: the Provider's own, its central depots and
+ * staging centres. A customer-site stockroom holds that Customer's own site stock: a bought unit received there would
+ * be sourced only for that Customer's replacements, as a hot spare that skips staging, and a returned unit would await
  * evaluation away from the depot.
  */
-export const RECEIVING_STOCKROOM_TYPES: readonly StockroomType[] = ['central_depot', 'staging_centre']
+export const RECEIVING_STOCKROOM_TYPES = PROVIDER_STOCKROOM_TYPES
 
 /** Why an arriving unit cannot be received into a Stockroom of this type, or null when it can. */
 export function receivingProblem(into: StockroomType): string | null {

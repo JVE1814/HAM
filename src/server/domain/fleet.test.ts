@@ -18,6 +18,8 @@ import {
     naasStockroomCondition,
     naasStockroomType,
     outsideFleetCondition,
+    PROVIDER_STOCKROOM_TYPES,
+    providerStockroomCondition,
     receiptProblem,
     SITE_CONDITION,
     SITES_OF_CUSTOMER_QUERY,
@@ -116,6 +118,11 @@ describe('NaaS stockrooms', () => {
             'stockroom.x_daas_ham_stockroom_typeINcentral_depot,staging_centre,customer_site',
         )
         expect(NAAS_STOCKROOM_TYPES).not.toContain('')
+    })
+
+    it("are the Provider's own, its central depots and staging centres, or a Customer's site stockroom", () => {
+        expect([...PROVIDER_STOCKROOM_TYPES, 'customer_site'].sort()).toEqual([...NAAS_STOCKROOM_TYPES].sort())
+        expect(providerStockroomCondition('stockroom.')).toBe('stockroom.x_daas_ham_stockroom_typeINcentral_depot,staging_centre')
     })
 })
 

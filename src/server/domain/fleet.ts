@@ -99,6 +99,18 @@ export function naasStockroomCondition(via = ''): string {
     return `${via}${NAAS_STOCKROOM_CONDITION}`
 }
 
+/**
+ * The Provider's own NaaS stockrooms, by type: its central depots and staging centres, which hold its free stock and
+ * the Spare pools and take in arriving units. The one other NaaS type, a customer-site stockroom, holds that Customer's
+ * site stock at a Site.
+ */
+export const PROVIDER_STOCKROOM_TYPES: readonly StockroomType[] = [STOCKROOM_TYPE.central_depot, STOCKROOM_TYPE.staging_centre]
+
+/** Encoded condition matching the Provider's own NaaS stockrooms (through `via`, e.g. `stockroom.` from an Asset). */
+export function providerStockroomCondition(via = ''): string {
+    return `${via}${STOCKROOM_TYPE_FIELD}IN${PROVIDER_STOCKROOM_TYPES.join(',')}`
+}
+
 /** The Model field that holds its OEM PID (cmdb_model.x_daas_ham_oem_pid). */
 export const OEM_PID_FIELD = 'x_daas_ham_oem_pid'
 

@@ -1,5 +1,5 @@
 import { OPEN_LINE_STAGES, UNFULFILLED_ORDER_STAGES } from './fulfilment.ts'
-import { fleetStagesQuery, naasStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
+import { fleetStagesQuery, providerStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
 import { STOCK_STAGES, type Stage } from './lifecycle.ts'
 import { shortfallRoute, type ShortfallRoute } from './returns.ts'
 import {
@@ -9,6 +9,7 @@ import {
     type OrderType,
     RMA_STATE,
     type RmaState,
+    STOCKROOM_TYPE,
 } from './vocabulary.ts'
 
 /**
@@ -189,10 +190,8 @@ export interface SourceQuery {
  */
 export function stockQueries(scope: StockScope): SourceQuery[] {
     const base = `model=${scope.modelId}^x_daas_ham_order_lineISEMPTY^${NOT_LESSOR_BOUND}`
-    const type = `stockroom.${STOCKROOM_TYPE_FIELD}`
-    // A NaaS stockroom type rules out a blank one, so != needs no ISEMPTY beside it.
-    const provider = `${base}^${naasStockroomCondition('stockroom.')}^${type}!=customer_site`
-    const customerSite = `${base}^${type}=customer_site^stockroom.x_daas_ham_customer=${scope.customerId}`
+    const provider = `${base}^${providerStockroomCondition('stockroom.')}`
+    const customerSite = `${base}^stockroom.${STOCKROOM_TYPE_FIELD}=${STOCKROOM_TYPE.customer_site}^stockroom.x_daas_ham_customer=${scope.customerId}`
     const atSite = `stockroom.location=${scope.siteId}^ORstockroom.location.parent=${scope.siteId}`
     const bySource: Record<Source, string> = {
         customer_site_stock: fleetStagesQuery(STOCK_STAGES, `${customerSite}^${atSite}`),

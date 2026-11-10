@@ -112,7 +112,7 @@ describe('stockQueries', () => {
     const lease = 'x_daas_ham_lease.end_action'
     const base = `model=m1^x_daas_ham_order_lineISEMPTY^${lease}!=return^OR${lease}ISEMPTY`
     const type = 'stockroom.x_daas_ham_stockroom_type'
-    const provider = `${base}^${type}INcentral_depot,staging_centre,customer_site^${type}!=customer_site`
+    const provider = `${base}^${type}INcentral_depot,staging_centre`
     const fleet = (query: string) => andEachClause(query, 'x_daas_ham_fleet=true')
     const free = fleet(stagesQuery(['available'], provider))
     const pool = fleet(stagesQuery(['spare_pool'], `${provider}^company=acme`))
@@ -154,10 +154,10 @@ describe('stockQueries', () => {
         }
     })
 
-    it('never counts stock in a stockroom with no NaaS stockroom type as central stock or spares', () => {
+    it("counts stock in the Provider's own NaaS stockrooms only as central stock or spares: no other type, nor none", () => {
         const [pooled, central] = queries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose: 'new' })
         for (const clause of [...pooled.split('^NQ'), ...central.split('^NQ')]) {
-            expect(clause).toContain(`^${type}INcentral_depot,staging_centre,customer_site^`)
+            expect(clause.split('^')).toContain(`${type}INcentral_depot,staging_centre`)
             expect(clause).not.toContain(`${type}ISEMPTY`)
         }
     })
