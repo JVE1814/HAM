@@ -27,20 +27,18 @@ import {
     stillToBuy,
     type StockCandidate,
     stockQueries,
+    type StockScope,
     type StockUnit,
 } from './sourcing'
 
-const depot = { stockroomId: 'depot', stockroomType: 'central_depot', siteId: '' } as const
-const lab = { stockroomId: 'lab', stockroomType: 'staging_centre', siteId: '' } as const
-const hqSpares = { stockroomId: 'acme-hq', stockroomType: 'customer_site', siteId: 'hq' } as const
+/** What the queries for a replacement for Acme at its HQ Site find, each unit under the Source of its query. */
 const stock: StockCandidate[] = [
-    { assetId: 'central-1', modelId: 'c9300', stage: 'available', ...depot, reservedFor: '' },
-    { assetId: 'central-2', modelId: 'c9300', stage: 'available', ...depot, reservedFor: '' },
-    { assetId: 'pool-1', modelId: 'c9300', stage: 'spare_pool', ...depot, reservedFor: 'acme' },
-    { assetId: 'site-1', modelId: 'c9300', stage: 'spare_pool', ...hqSpares, reservedFor: 'acme' },
-    { assetId: 'other-pool', modelId: 'c9300', stage: 'spare_pool', ...depot, reservedFor: 'globex' },
-    { assetId: 'staging-1', modelId: 'c9300', stage: 'available', ...lab, reservedFor: '' },
-    { assetId: 'ap-1', modelId: 'mr46', stage: 'available', ...depot, reservedFor: '' },
+    { assetId: 'central-1', modelId: 'c9300', stockroomId: 'depot', source: 'central_stock' },
+    { assetId: 'central-2', modelId: 'c9300', stockroomId: 'depot', source: 'central_stock' },
+    { assetId: 'pool-1', modelId: 'c9300', stockroomId: 'depot', source: 'spare_pool' },
+    { assetId: 'site-1', modelId: 'c9300', stockroomId: 'acme-hq', source: 'customer_site_stock' },
+    { assetId: 'staging-1', modelId: 'c9300', stockroomId: 'lab', source: 'central_stock' },
+    { assetId: 'ap-1', modelId: 'mr46', stockroomId: 'depot', source: 'central_stock' },
 ]
 
 /** A request for Acme at its HQ Site. */
@@ -71,16 +69,12 @@ describe('planSourcing', () => {
         expect(plan.toPurchase).toBe(0)
     })
 
-    it("does not install a hot spare at another of the Customer's Sites in place", () => {
-        const atStore = { ...acme({ modelId: 'c9300', quantity: 2, purpose: 'replace' }), siteId: 'store-42' }
-        const plan = planSourcing(atStore, stock)
-        expect(plan.picks).toEqual([
-            { assetId: 'pool-1', source: 'spare_pool' },
-            { assetId: 'central-1', source: 'central_stock' },
-        ])
+    it('leaves a hot spare where it is for a new install: site stock serves replacements only', () => {
+        const plan = planSourcing(acme({ modelId: 'c9300', quantity: 5, purpose: 'new' }), stock)
+        expect(plan.picks.map((p) => p.assetId)).not.toContain('site-1')
     })
 
-    it("never takes another customer's spares or another model", () => {
+    it('never takes another Model', () => {
         const plan = planSourcing(acme({ modelId: 'mr46', quantity: 2, purpose: 'new' }), stock)
         expect(plan.picks.map((p) => p.assetId)).toEqual(['ap-1'])
         expect(plan.toPurchase).toBe(1)
@@ -122,33 +116,46 @@ describe('stockQueries', () => {
     const fleet = (query: string) => andEachClause(query, 'x_daas_ham_fleet=true')
     const free = fleet(stagesQuery(['available'], provider))
     const pool = fleet(stagesQuery(['spare_pool'], `${provider}^company=acme`))
+    const queries = (scope: StockScope) => stockQueries(scope).map((found) => found.query)
 
     it("asks for the Customer's own stock and free stock only, one query per source in priority order", () => {
-        expect(stockQueries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose: 'new' })).toEqual([pool, free])
+        expect(stockQueries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose: 'new' })).toEqual([
+            { source: 'spare_pool', query: pool },
+            { source: 'central_stock', query: free },
+        ])
     })
 
     it("adds the Customer's site stockroom stock at the Site or one of its Rooms for a replacement, first", () => {
         const [site, ...rest] = stockQueries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose: 'replace' })
-        expect(rest).toEqual([pool, free])
+        expect(rest.map((found) => found.query)).toEqual([pool, free])
         const siteStockroom = 'stockroom.x_daas_ham_stockroom_type=customer_site^stockroom.x_daas_ham_customer=acme'
         const atSite = 'stockroom.location=hq^ORstockroom.location.parent=hq'
-        expect(site).toBe(fleet(stagesQuery(['available', 'spare_pool'], `${base}^${siteStockroom}^${atSite}`)))
+        expect(site.source).toBe('customer_site_stock')
+        expect(site.query).toBe(fleet(stagesQuery(['available', 'spare_pool'], `${base}^${siteStockroom}^${atSite}`)))
+    })
+
+    it("finds no hot spare at another of the Customer's Sites, nor another Customer's spares, in any clause", () => {
+        const [site, pooled] = queries({ modelId: 'm1', customerId: 'acme', siteId: 'store-42', purpose: 'replace' })
+        for (const clause of site.split('^NQ')) {
+            expect(clause).toContain('^stockroom.x_daas_ham_customer=acme^stockroom.location=store-42^ORstockroom.location.parent=store-42')
+        }
+        for (const clause of pooled.split('^NQ')) expect(clause.split('^')).toContain('company=acme')
     })
 
     it('asks for free stock only when stock is sought for no Customer (the spare-pool top-up)', () => {
-        expect(stockQueries(freeStockOf('m1'))).toEqual([free])
+        expect(stockQueries(freeStockOf('m1'))).toEqual([{ source: 'central_stock', query: free }])
     })
 
     it('asks for fleet assets only, in every clause of every query (ADR 0016)', () => {
         for (const purpose of ['new', 'replace'] as const) {
-            for (const query of stockQueries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose })) {
+            for (const query of queries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose })) {
                 for (const clause of query.split('^NQ')) expect(clause.split('^')).toContain('x_daas_ham_fleet=true')
             }
         }
     })
 
     it('never counts stock in a stockroom with no NaaS stockroom type as central stock or spares', () => {
-        const [pooled, central] = stockQueries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose: 'new' })
+        const [pooled, central] = queries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose: 'new' })
         for (const clause of [...pooled.split('^NQ'), ...central.split('^NQ')]) {
             expect(clause).toContain(`^${type}INcentral_depot,staging_centre,customer_site^`)
             expect(clause).not.toContain(`${type}ISEMPTY`)
@@ -157,7 +164,7 @@ describe('stockQueries', () => {
 
     it('leaves stock of a lease being returned to its Lessor out of every clause of every query', () => {
         for (const purpose of ['new', 'replace'] as const) {
-            for (const query of stockQueries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose })) {
+            for (const query of queries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose })) {
                 for (const clause of query.split('^NQ')) expect(clause).toContain(`^${lease}!=return^OR${lease}ISEMPTY`)
             }
         }
@@ -306,7 +313,7 @@ describe('reservedSparesQuery', () => {
         const pool = andEachClause(stagesQuery(['spare_pool'], `company=acme^${notLessorBound}`), 'x_daas_ham_fleet=true')
         expect(clauses).toEqual(expect.arrayContaining(pool.split('^NQ')))
         const [poolStock] = stockQueries({ modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose: 'new' })
-        expect(poolStock).toContain(`^${notLessorBound}`)
+        expect(poolStock.query).toContain(`^${notLessorBound}`)
     })
 
     it("counts the Customer's units in transfer on no Order line, which go back to the pool, in both of its combinations", () => {

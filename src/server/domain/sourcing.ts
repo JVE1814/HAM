@@ -9,7 +9,6 @@ import {
     type OrderType,
     RMA_STATE,
     type RmaState,
-    type StockroomType,
 } from './vocabulary.ts'
 
 /**
@@ -22,16 +21,12 @@ import {
 
 export type Source = 'customer_site_stock' | 'spare_pool' | 'central_stock'
 
+/** Stock that may serve a request, under the Source whose query found it (`stockQueries`). */
 export interface StockCandidate {
     assetId: string
     modelId: string
-    stage: 'available' | 'spare_pool'
     stockroomId: string
-    stockroomType: StockroomType
-    /** Customer the Asset is reserved for (spare pool) or whose site stockroom holds it; '' if free stock. */
-    reservedFor: string
-    /** The Site a customer-site stockroom stands at; '' for the Provider's own stockrooms. */
-    siteId: string
+    source: Source
 }
 
 export interface SourcingRequest {
@@ -47,19 +42,6 @@ export interface SourcingPlan {
     picks: Array<{ assetId: string; source: Source }>
     toPurchase: number
     summary: string
-}
-
-/** Who stock is sought for: a line's Customer and Site, or no one (customerId '') for free stock only. */
-type Seeker = Pick<SourcingRequest, 'customerId' | 'siteId'>
-
-function sourceOf(candidate: StockCandidate, seeker: Seeker): Source | null {
-    if (candidate.stockroomType === 'customer_site') {
-        // A spare at another of the Customer's Sites is not shipped from there: it is no hot spare for this Site.
-        const here = candidate.reservedFor === seeker.customerId && candidate.siteId === seeker.siteId
-        return here ? 'customer_site_stock' : null
-    }
-    if (candidate.stage === 'spare_pool') return candidate.reservedFor === seeker.customerId ? 'spare_pool' : null
-    return candidate.reservedFor === '' ? 'central_stock' : null
 }
 
 const PRIORITY: Record<SourcingRequest['purpose'], readonly Source[]> = {
@@ -189,16 +171,23 @@ export function isClaimable(unit: StockUnit, from: readonly Stage[]): boolean {
     return isFree(unit, from) && unit.leaseEndAction !== RETURNING
 }
 
+/** The stock of one Source that may serve a request, as an encoded alm_hardware query. */
+export interface SourceQuery {
+    source: Source
+    query: string
+}
+
 /**
  * Encoded alm_hardware queries for the stock that may serve `scope`, one per Source in priority order, so a limit on
  * each cuts within its Source only and other Customers' spares never crowd it out: the Customer's site stockroom
- * stock at the Site or one of its Rooms (replacements), its Spare pool, and free stock in the Provider's NaaS
- * stockrooms (central depots and staging centres). Only fleet assets in NaaS stockrooms are stock (ADR 0016): every
- * clause carries the Fleet flag, and stock in a stockroom with no NaaS stockroom type, or in none, is the Provider
- * IT's. Stock on an Order line or bound for its Lessor (`isClaimable`) is never a candidate. `sourceOf` still decides
- * each one.
+ * stock at the Site or one of its Rooms (replacements; a spare at another of its Sites is not shipped from there, so
+ * it is no hot spare for this one), its Spare pool, and free stock in the Provider's NaaS stockrooms (central depots
+ * and staging centres). Only fleet assets in NaaS stockrooms are stock (ADR 0016): every clause carries the Fleet
+ * flag, and stock in a stockroom with no NaaS stockroom type, or in none, is the Provider IT's. Stock on an Order line
+ * or bound for its Lessor (`isClaimable`) is never a candidate. What a query finds is stock of its Source: nothing
+ * else says what a Source is.
  */
-export function stockQueries(scope: StockScope): string[] {
+export function stockQueries(scope: StockScope): SourceQuery[] {
     const base = `model=${scope.modelId}^x_daas_ham_order_lineISEMPTY^${NOT_LESSOR_BOUND}`
     const type = `stockroom.${STOCKROOM_TYPE_FIELD}`
     // A NaaS stockroom type rules out a blank one, so != needs no ISEMPTY beside it.
@@ -211,7 +200,7 @@ export function stockQueries(scope: StockScope): string[] {
         central_stock: fleetStagesQuery(['available'], provider),
     }
     const sources: readonly Source[] = scope.customerId ? PRIORITY[scope.purpose] : ['central_stock']
-    return sources.map((source) => bySource[source])
+    return sources.map((source) => ({ source, query: bySource[source] }))
 }
 
 const LABEL: Record<Source, string> = {
@@ -224,7 +213,7 @@ export function planSourcing(request: SourcingRequest, stock: readonly StockCand
     const picks: SourcingPlan['picks'] = []
     for (const source of PRIORITY[request.purpose]) {
         const matching = stock
-            .filter((c) => c.modelId === request.modelId && sourceOf(c, request) === source)
+            .filter((c) => c.modelId === request.modelId && c.source === source)
             .sort((a, b) => a.stockroomId.localeCompare(b.stockroomId) || a.assetId.localeCompare(b.assetId))
         for (const candidate of matching) {
             if (picks.length === request.quantity) break
@@ -383,7 +372,7 @@ export function sparePoolShortfall(input: { deployed: number; reserved: number; 
 /** Free central stock of a model to move into a Customer's Spare pool (top-up). */
 export function pickForSparePool(stock: readonly StockCandidate[], modelId: string, count: number): string[] {
     return stock
-        .filter((c) => c.modelId === modelId && sourceOf(c, freeStockOf(modelId)) === 'central_stock')
+        .filter((c) => c.modelId === modelId && c.source === 'central_stock')
         .sort((a, b) => a.stockroomId.localeCompare(b.stockroomId) || a.assetId.localeCompare(b.assetId))
         .slice(0, Math.max(0, count))
         .map((c) => c.assetId)

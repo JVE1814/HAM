@@ -1,6 +1,5 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { messageOf } from '../domain/errors.ts'
-import { naasStockroomType, SITE_FIELD, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import { LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import type { Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
@@ -15,20 +14,20 @@ import {
 import { moveAsset, readStage } from './assets.ts'
 import { attemptLock, type LockRun } from './locks.ts'
 import { PROPERTY, stringProperty } from './properties.ts'
-import { bool, str } from './records.ts'
+import { str } from './records.ts'
 import { STOCK_STAGES } from '../domain/lifecycle.ts'
 
 /** Stock that can serve an Order line, claiming it for one, giving it back, and changing it where a claim could race. */
 
 /**
- * Stock on no Order line that may serve `scope` (domain/sourcing `stockQueries`) for a `shortfall`: a bounded number
- * per Source (`candidateLimit`), by stockroom then sys_id so the limit cuts the same way each run. A hot spare linked
- * to a line stays in the pool but is taken.
+ * Stock on no Order line that may serve `scope` for a `shortfall`, each unit under the Source whose query found it
+ * (domain/sourcing `stockQueries`): a bounded number per Source (`candidateLimit`), by stockroom then sys_id so the
+ * limit cuts the same way each run. A hot spare linked to a line stays in the pool but is taken.
  */
 export function stockCandidates(scope: StockScope, shortfall: number): StockCandidate[] {
     const limit = candidateLimit(shortfall)
     const candidates: StockCandidate[] = []
-    for (const query of stockQueries(scope)) {
+    for (const { source, query } of stockQueries(scope)) {
         const asset = new GlideRecord('alm_hardware')
         asset.addEncodedQuery(query)
         asset.orderBy('stockroom')
@@ -36,39 +35,10 @@ export function stockCandidates(scope: StockScope, shortfall: number): StockCand
         asset.setLimit(limit)
         asset.query()
         while (asset.next()) {
-            const candidate = candidateOf(asset, scope.modelId)
-            if (candidate) candidates.push(candidate)
+            candidates.push({ assetId: asset.getUniqueValue(), modelId: scope.modelId, stockroomId: str(asset, 'stockroom'), source })
         }
     }
     return candidates
-}
-
-/**
- * The Asset as sourcing weighs it, or null when it is no stock: not available or in a spare pool, or in a stockroom
- * with no NaaS stockroom type (ADR 0016), which the queries leave out too.
- */
-function candidateOf(asset: GlideRecord, modelId: string): StockCandidate | null {
-    const stage = readStage(asset)
-    if (stage !== 'available' && stage !== 'spare_pool') return null
-    const stockroomType = naasStockroomType(str(asset, `stockroom.${STOCKROOM_TYPE_FIELD}`))
-    if (!stockroomType) return null
-    const atCustomerSite = stockroomType === 'customer_site'
-    const pooledFor = stage === 'spare_pool' ? str(asset, 'company') : ''
-    return {
-        assetId: asset.getUniqueValue(),
-        modelId,
-        stage,
-        stockroomId: str(asset, 'stockroom'),
-        stockroomType,
-        reservedFor: atCustomerSite ? str(asset, 'stockroom.x_daas_ham_customer') : pooledFor,
-        siteId: atCustomerSite ? stockroomSite(asset) : '',
-    }
-}
-
-/** The Site the Asset's stockroom stands at: its location when that is a Site, else the Site of the Room it is in. */
-function stockroomSite(asset: GlideRecord): string {
-    const location = str(asset, 'stockroom.location')
-    return bool(asset, `stockroom.location.${SITE_FIELD}`) ? location : str(asset, 'stockroom.location.parent')
 }
 
 export interface Reservation {
