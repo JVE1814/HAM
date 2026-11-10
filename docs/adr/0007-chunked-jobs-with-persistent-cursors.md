@@ -55,10 +55,11 @@ reached the end with no record failed; otherwise *complete with N failed record(
 (time budget)* followed by *N failed record(s) so far*. An event-driven job keeps its failures where
 its outcome is kept, through its `flush` (the billing period's failed lines, the margin period's
 failure count). The lifecycle recalculation and the buyout transfer have no flush, and keep them
-only in the log. A superseding pass (ADR 0013) marks its job cursor *running* as it starts and
-*complete* once its last chunk is written. A completion the platform refuses is logged rather than
-thrown, since the pass's own completion is already written, and the cursor reads *running* with an
-old last run, as a stalled pass would, until the next pass starts.
+only in the log. A pass the runner starts under the job's lock (the margin recompute, ADR 0013)
+marks its job cursor *running* as it starts and *complete* once its last chunk is written. A
+completion the platform refuses is logged rather than thrown, since the pass's own completion is
+already written, and the cursor reads *running* with an old last run, as a stalled pass would,
+until the next pass starts.
 
 A run whose first insert of the cursor record loses to another run doing the same (the unique index
 on job) goes on from that run's record. When there is still no record, a scheduled job does not run
