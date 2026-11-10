@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { attestationDue, closedLineResult, compareAudit, onTheShelfQuery } from './audit'
-import { fleetCondition } from './fleet'
+import { ALL_STAGES, type Stage } from './lifecycle'
+import { recordMatches as matches } from '../test-support/encoded-query'
+import { assetIn, type SampleRecord } from '../test-support/stored-asset'
 
 describe('compareAudit', () => {
     const expected = [
@@ -48,18 +50,24 @@ describe('closedLineResult', () => {
 })
 
 describe('onTheShelfQuery', () => {
-    const clauses = onTheShelfQuery('sr1').split('^NQ')
+    const query = onTheShelfQuery('sr1')
+    /** A fleet asset in stockroom sr1, in `stage`. */
+    const unit = (stage: Stage, fields: SampleRecord = {}) => assetIn(stage, { x_daas_ham_fleet: 'true', stockroom: 'sr1', ...fields })
+    const expected = (fields: SampleRecord = {}) => ALL_STAGES.filter((stage) => matches(query, unit(stage, fields)))
 
-    it('keeps every stage to fleet assets In stock in the stockroom', () => {
-        expect(clauses.length).toBeGreaterThan(1)
-        for (const clause of clauses) {
-            expect(clause).toContain('stockroom=sr1')
-            expect(clause).toContain('install_status=6')
-            expect(clause).toContain(fleetCondition())
-        }
+    it('expects the fleet assets In stock in the stockroom, whatever they wait for there, and no unit in another stage', () => {
+        expect(expected()).toEqual(['available', 'reserved', 'spare_pool', 'staging', 'staged', 'in_transfer', 'pending_evaluation', 'pending_wipe', 'pending_disposal'])
     })
 
-    it('counts a unit pending transfer, still on the shelf it is sent from', () => {
-        expect(clauses.some((clause) => clause.includes('substatus=pending_transfer'))).toBe(true)
+    it("expects no unit of another stockroom, and none of the Provider IT's (ADR 0016)", () => {
+        expect(expected({ stockroom: 'sr2' })).toEqual([])
+        expect(expected({ stockroom: '' })).toEqual([])
+        expect(expected({ x_daas_ham_fleet: 'false' })).toEqual([])
+        expect(expected({ x_daas_ham_fleet: '' })).toEqual([])
+    })
+
+    it('counts a unit pending transfer, still on the shelf it is sent from, and not one In transit, on no shelf', () => {
+        expect(matches(query, { ...unit('in_transfer'), install_status: '6', substatus: 'pending_transfer' })).toBe(true)
+        expect(matches(query, { ...unit('in_transfer'), install_status: '9', substatus: 'reserved' })).toBe(false)
     })
 })

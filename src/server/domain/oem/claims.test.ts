@@ -6,7 +6,6 @@ import {
     dependentActions,
     dueStepsQuery,
     settledStatus,
-    STEP_STATUS,
     initialAutomationStatus,
     runVendorClaims,
     type ClaimOutcome,
@@ -14,6 +13,7 @@ import {
     type ClaimTarget,
 } from './claims'
 import type { ClaimAction } from '../vocabulary'
+import { recordMatches } from '../../test-support/encoded-query'
 
 function fake(responses: Array<HttpResponse | ((request: HttpRequest) => HttpResponse)>) {
     const calls: HttpRequest[] = []
@@ -469,32 +469,51 @@ describe('runVendorClaims', () => {
     })
 })
 
+/** `gs.minutesAgoStart(n)` as a stored date/time: n minutes before 2026-11-09 12:00:00. */
+function minutesAgo(expression: string): string {
+    const minutes = /^gs\.minutesAgoStart\((\d+)\)$/.exec(expression)?.[1]
+    if (minutes === undefined) throw new Error(`no value for ${expression}`)
+    return new Date(Date.parse('2026-11-09T12:00:00Z') - Number(minutes) * 60000).toISOString().slice(0, 19).replace('T', ' ')
+}
+
+/** An open licence step of an active staging task on an Aruba fleet asset: pending, never sent. */
+const pendingStep = (fields: Record<string, string> = {}) => ({
+    automation: 'oem_licence',
+    done: 'false',
+    automation_status: 'pending',
+    attempts: '0',
+    sys_updated_on: '2026-11-09 11:59:00',
+    'staging_task.active': 'true',
+    'staging_task.asset.model.x_daas_ham_oem_source': 'aruba',
+    'staging_task.asset.x_daas_ham_fleet': 'true',
+    ...fields,
+})
+/** The same step failed once, a day ago. */
+const failedStep = (fields: Record<string, string> = {}) => pendingStep({ automation_status: 'failed', attempts: '1', sys_updated_on: '2026-11-08 12:00:00', ...fields })
+const due = (step: Record<string, string>) => recordMatches(dueStepsQuery('aruba', 'oem_licence'), step, minutesAgo)
+
 describe('dueStepsQuery', () => {
-    it("finds open pending steps, and failed ones to retry, of the vendor's fleet assets and the action in each OR group", () => {
-        const groups = dueStepsQuery('aruba', 'oem_licence')
-            .split('^NQ')
-            .map((group) => group.split('^'))
-        expect(groups).toHaveLength(2)
-        for (const group of groups) {
-            expect(group).toEqual(
-                expect.arrayContaining([
-                    'automation=oem_licence',
-                    'done=false',
-                    'staging_task.active=true',
-                    'staging_task.asset.model.x_daas_ham_oem_source=aruba',
-                    'staging_task.asset.x_daas_ham_fleet=true',
-                ]),
-            )
+    it('finds a pending step at once, and a failed one once it has waited, while it has attempts left', () => {
+        expect(due(pendingStep())).toBe(true)
+        expect(due(failedStep())).toBe(true)
+        expect(due(failedStep({ sys_updated_on: '2026-11-09 11:59:00' }))).toBe(false)
+        expect(due(failedStep({ attempts: '1000' }))).toBe(false)
+    })
+
+    it("finds, pending or failed, only the open steps of the action on the vendor's fleet assets whose staging task is active", () => {
+        for (const step of [pendingStep, failedStep]) {
+            expect(due(step({ automation: 'oem_claim' }))).toBe(false)
+            expect(due(step({ done: 'true' }))).toBe(false)
+            expect(due(step({ 'staging_task.active': 'false' }))).toBe(false)
+            expect(due(step({ 'staging_task.asset.model.x_daas_ham_oem_source': 'meraki' }))).toBe(false)
+            expect(due(step({ 'staging_task.asset.x_daas_ham_fleet': 'false' }))).toBe(false)
+            expect(due(step({ 'staging_task.asset.x_daas_ham_fleet': '' }))).toBe(false)
         }
-        expect(groups[0]).toContain('automation_status=pending')
-        expect(groups[1]).toEqual(expect.arrayContaining(['automation_status=failed', 'attempts<5', 'sys_updated_on<javascript:gs.minutesAgoStart(30)']))
     })
 
     it('never finds steps waiting for their prerequisite step', () => {
-        const statuses = dueStepsQuery('aruba', 'oem_licence')
-            .split(/\^NQ|\^/)
-            .filter((clause) => clause.startsWith('automation_status'))
-        expect(new Set(statuses)).toEqual(new Set(['automation_status=pending', 'automation_status=failed']))
+        expect(due(pendingStep({ automation_status: 'waiting' }))).toBe(false)
+        expect(due(failedStep({ automation_status: 'waiting' }))).toBe(false)
     })
 })
 
@@ -526,7 +545,7 @@ describe('settledStatus', () => {
     it('ticks a step whose call succeeded and fails the others, which are due again later', () => {
         expect(settledStatus({ stepId: 's1', ok: true, message: '' })).toBe('done')
         expect(settledStatus({ stepId: 's1', ok: false, message: 'no' })).toBe('failed')
-        expect(dueStepsQuery('meraki', 'oem_claim')).toContain(`automation_status=${STEP_STATUS.failed}`)
-        expect(dueStepsQuery('meraki', 'oem_claim')).not.toContain(`automation_status=${STEP_STATUS.waiting}`)
+        expect(due(failedStep({ automation_status: settledStatus({ stepId: 's1', ok: false, message: 'no' }) }))).toBe(true)
+        expect(due(failedStep({ automation_status: settledStatus({ stepId: 's1', ok: true, message: '' }) }))).toBe(false)
     })
 })

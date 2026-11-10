@@ -13,7 +13,9 @@ import {
     stillCovered,
     stockReturnMoves,
 } from './leases'
-import { ALL_STAGES, checkTransition, type TransitionFacts } from './lifecycle'
+import { ALL_STAGES, checkTransition, type Stage, type TransitionFacts } from './lifecycle'
+import { recordMatches as matches } from '../test-support/encoded-query'
+import { assetIn, type SampleRecord } from '../test-support/stored-asset'
 
 describe('earliestReviewedEnd', () => {
     it('keeps reviewing an undecided lease for 30 days past its end', () => {
@@ -105,14 +107,26 @@ describe('leaseDecisionProblem', () => {
 })
 
 describe('stillCovered', () => {
+    const RETIRED = ['disposed', 'sold', 'returned_to_oem', 'returned_to_customer', 'returned_to_lessor']
+    const stagesCovered = (query: string, fields: SampleRecord) => ALL_STAGES.filter((stage) => matches(query, assetIn(stage, fields)))
+
+    it('keeps the fleet assets the lease condition finds, in stock or at a Site', () => {
+        const onLease = stagesCovered(stillCovered('x_daas_ham_lease=L1'), { x_daas_ham_fleet: 'true', x_daas_ham_lease: 'L1' })
+        expect(onLease).toEqual(ALL_STAGES.filter((stage) => !RETIRED.includes(stage)))
+        expect(stagesCovered(stillCovered('x_daas_ham_lease=L1'), { x_daas_ham_fleet: 'true', x_daas_ham_lease: 'L2' })).toEqual([])
+    })
+
     it('leaves retired units, which keep their lease as history, out of what the lease covers', () => {
-        expect(stillCovered('x_daas_ham_lease=L1')).toBe('x_daas_ham_lease=L1^install_status!=7^x_daas_ham_fleet=true')
-        const bought = 'x_daas_ham_lease.end_action=buyout'
-        expect(stillCovered(bought)).toBe(`${bought}^install_status!=7^x_daas_ham_fleet=true`)
+        const boughtOut = stillCovered('x_daas_ham_lease.end_action=buyout')
+        for (const stage of RETIRED as Stage[]) {
+            expect(matches(boughtOut, assetIn(stage, { x_daas_ham_fleet: 'true', 'x_daas_ham_lease.end_action': 'buyout' })), stage).toBe(false)
+        }
+        expect(matches(boughtOut, assetIn('in_service', { x_daas_ham_fleet: 'true', 'x_daas_ham_lease.end_action': 'buyout' }))).toBe(true)
     })
 
     it('covers fleet assets only (ADR 0016)', () => {
-        expect(stillCovered('x_daas_ham_lease=L1').split('^')).toContain('x_daas_ham_fleet=true')
+        expect(stagesCovered(stillCovered('x_daas_ham_lease=L1'), { x_daas_ham_fleet: 'false', x_daas_ham_lease: 'L1' })).toEqual([])
+        expect(stagesCovered(stillCovered('x_daas_ham_lease=L1'), { x_daas_ham_fleet: '', x_daas_ham_lease: 'L1' })).toEqual([])
     })
 })
 

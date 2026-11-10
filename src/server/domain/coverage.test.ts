@@ -12,6 +12,8 @@ import {
     withoutCoverage,
 } from './coverage'
 import type { CoverageFact } from './oem/types'
+import { recordMatches as matches } from '../test-support/encoded-query'
+import { assetIn } from '../test-support/stored-asset'
 
 describe('coverageSummary', () => {
     it('is covered until the latest end date among covering contracts', () => {
@@ -162,15 +164,29 @@ describe('coverageBySerial', () => {
 })
 
 describe('staleCoverageQuery', () => {
-    it("asks again for a vendor's fleet assets with a serial, not retired, never checked or checked before the cut-off", () => {
-        expect(staleCoverageQuery('cisco', '2026-11-01 00:00:00').split('^')).toEqual([
-            'x_daas_ham_fleet=true',
-            'model.x_daas_ham_oem_source=cisco',
-            'install_status!=7',
-            'serial_numberISNOTEMPTY',
-            'x_daas_ham_coverage_checkedISEMPTY',
-            'ORx_daas_ham_coverage_checked<2026-11-01 00:00:00',
-        ])
+    const query = staleCoverageQuery('cisco', '2026-11-01 00:00:00')
+    /** A Cisco fleet asset in service with a serial, its coverage never checked. */
+    const unchecked = assetIn('in_service', { x_daas_ham_fleet: 'true', 'model.x_daas_ham_oem_source': 'cisco', serial_number: 'FOC1', x_daas_ham_coverage_checked: '' })
+
+    it("asks again for a vendor's fleet assets never checked, or last checked before the cut-off", () => {
+        expect(matches(query, unchecked)).toBe(true)
+        expect(matches(query, { ...unchecked, x_daas_ham_coverage_checked: '2026-10-31 23:59:59' })).toBe(true)
+        expect(matches(query, { ...unchecked, x_daas_ham_coverage_checked: '2026-11-01 00:00:00' })).toBe(false)
+        expect(matches(query, { ...unchecked, x_daas_ham_coverage_checked: '2026-11-02 08:00:00' })).toBe(false)
+    })
+
+    it("sends no other vendor's serial, no Asset without one, no retired unit, and none of the Provider IT's (ADR 0016)", () => {
+        expect(matches(query, { ...unchecked, 'model.x_daas_ham_oem_source': 'fortinet' })).toBe(false)
+        expect(matches(query, { ...unchecked, serial_number: '' })).toBe(false)
+        expect(matches(query, { ...unchecked, ...assetIn('returned_to_oem') })).toBe(false)
+        expect(matches(query, { ...unchecked, x_daas_ham_fleet: 'false' })).toBe(false)
+        expect(matches(query, { ...unchecked, x_daas_ham_fleet: '' })).toBe(false)
+        // Stale and outside the fleet: the ^OR of the two date conditions lets no other condition go.
+        expect(matches(query, { ...unchecked, x_daas_ham_fleet: 'false', x_daas_ham_coverage_checked: '2026-10-01 00:00:00' })).toBe(false)
+    })
+
+    it('asks for a unit in stock or at a Site alike', () => {
+        for (const stage of ['available', 'spare_pool', 'shipped', 'pending_return'] as const) expect(matches(query, { ...unchecked, ...assetIn(stage) }), stage).toBe(true)
     })
 })
 

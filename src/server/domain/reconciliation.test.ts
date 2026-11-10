@@ -6,6 +6,7 @@ import {
     seenWithoutFleetAssetQuery,
     stillSeenWithoutFleetAssetQuery,
 } from './reconciliation'
+import { recordMatches as matches } from '../test-support/encoded-query'
 
 const DAY = 86_400_000
 const now = Date.parse('2026-11-07T12:00:00Z')
@@ -90,26 +91,48 @@ describe('reconcileRack', () => {
     })
 })
 
+/** A network-gear CI at a customer Site, by the Asset it points at: none, or one with this Fleet flag on its hardware record. */
+const FLAG = 'asset.ref_alm_hardware.x_daas_ham_fleet'
+const AT_SITE = { 'location.x_daas_ham_is_site': 'true' }
+const ciOn = (fleet: string | null, where: Record<string, string> = AT_SITE) => (fleet === null ? { asset: '', ...where } : { asset: 'a1', [FLAG]: fleet, ...where })
+
 describe('seenWithoutFleetAssetQuery', () => {
     const query = seenWithoutFleetAssetQuery()
 
-    it('finds CIs pointing at no Asset or at one outside the fleet, through the hardware table (ADR 0016)', () => {
-        const hardware = 'asset.ref_alm_hardware.x_daas_ham_fleet'
-        expect(query.startsWith(`assetISEMPTY^OR${hardware}=false^OR${hardware}ISEMPTY^`)).toBe(true)
-        // A CI's asset is an alm_asset reference: a condition on asset.x_daas_ham_fleet would be ignored.
-        expect(query).not.toMatch(/(^|\^|OR)asset\.x_daas_ham_fleet/)
+    it('finds a CI at a customer Site that points at no Asset, or at one outside the fleet, flag false or blank (ADR 0016)', () => {
+        expect(matches(query, ciOn(null))).toBe(true)
+        expect(matches(query, ciOn('false'))).toBe(true)
+        expect(matches(query, ciOn(''))).toBe(true)
+    })
+
+    it("leaves out a CI on a fleet asset, read through the Asset's hardware record: alm_asset itself has no Fleet flag", () => {
+        // The sample has the flag on the hardware record only: read as asset.x_daas_ham_fleet it is blank, as on the instance.
+        expect(matches(query, ciOn('true'))).toBe(false)
     })
 
     it('keeps to CIs at a customer Site, or in a room or building of one', () => {
-        expect(query.endsWith('^location.x_daas_ham_is_site=true^ORlocation.parent.x_daas_ham_is_site=true^ORlocation.parent.parent.x_daas_ham_is_site=true')).toBe(true)
-        expect(query).not.toContain('^NQ')
+        const room = { 'location.x_daas_ham_is_site': 'false', 'location.parent.x_daas_ham_is_site': 'true' }
+        const rack = { 'location.x_daas_ham_is_site': 'false', 'location.parent.x_daas_ham_is_site': 'false', 'location.parent.parent.x_daas_ham_is_site': 'true' }
+        const elsewhere = { 'location.x_daas_ham_is_site': 'false', 'location.parent.x_daas_ham_is_site': '' }
+        for (const fleet of [null, 'false', '']) {
+            expect(matches(query, ciOn(fleet, room)), String(fleet)).toBe(true)
+            expect(matches(query, ciOn(fleet, rack)), String(fleet)).toBe(true)
+            expect(matches(query, ciOn(fleet, elsewhere)), String(fleet)).toBe(false)
+            expect(matches(query, ciOn(fleet, {})), String(fleet)).toBe(false)
+        }
+        expect(matches(query, ciOn('true', room))).toBe(false)
     })
 })
 
 describe('stillSeenWithoutFleetAssetQuery', () => {
     it('keeps the reported CIs the seen-without-asset condition still matches, discovered recently or not', () => {
-        expect(stillSeenWithoutFleetAssetQuery(['ci1', 'ci2', 'ci1'])).toBe(`sys_idINci1,ci2^${seenWithoutFleetAssetQuery()}`)
-        expect(stillSeenWithoutFleetAssetQuery(['ci1'])).not.toContain('last_discovered')
+        const query = stillSeenWithoutFleetAssetQuery(['ci1', 'ci2', 'ci1']) ?? ''
+        const longAgo = { last_discovered: '2020-01-01 00:00:00' }
+        expect(matches(query, { sys_id: 'ci1', ...ciOn(null), ...longAgo })).toBe(true)
+        expect(matches(query, { sys_id: 'ci2', ...ciOn('false') })).toBe(true)
+        expect(matches(query, { sys_id: 'ci3', ...ciOn(null) })).toBe(false)
+        expect(matches(query, { sys_id: 'ci1', ...ciOn('true') })).toBe(false)
+        expect(matches(query, { sys_id: 'ci1', ...ciOn(null, {}) })).toBe(false)
     })
 
     it('gives no query for no CI, which would match every CI at a Site', () => {
@@ -119,10 +142,20 @@ describe('stillSeenWithoutFleetAssetQuery', () => {
 })
 
 describe('outsideFleetExceptionsQuery', () => {
-    it('finds open exceptions of the types on an Asset outside the fleet, flag false or blank', () => {
-        expect(outsideFleetExceptionsQuery(['unseen', 'serial_mismatch'])).toBe(
-            'status=open^exception_typeINunseen,serial_mismatch^assetISNOTEMPTY^asset.x_daas_ham_fleet=false^ORasset.x_daas_ham_fleetISEMPTY',
-        )
-        expect(outsideFleetExceptionsQuery(['unseen'])).not.toContain('^NQ')
+    const query = outsideFleetExceptionsQuery(['unseen', 'serial_mismatch'])
+    const raised = { status: 'open', exception_type: 'unseen', asset: 'a1', 'asset.x_daas_ham_fleet': 'false' }
+
+    it('finds the open exceptions of the types on an Asset outside the fleet, flag false or blank', () => {
+        expect(matches(query, raised)).toBe(true)
+        expect(matches(query, { ...raised, exception_type: 'serial_mismatch' })).toBe(true)
+        // A row from before the column, or an Asset since deleted: the reference is left, the flag reads blank.
+        expect(matches(query, { ...raised, 'asset.x_daas_ham_fleet': '' })).toBe(true)
+    })
+
+    it('leaves the exceptions of a fleet asset to the daily reconciliation, and those resolved, of another type or on no Asset', () => {
+        expect(matches(query, { ...raised, 'asset.x_daas_ham_fleet': 'true' })).toBe(false)
+        expect(matches(query, { ...raised, status: 'resolved' })).toBe(false)
+        expect(matches(query, { ...raised, exception_type: 'rack_overlap' })).toBe(false)
+        expect(matches(query, { ...raised, asset: '', 'asset.x_daas_ham_fleet': '' })).toBe(false)
     })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkTransition, DEPLOYED_STAGES, INSTALLED_STAGES, stagesQuery, type Stage } from './lifecycle'
+import { ALL_STAGES, checkTransition, DEPLOYED_STAGES, INSTALLED_STAGES, type Stage } from './lifecycle'
 import {
     chargedFeeQuery,
     collectionMethod,
@@ -20,6 +20,8 @@ import {
     type ReturnRequester,
 } from './returns'
 import { type LeaseEndAction, RETURN_TRIGGER_CHOICES, type ReturnTrigger } from './vocabulary'
+import { recordMatches as matches } from '../test-support/encoded-query'
+import { assetIn, type SampleRecord } from '../test-support/stored-asset'
 
 describe('returnRequestFindings', () => {
     const acmeSite: RequestedReturn = { customerId: 'acme', site: { id: 'acme-hq', customerId: 'acme', isSite: true } }
@@ -146,25 +148,28 @@ describe('overdueStep', () => {
 
 describe('sitePackageHoldersQuery', () => {
     const query = sitePackageHoldersQuery({ siteId: 'acme-hq', agreementId: 'acme-msa' })
-
-    it('counts only Assets at the Site under the Agreement', () => {
-        for (const clause of query.split('^NQ')) {
-            expect(clause).toContain('x_daas_ham_site=acme-hq^x_daas_ham_agreement=acme-msa')
-        }
-    })
-
-    it('counts fleet assets only, in every clause (ADR 0016)', () => {
-        for (const clause of query.split('^NQ')) expect(clause.split('^')).toContain('x_daas_ham_fleet=true')
-    })
+    /** A fleet asset at the Site under the Agreement, in `stage`. */
+    const unit = (stage: Stage, fields: SampleRecord = {}) => assetIn(stage, { x_daas_ham_fleet: 'true', x_daas_ham_site: 'acme-hq', x_daas_ham_agreement: 'acme-msa', ...fields })
+    const holding = (fields: SampleRecord = {}) => ALL_STAGES.filter((stage) => matches(query, unit(stage, fields)))
 
     // A swap's new units before monitoring sees them, units serving there and units still to come back.
-    it.each<Stage>(['shipped', 'pending_in_service', 'in_service', 'temporary_deployment', 'pending_return'])(
-        'is held open by a unit %s',
-        (stage) => expect(query).toContain(stagesQuery([stage])),
-    )
+    it('is held open by a unit shipped, awaiting first sighting, in service, temporarily deployed or awaiting return, and by no other', () => {
+        expect(holding()).toEqual(['shipped', 'pending_in_service', 'in_service', 'temporary_deployment', 'pending_return'])
+    })
 
     it.each<Stage>(['pending_evaluation', 'missing', 'available'])('lets go of a unit %s', (stage) => {
-        expect(query).not.toContain(stagesQuery([stage]))
+        expect(matches(query, unit(stage))).toBe(false)
+    })
+
+    it('counts only Assets at the Site under the Agreement, whatever their stage', () => {
+        expect(holding({ x_daas_ham_site: 'acme-branch' })).toEqual([])
+        expect(holding({ x_daas_ham_agreement: 'acme-old' })).toEqual([])
+        expect(holding({ x_daas_ham_site: '' })).toEqual([])
+    })
+
+    it('counts fleet assets only, whatever their stage (ADR 0016)', () => {
+        expect(holding({ x_daas_ham_fleet: 'false' })).toEqual([])
+        expect(holding({ x_daas_ham_fleet: '' })).toEqual([])
     })
 })
 
@@ -188,8 +193,17 @@ describe('SITE_RECOVERY_STAGES', () => {
 })
 
 describe('siteRecoveryLineQuery', () => {
-    it('finds the Asset awaited back on a site decommission or agreement end', () => {
-        expect(siteRecoveryLineQuery('a1')).toBe('asset=a1^status=awaiting^return_order.triggerINsite_decommission,agreement_end')
+    const query = siteRecoveryLineQuery('a1')
+    const line = (fields: SampleRecord = {}) => ({ asset: 'a1', status: 'awaiting', 'return_order.trigger': 'site_decommission', ...fields })
+    const triggers = Object.keys(RETURN_TRIGGER_CHOICES) as ReturnTrigger[]
+
+    it('finds the line that awaits the Asset back on a site decommission or agreement end, and on no other Return', () => {
+        expect(triggers.filter((trigger) => matches(query, line({ 'return_order.trigger': trigger })))).toEqual(['site_decommission', 'agreement_end'])
+    })
+
+    it("finds no other Asset's line, nor one whose unit is back, evaluated or declared missing", () => {
+        expect(matches(query, line({ asset: 'a2' }))).toBe(false)
+        for (const status of ['received', 'evaluated', 'missing']) expect(matches(query, line({ status })), status).toBe(false)
     })
 })
 
@@ -249,8 +263,17 @@ describe('fee identity', () => {
     const sysId = (c: string) => c.repeat(32)
     const fee = { type: 'late_return' as const, assetId: sysId('a'), returnOrderId: sysId('r') }
 
+    const charge = (fields: SampleRecord = {}) => ({ fee_type: 'late_return', asset: sysId('a'), return_order: sysId('r'), status: 'open', ...fields })
+
     it('counts every charge of the same type, Asset and Return order but a waived one', () => {
-        const charged = `fee_type=late_return^asset=${sysId('a')}^return_order=${sysId('r')}^status!=waived`
-        expect(chargedFeeQuery(fee)).toBe(charged)
+        expect(matches(chargedFeeQuery(fee), charge())).toBe(true)
+        expect(matches(chargedFeeQuery(fee), charge({ status: 'billed' }))).toBe(true)
+        expect(matches(chargedFeeQuery(fee), charge({ status: 'waived' }))).toBe(false)
+    })
+
+    it('counts no charge of another type, Asset or Return order', () => {
+        expect(matches(chargedFeeQuery(fee), charge({ fee_type: 'lost' }))).toBe(false)
+        expect(matches(chargedFeeQuery(fee), charge({ asset: sysId('b') }))).toBe(false)
+        expect(matches(chargedFeeQuery(fee), charge({ return_order: sysId('s') }))).toBe(false)
     })
 })
