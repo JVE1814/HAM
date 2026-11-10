@@ -75,7 +75,8 @@ export interface EntitlementAssessment {
     findings: string[]
 }
 
-function isCurrent(entry: CatalogEntryView, today: string): boolean {
+/** Whether the Customer's catalog offers the entry on `today`: it is active and inside its validity dates. */
+export function isCurrent(entry: CatalogEntryView, today: string): boolean {
     if (!entry.active) return false
     if (entry.validFrom && entry.validFrom > today) return false
     if (entry.validTo && entry.validTo < today) return false

@@ -2,6 +2,7 @@ import { GlideAggregate, GlideRecord } from '@servicenow/glide'
 import {
     deployedUsageQuery,
     inFlightLinesQuery,
+    isCurrent,
     type CatalogEntryView,
     type ContractedQuantity,
     type EntitlementContext,
@@ -22,21 +23,27 @@ export function entitlementContext(customerId: string, agreementId: string, excl
 }
 
 function catalogEntries(customerId: string): CatalogEntryView[] {
+    const entries: CatalogEntryView[] = []
+    eachCatalogEntry(customerId, (entry) => entries.push(entry))
+    return entries
+}
+
+/** Visit each entry of the Customer's catalog, current or not, with its record. */
+function eachCatalogEntry(customerId: string, visit: (entry: CatalogEntryView, record: GlideRecord) => void): void {
     const gr = new GlideRecord('x_daas_ham_catalog_entry')
     gr.addQuery('customer', customerId)
     gr.query()
-    const entries: CatalogEntryView[] = []
     while (gr.next()) {
-        entries.push({
+        const entry: CatalogEntryView = {
             kind: str(gr, 'entry_type') as CatalogEntryView['kind'],
             modelId: str(gr, 'model') || undefined,
             siteTemplateId: str(gr, 'site_template') || undefined,
             active: bool(gr, 'active'),
             validFrom: str(gr, 'valid_from') || undefined,
             validTo: str(gr, 'valid_to') || undefined,
-        })
+        }
+        visit(entry, gr)
     }
-    return entries
 }
 
 function contractedQuantities(agreementId: string): ContractedQuantity[] {
@@ -83,14 +90,17 @@ function usageByModel(table: string, query: string, aggregate: 'COUNT' | 'SUM', 
     return usage
 }
 
-/** The Models a Customer's catalog offers now (its active Model entries), each with its Device class. */
+/**
+ * The Models a Customer's catalog offers now, each with its Device class: its Model entries that are current as the
+ * entitlement check reads them (domain/entitlement `isCurrent`: active and inside their validity dates), so a Model
+ * picked from here is one an Order for it is not flagged for.
+ */
 export function catalogModels(customerId: string): Array<{ modelId: string; deviceClass: string }> {
-    const entry = new GlideRecord('x_daas_ham_catalog_entry')
-    entry.addQuery('customer', customerId)
-    entry.addQuery('entry_type', 'model')
-    entry.addQuery('active', true)
-    entry.query()
+    const today = todayIso()
     const models: Array<{ modelId: string; deviceClass: string }> = []
-    while (entry.next()) models.push({ modelId: str(entry, 'model'), deviceClass: str(entry, 'model.x_daas_ham_device_class') })
+    eachCatalogEntry(customerId, (entry, record) => {
+        if (entry.kind !== 'model' || !isCurrent(entry, today)) return
+        models.push({ modelId: entry.modelId ?? '', deviceClass: str(record, 'model.x_daas_ham_device_class') })
+    })
     return models
 }
