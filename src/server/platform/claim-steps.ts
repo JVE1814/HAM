@@ -13,10 +13,12 @@ import {
     type ClaimStore,
     type ClaimTarget,
 } from '../domain/oem/claims.ts'
+import { openJobCursor, type JobCursor } from './job-cursor.ts'
 import { withLock } from './locks.ts'
 import { boolProperty, intProperty, PROPERTY, type PropertyOf } from './properties.ts'
 import { restMessagePort } from './rest-messages.ts'
 import { bool, num, pluck, recordsById, str, warnRefused } from './records.ts'
+import { messageOf } from '../domain/errors.ts'
 import { memoized } from '../domain/memo.ts'
 import type { ClaimAction, OemVendor } from '../domain/vocabulary.ts'
 
@@ -138,25 +140,27 @@ export function releaseStepsWaitingOn(taskId: string, action: string): void {
     while (step.next()) release(step)
 }
 
-/** Waiting steps a claim run checks for a prerequisite no longer open, at most: the longest waiting first. */
+/** Waiting steps a claim run checks for a prerequisite no longer open, at most. */
 const STRANDED_LOAD = 200
+
+/** The job cursor (platform/job-cursor) holding the sys_id of the last waiting step a claim run checked. */
+const STRANDED_CURSOR = 'oem_claim_stranded'
 
 /**
  * Release the waiting steps whose staging task (still active) has no open step of their prerequisite action
  * (CLAIM_PREREQUISITE) left to wait on: its release was refused when it was ticked done (logged), or it is gone. A
- * waiting step is never due, so left waiting it would never be sent. Run by each claim run, before it loads due steps.
+ * waiting step is never due, so left waiting it would never be sent. Run by each claim run, before it loads due steps,
+ * holding its run lock. A run checks the next STRANDED_LOAD in sys_id order after the last one the run before checked,
+ * starting over after the last: steps still rightly waiting never keep a stranded one from its turn.
  */
 function releaseStranded(): void {
-    const waiting = new GlideRecord(STEP)
-    waiting.addEncodedQuery(`automation_status=${STEP_STATUS.waiting}^done=false^staging_task.active=true`)
-    waiting.orderBy('sys_updated_on')
-    waiting.setLimit(STRANDED_LOAD)
-    waiting.query()
-    const steps: Array<{ stepId: string; taskId: string; prerequisite: string }> = []
-    while (waiting.next()) {
-        const prerequisite = CLAIM_PREREQUISITE[str(waiting, 'automation') as ClaimAction] ?? ''
-        steps.push({ stepId: waiting.getUniqueValue(), taskId: str(waiting, 'staging_task'), prerequisite })
-    }
+    const cursor = strandedCursor()
+    const after = cursor?.cursor ?? ''
+    let steps = waitingSteps(after)
+    // None left after the cursor: the pass is over, and this run starts the next.
+    if (steps.length === 0 && after) steps = waitingSteps('')
+    // A short page ends the pass, so the next run starts from the first step.
+    if (cursor) saveStrandedCursor(cursor, steps.length === STRANDED_LOAD ? (steps[steps.length - 1]?.stepId ?? '') : '')
     if (steps.length === 0) return
     const open = new Set<string>()
     const openStep = new GlideRecord(STEP)
@@ -171,6 +175,42 @@ function releaseStranded(): void {
     step.addQuery('sys_id', 'IN', stranded.join(','))
     step.query()
     while (step.next()) release(step)
+}
+
+/** Up to STRANDED_LOAD waiting steps of active staging tasks, in sys_id order after `after` ('' for the first). */
+function waitingSteps(after: string): Array<{ stepId: string; taskId: string; prerequisite: string }> {
+    const waiting = new GlideRecord(STEP)
+    waiting.addEncodedQuery(`automation_status=${STEP_STATUS.waiting}^done=false^staging_task.active=true`)
+    if (after) waiting.addQuery('sys_id', '>', after)
+    waiting.orderBy('sys_id')
+    waiting.setLimit(STRANDED_LOAD)
+    waiting.query()
+    const steps: Array<{ stepId: string; taskId: string; prerequisite: string }> = []
+    while (waiting.next()) {
+        const prerequisite = CLAIM_PREREQUISITE[str(waiting, 'automation') as ClaimAction] ?? ''
+        steps.push({ stepId: waiting.getUniqueValue(), taskId: str(waiting, 'staging_task'), prerequisite })
+    }
+    return steps
+}
+
+/**
+ * The stranded-step cursor, created on the first run; null (logged) when it cannot be: each run then checks the first
+ * STRANDED_LOAD waiting steps only.
+ */
+function strandedCursor(): JobCursor | null {
+    try {
+        return openJobCursor(STRANDED_CURSOR)
+    } catch (error) {
+        gs.warn(`[x_daas_ham] Job cursor ${STRANDED_CURSOR} not created, so each claim run checks the same waiting steps: ${messageOf(error)}`)
+        return null
+    }
+}
+
+/** Save where the next run checks from; a refused save is logged, and the next run checks this run's steps again. */
+function saveStrandedCursor(cursor: JobCursor, next: string): void {
+    if (cursor.cursor === next) return
+    const refused = cursor.save({ cursor: next })
+    if (refused) gs.warn(`[x_daas_ham] Job cursor ${STRANDED_CURSOR} not saved, so the next claim run checks the same waiting steps: ${refused}`)
 }
 
 /**

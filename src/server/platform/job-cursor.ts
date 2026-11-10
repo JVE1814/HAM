@@ -9,6 +9,7 @@ import { num, refusal, str } from './records.ts'
  * - a scheduled job (platform/chunked `runTableJob`): the key its last run stopped at, '' once a pass is complete;
  * - an event job whose passes replace each other (`margin_<period>`, `billing_generate_<period>`): the current pass's token;
  * - `provider_tag_sequence` (platform/tags): the last Provider tag number issued;
+ * - `oem_claim_stranded` (platform/claim-steps): the last waiting step a claim run checked, '' once it checked them all;
  * - `preflight` (entry/preflight): nothing, its result is the row's `last_status`.
  */
 const TABLE = 'x_daas_ham_job_cursor'
