@@ -6,83 +6,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * handed by its table, the hardware ACLs on alm_asset, and reading the record and the session.
  */
 
+/** A record's values as a test writes them: a reference is the sys_id of the row it points at, or that row itself. */
 type Row = Record<string, string | Record<string, string>>
 
-const platform = vi.hoisted(() => ({
-    userId: '',
-    roles: [] as string[],
-    company: '',
-    /** The rows a GlideRecord reads, by table. */
-    rows: {} as Record<string, Array<Record<string, unknown>>>,
-    /** The tables a table extends, nearest first. */
-    parents: {} as Record<string, string[]>,
-    /** What GlideTableHierarchy#getTables gives for a table, where it is not the array of the table and its parents. */
-    hierarchy: {} as Record<string, () => unknown>,
-    warnings: [] as string[],
-}))
+vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
-/** The value of `field` on `row`, dot-walked through the rows its references hold; null for blank. */
-function valueOf(row: Record<string, unknown> | null, field: string): string | null {
-    const [first, ...rest] = field.split('.')
-    const value = row?.[first]
-    if (rest.length > 0) return valueOf(typeof value === 'object' && value ? (value as Record<string, unknown>) : null, rest.join('.'))
-    if (typeof value === 'object' && value) return String((value as Record<string, unknown>).sys_id ?? '') || null
-    return value === undefined || value === '' ? null : String(value)
+/** The references these tests dot-walk or fill with a row. */
+const REFERENCES = {
+    'x_daas_ham_audit_line.audit': 'x_daas_ham_audit',
+    'alm_transfer_order.from_stockroom': 'alm_stockroom',
+    'alm_transfer_order.to_stockroom': 'alm_stockroom',
+    'x_daas_ham_order.site': 'cmn_location',
+    'x_daas_ham_return_order_line.return_order': 'x_daas_ham_return_order',
+    'x_daas_ham_shipment_event.shipment': 'x_daas_ham_shipment',
+    'x_daas_ham_site_template_item.site_template': 'x_daas_ham_site_template',
 }
-
-vi.mock('@servicenow/glide', () => {
-    class GlideRecord {
-        row: Record<string, unknown> | null = null
-        fresh = false
-        filters: string[] = []
-        private found: Array<Record<string, unknown>> = []
-        constructor(private table: string) {}
-        getTableName = () => this.table
-        isNewRecord = () => this.fresh
-        getUniqueValue = () => valueOf(this.row, 'sys_id') ?? ''
-        getValue = (field: string) => (field.includes('.') ? null : valueOf(this.row, field))
-        getElement = (field: string) => ({ getValue: () => valueOf(this.row, field) })
-        addEncodedQuery = (query: string) => void this.filters.push(query)
-        setLimit = () => undefined
-        get(id: string) {
-            this.row = (platform.rows[this.table] ?? []).find((row) => row.sys_id === id) ?? null
-            return this.row !== null
-        }
-        query() {
-            const terms = this.filters.flatMap((filter) => filter.split('^'))
-            this.found = (platform.rows[this.table] ?? []).filter((row) =>
-                terms.every((term) => {
-                    const [, field, operator, operand] = /^(\w+?)(LIKE|IN|=)(.*)$/.exec(term) ?? []
-                    const value = String(row[field] ?? '')
-                    if (operator === 'IN') return operand.split(',').includes(value)
-                    return operator === 'LIKE' ? value.includes(operand) : value === operand
-                }),
-            )
-        }
-        next() {
-            this.row = this.found.shift() ?? null
-            return this.row !== null
-        }
-    }
-    return {
-        GlideRecord,
-        GlideAggregate: class {},
-        GlideTableHierarchy: class {
-            constructor(private table: string) {}
-            getTables = () => platform.hierarchy[this.table]?.() ?? [this.table, ...(platform.parents[this.table] ?? [])]
-        },
-        gs: {
-            getUserID: () => platform.userId,
-            hasRole: (role: string) => platform.roles.includes(role),
-            getUser: () => ({ getCompanyID: () => platform.company }),
-            warn: (message: string) => void platform.warnings.push(message),
-        },
-    }
-})
 
 const { GlideRecord } = await import('@servicenow/glide')
 const { grantsCustomerRecord, grantsFleetAsset, readsRecord, scopeRecords } = await import('./visibility.ts')
 const { beyondVisibility } = await import('../platform/beyond-visibility.ts')
+const { conditionsOf, platform, recordOf } = await import('../test-support/fake-glide.ts')
 
 type Reader = 'staff' | 'tech' | 'admin' | 'contact' | 'service desk'
 const ROLES: Record<Reader, string[]> = {
@@ -103,33 +46,41 @@ let users = 0
  * keep a user's session, and where a table is placed, for as long as they are loaded (on the platform, a transaction).
  */
 function signIn(reader: Reader): void {
-    platform.userId = `user${++users}`
-    platform.roles = ROLES[reader]
-    platform.company = 'cust1'
-    SITE1.x_daas_ham_site_contacts = `someone,${platform.userId}`
-    platform.rows.cmn_location = [SITE1]
-    platform.rows.sys_user_grmember = [{ user: platform.userId, group: 'depot_crew' }]
-    platform.rows.alm_stockroom = [DEPOT, OTHER_DEPOT]
+    const userId = `user${++users}`
+    platform.user = { id: userId, name: '', company: 'cust1', roles: ROLES[reader], interactive: true }
+    SITE1.x_daas_ham_site_contacts = `someone,${userId}`
+    platform.tables.cmn_location = [SITE1]
+    platform.tables.sys_user_grmember = [{ user: userId, group: 'depot_crew' }]
+    platform.tables.alm_stockroom = [DEPOT, OTHER_DEPOT]
 }
 
-/** A saved record of `table`, as a rule or an ACL is handed it. */
+/** `row` with each row it holds in a reference stored in that reference's table (in place of one with its sys_id) and named by its sys_id. */
+function withReferencesStored(table: string, row: Row): Record<string, string> {
+    return Object.fromEntries(
+        Object.entries(row).map(([field, value]) => {
+            if (typeof value === 'string') return [field, value]
+            const target = REFERENCES[`${table}.${field}` as keyof typeof REFERENCES]
+            const others = (platform.tables[target] ?? []).filter((other) => other.sys_id !== value.sys_id)
+            platform.tables[target] = [...others, value]
+            return [field, value.sys_id ?? '']
+        }),
+    )
+}
+
+/** A saved record of `table`, as a rule or an ACL is handed it; with `saved` false, one not saved yet. */
 function record(table: string, row: Row, saved = true) {
-    const current = new GlideRecord(table)
-    Object.assign(current, { row: { sys_id: saved ? `${table}-row` : '', ...row }, fresh: !saved })
-    return current
+    return recordOf<InstanceType<typeof GlideRecord>>(table, { sys_id: saved ? `${table}-row` : '', ...withReferencesStored(table, row) }, { fresh: !saved })
 }
 
 function filterOf(table: string): string[] {
     const current = new GlideRecord(table)
     scopeRecords(current)
-    return (current as unknown as { filters: string[] }).filters
+    return conditionsOf(current)
 }
 
 beforeEach(() => {
-    platform.warnings = []
-    platform.parents = {}
-    platform.hierarchy = {}
-    platform.rows = {}
+    platform.reset()
+    platform.references = { ...REFERENCES }
 })
 
 describe('scopeRecords', () => {
@@ -171,7 +122,7 @@ describe('scopeRecords', () => {
         signIn('admin')
         const current = new GlideRecord('alm_hardware')
         beyondVisibility(current, () => scopeRecords(current))
-        expect((current as unknown as { filters: string[] }).filters).toEqual([])
+        expect(conditionsOf(current)).toEqual([])
     })
 
     it('shows a narrowed reader nothing of a table with no scoping, which only a wiring mistake can reach, and logs it', () => {
@@ -208,13 +159,12 @@ describe('readsRecord', () => {
         signIn('tech')
         expect(readsRecord(record('x_daas_ham_audit', { stockroom: 'sr9' }, false))).toBe(true)
         expect(readsRecord(new GlideRecord('x_daas_ham_audit'))).toBe(true)
-        const unsavedWithId = record('x_daas_ham_audit', { stockroom: 'sr9' })
-        Object.assign(unsavedWithId, { fresh: true })
+        const unsavedWithId = record('x_daas_ham_audit', { sys_id: 'not-saved-yet', stockroom: 'sr9' }, false)
         expect(readsRecord(unsavedWithId)).toBe(true)
     })
 
     it('checks hardware on alm_asset, where its ACL sits: on the alm_hardware record, which an alm_asset row does not carry', () => {
-        platform.rows.alm_hardware = [
+        platform.tables.alm_hardware = [
             { sys_id: 'mine', sys_class_name: 'alm_hardware', x_daas_ham_fleet: '1', stockroom: 'sr1' },
             { sys_id: 'theirs', sys_class_name: 'alm_hardware', x_daas_ham_fleet: '1', stockroom: 'sr9' },
             { sys_id: 'laptop', sys_class_name: 'alm_hardware', x_daas_ham_fleet: '0', stockroom: 'sr9' },
@@ -300,10 +250,10 @@ describe('grantsCustomerRecord', () => {
 
     it('grants as the contact the ACL admits, whatever else the user holds: a staff role adds no record here', () => {
         signIn('admin')
-        platform.roles = ['x_daas_ham.customer_admin', 'x_daas_ham.inventory_tech']
+        platform.user.roles = ['x_daas_ham.customer_admin', 'x_daas_ham.inventory_tech']
         expect(grantsCustomerRecord(record('x_daas_ham_agreement', { customer: 'cust9' }))).toBe(false)
         signIn('contact')
-        platform.roles = ['x_daas_ham.site_contact', 'x_daas_ham.noc']
+        platform.user.roles = ['x_daas_ham.site_contact', 'x_daas_ham.noc']
         expect(grantsCustomerRecord(record('x_daas_ham_order', { customer: 'cust1', site: OTHER_SITE }))).toBe(false)
         expect(grantsCustomerRecord(record('x_daas_ham_order', { customer: 'cust1', site: SITE1 }))).toBe(true)
     })
