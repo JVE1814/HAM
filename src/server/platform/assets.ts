@@ -1,6 +1,13 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { normalizeSerial } from '../domain/serials.ts'
-import { FLEET_FIELD, fleetCondition, OEM_PID_FIELD, STOCKROOM_TYPE_FIELD, type FleetCandidate } from '../domain/fleet.ts'
+import {
+    adoptionProblem,
+    FLEET_FIELD,
+    fleetCondition,
+    OEM_PID_FIELD,
+    STOCKROOM_TYPE_FIELD,
+    type FleetCandidate,
+} from '../domain/fleet.ts'
 import {
     checkTransition,
     fieldsOf,
@@ -14,7 +21,7 @@ import { PLACEMENT_FIELDS } from '../domain/rack.ts'
 import { LEGAL_OWNER, type LegalOwner } from '../domain/vocabulary.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { PROPERTY, stringProperty } from './properties.ts'
-import { bool, refusal, str, type ReadOptions } from './records.ts'
+import { bool, refusal, str, warnRefused, type ReadOptions } from './records.ts'
 
 /** Reading and moving Assets (alm_hardware) through their Lifecycle stage (ADR 0002). */
 
@@ -119,6 +126,19 @@ export function isFleetAsset(asset: GlideRecord): boolean {
 export function joinFleet(asset: GlideRecord): void {
     asset.setValue(FLEET_FIELD, true)
     if (!str(asset, 'x_daas_ham_legal_owner')) asset.setValue('x_daas_ham_legal_owner', LEGAL_OWNER.provider)
+}
+
+/**
+ * Adopt equipment the Provider already has into the fleet ("Add to fleet") and save it, when domain/fleet
+ * `adoptionProblem` allows it; why it was not adopted ('' once saved): that problem, or the platform's reason for the
+ * save it refused, logged with the Asset named as `name`. alm_hardware is a global table, but what the platform refuses
+ * from this scope is a rule's setAbortAction, not a save: the Asset is saved as any script saves one.
+ */
+export function adoptIntoFleet(asset: GlideRecord, name: string): string {
+    const problem = adoptionProblem(fleetCandidate(asset))
+    if (problem) return problem
+    joinFleet(asset)
+    return asset.update() ? '' : warnRefused(asset, `${name} not added to the fleet`)
 }
 
 /** The Asset as domain/fleet `adoptionProblem` and `receiptProblem` judge it. */
