@@ -18,6 +18,8 @@ import {
     type TransferContext,
     type TransitionFacts,
 } from './lifecycle'
+import { recordMatches as matches } from '../test-support/encoded-query'
+import { assetIn, through, type SampleRecord } from '../test-support/stored-asset'
 
 const deployable: TransitionFacts = {
     hasSite: true,
@@ -395,29 +397,37 @@ describe('isDeployed', () => {
 })
 
 describe('stagesQuery', () => {
-    it('builds one OR-ed clause per stage, each carrying the base query', () => {
-        expect(stagesQuery(['in_service', 'shipped'], 'x_daas_ham_agreement=a1')).toBe(
-            'install_status=1^substatusISEMPTY^x_daas_ham_agreement=a1^NQinstall_status=9^substatus=shipped_to_site^x_daas_ham_agreement=a1',
-        )
+    const stagesFound = (query: string, fields: SampleRecord = {}) => ALL_STAGES.filter((stage) => matches(query, assetIn(stage, fields)))
+
+    it('finds the Assets in the stages asked for, and in no other', () => {
+        expect(stagesFound(stagesQuery(['in_service', 'shipped']))).toEqual(['shipped', 'in_service'])
+        expect(stagesFound(stagesQuery(['available']))).toEqual(['available'])
     })
 
-    it('works without a base query', () => {
-        expect(stagesQuery(['available'])).toBe('install_status=6^substatus=available')
+    it('keeps the Assets of every stage to the base query', () => {
+        const query = stagesQuery(['in_service', 'shipped'], 'x_daas_ham_agreement=a1')
+        expect(stagesFound(query, { x_daas_ham_agreement: 'a1' })).toEqual(['shipped', 'in_service'])
+        expect(stagesFound(query, { x_daas_ham_agreement: 'a2' })).toEqual([])
     })
 
-    it("gives in transfer a clause for each of Inventory's combinations, each carrying the base query", () => {
-        expect(stagesQuery(['in_transfer'])).toBe('install_status=6^substatus=pending_transfer^NQinstall_status=9^substatus=reserved')
-        expect(stagesQuery(['reserved', 'in_transfer'], 'model=m1', 'asset.')).toBe(
-            'asset.install_status=6^asset.substatus=reserved^model=m1' +
-                '^NQasset.install_status=6^asset.substatus=pending_transfer^model=m1' +
-                '^NQasset.install_status=9^asset.substatus=reserved^model=m1',
-        )
+    it("finds a unit in transfer in either of Inventory's combinations, each kept to the base query", () => {
+        const query = stagesQuery(['reserved', 'in_transfer'], 'model=m1')
+        const pendingTransfer = { install_status: '6', substatus: 'pending_transfer' }
+        const inTransitReserved = { install_status: '9', substatus: 'reserved' }
+        for (const unit of [pendingTransfer, inTransitReserved, assetIn('reserved')]) {
+            expect(matches(query, { ...unit, model: 'm1' }), JSON.stringify(unit)).toBe(true)
+            expect(matches(query, { ...unit, model: 'm2' }), JSON.stringify(unit)).toBe(false)
+        }
+        expect(stagesFound(query, { model: 'm1' })).toEqual(['reserved', 'in_transfer'])
     })
 
-    it('dot-walks to the asset from a related table', () => {
-        expect(stagesQuery(['in_service', 'available'], 'covered=true', 'asset.')).toBe(
-            'asset.install_status=1^asset.substatusISEMPTY^covered=true^NQasset.install_status=6^asset.substatus=available^covered=true',
-        )
+    it('reads the stage of the Asset a record of a related table points at', () => {
+        const query = stagesQuery(['in_service', 'available'], 'covered=true', 'asset.')
+        const found = (covered: string) => ALL_STAGES.filter((stage) => matches(query, through('asset.', assetIn(stage), { covered })))
+        expect(found('true')).toEqual(['available', 'in_service'])
+        expect(found('false')).toEqual([])
+        // The record's own fields are not the Asset's.
+        expect(matches(query, { ...assetIn('in_service'), covered: 'true' })).toBe(false)
     })
 })
 
@@ -455,7 +465,13 @@ describe('billingChange', () => {
 })
 
 describe('notRetiredCondition', () => {
-    it('leaves out the retired stages, which are all stored as install status Retired', () => {
-        expect(notRetiredCondition()).toBe('install_status!=7')
+    it('leaves out the Assets in a retired stage, and no other', () => {
+        const kept = ALL_STAGES.filter((stage) => matches(notRetiredCondition(), assetIn(stage)))
+        const retired: readonly Stage[] = ['disposed', 'sold', 'returned_to_oem', 'returned_to_customer', 'returned_to_lessor']
+        expect(kept).toEqual(ALL_STAGES.filter((stage) => !retired.includes(stage)))
+    })
+
+    it('keeps an Asset in a combination the app does not model', () => {
+        expect(matches(notRetiredCondition(), { install_status: '6', substatus: 'defective' })).toBe(true)
     })
 })
