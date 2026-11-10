@@ -154,20 +154,26 @@ function awaitsReturn(assetId: string): boolean {
  * which would leave the line it is not received on to be declared missing and charged as lost. No unique index can
  * hold it: an Asset is on one awaiting line at a time, but on any number of settled ones.
  *
- * 'skipped' when the Asset is not found, already awaits a return, or another Return holds its lock through every try,
- * back to back (a holder holds it for one check, one line and one move), and is taking it. A lock that cannot be taken
- * leaves the unit off the order, logged; the line's own errors escape.
+ * 'skipped' when the Asset is not found, already awaits a return, or another Return held its lock through every try,
+ * back to back (a holder holds it for one check, one line and one move), and has taken it. One whose lock was held
+ * through every try but that still awaits no return (the holder was slow, refused or died holding it) is 'refused',
+ * logged, as is one whose lock cannot be taken; the line's own errors escape.
  */
 function addUnderLock(order: GlideRecord, assetId: string): LineResult {
     // Lost before the line was written: the try is given up, and the next checks afresh.
     const attempt = attemptLock(LOCK.returnAsset(assetId), (lock) => addLineHolding(lock, order, assetId) ?? TRY_AGAIN)
     if (attempt.ran) return attempt.value
     const left = `Asset ${assetId} left off return ${str(order, 'number')}`
-    if (attempt.held) {
-        gs.info(`[x_daas_ham] ${left}: another return holds its lock and takes it`)
+    if (!attempt.held) {
+        gs.warn(`[x_daas_ham] ${left}: ${messageOf(attempt.error)}`)
+        return 'refused'
+    }
+    // The holder has normally put it on its Return by now; one that has not leaves the unit on none (as recordFee).
+    if (awaitsReturn(assetId)) {
+        gs.info(`[x_daas_ham] ${left}: another return held its lock and took it`)
         return 'skipped'
     }
-    gs.warn(`[x_daas_ham] ${left}: ${messageOf(attempt.error)}`)
+    gs.warn(`[x_daas_ham] ${left}: its return lock was held through every try, yet it awaits no return: put it on one by hand if it is due back`)
     return 'refused'
 }
 
