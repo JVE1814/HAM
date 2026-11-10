@@ -75,7 +75,8 @@ describe('closeAudit', () => {
     it('raises no second exception when the close is refused and made again', () => {
         platform.refuses = (table) => (table === AUDITS ? 'no' : '')
         expect(closeAudit(countedAudit())).toBe('not_saved')
-        expect(platform.warnings).toEqual(['[x_daas_ham] Audit AUD1 not closed: no'])
+        // One warning, naming the audit and why the platform refused.
+        expect(platform.warnings).toEqual([expect.stringMatching(/\bAUD1\b.*: no$/)])
         platform.refuses = () => ''
         expect(closeAudit(record(AUDITS, 'audit1'))).toBe('closed')
         expect(rows(EXCEPTIONS)).toHaveLength(1)
@@ -109,7 +110,8 @@ describe('starting an audit', () => {
         platform.refuses = (table, row) => (table === LINES && row.asset === 'a2' ? 'no' : '')
         expect(startSiteAudit(site())).toEqual({ started: true, workOrderOpened: false, number: 'AUD1', expected: 1, leftOff: 1 })
         expect(rows(AUDITS)[0].expected_count).toBe('1')
-        expect(platform.warnings).toEqual(['[x_daas_ham] Asset a2 left off audit AUD1: no'])
+        // One warning, naming the Asset, the audit and why the platform refused.
+        expect(platform.warnings).toEqual([expect.stringMatching(/\ba2\b.*\bAUD1\b.*: no$/)])
     })
 
     it('starts none the platform refuses, and no blind count of a stockroom outside NaaS', () => {

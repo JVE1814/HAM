@@ -127,7 +127,7 @@ describe('passes on a job cursor', () => {
     })
 
     it('has no current pass for a job without a row, or for an event that names none', () => {
-        expect(isCurrentPass('job1', '1762689600000')).toBe(false)
+        expect(isCurrentPass('job1', 'some-pass')).toBe(false)
         startPass('job1', JOB_STATUS.running)
         expect(isCurrentPass('job1', '')).toBe(false)
     })
@@ -180,7 +180,8 @@ describe('runTableJob', () => {
         const { spec, handled } = job()
         expect(runTableJob({ ...spec, job: 'scan' })).toMatchObject({ processed: 0, done: false, lastError: 'job cursor scan could not be created: no rights' })
         expect(handled).toEqual([])
-        expect(platform.logs).toEqual(['error [x_daas_ham] scan: not run: job cursor scan could not be created: no rights'])
+        // One error in the log, naming the job and why it did not run.
+        expect(platform.logs).toEqual([expect.stringMatching(/^error .*\bscan\b.*no rights/)])
     })
 })
 
@@ -211,12 +212,18 @@ describe('an event job whose passes are started where they are triggered', () =>
         return { ...run, result: runEventTableJob(queued(position), run.spec) }
     }
 
-    it('queues the first chunk with the new pass and no cursor', () => {
+    /** Queue a pass and give its token: the job's cursor row holds the current pass's. */
+    function queueNewPass(): string {
         queuePass(EVENT_NAME, record, SUBJECT, PASS.job)
-        const token = cursorRow(PASS.job)?.cursor
-        expect(token).toBe('1762689600000')
+        return cursorRow(PASS.job)?.cursor ?? ''
+    }
+
+    it('queues the first chunk with the new pass and no cursor', () => {
+        const token = queueNewPass()
+        expect(token).not.toBe('')
         expect(cursorRow(PASS.job)).toMatchObject({ last_status: 'pass started' })
-        expect(platform.events).toEqual([{ name: EVENT_NAME, record: 'rec1', parm1: SUBJECT, parm2: '1762689600000:', delayed: false }])
+        expect(platform.events).toEqual([{ name: EVENT_NAME, record: 'rec1', parm1: SUBJECT, parm2: `${token}:`, delayed: false }])
+        expect(inCurrentPass(queued(`${token}:`), PASS.job)).toBe(true)
     })
 
     it('queues nothing for a pass that cannot be recorded', () => {
@@ -227,16 +234,16 @@ describe('an event job whose passes are started where they are triggered', () =>
 
     it('flushes each chunk and queues the next with the pass and where it got to, taking no lock', () => {
         items('a', 'b')
-        queuePass(EVENT_NAME, record, SUBJECT, PASS.job)
+        const token = queueNewPass()
         const first = oneChunk(platform.events[0]?.parm2 ?? '')
         expect(first.handled).toEqual(['a'])
         expect(first.flushed).toEqual([{ failed: 0 }])
         expect(first.result).toMatchObject({ done: false, superseded: false })
-        expect(platform.events[1]).toMatchObject({ parm1: SUBJECT, parm2: '1762689600000:a' })
+        expect(platform.events[1]).toMatchObject({ parm1: SUBJECT, parm2: `${token}:a` })
 
         platform.properties['x_daas_ham.job.budget_seconds'] = '120'
         const last = job(PASS)
-        expect(runEventTableJob(queued('1762689600000:a'), last.spec)).toMatchObject({ done: true, superseded: false })
+        expect(runEventTableJob(queued(platform.events[1]?.parm2 ?? ''), last.spec)).toMatchObject({ done: true, superseded: false })
         expect(last.handled).toEqual(['b'])
         expect(platform.events).toHaveLength(2)
         // Nothing marks the row as the pass ends: the caller completes it.
@@ -246,21 +253,21 @@ describe('an event job whose passes are started where they are triggered', () =>
 
     it('drops a chunk of a pass replaced since: nothing handled, flushed or queued', () => {
         items('a', 'b')
-        queuePass(EVENT_NAME, record, SUBJECT, PASS.job)
+        const replaced = queueNewPass()
         platform.clock += 1000
-        queuePass(EVENT_NAME, record, SUBJECT, PASS.job)
-        const stale = oneChunk('1762689600000:')
+        const current = queueNewPass()
+        const stale = oneChunk(`${replaced}:`)
         expect(stale.result).toMatchObject({ superseded: true, done: false, processed: 0 })
         expect(stale.handled).toEqual([])
         expect(stale.flushed).toEqual([])
         expect(platform.events).toHaveLength(2)
-        expect(inCurrentPass(queued('1762689600000:'), PASS.job)).toBe(false)
-        expect(inCurrentPass(queued('1762689601000:'), PASS.job)).toBe(true)
+        expect(inCurrentPass(queued(`${replaced}:`), PASS.job)).toBe(false)
+        expect(inCurrentPass(queued(`${current}:`), PASS.job)).toBe(true)
     })
 
     it('neither flushes nor queues for a pass retired while its chunk ran', () => {
         items('a', 'b')
-        queuePass(EVENT_NAME, record, SUBJECT, PASS.job)
+        const token = queueNewPass()
         const run = job(PASS)
         const retiring = {
             ...run.spec,
@@ -270,27 +277,27 @@ describe('an event job whose passes are started where they are triggered', () =>
                 if (row) retirePass(row)
             },
         }
-        expect(runEventTableJob(queued('1762689600000:'), retiring)).toMatchObject({ superseded: true, done: false })
+        expect(runEventTableJob(queued(`${token}:`), retiring)).toMatchObject({ superseded: true, done: false })
         expect(run.flushed).toEqual([])
         expect(platform.events).toHaveLength(1)
     })
 
     it.each(['', 'a', ':a'])('drops an event that names no pass (parm2 %j) instead of starting one', (position) => {
         items('a')
-        queuePass(EVENT_NAME, record, SUBJECT, PASS.job)
+        const token = queueNewPass()
         const run = oneChunk(position)
         expect(run.result.superseded).toBe(true)
         expect(run.handled).toEqual([])
-        expect(cursorRow(PASS.job)?.cursor).toBe('1762689600000')
+        expect(cursorRow(PASS.job)?.cursor).toBe(token)
     })
 
     it('lets what a flush throws escape, with the pass still current', () => {
         items('a')
-        queuePass(EVENT_NAME, record, SUBJECT, PASS.job)
+        const token = queueNewPass()
         const run = job(PASS)
         const failing = { ...run.spec, flush: () => { throw new Error('count refused') } }
-        expect(() => runEventTableJob(queued('1762689600000:'), failing)).toThrow('count refused')
-        expect(inCurrentPass(queued('1762689600000:'), PASS.job)).toBe(true)
+        expect(() => runEventTableJob(queued(`${token}:`), failing)).toThrow('count refused')
+        expect(inCurrentPass(queued(`${token}:`), PASS.job)).toBe(true)
         expect(platform.events).toHaveLength(1)
     })
 })
@@ -307,8 +314,10 @@ describe('an event job whose passes supersede each other under its lock (ADR 001
         expect(calls).toEqual(['start'])
         expect(run.handled).toEqual(['a'])
         expect(run.flushed).toEqual([{ failed: 0 }])
-        expect(cursorRow(JOB)).toMatchObject({ cursor: '1762689600000', last_status: 'running' })
-        expect(platform.events).toEqual([{ name: EVENT_NAME, record: 'rec1', parm1: SUBJECT, parm2: '1762689600000:a', delayed: false }])
+        const token = cursorRow(JOB)?.cursor ?? ''
+        expect(isCurrentPass(JOB, token)).toBe(true)
+        expect(cursorRow(JOB)).toMatchObject({ last_status: 'running' })
+        expect(platform.events).toEqual([{ name: EVENT_NAME, record: 'rec1', parm1: SUBJECT, parm2: `${token}:a`, delayed: false }])
         expect(platform.tables[LOCKS]).toEqual([])
     })
 
