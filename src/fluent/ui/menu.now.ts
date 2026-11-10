@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { ApplicationMenu, Record } from '@servicenow/sdk/core'
-import { broadStaff, providerStaff, scanners, staffOrderRaisers, stockroomWorkers } from '../security/roles.now'
+import { broadStaff, orderRaisers, providerStaff, scanners, stockroomWorkers } from '../security/roles.now'
 import { ROLE } from '../../server/domain/visibility'
 import { requestNetworkEquipment } from './order-producer.now'
 import { requestReturn } from './return-producer.now'
@@ -66,7 +66,7 @@ Record({
         application: naasMenu,
         link_type: 'DIRECT',
         query: `com.glideapp.servicecatalog_cat_item_view.do?v=1&sysparm_id=${requestNetworkEquipment.$id}`,
-        roles: staffOrderRaisers,
+        roles: orderRaisers,
         active: true,
         order: 120,
     },
@@ -506,7 +506,7 @@ Record({
         application: naasMenu,
         link_type: 'DIRECT',
         query: `com.glideapp.servicecatalog_cat_item_view.do?v=1&sysparm_id=${requestReturn.$id}`,
-        roles: staffOrderRaisers,
+        roles: orderRaisers,
         active: true,
         order: 150,
     },

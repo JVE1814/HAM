@@ -23,7 +23,17 @@ const REFERENCES = {
 }
 
 const { GlideRecord } = await import('@servicenow/glide')
-const { grantsCustomerRecord, grantsFleetAsset, readsRecord, scopeRecords } = await import('./visibility.ts')
+const {
+    createsCustomerReturn,
+    deletesAsset,
+    grantsCustomerRecord,
+    grantsFleetAsset,
+    readsAssetCost,
+    readsRecord,
+    scopeRecords,
+    writesAsset,
+    writesAssetCommercialField,
+} = await import('./visibility.ts')
 const { beyondVisibility } = await import('../platform/beyond-visibility.ts')
 const { conditionsOf, platform, recordOf } = await import('../test-support/fake-glide.ts')
 
@@ -217,6 +227,84 @@ describe('grantsFleetAsset', () => {
     })
 })
 
+describe('the checks of changes to hardware by hand', () => {
+    const hardware = (row: Row) => record('alm_hardware', { sys_class_name: 'alm_hardware', ...row })
+    const fleet = (row: Row = {}) => hardware({ x_daas_ham_fleet: '1', ...row })
+    const CHECKS = { writesAsset, deletesAsset, writesAssetCommercialField, readsAssetCost }
+
+    it('pass an Asset of another class, in case Applies To is not applied', () => {
+        platform.parents.alm_consumable = ['alm_asset']
+        for (const reader of ['tech', 'admin', 'contact', 'staff'] as const) {
+            signIn(reader)
+            for (const [name, check] of Object.entries(CHECKS)) {
+                expect(check(record('alm_asset', { sys_class_name: 'alm_consumable', x_daas_ham_fleet: '1', company: 'cust9' })), `${reader} ${name}`).toBe(true)
+            }
+        }
+    })
+
+    it('pass hardware outside the fleet, which the platform decides alone', () => {
+        for (const reader of ['tech', 'admin', 'contact', 'staff'] as const) {
+            signIn(reader)
+            for (const [name, check] of Object.entries(CHECKS)) {
+                expect(check(hardware({ x_daas_ham_fleet: '0', stockroom: 'sr9', company: 'cust9' })), `${reader} ${name}`).toBe(true)
+            }
+        }
+    })
+
+    it('let an asset editor save a fleet asset their scope keeps, on the alm_hardware record of an alm_asset row', () => {
+        platform.tables.alm_hardware = [
+            { sys_id: 'mine', sys_class_name: 'alm_hardware', x_daas_ham_fleet: '1', stockroom: 'sr1' },
+            { sys_id: 'theirs', sys_class_name: 'alm_hardware', x_daas_ham_fleet: '1', stockroom: 'sr9' },
+        ]
+        const assetRow = (id: string) => record('alm_asset', { sys_id: id, sys_class_name: 'alm_hardware' })
+        signIn('tech')
+        expect(writesAsset(assetRow('mine'))).toBe(true)
+        expect(writesAsset(assetRow('theirs'))).toBe(false)
+        expect(writesAsset(fleet({ stockroom: 'sr1' }))).toBe(true)
+        expect(writesAsset(fleet({ stockroom: 'sr9' }))).toBe(false)
+        // The NOC sees every fleet asset and runs none.
+        signIn('staff')
+        expect(writesAsset(fleet({ stockroom: 'sr1' }))).toBe(false)
+        platform.user.roles = ['x_daas_ham.field_tech']
+        expect(writesAsset(fleet({ stockroom: 'sr9' }))).toBe(true)
+        signIn('admin')
+        expect(writesAsset(fleet({ company: 'cust1' }))).toBe(false)
+        signIn('service desk')
+        expect(writesAsset(fleet({ stockroom: 'sr9' }))).toBe(true)
+    })
+
+    it('keep deleting a fleet asset to app administrators, and its company and cost to asset managers', () => {
+        signIn('tech')
+        expect(deletesAsset(fleet({ stockroom: 'sr1' }))).toBe(false)
+        expect(writesAssetCommercialField(fleet({ stockroom: 'sr1' }))).toBe(false)
+        signIn('staff')
+        platform.user.roles = ['x_daas_ham.asset_manager']
+        expect(deletesAsset(fleet())).toBe(false)
+        expect(writesAssetCommercialField(fleet())).toBe(true)
+        platform.user.roles = ['x_daas_ham.admin']
+        expect(deletesAsset(fleet())).toBe(true)
+    })
+
+    it("keep a fleet asset's cost from Customer contacts", () => {
+        for (const reader of ['admin', 'contact'] as const) {
+            signIn(reader)
+            expect(readsAssetCost(fleet({ company: 'cust1', x_daas_ham_site: 'site1' })), reader).toBe(false)
+        }
+        for (const reader of ['tech', 'staff', 'service desk'] as const) {
+            signIn(reader)
+            expect(readsAssetCost(fleet({ company: 'cust1' })), reader).toBe(true)
+        }
+    })
+
+    it('pass a record that is not a saved row: a New form, a check of the whole table', () => {
+        signIn('admin')
+        for (const [name, check] of Object.entries(CHECKS)) {
+            expect(check(new GlideRecord('alm_hardware')), name).toBe(true)
+            expect(check(record('alm_hardware', { sys_class_name: 'alm_hardware', x_daas_ham_fleet: '1', company: 'cust9' }, false)), name).toBe(true)
+        }
+    })
+})
+
 describe('grantsCustomerRecord', () => {
     const OTHER_SITE = { sys_id: 'site9', company: 'cust1', x_daas_ham_site_contacts: 'someone' }
 
@@ -264,5 +352,30 @@ describe('grantsCustomerRecord', () => {
         expect(grantsCustomerRecord(record('x_daas_ham_order', { customer: 'cust1' }, false))).toBe(true)
         expect(grantsCustomerRecord(record('u_unplaced_grant', { customer: 'cust1' }))).toBe(false)
         expect(platform.warnings).toHaveLength(1)
+    })
+})
+
+describe("the customer admins' create ACLs", () => {
+    it('grant an Order of their own Customer only, and none that names no Customer', () => {
+        signIn('admin')
+        expect(grantsCustomerRecord(record('x_daas_ham_order', { customer: 'cust1' }, false))).toBe(true)
+        expect(grantsCustomerRecord(record('x_daas_ham_order', { customer: 'cust9' }, false))).toBe(false)
+        expect(grantsCustomerRecord(new GlideRecord('x_daas_ham_order'))).toBe(false)
+    })
+
+    it('grant a Return of their own Customer, or one that names none yet', () => {
+        signIn('admin')
+        expect(createsCustomerReturn(record('x_daas_ham_return_order', { customer: 'cust1' }, false))).toBe(true)
+        expect(createsCustomerReturn(record('x_daas_ham_return_order', { customer: 'cust9' }, false))).toBe(false)
+        expect(createsCustomerReturn(new GlideRecord('x_daas_ham_return_order'))).toBe(true)
+    })
+
+    it('grant a user with no Company neither', () => {
+        signIn('admin')
+        platform.user = { ...platform.user, id: 'no-company', company: '' }
+        expect(grantsCustomerRecord(record('x_daas_ham_order', { customer: 'cust1' }, false))).toBe(false)
+        expect(grantsCustomerRecord(new GlideRecord('x_daas_ham_order'))).toBe(false)
+        expect(createsCustomerReturn(record('x_daas_ham_return_order', { customer: 'cust1' }, false))).toBe(false)
+        expect(createsCustomerReturn(new GlideRecord('x_daas_ham_return_order'))).toBe(false)
     })
 })

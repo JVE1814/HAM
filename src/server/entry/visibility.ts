@@ -1,12 +1,17 @@
 import { GlideRecord, GlideTableHierarchy, gs } from '@servicenow/glide'
 import { memoized } from '../domain/memo.ts'
 import {
+    deletesFleetAsset,
     grantsContactRecord,
     grantsNaasRecord,
+    grantsReturnOfOwnCustomer,
+    readsFleetProviderField,
     rowVisible,
     SCOPED_TABLES,
     scopingOf,
     visibilityFilter,
+    writesFleetAsset,
+    writesFleetCommercialField,
     type ScopedRow,
     type TableScoping,
 } from '../domain/visibility.ts'
@@ -161,6 +166,40 @@ export function grantsFleetAsset(current: GlideRecord): boolean {
     return grantsNaasRecord(session.scope, HARDWARE, hardwareRow(current), session)
 }
 
+/*
+ * Changes to hardware by hand (security/acls-hardware.now.ts, ADR 0005): Deny-Unless ACLs on alm_asset, beside the
+ * platform's Allow-If ones there, which the platform's `asset` role (inventory and field techs hold it) passes for every
+ * Asset. On a fleet asset they keep saving to the asset editors whose scope keeps it, deleting to app administrators,
+ * and the company and cost to asset managers (domain/visibility); any other Asset passes, left to the platform.
+ */
+
+const hasRole = (role: string): boolean => gs.hasRole(role)
+
+/** Row check of the Deny-Unless write ACL on alm_asset: a fleet asset is saved only by an asset editor who sees it. */
+export function writesAsset(current: GlideRecord): boolean {
+    if (otherAssetClass(current)) return true
+    const session = currentSession()
+    return writesFleetAsset(session.scope, hasRole, hardwareRow(current), session)
+}
+
+/** Check of the Deny-Unless delete ACL on alm_asset: a fleet asset is deleted only by an app administrator. */
+export function deletesAsset(current: GlideRecord): boolean {
+    if (otherAssetClass(current)) return true
+    return deletesFleetAsset(hasRole, hardwareRow(current))
+}
+
+/** Check of the Deny-Unless write ACLs on alm_asset.company and alm_asset.cost: an asset manager's, on a fleet asset. */
+export function writesAssetCommercialField(current: GlideRecord): boolean {
+    if (otherAssetClass(current)) return true
+    return writesFleetCommercialField(hasRole, hardwareRow(current))
+}
+
+/** Check of the Deny-Unless read ACL on alm_asset.cost: a fleet asset's cost is not a Customer contact's to read. */
+export function readsAssetCost(current: GlideRecord): boolean {
+    if (otherAssetClass(current)) return true
+    return readsFleetProviderField(currentSession().scope, hardwareRow(current))
+}
+
 /**
  * Grant of the Customer contacts' Allow-If read ACLs on the app's own tables (security/acls.now.ts,
  * acls-logistics.now.ts): a record of the reader's Customer and, for a site contact who is no Customer admin, of a
@@ -169,6 +208,9 @@ export function grantsFleetAsset(current: GlideRecord): boolean {
  * attestation items, shipment events, Site templates and their items) shows a contact no other Customer's or Site's
  * record. It decides for the contact the ACL's roles admit, whatever else the user holds: staff read through their
  * own ACLs. The reader's Customer and Sites are read once per transaction (platform/session), so a row costs no query.
+ *
+ * It is also the grant of the customer admins' create ACL on Orders: an Order that names their own Customer, and none
+ * that names no Customer (a record that is not a saved row is judged by its values).
  */
 export function grantsCustomerRecord(current: GlideRecord): boolean {
     const session = currentSession()
@@ -176,4 +218,12 @@ export function grantsCustomerRecord(current: GlideRecord): boolean {
     const { scoping } = placementOf(table)
     if (!scoping) warnUnplaced(table)
     return grantsContactRecord(session.contactScope(), scoping, scopedRow(current), session)
+}
+
+/**
+ * Grant of the customer admins' create ACL on Returns (security/acls.now.ts): a Return of their own Customer, or one
+ * that names none yet (domain/visibility `grantsReturnOfOwnCustomer`).
+ */
+export function createsCustomerReturn(current: GlideRecord): boolean {
+    return grantsReturnOfOwnCustomer(currentSession().customerId, str(current, SCOPED_TABLES.x_daas_ham_return_order.customer))
 }

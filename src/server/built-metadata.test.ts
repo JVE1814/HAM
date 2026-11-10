@@ -690,6 +690,8 @@ describe('NaaS Asset Workspace URL', () => {
  */
 interface BuiltAcl {
     table: string
+    /** The field a field-level ACL secures; '' for a record ACL. */
+    field: string
     /** The table of its records: its own, or the one class an ACL on a parent table applies to. */
     records: string
     operation: string
@@ -697,32 +699,54 @@ interface BuiltAcl {
     /** The names of the roles it grants. */
     roles: string[]
     appliesTo: string
+    condition: string
     /** The entry function its script calls, `inline` for a script written in the ACL, '' for none. */
     script: string
 }
 
-function builtAcls(): BuiltAcl[] {
+/** The names of the roles each built ACL grants, by the ACL's id. */
+function aclRoles(): Map<string, string[]> {
     const rolesOf = new Map<string, string[]>()
     for (const grant of records('sys_security_acl_role')) {
         rolesOf.set(grant.sys_security_acl ?? '', [...(rolesOf.get(grant.sys_security_acl ?? '') ?? []), grant['sys_user_role.name'] ?? ''])
     }
+    return rolesOf
+}
+
+/** The app's ACLs on records and on their fields (a field ACL is built under the name `<table>.<field>`). */
+function builtAcls(): BuiltAcl[] {
+    const rolesOf = aclRoles()
     return records('sys_security_acl')
         .filter((acl) => acl.type === 'record')
-        .map((acl) => ({
-            table: acl.name ?? '',
-            records: /^sys_class_name=(\w+)$/.exec(acl.applies_to ?? '')?.[1] ?? acl.name ?? '',
-            operation: acl.operation ?? '',
-            deny: acl.decision_type === 'deny',
-            roles: rolesOf.get(acl.sys_id ?? '') ?? [],
-            appliesTo: acl.applies_to ?? '',
-            script: wrapped(acl.script ?? '')?.fn ?? (acl.script ? 'inline' : ''),
-        }))
+        .map((acl) => {
+            const [table = '', field = ''] = (acl.name ?? '').split('.')
+            return {
+                table,
+                field,
+                records: /^sys_class_name=(\w+)$/.exec(acl.applies_to ?? '')?.[1] ?? table,
+                operation: acl.operation ?? '',
+                deny: acl.decision_type === 'deny',
+                roles: rolesOf.get(acl.sys_id ?? '') ?? [],
+                appliesTo: acl.applies_to ?? '',
+                condition: acl.condition ?? '',
+                script: wrapped(acl.script ?? '')?.fn ?? (acl.script ? 'inline' : ''),
+            }
+        })
 }
+
+/** The ACLs on records: a field ACL grants no table. */
+const recordAcls = (): BuiltAcl[] => builtAcls().filter((acl) => !acl.field)
+
+const isCustomerRole = (role: string) => role === ROLE.customerAdmin || role === ROLE.siteContact
+/** Every provider-staff role (security/roles.now.ts `providerStaff`), sorted. */
+const PROVIDER_STAFF = [...BROAD_STAFF, ROLE.inventoryTech].sort()
+/** The roles that read the money tables (security/roles.now.ts `moneyReaders`), sorted. */
+const MONEY_READERS = [ROLE.finance, ROLE.accountManager, ROLE.assetManager].sort()
 
 describe('the rules and ACLs that scope what a reader sees', () => {
     const SCOPINGS: Readonly<Record<string, TableScoping>> = SCOPED_TABLES
     const scopedTables = Object.keys(SCOPINGS)
-    const reads = () => builtAcls().filter((acl) => acl.operation === 'read')
+    const reads = () => recordAcls().filter((acl) => acl.operation === 'read')
     const rules = () =>
         records('sys_script')
             .filter((rule) => rule.action_query === 'true')
@@ -771,8 +795,7 @@ describe('the rules and ACLs that scope what a reader sees', () => {
     })
 
     describe('read ACLs for Customer contacts', () => {
-        const contactReads = () =>
-            reads().filter((acl) => !acl.deny && acl.roles.some((role) => role === ROLE.customerAdmin || role === ROLE.siteContact))
+        const contactReads = () => reads().filter((acl) => !acl.deny && acl.roles.some(isCustomerRole))
 
         it('cover the tables a Customer contact reads', () => {
             expect(contactReads().map((acl) => acl.records).sort()).toEqual(
@@ -801,17 +824,147 @@ describe('the rules and ACLs that scope what a reader sees', () => {
     })
 
     describe('ACLs on the hardware the app shares with the Provider IT', () => {
-        const hardware = () => builtAcls().filter((acl) => acl.records === 'alm_hardware')
+        const hardware = () => recordAcls().filter((acl) => acl.records === 'alm_hardware')
+        /** The app's ACLs on alm_asset, the parent: record and field ACLs that apply to hardware alone. */
+        const onParent = () => builtAcls().filter((acl) => acl.table === 'alm_asset')
+        /** The scripts of entry/visibility that pass an Asset of another class first (entry/visibility.test.ts holds each to it). */
+        const CLASS_CHECKED = ['readsRecord', 'grantsFleetAsset', 'writesAsset', 'deletesAsset', 'writesAssetCommercialField', 'readsAssetCost']
 
-        it("sit on alm_asset, so alm_hardware inherits the platform's read ACLs there and an alm_asset list is checked too", () => {
-            expect(builtAcls().filter((acl) => acl.table === 'alm_hardware')).toEqual([])
-            expect(hardware().length).toBeGreaterThanOrEqual(3)
+        it("sit on alm_asset, so alm_hardware inherits the platform's record ACLs there and an alm_asset list is checked too", () => {
+            expect(recordAcls().filter((acl) => acl.table === 'alm_hardware')).toEqual([])
+            expect(hardware().length).toBeGreaterThanOrEqual(5)
             for (const acl of hardware()) expect(acl.table, `${acl.operation} ${acl.roles}`).toBe('alm_asset')
-            expect(builtAcls().filter((acl) => acl.table === 'alm_asset' && acl.records !== 'alm_hardware')).toEqual([])
+            expect(onParent().filter((acl) => acl.records !== 'alm_hardware')).toEqual([])
+        })
+
+        it('check the class again in their script, in case Applies To is not applied', () => {
+            for (const acl of onParent().filter((acl) => acl.deny || !acl.field)) {
+                expect(CLASS_CHECKED, `${acl.operation} ${acl.field} ${acl.roles}`).toContain(acl.script)
+            }
         })
 
         it('grant only fleet assets: the Allow-If ones leave other hardware to the platform', () => {
             for (const acl of hardware().filter((acl) => !acl.deny)) expect(acl.script, `${acl.roles}`).toBe('grantsFleetAsset')
+        })
+    })
+
+    describe('ACLs on changes to hardware by hand', () => {
+        const onParent = (operation: string, field = '') =>
+            builtAcls().filter((acl) => acl.table === 'alm_asset' && acl.operation === operation && acl.field === field)
+        const denyScript = (operation: string, field = '') =>
+            onParent(operation, field)
+                .filter((acl) => acl.deny)
+                .map((acl) => acl.script)
+
+        it("check, beside the platform's asset-role ACLs, who saves and deletes a fleet asset", () => {
+            expect(denyScript('write')).toEqual(['writesAsset'])
+            expect(denyScript('delete')).toEqual(['deletesAsset'])
+            for (const acl of onParent('write').concat(onParent('delete'))) expect(acl.roles, acl.operation).toEqual([])
+        })
+
+        it("keep a fleet asset's company and cost to asset managers, and its cost from Customer contacts", () => {
+            expect(denyScript('write', 'company')).toEqual(['writesAssetCommercialField'])
+            expect(denyScript('write', 'cost')).toEqual(['writesAssetCommercialField'])
+            expect(denyScript('read', 'cost')).toEqual(['readsAssetCost'])
+        })
+
+        /*
+         * Allow-If ACLs the platform has at the same name and operation (Brazil, read-only, 2026-11-09): alm_asset.company
+         * write (snc_internal), alm_asset.cost read (snc_internal; sn_esm_user, sn_customerservice.requester). alm_asset.cost
+         * has no write ACL of the platform's: it takes alm_asset.*'s, snc_internal on an Asset not consumed (10).
+         */
+        const PLATFORM_ALLOW_IF = ['alm_asset.company write', 'alm_asset.cost read']
+
+        it('sit each beside an Allow-If ACL of its own level, so no verdict depends on matching across levels', () => {
+            const denied = builtAcls().filter((acl) => acl.deny && acl.field)
+            expect(denied.length).toBeGreaterThan(0)
+            for (const acl of denied) {
+                const level = `${acl.table}.${acl.field} ${acl.operation}`
+                const ours = builtAcls().filter(
+                    (other) => !other.deny && other.table === acl.table && other.field === acl.field && other.operation === acl.operation,
+                )
+                expect(PLATFORM_ALLOW_IF.includes(level) || ours.length > 0, level).toBe(true)
+            }
+            const costWrite = onParent('write', 'cost').filter((acl) => !acl.deny)
+            expect(costWrite.map((acl) => [acl.roles, acl.condition, acl.appliesTo])).toEqual([[['snc_internal'], 'install_status!=10', 'sys_class_name=alm_hardware']])
+        })
+
+        // An Asset's Lessor is its lease's Vendor (ADR 0018): it has no column of its own to guard.
+        it("leave the app's own Customer and ownership columns on hardware to asset managers, and its Fleet flag to admins", () => {
+            const writers = (field: string) => builtAcls().filter((acl) => acl.table === 'alm_hardware' && acl.field === field && acl.operation === 'write')
+            for (const field of ['x_daas_ham_agreement', 'x_daas_ham_subscription_line', 'x_daas_ham_lease', 'x_daas_ham_legal_owner']) {
+                expect(writers(field).map((acl) => [acl.roles, acl.deny]), field).toEqual([[[ROLE.assetManager], false]])
+            }
+            expect(writers(FLEET_FIELD).map((acl) => acl.roles)).toEqual([[ROLE.admin]])
+            expect(
+                builtAcls()
+                    .filter((acl) => acl.field === FLEET_FIELD && acl.operation === 'create')
+                    .map((acl) => acl.roles),
+            ).toEqual([[ROLE.admin]])
+        })
+    })
+
+    describe("ACLs on the Provider's own fields of records a Customer contact reads", () => {
+        const fieldReaders = (table: string, field: string) =>
+            builtAcls().filter((acl) => acl.table === table && acl.field === field && acl.operation === 'read' && !acl.deny)
+
+        it('grant them to provider staff, which holds no customer role, so the record a contact reads comes without them', () => {
+            const fields: Array<[string, string]> = [
+                ['alm_hardware', 'x_daas_ham_support_cost'],
+                ['alm_hardware', 'x_daas_ham_claim_code'],
+                ['alm_hardware', 'x_daas_ham_lease'],
+                ['x_daas_ham_shipment', 'cost'],
+            ]
+            for (const [table, field] of fields) {
+                expect(
+                    fieldReaders(table, field).map((acl) => [...acl.roles].sort()),
+                    `${table}.${field}`,
+                ).toEqual([PROVIDER_STAFF])
+            }
+            expect(PROVIDER_STAFF.filter(isCustomerRole)).toEqual([])
+        })
+    })
+
+    describe('create ACLs of Orders, Order lines and Returns', () => {
+        const creators = (table: string) => recordAcls().filter((acl) => acl.table === table && acl.operation === 'create')
+        const forCustomer = (table: string) => creators(table).filter((acl) => acl.roles.some(isCustomerRole))
+        const forStaff = (table: string) => creators(table).filter((acl) => !acl.roles.some(isCustomerRole))
+
+        it('give a customer admin no Order lines: the record producer adds them past the ACLs (platform/orders)', () => {
+            expect(forCustomer('x_daas_ham_order_line')).toEqual([])
+            expect(forStaff('x_daas_ham_order_line')).toHaveLength(1)
+            const raisers = (table: string) => forStaff(table).map((acl) => [...acl.roles].sort())
+            expect(raisers('x_daas_ham_order_line')).toEqual(raisers('x_daas_ham_order'))
+        })
+
+        it('let a customer admin create an Order only of their own Customer, and a Return of theirs or of none yet', () => {
+            const grant = (table: string) => forCustomer(table).map((acl) => [acl.roles, acl.script])
+            expect(grant('x_daas_ham_order')).toEqual([[[ROLE.customerAdmin], 'grantsCustomerRecord']])
+            expect(grant('x_daas_ham_return_order')).toEqual([[[ROLE.customerAdmin], 'createsCustomerReturn']])
+        })
+    })
+
+    describe('read ACLs of the service desk', () => {
+        it('cover the tables of the Orders and Returns it raises, and no other', () => {
+            const read = reads().filter((acl) => !acl.deny && acl.roles.includes(PLATFORM_ROLE.serviceDeskAgent))
+            expect(read.map((acl) => acl.table).sort()).toEqual(
+                [
+                    'x_daas_ham_agreement',
+                    'x_daas_ham_order',
+                    'x_daas_ham_order_line',
+                    'x_daas_ham_return_order',
+                    'x_daas_ham_return_order_line',
+                    'x_daas_ham_site_template',
+                    'x_daas_ham_site_template_item',
+                ].sort(),
+            )
+            for (const acl of read) expect([acl.roles, acl.script], acl.table).toEqual([[PLATFORM_ROLE.serviceDeskAgent], ''])
+            for (const table of ['x_daas_ham_order', 'x_daas_ham_return_order']) {
+                const raisers = recordAcls()
+                    .filter((acl) => acl.table === table && acl.operation === 'create')
+                    .flatMap((acl) => acl.roles)
+                expect(raisers, table).toContain(PLATFORM_ROLE.serviceDeskAgent)
+            }
         })
     })
 
@@ -885,13 +1038,45 @@ describe('workspace audiences', () => {
     const audience = (name: string) =>
         (records('sys_ux_applicability').find((found) => found.name === name)?.roles ?? '').split(',').map((id) => roleNames().get(id) ?? id)
     const grantedOn = (table: string, operation: string) =>
-        builtAcls().filter((acl) => acl.table === table && acl.operation === operation && !acl.deny).flatMap((acl) => acl.roles)
+        recordAcls()
+            .filter((acl) => acl.table === table && acl.operation === operation && !acl.deny)
+            .flatMap((acl) => acl.roles)
 
     it('are the role groups the navigator and the ACLs name', () => {
         const workspaceModule = records('sys_app_module').find((module) => module.title === 'NaaS Asset Workspace')
         expect(audience('NaaS provider staff')).toEqual(workspaceModule?.roles?.split(','))
         expect(audience('NaaS provider staff except inventory techs')).toEqual(BROAD_STAFF)
         expect(audience('NaaS billing and margin readers').sort()).toEqual(grantedOn('x_daas_ham_margin', 'read').sort())
+    })
+})
+
+describe('the NaaS dashboard', () => {
+    const readsOf = (table: string) => recordAcls().filter((acl) => acl.records === table && acl.operation === 'read' && !acl.deny)
+
+    it("is read by the workspace's roles, so the NOC and the techs keep its Operations, Billing and Lifecycle tabs", () => {
+        const path = records('sys_ux_page_registry').find((registry) => registry.title === 'NaaS Asset Workspace')?.path
+        const route = records('sys_security_acl').filter((acl) => (acl.name ?? '').endsWith(`.${path}.*`))
+        const permissions = records('par_dashboard_permission')
+        expect(PROVIDER_STAFF).toHaveLength(6)
+        expect(route.map((acl) => [...(aclRoles().get(acl.sys_id ?? '') ?? [])].sort())).toEqual([PROVIDER_STAFF])
+        expect(permissions.map((permission) => permission['role.name']).sort()).toEqual(PROVIDER_STAFF)
+        for (const permission of permissions) {
+            expect([permission.can_read, permission.can_write, permission.can_share, permission.owner], permission['role.name']).toEqual([
+                'true',
+                'false',
+                'false',
+                'false',
+            ])
+        }
+    })
+
+    it("leaves each widget's data to its table's read ACL: the Margin tab's to the money readers", () => {
+        const tables = [...new Set(dashboardSources().map((source) => source.table))]
+        expect(tables).toEqual(expect.arrayContaining(['alm_hardware', 'x_daas_ham_margin', 'x_daas_ham_cost_fact']))
+        for (const table of tables) expect(readsOf(table).length, table).toBeGreaterThan(0)
+        for (const table of ['x_daas_ham_margin', 'x_daas_ham_cost_fact']) {
+            expect(readsOf(table).map((acl) => [...acl.roles].sort()), table).toEqual([MONEY_READERS])
+        }
     })
 })
 

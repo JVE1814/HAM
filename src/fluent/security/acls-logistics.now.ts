@@ -49,6 +49,20 @@ Acl({
     script: grantsCustomerRecord,
 })
 
+/*
+ * The Provider's carrier cost of a label is not the Customer's to read: the customer read ACL above grants the whole
+ * Shipment, and a field with no ACL of its own is read with its record. Provider staff, who read every Shipment, keep it.
+ */
+Acl({
+    $id: Now.ID['acl_shipment_cost_read'],
+    type: 'record',
+    table: 'x_daas_ham_shipment',
+    field: 'cost',
+    operation: 'read',
+    roles: providerStaff,
+    description: "NaaS: a Shipment's carrier cost is the Provider's, read by provider staff only (not Customer contacts).",
+})
+
 Acl({
     $id: Now.ID['acl_shipment_event_read'],
     type: 'record',

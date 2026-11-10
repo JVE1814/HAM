@@ -7,6 +7,7 @@ import { IN_SERVICE_ON_ENDED_LINE, IN_SERVICE_UNBILLED } from '../../server/doma
 import { INSTALLED_PAST_SUPPORT } from '../../server/domain/model-lifecycle'
 import { INSTALLED_WITHOUT_COVERAGE } from '../../server/domain/coverage'
 import { OPEN_EXCEPTIONS_QUERY } from '../../server/domain/reconciliation'
+import { ROLE } from '../../server/domain/visibility'
 import { SUBSCRIPTION_LINE_STATUS } from '../../server/domain/vocabulary'
 
 /*
@@ -420,5 +421,19 @@ export const naasDashboard = Dashboard({
         },
     ],
     visibilities: [{ $id: Now.ID['dash_naas_visibility'], experience: naasWorkspace }],
-    permissions: [],
+    /*
+     * Read by the workspace's six roles (its route ACL in workspace.now.ts, security/roles.now.ts `providerStaff`); an app
+     * administrator holds them all. A dashboard's tabs take no permissions of their own, so each widget's data is its
+     * table's read ACL's: the Margin tab's margin and cost facts are `moneyReaders`' alone (acls-commercial.now.ts), and
+     * an inventory tech reads no subscription lines or reconciliation exceptions, so those widgets show the others
+     * nothing. built-metadata.test.ts holds this list to the workspace's roles.
+     */
+    permissions: [
+        { $id: Now.ID['dash_naas_read_asset_manager'], role: Now.ref('sys_user_role', { name: ROLE.assetManager }), canRead: true },
+        { $id: Now.ID['dash_naas_read_inventory_tech'], role: Now.ref('sys_user_role', { name: ROLE.inventoryTech }), canRead: true },
+        { $id: Now.ID['dash_naas_read_field_tech'], role: Now.ref('sys_user_role', { name: ROLE.fieldTech }), canRead: true },
+        { $id: Now.ID['dash_naas_read_noc'], role: Now.ref('sys_user_role', { name: ROLE.noc }), canRead: true },
+        { $id: Now.ID['dash_naas_read_account_manager'], role: Now.ref('sys_user_role', { name: ROLE.accountManager }), canRead: true },
+        { $id: Now.ID['dash_naas_read_finance'], role: Now.ref('sys_user_role', { name: ROLE.finance }), canRead: true },
+    ],
 })

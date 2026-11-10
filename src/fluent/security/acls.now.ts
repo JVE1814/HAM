@@ -18,9 +18,10 @@ import {
     providerStaff,
     returnWorkers,
     scanners,
+    serviceDesk,
     stockroomWorkers,
 } from './roles.now'
-import { grantsCustomerRecord, grantsFleetAsset } from '../../server/entry/visibility'
+import { createsCustomerReturn, grantsCustomerRecord, grantsFleetAsset } from '../../server/entry/visibility'
 
 /*
  * Access controls for app tables. Reads are also narrowed by the before-query rules in
@@ -30,8 +31,10 @@ import { grantsCustomerRecord, grantsFleetAsset } from '../../server/entry/visib
  * domain/visibility SCOPED_TABLES as its before-query rule does. Return lines, attestation items, shipment events and
  * Site templates with their items have no before-query rule: their ACL is the only check.
  * Inventory techs read only the tables of their stockroom work (providerStaff or a list naming inventoryTech); other
- * staff reads use broadStaff or a narrower list. On the tables narrowed to an inventory tech's stockrooms, a
- * Deny-Unless row check (acls-visibility.now.ts) re-checks the stockroom. Hardware's read ACLs sit on alm_asset (below).
+ * staff reads use broadStaff or a narrower list, and the service desk reads what the Orders and Returns it raises need.
+ * On the tables narrowed to an inventory tech's stockrooms, a Deny-Unless row check (acls-visibility.now.ts) re-checks
+ * the stockroom. Hardware's read ACLs sit on alm_asset (below); who changes hardware by hand, and who reads its
+ * Provider fields, is in acls-hardware.now.ts.
  */
 
 Acl({
@@ -272,6 +275,68 @@ Acl({
     script: grantsCustomerRecord,
 })
 
+/*
+ * The service desk (serviceDesk) raises Orders and Returns for any Customer (orderRaisers): it reads the Agreements and
+ * Site templates the record producers offer, and the Orders, Order lines and Returns it raises, submits and follows.
+ * It holds no NaaS role, so the before-query rules leave it every Customer's (ADR 0005). Nothing else of the app's is
+ * its to read: not the commercial lines, catalog, fees or money tables.
+ */
+Acl({
+    $id: Now.ID['acl_agreement_read_service_desk'],
+    type: 'record',
+    table: 'x_daas_ham_agreement',
+    operation: 'read',
+    roles: serviceDesk,
+})
+
+Acl({
+    $id: Now.ID['acl_site_template_read_service_desk'],
+    type: 'record',
+    table: 'x_daas_ham_site_template',
+    operation: 'read',
+    roles: serviceDesk,
+})
+
+Acl({
+    $id: Now.ID['acl_site_template_item_read_service_desk'],
+    type: 'record',
+    table: 'x_daas_ham_site_template_item',
+    operation: 'read',
+    roles: serviceDesk,
+})
+
+Acl({
+    $id: Now.ID['acl_order_read_service_desk'],
+    type: 'record',
+    table: 'x_daas_ham_order',
+    operation: 'read',
+    roles: serviceDesk,
+})
+
+Acl({
+    $id: Now.ID['acl_order_line_read_service_desk'],
+    type: 'record',
+    table: 'x_daas_ham_order_line',
+    operation: 'read',
+    roles: serviceDesk,
+})
+
+Acl({
+    $id: Now.ID['acl_return_order_read_service_desk'],
+    type: 'record',
+    table: 'x_daas_ham_return_order',
+    operation: 'read',
+    roles: serviceDesk,
+})
+
+Acl({
+    $id: Now.ID['acl_return_order_line_read_service_desk'],
+    type: 'record',
+    table: 'x_daas_ham_return_order_line',
+    operation: 'read',
+    roles: serviceDesk,
+})
+
 Acl({
     $id: Now.ID['acl_order_read'],
     type: 'record',
@@ -295,6 +360,20 @@ Acl({
     table: 'x_daas_ham_order',
     operation: 'create',
     roles: orderRaisers,
+})
+
+/*
+ * A customer admin creates an Order of their own Customer only. Every Order rule check of a customer admin is asked
+ * of an Order that names its Customer (the producer's, platform/orders `orderingUser`), so one naming none is refused.
+ */
+Acl({
+    $id: Now.ID['acl_order_create_customer'],
+    type: 'record',
+    table: 'x_daas_ham_order',
+    operation: 'create',
+    roles: [customerAdmin],
+    description: 'NaaS customer admins create Orders of their own Customer only.',
+    script: grantsCustomerRecord,
 })
 
 Acl({
@@ -330,6 +409,7 @@ Acl({
     script: grantsCustomerRecord,
 })
 
+// No customer role: a customer admin's lines are the record producer's, which its script adds (platform/orders).
 Acl({
     $id: Now.ID['acl_order_line_create'],
     type: 'record',
@@ -1053,6 +1133,21 @@ Acl({
     table: 'x_daas_ham_return_order',
     operation: 'create',
     roles: orderRaisers,
+})
+
+/*
+ * A customer admin creates a Return of their own Customer only. One that names no Customer yet passes: the customer
+ * page asks whether a Return may be raised at all (platform/returns, canCreate() of an empty record) before it names
+ * the Customer, and a Return with none is no Customer's, which no customer contact reads.
+ */
+Acl({
+    $id: Now.ID['acl_return_order_create_customer'],
+    type: 'record',
+    table: 'x_daas_ham_return_order',
+    operation: 'create',
+    roles: [customerAdmin],
+    description: 'NaaS customer admins create Returns of their own Customer only.',
+    script: createsCustomerReturn,
 })
 
 Acl({

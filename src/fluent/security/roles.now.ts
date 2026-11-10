@@ -2,7 +2,10 @@ import '@servicenow/sdk/global'
 import { Role } from '@servicenow/sdk/core'
 import { BROAD_STAFF, PLATFORM_ROLE, ROLE } from '../../server/domain/visibility'
 
-/* The base-platform roles contained below (domain/visibility PLATFORM_ROLE) must exist on the instance; see README "Required plugins". */
+/*
+ * The base-platform roles contained below must exist on the instance, as must the service desk's, which the ACLs grant
+ * directly (`serviceDesk`): domain/visibility PLATFORM_ROLE; see README "Required plugins".
+ */
 
 export const inventoryTech = Role({
     name: ROLE.inventoryTech,
@@ -76,17 +79,25 @@ export const providerStaff = [ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldT
 /** Provider staff without inventory techs: the read list for customer, commercial and configuration tables. */
 export const broadStaff = BROAD_STAFF
 
+/**
+ * The service desk (Customer Service agents, a platform role the ACLs name directly): raises Orders and Returns for any
+ * Customer, so it reads the Agreements, Site templates, Orders and Returns that work needs, and no other NaaS table.
+ */
+export const serviceDesk = [PLATFORM_ROLE.serviceDeskAgent]
+
 /** External customer roles; their reads are filtered to their own customer. */
 export const customerRoles = [ROLE.customerAdmin, ROLE.siteContact]
 
 /** Who writes Agreements, Catalog entries and the other commercial records. */
 export const commercialEditors = [ROLE.accountManager, ROLE.assetManager]
 
-/** Who raises an Order: staff, the Customer's admin and the service desk. */
-export const orderRaisers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, ROLE.customerAdmin, PLATFORM_ROLE.serviceDeskAgent]
-
-/** The staff among them, who raise one from the navigator or submit one on its form. */
-export const staffOrderRaisers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, PLATFORM_ROLE.serviceDeskAgent]
+/**
+ * Who raises an Order or a Return for any Customer, from the navigator, a record producer or its form: provider roles
+ * and the service desk. A customer admin raises them for their own Customer only, through the record producers, and has
+ * create ACLs of its own that check the Customer (a Table API insert meets no producer); it creates no Order lines,
+ * which the producer's script adds (platform/orders), past ACLs.
+ */
+export const orderRaisers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, PLATFORM_ROLE.serviceDeskAgent]
 
 /** Who changes an Order as it is fulfilled. */
 export const orderWorkers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, ROLE.inventoryTech, ROLE.fieldTech, PLATFORM_ROLE.serviceDeskAgent]
@@ -103,7 +114,7 @@ export const returnWorkers = [ROLE.assetManager, ROLE.inventoryTech, ROLE.noc]
 /** Who writes Lease schedules and their decisions. */
 export const leaseEditors = [ROLE.assetManager, ROLE.finance]
 
-/** The roles that read billing and margin data. */
+/** Roles that read the money tables (service intervals, billing, cost facts and margin), the NaaS dashboard's Margin tab among them. */
 export const moneyReaders = [ROLE.finance, ROLE.accountManager, ROLE.assetManager]
 
 /** Every person the app serves, provider staff and Customer contacts: the rack elevations are open to them all. */

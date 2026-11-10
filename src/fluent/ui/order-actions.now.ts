@@ -9,8 +9,8 @@ import {
     commercialEditors,
     customerAdmin,
     fieldTech,
+    orderRaisers,
     siteContact,
-    staffOrderRaisers,
     stockroomWorkers,
 } from '../security/roles.now'
 import { APPROVAL_REQUESTED } from '../../server/domain/approvals'
@@ -25,7 +25,7 @@ UiAction({
     table: 'x_daas_ham_order',
     actionName: 'x_daas_ham_submit_order',
     condition: `current.stage == '${ORDER_STAGE.draft}'`,
-    roles: staffOrderRaisers,
+    roles: orderRaisers,
     form: { showButton: true, style: 'primary' },
     showUpdate: true,
     script: uiSubmitOrder,
