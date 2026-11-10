@@ -111,12 +111,21 @@ function lineValues(reservation: Reservation): Record<string, string> {
 }
 
 /**
+ * Take a unit off its Order line and no more (the caller saves): one that stays its Customer's (a hot spare, a unit
+ * that failed staging or left in transit). Every unit that leaves a line is taken off it here or by
+ * `releaseToProviderStock`.
+ */
+export function takeOffOrderLine(asset: GlideRecord): void {
+    asset.setValue('x_daas_ham_order_line', '')
+}
+
+/**
  * Give a unit back to Provider stock, the inverse of a reservation (`lineValues`): it is the Provider's own again
  * (its company, ADR 0006), under no Agreement and on no Order line. Sets the fields only: the caller moves the Asset to
  * the stage it goes back to and saves it, each with its own answer to a refusal.
  */
 export function releaseToProviderStock(asset: GlideRecord): void {
-    asset.setValue('x_daas_ham_order_line', '')
+    takeOffOrderLine(asset)
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('x_daas_ham_agreement', '')
 }

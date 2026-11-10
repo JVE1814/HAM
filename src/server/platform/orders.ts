@@ -33,7 +33,7 @@ import { addOrderLines, cancelLine, type NewLine, type RefusedLine } from './ord
 import { bool, findById, num, refusal, str, warnRefused } from './records.ts'
 import { currentSession } from './session.ts'
 import { skipOpenStagingTasks } from './staging-tasks.ts'
-import { releaseToProviderStock } from './stock.ts'
+import { releaseToProviderStock, takeOffOrderLine } from './stock.ts'
 import { SITE_FIELD } from '../domain/fleet.ts'
 
 /**
@@ -284,7 +284,7 @@ function releaseAsset(asset: GlideRecord): boolean {
     const serial = str(asset, 'serial_number')
     const release = cancelledUnit(readStage(asset))
     if (release === 'stays_spare') {
-        asset.setValue('x_daas_ham_order_line', '')
+        takeOffOrderLine(asset)
         // Still linked to the line, the spare is never picked again.
         return saveReleased(asset, `${serial} still linked to its line, unlink it`) && closed
     }

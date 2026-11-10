@@ -11,7 +11,7 @@ import {
     voidsWipeEvidence,
 } from '../domain/lifecycle.ts'
 import { PLACEMENT_FIELDS } from '../domain/rack.ts'
-import type { LegalOwner } from '../domain/vocabulary.ts'
+import { LEGAL_OWNER, type LegalOwner } from '../domain/vocabulary.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { PROPERTY, stringProperty } from './properties.ts'
 import { bool, refusal, str, type ReadOptions } from './records.ts'
@@ -87,7 +87,7 @@ export function newAsset(modelId: string, stage: Stage): GlideRecord {
     const asset = new GlideRecord('alm_hardware')
     asset.initialize()
     asset.setValue(FLEET_FIELD, true)
-    asset.setValue('x_daas_ham_legal_owner', 'provider')
+    asset.setValue('x_daas_ham_legal_owner', LEGAL_OWNER.provider)
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('model', modelId)
     asset.setValue('quantity', 1)
@@ -108,7 +108,7 @@ export function isFleetAsset(asset: GlideRecord): boolean {
  */
 export function joinFleet(asset: GlideRecord): void {
     asset.setValue(FLEET_FIELD, true)
-    if (!str(asset, 'x_daas_ham_legal_owner')) asset.setValue('x_daas_ham_legal_owner', 'provider')
+    if (!str(asset, 'x_daas_ham_legal_owner')) asset.setValue('x_daas_ham_legal_owner', LEGAL_OWNER.provider)
 }
 
 /** The Asset as domain/fleet `adoptionProblem` and `receiptProblem` judge it. */

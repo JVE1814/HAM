@@ -99,6 +99,11 @@ export const LEGAL_OWNER_CHOICES = {
     lessor: { label: 'Lessor', sequence: 2 },
 } as const
 export type LegalOwner = keyof typeof LEGAL_OWNER_CHOICES
+export const LEGAL_OWNER = {
+    provider: 'provider',
+    customer: 'customer',
+    lessor: 'lessor',
+} as const satisfies Named<LegalOwner>
 
 /** Where a unit is staged: on the Asset, its Staging task and the Staging checklist template. */
 export const STAGING_SOURCE_CHOICES = {

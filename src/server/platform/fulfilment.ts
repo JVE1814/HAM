@@ -16,6 +16,7 @@ import { beyondVisibility } from './beyond-visibility.ts'
 import { EVENT, fire } from './events.ts'
 import { saveLineStage } from './order-lines.ts'
 import { exists, findById, num, str, warnRefused } from './records.ts'
+import { takeOffOrderLine } from './stock.ts'
 
 /**
  * Keeps Order-line and Order stages in step with their Assets (derived, see domain/fulfilment), and has a line that
@@ -122,7 +123,7 @@ function takeOffLine(assetId: string, line: GlideRecord, to: Stage): boolean {
     // A fresh record, read past the user's rules: saving `current` again from its own after rule would run its rules twice.
     const asset = findById('alm_hardware', assetId, { beyondVisibility: true })
     if (!asset) return false
-    asset.setValue('x_daas_ham_order_line', '')
+    takeOffOrderLine(asset)
     const what = `${str(asset, 'serial_number')} left ${str(line, 'number')} in transit (${to})`
     if (asset.update()) {
         gs.info(`[x_daas_ham] ${what}: taken off the line, which is filled again`)

@@ -14,7 +14,7 @@ import {
 } from '../domain/leases.ts'
 import { isRetired, SERVING_STAGES, type Stage, stagesQuery, STOCK_STAGES } from '../domain/lifecycle.ts'
 import { isFree } from '../domain/sourcing.ts'
-import type { LeaseEndAction } from '../domain/vocabulary.ts'
+import { LEGAL_OWNER, type LeaseEndAction } from '../domain/vocabulary.ts'
 import { providerApproverIds } from './approvals.ts'
 import { moveAsset, readStage } from './assets.ts'
 import { runEventTableJob } from './chunked.ts'
@@ -42,7 +42,7 @@ const DECISION_CLOSED = 3
  * its Lease schedule): set its Legal owner (the caller saves). One on no lease is left as it is.
  */
 export function giveToLessor(asset: GlideRecord): void {
-    if (findById(LEASE, str(asset, 'x_daas_ham_lease'))) asset.setValue('x_daas_ham_legal_owner', 'lessor')
+    if (findById(LEASE, str(asset, 'x_daas_ham_lease'))) asset.setValue('x_daas_ham_legal_owner', LEGAL_OWNER.lessor)
 }
 
 /**
@@ -344,7 +344,7 @@ export function transferToProvider(queued: JobEvent, lease: GlideRecord): void {
             const asset = findById('alm_hardware', assetId)
             if (!asset || str(asset, 'x_daas_ham_lease') !== leaseId || isRetired(readStage(asset))) return
             asset.setValue('x_daas_ham_lease', '')
-            asset.setValue('x_daas_ham_legal_owner', 'provider')
+            asset.setValue('x_daas_ham_legal_owner', LEGAL_OWNER.provider)
             if (purchase) {
                 asset.setValue('cost', purchase.cost)
                 asset.setValue('purchase_date', purchase.date)

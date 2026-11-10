@@ -29,7 +29,7 @@ import { requestPurchase } from './procurement.ts'
 import { stagingStockroom } from './properties.ts'
 import { findById, num, str, warnRefused } from './records.ts'
 import { openStagingTask, skipOpenStagingTasks, startStaging } from './staging-tasks.ts'
-import { linkHotSpare, releaseToProviderStock, reserveAsset, stockCandidates } from './stock.ts'
+import { linkHotSpare, releaseToProviderStock, reserveAsset, stockCandidates, takeOffOrderLine } from './stock.ts'
 import { requestTransfer } from './transfers.ts'
 
 /**
@@ -319,7 +319,7 @@ function leftUnsaved(line: GlideRecord, why: keyof typeof AGAIN_BECAUSE, transfe
  */
 function unreserve(asset: GlideRecord, source: Source, why = 'no transfer order'): boolean {
     if (source === 'spare_pool') {
-        asset.setValue('x_daas_ham_order_line', '')
+        takeOffOrderLine(asset)
         return moveAndSave(asset, 'spare_pool', why)
     }
     releaseToProviderStock(asset)

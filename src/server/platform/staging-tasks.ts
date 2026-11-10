@@ -5,6 +5,7 @@ import { moveAndSave } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { lineLostUnit } from './fulfilment.ts'
 import { bool, deleteWhere, exists, findById, num, refusal, str, warnRefused } from './records.ts'
+import { takeOffOrderLine } from './stock.ts'
 
 /** Staging tasks with their checklist steps: opening them, starting the staging, and skipping those no longer needed. */
 
@@ -83,7 +84,7 @@ export function completeStaging(assetId: string, taskNumber: string, failed: boo
     if (!asset) return
     if (!failed) return void moveAndSave(asset, 'staged', `staging ${taskNumber}`)
     const lineId = str(asset, 'x_daas_ham_order_line')
-    asset.setValue('x_daas_ham_order_line', '')
+    takeOffOrderLine(asset)
     moveAndSave(asset, 'pending_evaluation', `staging ${taskNumber} failed`)
     if (lineId) lineLostUnit(lineId)
 }
