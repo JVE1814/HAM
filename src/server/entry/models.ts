@@ -14,12 +14,17 @@ export function normalizeRawModels(): void {
 
 /**
  * After-update rule on normalization exceptions given a resolved model: learn a rule from it. One whose alias or rule
- * is refused stays open, as nothing maps its raw pair yet.
+ * is refused stays open, as nothing maps its raw pair yet. One learned whose resolution the platform refuses stays open
+ * too (platform/normalization `resolveNormalizationException`): the user sets it resolved by hand.
  */
 export function onNormalizationResolved(current: GlideRecord): void {
-    if (resolveNormalizationException(current)) return
-    const retry = 'clear its resolved model and set it again to retry'
-    gs.addErrorMessage(`No rule learned (see the system log), so the exception stays open: ${retry}`)
+    const resolution = resolveNormalizationException(current)
+    if (!resolution.learned) {
+        const retry = 'clear its resolved model and set it again to retry'
+        return void gs.addErrorMessage(`No rule learned (see the system log), so the exception stays open: ${retry}`)
+    }
+    if (!resolution.unresolved) return
+    gs.addErrorMessage(`The rule was learned, but the exception was not saved as resolved (${resolution.unresolved}): set its status to Resolved`)
 }
 
 /**

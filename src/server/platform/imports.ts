@@ -59,11 +59,12 @@ export function importAsnRow(row: GlideRecord): RowOutcome {
     const resolution = resolveModel(raw, loadNormalizationData())
     const modelId = resolution.modelId
     if (!modelId) {
-        recordNormalizationException(raw, 'reason' in resolution ? resolution.reason : '', {
+        const raised = recordNormalizationException(raw, 'reason' in resolution ? resolution.reason : '', {
             table: 'x_daas_ham_asn_import',
             id: row.getUniqueValue(),
         })
-        return failed(`PID ${raw.model} does not map to a model; see normalization exceptions`)
+        const see = raised ? 'see normalization exceptions' : 'no normalization exception was raised (see the system log)'
+        return failed(`PID ${raw.model} does not map to a model; ${see}`)
     }
 
     const attempt = attemptLock(LOCK.receiveSerial(serial), (lock) => insertHolding(lock, row, serial, modelId))

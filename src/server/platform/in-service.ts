@@ -10,7 +10,7 @@ import { runTableJob } from './chunked.ts'
 import { daysAgoGlide, glideToMs, msToGlide } from './clock.ts'
 import { applyLifecycleDates, lifecycleReaders, type LifecycleReaders } from './lifecycle-dates.ts'
 import { withLockTries } from './locks.ts'
-import { choice, deleteWhere, findById, refusal, str, warnRefused } from './records.ts'
+import { choice, deleteWhere, findById, refusal, str } from './records.ts'
 import { attachToSubscription } from './subscriptions.ts'
 
 /** In-service detection: Seen signals in, billing start out (P1.8), and the device events they are kept as. */
@@ -79,15 +79,17 @@ function underSeenLock(assetId: string, see: (lock: HeldLock, asset: GlideRecord
 
 /**
  * Apply one NMS event to the Asset under its sighting lock: the event is stored when it is a state change, and a
- * sighting moves last_seen forward and puts a pending Asset in service. False when it was not applied (see
- * `underSeenLock`), for the NMS to send again.
+ * sighting moves last_seen forward and puts a pending Asset in service. False when it was not wholly applied (see
+ * `underSeenLock`), or the platform refused to store it (logged), for the NMS to send again. A down event is only
+ * stored, so one refused would be lost once acknowledged; a refused event sent again has its sighting applied again,
+ * which changes nothing.
  */
 export function applyDeviceEvent(assetId: string, event: DeviceEvent, readers: LifecycleReaders): boolean {
     return underSeenLock(assetId, (lock, asset) => {
-        if (isStateChange(event.event, () => lastEventKind(assetId))) storeEvent(assetId, event)
-        if (event.event === 'down') return true
+        const stored = !isStateChange(event.event, () => lastEventKind(assetId)) || storeEvent(assetId, event)
+        if (event.event === 'down') return stored
         recordSeen(asset, event.observedAt, event.source)
-        return goLiveIfSeen(lock, asset, readers)
+        return goLiveIfSeen(lock, asset, readers) && stored
     })
 }
 
@@ -129,7 +131,8 @@ function lastEventKind(assetId: string): string {
     return gr.next() ? str(gr, 'event') : ''
 }
 
-function storeEvent(assetId: string, event: DeviceEvent): void {
+/** Store the event; false when the platform refuses it (logged as an error). */
+function storeEvent(assetId: string, event: DeviceEvent): boolean {
     const gr = new GlideRecord('x_daas_ham_device_event')
     gr.initialize()
     gr.setValue('asset', assetId)
@@ -137,8 +140,9 @@ function storeEvent(assetId: string, event: DeviceEvent): void {
     gr.setValue('event', event.event)
     gr.setValue('source', event.source)
     gr.setValue('observed_at', msToGlide(event.observedAt))
-    // The sighting itself is applied all the same; only the history lacks this change of state.
-    if (!gr.insert()) warnRefused(gr, `Device event "${event.event}" of ${event.identifier} not stored`)
+    if (gr.insert()) return true
+    gs.error(`[x_daas_ham] in-service detection: ${event.event} event of ${event.identifier} not stored: ${refusal(gr)}`)
+    return false
 }
 
 /** Drop the device events stored more than `retentionDays` ago. */

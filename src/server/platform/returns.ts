@@ -1,6 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { HeldLock } from '../domain/job-lock.ts'
-import { isDeployed } from '../domain/lifecycle.ts'
+import { checkTransition, isDeployed, type Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import {
     AWAITED,
@@ -30,7 +30,7 @@ import {
     type ReturnTrigger,
 } from '../domain/vocabulary.ts'
 import { customerAdminIds } from './approvals.ts'
-import { clearRackPlacement, clearWipeEvidence, isFleetAsset, moveAndSave, moveRefusal, readStage } from './assets.ts'
+import { clearRackPlacement, clearWipeEvidence, isFleetAsset, moveAndSave, moveRefusal, readStage, transitionFacts } from './assets.ts'
 import { runTableJob } from './chunked.ts'
 import { nowGlide, todayIso } from './clock.ts'
 import { EVENT, fire } from './events.ts'
@@ -424,9 +424,10 @@ function declareMissing(overdue: OverdueLine): void {
 
 /**
  * The declaration, made holding the unit's receive `lock`: only while its line still awaits it and the Asset is still
- * at or towards the Site, or missing already (an earlier run whose line was refused). True once the line is missing.
- * A unit anywhere else (received, its line refused), or outside the fleet (a line raised before the Fleet flag, ADR
- * 0016), is logged each run: no run settles that line.
+ * at or towards the Site in a stage the lifecycle lets go missing (`mayGoMissing`), or missing already (an earlier run
+ * whose line was refused). True once the line is missing. A unit anywhere else (received, its line refused), or one
+ * the lifecycle keeps from going missing, or outside the fleet (a line raised before the Fleet flag, ADR 0016), is
+ * logged each run, with no move tried: no run settles that line.
  */
 function declareHolding(lock: HeldLock, overdue: OverdueLine): boolean {
     const record = findById(RETURN_LINE, overdue.lineId)
@@ -438,7 +439,7 @@ function declareHolding(lock: HeldLock, overdue: OverdueLine): boolean {
         return false
     }
     const stage = asset ? readStage(asset) : null
-    if (asset && stage !== 'missing' && !isDeployed(stage)) {
+    if (asset && stage !== 'missing' && !mayGoMissing(asset, stage)) {
         const unit = `Line of ${str(asset, 'serial_number')} on ${overdue.number}`
         gs.warn(`[x_daas_ham] ${unit} not declared missing: the unit is ${stage ?? 'unknown'}; settle the line by hand`)
         return false
@@ -461,6 +462,11 @@ function declareHolding(lock: HeldLock, overdue: OverdueLine): boolean {
     const unit = asset ? str(asset, 'serial_number') : overdue.assetId
     warnRefused(record, `Line of ${unit} on ${overdue.number} not declared missing`)
     return false
+}
+
+/** Whether the unit is at or towards its Site in a stage the lifecycle moves to missing (domain/lifecycle `checkTransition`). */
+function mayGoMissing(asset: GlideRecord, stage: Stage | null): boolean {
+    return isDeployed(stage) && checkTransition(stage, 'missing', transitionFacts(asset)).allowed
 }
 
 /** Close a Return order once every line is evaluated or declared missing. */

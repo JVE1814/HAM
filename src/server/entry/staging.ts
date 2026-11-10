@@ -30,7 +30,16 @@ export function guardStagingClosure(current: GlideRecord): void {
     if (!outcome.complete) abortWith(current, `${outcome.remaining} mandatory staging step(s) are still open`)
 }
 
-/** After-update rule on staging tasks closed complete: the Asset is staged, or goes for evaluation if it failed. */
+/**
+ * After-update rule on staging tasks closed complete: the Asset is staged, or goes for evaluation if it failed. The
+ * user is told when closing the task did not move its unit on, and what to do then (platform/staging-tasks
+ * `completeStaging`).
+ */
 export function onStagingClosed(current: GlideRecord): void {
-    completeStaging(str(current, 'asset'), str(current, 'number'), choice<StagingResult>(current, 'result') === 'failed')
+    const unmoved = completeStaging(str(current, 'asset'), {
+        number: str(current, 'number'),
+        lineId: str(current, 'order_line'),
+        failed: choice<StagingResult>(current, 'result') === 'failed',
+    })
+    if (unmoved) gs.addErrorMessage(unmoved)
 }

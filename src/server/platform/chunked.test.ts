@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { inCurrentPass, queuePass, runEventTableJob, runTableJob, visitInKeyOrder, type PassJob } from './chunked.ts'
 import type { JobEvent } from './events.ts'
 import { completePass, findJobCursor, isCurrentPass, JOB_STATUS, openJobCursor, retirePass, startPass } from './job-cursor.ts'
+import { withLock } from './locks.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
 /*
@@ -480,5 +481,16 @@ describe('visitInKeyOrder', () => {
             item.update()
         })
         expect(seen).toEqual(['a', 'b', 'c', 'd'])
+    })
+})
+
+describe('a job lock the platform refuses to delete', () => {
+    it('is logged when it is released: it stays held until it is taken as abandoned', () => {
+        platform.refuses = (table, _row, operation) => (table === LOCKS && operation === 'delete' ? 'no rights' : '')
+        expect(withLock('lock1', () => 'done')).toEqual({ ran: true, value: 'done' })
+        expect(platform.tables[LOCKS]).toHaveLength(1)
+        expect(platform.logs).toEqual([
+            'warn [x_daas_ham] Job lock lock1 not released: no rights; held until taken as abandoned, 10 minutes after it was taken',
+        ])
     })
 })

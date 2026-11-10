@@ -17,7 +17,7 @@ import {
     type ApprovalRollup,
 } from './approvals.ts'
 import { isFleetAsset, moveRefusal, readStage, transitionFacts } from './assets.ts'
-import { choice, findById, str, warnRefused } from './records.ts'
+import { choice, findById, refusal, str, warnRefused } from './records.ts'
 
 /**
  * Disposal orders: approve, then retire each wiped Asset by its method (P2.5, D61). None of it tells the user anything:
@@ -111,12 +111,14 @@ export function rollUpDisposalApprovals(orderId: string): ApprovalRollup | null 
 
 /**
  * What came of completing a Disposal order: how many lines stay blocked and how many could not be saved (logged); it
- * is `completed` when there are none of either and the order was saved as completed.
+ * is `completed` when there are none of either and the order was saved as completed. `refused` when every line is done
+ * but the platform refused to save the order as completed, and why.
  */
 export interface DisposalCompletion {
     completed: boolean
     blocked: number
     unsaved: number
+    refused?: string
 }
 
 /** Retire every ready line of the Disposal order and record what blocks the rest; the order completes once none is left. */
@@ -140,8 +142,9 @@ export function completeDisposal(order: GlideRecord): DisposalCompletion {
     if (blocked > 0 || unsaved > 0) return { completed: false, blocked, unsaved }
     order.setValue('stage', DISPOSAL_STAGE.completed)
     order.setValue('state', DISPOSAL_TASK_STATE.complete)
-    // Refused, it stays approved with every line done: completing it again saves only the order.
-    return { completed: !!order.update(), blocked, unsaved }
+    if (order.update()) return { completed: true, blocked, unsaved }
+    // Refused, it stays open with every line done: completing it again retires nothing twice and closes it.
+    return { completed: false, blocked, unsaved, refused: refusal(order) }
 }
 
 /**

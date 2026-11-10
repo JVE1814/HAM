@@ -187,8 +187,8 @@ function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Order
     const findings = [...ownershipFindings(parties, raiser), ...unsaved]
     if (findings.length === 0) return submitAccepted(order)
     order.setValue('work_notes', `Not submitted:\n${findings.join('\n')}`)
-    // A refused save loses only the note: the caller is given the same findings to tell the user, or to log.
-    order.update()
+    // A refresh Order the daily job raised has only this note to say why it is a draft.
+    if (!order.update()) warnRefused(order, `${str(order, 'number')} not submitted (${findings.join('; ')}), and its note not saved`)
     return notSubmitted(`Order not submitted. ${findings.join('. ')}.`)
 }
 
@@ -219,8 +219,7 @@ function submitAccepted(order: GlideRecord): Submission {
     if (asked.awaiting) return { submitted: true }
     if (asked.step === 'save') return notSubmitted(`Order not submitted: ${asked.reason}`)
     order.setValue('work_notes', `Not submitted: ${asked.reason}`)
-    // As in `submitAsRaised`: a refused save loses only the note.
-    order.update()
+    if (!order.update()) warnRefused(order, `${str(order, 'number')} not submitted (${asked.reason}), and its note not saved`)
     return notSubmitted(`Order not submitted: ${asked.reason}.`)
 }
 

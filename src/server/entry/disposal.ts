@@ -29,9 +29,10 @@ export function onDisposalApprovalDecision(current: ForeignRecord): void {
 export function uiCompleteDisposal(current: GlideRecord): void {
     // A refused form save (a method or Customer changed after submit) leaves the refused values on `current`.
     if (!current.update()) return
-    const { blocked, unsaved } = completeDisposal(current)
+    const { blocked, unsaved, refused } = completeDisposal(current)
     if (blocked > 0) gs.addErrorMessage(`${blocked} line(s) are blocked; see "Blocked by" on the lines`)
     if (unsaved > 0) gs.addErrorMessage(`${unsaved} line(s) could not be saved (see the system log)`)
+    if (refused) gs.addErrorMessage(`Every line is done, but ${str(current, 'number')} was not saved as completed: ${refused}; complete it again`)
 }
 
 /**

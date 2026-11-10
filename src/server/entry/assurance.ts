@@ -11,6 +11,11 @@ function tellLeftOff(started: { number: string; leftOff: number }): void {
     if (started.leftOff > 0) gs.addErrorMessage(`${started.leftOff} asset(s) left off ${started.number} and not counted (see the system log)`)
 }
 
+/** Tell the user that the platform refused to save `what` on a started audit, and why (platform/audits `StartedAudit.unsaved`). */
+function tellUnsaved(started: { number: string; unsaved?: string }, what: string): void {
+    if (started.unsaved) gs.addErrorMessage(`Audit ${started.number} started, but ${what} was not saved: ${started.unsaved}`)
+}
+
 /**
  * UI action "Start blind count" on a stockroom (platform/audits `startStockroomAudit`). The action is offered on NaaS
  * stockrooms only; one whose type was cleared on a form opened before is refused.
@@ -19,6 +24,7 @@ export function uiStartStockroomAudit(current: GlideRecord): void {
     const audit = startStockroomAudit(current)
     if (!audit.started) return void gs.addErrorMessage(`Blind count not started: ${audit.reason}`)
     tellLeftOff(audit)
+    tellUnsaved(audit, 'its expected count')
     gs.addInfoMessage(`Audit ${audit.number} started with ${audit.expected} expected asset(s); scan them in the warehouse app (Audit mode)`)
 }
 
@@ -28,6 +34,7 @@ export function uiStartSiteAudit(current: GlideRecord): void {
     if (!audit.started) return void gs.addErrorMessage(`Site audit not started: ${audit.reason}`)
     tellLeftOff(audit)
     if (!audit.workOrderOpened) gs.addErrorMessage(`No work order for ${audit.number} (see the system log): open one by hand`)
+    tellUnsaved(audit, audit.workOrderOpened ? 'its expected count and work order' : 'its expected count')
 }
 
 /** POST /audits/{id}/scan { code }: record one scan against an open audit the user may see. */
@@ -37,15 +44,19 @@ export function scanAudit(request: RESTAPIRequest, response: RESTAPIResponse): v
     const code = textBodyOf(request).code ?? ''
     if (!audit) return reply(response, 404, { error: 'No open audit with that number' })
     if (!code) return reply(response, 400, { error: 'code is required' })
-    // An unrecorded scan would count its unit missing at close, so the technician is told to scan again.
-    const refused = recordScan(audit, code)
-    if (refused) return reply(response, 422, { error: `Scan not recorded: ${refused}` })
+    // An unrecorded scan would count its unit missing at close, so the technician is told to scan again. Why the
+    // platform refused it is logged, not sent to the client (as entry/customer).
+    if (recordScan(audit, code)) return reply(response, 422, { error: 'Scan not recorded: the platform refused it; scan it again' })
     reply(response, 200, { audit: str(audit, 'number'), scanned: code })
 }
 
 /** UI action "Close audit": compare scans with the expected list; missing assets become exceptions (platform/audits `closeAudit`). */
 export function uiCloseAudit(current: GlideRecord): void {
-    if (closeAudit(current) === 'not_open') gs.addErrorMessage('Only an open audit of one of your stockrooms can be closed')
+    const number = str(current, 'number')
+    const close = closeAudit(current)
+    if (close.outcome === 'not_open') return void gs.addErrorMessage('Only an open audit of one of your stockrooms can be closed')
+    if (close.outcome === 'not_saved') return void gs.addErrorMessage(`Audit ${number} not closed: ${close.reason}`)
+    if (close.unsaved > 0) gs.addErrorMessage(`Audit ${number} closed, but ${close.unsaved} line result(s) or exception(s) were not saved (see the system log)`)
 }
 
 /** Daily job: open the attestations that are due (platform/attestations `raiseDueAttestations`). */

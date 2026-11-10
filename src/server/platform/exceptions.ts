@@ -39,13 +39,14 @@ export interface FoundException {
  */
 export function openException(type: ExceptionType, subject: ExceptionSubject, facts: ExceptionFacts): void {
     // Most calls find the exception already open from an earlier run: those need no lock.
-    if (isOpen(type, subject)) return
+    if (hasOpenException(type, subject)) return
     withLockTries(LOCK.reconException(type, fieldOf(subject).id), () => {
-        if (!isOpen(type, subject)) insertException(type, subject, facts)
+        if (!hasOpenException(type, subject)) insertException(type, subject, facts)
     })
 }
 
-function isOpen(type: ExceptionType, subject: ExceptionSubject): boolean {
+/** Whether an exception of `type` is open for the subject: what a caller that must know its raise stood reads back. */
+export function hasOpenException(type: ExceptionType, subject: ExceptionSubject): boolean {
     const { field, id } = fieldOf(subject)
     return exists(TABLE, `exception_type=${type}^${OPEN_EXCEPTIONS_QUERY}^${field}=${id}`)
 }

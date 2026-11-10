@@ -173,7 +173,12 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
             if (fresh && unreserve(fresh, source)) putBack++
         }
     }
-    for (const asset of toStage) startStaging(asset, lineId, 'sourcing')
+    // An Asset whose Staging task could not be opened stays reserved for the line rather than staging with no task to
+    // finish. So does one whose move into staging is refused (logged): the task just opened is skipped (logged when
+    // refused), so the unit is reserved for its line with no task, not reserved under an open task.
+    for (const asset of toStage) {
+        if (startStaging(asset, lineId, 'sourcing') === 'not_moved') skipOpenStagingTasks(asset.getUniqueValue(), 'Not moved into staging at sourcing')
+    }
     // A unit in transfer gets its Staging task now and goes into staging when its line is received at the staging
     // centre (entry/assets `onTransferReleased`); without the task it is reserved for the line there.
     for (const asset of inTransfer) openStagingTask(asset, lineId)

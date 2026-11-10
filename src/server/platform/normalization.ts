@@ -76,13 +76,15 @@ export function resolveModel(raw: { manufacturer: string; model: string }, data:
 /**
  * Remember a raw pair nobody could map (counted, so the worst offenders surface first). The open exception of the pair
  * is found and counted on, or raised, without a lock: two rows that raise the same pair at the same moment can each
- * raise one, and both are then counted on and resolved by hand like any other. A refused save is logged.
+ * raise one, and both are then counted on and resolved by hand like any other. Whether an open exception names the
+ * pair: false when the platform refuses to raise it (logged), so nothing surfaces the pair until it is seen again. One
+ * open already whose count the platform refuses is logged and still names it.
  */
 export function recordNormalizationException(
     raw: { manufacturer: string; model: string },
     reason: string,
     source: { table: string; id: string },
-): void {
+): boolean {
     const rawPair = `${raw.manufacturer} / ${raw.model}`
     const exception = new GlideRecord('x_daas_ham_norm_exception')
     exception.addQuery('raw_manufacturer', raw.manufacturer)
@@ -93,7 +95,7 @@ export function recordNormalizationException(
     if (exception.next()) {
         exception.setValue('occurrences', num(exception, 'occurrences') + 1)
         if (!exception.update()) warnRefused(exception, `Normalization exception ${rawPair} not counted again`)
-        return
+        return true
     }
     exception.initialize()
     exception.setValue('raw_manufacturer', raw.manufacturer)
@@ -101,7 +103,9 @@ export function recordNormalizationException(
     exception.setValue('reason', reason)
     exception.setValue('source_table', source.table)
     exception.setValue('source_record', source.id)
-    if (!exception.insert()) warnRefused(exception, `No normalization exception for ${rawPair}`)
+    if (exception.insert()) return true
+    warnRefused(exception, `No normalization exception for ${rawPair}`)
+    return false
 }
 
 /**
@@ -228,12 +232,21 @@ function learned(record: GlideRecord, what: string, rawPair: string): boolean {
 }
 
 /**
- * A normalization exception was given its resolved Model: learn a rule from it (learnFromResolution) and resolve it.
- * False when no rule was learned: the exception then stays open, as nothing maps its raw pair yet.
+ * What came of resolving a normalization exception: no rule was learned; or one was, with why the platform refused to
+ * save the exception as resolved (`unresolved`) when it did.
  */
-export function resolveNormalizationException(exception: GlideRecord): boolean {
-    if (!learnFromResolution(exception, loadNormalizationData())) return false
+export type NormalizationResolution = { learned: false } | { learned: true; unresolved?: string }
+
+/**
+ * A normalization exception was given its resolved Model: learn a rule from it (learnFromResolution) and resolve it.
+ * When no rule was learned the exception stays open, as nothing maps its raw pair yet. One learned whose resolution
+ * the platform refuses stays open too (logged): the user sets it resolved by hand, which learns nothing twice, as the
+ * rule runs only on a new resolved model.
+ */
+export function resolveNormalizationException(exception: GlideRecord): NormalizationResolution {
+    if (!learnFromResolution(exception, loadNormalizationData())) return { learned: false }
     exception.setValue('status', NORM_EXCEPTION_STATUS.resolved)
-    if (!exception.update()) warnRefused(exception, `Normalization exception ${str(exception, 'raw_manufacturer')} / ${str(exception, 'raw_model')} not resolved`)
-    return true
+    if (exception.update()) return { learned: true }
+    const rawPair = `${str(exception, 'raw_manufacturer')} / ${str(exception, 'raw_model')}`
+    return { learned: true, unresolved: warnRefused(exception, `Normalization exception ${rawPair}: rule learned, but not saved as resolved`) }
 }
