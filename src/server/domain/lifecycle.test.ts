@@ -58,6 +58,47 @@ describe('stage mapping', () => {
     })
 })
 
+/*
+ * What a stage is stored as is not this code's to remake. The pairs without a substatus of the app's own are the
+ * platform's choices, which Asset Management and Inventory read and set too (external-contracts N6-N8, N38), and every
+ * Asset on an instance already carries the pair it was saved with.
+ */
+describe('fieldsOf', () => {
+    const STORED = [
+        ['on_order', '2', ''],
+        ['in_transit', '9', ''],
+        ['available', '6', 'available'],
+        ['reserved', '6', 'reserved'],
+        ['spare_pool', '6', 'reserved_spare_pool'],
+        ['staging', '6', 'staging'],
+        ['staged', '6', 'staged'],
+        ['in_transfer', '6', 'pending_transfer'],
+        ['shipped', '9', 'shipped_to_site'],
+        ['pending_in_service', '1', 'pending_in_service'],
+        ['in_service', '1', ''],
+        ['temporary_deployment', '1', 'temporary_deployment'],
+        ['pending_return', '1', 'pending_return'],
+        ['pending_evaluation', '6', 'pending_evaluation'],
+        ['pending_oem_rma', '3', 'pending_oem_rma'],
+        ['pending_wipe', '6', 'pending_wipe'],
+        ['pending_disposal', '6', 'pending_disposal'],
+        ['missing', '8', 'lost'],
+        ['disposed', '7', 'disposed'],
+        ['sold', '7', 'sold'],
+        ['returned_to_oem', '7', 'vendor_credit'],
+        ['returned_to_customer', '7', 'returned_to_customer'],
+        ['returned_to_lessor', '7', 'lease_return'],
+    ] as const
+
+    it.each(STORED)('stores %s as install status %s with substatus "%s"', (stage, installStatus, substatus) => {
+        expect(fieldsOf(stage)).toEqual({ installStatus, substatus })
+    })
+
+    it('is held to a stored pair above for every stage', () => {
+        expect(STORED.map(([stage]) => stage).sort()).toEqual([...ALL_STAGES].sort())
+    })
+})
+
 describe('disposalStage', () => {
     it('maps each disposal method to the retired stage', () => {
         expect(disposalStage('broker_resale')).toBe('sold')
