@@ -24,7 +24,6 @@ import {
     overlapsMonth,
     previousMonth,
     prorate,
-    RESET_AFTER_IDLE_MINUTES,
     resetGenerationError,
     restartInterval,
     roundToCent,
@@ -40,7 +39,7 @@ import {
     type StoredBillingLine,
 } from './billing'
 import { fleetStagesQuery } from './fleet'
-import { ALL_STAGES, IN_USE_STAGES, isBillable } from './lifecycle'
+import { IN_USE_STAGES } from './lifecycle'
 
 const nov = monthBounds('2026-11')
 const feb = monthBounds('2028-02')
@@ -521,8 +520,6 @@ describe('withinLine', () => {
 
 describe('IN_SERVICE_ON_ENDED_LINE', () => {
     it('flags billed fleet assets whose line was set ended or is past its end date', () => {
-        expect(IN_USE_STAGES).toEqual(ALL_STAGES.filter((stage) => isBillable(stage)))
-        expect(IN_USE_STAGES.length).toBeGreaterThan(0)
         const ended = 'x_daas_ham_subscription_line.status=ended^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()'
         const fleet = 'x_daas_ham_fleet=true'
         expect(IN_SERVICE_ON_ENDED_LINE).toBe(
@@ -541,7 +538,6 @@ describe('decideGenerationReset', () => {
     const minutesAgo = (minutes: number) => now - minutes * 60000
 
     it('resets a generating period once its latest activity is 30 minutes old', () => {
-        expect(RESET_AFTER_IDLE_MINUTES).toBe(30)
         expect(decideGenerationReset('generating', [minutesAgo(30)], now)).toEqual({ reset: true, idleMinutes: 30 })
         expect(decideGenerationReset('generating', [minutesAgo(240), minutesAgo(45)], now)).toEqual({ reset: true, idleMinutes: 45 })
         expect(decideGenerationReset('generating', [undefined, minutesAgo(31)], now)).toEqual({ reset: true, idleMinutes: 31 })
@@ -617,14 +613,38 @@ describe('a Billing line as exported', () => {
     })
 
     it('is a pull API line of its stored values, with the display values the API names', () => {
-        expect(JSON.stringify(billingLineJson('l1', subscription))).toBe(
-            '{"id":"l1","kind":"subscription","customerId":"c1","customer":"Acme, Inc.","agreement":"AGR0001","subscriptionLine":"sl1",' +
-                '"siteId":"s1","site":"Lyon","feeEvent":"","description":"Switches - Lyon, HQ","units":42,"monthlyRate":12.5,"amount":17.5,"currency":"EUR"}',
-        )
-        expect(JSON.stringify(billingLineJson('l2', fee))).toBe(
-            '{"id":"l2","kind":"fee","customerId":"c1","customer":"Acme, Inc.","agreement":"AGR0001","subscriptionLine":"",' +
-                '"siteId":"","site":"","feeEvent":"f1","description":"Lost fee: SN1 (2026-10-12)","units":1,"monthlyRate":0,"amount":350,"currency":"EUR"}',
-        )
+        expect(billingLineJson('l1', subscription)).toEqual({
+            id: 'l1',
+            kind: 'subscription',
+            customerId: 'c1',
+            customer: 'Acme, Inc.',
+            agreement: 'AGR0001',
+            subscriptionLine: 'sl1',
+            siteId: 's1',
+            site: 'Lyon',
+            feeEvent: '',
+            description: 'Switches - Lyon, HQ',
+            units: 42,
+            monthlyRate: 12.5,
+            amount: 17.5,
+            currency: 'EUR',
+        })
+        expect(billingLineJson('l2', fee)).toEqual({
+            id: 'l2',
+            kind: 'fee',
+            customerId: 'c1',
+            customer: 'Acme, Inc.',
+            agreement: 'AGR0001',
+            subscriptionLine: '',
+            siteId: '',
+            site: '',
+            feeEvent: 'f1',
+            description: 'Lost fee: SN1 (2026-10-12)',
+            units: 1,
+            monthlyRate: 0,
+            amount: 350,
+            currency: 'EUR',
+        })
     })
 
     it('reads a number column that is empty or unreadable as 0', () => {

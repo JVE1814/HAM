@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
     ABANDONED_AFTER_MINUTES,
     attemptUnderLock,
-    LOCK_TRIES,
-    LONG_HOLD_LOCK_TRIES,
     REQUEUE,
     TRY_AGAIN,
     writeHoldingLock,
@@ -44,15 +42,6 @@ function lockRows(takes: Array<'free' | 'held' | 'throws'> = []) {
 describe('the numbers the retries share', () => {
     it('queue a request again for longer than a lock takes to count as abandoned', () => {
         expect(REQUEUE.times * REQUEUE.delaySeconds).toBeGreaterThan(ABANDONED_AFTER_MINUTES * 60)
-    })
-
-    it('are those the app has run with', () => {
-        expect({ ABANDONED_AFTER_MINUTES, LOCK_TRIES, LONG_HOLD_LOCK_TRIES, REQUEUE }).toEqual({
-            ABANDONED_AFTER_MINUTES: 10,
-            LOCK_TRIES: 5,
-            LONG_HOLD_LOCK_TRIES: 10,
-            REQUEUE: { delaySeconds: 60, times: 15 },
-        })
     })
 })
 

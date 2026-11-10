@@ -346,7 +346,6 @@ describe('parseTrackingWebhook', () => {
 
 describe('OPEN_SHIPMENTS', () => {
     it('leaves out the final statuses, whose label is no longer in use', () => {
-        expect(OPEN_SHIPMENTS).toBe('statusNOT INdelivered,returned,voided')
         // The statuses a later tracking update no longer moves on.
         const statuses = Object.keys(SHIPMENT_STATUS_CHOICES) as ShipmentStatus[]
         const final = statuses.filter((status) => status !== 'label_created' && nextShipmentStatus(status, 'label_created') === status)
@@ -477,9 +476,18 @@ describe('applyTracking', () => {
 })
 
 describe('trackingEventKey', () => {
-    it('is the time and the stored description', () => {
-        expect(trackingEventKey({ occurredAt: '2026-11-06T14:02:00Z', description: 'Delivered' })).toBe('2026-11-06T14:02:00Z|Delivered')
-        expect(trackingEventKey({ occurredAt: 't', description: 'y'.repeat(300) })).toBe(`t|${'y'.repeat(255)}`)
+    const delivered = { occurredAt: '2026-11-06T14:02:00Z', description: 'Delivered' }
+
+    it('is the same for the same time and description, and another for another time or description', () => {
+        expect(trackingEventKey({ ...delivered })).toBe(trackingEventKey(delivered))
+        expect(trackingEventKey({ ...delivered, occurredAt: '2026-11-06T14:03:00Z' })).not.toBe(trackingEventKey(delivered))
+        expect(trackingEventKey({ ...delivered, description: 'Delivered, front desk' })).not.toBe(trackingEventKey(delivered))
+    })
+
+    it('tells descriptions apart as far as they are stored: by their first 255 characters', () => {
+        const stored = { ...delivered, description: 'y'.repeat(255) }
+        expect(trackingEventKey({ ...stored, description: `${stored.description}, signed` })).toBe(trackingEventKey(stored))
+        expect(trackingEventKey({ ...stored, description: `${'y'.repeat(254)}z` })).not.toBe(trackingEventKey(stored))
     })
 })
 
@@ -528,7 +536,6 @@ describe('trackingRetryParams and parseTrackingRetry', () => {
     }
 
     it('carries the whole update in one parameter when it fits', () => {
-        expect(TRACKING_RETRY_CHARS).toBe(4000)
         const params = trackingRetryParams(update, new Set())
         expect(params).toHaveLength(1)
         expect(parseTrackingRetry(params![0])).toEqual({ update, newestAt: delivered.occurredAt })

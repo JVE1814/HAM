@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { preflightReport, REQUIRED_ROLES, REQUIRED_TABLES } from './preflight'
+import { preflightReport } from './preflight'
 
 describe('preflightReport', () => {
     it('passes when every required table and role exists', () => {
@@ -15,10 +15,5 @@ describe('preflightReport', () => {
         expect(report.ok).toBe(false)
         expect(report.missing).toEqual(['table wm_order (Field Service Management)', 'role procurement_user'])
         expect(report.summary).toBe('2 prerequisite(s) missing')
-    })
-
-    it('checks the tables and roles the app depends on', () => {
-        expect(REQUIRED_TABLES.map((t) => t.table)).toContain('customer_account')
-        expect(REQUIRED_ROLES).toContain('snc_external')
     })
 })

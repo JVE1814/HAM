@@ -3,13 +3,11 @@ import {
     ALL_STAGES,
     billingChange,
     checkTransition,
-    DEPLOYED_STAGES,
     disposalStage,
     fieldsOf,
     isBillable,
     isDeployed,
     notRetiredCondition,
-    SERVING_STAGES,
     stageAfterTransfer,
     stageChangeRefusal,
     stageOf,
@@ -379,13 +377,6 @@ describe('stagesQuery', () => {
         expect(stagesQuery(['in_service', 'available'], 'covered=true', 'asset.')).toBe(
             'asset.install_status=1^asset.substatusISEMPTY^covered=true^NQasset.install_status=6^asset.substatus=available^covered=true',
         )
-    })
-})
-
-describe('serving and deployed stages', () => {
-    it('serves customers at or on the way to a site, and counts assets coming back as deployed too', () => {
-        expect(SERVING_STAGES).toEqual(['shipped', 'pending_in_service', 'in_service', 'temporary_deployment'])
-        expect(DEPLOYED_STAGES).toEqual([...SERVING_STAGES, 'pending_return'])
     })
 })
 

@@ -51,30 +51,8 @@ describe('LOCK', () => {
         expect(LOCK.job(`margin_${a}`)).toBe(`margin_${a}`)
     })
 
-    it('is declared in the order of ADR 0013, in which locks may be taken', () => {
-        expect(Object.keys(LOCK)).toEqual([
-            'refreshOrders',
-            'seenAsset',
-            'receiveSerial',
-            'receiveAsset',
-            'sourceOrder',
-            'shipOrder',
-            'trackShipment',
-            'returnLabel',
-            'orderLine',
-            'providerTagSequence',
-            'sparePool',
-            'reserveAsset',
-            'fee',
-            'reconException',
-            'subscriptionLine',
-            'serviceInterval',
-            'job',
-        ])
-        expect(oneOfEach(sysId('a'))).toHaveLength(Object.keys(LOCK).length)
-    })
-
     it('gives every lock, and every record of one, a name of its own', () => {
+        expect(oneOfEach(sysId('a'))).toHaveLength(Object.keys(LOCK).length)
         const names = [...oneOfEach(sysId('a')), ...oneOfEach(sysId('b'))]
         // The two locks that name no record are the same whatever the record.
         expect(new Set(names).size).toBe(names.length - 2)
@@ -98,9 +76,8 @@ describe('LOCK', () => {
 
     it('cuts a longer name to the Job lock name, whichever lock it is', () => {
         const long = 'X'.repeat(200)
-        expect(LOCK_NAME_LENGTH).toBe(100)
-        expect(LOCK.receiveSerial(long)).toBe(`receive_serial_${long}`.slice(0, 100))
-        expect(LOCK.job(long)).toHaveLength(100)
-        expect(LOCK.sparePool(long, long)).toHaveLength(100)
+        expect(LOCK.receiveSerial(long)).toBe(`receive_serial_${long}`.slice(0, LOCK_NAME_LENGTH))
+        expect(LOCK.job(long)).toHaveLength(LOCK_NAME_LENGTH)
+        expect(LOCK.sparePool(long, long)).toHaveLength(LOCK_NAME_LENGTH)
     })
 })

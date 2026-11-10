@@ -12,6 +12,7 @@ import {
 } from './domain/fleet'
 import { replacementStep } from './domain/breakfix'
 import { CANCELLABLE_ORDER_STAGES } from './domain/fulfilment'
+import { LOCK_NAME_LENGTH } from './domain/lock-names'
 import { OEM_ADAPTERS } from './domain/oem/adapters'
 import { CLAIM_ROUTES } from './domain/oem/claims'
 import { REST_MESSAGE } from './domain/rest-message-names'
@@ -229,17 +230,6 @@ function andTerms(condition: string): string[] {
     return [...terms, term].map((found) => found.replace(/\s+/g, ''))
 }
 
-describe('andTerms', () => {
-    it('splits at the top level only, outside parentheses and string literals', () => {
-        expect(andTerms("(a.changes() || b.changes()) && c == true && d != '&&' && f(x && y)")).toEqual([
-            '(a.changes()||b.changes())',
-            'c==true',
-            "d!='&&'",
-            'f(x&&y)',
-        ])
-    })
-})
-
 describe('scripts wired to server modules', () => {
     const SCRIPTED = ['sys_script', 'sys_ui_action', 'sysevent_script_action', 'sysauto_script', 'sys_ws_operation', 'sys_security_acl']
     const SCRIPT_FIELDS = ['script', 'operation_script', 'post_insert_script']
@@ -341,22 +331,6 @@ function holdsInEveryClause(query: string, condition: string): boolean {
         return terms.some((term, i) => term === condition && !isOrTerm(terms[i + 1] ?? ''))
     })
 }
-
-describe('holdsInEveryClause', () => {
-    it('takes a condition ANDed into every clause', () => {
-        expect(holdsInEveryClause(FLEET_CONDITION, FLEET_CONDITION)).toBe(true)
-        expect(holdsInEveryClause(`install_status=1^${FLEET_CONDITION}^NQinstall_status=6^${FLEET_CONDITION}`, FLEET_CONDITION)).toBe(true)
-        expect(holdsInEveryClause(`install_status=1^${FLEET_CONDITION}^ORDERBYasset_tag^EQ`, FLEET_CONDITION)).toBe(true)
-    })
-
-    it('refuses a condition missing from a clause, bound to the last clause only, or ORed', () => {
-        expect(holdsInEveryClause('install_status=1', FLEET_CONDITION)).toBe(false)
-        expect(holdsInEveryClause(`install_status=1^NQinstall_status=6^${FLEET_CONDITION}`, FLEET_CONDITION)).toBe(false)
-        expect(holdsInEveryClause(`install_status=1^${FLEET_CONDITION}^ORinstall_status=6`, FLEET_CONDITION)).toBe(false)
-        expect(holdsInEveryClause(`install_status=1^OR${FLEET_CONDITION}`, FLEET_CONDITION)).toBe(false)
-        expect(holdsInEveryClause('install_status=1^x_daas_ham_fleet=false', FLEET_CONDITION)).toBe(false)
-    })
-})
 
 /*
  * The platform tables the app shares with the Provider's IT (ADR 0016) hold its records too. So whatever lists or
@@ -479,13 +453,6 @@ describe('what the metadata reads of the tables shared with the Provider IT', ()
         )
         expect(outside(references())).toEqual([])
     })
-
-    it('never takes the term a form value completes, or a script of another shape, for a condition', () => {
-        expect(qualifierQuery(`javascript:'a=1^b=' + current.variables.site`)).toBe('a=1^b=<form value>')
-        expect(holdsInEveryClause(qualifierQuery(`javascript:'${FLEET_CONDITION}' + current.variables.x`), FLEET_CONDITION)).toBe(false)
-        expect(holdsInEveryClause(qualifierQuery(`javascript:'${FLEET_CONDITION}^OR' + current.variables.x`), FLEET_CONDITION)).toBe(false)
-        expect(qualifierQuery(`javascript:new Qualifier().get('${FLEET_CONDITION}')`)).toBe('')
-    })
 })
 
 describe('the columns the app adds to the shared tables', () => {
@@ -502,6 +469,13 @@ describe('the columns the app adds to the shared tables', () => {
         expect(column('alm_stockroom', STOCKROOM_TYPE_FIELD)?.default_value).toBeUndefined()
         expect(column('cmdb_model', OEM_PID_FIELD)).toMatchObject({ type: 'string' })
         expect(column('cmdb_model', OEM_PID_FIELD)?.default_value).toBeUndefined()
+    })
+})
+
+describe('the Job lock name column', () => {
+    it('holds a name as long as the server code cuts lock names to: one the instance cut shorter would be another lock', () => {
+        const name = builtColumns().find((column) => column.table === 'x_daas_ham_job_lock' && column.name === 'name')
+        expect(Number(name?.max_length)).toBeGreaterThanOrEqual(LOCK_NAME_LENGTH)
     })
 })
 

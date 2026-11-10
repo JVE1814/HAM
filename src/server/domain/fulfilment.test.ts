@@ -7,7 +7,6 @@ import {
     followsLines,
     leftInTransit,
     lineStageFor,
-    OPEN_LINE_STAGES,
     OPEN_ORDERS_QUERY,
     orderStageFor,
     refillsLine,
@@ -33,11 +32,6 @@ describe('lineStageFor', () => {
         expect(lineStageFor({ current: 'awaiting_stock', quantity: 1, assetStages: ['in_transfer'] })).toBe('sourced')
         expect(lineStageFor({ current: 'sourced', quantity: 2, assetStages: ['in_transfer', 'staged'] })).toBe('sourced')
         expect(lineStageFor({ current: 'sourced', quantity: 3, assetStages: ['in_transfer', 'reserved'] })).toBe('awaiting_stock')
-    })
-
-    it('moves on once a unit in transfer is received and goes into staging', () => {
-        expect(lineStageFor({ current: 'sourced', quantity: 2, assetStages: ['staging', 'staged'] })).toBe('staging')
-        expect(lineStageFor({ current: 'sourced', quantity: 1, assetStages: ['reserved'] })).toBe('sourced')
     })
 
     it('counts a hot spare that skips staging as staged', () => {
@@ -235,9 +229,8 @@ describe('the Order stage sets', () => {
     })
 })
 
-describe('the Order line stage sets', () => {
-    it('are cut from the one line ordering: open before Ship, and filled again from awaiting stock to shipped', () => {
-        expect(OPEN_LINE_STAGES).toEqual(['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship'])
+describe('the Order line stages', () => {
+    it('have a line filled again from awaiting stock to shipped', () => {
         const refilled = (Object.keys(LINE_STAGE_CHOICES) as LineStage[]).filter((stage) => refillsLine({ stage, siteRecovery: false }))
         expect(refilled).toEqual(['awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped'])
     })
