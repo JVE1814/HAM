@@ -7,7 +7,11 @@ import { lineLostUnit } from './fulfilment.ts'
 import { bool, deleteWhere, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { takeOffOrderLine } from './stock.ts'
 
-/** Staging tasks with their checklist steps: opening them, starting the staging, and skipping those no longer needed. */
+/**
+ * Staging tasks with their checklist steps: opening them, starting the staging, and skipping those no longer needed.
+ * A task's steps are created (and removed with a task that could not be opened) here; what an automated step goes
+ * through afterwards is platform/claim-steps'.
+ */
 
 function templates(): StagingTemplateView[] {
     const gr = new GlideRecord('x_daas_ham_staging_template')

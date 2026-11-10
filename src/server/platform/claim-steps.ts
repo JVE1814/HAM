@@ -16,6 +16,16 @@ import { num, pluck, recordsById, str, warnRefused } from './records.ts'
 import { memoized } from '../domain/memo.ts'
 import type { ClaimAction, OemVendor } from '../domain/vocabulary.ts'
 
+/**
+ * The automated steps of a Staging task (x_daas_ham_staging_step rows with an `automation`) and the OEM claims they
+ * stand for. Of a step's state (domain/oem/claims `STEP_STATUS`), this module owns what follows its creation: a step
+ * waiting on another is released once that one is ticked (`releaseStepsWaitingOn`: waiting to due), and the claim run
+ * settles each step it sent (`settle`: done and ticked, or failed with one more attempt and the vendor's message).
+ * The rest is platform/staging-tasks': it creates a task's steps, each automated one in its
+ * `initialAutomationStatus`, and removes them with a task that could not be opened. A person ticks the steps done by
+ * hand; who and when is stamped by the before rule (entry/staging `stampStagingStep`).
+ */
+
 const STEP = 'x_daas_ham_staging_step'
 
 /** The fields of a step's Asset that a claim needs. */
