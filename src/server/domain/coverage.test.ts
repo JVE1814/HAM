@@ -9,6 +9,7 @@ import {
     groupExpiringCoverage,
     mergeCoverage,
     staleCoverageQuery,
+    withoutCoverage,
 } from './coverage'
 import type { CoverageFact } from './oem/types'
 
@@ -170,6 +171,15 @@ describe('staleCoverageQuery', () => {
             'x_daas_ham_coverage_checkedISEMPTY',
             'ORx_daas_ham_coverage_checked<2026-11-01 00:00:00',
         ])
+    })
+})
+
+describe('withoutCoverage', () => {
+    it('is no coverage end, or one before today', () => {
+        expect(withoutCoverage('', '2026-11-07')).toBe(true)
+        expect(withoutCoverage('2026-11-06', '2026-11-07')).toBe(true)
+        expect(withoutCoverage('2026-11-07', '2026-11-07')).toBe(false)
+        expect(withoutCoverage('2027-01-01', '2026-11-07')).toBe(false)
     })
 })
 

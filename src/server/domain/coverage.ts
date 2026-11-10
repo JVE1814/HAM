@@ -156,8 +156,13 @@ export function staleCoverageQuery(vendor: OemVendor, staleBefore: string): stri
     return `${fleetCondition()}^model.x_daas_ham_oem_source=${vendor}^${notRetiredCondition()}^serial_numberISNOTEMPTY^${stale}`
 }
 
+/** Whether an Asset is without OEM coverage on `today`: it has no coverage end ('') or its coverage ended before today. */
+export function withoutCoverage(coverageEnd: string, today: string): boolean {
+    return !coverageEnd || coverageEnd < today
+}
+
 /**
- * Encoded query on alm_hardware: the installed fleet assets (ADR 0016) without OEM coverage, missing or ended before
- * today, as the workspace lists and counts them.
+ * Encoded query on alm_hardware: the installed fleet assets (ADR 0016) without OEM coverage (`withoutCoverage`), as the
+ * workspace lists and counts them.
  */
 export const INSTALLED_WITHOUT_COVERAGE = `${INSTALLED_CONDITION}^x_daas_ham_coverage_endISEMPTY^ORx_daas_ham_coverage_end<javascript:gs.beginningOfToday()^${FLEET_CONDITION}`

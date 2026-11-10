@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { assetLifecycleStamp, mergeLifecycle, parseLifecycleRow, type AssetLifecycleFacts, type LifecycleDates } from './model-lifecycle'
+import {
+    assetLifecycleStamp,
+    INSTALLED_PAST_SUPPORT,
+    mergeLifecycle,
+    parseLifecycleRow,
+    PAST_SUPPORT_PHASES,
+    type AssetLifecycleFacts,
+    type LifecycleDates,
+} from './model-lifecycle'
 import type { RefreshBasis } from './vocabulary'
 
 const cisco = {
@@ -116,5 +124,11 @@ describe('mergeLifecycle', () => {
         expect(
             mergeLifecycle({ endOfSale: '2024-01-31', endOfSupport: '2029-01-31' }, { endOfSupport: '2029-06-30', endOfLife: undefined }),
         ).toEqual({ endOfSale: '2024-01-31', endOfSupport: '2029-06-30', endOfExtendedSupport: undefined, endOfLife: undefined })
+    })
+})
+
+describe('PAST_SUPPORT_PHASES', () => {
+    it('are the phases INSTALLED_PAST_SUPPORT selects', () => {
+        expect(INSTALLED_PAST_SUPPORT).toContain(`^x_daas_ham_lifecycle_phaseIN${PAST_SUPPORT_PHASES.join(',')}^`)
     })
 })

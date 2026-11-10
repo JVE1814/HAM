@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { addDays } from '../../server/domain/calendar'
 import { rackElevation, type PowerBudget } from '../../server/domain/rack'
 import type { AssetStage, RackDevice, RackElevation, RackListing, Site } from '../../server/domain/rest-contracts'
+import { supportRisk, type SupportRisk } from '../../server/domain/support-risk'
+import { RACK_FACE_CHOICES, type RackFace } from '../../server/domain/vocabulary'
 import { stageText } from '../stage'
 import { rackApi } from './api'
 
@@ -14,16 +15,9 @@ const STAGE_COLOURS: Partial<Record<AssetStage, string>> = {
     temporary_deployment: 'var(--accent)',
 }
 
-const PAST_SUPPORT: ReadonlyArray<RackDevice['lifecyclePhase']> = ['end_of_support', 'end_of_extended_support', 'end_of_life']
+const RISK_COLOURS: Record<SupportRisk, string> = { high: 'var(--error)', medium: 'var(--warn)', low: 'var(--ok)' }
 
-function riskOf(device: RackDevice, today: string): 'high' | 'medium' | 'low' {
-    if (PAST_SUPPORT.includes(device.lifecyclePhase)) return 'high'
-    if (!device.coverageEnd || device.coverageEnd < today) return 'high'
-    if (device.lifecyclePhase === 'end_of_sale' || (device.refreshDue && device.refreshDue < addDays(today, 180))) return 'medium'
-    return 'low'
-}
-
-const RISK_COLOURS = { high: 'var(--error)', medium: 'var(--warn)', low: 'var(--ok)' }
+const FACES = Object.keys(RACK_FACE_CHOICES) as RackFace[]
 
 function hashColour(text: string): string {
     let hash = 0
@@ -56,7 +50,7 @@ export default function App() {
 
     const byId = useMemo(() => new Map((detail?.devices ?? []).map((d) => [d.tag || d.serial, d])), [detail])
     const colour = (device: RackDevice) =>
-        colourBy === 'customer' ? hashColour(device.customer) : colourBy === 'risk' ? RISK_COLOURS[riskOf(device, today)] : STAGE_COLOURS[device.stage] ?? 'var(--neutral)'
+        colourBy === 'customer' ? hashColour(device.customer) : colourBy === 'risk' ? RISK_COLOURS[supportRisk(device, today)] : STAGE_COLOURS[device.stage] ?? 'var(--neutral)'
 
     return (
         <main className="racks">
@@ -97,7 +91,7 @@ export default function App() {
             {detail && <PowerBar power={detail.rack.power} />}
             {detail && (
                 <section className="faces">
-                    {(['front', 'rear'] as const).map((face) => (
+                    {FACES.map((face) => (
                         <div key={face} className="face">
                             <h2>
                                 {detail.rack.name} · {face}

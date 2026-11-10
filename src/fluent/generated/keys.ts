@@ -2873,6 +2873,10 @@ declare global {
                         table: 'sys_module'
                         id: '6544c45b3f2d4508ba508c33ebffe964'
                     }
+                    'src_server_domain_support-risk_ts': {
+                        table: 'sys_module'
+                        id: '91e3327a684d4ceca9678e277ede42ab'
+                    }
                     src_server_domain_visibility_ts: {
                         table: 'sys_module'
                         id: '41f4b809ba674a7b9783da8f02e6a629'

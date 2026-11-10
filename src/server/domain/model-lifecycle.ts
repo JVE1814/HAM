@@ -123,8 +123,15 @@ export function mergeLifecycle(existing: LifecycleDates, incoming: LifecycleDate
     return merged
 }
 
+/** The Lifecycle phases of a Model past its end of support. */
+export const PAST_SUPPORT_PHASES: readonly LifecyclePhase[] = [
+    LIFECYCLE_PHASE.end_of_support,
+    LIFECYCLE_PHASE.end_of_extended_support,
+    LIFECYCLE_PHASE.end_of_life,
+]
+
 /**
- * Encoded query on alm_hardware: the installed fleet assets (ADR 0016) whose Model is past its end of support, as the
- * workspace lists and counts them.
+ * Encoded query on alm_hardware: the installed fleet assets (ADR 0016) whose Model is past its end of support
+ * (`PAST_SUPPORT_PHASES`; domain/model-lifecycle.test.ts holds it to the list), as the workspace lists and counts them.
  */
 export const INSTALLED_PAST_SUPPORT = `${INSTALLED_CONDITION}^x_daas_ham_lifecycle_phaseIN${LIFECYCLE_PHASE.end_of_support},${LIFECYCLE_PHASE.end_of_extended_support},${LIFECYCLE_PHASE.end_of_life}^${FLEET_CONDITION}`
