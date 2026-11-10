@@ -13,7 +13,17 @@ import {
     type ReceivingLine,
 } from '../domain/warehouse.ts'
 import { LINE_STAGE, type StockroomType } from '../domain/vocabulary.ts'
-import { findAnyAsset, findAssetByIdentifier, fleetCandidate, isFleetAsset, joinFleet, moveAsset, newAsset, readStage } from './assets.ts'
+import {
+    fleetCandidate,
+    identifyAnyAsset,
+    identifyAsset,
+    isFleetAsset,
+    joinFleet,
+    moveAsset,
+    newAsset,
+    readStage,
+    type AssetIdentified,
+} from './assets.ts'
 import { sourceOrderAgain, unitsOnLine } from './fulfilment.ts'
 import { withLock } from './locks.ts'
 import { loadNormalizationData, resolveModel } from './normalization.ts'
@@ -34,7 +44,8 @@ import { nextProviderTag } from './tags.ts'
 
 /**
  * Why a scan did nothing. `reason` is the kind of refusal: the stockroom chosen is not one to use (`invalid`), no
- * Asset answers to the code (`unknown`), the Asset or its Order line is not in a state for it (`conflict`), the
+ * Asset answers to the code (`unknown`), two Assets do or the Asset or its Order line is not in a state for it
+ * (`conflict`), the
  * lifecycle or the platform refused what the scan would save (`refused`), or another scan or run holds a lock it needs
  * and scanning again will do (`busy`).
  */
@@ -84,10 +95,23 @@ function stockroomType(stockroom: GlideRecord): StockroomType | null {
     return naasStockroomType(str(stockroom, STOCKROOM_TYPE_FIELD))
 }
 
+/**
+ * The fleet asset a scanned code names (platform/assets `identifyAsset`: serial, else Provider tag, else Customer tag),
+ * or why it is not used: none carries it (`unknown`), or two do, as two Customers may share a Customer tag (`conflict`).
+ */
+function scannedAsset(code: string): Scan {
+    return scanned(identifyAsset(code)) ?? NOT_FOUND
+}
+
+/** An identifier lookup as a scan reads it: the Asset, an ambiguous code refused, or null when none carries it. */
+function scanned(identified: AssetIdentified): Scan | null {
+    if (identified && 'ambiguous' in identified) return { reason: 'conflict', why: identified.ambiguous }
+    return identified
+}
+
 /** The fleet asset a scanned code names (its serial, Provider tag or Customer tag), not the Provider IT's. */
 export function lookUp(code: string): Scan {
-    const asset = findAssetByIdentifier(code)
-    return asset ? { asset } : NOT_FOUND
+    return scannedAsset(code)
 }
 
 /** A unit scanned for receipt: its code, and the PID (and manufacturer) scanned with it when no ASN announced it. */
@@ -123,15 +147,14 @@ export function receive(unit: ScannedUnit, stockroomId: string): Scan {
 
     // Arriving units (bought or returned) sit in none of the user's stockrooms yet, so the lookup goes past the stockroom
     // rule; only those stages are received below, never stock held elsewhere. It finds the Provider IT's Assets too, so
-    // a serial IT holds is refused below rather than given a second Asset.
-    let asset = findAnyAsset(unit.code, 'identifier')
-    if (!asset) {
+    // a serial IT holds is refused below rather than given a second Asset. A code two Assets carry is refused.
+    let found = scanned(identifyAnyAsset(unit.code))
+    if (!found) {
         if (!unit.pid) return { reason: 'unknown', why: 'Unknown serial: scan the PID too to receive without an ASN' }
-        const created = createReceivedAsset(unit.code, unit.pid, unit.manufacturer ?? '')
-        if ('reason' in created) return created
-        asset = created.asset
+        found = createReceivedAsset(unit.code, unit.pid, unit.manufacturer ?? '')
     }
-    const assetId = asset.getUniqueValue()
+    if ('reason' in found) return found
+    const assetId = found.asset.getUniqueValue()
     // Not the stock lock (platform/stock) the allocation's reservation takes: a second take of a lock is refused.
     const receipt = withLock(LOCK.receiveAsset(assetId), (lock) => receiveHolding(lock, assetId, stockroomId))
     return receipt.ran ? receipt.value : SCAN_AGAIN
@@ -155,6 +178,8 @@ function receiveHolding(lock: HeldLock, assetId: string, stockroomId: string): S
     if (returned === 'received') return { asset }
     if (returned !== 'not_returning') return { reason: 'refused', why: `Not received: ${returned.refused}` }
     if (!awaitsReceipt(stage) || !moveAsset(asset, 'available').allowed) {
+        // Found past the stockroom rule: a unit held in a stockroom the user cannot see is not described to them.
+        if (!findById('alm_hardware', assetId)) return NOT_FOUND
         return { reason: 'conflict', why: `Not awaiting receipt (${stage ?? 'unknown stage'})` }
     }
     const tag = str(asset, 'asset_tag') || nextProviderTag()
@@ -205,8 +230,7 @@ function createReceivedAsset(code: string, pid: string, manufacturer: string): S
     const serial = normalizeSerial(code)
     const created = withLock(LOCK.receiveSerial(serial), (lock) => {
         // Any Asset the scanned code names, the Provider IT's too: the receipt refuses it rather than create a second one.
-        const found = findAnyAsset(code, 'identifier')
-        return found ? { asset: found } : insertReceivedAsset(lock, modelId, serial)
+        return scanned(identifyAnyAsset(code)) ?? insertReceivedAsset(lock, modelId, serial)
     })
     return created.ran ? created.value : SCAN_AGAIN
 }
@@ -324,9 +348,9 @@ export function putAway(code: string, stockroomId: string): Scan {
     const type = stockroomType(stockroom)
     if (!type) return { reason: 'invalid', why: NOT_NAAS_STOCKROOM }
     // A fleet asset only: the Provider IT's are not found.
-    const found = findAssetByIdentifier(code)
-    if (!found) return NOT_FOUND
-    const change = changeStock(found.getUniqueValue(), 'put away', (asset, lock) =>
+    const found = scannedAsset(code)
+    if ('reason' in found) return found
+    const change = changeStock(found.asset.getUniqueValue(), 'put away', (asset, lock) =>
         asset ? putAwayHolding(lock, asset, stockroom, type) : NOT_FOUND,
     )
     return change.ran ? change.value : STOCK_BUSY
@@ -349,8 +373,9 @@ function putAwayHolding(lock: HeldLock, asset: GlideRecord, stockroom: GlideReco
 
 /** Confirm a scanned fleet asset is a staged asset of the Order numbered `orderNumber`. */
 export function pick(code: string, orderNumber: string): Scan {
-    const asset = findAssetByIdentifier(code)
-    if (!asset) return NOT_FOUND
+    const found = scannedAsset(code)
+    if ('reason' in found) return found
+    const asset = found.asset
     const ownOrder = str(asset, 'x_daas_ham_order_line.order.number')
     if (ownOrder !== orderNumber) {
         return { reason: 'conflict', why: ownOrder ? `Belongs to ${ownOrder}` : 'Not allocated to an order' }

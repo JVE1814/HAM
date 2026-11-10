@@ -1,5 +1,5 @@
 import { chunks } from '../collections.ts'
-import { errorText, isSuccess, type HttpPort } from '../http.ts'
+import { failureText, isSuccess, type HttpPort } from '../http.ts'
 import { asArray, field, isoDate, parseJson, text } from '../json.ts'
 import type { OemVendor } from '../vocabulary.ts'
 import type { CoverageFact, CoverageFetched, Fetched, LifecycleFact, RmaFact } from './types.ts'
@@ -23,7 +23,7 @@ type Capability<Result> = (keys: readonly string[], context: OemContext) => Resu
 function call(context: OemContext, fn: RestFunction, params: Record<string, string>, errors: string[]): unknown {
     const response = context.http({ fn, params })
     if (!isSuccess(response.status)) {
-        errors.push(`${fn} ${JSON.stringify(params)}: ${errorText(response.status, response.body)}`)
+        errors.push(`${fn} ${JSON.stringify(params)}: ${failureText(response)}`)
         return undefined
     }
     const json = parseJson(response.body)
@@ -48,6 +48,27 @@ function eoxBatches(pids: readonly string[]): string[][] {
     return out
 }
 
+/**
+ * A PID as compared with another, trimmed and in upper case, as the OEMs write it: Cisco answers in its own case
+ * (WS-C3850-24T for ws-c3850-24t asked), and Models are matched to an OEM's answer by it.
+ */
+export function pidKey(pid: string): string {
+    return pid.trim().toUpperCase()
+}
+
+/**
+ * The PID of `batch` an EoX record answers, as it was sent: its input value (`EOXInputValue`), else its product
+ * (`EOLProductID`), matched ignoring case; undefined when it answers none of them.
+ */
+function askedPid(record: unknown, batch: readonly string[]): string | undefined {
+    for (const answered of [text(field(record, 'EOXInputValue')), text(field(record, 'EOLProductID'))]) {
+        const pid = answered ? batch.find((asked) => pidKey(asked) === pidKey(answered)) : undefined
+        if (pid !== undefined) return pid
+    }
+    return undefined
+}
+
+/** EoX v5 by PID: each fact carries the PID as it was asked, so the caller finds its Model whatever case Cisco answers in. */
 const ciscoLifecycle: Capability<Fetched<LifecycleFact>> = (pids, context) => {
     const facts: LifecycleFact[] = []
     const errors: string[] = []
@@ -55,9 +76,14 @@ const ciscoLifecycle: Capability<Fetched<LifecycleFact>> = (pids, context) => {
         const json = call(context, REST_MESSAGE.ciscoSupport.fn.eoxByPid, { pids: batch.join(',') }, errors)
         for (const record of asArray(field(json, 'EOXRecord'))) {
             if (field(record, 'EOXError')) continue // product without an EoX bulletin
-            const pid = text(field(record, 'EOLProductID'))
+            const product = text(field(record, 'EOLProductID'))
+            if (!product) continue
+            const pid = askedPid(record, batch)
+            if (pid === undefined) {
+                errors.push(`eox_by_pid: the EoX record of ${product} answers none of the product IDs asked`)
+                continue
+            }
             const lastDateOfSupport = isoDate(field(record, 'LastDateOfSupport', 'value'))
-            if (!pid) continue
             facts.push({
                 pid,
                 dates: {
@@ -95,9 +121,15 @@ const ciscoCoverage: Capability<CoverageFetched> = (serials, context) => {
         for (const record of records as unknown[]) {
             const serial = text(field(record, 'sr_no'))
             if (!serial) continue
+            // YES or NO; a record without it says nothing about the contract, which keeps what is stored.
+            const isCovered = text(field(record, 'is_covered')).toUpperCase()
+            if (isCovered !== 'YES' && isCovered !== 'NO') {
+                errors.push(`coverage_by_serial ${serial}: no is_covered in the answer, so its stored coverage is kept`)
+                continue
+            }
             facts.push({
                 serial,
-                covered: text(field(record, 'is_covered')).toUpperCase() === 'YES',
+                covered: isCovered === 'YES',
                 contractNumber: text(field(record, 'service_contract_number')),
                 serviceLevel: text(field(record, 'service_line_descr')),
                 // The SN2INFO v2 summary has no start date; v1.0 responses carry coverage_start_date.
@@ -134,13 +166,19 @@ function merakiModel(pid: string): string {
     return pid.replace(/-HW$/i, '')
 }
 
+/** Whether a Meraki inventory device carries EoX dates: its `eox` may be there with a null status and no dates. */
+function hasEoxDates(device: unknown): boolean {
+    return !!(isoDate(field(device, 'eox', 'endOfSaleAt')) || isoDate(field(device, 'eox', 'endOfSupportAt')))
+}
+
+/** The first organisation whose inventory has a device of the model with EoX dates gives them; later ones are not asked. */
 const merakiLifecycle: Capability<Fetched<LifecycleFact>> = (pids, context) => {
     const facts: LifecycleFact[] = []
     const errors: string[] = []
     for (const pid of pids) {
         for (const orgId of context.orgIds) {
             const json = call(context, REST_MESSAGE.meraki.fn.inventoryByModel, { org_id: orgId, model: merakiModel(pid) }, errors)
-            const device = asArray(json).find((d) => field(d, 'eox'))
+            const device = asArray(json).find(hasEoxDates)
             if (!device) continue
             facts.push({
                 pid,

@@ -1,7 +1,7 @@
 import { gs } from '@servicenow/glide'
 import { RESTMessageV2 } from '@servicenow/glide/sn_ws'
 import { messageOf } from '../domain/errors.ts'
-import type { HttpPort } from '../domain/http.ts'
+import type { HttpPort, HttpResponse } from '../domain/http.ts'
 import { secretProperty, stringProperty, type PropertyOf } from './properties.ts'
 
 /**
@@ -35,7 +35,11 @@ export interface MessageVariables {
     settings?: readonly SettingVariable[]
 }
 
-/** Calls functions of the REST message `message`, with its `variables`; failures come back as status 0. */
+/**
+ * Calls functions of the REST message `message`, with its `variables`. A call that gets no answer comes back as status
+ * 0 with the reason in `error`, logged: one that throws, and one RESTMessageV2 answers with status 0, as it does for a
+ * timeout or a DNS, TLS or connection failure, with the reason in getErrorMessage() and no body.
+ */
 export function restPort(message: string, variables: MessageVariables): HttpPort {
     const secrets = variables.secrets ?? []
     const settings = variables.settings ?? []
@@ -51,10 +55,19 @@ export function restPort(message: string, variables: MessageVariables): HttpPort
             }
             if (request.body !== undefined) rest.setRequestBody(request.body)
             const response = rest.execute()
-            return { status: response.getStatusCode(), body: response.getBody() }
+            const status = Number(response.getStatusCode())
+            if (status === 0) return noAnswer(message, request.fn, String(response.getErrorMessage() || 'no reason given'))
+            // Typed as a string, but null when no body came.
+            const body: string | null = response.getBody()
+            return { status, body: body === null || body === undefined ? '' : String(body) }
         } catch (error) {
-            gs.warn(`[x_daas_ham] ${message}.${request.fn} failed: ${messageOf(error)}`)
-            return { status: 0, body: '' }
+            return noAnswer(message, request.fn, messageOf(error))
         }
     }
+}
+
+/** A call of `message`.`fn` that got no answer, logged with its reason. */
+function noAnswer(message: string, fn: string, error: string): HttpResponse {
+    gs.warn(`[x_daas_ham] ${message}.${fn} failed: ${error}`)
+    return { status: 0, body: '', error }
 }

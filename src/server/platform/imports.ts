@@ -11,7 +11,7 @@ import type { CoverageFact } from '../domain/oem/types.ts'
 import { normalizeSerial } from '../domain/serials.ts'
 import { DEFAULT_STAGING_SOURCE } from '../domain/staging.ts'
 import type { OemVendor, StagingSource } from '../domain/vocabulary.ts'
-import { findAnyAsset, newAsset } from './assets.ts'
+import { findAnyAssetBySerial, newAsset } from './assets.ts'
 import { applyCoverage } from './coverage.ts'
 import { attemptLock, whyNotRun } from './locks.ts'
 import { writeModelLifecycle } from './model-lifecycle.ts'
@@ -83,7 +83,7 @@ function loadAgain(serial: string, why: string): RowOutcome {
  */
 function checkAsnRow(row: GlideRecord, serial: string): AsnRowCheck {
     const fields = { serial, pid: str(row, 'pid'), poNumber: str(row, 'po_number') }
-    return validateAsnRows([fields], findAnyAsset(serial, 'serial') ? new Set([serial]) : new Set())[0]
+    return validateAsnRows([fields], findAnyAssetBySerial(serial) ? new Set([serial]) : new Set())[0]
 }
 
 /**

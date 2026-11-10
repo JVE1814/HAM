@@ -13,6 +13,7 @@ import { labelReturn, retryTracking, trackShipment, voidLabel } from '../platfor
 export function uiCreateReturnLabel(current: GlideRecord): void {
     const label = labelReturn(current)
     if (!label.bought) return void gs.addErrorMessage(label.why)
+    if (label.unnoted) return void gs.addErrorMessage(label.unnoted)
     gs.addInfoMessage(`Return label ${label.trackingNumber} created`)
 }
 
@@ -23,7 +24,7 @@ export function uiCreateReturnLabel(current: GlideRecord): void {
 export function uiMarkLabelVoided(current: GlideRecord): void {
     const outcome = voidLabel(current.getUniqueValue(), str(current, 'tracking_number'))
     if (!outcome.voided) return void gs.addErrorMessage(outcome.why)
-    if (outcome.orderKeepsIt) gs.addErrorMessage(outcome.message)
+    if (outcome.leftUndone) gs.addErrorMessage(outcome.message)
     else gs.addInfoMessage(outcome.message)
 }
 

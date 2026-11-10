@@ -64,9 +64,19 @@ describe('Meraki claim', () => {
         expect(run([target('A')], http, 10).outcomes).toEqual([{ stepId: 'A', ok: false, message: 'not in the claimed serials' }])
     })
 
-    it('counts the batch as claimed only when the response has no serials field', () => {
-        const { http } = fake([{ status: 200, body: '' }])
+    it('counts the batch as claimed only when the response is a JSON object with no serials field', () => {
+        const { http } = fake([{ status: 200, body: JSON.stringify({ orders: [], licenses: [] }) }])
         expect(run([target('A'), target('B')], http, 10).outcomes.map((o) => o.ok)).toEqual([true, true])
+    })
+
+    it('fails the batch on a 2xx whose body is not a JSON object, so no step waiting on the claim is released', () => {
+        for (const body of ['', '<html>Bad gateway</html>', 'null', '[]', '"ok"']) {
+            const { http } = fake([{ status: 200, body }])
+            expect(run([target('A'), target('B')], http, 10).outcomes, body).toEqual([
+                { stepId: 'A', ok: false, message: 'HTTP 200: the response is not a JSON object' },
+                { stepId: 'B', ok: false, message: 'HTTP 200: the response is not a JSON object' },
+            ])
+        }
     })
 
     it('stops at the call budget and leaves the rest for the next run', () => {
@@ -74,6 +84,11 @@ describe('Meraki claim', () => {
         const result = run([target('A'), target('B', { account: 'org2' })], http, 1)
         expect(result.calls).toBe(1)
         expect(result.outcomes.map((o) => o.stepId)).toEqual(['A'])
+    })
+
+    it("fails a batch that got no answer with the transport's reason", () => {
+        const { http } = fake([{ status: 0, body: '', error: 'java.net.UnknownHostException: api.meraki.com' }])
+        expect(run([target('A')], http, 10).outcomes).toEqual([{ stepId: 'A', ok: false, message: 'no response: java.net.UnknownHostException: api.meraki.com' }])
     })
 
     it('fails a batch on an API error and needs an org', () => {

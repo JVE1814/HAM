@@ -7,6 +7,7 @@ import {
     applyTracking,
     buyLabel,
     labelVoidable,
+    newestEventAt,
     newTrackingEvents,
     OPEN_SHIPMENTS,
     parseTrackingRetry,
@@ -165,8 +166,11 @@ export function orderLabelBought(orderId: string, trackingNumber: string): boole
     return shipment.hasNext()
 }
 
-/** What came of asking for a return label: the label bought, or why none was. */
-export type ReturnLabelOutcome = { bought: true; trackingNumber: string } | { bought: false; why: string }
+/**
+ * What came of asking for a return label: the label bought, or why none was. `unnoted` when the label is bought but its
+ * note on the Return order was not saved: what to tell the user instead, with where its link is.
+ */
+export type ReturnLabelOutcome = { bought: true; trackingNumber: string; unnoted?: string } | { bought: false; why: string }
 
 /**
  * Buy the prepaid label a ship-back Return order's Site contact prints, one box per unit still awaited, and note it on
@@ -191,9 +195,11 @@ export function labelReturn(returnOrder: GlideRecord): ReturnLabelOutcome {
     const result = label.value
     if (!result.ok) return { bought: false, why: result.error }
     returnOrder.setValue('work_notes', `Return label ${result.trackingNumber} (${result.carrier}): ${result.labelUrl}`)
-    // The record of the form the label was asked from: a refused save (the platform says why) loses only the note.
-    returnOrder.update()
-    return { bought: true, trackingNumber: result.trackingNumber }
+    // The label and its Shipment are saved either way; only the note giving the Site contact the label link is lost.
+    if (returnOrder.update()) return { bought: true, trackingNumber: result.trackingNumber }
+    const where = `its link is on the Shipment (${result.labelUrl})`
+    const unnoted = `Return label ${result.trackingNumber} created, but its work note was not saved (${refusal(returnOrder)}): ${where}`
+    return { bought: true, trackingNumber: result.trackingNumber, unnoted }
 }
 
 /** A prepaid return label the Site contact prints, with its status. */
@@ -223,10 +229,11 @@ export function returnLabels(returnOrderIds: readonly string[]): Map<string, Ret
 }
 
 /**
- * What came of marking a label voided: not voided and why, or voided, with what to tell the user. `orderKeepsIt` when
- * the label is voided but its Order could not be cleared of it, which `message` then says to do by hand.
+ * What came of marking a label voided: not voided and why, or voided, with what to tell the user. `leftUndone` when
+ * the label is voided but what goes with it was not saved (its Order could not be cleared of it, or its Return order
+ * was not noted), which `message` then says to do by hand.
  */
-export type VoidOutcome = { voided: true; message: string; orderKeepsIt: boolean } | { voided: false; why: string }
+export type VoidOutcome = { voided: true; message: string; leftUndone: boolean } | { voided: false; why: string }
 
 function notVoided(why: string): VoidOutcome {
     return { voided: false, why }
@@ -250,9 +257,13 @@ export function voidLabel(shipmentId: string, trackingNumber: string): VoidOutco
     const returnOrder = findById('x_daas_ham_return_order', str(voiding.shipment, 'return_order'))
     if (returnOrder) {
         returnOrder.setValue('work_notes', `Return label ${trackingNumber} voided with the carrier: do not ship on it.`)
-        if (!returnOrder.update()) warnRefused(returnOrder, `${str(returnOrder, 'number')} not told label ${trackingNumber} is voided`)
+        // The label is voided all the same; only the note telling the Site not to ship on it is lost.
+        if (!returnOrder.update()) {
+            const unnoted = `${str(returnOrder, 'number')} was not noted (${refusal(returnOrder)}): tell the Site not to ship on it`
+            return { voided: true, message: `Label ${trackingNumber} marked voided, but ${unnoted}`, leftUndone: true }
+        }
     }
-    return { voided: true, message: `Label ${trackingNumber} marked voided`, orderKeepsIt: false }
+    return { voided: true, message: `Label ${trackingNumber} marked voided`, leftUndone: false }
 }
 
 /**
@@ -282,17 +293,17 @@ function clearOrderTracking(orderId: string, label: LabelRef): VoidOutcome {
     const order = findById('x_daas_ham_order', orderId)
     const tracked = order ? { trackingNumber: str(order, 'tracking_number'), carrier: str(order, 'carrier') } : null
     const note = tracked && voidedLabelOrderNote(tracked, label)
-    if (!order || !note) return { voided: true, message: `Label ${label.trackingNumber} marked voided`, orderKeepsIt: false }
+    if (!order || !note) return { voided: true, message: `Label ${label.trackingNumber} marked voided`, leftUndone: false }
     order.setValue('tracking_number', '')
     order.setValue('carrier', '')
     order.setValue('work_notes', note)
     const number = str(order, 'number')
     if (!order.update()) {
         const left = `${number} still names it (${refusal(order)}): clear its tracking number and carrier by hand`
-        return { voided: true, message: `Label ${label.trackingNumber} marked voided, but ${left}`, orderKeepsIt: true }
+        return { voided: true, message: `Label ${label.trackingNumber} marked voided, but ${left}`, leftUndone: true }
     }
     const replace = 'buy the replacement with the carrier and type its tracking number on the Order'
-    return { voided: true, message: `Label ${label.trackingNumber} marked voided and cleared from ${number}: ${replace}`, orderKeepsIt: false }
+    return { voided: true, message: `Label ${label.trackingNumber} marked voided and cleared from ${number}: ${replace}`, leftUndone: false }
 }
 
 /** The Shipment saved as voided, or why it was not. */
@@ -364,11 +375,16 @@ export type WebhookTracking = Tracking | { outcome: 'queued' }
  * and its events read again there (`trackUnderLock`). One held off through every try is queued to be applied in the
  * background (`trackLater`), not left to the aggregator: ShipEngine resends at most twice, typically 30 minutes apart,
  * then drops it.
+ *
+ * Deliveries also arrive out of order: ShipEngine resends one answered 500 about 30 minutes later, by when a newer
+ * update may have been applied. So a webhook is placed by its newest event, as a queued update is (`track`): one
+ * overtaken by an event stored since adds only its events, and its older status, detail and estimate do not move the
+ * Shipment back (say from Out for delivery to In transit, or to Label created, offering Mark label voided again).
  */
 export function trackShipment(update: TrackingUpdate): WebhookTracking {
     const found = new GlideRecord(SHIPMENT)
     if (!found.get('tracking_number', update.trackingNumber)) return { outcome: 'unmatched' }
-    const tracking = settle(trackUnderLock(found.getUniqueValue(), update), update)
+    const tracking = settle(trackUnderLock(found.getUniqueValue(), update, newestEventAt(update.events)), update)
     return tracking.outcome === 'busy' && trackLater(found, update) ? { outcome: 'queued' } : tracking
 }
 
@@ -431,13 +447,13 @@ function settle(tracked: Tracked, update: TrackingUpdate): Tracking {
 
 /**
  * Apply `update` to the Shipment `shipmentId` under its tracking lock (`track`, on the Shipment read again there).
- * `newestAt` is given for a queued update only (`track`). The lock is a leaf (ADR 0013): taken holding no other lock,
+ * `newestAt` is when the update's newest event happened (`track`). The lock is a leaf (ADR 0013): taken holding no other lock,
  * and none is taken under it, so the Order is noted after it is released (`settle`). It is tried back to back: a holder
  * keeps it for one status save and that update's new events only, and a webhook held off through every try is answered
  * at once (EasyPost waits 7 s, ShipEngine 10 s). Taking it throws only when an insert is refused with no lock row
  * (platform/locks `withLockTries` tries again, and that error escapes only when every try threw).
  */
-function trackUnderLock(shipmentId: string, update: TrackingUpdate, newestAt?: string): Tracked {
+function trackUnderLock(shipmentId: string, update: TrackingUpdate, newestAt: string): Tracked {
     const tracked = withLockTries(LOCK.trackShipment(shipmentId), () => {
         const shipment = findById(SHIPMENT, shipmentId)
         return shipment ? track(shipment, update, newestAt) : null
@@ -485,18 +501,19 @@ function trackAgain(shipment: GlideRecord, param: string, tries: number, why: st
 }
 
 /**
- * Apply `update` to `shipment`, read again under its tracking lock, save it and add the events not stored yet. A queued
- * update (`newestAt`: when its newest event happened) overtaken by an update applied while it waited (domain/shipping
- * `statusOvertaken`) adds only its events, so its older status cannot move the Shipment back. A holder does not check
- * that it still holds the lock: its few writes take a moment, far inside the lock's ten minutes.
+ * Apply `update` to `shipment`, read again under its tracking lock, save it and add the events not stored yet. An
+ * update (`newestAt`: when its newest event happened, '' when none is dated) overtaken by one applied before it, a
+ * webhook resent late or one queued while another was applied (domain/shipping `statusOvertaken`), adds only its
+ * events, so its older status cannot move the Shipment back. A holder does not check that it still holds the lock:
+ * its few writes take a moment, far inside the lock's ten minutes.
  */
-function track(shipment: GlideRecord, update: TrackingUpdate, newestAt?: string): Saved | { error: true } {
+function track(shipment: GlideRecord, update: TrackingUpdate, newestAt: string): Saved | { error: true } {
     const shipmentId = shipment.getUniqueValue()
     // Read under the lock, so no other delivery inserts between this read and the inserts below.
     const stored = storedEvents(shipmentId)
     let status = str(shipment, 'status') as ShipmentStatus
     let deliveredNow = false
-    if (newestAt === undefined || !statusOvertaken(update, newestAt, stored.times)) {
+    if (!statusOvertaken(update, newestAt, stored.times)) {
         const applied = applyTracking(status, update)
         status = applied.status
         deliveredNow = applied.deliveredNow

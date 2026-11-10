@@ -20,17 +20,33 @@ export interface CoverageSummary {
     serviceLevel: string
 }
 
-export function coverageSummary(contracts: readonly CoverageView[], today: string): CoverageSummary {
-    const latest = contracts
-        .filter((c) => c.covered && c.endDate)
-        .sort((a, b) => (b.endDate ?? '').localeCompare(a.endDate ?? ''))[0]
-    if (!latest?.endDate) return { coveredToday: false, coverageEnd: '', serviceLevel: '' }
-    return { coveredToday: latest.endDate >= today, coverageEnd: latest.endDate, serviceLevel: latest.serviceLevel }
+/**
+ * The coverage end an Asset is given for a covering contract with no end date (Mist `has_support` without dates, a CSV
+ * row without an end): open-ended, later than any real date, so the Asset reads as covered (`coverage_end >= today`)
+ * wherever that is checked, as annualSupportCost counts the contract as covering it.
+ */
+export const OPEN_ENDED_COVERAGE_END = '9999-12-31'
+
+/** Until when a contract covers its Asset: its end date, OPEN_ENDED_COVERAGE_END when it has none, null when it does not cover. */
+function coveredUntil(contract: CoverageView): string | null {
+    return contract.covered ? contract.endDate || OPEN_ENDED_COVERAGE_END : null
 }
 
-/** What the Provider pays per year for the contracts covering an Asset today. */
+/** An Asset's coverage from its contracts: the covering contract that ends last (an open-ended one first), and whether it covers today. */
+export function coverageSummary(contracts: readonly CoverageView[], today: string): CoverageSummary {
+    const covering = contracts.flatMap((contract) => {
+        const end = coveredUntil(contract)
+        return end === null ? [] : [{ end, serviceLevel: contract.serviceLevel }]
+    })
+    const latest = covering.sort((a, b) => b.end.localeCompare(a.end))[0]
+    if (!latest) return { coveredToday: false, coverageEnd: '', serviceLevel: '' }
+    return { coveredToday: latest.end >= today, coverageEnd: latest.end, serviceLevel: latest.serviceLevel }
+}
+
+/** What the Provider pays per year for the contracts covering an Asset today (open-ended ones included, as coverageSummary counts them). */
 export function annualSupportCost(contracts: readonly CoverageView[], today: string): number {
-    return contracts.filter((c) => c.covered && (!c.endDate || c.endDate >= today)).reduce((sum, c) => sum + (c.annualCost ?? 0), 0)
+    const coversToday = (contract: CoverageView) => (coveredUntil(contract) ?? '') >= today
+    return contracts.filter(coversToday).reduce((sum, contract) => sum + (contract.annualCost ?? 0), 0)
 }
 
 /** What the coverage sync does with one asked serial once its vendor has been called. */

@@ -1,7 +1,8 @@
 import { GlideRecord, gs } from '@servicenow/glide'
+import { appendTo } from '../domain/collections.ts'
 import { coverageDisposition, type CoverageAnswer } from '../domain/coverage.ts'
 import { naasModelCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
-import { enabledRoutes, type CoverageRoute } from '../domain/oem/adapters.ts'
+import { enabledRoutes, pidKey, type CoverageRoute } from '../domain/oem/adapters.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
 import { daysAgoGlide, nowMs } from './clock.ts'
 import { applyCoverage, staleAssets } from './coverage.ts'
@@ -20,39 +21,60 @@ import { str } from './records.ts'
 /** Assets per coverage batch. */
 const COVERAGE_BATCH = 200
 
-/** The most errors of one answer that are logged: a vendor that is down fails every key the same way. */
+/**
+ * The most errors of one job and run that are logged: a vendor that is down fails every key the same way. The rest
+ * are counted in one more line.
+ */
 const ERRORS_LOGGED = 20
 
 function report(job: string, errors: readonly string[]): void {
     for (const error of errors.slice(0, ERRORS_LOGGED)) gs.warn(`[x_daas_ham] ${job}: ${error}`)
+    const more = errors.length - ERRORS_LOGGED
+    if (more > 0) gs.warn(`[x_daas_ham] ${job}: and ${more} more error(s) not logged`)
 }
 
-/** `vendor`'s NaaS Models (those with an OEM PID), by PID. */
-function naasModelsByPid(vendor: OemVendor): Map<string, string> {
-    const models = new Map<string, string>()
+/**
+ * `vendor`'s NaaS Models (those with an OEM PID), by PID as an OEM's answer is matched to them (domain/oem/adapters
+ * `pidKey`): the PID to ask for each key, as the first of its Models stores it (trimmed), and the Models with it.
+ */
+function naasModelsByPid(vendor: OemVendor): { asked: Map<string, string>; models: Map<string, string[]> } {
+    const asked = new Map<string, string>()
+    const models = new Map<string, string[]>()
     const model = new GlideRecord('cmdb_model')
     model.addQuery('x_daas_ham_oem_source', vendor)
     model.addEncodedQuery(naasModelCondition())
     model.query()
-    while (model.next()) models.set(str(model, OEM_PID_FIELD), model.getUniqueValue())
-    return models
+    while (model.next()) {
+        const pid = str(model, OEM_PID_FIELD).trim()
+        if (!pid) continue
+        if (!asked.has(pidKey(pid))) asked.set(pidKey(pid), pid)
+        appendTo(models, pidKey(pid), model.getUniqueValue())
+    }
+    return { asked, models }
 }
 
-/** EoX milestones for NaaS Models of every vendor with a lifecycle API. */
+/**
+ * EoX milestones for NaaS Models of every vendor with a lifecycle API. Models are matched to the answer by PID
+ * ignoring case and surrounding spaces, so a PID stored in lower case still gets its dates, and Models sharing a PID
+ * each get them; one asked once. An answer for a PID no Model has is logged.
+ */
 export function syncLifecycle(): void {
     for (const { vendor, route } of enabledRoutes('lifecycle', oemEnabled)) {
-        const models = naasModelsByPid(vendor)
-        const result = route.run([...models.keys()], oemContext(route.via))
-        report(`lifecycle ${vendor}`, result.errors)
+        const { asked, models } = naasModelsByPid(vendor)
+        if (asked.size === 0) continue
+        const result = route.run([...asked.values()], oemContext(route.via))
+        const errors = [...result.errors]
         // New dates win; dates the vendor does not give (e.g. a CSV end of life) are kept.
-        const refused: string[] = []
         for (const fact of result.facts) {
-            const modelId = models.get(fact.pid)
-            if (!modelId) continue
-            const written = writeModelLifecycle(modelId, fact.dates, { source: vendor, reference: fact.reference })
-            refused.push(...written.refused.map((why) => `${fact.pid} not saved: ${why}`))
+            const modelIds = models.get(pidKey(fact.pid))
+            if (!modelIds) errors.push(`an answer for PID ${fact.pid} matches no ${vendor} Model`)
+            for (const modelId of modelIds ?? []) {
+                // A refused save leaves the Model's stored dates as they were: the next daily run asks again.
+                const written = writeModelLifecycle(modelId, fact.dates, { source: vendor, reference: fact.reference })
+                errors.push(...written.refused.map((why) => `lifecycle of PID ${fact.pid} (Model ${modelId}) not saved: ${why}`))
+            }
         }
-        report(`lifecycle ${vendor}`, refused)
+        report(`lifecycle ${vendor}`, errors)
     }
 }
 

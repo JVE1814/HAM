@@ -2,7 +2,7 @@ import { normalizeSerial } from '../serials.ts'
 import { chunks } from '../collections.ts'
 import { andEachClause } from '../encoded-query.ts'
 import { fleetCondition } from '../fleet.ts'
-import { errorText, isSuccess, type HttpPort, type HttpRequest, type HttpResponse } from '../http.ts'
+import { failureText, isSuccess, type HttpPort, type HttpRequest, type HttpResponse } from '../http.ts'
 import { asArray, field, parseJson, text } from '../json.ts'
 import type { AutomationStatus, ClaimAction, OemVendor } from '../vocabulary.ts'
 import { fortiCloudError } from './forticloud.ts'
@@ -84,7 +84,7 @@ function fail(targets: readonly ClaimTarget[], message: string): ClaimOutcome[] 
 function outcome(target: ClaimTarget, response: HttpResponse, okMessage: string): ClaimOutcome {
     return isSuccess(response.status)
         ? { stepId: target.stepId, ok: true, message: okMessage }
-        : { stepId: target.stepId, ok: false, message: errorText(response.status, response.body) }
+        : { stepId: target.stepId, ok: false, message: failureText(response) }
 }
 
 /** Targets that cannot be sent at all (missing identifier, or missing account where the call needs one). */
@@ -120,11 +120,18 @@ const merakiClaim: ClaimAdapter = (targets, http, maxCalls) => {
     for (const batch of sent) {
         const response = http({ fn: REST_MESSAGE.meraki.fn.claimInventory, params: { org_id: batch[0].account }, body: JSON.stringify({ serials: batch.map((t) => t.serial) }) })
         if (!isSuccess(response.status)) {
-            outcomes.push(...fail(batch, errorText(response.status, response.body)))
+            outcomes.push(...fail(batch, failureText(response)))
+            continue
+        }
+        // A body that is not a JSON object says nothing about the claim (as FortiCloud's): the batch fails, to be tried
+        // again, rather than release the licence and zero-touch steps waiting on it.
+        const json = parseJson(response.body)
+        if (json === null || typeof json !== 'object' || Array.isArray(json)) {
+            outcomes.push(...fail(batch, `HTTP ${response.status}: the response is not a JSON object`))
             continue
         }
         // Only a missing serials field is unknown (counted as done); an explicit [] means nothing was claimed.
-        const returned = field(parseJson(response.body), 'serials')
+        const returned = field(json, 'serials')
         const claimed = new Set(asArray(returned).map((s) => normalizeSerial(text(s))))
         for (const t of batch) {
             const done = !Array.isArray(returned) || claimed.has(normalizeSerial(t.serial))
@@ -151,7 +158,7 @@ const mistClaim: ClaimAdapter = (targets, http, maxCalls) => {
         const json = parseJson(response.body)
         const hasResult = ['added', 'duplicated', 'error'].some((k) => Array.isArray(field(json, k)))
         if (!isSuccess(response.status) && !(response.status === 400 && hasResult)) {
-            outcomes.push(...fail(batch, errorText(response.status, response.body)))
+            outcomes.push(...fail(batch, failureText(response)))
             continue
         }
         const accepted = new Set([...asArray(field(json, 'added')), ...asArray(field(json, 'duplicated'))].map(claimCodeKey))
@@ -196,7 +203,7 @@ const greenLakeSubscribe: ClaimAdapter = (targets, http, maxCalls) => {
         const device = isSuccess(found.status) ? asArray(field(parseJson(found.body), 'items'))[0] : undefined
         const deviceId = text(field(device, 'id'))
         if (!deviceId) {
-            outcomes.push({ stepId: t.stepId, ok: false, message: isSuccess(found.status) ? 'device not in the GreenLake workspace yet' : errorText(found.status, found.body) })
+            outcomes.push({ stepId: t.stepId, ok: false, message: isSuccess(found.status) ? 'device not in the GreenLake workspace yet' : failureText(found) })
             continue
         }
         if (asArray(field(device, 'subscription')).some((s) => text(field(s, 'id')).toLowerCase() === t.account.toLowerCase())) {
@@ -219,7 +226,7 @@ const fortiRegister: ClaimAdapter = (targets, http, maxCalls) => {
         const body = JSON.stringify({ registrationUnits: batch.map((t) => ({ serialNumber: t.serial, description: 'NaaS staging', isGovernment: false })) })
         const response = http({ fn: REST_MESSAGE.fortiCare.fn.registerProducts, params: {}, body })
         const json = parseJson(response.body)
-        const error = isSuccess(response.status) ? fortiCloudError(json) : errorText(response.status, response.body)
+        const error = isSuccess(response.status) ? fortiCloudError(json) : failureText(response)
         if (error === null) outcomes.push(...batch.map((t) => ({ stepId: t.stepId, ok: true, message: 'registered in FortiCloud' })))
         else outcomes.push(...fail(batch, error))
     }
@@ -260,7 +267,7 @@ const checkPointZeroTouch: ClaimAdapter = (targets, http, maxCalls) => {
     const login = http({ fn: REST_MESSAGE.checkPoint.fn.login, params: {} })
     const sid = isSuccess(login.status) ? text(field(parseJson(login.body), 'sid')) : ''
     if (!sid) {
-        const reason = isSuccess(login.status) ? 'no session id returned' : errorText(login.status, login.body)
+        const reason = isSuccess(login.status) ? 'no session id returned' : failureText(login)
         outcomes.push(...fail(reachable.map((c) => c.target), `Zero Touch login failed: ${reason}`))
         return { outcomes, calls: 1 }
     }

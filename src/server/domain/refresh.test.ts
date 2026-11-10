@@ -35,6 +35,23 @@ describe('replacementModel', () => {
         expect(replacementModel({ modelId: 'c9300', deviceClass: 'switch' }, catalog, lifecycle, '2026-11-07')).toBe('c9300x')
     })
 
+    it('prefers a model with a known end of support over one with none on record (not synced yet)', () => {
+        const withUnsynced = [{ modelId: 'c9200', deviceClass: 'switch' }, ...catalog]
+        const lifecycleOf = new Map([...lifecycle, ['c9200', {}]])
+        expect(replacementModel({ modelId: 'c9300', deviceClass: 'switch' }, withUnsynced, lifecycleOf, '2026-11-07')).toBe('c9300x')
+        // No lifecycle entry at all reads the same.
+        expect(replacementModel({ modelId: 'c9300', deviceClass: 'switch' }, withUnsynced, lifecycle, '2026-11-07')).toBe('c9300x')
+    })
+
+    it('takes a model without a known end of support only when no other sellable one is catalogued, in catalog order', () => {
+        const unknowns = [
+            { modelId: 'c9300', deviceClass: 'switch' },
+            { modelId: 'c9200', deviceClass: 'switch' },
+            { modelId: 'c9500', deviceClass: 'switch' },
+        ]
+        expect(replacementModel({ modelId: 'c9300', deviceClass: 'switch' }, unknowns, lifecycle, '2026-11-07')).toBe('c9200')
+    })
+
     it('finds nothing when the customer catalog has no sellable model of that class', () => {
         expect(replacementModel({ modelId: 'isr4331', deviceClass: 'router' }, catalog, lifecycle, '2026-11-07')).toBeNull()
     })

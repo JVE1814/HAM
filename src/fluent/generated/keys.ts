@@ -2676,6 +2676,10 @@ declare global {
                         table: 'sys_module'
                         id: 'ca54425d553a43cd8416dee48a2da7b0'
                     }
+                    'src_server_domain_asset-identifier_ts': {
+                        table: 'sys_module'
+                        id: 'fe8d93fb3d164c6ab6fb69d34f4cecd0'
+                    }
                     src_server_domain_audit_ts: {
                         table: 'sys_module'
                         id: '3dd2facc48c643e3a065e9472a4ff0a0'

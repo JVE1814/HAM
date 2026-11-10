@@ -69,6 +69,27 @@ describe('Cisco', () => {
         expect(result.facts.map((f) => f.pid)).toEqual(pids)
     })
 
+    it('keys each EoX fact by the product ID as it was asked, whatever case Cisco answers in', () => {
+        // Cisco answers EOLProductID in its own case: a Model stored as ws-c3850-24t must still get its dates.
+        const { http } = fakeHttp({
+            eox_by_pid: (params) => {
+                const answer = eoxResponse(params)
+                return { ...answer, EOXRecord: answer.EOXRecord.map((record) => ({ ...record, EOLProductID: record.EOLProductID.toUpperCase() })) }
+            },
+        })
+        const result = OEM_ADAPTERS.cisco.lifecycle!.run(['ws-c3850-24t', 'C9300-48P'], { http, orgIds: [] })
+        expect(result.facts.map((f) => f.pid)).toEqual(['ws-c3850-24t', 'C9300-48P'])
+        expect(result.errors).toEqual([])
+    })
+
+    it('matches an EoX record by its product when it carries no input value, and reports one that answers no PID asked', () => {
+        const record = (pid: string) => ({ EOLProductID: pid, LastDateOfSupport: { value: '2029-04-30', dateFormat: 'YYYY-MM-DD' } })
+        const http = () => ({ status: 200, body: JSON.stringify({ EOXRecord: [record('WS-C3850-24T'), record('WS-C3850-48T')] }) })
+        const result = OEM_ADAPTERS.cisco.lifecycle!.run(['ws-c3850-24t'], { http, orgIds: [] })
+        expect(result.facts.map((f) => f.pid)).toEqual(['ws-c3850-24t'])
+        expect(result.errors).toEqual(['eox_by_pid: the EoX record of WS-C3850-48T answers none of the product IDs asked'])
+    })
+
     it('maps SN2INFO v2 coverage summaries: contract end from covered_product_line_end_date, no start date', () => {
         const { http, calls } = fakeHttp({
             coverage_by_serial: () => ({
@@ -103,6 +124,17 @@ describe('Cisco', () => {
         expect(result.errors).toEqual([])
     })
 
+    it('writes no fact for an SN2INFO record without is_covered, so the stored coverage stands (missing means unknown)', () => {
+        const http = () => ({
+            status: 200,
+            body: JSON.stringify({ serial_numbers: [{ sr_no: 'FOC1', service_contract_number: '9123', covered_product_line_end_date: '2027-06-30' }, { sr_no: 'FOC2', is_covered: 'no' }] }),
+        })
+        const result = OEM_ADAPTERS.cisco.coverage!.run(['FOC1', 'FOC2'], { http, orgIds: [] })
+        expect(result.facts).toEqual([{ serial: 'FOC2', covered: false, contractNumber: '', serviceLevel: '', startDate: undefined, endDate: undefined }])
+        expect(result.errors).toEqual(['coverage_by_serial FOC1: no is_covered in the answer, so its stored coverage is kept'])
+        expect(result).toMatchObject({ failed: [], rejected: [] })
+    })
+
     it('reads RMA status and reports HTTP failures as errors', () => {
         const { http } = fakeHttp({
             rma_status: (params) => (params.rma === '8000000001' ? { returns: { RmaRecord: [{ rmaNo: '8000000001', status: 'Shipped' }] } } : undefined),
@@ -110,6 +142,13 @@ describe('Cisco', () => {
         const result = OEM_ADAPTERS.cisco.rmaStatus!.run(['8000000001', '8000000002'], { http, orgIds: [] })
         expect(result.facts).toEqual([{ rmaNumber: '8000000001', status: 'Shipped' }])
         expect(result.errors).toEqual(['rma_status {"rma":"8000000002"}: HTTP 500'])
+    })
+
+    it("names the transport's reason for a call that got no answer", () => {
+        const http = () => ({ status: 0, body: '', error: 'Read timed out' })
+        const result = OEM_ADAPTERS.cisco.coverage!.run(['FOC1'], { http, orgIds: [] })
+        expect(result.errors).toEqual(['coverage_by_serial {"serials":"FOC1"}: no response: Read timed out'])
+        expect(result.failed).toEqual(['FOC1'])
     })
 
     it("adds the vendor's own error text to a failed call's error", () => {
@@ -132,6 +171,23 @@ describe('Meraki', () => {
             { org_id: 'org2', model: 'MR46' },
         ])
         expect(result.facts).toEqual([{ pid: 'MR46-HW', dates: { endOfSale: '2026-06-30', endOfSupport: '2031-06-30' }, reference: 'meraki:org2' }])
+    })
+
+    it('keeps searching later organisations past a device whose eox has a null status and no dates', () => {
+        const { http, calls } = fakeHttp({
+            inventory_by_model: (params) =>
+                params.org_id === 'org1'
+                    ? [{ serial: 'Q2XX-1', model: 'MR46', eox: { status: null, endOfSaleAt: null, endOfSupportAt: null } }]
+                    : [{ serial: 'Q2XX-2', model: 'MR46', eox: { status: 'endOfSale', endOfSaleAt: '2026-06-30T00:00:00Z', endOfSupportAt: null } }],
+        })
+        const result = OEM_ADAPTERS.meraki.lifecycle!.run(['MR46-HW'], { http, orgIds: ['org1', 'org2'] })
+        expect(calls).toHaveLength(2)
+        expect(result.facts).toEqual([{ pid: 'MR46-HW', dates: { endOfSale: '2026-06-30', endOfSupport: undefined }, reference: 'meraki:org2' }])
+    })
+
+    it('gives no fact for a model no organisation has EoX dates for', () => {
+        const { http } = fakeHttp({ inventory_by_model: () => [{ serial: 'Q2XX', model: 'MR46', eox: { status: null } }] })
+        expect(OEM_ADAPTERS.meraki.lifecycle!.run(['MR46-HW'], { http, orgIds: ['org1'] }).facts).toEqual([])
     })
 })
 
