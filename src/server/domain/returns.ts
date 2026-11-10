@@ -1,5 +1,5 @@
 import { addDays } from './calendar.ts'
-import type { NamedRecord } from './customer-parties.ts'
+import { actorRefusal, CHOOSE_CUSTOMER, siteFinding, type ActWording, type NamedSite } from './customer-parties.ts'
 import { fleetStagesQuery } from './fleet.ts'
 import { DEPLOYED_STAGES, SERVING_STAGES, type Stage } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
@@ -20,7 +20,7 @@ import {
 /** The Customer a requested Return is for and the Site it names, with the Customer that Site belongs to. */
 export interface RequestedReturn {
     customerId: string
-    site?: NamedRecord & { isSite: boolean }
+    site?: NamedSite
 }
 
 /** The person requesting a Return: whether the Return create rule lets them, how far they see (ADR 0005) and their own Customer. */
@@ -30,17 +30,15 @@ export interface ReturnRequester {
     customerId: string
 }
 
+const REQUESTING_RETURNS: ActWording = { act: 'request returns', actForOwn: 'request returns' }
+
 /**
- * Why this person may not request a Return for the Customer, or null when they may. As for an Order (domain/entitlement
- * `raiserRefusal`): only those the Return create rule lets in ask for returns, and site contacts never do; provider
- * staff and the service desk ask for any Customer, a customer admin only for their own.
+ * Why this person may not request a Return for the Customer, or null when they may (domain/customer-parties
+ * `actorRefusal`, as for an Order): only those the Return create rule lets in ask for returns, a customer admin only
+ * for their own Customer.
  */
 export function returnRequesterRefusal(customerId: string, requester: ReturnRequester): string | null {
-    if (!requester.mayRequest || requester.scope === 'own_sites') return 'You may not request returns'
-    if (requester.scope === 'own_customer' && customerId !== requester.customerId) {
-        return 'You can only request returns for your own customer'
-    }
-    return null
+    return actorRefusal(customerId, { ...requester, permitted: requester.mayRequest }, REQUESTING_RETURNS)
 }
 
 /** Why a requested Return cannot be raised, and what it is about: who asks for it, or the Customer and Site it names. */
@@ -56,15 +54,8 @@ export interface ReturnRequestFinding {
 export function returnRequestFindings(request: RequestedReturn, requester: ReturnRequester): ReturnRequestFinding[] {
     const refusal = returnRequesterRefusal(request.customerId, requester)
     if (refusal) return [{ about: 'requester', message: refusal }]
-    const misplaced = siteFinding(request)
+    const misplaced = request.customerId ? siteFinding(request.customerId, request.site) : CHOOSE_CUSTOMER
     return misplaced ? [{ about: 'site', message: misplaced }] : []
-}
-
-function siteFinding(request: RequestedReturn): string | null {
-    if (!request.customerId) return 'Choose the customer'
-    if (!request.site) return "Choose one of the customer's sites"
-    if (!request.site.isSite || request.site.customerId !== request.customerId) return "The site is not one of the customer's sites"
-    return null
 }
 
 /**

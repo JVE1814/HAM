@@ -1,5 +1,13 @@
 import type { Approver } from './approvals.ts'
-import type { NamedRecord } from './customer-parties.ts'
+import {
+    actorRefusal,
+    agreementFinding,
+    CHOOSE_CUSTOMER,
+    siteFinding,
+    type ActWording,
+    type NamedRecord,
+    type NamedSite,
+} from './customer-parties.ts'
 import { fleetStagesQuery } from './fleet.ts'
 import { OPEN_LINE_STAGES, UNFULFILLED_ORDER_STAGES } from './fulfilment.ts'
 import { DEPLOYED_STAGES } from './lifecycle.ts'
@@ -111,7 +119,7 @@ export function assessOrder(request: OrderRequest, context: EntitlementContext):
 export interface OrderParties {
     customerId: string
     agreement?: NamedRecord
-    site?: NamedRecord & { isSite: boolean }
+    site?: NamedSite
     siteTemplate?: NamedRecord
 }
 
@@ -122,15 +130,14 @@ export interface Orderer {
     customerId: string
 }
 
+const RAISING_ORDERS: ActWording = { act: 'raise orders', actForOwn: 'order' }
+
 /**
- * Why this person may not raise an Order for the Customer, or null when they may. Only Order raisers raise Orders, and
- * site contacts never do; provider staff and the service desk raise them for any Customer, a customer admin only for
- * their own.
+ * Why this person may not raise an Order for the Customer, or null when they may (domain/customer-parties
+ * `actorRefusal`): only Order raisers raise Orders, a customer admin only for their own Customer.
  */
 export function raiserRefusal(customerId: string, orderer: Orderer): string | null {
-    if (!orderer.mayRaise || orderer.scope === 'own_sites') return 'You may not raise orders'
-    if (orderer.scope === 'own_customer' && customerId !== orderer.customerId) return 'You can only order for your own customer'
-    return null
+    return actorRefusal(customerId, { ...orderer, permitted: orderer.mayRaise }, RAISING_ORDERS)
 }
 
 /** Whether the Order names no Site template, or one offered to its Customer or to every Customer. */
@@ -146,12 +153,10 @@ export function siteTemplateOffered(order: OrderParties): boolean {
 export function ownershipFindings(order: OrderParties, orderer: Orderer): string[] {
     const refusal = raiserRefusal(order.customerId, orderer)
     if (refusal) return [refusal]
-    if (!order.customerId) return ['Choose the customer']
-    const findings: string[] = []
-    if (!order.agreement) findings.push("Choose one of the customer's agreements")
-    else if (order.agreement.customerId !== order.customerId) findings.push("The agreement is not one of the customer's agreements")
-    if (!order.site) findings.push("Choose one of the customer's sites")
-    else if (!order.site.isSite || order.site.customerId !== order.customerId) findings.push("The site is not one of the customer's sites")
+    if (!order.customerId) return [CHOOSE_CUSTOMER]
+    const findings = [agreementFinding(order.customerId, order.agreement), siteFinding(order.customerId, order.site)].filter(
+        (finding): finding is string => finding !== null,
+    )
     if (!siteTemplateOffered(order)) findings.push('The site template is not offered to the customer')
     return findings
 }
