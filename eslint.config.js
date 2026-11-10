@@ -29,9 +29,16 @@ export default tseslint.config(
             '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
         },
     },
+    // A page shares the pure domain core with the server and nothing else of it: platform and entry modules need Glide.
     {
         files: ['src/client/**/*.{ts,tsx}'],
         languageOptions: { globals: { ...globals.browser } },
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                { patterns: [{ regex: '/server/(?!domain/)', message: 'A page imports server code from server/domain only.' }] },
+            ],
+        },
     },
     // The instance stores each server module as a sys_module whose path ends in ".ts" and resolves an import by that
     // exact path, so a relative import without the extension builds and passes every unit test, then fails on the
