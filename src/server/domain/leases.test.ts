@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+    buyoutCost,
     buyoutPurchase,
+    buyoutSplit,
     buyoutTerms,
     decidedLease,
     earliestReviewedEnd,
     evenShare,
+    evenSplit,
     leaseDecisionProblem,
     leaseMismatch,
     stillCovered,
@@ -151,12 +154,71 @@ describe('buyoutPurchase', () => {
 })
 
 describe('evenShare', () => {
-    it('splits an amount evenly, e.g. a buyout price over the Assets covered', () => {
+    it("splits an amount evenly, unrounded, e.g. a lease payment's share for Margin", () => {
         expect(evenShare(9000, 3)).toBe(3000)
         expect(evenShare(0, 3)).toBe(0)
+        expect(evenShare(10000, 3) * 3).toBeCloseTo(10000, 9)
     })
 
     it('gives no share when there is none to split it over', () => {
         expect(evenShare(9000, 0)).toBe(0)
+    })
+})
+
+describe('evenSplit', () => {
+    /** The shares an amount split by evenSplit gives, the first `extra` one cent more. */
+    function shares(amount: number, count: number): number[] {
+        const split = evenSplit(amount, count)
+        return Array.from({ length: count }, (_, i) => (i < split.extra ? Math.round(split.share * 100 + 1) / 100 : split.share))
+    }
+
+    it('splits to the cent by largest remainder, so the shares add up to the amount', () => {
+        expect(evenSplit(10000, 3)).toEqual({ share: 3333.33, extra: 1 })
+        expect(shares(10000, 3)).toEqual([3333.34, 3333.33, 3333.33])
+        expect(evenSplit(9000, 3)).toEqual({ share: 3000, extra: 0 })
+        expect(evenSplit(0.05, 3)).toEqual({ share: 0.01, extra: 2 })
+        expect(evenSplit(0.02, 3)).toEqual({ share: 0, extra: 2 })
+        for (const [amount, count] of [[10000, 3], [1234.57, 7], [0.99, 4], [100000.01, 11]]) {
+            const cents = shares(amount, count).reduce((sum, share) => sum + Math.round(share * 100), 0)
+            expect(cents).toBe(Math.round(amount * 100))
+        }
+    })
+
+    it('splits nothing over no Assets, or a price that is not positive', () => {
+        expect(evenSplit(9000, 0)).toEqual({ share: 0, extra: 0 })
+        expect(evenSplit(0, 3)).toEqual({ share: 0, extra: 0 })
+        expect(evenSplit(-30, 3)).toEqual({ share: 0, extra: 0 })
+    })
+})
+
+describe('buyoutSplit and buyoutCost', () => {
+    const ids = ['c3', 'a1', 'b2']
+
+    it("gives the left-over cents to the first Assets in sys_id order, whatever order they are listed in", () => {
+        const split = buyoutSplit(10000, ids)
+        expect(split).toEqual({ share: 3333.33, extraThrough: 'a1' })
+        expect(ids.map((id) => buyoutCost(split, id))).toEqual([3333.33, 3333.34, 3333.33])
+        const twoLeft = buyoutSplit(10000.02, [...ids, 'd4', 'd4'])
+        expect(twoLeft).toEqual({ share: 2500, extraThrough: 'b2' })
+        expect(['a1', 'b2', 'c3', 'd4'].map((id) => buyoutCost(twoLeft, id))).toEqual([2500.01, 2500.01, 2500, 2500])
+    })
+
+    it('adds up to the price over the Assets covered at buyout', () => {
+        const covered = Array.from({ length: 7 }, (_, i) => `asset${i}`)
+        const split = buyoutSplit(1234.57, covered)
+        const cents = covered.reduce((sum, id) => sum + Math.round(buyoutCost(split, id) * 100), 0)
+        expect(cents).toBe(123457)
+    })
+
+    it('gives every Asset the share when it divides evenly, and nothing without Assets', () => {
+        const split = buyoutSplit(9000, ids)
+        expect(split).toEqual({ share: 3000, extraThrough: '' })
+        expect(ids.map((id) => buyoutCost(split, id))).toEqual([3000, 3000, 3000])
+        expect(buyoutSplit(9000, [])).toEqual({ share: 0, extraThrough: '' })
+    })
+
+    it('costs a share stored unrounded before the upgrade to the cent', () => {
+        expect(buyoutCost({ share: 10000 / 3, extraThrough: '' }, 'a1')).toBe(3333.33)
+        expect(buyoutCost({ share: 20000 / 3, extraThrough: '' }, 'a1')).toBe(6666.67)
     })
 })

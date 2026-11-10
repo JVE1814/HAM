@@ -6,7 +6,12 @@ import {
     billingLineJson,
     billingMonthProblem,
     billsFromIntervals,
+    chooseCurrency,
+    currencyCode,
+    currencyTotals,
     decideGenerationReset,
+    divideRounded,
+    fromCents,
     IN_SERVICE_ON_ENDED_LINE,
     IN_SERVICE_UNBILLED,
     NO_LINE,
@@ -20,8 +25,12 @@ import {
     RESET_AFTER_IDLE_MINUTES,
     resetGenerationError,
     restartInterval,
+    roundToCent,
+    singleCurrencyTotal,
     subscriptionCharges,
+    toCents,
     toCsv,
+    totalsText,
     withinLine,
     type BillingLineField,
     type ChargeSources,
@@ -129,6 +138,138 @@ describe('prorate', () => {
         expect(prorate(45, 10, 30)).toBe(15)
         expect(prorate(100, 1, 31)).toBe(3.23)
     })
+
+    it('rounds a charge of exactly half a cent up, which binary floats would round down', () => {
+        // 0.29 x 14 / 28 = 0.145 and 0.7 x 3 / 28 = 0.075, yet (0.29 * 14 * 100) / 28 is 14.499999999999998 in floats.
+        expect(prorate(0.29, 14, 28)).toBe(0.15)
+        expect(prorate(0.7, 3, 28)).toBe(0.08)
+        expect(prorate(10.05, 1, 2)).toBe(5.03)
+        expect(prorate(-0.29, 14, 28)).toBe(-0.15)
+    })
+
+    it('stays exact for large rates and many device-days', () => {
+        expect(prorate(123456.78, 31 * 400, 31)).toBe(49382712)
+        expect(prorate(45, 0, 30)).toBe(0)
+    })
+})
+
+describe('toCents', () => {
+    it('rounds half a cent away from zero, ignoring the binary noise of a decimal amount', () => {
+        expect(toCents(1.005)).toBe(101)
+        expect(toCents(2.675)).toBe(268)
+        expect(toCents(1200.555)).toBe(120056)
+        expect(toCents(-1.005)).toBe(-101)
+        expect(toCents(0.004)).toBe(0)
+        expect(toCents(-0.004)).toBe(0)
+        expect(toCents(Number.NaN)).toBe(0)
+    })
+
+    it('reads back as the amount to the cent', () => {
+        expect(fromCents(toCents(0.1 + 0.2))).toBe(0.3)
+        expect(roundToCent(1.005)).toBe(1.01)
+    })
+})
+
+describe('divideRounded', () => {
+    it('divides whole numbers rounding half away from zero, exactly', () => {
+        expect(divideRounded(7, 2)).toBe(4)
+        expect(divideRounded(5, 3)).toBe(2)
+        expect(divideRounded(-7, 2)).toBe(-4)
+        expect(divideRounded(7, -2)).toBe(-4)
+        expect(divideRounded(0, 5)).toBe(0)
+        // At a half, and one part in 2^53 under it.
+        expect(divideRounded(2 ** 52, 2 ** 53)).toBe(1)
+        expect(divideRounded(2 ** 52 - 1, 2 ** 53)).toBe(0)
+    })
+})
+
+describe('currencyCode', () => {
+    it('reads a three-letter code in any case, and nothing else', () => {
+        expect(currencyCode(' eur ')).toBe('EUR')
+        expect(currencyCode('USD')).toBe('USD')
+        expect(currencyCode('')).toBe('')
+        expect(currencyCode('EURO')).toBe('')
+        expect(currencyCode('E1R')).toBe('')
+    })
+})
+
+describe('chooseCurrency', () => {
+    const unread = (): string[] => {
+        throw new Error('the Customer is not read for an amount naming an Agreement')
+    }
+
+    it("takes the Agreement's currency, never a default", () => {
+        expect(chooseCurrency({ name: 'NAG0001001', currency: 'usd' }, unread)).toEqual({ currency: 'USD' })
+        expect(chooseCurrency({ name: 'NAG0001001', currency: '' }, unread)).toEqual({
+            problem: "its Agreement NAG0001001 has no currency: set the Agreement's currency",
+        })
+        expect(chooseCurrency({ name: 'NAG0001001', currency: 'Euro' }, unread)).toEqual({
+            problem: "its Agreement NAG0001001 has 'Euro' as its currency, not a three-letter code: set the Agreement's currency",
+        })
+    })
+
+    it('takes the currency every Agreement of the Customer has, for an amount naming none', () => {
+        expect(chooseCurrency(null, () => ['EUR'])).toEqual({ currency: 'EUR' })
+        expect(chooseCurrency(null, () => ['eur', 'EUR'])).toEqual({ currency: 'EUR' })
+        expect(chooseCurrency(null, () => ['USD', 'EUR'])).toEqual({
+            problem: "it names no Agreement, and its Customer's Agreements are in EUR, USD: set its Agreement",
+        })
+        expect(chooseCurrency(null, () => ['EUR', ''])).toEqual({
+            problem: "it names no Agreement, and its Customer's Agreements are in no currency, EUR: set its Agreement",
+        })
+        expect(chooseCurrency(null, () => [''])).toEqual({
+            problem: "it names no Agreement, and its Customer's Agreements are in no currency: set its Agreement",
+        })
+        expect(chooseCurrency(null, () => [])).toEqual({ problem: "it names no Agreement, and its Customer's Agreements are in none: set its Agreement" })
+    })
+})
+
+describe('currencyTotals', () => {
+    it('totals lines per currency, in currency order, never adding two currencies', () => {
+        expect(
+            currencyTotals([
+                { currency: 'USD', lines: 2, amount: 99 },
+                { currency: 'EUR', lines: 3, amount: 1234.56 },
+                { currency: 'eur', lines: 1, amount: 0.1 },
+                { currency: 'EUR', lines: 1, amount: 0.2 },
+            ]),
+        ).toEqual([
+            { currency: 'EUR', lines: 5, amount: 1234.86 },
+            { currency: 'USD', lines: 2, amount: 99 },
+        ])
+        expect(currencyTotals([])).toEqual([])
+    })
+
+    it('keeps lines without a currency apart', () => {
+        expect(currencyTotals([{ currency: '', lines: 1, amount: 100 }, { currency: 'EUR', lines: 1, amount: 5 }])).toEqual([
+            { currency: '', lines: 1, amount: 100 },
+            { currency: 'EUR', lines: 1, amount: 5 },
+        ])
+    })
+})
+
+describe('totalsText and singleCurrencyTotal', () => {
+    const eur = { currency: 'EUR', lines: 3, amount: 1234.5 }
+    const usd = { currency: 'USD', lines: 1, amount: -99 }
+
+    it('shows each currency with its total to the cent', () => {
+        expect(totalsText([eur, usd])).toBe('EUR 1234.50; USD -99.00')
+        expect(totalsText([{ currency: '', lines: 1, amount: 100 }])).toBe('no currency 100.00')
+        expect(totalsText([])).toBe('')
+    })
+
+    it('fits the Totals field', () => {
+        const many = Array.from({ length: 30 }, (_, i) => ({ currency: `X${String.fromCharCode(65 + Math.floor(i / 26))}${String.fromCharCode(65 + (i % 26))}`, lines: 1, amount: 1234567.89 }))
+        const text = totalsText(many)
+        expect(text).toHaveLength(255)
+        expect(text.endsWith(' ...')).toBe(true)
+    })
+
+    it('gives a single Total only while the lines are in one currency', () => {
+        expect(singleCurrencyTotal([eur])).toBe(1234.5)
+        expect(singleCurrencyTotal([])).toBe(0)
+        expect(singleCurrencyTotal([eur, usd])).toBeNull()
+    })
 })
 
 const SITE_NAMES: { [siteId: string]: string } = { hq: 'Head office', store: 'Store 12' }
@@ -157,12 +298,12 @@ describe('billsFromIntervals', () => {
 })
 
 describe('subscriptionCharges', () => {
-    const sitePackage = { lineType: 'site_package', monthlyRate: 4500, siteId: 'hq', description: 'Site package' }
-    const perDevice = { lineType: 'device_class', monthlyRate: 45, siteId: '', description: 'Laptop', start: '2026-01-01' }
+    const sitePackage = { lineType: 'site_package', monthlyRate: 4500, currency: 'EUR', siteId: 'hq', description: 'Site package' }
+    const perDevice = { lineType: 'device_class', monthlyRate: 45, currency: 'EUR', siteId: '', description: 'Laptop', start: '2026-01-01' }
 
     it('charges a site package for the days it was active', () => {
         expect(subscriptionCharges({ ...sitePackage, start: '2026-11-16' }, nov, sources())).toEqual([
-            { siteId: 'hq', description: 'Site package - Head office', units: 15, amount: 2250 },
+            { siteId: 'hq', description: 'Site package - Head office', units: 15, amount: 2250, currency: 'EUR' },
         ])
         expect(subscriptionCharges({ ...sitePackage, start: '2026-12-01' }, nov, sources())).toEqual([])
         expect(subscriptionCharges({ ...sitePackage }, nov, sources())).toEqual([])
@@ -170,14 +311,14 @@ describe('subscriptionCharges', () => {
 
     it('ends a site package on its end date', () => {
         expect(subscriptionCharges({ ...sitePackage, monthlyRate: 3000, start: '2026-01-01', end: '2026-11-10' }, nov, sources())).toEqual([
-            { siteId: 'hq', description: 'Site package - Head office', units: 10, amount: 1000 },
+            { siteId: 'hq', description: 'Site package - Head office', units: 10, amount: 1000, currency: 'EUR' },
         ])
     })
 
     it('bills a site package by its own dates, whatever Service intervals it is given', () => {
         const read = sources([{ siteId: 'store', start: '2026-11-01' }])
         expect(subscriptionCharges({ ...sitePackage, start: '2026-11-16' }, nov, read)).toEqual([
-            { siteId: 'hq', description: 'Site package - Head office', units: 15, amount: 2250 },
+            { siteId: 'hq', description: 'Site package - Head office', units: 15, amount: 2250, currency: 'EUR' },
         ])
         expect(subscriptionCharges({ ...sitePackage, start: '2026-12-01' }, nov, read)).toEqual([])
     })
@@ -190,8 +331,8 @@ describe('subscriptionCharges', () => {
             { siteId: 'store', start: '2026-01-01', end: '2026-10-31' },
         ])
         expect(subscriptionCharges(perDevice, nov, read)).toEqual([
-            { siteId: 'hq', description: 'Laptop - Head office', units: 40, amount: 60 },
-            { siteId: 'store', description: 'Laptop - Store 12', units: 15, amount: 22.5 },
+            { siteId: 'hq', description: 'Laptop - Head office', units: 40, amount: 60, currency: 'EUR' },
+            { siteId: 'store', description: 'Laptop - Store 12', units: 15, amount: 22.5, currency: 'EUR' },
         ])
     })
 
@@ -226,8 +367,8 @@ describe('subscriptionCharges', () => {
             ]),
         )
         expect(grouped).toEqual([
-            { siteId: 'hq', description: 'Laptop - Head office', units: 30, amount: 45 },
-            { siteId: 'store', description: 'Laptop - Store 12', units: 15, amount: 22.5 },
+            { siteId: 'hq', description: 'Laptop - Head office', units: 30, amount: 45, currency: 'EUR' },
+            { siteId: 'store', description: 'Laptop - Store 12', units: 15, amount: 22.5, currency: 'EUR' },
         ])
         const perAsset = subscriptionCharges(
             perDevice,
@@ -242,12 +383,18 @@ describe('subscriptionCharges', () => {
         expect(grouped).toEqual(perAsset)
     })
 
+    it("charges in the line's currency", () => {
+        expect(subscriptionCharges({ ...sitePackage, currency: 'USD', start: '2026-11-16' }, nov, sources())).toEqual([
+            { siteId: 'hq', description: 'Site package - Head office', units: 15, amount: 2250, currency: 'USD' },
+        ])
+    })
+
     it('describes a charge by the line alone when its Site has no name', () => {
         expect(subscriptionCharges({ ...sitePackage, siteId: '', start: '2026-11-16' }, nov, sources())).toEqual([
-            { siteId: '', description: 'Site package', units: 15, amount: 2250 },
+            { siteId: '', description: 'Site package', units: 15, amount: 2250, currency: 'EUR' },
         ])
         expect(subscriptionCharges(perDevice, nov, sources([{ siteId: 'unknown', start: '2026-11-21' }]))).toEqual([
-            { siteId: 'unknown', description: 'Laptop', units: 10, amount: 15 },
+            { siteId: 'unknown', description: 'Laptop', units: 10, amount: 15, currency: 'EUR' },
         ])
     })
 
@@ -257,8 +404,8 @@ describe('subscriptionCharges', () => {
             { siteId: 'store', start: '2026-11-20', end: '2026-11-25' },
         ])
         expect(subscriptionCharges({ ...perDevice, start: '2026-11-21' }, nov, read)).toEqual([
-            { siteId: 'hq', description: 'Laptop - Head office', units: 10, amount: 15 },
-            { siteId: 'store', description: 'Laptop - Store 12', units: 5, amount: 7.5 },
+            { siteId: 'hq', description: 'Laptop - Head office', units: 10, amount: 15, currency: 'EUR' },
+            { siteId: 'store', description: 'Laptop - Store 12', units: 5, amount: 7.5, currency: 'EUR' },
         ])
     })
 
@@ -269,7 +416,7 @@ describe('subscriptionCharges', () => {
             { siteId: 'store', start: '2026-11-16' },
         ])
         expect(subscriptionCharges({ ...perDevice, end: '2026-11-15' }, nov, read)).toEqual([
-            { siteId: 'hq', description: 'Laptop - Head office', units: 33, amount: 49.5 },
+            { siteId: 'hq', description: 'Laptop - Head office', units: 33, amount: 49.5, currency: 'EUR' },
         ])
     })
 
@@ -288,6 +435,17 @@ describe('subscriptionCharges', () => {
 describe('toCsv', () => {
     it('quotes fields that need it and ends rows with CRLF', () => {
         expect(toCsv([['customer', 'amount'], ['Acme, Inc.', 12.5], ['say "hi"', 0]])).toBe('customer,amount\r\n"Acme, Inc.",12.5\r\n"say ""hi""",0\r\n')
+    })
+
+    it('writes text a spreadsheet would run as a formula with a leading apostrophe', () => {
+        expect(toCsv([['=HYPERLINK("http://x","y")', '+1', '-2', '@SUM(A1)', '\tx', 'a=b']])).toBe(
+            `"'=HYPERLINK(""http://x"",""y"")",'+1,'-2,'@SUM(A1),'\tx,a=b\r\n`,
+        )
+        expect(toCsv([['\r=1']])).toBe(`"'\r=1"\r\n`)
+    })
+
+    it('writes numbers as they are, negative ones too', () => {
+        expect(toCsv([[-12.5, 0, 3]])).toBe('-12.5,0,3\r\n')
     })
 })
 

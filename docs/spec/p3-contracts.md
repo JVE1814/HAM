@@ -43,6 +43,17 @@ applied again, even from a form opened before it closed.
 | Extend | The lease runs to the new end date (which must be later); a new decision comes due before it |
 | Return | Stock (available, spare pool, not linked to an Order line) leaves circulation: each unit is read again first under its stock lock (`reserve_asset_<sys_id>`, the lock sourcing claims take) and moved only while it is still free stock on no Order line, so one reserved meanwhile keeps its reservation. It is moved to pending wipe (spare-pool stock through available, becoming Provider stock again) and only then put on a draft *return to lessor* disposal order; a unit whose move is refused, or whose lock stays held through 5 tries, stays off the order and is reported. A unit at pending wipe whose disposal line, or the disposal order itself, is refused is reported too and left on no disposal: add it by hand. A hot spare already linked to an Order line is left to it and swapped out once deployed. From the decision on, sourcing and the spare-pool top-up never claim the lease's units: they are left out of the stock queries and refused on the claim's fresh read. Nor does the top-up count them as reserved spares. Deployed Assets (including ones shipped or awaiting first sighting) get a Refresh due date no later than the lease end, so automatic refresh replaces them; the swapped-back units are returned and evaluated as usual. Whatever the outcome other than OEM RMA, a swapped-back unit of a returned lease goes to pending wipe, never back to stock, and it can only be returned to the lessor. Units of a returned lease that reach stock after the decision by another route (a released reservation, a unit put back from pending wipe) are not withdrawn automatically: move them to pending wipe and put them on a *return to lessor* disposal order by hand. If a returned lease's end date changes later, its deployed Assets' Refresh due dates are recomputed |
 
+## Agreement currency
+
+- Each **Agreement** bills in one currency: its *Currency*, a three-letter ISO 4217 code (e.g. EUR),
+  mandatory and with no default. An Agreement saved before the field existed has none: set it before
+  the next Billing period is generated, or that Agreement's lines and fees fail to bill (P3.25).
+- The Agreement's Billing lines (its Subscription lines' and its Fee events') and its Cost facts are
+  kept in that currency. A Subscription line's own *Currency* field is read-only and not used (it keeps
+  the values saved before); nor is a Fee event's.
+- Amounts of two currencies are never added: Billing period totals and Margin are kept per currency.
+  A shipment's cost is the one exception to the Agreement's currency: it stays in the carrier's.
+
 ## Renewals
 
 - **Agreements** (daily): within *renewal lead days* of the end date the account manager (or, without

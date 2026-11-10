@@ -1,10 +1,13 @@
-import { activeDays, monthBounds, type MonthBounds } from './billing.ts'
+import { activeDays, divideRounded, fromCents, monthBounds, toCents, type MonthBounds } from './billing.ts'
 import { addDays, addMonths } from './calendar.ts'
 import { evenShare } from './leases.ts'
 import { legalOwnerOf } from './lifecycle.ts'
 import type { CostType, LegalOwner } from './vocabulary.ts'
 
-/** Cost facts and Margin per Customer and Site (P3.28, D72). */
+/**
+ * Cost facts and Margin per Customer and Site (P3.28, D72), each in one currency: costs take their Agreement's (a
+ * shipment's, its carrier's), and amounts of two currencies are never added (domain/billing `chooseCurrency`).
+ */
 
 /** What an Asset's Lease schedule charges, as stored on it. */
 export interface LeaseTerms {
@@ -107,31 +110,34 @@ function leaseRunsIn(lease: LeaseTerms, bounds: MonthBounds): boolean {
     return (!starts || starts <= bounds.last) && (!ends || ends >= bounds.first)
 }
 
-/** Where a cost or revenue belongs: a Customer, and a Site ('' for customer-level amounts such as fees). */
-function marginKey(customerId: string, siteId: string): string {
-    return `${customerId}|${siteId}`
+/** Where a cost or revenue belongs: a Customer, a Site ('' for customer-level amounts such as fees) and a currency. */
+function marginKey(customerId: string, siteId: string, currency: string): string {
+    return `${customerId}|${siteId}|${currency}`
 }
 
-function splitMarginKey(key: string): { customerId: string; siteId: string } {
-    const [customerId, siteId = ''] = key.split('|')
-    return { customerId, siteId }
+function splitMarginKey(key: string): { customerId: string; siteId: string; currency: string } {
+    const [customerId, siteId = '', currency = ''] = key.split('|')
+    return { customerId, siteId, currency }
 }
 
-/** Which Cost fact an amount belongs to: one per Customer, Site and cost type in a period. */
-export function costFactKey(customerId: string, siteId: string, type: string): string {
-    return `${marginKey(customerId, siteId)}|${type}`
+/** Which Cost fact an amount belongs to: one per Customer, Site, cost type and currency in a period. */
+export function costFactKey(customerId: string, siteId: string, type: string, currency: string): string {
+    return `${marginKey(customerId, siteId, currency)}|${type}`
 }
 
-/** Running totals of cost per Customer, Site and type, flushed to Cost facts in batches. */
+/** Running totals of cost per Customer, Site, type and currency, flushed to Cost facts in batches. */
 export class CostLedger {
     private totals = new Map<string, CostEntry>()
 
-    add(customerId: string, siteId: string, type: CostType, amount: number): void {
+    /** Add a cost (none without a Customer, or of 0); throws for one without a currency, which no Cost fact may hold. */
+    add(entry: CostEntry): void {
+        const { customerId, siteId, type, currency, amount } = entry
         if (!customerId || amount === 0) return
-        const key = costFactKey(customerId, siteId, type)
+        if (!currency) throw new Error(`a ${type} cost has no currency`)
+        const key = costFactKey(customerId, siteId, type, currency)
         const total = this.totals.get(key)
         if (total) total.amount += amount
-        else this.totals.set(key, { customerId, siteId, type, amount })
+        else this.totals.set(key, { customerId, siteId, type, currency, amount })
     }
 
     /** The totals so far by costFactKey, handed over: the ledger starts afresh, so later amounts leave them as they are. */
@@ -142,10 +148,12 @@ export class CostLedger {
     }
 }
 
-/** Revenue or cost for a Customer and Site ('' for customer-level amounts such as fees). */
+/** Revenue or cost for a Customer and Site ('' for customer-level amounts such as fees), in one currency. */
 export interface Amount {
     customerId: string
     siteId: string
+    /** A three-letter code (domain/billing `currencyCode`). */
+    currency: string
     amount: number
 }
 
@@ -154,44 +162,62 @@ export interface CostEntry extends Amount {
     type: CostType
 }
 
+/** Revenue against cost for a Customer and Site in one currency. */
 export interface MarginRow {
     customerId: string
     siteId: string
+    currency: string
     revenue: number
     cost: number
     margin: number
-    /** Margin as a share of revenue, in percent; null without revenue. */
+    /** Margin as a share of revenue, in percent to one decimal; null without revenue. */
     marginPct: number | null
 }
 
-/** Rounded to the cent. */
+/** Rounded to the cent, half away from zero (domain/billing `toCents`). */
 export function cents(value: number): number {
-    return Math.round(value * 100) / 100
+    return fromCents(toCents(value))
 }
 
-/** Margin for every Customer/Site with revenue or cost; amounts for the same Customer and Site are summed. */
+/**
+ * Margin for every Customer, Site and currency with revenue or cost, sorted by them in that order; amounts for the same
+ * three are summed, then rounded to the cent, and the margin is worked out in whole cents. Revenue in one currency is
+ * never set against cost in another: a Customer and Site with amounts in two currencies get a row for each.
+ */
 export function marginRows(revenue: Iterable<Amount>, cost: Iterable<Amount>): MarginRow[] {
     const revenues = sumByKey(revenue)
     const costs = sumByKey(cost)
-    const keys = new Set([...revenues.keys(), ...costs.keys()])
-    return [...keys].sort().map((key) => {
-        const r = cents(revenues.get(key) ?? 0)
-        const c = cents(costs.get(key) ?? 0)
+    const keys = [...new Set([...revenues.keys(), ...costs.keys()])].map((key) => ({ key, ...splitMarginKey(key) }))
+    keys.sort((a, b) => compare(a.customerId, b.customerId) || compare(a.siteId, b.siteId) || compare(a.currency, b.currency))
+    return keys.map(({ key, ...where }) => {
+        const r = toCents(revenues.get(key) ?? 0)
+        const c = toCents(costs.get(key) ?? 0)
         return {
-            ...splitMarginKey(key),
-            revenue: r,
-            cost: c,
-            margin: cents(r - c),
-            marginPct: r !== 0 ? Math.round(((r - c) / r) * 1000) / 10 : null,
+            ...where,
+            revenue: fromCents(r),
+            cost: fromCents(c),
+            margin: fromCents(r - c),
+            marginPct: r !== 0 ? divideRounded((r - c) * 1000, r) / 10 : null,
         }
     })
 }
 
+function compare(a: string, b: string): number {
+    return a < b ? -1 : a > b ? 1 : 0
+}
+
 function sumByKey(amounts: Iterable<Amount>): Map<string, number> {
     const sums = new Map<string, number>()
-    for (const { customerId, siteId, amount } of amounts) {
-        const key = marginKey(customerId, siteId)
+    for (const { customerId, siteId, currency, amount } of amounts) {
+        const key = marginKey(customerId, siteId, currency)
         sums.set(key, (sums.get(key) ?? 0) + amount)
     }
     return sums
+}
+
+/** A work order's field labour cost: its own as stored (an explicit 0 included), or `visitCost` when it is blank. */
+export function labourCost(stored: string, visitCost: number): number {
+    if (stored.trim() === '') return visitCost
+    const cost = Number(stored)
+    return Number.isFinite(cost) ? cost : visitCost
 }

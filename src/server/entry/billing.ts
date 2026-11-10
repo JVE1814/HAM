@@ -44,10 +44,17 @@ export function generateBillingLines(event: GlideRecord, current: GlideRecord): 
     generateChunk(jobEvent(EVENT.billingGenerate, event, current))
 }
 
-/** Tell the user what became of an action on a period: `done` when it was done, else why not (unless the platform has). */
+/**
+ * Tell the user what became of an action on a period: `done` when it was done (then what it left to put right by hand,
+ * if anything), else why not (unless the platform has).
+ */
 function report(outcome: PeriodOutcome, done: string): void {
-    if (outcome.done) gs.addInfoMessage(done)
-    else if (outcome.why) gs.addErrorMessage(outcome.why)
+    if (!outcome.done) {
+        if (outcome.why) gs.addErrorMessage(outcome.why)
+        return
+    }
+    gs.addInfoMessage(done)
+    if (outcome.warning) gs.addErrorMessage(outcome.warning)
 }
 
 /** UI action "Regenerate" on a period ready for review: rebuild its lines from current data. */

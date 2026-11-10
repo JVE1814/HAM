@@ -183,9 +183,16 @@ describe('buyLabel', () => {
         })
     })
 
-    it('falls back to the label href and a EUR currency', () => {
+    it('falls back to the label href, and assumes no currency the aggregator did not give', () => {
         const body = JSON.stringify({ ...LABEL_RESPONSE, label_download: { href: 'https://labels.example/se-1.pdf' }, shipment_cost: { amount: 0 } })
-        expect(buyLabel(() => ({ status: 200, body }), input)).toMatchObject({ ok: true, labelUrl: 'https://labels.example/se-1.pdf', cost: 0, currency: 'EUR' })
+        expect(buyLabel(() => ({ status: 200, body }), input)).toMatchObject({ ok: true, labelUrl: 'https://labels.example/se-1.pdf', cost: 0, currency: '' })
+    })
+
+    it("keeps the carrier's currency, as a three-letter code only", () => {
+        const priced = (currency: unknown) => JSON.stringify({ ...LABEL_RESPONSE, shipment_cost: { currency, amount: 12.5 } })
+        expect(buyLabel(() => ({ status: 200, body: priced(' gbp ') }), input)).toMatchObject({ ok: true, cost: 12.5, currency: 'GBP' })
+        expect(buyLabel(() => ({ status: 200, body: priced('euros') }), input)).toMatchObject({ ok: true, cost: 12.5, currency: '' })
+        expect(buyLabel(() => ({ status: 200, body: priced(978) }), input)).toMatchObject({ ok: true, cost: 12.5, currency: '' })
     })
 
     it('reports aggregator errors and incomplete addresses without calling out', () => {

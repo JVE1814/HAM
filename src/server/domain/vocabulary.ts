@@ -699,4 +699,5 @@ export const COST_TYPE_CHOICES = {
     oem_support: { label: 'OEM support', sequence: 2 },
     field_labour: { label: 'Field labour', sequence: 3 },
 } as const
-export type CostType = keyof typeof COST_TYPE_CHOICES
+/** A Cost fact's type: one of the list's, or the cost of a Shipment's label, which the margin pass also writes. */
+export type CostType = keyof typeof COST_TYPE_CHOICES | 'shipping'

@@ -120,13 +120,17 @@ export function takeOffPeriod(fee: GlideRecord): string {
 }
 
 /**
- * Mark the open fees of a Billing period billed, as it closes. One set-based update, which reports nothing: a fee left
- * open stays on its closed period and is billed by no later one (`billableFees`).
+ * Mark the open fees of a Billing period billed, as it closes, saving each and checking it. A fee the platform refuses
+ * is handed to `refused` with why: left open, it stays on its closed period and is billed by no later one
+ * (`billableFees`).
  */
-export function markBilled(periodId: string): void {
-    const fees = new GlideRecord(FEE)
-    fees.addQuery('billing_period', periodId)
-    fees.addQuery('status', FEE_STATUS.open)
-    fees.setValue('status', FEE_STATUS.billed)
-    fees.updateMultiple()
+export function markBilled(periodId: string, refused: (fee: GlideRecord, why: string) => void): void {
+    const fee = new GlideRecord(FEE)
+    fee.addQuery('billing_period', periodId)
+    fee.addQuery('status', FEE_STATUS.open)
+    fee.query()
+    while (fee.next()) {
+        fee.setValue('status', FEE_STATUS.billed)
+        if (!fee.update()) refused(fee, refusal(fee))
+    }
 }

@@ -1,3 +1,4 @@
+import { currencyCode } from './billing.ts'
 import { errorText, isSuccess, type HttpPort } from './http.ts'
 import { asArray, field, isoDate, parseJson, text } from './json.ts'
 import { SHIPMENT_STATUS, type ShipmentStatus } from './vocabulary.ts'
@@ -33,6 +34,7 @@ export interface LabelInput {
 }
 
 export type LabelResult =
+    /** `currency` is the carrier's three-letter code for `cost`, '' when the aggregator gave none. */
     | { ok: true; labelId: string; trackingNumber: string; carrier: string; labelUrl: string; cost: number; currency: string }
     | { ok: false; error: string }
 
@@ -144,7 +146,8 @@ export function buyLabel(http: HttpPort, input: LabelInput): LabelResult {
         carrier: text(field(json, 'carrier_code')),
         labelUrl: text(field(json, 'label_download', 'pdf')) || text(field(json, 'label_download', 'href')),
         cost: Number(field(json, 'shipment_cost', 'amount')) || 0,
-        currency: text(field(json, 'shipment_cost', 'currency')).toUpperCase() || 'EUR',
+        // The carrier's currency, kept on the Shipment and costed in it by Margin: never a default ('' when not given).
+        currency: currencyCode(text(field(json, 'shipment_cost', 'currency'))),
     }
 }
 

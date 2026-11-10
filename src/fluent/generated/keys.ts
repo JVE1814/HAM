@@ -8933,6 +8933,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '18b6c3a5ccdc45c081630c2d40db02d3'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'number'
+                        }
+                    },
+                    {
                         table: 'sys_ui_section'
                         id: '18c3820eab2b48f891ba42f9f4a43c23'
                         key: {
@@ -27207,6 +27215,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '783eba5ffb174fd7a88242374144087f'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            element: 'currency'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '7846ddd998434195b1189220f79b6f7f'
                         key: {
@@ -32682,6 +32699,14 @@ declare global {
                         key: {
                             document_key: 'e20acdfe41e6444a81b3be68e3fe89c5'
                             variable: 'dd54cf535320220002c6435723dc34fd'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '94e4f96c22334c949de322d93fb5e1c8'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'totals'
                         }
                     },
                     {
@@ -43510,6 +43535,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: 'cd2ebf8adbca49a098a847a5c5f75c9c'
+                        key: {
+                            name: 'x_daas_ham_agreement'
+                            element: 'currency'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: 'cd332e8654ff4689af6d85158b6a38e9'
                         key: {
@@ -43574,6 +43607,15 @@ declare global {
                         key: {
                             name: 'x_daas_ham_subscription_line'
                             element: 'start_date'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'cd41a26c39bc4da29cfdba1762873c08'
+                        key: {
+                            name: 'x_daas_ham_shipment'
+                            element: 'number'
                             language: 'en'
                         }
                     },
@@ -49559,15 +49601,6 @@ declare global {
                         }
                     },
                     {
-                        table: 'sys_documentation'
-                        id: 'f20164e60e1a4579a0347608f4eb9052'
-                        key: {
-                            name: 'x_daas_ham_shipment'
-                            element: 'number'
-                            language: 'en'
-                        }
-                    },
-                    {
                         table: 'sys_security_acl_role'
                         id: 'f214ba3ebf2344bd84e90e7a994eb036'
                         key: {
@@ -50590,6 +50623,15 @@ declare global {
                         key: {
                             document_key: '734616e614cc4a5db34a82caaef1e9d5'
                             variable: '9024a37f671003007ba405225685efe5'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'f8967c590f2347189aa74a557920dfc9'
+                        key: {
+                            name: 'x_daas_ham_billing_period'
+                            element: 'totals'
+                            language: 'en'
                         }
                     },
                     {
@@ -51733,14 +51775,6 @@ declare global {
                             value: 'prefix'
                             language: 'en'
                             dependent_value: 'NULL'
-                        }
-                    },
-                    {
-                        table: 'sys_dictionary'
-                        id: 'ff4c3b748e364c8fbce813f0d4645247'
-                        key: {
-                            name: 'x_daas_ham_shipment'
-                            element: 'number'
                         }
                     },
                     {
