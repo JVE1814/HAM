@@ -21,7 +21,7 @@ import {
 import type { OrderType } from '../domain/vocabulary.ts'
 import { moveAndSave } from './assets.ts'
 import { todayIso } from './clock.ts'
-import { EVENT, requeue } from './events.ts'
+import { EVENT, requeueCounted } from './events.ts'
 import { lineLostUnit, recomputeLine, recomputeOrder, unitsOnLine } from './fulfilment.ts'
 import { withLock, withLockTries, type LockRun } from './locks.ts'
 import { saveLineSourcing } from './order-lines.ts'
@@ -84,11 +84,10 @@ export function runSourcingPass(order: GlideRecord, queuedAgain: number): void {
 /** Queue the request to source `order` again a minute later, unless it was already queued again `tries` times. */
 function queuePassAgain(order: GlideRecord, tries: number, why: string): void {
     const number = str(order, 'number')
-    if (tries >= REQUEUE.times) {
+    if (!requeueCounted(EVENT.sourceOrder, order, '', tries)) {
         return void gs.warn(`[x_daas_ham] ${number} not sourced again after ${tries} tries (${why}): check its lines`)
     }
     gs.info(`[x_daas_ham] ${number} sourced again in ${REQUEUE.delaySeconds} s: ${why}`)
-    requeue(EVENT.sourceOrder, order, '', String(tries + 1))
 }
 
 /**

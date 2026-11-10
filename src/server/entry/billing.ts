@@ -22,7 +22,7 @@ import {
     type PeriodOutcome,
 } from '../platform/billing.ts'
 import { todayIso } from '../platform/clock.ts'
-import { EVENT, jobEvent } from '../platform/events.ts'
+import { EVENT, jobEvent, subjectOf } from '../platform/events.ts'
 import { queueMarginCompute } from '../platform/margin.ts'
 import { str } from '../platform/records.ts'
 import { queryInt, reply } from '../platform/rest-api.ts'
@@ -82,7 +82,7 @@ export function uiExportBillingPeriod(current: GlideRecord): void {
 
 /** Script action on x_daas_ham.billing.export (parm1 = period): attach the CSV of a closed period's lines. */
 export function exportBillingPeriod(event: GlideRecord): void {
-    attachExport(str(event, 'parm1'))
+    attachExport(subjectOf(event))
 }
 
 /** Before update/delete rule on billing lines: a closed period's lines never change. */

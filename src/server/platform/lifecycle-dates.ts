@@ -5,7 +5,7 @@ import { assetLifecycleStamp, type AssetLifecycleFacts, type LifecycleDates } fr
 import { memoized } from '../domain/memo.ts'
 import { runEventTableJob } from './chunked.ts'
 import { glideToIsoDate, todayIso } from './clock.ts'
-import { EVENT, fire, jobEvent } from './events.ts'
+import { EVENT, jobEvent, queueJob } from './events.ts'
 import { readModelLifecycle } from './model-lifecycle.ts'
 import { findById, num, str, warnRefused } from './records.ts'
 
@@ -110,7 +110,7 @@ export type RefreshPass = keyof typeof REFRESH_PASS
 
 /** Queue the `pass` of `subject` (an Agreement or a Lease schedule): its Assets are recomputed in the background. */
 export function queueRefresh(pass: Exclude<RefreshPass, 'model'>, subject: GlideRecord): void {
-    fire(REFRESH_PASS[pass].event, subject, subject.getUniqueValue())
+    queueJob(REFRESH_PASS[pass].event, subject)
 }
 
 /**

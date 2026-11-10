@@ -1,6 +1,7 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { parseTrackingWebhook, tokenMatches, WEBHOOK_TOKEN_HEADER, webhookToken } from '../domain/shipping.ts'
+import { timesRequeued } from '../platform/events.ts'
 import { PROPERTY, secretProperty } from '../platform/properties.ts'
 import { str } from '../platform/records.ts'
 import { queryParam, reply } from '../platform/rest-api.ts'
@@ -63,5 +64,5 @@ export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIRes
 export function retryTrackingUpdate(event: GlideRecord, current: GlideRecord): void {
     // The Shipment is gone: nothing to apply.
     if (!current.getUniqueValue()) return
-    retryTracking(current, str(event, 'parm1'), Number(str(event, 'parm2')) || 0)
+    retryTracking(current, str(event, 'parm1'), timesRequeued(event))
 }

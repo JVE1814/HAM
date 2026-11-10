@@ -7,7 +7,7 @@ import { memoized } from '../domain/memo.ts'
 import type { LegalOwner } from '../domain/vocabulary.ts'
 import { recordMarginOutcome } from './billing.ts'
 import { runEventTableJob } from './chunked.ts'
-import { EVENT, fire, type JobEvent } from './events.ts'
+import { EVENT, queueJob, type JobEvent } from './events.ts'
 import { intProperty, PROPERTY } from './properties.ts'
 import { count, deleteWhere, findById, num, recordsById, refusal, str } from './records.ts'
 
@@ -15,7 +15,7 @@ import { count, deleteWhere, findById, num, recordsById, refusal, str } from './
 
 /** Queue a fresh margin pass for a closed period: it supersedes one still in progress (ADR 0013). */
 export function queueMarginCompute(period: GlideRecord): void {
-    fire(EVENT.marginCompute, period, period.getUniqueValue())
+    queueJob(EVENT.marginCompute, period)
 }
 
 /**

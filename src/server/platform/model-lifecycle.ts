@@ -3,7 +3,7 @@ import { isNaasModel, naasModelCondition, OEM_PID_FIELD } from '../domain/fleet.
 import { createMarks } from '../domain/marks.ts'
 import { mergeLifecycle, MILESTONES, type LifecycleDates } from '../domain/model-lifecycle.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
-import { EVENT, fire } from './events.ts'
+import { EVENT, queueJob } from './events.ts'
 import { findById, refusal, str } from './records.ts'
 
 /**
@@ -184,7 +184,7 @@ export function writingModelLifecycle(modelId: string): boolean {
  */
 export function queueModelRefresh(modelId: string): void {
     const model = findById('cmdb_model', modelId)
-    if (model && isNaasModel(str(model, OEM_PID_FIELD))) fire(EVENT.lifecycleChanged, model, modelId, '')
+    if (model && isNaasModel(str(model, OEM_PID_FIELD))) queueJob(EVENT.lifecycleChanged, model)
 }
 
 /**

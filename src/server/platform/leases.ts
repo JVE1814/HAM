@@ -20,7 +20,7 @@ import { moveAsset, readStage } from './assets.ts'
 import { runEventTableJob } from './chunked.ts'
 import { todayIso } from './clock.ts'
 import { addDisposalLine, draftLessorDisposal } from './disposal.ts'
-import { EVENT, fire, type JobEvent } from './events.ts'
+import { EVENT, fire, queueJob, type JobEvent } from './events.ts'
 import { queueRefresh } from './lifecycle-dates.ts'
 import { PROPERTY, stringProperty } from './properties.ts'
 import { bool, count, exists, findById, num, refusal, str, warnRefused } from './records.ts'
@@ -85,7 +85,7 @@ function resumeBuyouts(): void {
 
 /** Queue the transfer of the lease's Assets to the Provider (`transferToProvider`). */
 function queueBuyout(lease: GlideRecord): void {
-    fire(EVENT.leaseBuyout, lease, lease.getUniqueValue())
+    queueJob(EVENT.leaseBuyout, lease)
 }
 
 /** Agreement end dates of the fleet assets a lease covers that are serving customers ('' = open-ended). */

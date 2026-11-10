@@ -22,7 +22,7 @@ import { messageOf } from '../domain/errors.ts'
 import { memoized } from '../domain/memo.ts'
 import { inCurrentPass, queuePass, runEventTableJob, type EventJobResult } from './chunked.ts'
 import { glideToMs, nowGlide, nowMs } from './clock.ts'
-import { EVENT, fire, type JobEvent } from './events.ts'
+import { EVENT, queueJob, type JobEvent } from './events.ts'
 import { billableFees, markBilled, putOnPeriod, takeOffPeriod, visitWaivedFees } from './fees.ts'
 import { findJobCursor, retirePass } from './job-cursor.ts'
 import { deleteWhere, exists, findById, num, refusal, str } from './records.ts'
@@ -445,7 +445,7 @@ export function closePeriod(period: GlideRecord): PeriodOutcome {
 
 /** Queue the CSV export of a closed period (attached in the background by `attachExport`). */
 export function queueExport(period: GlideRecord): void {
-    fire(EVENT.billingExport, period, period.getUniqueValue())
+    queueJob(EVENT.billingExport, period)
 }
 
 /** The CSV export of a period: its file name, and whether it is attached. */

@@ -15,7 +15,7 @@ import { messageOf } from '../domain/errors.ts'
 import { REQUEUE, writeHoldingLock, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { nowMs } from './clock.ts'
-import { fire, requeue, type JobEvent } from './events.ts'
+import { queueJobAt, type JobEvent } from './events.ts'
 import { completePass, isCurrentPass, JOB_STATUS, openJobCursor, startPass, type JobCursor } from './job-cursor.ts'
 import { isLocked, withLock, type LockRun } from './locks.ts'
 import { intProperty, PROPERTY } from './properties.ts'
@@ -120,7 +120,7 @@ export function runEventTableJob<R, T = R>(queued: JobEvent, spec: EventJob<T, R
         loadCursor: () => queued.position,
         saveCursor: (next, _processed, done, failures) => {
             spec.flush?.(failures)
-            if (!done) fire(queued.name, queued.record, queued.subject, next)
+            if (!done) queueJobAt(queued, next)
         },
     })
     return { ...result, superseded: false }
@@ -133,7 +133,7 @@ export function runEventTableJob<R, T = R>(queued: JobEvent, spec: EventJob<T, R
  */
 export function queuePass(name: string, record: GlideRecord, subject: string, job: string): void {
     const token = startPass(job, JOB_STATUS.passStarted)
-    fire(name, record, subject, passParm({ token, cursor: '' }))
+    queueJobAt({ name, record, subject, position: '' }, passParm({ token, cursor: '' }))
 }
 
 /** Whether the pass the event belongs to is still `job`'s current one. */
@@ -184,7 +184,7 @@ function runPassChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, pass: PassJo
                             isCurrent: () => isCurrentPass(job, token),
                             held: () => lock.held(),
                             flush: () => spec.flush?.(failures),
-                            queueNext: () => fire(queued.name, queued.record, queued.subject, passParm({ token, cursor: next })),
+                            queueNext: () => queueJobAt(queued, passParm({ token, cursor: next })),
                             complete: () => {
                                 if (!locked) return
                                 locked.complete?.()
@@ -221,7 +221,7 @@ function recordStop(job: string, locked: NonNullable<PassJob['underLock']>, toke
 /** Queue the event again with `parm2` (the same pass and cursor, or '' to start one) to run once the job's lock is free. */
 function retryLater(queued: JobEvent, parm2: string): EventJobResult {
     gs.warn(`[x_daas_ham] ${queued.name} ${queued.subject}: job locked, running again in ${REQUEUE.delaySeconds} s`)
-    requeue(queued.name, queued.record, queued.subject, parm2)
+    queueJobAt(queued, parm2, 'later')
     return { processed: 0, failed: 0, done: false, cursor: parm2, lastError: 'job locked: retried later', superseded: false }
 }
 
@@ -232,7 +232,7 @@ function retryLater(queued: JobEvent, parm2: string): EventJobResult {
 function restartPass(queued: JobEvent, error: string): EventJobResult {
     const threw = error ? ` (the write then threw: ${error})` : ''
     gs.warn(`[x_daas_ham] ${queued.name} ${queued.subject}: job lock lost while writing${threw}, starting a fresh pass`)
-    fire(queued.name, queued.record, queued.subject, '')
+    queueJobAt(queued, '')
     return { processed: 0, failed: 0, done: false, cursor: '', lastError: 'job lock lost: pass restarted', superseded: false }
 }
 

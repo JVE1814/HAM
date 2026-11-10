@@ -23,7 +23,7 @@ import {
 } from '../domain/shipping.ts'
 import { SHIPMENT_DIRECTION, SHIPMENT_STATUS, type ShipmentDirection, type ShipmentStatus } from '../domain/vocabulary.ts'
 import { msToGlide, nowMs } from './clock.ts'
-import { EVENT, fire, requeue } from './events.ts'
+import { EVENT, fire, requeueCounted } from './events.ts'
 import { withLock, withLockTries } from './locks.ts'
 import { boolProperty, intProperty, PROPERTY, stagingStockroom, stringProperty } from './properties.ts'
 import { count, findById, refusal, str, warnRefused } from './records.ts'
@@ -460,12 +460,11 @@ function trackLater(shipment: GlideRecord, update: TrackingUpdate): boolean {
 /** Queue the retry `param` of `shipment` again a minute later, unless it was already queued again `tries` times. */
 function trackAgain(shipment: GlideRecord, param: string, tries: number, why: string): void {
     const name = shipmentName(shipment)
-    if (tries >= REQUEUE.times) {
+    if (!requeueCounted(EVENT.trackShipment, shipment, param, tries)) {
         const check = 'check the Shipment with the carrier'
         return void gs.warn(`[x_daas_ham] Tracking update of ${name} dropped after ${tries} tries (${why}): ${check}`)
     }
     gs.info(`[x_daas_ham] Tracking update of ${name} tried again in ${REQUEUE.delaySeconds} s: ${why}`)
-    requeue(EVENT.trackShipment, shipment, param, String(tries + 1))
 }
 
 /**

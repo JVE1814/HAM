@@ -2,6 +2,7 @@ import { gs, type GlideRecord } from '@servicenow/glide'
 import { approvalAwaited } from '../domain/approvals.ts'
 import type { NewLine } from '../platform/order-lines.ts'
 import { cancelOrder, rollUpOrderApprovals, submitOrder, submitProducedOrder, type Submission } from '../platform/orders.ts'
+import { timesRequeued } from '../platform/events.ts'
 import { str } from '../platform/records.ts'
 import { runSourcingPass } from '../platform/sourcing.ts'
 
@@ -76,7 +77,7 @@ export function uiRecheckApprovals(current: GlideRecord): void {
 
 /** Script action on x_daas_ham.order.source (parm2: how many times this request was queued again). */
 export function sourceOrder(event: GlideRecord, current: GlideRecord): void {
-    runSourcingPass(current, Number(str(event, 'parm2')) || 0)
+    runSourcingPass(current, timesRequeued(event))
 }
 
 /** UI action "Cancel order" (platform/orders `cancelOrder`). */
