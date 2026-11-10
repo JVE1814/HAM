@@ -1,9 +1,9 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { LOCK } from '../domain/lock-names.ts'
 import { OPEN_EXCEPTIONS_QUERY } from '../domain/reconciliation.ts'
 import { nowGlide } from './clock.ts'
 import { withLockTries } from './locks.ts'
-import { exists, pluck, refusal, str } from './records.ts'
+import { exists, pluck, str, warnRefused } from './records.ts'
 import { EXCEPTION_STATUS, type ExceptionType } from '../domain/vocabulary.ts'
 
 /** Reconciliation exceptions: at most one open exception per type and asset (or CI, such as a rack). */
@@ -62,7 +62,7 @@ function insertException(type: ExceptionType, subject: ExceptionSubject, facts: 
     exception.setValue('detected_at', nowGlide())
     // An audit or attestation is closed once and does not raise it again, so a refused one is logged, not lost.
     if (exception.insert()) return
-    gs.warn(`[x_daas_ham] No ${type} exception for ${id} (${facts.detail}): ${refusal(exception)}`)
+    warnRefused(exception, `No ${type} exception for ${id} (${facts.detail})`)
 }
 
 /**
@@ -107,7 +107,7 @@ function resolveEach(exception: GlideRecord): void {
         exception.setValue('status', EXCEPTION_STATUS.resolved)
         if (exception.update()) continue
         const subjectId = str(exception, 'asset') || str(exception, 'ci')
-        gs.warn(`[x_daas_ham] ${str(exception, 'exception_type')} exception for ${subjectId} not resolved: ${refusal(exception)}`)
+        warnRefused(exception, `${str(exception, 'exception_type')} exception for ${subjectId} not resolved`)
     }
 }
 

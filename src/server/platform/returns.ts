@@ -470,5 +470,5 @@ function closeReturnIfDone(returnOrderId: string): void {
     if (!order || str(order, 'state') === String(RETURN_TASK_STATE.closed)) return
     order.setValue('state', RETURN_TASK_STATE.closed)
     // No later line calls this again, and an open Return still asks the Customer for its equipment.
-    if (!order.update()) gs.warn(`[x_daas_ham] Return ${str(order, 'number')} not closed: ${refusal(order)}; close it`)
+    if (!order.update()) warnRefused(order, `Return ${str(order, 'number')} not closed, close it`)
 }

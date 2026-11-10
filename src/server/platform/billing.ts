@@ -25,7 +25,7 @@ import { glideToMs, nowGlide, nowMs } from './clock.ts'
 import { EVENT, queueJob, type JobEvent } from './events.ts'
 import { billableFees, markBilled, putOnPeriod, takeOffPeriod, visitWaivedFees } from './fees.ts'
 import { findJobCursor, retirePass } from './job-cursor.ts'
-import { deleteWhere, exists, findById, num, refusal, str } from './records.ts'
+import { deleteWhere, exists, findById, num, refusal, str, throwRefused, warnRefused } from './records.ts'
 import { BILLING_PERIOD_STATUS, type BillingLineKind, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
@@ -168,7 +168,7 @@ function billLines(period: GlideRecord, bounds: MonthBounds, queued: JobEvent, j
         flush: (failures) => {
             if (failures.failed === 0) return
             addFailedLines(period, failures.failed, failures.lastError)
-            if (!period.update()) throw new Error(`${failures.failed} failed line(s) not counted: ${refusal(period)}`)
+            if (!period.update()) throwRefused(period, `${failures.failed} failed line(s) not counted`)
         },
         handle: (line, lineId) => {
             if (line.intervalsUnread) throw line.intervalsUnread.error
@@ -278,7 +278,7 @@ function insertLine(period: GlideRecord, values: BillingLineValues): void {
     line.initialize()
     line.setValue('billing_period', period.getUniqueValue())
     for (const [field, value] of Object.entries(values)) line.setValue(field, value)
-    if (!line.insert()) throw new Error(`billing line not saved: ${refusal(line)}`)
+    if (!line.insert()) throwRefused(line, 'billing line not saved')
 }
 
 /** Count lines that failed to bill on the period (does not save): Close period refuses until a regeneration bills them. */
@@ -354,7 +354,8 @@ export function regeneratePeriod(period: GlideRecord): PeriodOutcome {
     if (!dropLinesForRegeneration(period)) {
         period.setValue('status', BILLING_PERIOD_STATUS.ready)
         period.setValue('last_error', 'Regenerate could not remove all of the old lines; remove them and Regenerate again')
-        period.update()
+        // Refused, the period stays generating with no generation queued: logged, to reset by hand (Reset generation).
+        if (!period.update()) warnRefused(period, `Billing period ${str(period, 'period')} not put back to ready after a failed regenerate`)
         return notDone(`${str(period, 'period')} not regenerated: some of its old lines could not be removed`)
     }
     // The period's open fees stay linked to it: the generation bills them again (finishGeneration).
@@ -573,7 +574,7 @@ export function recordMarginOutcome(period: GlideRecord, failed: number, error: 
     period.setValue('margin_failed', failed)
     period.setValue('margin_error', error.slice(0, 255))
     period.setWorkflow(false)
-    if (!period.update()) throw new Error(`Margin status not saved: ${refusal(period)}`)
+    if (!period.update()) throwRefused(period, 'Margin status not saved')
 }
 
 /**

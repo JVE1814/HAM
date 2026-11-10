@@ -9,7 +9,7 @@ import { recordMarginOutcome } from './billing.ts'
 import { runEventTableJob } from './chunked.ts'
 import { EVENT, queueJob, type JobEvent } from './events.ts'
 import { intProperty, PROPERTY } from './properties.ts'
-import { count, deleteWhere, findById, num, recordsById, refusal, str } from './records.ts'
+import { count, deleteWhere, findById, num, recordsById, str, throwRefused } from './records.ts'
 
 /** Cost facts and Margin per Customer and Site, computed when a Billing period closes (P3.28). */
 
@@ -153,7 +153,9 @@ function leaseTermsOf(leaseId: string): LeaseTerms | null {
 
 /**
  * Add a batch's totals by costFactKey (as CostLedger.drain hands them over; this uses them up) to
- * the period's Cost facts, reading the ones they add to with one query. A refused save throws (see checkSaved).
+ * the period's Cost facts, reading the ones they add to with one query. A refused save throws (platform/records
+ * `throwRefused`), so that the pass stops and records why on the period (ADR 0013) instead of completing with that cost
+ * left out.
  */
 function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void {
     if (pending.size === 0) return
@@ -168,7 +170,7 @@ function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void
         const entry = pending.get(key)
         if (!entry) continue
         fact.setValue('amount', cents(num(fact, 'amount') + entry.amount))
-        checkSaved(fact.update(), fact, `${entry.type} Cost fact`)
+        if (!fact.update()) throwRefused(fact, `${entry.type} Cost fact not saved`)
         pending.delete(key)
     }
     for (const entry of pending.values()) {
@@ -179,16 +181,8 @@ function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void
         added.setValue('site', entry.siteId)
         added.setValue('cost_type', entry.type)
         added.setValue('amount', cents(entry.amount))
-        checkSaved(added.insert(), added, `${entry.type} Cost fact`)
+        if (!added.insert()) throwRefused(added, `${entry.type} Cost fact not saved`)
     }
-}
-
-/**
- * Throw when the platform refused a save of the pass, so that the pass stops and records why on the period
- * (ADR 0013) instead of completing with that cost or Margin row left out.
- */
-function checkSaved(sysId: string | null, record: GlideRecord, what: string): void {
-    if (!sysId) throw new Error(`${what} not saved: ${refusal(record)}`)
 }
 
 /** Field work orders closed in the month, as Cost facts: their labour cost, or the standard visit cost. */
@@ -241,6 +235,6 @@ function writeMargin(periodId: string): void {
         margin.setValue('cost', row.cost)
         margin.setValue('margin', row.margin)
         margin.setValue('margin_pct', row.marginPct ?? '')
-        checkSaved(margin.insert(), margin, 'Margin row')
+        if (!margin.insert()) throwRefused(margin, 'Margin row not saved')
     }
 }

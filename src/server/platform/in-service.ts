@@ -10,7 +10,7 @@ import { runTableJob } from './chunked.ts'
 import { daysAgoGlide, glideToMs, msToGlide } from './clock.ts'
 import { applyLifecycleDates, lifecycleReaders, type LifecycleReaders } from './lifecycle-dates.ts'
 import { withLockTries } from './locks.ts'
-import { choice, deleteWhere, findById, refusal, str } from './records.ts'
+import { choice, deleteWhere, findById, refusal, str, warnRefused } from './records.ts'
 import { attachToSubscription } from './subscriptions.ts'
 
 /** In-service detection: Seen signals in, billing start out (P1.8), and the device events they are kept as. */
@@ -137,10 +137,12 @@ function storeEvent(assetId: string, event: DeviceEvent): void {
     gr.setValue('event', event.event)
     gr.setValue('source', event.source)
     gr.setValue('observed_at', msToGlide(event.observedAt))
-    gr.insert()
+    // The sighting itself is applied all the same; only the history lacks this change of state.
+    if (!gr.insert()) warnRefused(gr, `Device event "${event.event}" of ${event.identifier} not stored`)
 }
 
 /** Drop the device events stored more than `retentionDays` ago. */
 export function purgeDeviceEventsOlderThan(retentionDays: number): void {
+    // What is left (deleteWhere says whether any is) is not checked: tomorrow's purge takes it.
     deleteWhere('x_daas_ham_device_event', `sys_created_on<${daysAgoGlide(retentionDays)}`)
 }

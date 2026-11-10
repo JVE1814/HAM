@@ -121,6 +121,14 @@ export function warnRefused(record: GlideRecord, undone: string): string {
 }
 
 /**
+ * `warnRefused` for work that must stop at a refused save rather than go on without the record (a pass of a Billing
+ * period, ADR 0013): throws what is `undone` and why, for the pass to record where it stopped.
+ */
+export function throwRefused(record: GlideRecord, undone: string): never {
+    throw new Error(`${undone}: ${refusal(record)}`)
+}
+
+/**
  * The value of `field`, which may be dot-walked ('reference.field'). In a scoped script a GlideRecord's getValue does
  * not dot-walk: it gives null for a dotted name, so those are read through getElement, whose value is null when the path
  * crosses an empty reference (and which is null itself for an unknown field). Not for a GlideAggregate: scoped scripts

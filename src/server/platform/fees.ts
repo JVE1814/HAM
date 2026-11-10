@@ -1,12 +1,11 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { messageOf } from '../domain/errors.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { chargedFeeQuery, type FeeIdentity } from '../domain/returns.ts'
 import { FEE_STATUS, type FeeType } from '../domain/vocabulary.ts'
 import { visitInKeyOrder } from './chunked.ts'
 import { todayIso } from './clock.ts'
-import { attemptLock } from './locks.ts'
+import { attemptLock, whyNotRun } from './locks.ts'
 import { exists, findById, num, refusal, str, warnRefused } from './records.ts'
 
 /**
@@ -41,7 +40,7 @@ export function recordFee(type: FeeType, asset: GlideRecord, returnOrderId: stri
         if (!isCharged(fee)) chargeHolding(lock, fee, asset, amount)
     })
     if (attempt.ran) return
-    const why = attempt.held ? 'left to a run holding its lock, which has not recorded it yet' : messageOf(attempt.error)
+    const why = whyNotRun(attempt, 'left to a run holding its lock, which has not recorded it yet')
     // The holder has normally charged it by now; one that has not may be slow, or have died holding the lock.
     if (isCharged(fee)) return
     gs.warn(`[x_daas_ham] ${type} fee for ${str(asset, 'serial_number')} not recorded: ${why}; check its Fee events`)

@@ -5,7 +5,7 @@ import { ATTESTATION_RESPONSE_CHOICES } from '../domain/vocabulary.ts'
 import { customerAdminIds } from './approvals.ts'
 import { glideToIsoDate, nowGlide, todayIso } from './clock.ts'
 import { openException } from './exceptions.ts'
-import { bool, exists, findById, num, refusal, str } from './records.ts'
+import { bool, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { installedAssetIds } from './installed-assets.ts'
 import { IN_USE_STAGES } from '../domain/lifecycle.ts'
 
@@ -71,7 +71,7 @@ function openAttestation(agreement: GlideRecord, siteId: string): void {
     attestation.setValue('state', ATTESTATION_STATE.pending)
     const attestationId = attestation.insert()
     // Refused: none is open at the Site, so the next run raises it again.
-    if (!attestationId) return void gs.warn(`[x_daas_ham] No attestation for site ${siteId}: ${refusal(attestation)}`)
+    if (!attestationId) return void warnRefused(attestation, `No attestation for site ${siteId}`)
     let why = listAttested(attestationId, installedAssetIds({ siteId }))
     if (!why) {
         attestation.setValue('state', ATTESTATION_STATE.open)
@@ -119,8 +119,7 @@ export function saveAttestationAnswers(attestation: GlideRecord, answers: readon
         item.setValue('response', String(answer.response))
         if (item.update()) continue
         refused++
-        const device = str(item, 'asset.serial_number')
-        gs.warn(`[x_daas_ham] ${str(attestation, 'number')}: answer for ${device} not saved: ${refusal(item)}`)
+        warnRefused(item, `${str(attestation, 'number')}: answer for ${str(item, 'asset.serial_number')} not saved`)
     }
     return refused
 }
@@ -150,7 +149,7 @@ export function completeAttestation(attestation: GlideRecord): string {
     attestation.setValue('attested_by', gs.getUserID())
     attestation.setValue('attested_at', nowGlide())
     attestation.setValue('state', ATTESTATION_STATE.closed)
-    return attestation.update() ? '' : notClosed(number, refusal(attestation))
+    return attestation.update() ? '' : warnRefused(attestation, `Attestation ${number} not closed`)
 }
 
 function notClosed(number: string, reason: string): string {

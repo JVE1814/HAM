@@ -1,6 +1,5 @@
 import type { GlideRecord } from '@servicenow/glide'
 import { validateAsnRows, type AsnRowCheck } from '../domain/asn.ts'
-import { messageOf } from '../domain/errors.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { parseLifecycleRow } from '../domain/model-lifecycle.ts'
@@ -8,10 +7,10 @@ import { normalizeSerial } from '../domain/serials.ts'
 import { DEFAULT_STAGING_SOURCE } from '../domain/staging.ts'
 import type { StagingSource } from '../domain/vocabulary.ts'
 import { findAnyAsset, newAsset } from './assets.ts'
-import { attemptLock } from './locks.ts'
+import { attemptLock, whyNotRun } from './locks.ts'
 import { writeModelLifecycle } from './model-lifecycle.ts'
 import { loadNormalizationData, recordNormalizationException, resolveModel } from './normalization.ts'
-import { choice, refusal, str } from './records.ts'
+import { choice, refusal, str, warnRefused } from './records.ts'
 
 /** Import-set rows processed on insert (ASN, lifecycle CSV): what each row comes to. */
 
@@ -27,7 +26,8 @@ export interface RowOutcome {
 export function finishImportRow(row: GlideRecord, outcome: RowOutcome): void {
     row.setValue('sys_import_state', outcome.state)
     row.setValue('sys_import_state_comment', outcome.comment)
-    row.update()
+    // The row was handled all the same; unsaved, it still shows as not imported.
+    if (!row.update()) warnRefused(row, `Import row ${row.getUniqueValue()} of ${row.getTableName()}: outcome "${outcome.state}" not saved`)
 }
 
 function failed(comment: string): RowOutcome {
@@ -62,7 +62,7 @@ export function importAsnRow(row: GlideRecord): RowOutcome {
 
     const attempt = attemptLock(LOCK.receiveSerial(serial), (lock) => insertHolding(lock, row, serial, modelId))
     if (attempt.ran) return attempt.value
-    return loadAgain(serial, attempt.held ? 'a scan or another row is receiving it' : messageOf(attempt.error))
+    return loadAgain(serial, whyNotRun(attempt, 'a scan or another row is receiving it'))
 }
 
 /** A row the serial's lock kept from importing, marked error with why: loading it again imports or refuses it. */

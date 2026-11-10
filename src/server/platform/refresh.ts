@@ -10,7 +10,7 @@ import { readModelLifecycle } from './model-lifecycle.ts'
 import type { NewLine } from './order-lines.ts'
 import { createOrder, submitOrder } from './orders.ts'
 import { intProperty, PROPERTY } from './properties.ts'
-import { pluck, str } from './records.ts'
+import { pluck, str, warnRefused } from './records.ts'
 import { OPEN_ORDERS_QUERY } from '../domain/fulfilment.ts'
 
 /** Refresh Orders for in-service Assets due within the horizon (P2.2, D48: fully automatic). */
@@ -108,7 +108,8 @@ function raiseWave({ customerId, siteId, agreementId, assets }: RefreshWave): st
     const order = raised.order
     if (unmatched.size > 0) {
         order.setValue('work_notes', `${unmatched.size} asset(s) have no sellable catalogued successor; their lines reuse the current model. Review before submitting.`)
-        order.update()
+        // Without the note nothing tells the account manager why the Order is a draft.
+        if (!order.update()) warnRefused(order, `Refresh Order ${number}: note on its ${unmatched.size} unmatched asset(s) not saved`)
         return number // left in draft for the account manager to adjust
     }
     const submission = submitOrder(order)

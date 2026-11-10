@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import {
     disposalApprovers,
     disposalCustomerFindings,
@@ -17,7 +17,7 @@ import {
     type ApprovalRollup,
 } from './approvals.ts'
 import { isFleetAsset, moveRefusal, readStage, transitionFacts } from './assets.ts'
-import { choice, findById, refusal, str, warnRefused } from './records.ts'
+import { choice, findById, str, warnRefused } from './records.ts'
 
 /**
  * Disposal orders: approve, then retire each wiped Asset by its method (P2.5, D61). None of it tells the user anything:
@@ -132,9 +132,8 @@ export function completeDisposal(order: GlideRecord): DisposalCompletion {
         if (line.update()) continue
         // A line not saved as done keeps the order open: its Asset may be retired already, so it is set done by hand.
         unsaved++
-        const reason = refusal(line)
         const what = `${str(order, 'number')} line for ${line.getDisplayValue('asset')}`
-        gs.warn(`[x_daas_ham] ${what} not saved (${blockers ? 'blocked' : 'done, its asset retired'}): ${reason}`)
+        warnRefused(line, `${what} not saved (${blockers ? 'blocked' : 'done, its asset retired'})`)
     }
     if (blocked > 0 || unsaved > 0) return { completed: false, blocked, unsaved }
     order.setValue('stage', DISPOSAL_STAGE.completed)

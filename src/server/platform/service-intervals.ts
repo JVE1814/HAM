@@ -1,14 +1,13 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { intervalEnd, restartInterval } from '../domain/billing.ts'
-import { messageOf } from '../domain/errors.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { isBillable } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { todayIso } from './clock.ts'
-import { attemptLock } from './locks.ts'
-import { exists, refusal, str, warnRefused } from './records.ts'
+import { attemptLock, whyNotRun } from './locks.ts'
+import { exists, str, warnRefused } from './records.ts'
 
 /** Service intervals: the days each Asset delivered a Subscription line (P3.25). */
 
@@ -45,7 +44,7 @@ function underIntervalLock(assetId: string, work: (lock: HeldLock) => void): str
         work(lock)
     })
     if (attempt.ran) return null
-    return attempt.held ? 'left to another save holding its lock, which has not finished' : messageOf(attempt.error)
+    return whyNotRun(attempt, 'left to another save holding its lock, which has not finished')
 }
 
 /**
@@ -153,8 +152,7 @@ function closeHolding(lock: HeldLock, assetId: string, endIso: string): void {
             continue
         }
         // Left open, the interval goes on billing an Asset that has left service.
-        const reason = refusal(interval)
-        gs.warn(`[x_daas_ham] ${serial} left service on ${endIso}, its Service interval did not close: ${reason}`)
+        warnRefused(interval, `${serial} left service on ${endIso}, its Service interval did not close`)
     }
     // The save that took a lost lock over may have put the Asset back in service and found the interval still open.
     if (closed) lock.lostAfter(`${closed} interval closed`, { check: "check it matches the Asset's stage", level: 'error' })
