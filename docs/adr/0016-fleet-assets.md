@@ -49,10 +49,27 @@ default too, is gone altogether: the platform's asset tracking strategy says how
   serial check before an Asset is created, look at every Asset (`includeNonFleet`), so one physical unit never gets a
   second record; an ASN row for a serial any Asset carries is refused as before.
 - The app's business rules on `alm_hardware` act on fleet assets only: each condition tests the flag after its change
-  test and before it loads a module (ADR 0002 and the 254-character condition limit). A case's *Failed asset* offers
-  fleet assets only (a reference qualifier).
+  test and before it loads a module (ADR 0002 and the 254-character condition limit).
+- Every Asset, Model and Stockroom reference on the app's tables and catalog items (a case's *Failed asset*, an Order
+  line's Model, an Audit's Stockroom, a return request's Assets, ...) carries a reference qualifier that holds
+  `domain/fleet`'s condition, so its picker offers fleet assets, NaaS Models or NaaS stockrooms only, also on a column
+  the app itself writes, as a user editing the record can change it. The workspace lists, the dashboard and the
+  navigator modules on those tables carry the condition in every `^NQ` clause too. Fluent metadata cannot call
+  `domain/fleet`'s functions, so it imports the conditions as constants written out there:
+  `built-metadata.test.ts` checks each built reference, list, module and dashboard source against them, and fails on
+  one added without.
+- Adoption puts a racked unit's placement into its rack as the rack checks count it (they count fleet assets only), so
+  *Add to fleet* is checked as placing the unit there (D67): one that would overlap a fleet asset on its face, leave
+  the rack or take it over its power budget is refused with the placement's reason, and stays outside the fleet.
 - A unit Procurement receives through its own receiving slips, never scanned in the warehouse app, stays outside the
   fleet until it is adopted.
 - Leaving the fleet is not offered: a unit leaves by disposal and keeps its flag, so its history stays the app's. A
   unit taken in by mistake is corrected by an administrator.
 - Adopting a unit in service does not start its billing, which starts on a go-live (ADR 0009).
+- Dropping the column defaults stops new values only. On an instance where an earlier version was installed, they were
+  written on every row that existed then and on each one created since without a value, and they stay: the Provider
+  IT's storerooms count as central depots and its hardware has the Legal owner *Provider* (its Models' *Track as
+  asset* stays set too, in a column the app no longer has, ADR 0018). The install does not clear them, as a stamped IT
+  storeroom has the same values as a NaaS central depot; an administrator clears them by hand
+  ([Fleet after an upgrade](../verify-on-instance.md#fleet-after-an-upgrade)). On the development instance, 9 of its
+  12 stockrooms were the platform's own IT warehouses stamped *Central depot*.

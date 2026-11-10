@@ -47,7 +47,13 @@
 | inventory tech only | fleet assets, NaaS stockrooms, transfer orders from or to a NaaS stockroom, staging tasks and audits (with their lines) of their stockrooms; plus, across all stockrooms and Customers, the ASN imports, staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and Disposal orders; no other app table; the Provider IT's hardware, stockrooms and transfer orders, and Model lifecycle milestones, as the platform allows |
 | customer admin | their Customer's fleet assets (and no other company's hardware), Orders, lines, Return orders and lines, Shipments and events, Attestations and items, Agreements, subscription lines, catalog entries and Fee events; Site templates with their items, their Customer's and those offered to every Customer (checked by the read ACL, no before-query rule) |
 | site contact | their Customer's fleet assets (and no other company's hardware), Orders and lines, Return orders and lines, Shipments and events, and Attestations and items at the Sites listing them as contacts; no Fee events |
-| anyone with no NaaS role | whatever the platform's ACLs and rules allow, fleet assets included |
+| service desk (`sn_customerservice_agent`, no NaaS role) | every Customer's Agreements, Site templates with their items, Orders and lines, and Return orders and lines, to raise, submit and follow them (read ACLs of its own, `security/acls.now.ts`); no other app table; hardware as the platform's ACLs allow |
+| anyone else with no NaaS role | whatever the platform's ACLs and rules allow, fleet assets included |
+
+On hardware, the app's own Provider columns (support cost, claim code and lease) are read by provider staff alone,
+whoever reads the Asset, and a Customer contact does not read a fleet asset's *Cost*, which Customer Service's
+ACLs grant its contacts, nor a Shipment's carrier cost (`security/acls-hardware.now.ts`,
+`security/acls-logistics.now.ts`).
 
 An inventory tech's stockrooms are the NaaS stockrooms whose *Assignment group* (the platform's
 `alm_stockroom.assignment_group`) is a group they are a member of (ADR 0018).

@@ -42,5 +42,6 @@ licensed its rows are read without any import.
   `model_manager` create or change a row. The asset manager role contains `model_manager`.
 - **Upgrades**: for an instance that had the earlier version, the build carries deletes for the ACLs, form, list,
   labels and choices of `x_daas_ham_model_lifecycle` and none for the table itself, which is left in place with its
-  rows (to confirm on the first upgrade: README, *Verify on the first install*). The app no longer reads them and
-  does not migrate them: an administrator loads them again through the lifecycle import or enters them by hand.
+  rows (to confirm on the first upgrade: [Model lifecycle](../verify-on-instance.md#model-lifecycle)). The app no
+  longer reads them and does not migrate them: an administrator loads them again through the lifecycle import or
+  enters them by hand.

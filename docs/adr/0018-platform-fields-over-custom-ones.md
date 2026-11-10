@@ -74,10 +74,10 @@ Order's *Requested by* contact (`x_daas_ham_order.requested_by_contact`; the tas
 - **Upgrades**: the build carries no delete for a removed table or column, so an instance that had an earlier
   version keeps them with their values, unread. Nothing is migrated: stockroom members are entered again as group
   members, and a Model's *Power (watts)*, a lease's *Vendor* and *Contract number* and an open work order's
-  *Initiated from* are filled in again (README, *Verify on the first install*).
+  *Initiated from* are filled in again ([Platform fields](../verify-on-instance.md#platform-fields)).
 - **`change_request` carries no column of the app any more.** For a table whose last app column goes, the build
   carries a delete of the table label SDK 4.14 wrote for it, under the app's own sys_id; the platform kept its own
-  label then and should now (to confirm on the first install: README).
+  label then and should now (to confirm on the first install: README, *Install*).
 - **Labels**: a lease's form and list read *Vendor* and *Contract number*, the platform's labels, where they read
   *Lessor* and *Schedule number*. The Contract number holds 40 characters (the schedule number held 60) and is
   required; the Vendor picker offers companies marked as vendors only.

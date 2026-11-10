@@ -2,9 +2,9 @@
 
 ## Audits (D63)
 
-- **Start blind count** is offered on NaaS stockrooms, those with a stockroom type: one with none is
-  the Provider IT's (ADR 0016). Pressed on a form opened before its type was cleared, it is refused
-  with *Blind count not started: this is not a NaaS stockroom (it has no stockroom type)*.
+- **Start blind count** is offered only on NaaS stockrooms, those with a stockroom type: one with
+  none is the Provider IT's (ADR 0016). Pressed on a form opened before its type was cleared, it is
+  refused with *Blind count not started: this is not a NaaS stockroom (it has no stockroom type)*.
 - A blind count lists as expected every fleet asset on the stockroom's shelves: *In stock* by
   install status and available, reserved, spare pool, staging, staged, pending evaluation, pending
   wipe, pending disposal or in transfer. A unit on a transfer order line stays on the shelf of the
@@ -68,6 +68,9 @@ rack exception are re-checked as well (see Racks), and their rack exceptions ope
 - Placement is the lowest rack unit plus the face; the height comes from the Model's rack units
   (minimum 1).
 - Saving a placement that leaves the rack or overlaps another device on the same face is refused.
+- Adding a racked Asset to the fleet (*Add to fleet*) is checked as placing it, as a device new to
+  the rack: one that does not fit, or would take the rack over its power budget, is refused with
+  the reason and stays outside the fleet (ADR 0016).
 - **Power budget (P3.29)**: a rack with a *power capacity (W)* also refuses a placement that would
   take the typical power (the Models' *Power (watts)*, the platform's `cmdb_model.power_consumption`,
   ADR 0018) of all devices in it, both faces, over the capacity, when the change adds draw (a device
@@ -75,24 +78,27 @@ rack exception are re-checked as well (see Racks), and their rack exceptions ope
   page shows used against available power.
 - The checks read the placements already saved, so two saves into the same units of one rack at the
   same moment can both pass (the check is a before rule, and a lock taken there ends before the
-  record is written). Once a save that changes an Asset's rack, lowest unit, face or Model is
-  written, an after rule re-checks the rack it is in and the rack it left. The re-check reads every
-  device placed there afresh, past the visibility rules. It opens *Devices overlap in rack* when
-  devices share units on one face, and *Rack over power budget* when their typical power (both
-  faces) is over the rack's capacity. One of each is open per rack, naming the devices (by asset
-  tag, else serial) or the watts. Each resolves when a later re-check finds it cleared. The daily
-  reconciliation also re-checks every rack with one open, so one cleared by a Model's size or power,
-  the rack's capacity or a deleted Asset resolves too.
-- The checks count every device placed in the rack, including ones the saving user cannot see (an
-  inventory tech sees only their Stockrooms' Assets). The elevation page and its power figure still
-  show only what the viewer may see.
+  record is written). Once a save that changes an Asset's rack, lowest unit, face or Model, or adds
+  a racked Asset to the fleet, is written, an after rule re-checks the rack it is in and the rack it
+  left. The re-check reads every fleet asset placed there afresh, past the visibility rules. It
+  opens *Devices overlap in rack* when devices share units on one face, and *Rack over power
+  budget* when their typical power (both faces) is over the rack's capacity. One of each is open
+  per rack, naming the devices (by asset tag, else serial) or the watts. Each resolves when a later
+  re-check finds it cleared. The daily reconciliation also re-checks every rack with one open, so
+  one cleared by a Model's size or power, the rack's capacity or a deleted Asset resolves too.
+- The checks count every fleet asset placed in the rack, including ones the saving user cannot see
+  (an inventory tech sees only their Stockrooms' Assets); the Provider IT's equipment in it is not
+  counted (ADR 0016). The elevation page and its power figure still show only what the viewer may
+  see.
 - The **rack elevation** page (`x_daas_ham_racks.do`) shows the front and rear of the racks in a
   Site's rooms. Colours are by stage, customer, or risk:
   - *high*: past end of support, or no current coverage;
   - *medium*: end of sale, or refresh due within 180 days.
 - The page and its endpoints show Customer contacts only the racks at Sites they can see (their
   Customer's; a Site contact's own Sites of their Customer). Other Sites and racks answer *not
-  found*. Staff see every Site.
+  found*. Staff see every Site. A rack is shown only at a Site or in a Room of one (a location whose
+  parent is the Site): a rack at any other location, such as the Provider IT's data-centre room or a
+  room under a building of the Site, is not listed and answers *not found*, to staff too.
 
 ## Customer self-service (D49)
 
