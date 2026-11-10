@@ -1,10 +1,12 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideDateTime, GlideRecord, GlideSchedule, gs } from '@servicenow/glide'
+import { checkJobWindow } from '../domain/scheduling.ts'
 import type { FieldPurpose } from '../domain/vocabulary.ts'
-import { str, warnRefused } from './records.ts'
+import { glideToMs } from './clock.ts'
+import { findById, str, warnRefused } from './records.ts'
 
 /**
- * On-site work: an FSM work order (wm_order) and the change request it runs under (D57).
- * Routine jobs use a standard change; the change type is decided by the caller.
+ * On-site work: an FSM work order (wm_order) and the change request it runs under (D57), and whether the work as
+ * planned fits its windows. Routine jobs use a standard change; the change type is decided by the caller.
  */
 
 /** What the work is for: the Customer, Site and the app record that asked for it. */
@@ -67,4 +69,30 @@ function workRecord(table: 'change_request' | 'wm_order', context: WorkContext):
     record.setValue('company', context.customerId)
     record.setValue('location', context.siteId)
     return record
+}
+
+/**
+ * Why the on-site work a NaaS Order's work order plans does not fit its change window and the Site's maintenance
+ * window (domain/scheduling `checkJobWindow`), or null when it fits. Only interactive saves are checked (background
+ * processes are not), and only once the work has a planned start. Only reads.
+ */
+export function workWindowRefusal(workOrder: GlideRecord): string | null {
+    const jobStart = glideToMs(str(workOrder, 'expected_start'))
+    const jobEnd = glideToMs(str(workOrder, 'estimated_end')) ?? jobStart
+    if (jobStart === undefined || jobEnd === undefined || !gs.isInteractive()) return null
+    const change = findById('change_request', str(workOrder, 'parent'))
+    const changeStart = change ? glideToMs(str(change, 'start_date')) : undefined
+    const changeEnd = change ? glideToMs(str(change, 'end_date')) : undefined
+    const scheduleId = str(workOrder, 'location.x_daas_ham_maintenance_schedule')
+    const schedule = scheduleId ? new GlideSchedule(scheduleId) : null
+    const verdict = checkJobWindow({
+        jobStart,
+        jobEnd,
+        change: changeStart !== undefined && changeEnd !== undefined ? { start: changeStart, end: changeEnd } : undefined,
+        inMaintenanceWindow:
+            !schedule ||
+            (schedule.isInSchedule(new GlideDateTime(str(workOrder, 'expected_start'))) &&
+                schedule.isInSchedule(new GlideDateTime(str(workOrder, 'estimated_end') || str(workOrder, 'expected_start')))),
+    })
+    return verdict.ok ? null : verdict.reason
 }

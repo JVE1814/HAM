@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { planShipment, replacementInstalled, type OnSiteWork } from '../domain/delivery.ts'
+import { installsOrder, planShipment, replacementInstalled, type OnSiteWork } from '../domain/delivery.ts'
 import { awaitsInstall, type InstallState } from '../domain/install-confirmation.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { isDeployed, stagesQuery } from '../domain/lifecycle.ts'
@@ -196,6 +196,15 @@ export function completeInstall(order: GlideRecord): number {
     retireReplacedAssets(order)
     recomputeOrder(order.getUniqueValue())
     return refused
+}
+
+/**
+ * A work order was closed complete: when it is the on-site work of the NaaS Order it was initiated from (domain/delivery
+ * `installsOrder`; a de-install or audit job is not), that Order's install is complete.
+ */
+export function completeInstallOfWork(workOrder: GlideRecord): void {
+    const order = findById('x_daas_ham_order', str(workOrder, 'initiated_from'))
+    if (order && installsOrder(str(workOrder, 'x_daas_ham_purpose'))) completeInstall(order)
 }
 
 /**

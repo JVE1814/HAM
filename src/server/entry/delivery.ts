@@ -1,10 +1,7 @@
-import { GlideDateTime, GlideSchedule, gs, type GlideRecord } from '@servicenow/glide'
-import { installsOrder } from '../domain/delivery.ts'
+import { gs, type GlideRecord } from '@servicenow/glide'
 import { beingInstalled, mayConfirmInstall } from '../domain/install-confirmation.ts'
-import { checkJobWindow } from '../domain/scheduling.ts'
-import { glideToMs } from '../platform/clock.ts'
-import { completeInstall, installState, shipOrder } from '../platform/delivery.ts'
-import { findById, str } from '../platform/records.ts'
+import { completeInstall, completeInstallOfWork, installState, shipOrder } from '../platform/delivery.ts'
+import { workWindowRefusal } from '../platform/field-work.ts'
 import { currentSession } from '../platform/session.ts'
 
 /*
@@ -42,41 +39,14 @@ export function uiConfirmInstalled(current: GlideRecord): void {
     if (refused > 0) gs.addErrorMessage(`${refused} unit(s) not confirmed installed (see the system log): try again`)
 }
 
-/** After-update rule on wm_order closed complete for a NaaS Order: the work order was initiated from it. */
+/** After-update rule on wm_order closed complete for a NaaS Order (platform/delivery `completeInstallOfWork`). */
 export function onWorkOrderClosed(current: GlideRecord): void {
-    const order = findById('x_daas_ham_order', str(current, 'initiated_from'))
-    if (order && installsOrder(str(current, 'x_daas_ham_purpose'))) completeInstall(order)
-}
-
-/**
- * Why the on-site work a NaaS Order's work order plans does not fit its change window and the Site's maintenance
- * window (domain/scheduling `checkJobWindow`), or null when it fits. Only interactive saves are checked (background
- * processes are not), and only once the work has a planned start. Only reads.
- */
-function workWindowRefusal(current: GlideRecord): string | null {
-    const jobStart = glideToMs(str(current, 'expected_start'))
-    const jobEnd = glideToMs(str(current, 'estimated_end')) ?? jobStart
-    if (jobStart === undefined || jobEnd === undefined || !gs.isInteractive()) return null
-    const change = findById('change_request', str(current, 'parent'))
-    const changeStart = change ? glideToMs(str(change, 'start_date')) : undefined
-    const changeEnd = change ? glideToMs(str(change, 'end_date')) : undefined
-    const scheduleId = str(current, 'location.x_daas_ham_maintenance_schedule')
-    const schedule = scheduleId ? new GlideSchedule(scheduleId) : null
-    const verdict = checkJobWindow({
-        jobStart,
-        jobEnd,
-        change: changeStart !== undefined && changeEnd !== undefined ? { start: changeStart, end: changeEnd } : undefined,
-        inMaintenanceWindow:
-            !schedule ||
-            (schedule.isInSchedule(new GlideDateTime(str(current, 'expected_start'))) &&
-                schedule.isInSchedule(new GlideDateTime(str(current, 'estimated_end') || str(current, 'expected_start')))),
-    })
-    return verdict.ok ? null : verdict.reason
+    completeInstallOfWork(current)
 }
 
 /**
  * Condition of the before rule on wm_order (br_work_order_window), once a NaaS Order's planned start or end changes:
- * whether the save must be refused. The rule refuses it with its Abort action, not with current.setAbortAction, which
+ * whether the save must be refused (platform/field-work `workWindowRefusal`). The rule refuses it with its Abort action, not with current.setAbortAction, which
  * the platform refuses from a scoped app on a record of a global table and saves anyway (as for racks.ts
  * refusesRackPlacement).
  */
