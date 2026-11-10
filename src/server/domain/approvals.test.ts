@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { approversToAsk, groupDecisions, rollupApprovals } from './approvals'
+import { approvalAwaited, approversToAsk, groupDecisions, rollupApprovals } from './approvals'
 
 describe('rollupApprovals', () => {
     it('is approved once every required approver group has an approval', () => {
@@ -83,5 +83,24 @@ describe('approversToAsk', () => {
     it('asks each approver once', () => {
         expect(approversToAsk(['customer_admin', 'account_manager'], [], ['am1', 'am2'])).toEqual(['am1', 'am2'])
         expect(approversToAsk(['customer_admin', 'account_manager'], ['both'], ['both'])).toEqual(['both'])
+    })
+})
+
+describe('approvalAwaited', () => {
+    it('names the group still asked to decide', () => {
+        const decisions = [
+            { group: 'customer_admin', state: 'approved' },
+            { group: 'account_manager', state: 'requested' },
+        ] as const
+        expect(approvalAwaited(['customer_admin', 'account_manager'], decisions)).toBe(
+            'waiting for the account manager (or the asset managers) to decide',
+        )
+    })
+
+    it('says no approval is still requested from the groups missing one', () => {
+        const decisions = [{ group: 'customer_admin', state: 'cancelled' }] as const
+        expect(approvalAwaited(['customer_admin', 'account_manager'], decisions)).toBe(
+            'no approval from a Customer admin and the account manager (or the asset managers) and none still requested',
+        )
     })
 })

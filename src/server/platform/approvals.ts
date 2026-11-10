@@ -6,7 +6,7 @@ import {
     type ApprovalOutcome,
     type ApprovalState,
 } from '../domain/approvals.ts'
-import type { Approver } from '../domain/entitlement.ts'
+import type { Approver } from '../domain/approvals.ts'
 import { ROLE } from '../domain/visibility.ts'
 import { exists, pluck, str, warnRefused } from './records.ts'
 

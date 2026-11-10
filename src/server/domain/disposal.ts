@@ -1,4 +1,4 @@
-import type { Approver } from './entitlement.ts'
+import type { Approver } from './approvals.ts'
 import type { Stage } from './lifecycle.ts'
 import type { DisposalMethod, LegalOwner } from './vocabulary.ts'
 

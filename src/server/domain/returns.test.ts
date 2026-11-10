@@ -14,6 +14,7 @@ import {
     shortfallRoute,
     SITE_RECOVERY_STAGES,
     sitePackageHoldersQuery,
+    siteRecoveryLineQuery,
     type RequestedReturn,
     type ReturnRequester,
 } from './returns'
@@ -182,6 +183,12 @@ describe('SITE_RECOVERY_STAGES', () => {
 
     it.each(SITE_RECOVERY_STAGES)('can move a unit %s to pending return', (stage) => {
         expect(checkTransition(stage, 'pending_return', atSite)).toEqual({ allowed: true })
+    })
+})
+
+describe('siteRecoveryLineQuery', () => {
+    it('finds the Asset awaited back on a site decommission or agreement end', () => {
+        expect(siteRecoveryLineQuery('a1')).toBe('asset=a1^status=awaiting^return_order.triggerINsite_decommission,agreement_end')
     })
 })
 

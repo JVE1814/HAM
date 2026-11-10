@@ -1,4 +1,5 @@
-import type { Approver } from './entitlement.ts'
+/** Who decides on an Order or a Disposal order: the Customer's admins, or the Provider's account manager. */
+export type Approver = 'customer_admin' | 'account_manager'
 
 export type ApprovalState = 'requested' | 'approved' | 'rejected' | 'cancelled' | 'not_required' | 'not_yet_requested'
 export type ApprovalOutcome = 'requested' | 'approved' | 'rejected'
@@ -51,4 +52,21 @@ export function approversToAsk(
         for (const id of admins.length > 0 ? admins : providerApproverIds) ids.add(id)
     }
     return [...ids]
+}
+
+const APPROVER_NAMES: Record<Approver, string> = {
+    customer_admin: 'a Customer admin',
+    account_manager: 'the account manager (or the asset managers)',
+}
+
+/**
+ * Why approvals that roll up to neither outcome (`rollupApprovals` gives requested) keep an Order awaiting approval, as
+ * Re-check approvals tells the user: whose approval is missing, and whether a request to them is still waiting.
+ */
+export function approvalAwaited(required: readonly Approver[], decisions: readonly ApprovalDecision[]): string {
+    const approved = new Set(decisions.filter((d) => d.state === 'approved').map((d) => d.group))
+    const missing = required.filter((group) => !approved.has(group))
+    const who = missing.map((group) => APPROVER_NAMES[group]).join(' and ')
+    const waiting = decisions.some((d) => d.state === 'requested' && missing.includes(d.group))
+    return waiting ? `waiting for ${who} to decide` : `no approval from ${who} and none still requested`
 }

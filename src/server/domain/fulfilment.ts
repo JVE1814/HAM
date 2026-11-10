@@ -1,8 +1,5 @@
-import type { ApprovalDecision } from './approvals.ts'
-import type { Approver } from './entitlement.ts'
 import type { Stage } from './lifecycle.ts'
-import { AWAITED } from './returns.ts'
-import { ORDER_STAGE, type LineStage, type OrderStage, type ReturnTrigger } from './vocabulary.ts'
+import { ORDER_STAGE, type LineStage, type OrderStage } from './vocabulary.ts'
 
 /**
  * Order-line and Order stages are derived, never set by hand: a line follows the slowest of its
@@ -123,14 +120,6 @@ export function refillsLine(line: { stage: LineStage; siteRecovery: boolean }): 
     return !line.siteRecovery && REFILLABLE.includes(line.stage)
 }
 
-/** Return triggers that bring back all of a Site, units in transit too (domain/returns `SITE_RECOVERY_STAGES`). */
-const SITE_RECOVERY_TRIGGERS: readonly ReturnTrigger[] = ['site_decommission', 'agreement_end']
-
-/** Encoded query on x_daas_ham_return_order_line: the Asset is awaited back on a whole-Site recovery. */
-export function siteRecoveryLineQuery(assetId: string): string {
-    return `asset=${assetId}^status=${AWAITED}^return_order.triggerIN${SITE_RECOVERY_TRIGGERS.join(',')}`
-}
-
 /** What Cancel order reads of an Order: the stages of its lines and of every Asset on them. */
 export interface OrderShipment {
     lineStages: readonly LineStage[]
@@ -144,24 +133,6 @@ export interface OrderShipment {
  */
 export function anythingShipped(order: OrderShipment): boolean {
     return order.lineStages.some((stage) => DELIVERED.has(stage)) || order.unitStages.some(sent)
-}
-
-const APPROVER_NAMES: Record<Approver, string> = {
-    customer_admin: 'a Customer admin',
-    account_manager: 'the account manager (or the asset managers)',
-}
-
-/**
- * Why approvals that roll up to neither outcome (domain/approvals `rollupApprovals` gives requested) keep an Order
- * awaiting approval, as Re-check approvals tells the user: whose approval is missing, and whether a request to them is
- * still waiting.
- */
-export function approvalAwaited(required: readonly Approver[], decisions: readonly ApprovalDecision[]): string {
-    const approved = new Set(decisions.filter((d) => d.state === 'approved').map((d) => d.group))
-    const missing = required.filter((group) => !approved.has(group))
-    const who = missing.map((group) => APPROVER_NAMES[group]).join(' and ')
-    const waiting = decisions.some((d) => d.state === 'requested' && missing.includes(d.group))
-    return waiting ? `waiting for ${who} to decide` : `no approval from ${who} and none still requested`
 }
 
 /**

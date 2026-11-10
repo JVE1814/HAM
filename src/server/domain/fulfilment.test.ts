@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
     anythingShipped,
-    approvalAwaited,
     CANCELLABLE_ORDER_STAGES,
     closedStateFor,
     ENDED_ORDER_STAGES,
@@ -12,7 +11,6 @@ import {
     OPEN_ORDERS_QUERY,
     orderStageFor,
     refillsLine,
-    siteRecoveryLineQuery,
     UNFULFILLED_ORDER_STAGES,
 } from './fulfilment'
 import { LINE_STAGE_CHOICES, ORDER_STAGE_CHOICES, type LineStage, type OrderStage } from './vocabulary'
@@ -167,10 +165,6 @@ describe('refillsLine', () => {
     it.each(['installed', 'in_service', 'cancelled', 'new'] as const)('leaves a %s line as it is', (stage) => {
         expect(refillsLine({ stage, siteRecovery: false })).toBe(false)
     })
-
-    it('finds the Asset awaited back on a site decommission or agreement end', () => {
-        expect(siteRecoveryLineQuery('a1')).toBe('asset=a1^status=awaiting^return_order.triggerINsite_decommission,agreement_end')
-    })
 })
 
 describe('anythingShipped', () => {
@@ -192,25 +186,6 @@ describe('anythingShipped', () => {
     it('is nothing before Ship', () => {
         const unitStages = ['reserved', 'in_transfer', 'staging', 'staged', 'spare_pool', 'missing', null] as const
         expect(anythingShipped({ lineStages: ['awaiting_stock', 'ready_to_ship', 'cancelled'], unitStages })).toBe(false)
-    })
-})
-
-describe('approvalAwaited', () => {
-    it('names the group still asked to decide', () => {
-        const decisions = [
-            { group: 'customer_admin', state: 'approved' },
-            { group: 'account_manager', state: 'requested' },
-        ] as const
-        expect(approvalAwaited(['customer_admin', 'account_manager'], decisions)).toBe(
-            'waiting for the account manager (or the asset managers) to decide',
-        )
-    })
-
-    it('says no approval is still requested from the groups missing one', () => {
-        const decisions = [{ group: 'customer_admin', state: 'cancelled' }] as const
-        expect(approvalAwaited(['customer_admin', 'account_manager'], decisions)).toBe(
-            'no approval from a Customer admin and the account manager (or the asset managers) and none still requested',
-        )
     })
 })
 

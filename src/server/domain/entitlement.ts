@@ -1,3 +1,5 @@
+import type { Approver } from './approvals.ts'
+import type { NamedRecord } from './customer-parties.ts'
 import { fleetStagesQuery } from './fleet.ts'
 import { OPEN_LINE_STAGES, UNFULFILLED_ORDER_STAGES } from './fulfilment.ts'
 import { DEPLOYED_STAGES } from './lifecycle.ts'
@@ -16,8 +18,6 @@ import { ORDER_STAGE, type CatalogEntryType, type EntitlementVerdict, type Order
  * Off-catalog needs the Customer admin; over quota also needs the account manager.
  * Lines replacing a deployed Asset (break-fix, refresh) are exempt from both checks.
  */
-
-export type Approver = 'customer_admin' | 'account_manager'
 
 export interface CatalogEntryView {
     kind: CatalogEntryType
@@ -105,15 +105,6 @@ export function assessOrder(request: OrderRequest, context: EntitlementContext):
     const verdict: EntitlementVerdict =
         overQuota.length > 0 ? 'over_quota' : offCatalog.length > 0 ? 'off_catalog' : 'within_agreement'
     return { verdict, approvers: approversFor(verdict), findings }
-}
-
-/**
- * A record an Order names, with the Customer it belongs to: '' for none (a Site template offered to every
- * Customer), null when it cannot be read.
- */
-export interface NamedRecord {
-    id: string
-    customerId: string | null
 }
 
 /** The Customer an Order is for and the records it names; a record the Order does not name is left out. */

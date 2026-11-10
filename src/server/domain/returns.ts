@@ -1,5 +1,5 @@
 import { addDays } from './calendar.ts'
-import type { NamedRecord } from './entitlement.ts'
+import type { NamedRecord } from './customer-parties.ts'
 import { fleetStagesQuery } from './fleet.ts'
 import { DEPLOYED_STAGES, SERVING_STAGES, type Stage } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
@@ -125,6 +125,14 @@ export function overdueStep(input: { dueDate: string; today: string; graceDays: 
  */
 export function sitePackageHoldersQuery(line: { siteId: string; agreementId: string }): string {
     return fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_site=${line.siteId}^x_daas_ham_agreement=${line.agreementId}`)
+}
+
+/** Return triggers that bring back all of a Site, units in transit too (`SITE_RECOVERY_STAGES`). */
+const SITE_RECOVERY_TRIGGERS: readonly ReturnTrigger[] = ['site_decommission', 'agreement_end']
+
+/** Encoded query on x_daas_ham_return_order_line: the Asset is awaited back on a whole-Site recovery. */
+export function siteRecoveryLineQuery(assetId: string): string {
+    return `asset=${assetId}^status=${AWAITED}^return_order.triggerIN${SITE_RECOVERY_TRIGGERS.join(',')}`
 }
 
 /**

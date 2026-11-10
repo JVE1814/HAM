@@ -1,12 +1,12 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { approversToAsk } from '../domain/approvals.ts'
+import type { NamedRecord } from '../domain/customer-parties.ts'
 import {
     approversFor,
     assessOrder,
     ownershipFindings,
     raiserRefusal,
     siteTemplateOffered,
-    type NamedRecord,
     type Orderer,
     type OrderParties,
     type RequestedLine,

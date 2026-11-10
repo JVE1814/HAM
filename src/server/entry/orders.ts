@@ -1,5 +1,5 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { approvalAwaited } from '../domain/fulfilment.ts'
+import { approvalAwaited } from '../domain/approvals.ts'
 import {
     cancelOrder,
     rollUpOrderApprovals,
