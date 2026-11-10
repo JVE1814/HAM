@@ -22,20 +22,73 @@ impersonating a user who holds that role and no other NaaS role.
 
 ## Install and platform data
 
+### Install log
+
+*System Applications > Application install history* (`sys_upgrade_history_log`) lists one *Skipped
+Error* row per global table the app adds columns to (`sys_documentation_<table>__en`, seven of
+them): SDK 4.14 writes a table label for each augmented table, and the platform keeps the table's
+own. Any other *Skipped Error* row is a defect. The development instance's install of 2026-11-09,
+of the earlier version, which also added columns to `change_request`, logged eight and no other.
+
+The app no longer adds a column to `change_request` (ADR 0018), so the build now carries a delete
+for the label it used to write there (`sys_documentation_change_request__en`, under the app's own
+sys_id, which the platform never stored): after the install, check that the *Change Request* table
+still has its label (*System Definition > Tables*). This was not run on an instance.
+
+### Preflight check
+
+Run the on-demand job **NaaS - preflight check** (*System Definition > Scheduled Jobs*). Its row
+`preflight` in *NaaS Asset Management > Administration > Background jobs* reads *All prerequisites
+present*, as on the development instance on 2026-11-09. Otherwise it reads *N prerequisite(s)
+missing* and names them, each also logged as an error.
+
 ### Choices
 
-The instance accepts the app's `alm_asset.substatus` choice set (v2 format, only the app's 10
-values). A Brazil instance already has *Pending evaluation* (`pending_evaluation`, In stock) and
-*Lease return* (`lease_return`, Retired), so the app ships neither and its stages use those values;
-on an older release check that both exist in `sys_choice name=alm_asset^element=substatus`.
+The instance accepts the app's `alm_asset.substatus` choice set (v2 format, the app's 10 values).
+That format deletes only the app's own values, so the platform's stay beside them: after the install
+of 2026-11-09, `sys_choice name=alm_asset^element=substatus^language=en` listed 55 rows on the
+development instance (Brazil), its 45 and the app's 10. Check that the out-of-box values are still
+there, e.g. `value=available` (In stock): the app's install never removes them, but a script that
+deletes this field's choices takes them along, and only a reinstall from the platform's own choice
+set brings them back. A Brazil instance already has *Pending evaluation* (`pending_evaluation`, In
+stock) and *Lease return* (`lease_return`, Retired), so the app ships neither and its stages use
+those values; on an older release check that both exist.
 
 ### Cross-scope access
 
 The privileges in `security/cross-scope.now.ts` match the scopes the instance reports
 (`alm_hardware`, `change_request`, `wm_order`, `proc_po`, `sys_attachment`, ...), including delete
-on `alm_transfer_order`, its lines and `proc_po`, which sourcing uses to remove a transfer order or
-purchase order created only in part (otherwise the line's sourcing summary names it for
-cancelling).
+on `alm_transfer_order` and its lines, which sourcing uses to remove a transfer order created only
+in part (otherwise the line's sourcing summary names it for cancelling). Procurement lets no other
+scope delete a purchase order (its table's application access), so a purchase order created
+without its line item is cancelled instead ([Purchase orders](#purchase-orders)).
+
+### Running ATF
+
+Tests with form steps run in a browser: a scheduled or CI/CD run (`now-sdk cicd testsuite run`)
+needs a *Scheduled Client Test Runner* page (*Automated Test Framework > Run > Scheduled Client
+Test Runner*) open, and every run needs the system property `sn_atf.runner.enabled` true (it is
+false by default, so tests do not run on production). For test authors: a *Record Validation* step
+checks the record loaded in memory, not the database, and compares a date field with `=` in the
+session time zone. The development instance runs in America/Los_Angeles, where a stored 2028-01-31
+matches only `ends=2028-02-01`. Check a date with a *Record Query* step, or with an `ON` range,
+which matches in every time zone:
+
+```text
+endsON2028-01-31@javascript:gs.dateGenerate('2028-01-31','start')@javascript:gs.dateGenerate('2028-01-31','end')
+```
+
+### ATF route tests
+
+Suites *NaaS - P1*, *P2* and *P3*. The tests of the customer returns, warehouse, audit scan and
+tracking webhook routes call each route's handler from a *Run Server Side Script* step, as the
+impersonated user, with `require('x_daas_ham/naas-ham/<version>/src/server/entry/<file>.ts')`.
+ATF's inbound REST step signs in through a basic auth profile, which the app's scope may not
+create. Confirm that these steps run (no *require is not defined* or *No module with path*).
+Confirm that *NaaS - the tracking webhook needs its token and records a delivery once* gets HTTP 401
+*bad token* from its unauthenticated REST step. Where `x_daas_ham.shipping.webhook_token` was empty
+before the run, confirm it is empty again after. `src/server/atf-scripts.test.ts` fails when the
+version in `package.json` changes, until the scripts' module paths are updated to match.
 
 ### Model lifecycle
 
@@ -67,10 +120,63 @@ group members ([Stockroom assignment](#stockroom-assignment)).
 The stored `proc_po` / `proc_po_item` status values and column names, `wm_order` state 3 = Closed
 Complete, and `last_discovered` / `discovery_source` as your connectors write them.
 
+### Purchase orders
+
+`platform/procurement.ts`. Procurement's business rule *Model Category of Model not empty* refuses a
+purchase order line item whose Model has no *Model category* (`cmdb_model_category`; the
+out-of-box *Network Gear* has asset class `alm_hardware` and CI class `cmdb_ci_netgear`). So the
+app requests no purchase order for such a Model: sourcing a line for it leaves the line awaiting
+stock with the sourcing summary *(no purchase order: give Model <name> a Model category: Procurement
+refuses a line item without one)*, the spare-pool top-up buys nothing for it, and each logs
+*[x_daas_ham] No purchase order (...)*. A purchase order whose line item Procurement refuses for
+another reason is set to *Canceled*, and the reason says so (*... without its line item (...); it
+is cancelled*), or says to cancel it when that save is refused too.
+
+**After an upgrade.** NaaS Models saved before have no Model category unless someone gave them
+one: list `cmdb_model` with `x_daas_ham_oem_pidISNOTEMPTY^cmdb_model_categoryISEMPTY` and set it
+(e.g. *Network Gear*) before sourcing or the spare-pool top-up buys for them.
+
+### Record names
+
+The instance stores the name of a business rule, UI action, script action, email notification,
+SLA definition, REST message and scripted REST API or route in a column of 40 characters, and cuts
+a longer one off without a warning (scheduled scripts and properties: 100).
+`src/server/built-metadata.test.ts` keeps every name in the built records within its limit. Check
+that the rule list (`sys_script`, filter *Name starts with NaaS*) shows no name cut off.
+
+### Long text on forms
+
+The classic form draws a multi-line text field (`multi_two_lines`, Fluent `MultiLineTextColumn`) of
+more than 255 characters as a bare hidden input with no field container and no label, and the
+form's live update then throws *Cannot read properties of null (reading 'offsetParent')* when the
+record watcher reports that field changed (development instance, 2026-11-09). So the long texts the
+app writes are string columns, drawn as a text area in their container: on an off-catalog Order
+open on the form, *Submit* writes its *Entitlement findings*, the form shows them under their
+label, and the browser console shows no error. The same holds for a disposal line's *Blocked by*.
+
+### Reference display
+
+A table extending `ast_contract` inherits its display field, `vendor_contract` (*Contract number*),
+which an Agreement leaves empty, so a reference to one would show blank. The Agreement overrides
+`number` as its display field (`sys_dictionary_override` on `number` with *Display override* true):
+a Subscription line's *Agreement* shows the Agreement's number (`NAG...`). A Lease schedule has no
+such override (ADR 0018): its *Contract number* is mandatory, and an Asset's *Lease schedule* shows
+it. On the development instance on 2026-11-09, on the earlier version, whose lease still overrode
+`number`, the lease showed `NLS0001001` and an Agreement reference was blank, as
+`data/agreements.now.ts` then gave the Agreement no override. A lease's reference showing its
+Contract number was not run on an instance.
+
 ### Scale
 
 Before-query rule performance and the chunked jobs at your data volumes (indexes are declared on the
-scoped columns).
+scoped columns). The *Job cursor* list (*Administration > Background jobs*; *Background job
+cursors* in the workspace) shows how each scheduled pass ended: a *Last status* other than
+*complete* (*complete with N failed record(s)*, or *paused (time budget), N failed record(s) so
+far*) means records failed; *Failed (this pass)* and *Last error* say how many and the last error,
+and each run logs them as an error in the system log. Some rows are no scheduled pass and read
+differently: `preflight` holds the preflight check's result, `billing_generate_<period sys_id>` a
+billing pass (ADR 0007), `provider_tag_sequence` the Provider tag counter, and `oem_claim_stranded`
+only where the OEM claim run's check for stranded steps goes on from, with no status.
 
 ## Fleet (ADR 0016)
 
@@ -172,8 +278,8 @@ its rows: give each NaaS stockroom an *Assignment group* holding its techs.
 Also after upgrading an existing install. The ACLs that `security/acls*.now.ts` give `broadStaff`
 (agreements, subscription lines, catalog entries, site templates, fee events, attestations, leases,
 OEM coverage and cloud accounts, model data, device events, reconciliation exceptions, ...) no
-longer list `x_daas_ham.inventory_tech` in `sys_security_acl_role`. Impersonating
-an inventory-tech-only user, the Agreements list is denied, other stockrooms' blind counts and site
+longer list `x_daas_ham.inventory_tech` in `sys_security_acl_role`. Impersonating an
+inventory-tech-only user, the Agreements list is denied, other stockrooms' blind counts and site
 audits are not listed, and in the warehouse app receiving one returned unit of a multi-unit site
 package keeps its subscription line active, receiving the last one ends it, and a late one records
 the late-return fee. Impersonating a field-tech-only user, the warehouse app offers only Audit and
@@ -193,10 +299,10 @@ already fills (in none of the tech's stockrooms) is refused with the overlap rea
 
 ### Hardware ACLs on `alm_asset`
 
-`sys_security_acl` holds no read ACL of the app on `alm_hardware`. The records keyed
-`acl_alm_hardware_read_staff` and `acl_alm_hardware_read_customer` (`keys.ts`) name `alm_asset`,
-with *Applies To* `sys_class_name=alm_hardware`, and **after an upgrade** they were moved there,
-not copied. Beside them, the row check keyed `acl_alm_asset_read_scope` is a Deny-Unless read ACL
+`sys_security_acl` holds no record ACL (one with no field) of the app on `alm_hardware`; its field
+ACLs there are on the app's own columns. The records keyed `acl_alm_hardware_read_staff` and
+`acl_alm_hardware_read_customer` (`keys.ts`) name `alm_asset`, with *Applies To*
+`sys_class_name=alm_hardware`, and **after an upgrade** they were moved there, not copied. Beside them, the row check keyed `acl_alm_asset_read_scope` is a Deny-Unless read ACL
 with no role, whose script is a function of the app's module. A user with no NaaS role (the service
 desk, an IT asset manager) reads hardware, fleet assets included, as the platform's ACLs allow,
 except the app's Provider columns (support cost, claim code, lease), which only provider staff
@@ -212,6 +318,52 @@ that a query the rule does not narrow reaches. The same query on `alm_asset_list
 same. Their `alm_asset` list shows consumables and licences as before the install (*Applies To*
 keeps the app's ACLs off the other classes of Asset) and leaves out other stockrooms' fleet assets,
 with such gaps (ADR 0005). A New form of an Audit or a Staging task opens.
+
+### Changes to hardware by hand
+
+ADR 0005, `security/acls-hardware.now.ts`. Impersonating an inventory-tech-only user, a fleet asset
+of their stockroom saves, but its company, cost, Agreement, subscription line, lease, Legal owner
+and Fleet are read-only, the form offers no Delete, and `DELETE
+/api/now/table/alm_hardware/<id>` is refused; a list edit of cost on `alm_asset_list.do` is refused
+on a fleet row; a laptop outside the fleet saves, deletes and takes a new company and cost as
+before. An asset manager changes a fleet asset's company and cost; only an app administrator
+deletes one. A consumable's cost is still writable as before. Impersonating a Customer contact who
+also holds `sn_customerservice.customer`, `GET /api/now/table/alm_hardware/<their fleet asset>`
+returns no cost, support cost, claim code or lease, and a Shipment returns no cost.
+
+### Customer creates
+
+`security/acls.now.ts`. As a customer admin, `POST /api/now/table/x_daas_ham_order` for another
+Customer and `POST /api/now/table/x_daas_ham_order_line` are refused; a `POST` of a Return order
+for another Customer is refused (this confirms the create rule sees the posted values); the
+customer page's *Return selected* and the two record producers still work. As a service desk
+agent (`sn_customerservice_agent` only), the order producer offers the Customer's Agreements and
+Site templates, the generated Order opens with its lines and *Submit* goes ahead, and the return
+producer opens the Return it raised.
+
+### REST access for customer users
+
+`logic/rest.now.ts`, `security/rest-acls.now.ts`. In *System Web Services > Scripted REST APIs >
+NaaS asset management*, the routes `/sites`, `/racks`, `/racks/{id}` and the five `/customer/...`
+routes have *Requires SNC Internal role* off and the ACLs *Scripted REST External Default* and
+*x_daas_ham NaaS customer routes*. The latter is an execute REST_Endpoint ACL with the roles
+`x_daas_ham.customer_admin` and `x_daas_ham.site_contact`. Every other authenticated route keeps
+*Requires SNC Internal role* on and the default ACL alone. `/shipping/tracking` has
+authentication, ACL authorization and *Requires SNC Internal role* off. Impersonating *Ada Acme
+(demo)*, `x_daas_ham_customer.do` lists the Customer's equipment and `x_daas_ham_racks.do` lists
+their Sites and racks. Impersonating *Sam Site (demo)*, both pages show only their Sites. As either
+user, `GET /api/x_daas_ham/naas/stockrooms` and `/billing_periods` answer HTTP 403.
+
+### NaaS dashboard
+
+`workspace/dashboard.now.ts`. *NaaS Asset Overview* shows in the workspace for each of the six NaaS
+staff roles and for app administrators, and for no Customer contact. As a NOC-only or
+inventory-tech-only user, Operations, Billing integrity and Lifecycle risk show counts. The Margin
+tab's tiles show no figures, because the money ACLs refuse them (if one shows a figure, the
+dashboard's widgets do not apply the tables' read ACLs), and an inventory tech also gets no
+subscription-line or reconciliation-exception counts. As finance, the Margin tab shows figures.
+Whether the Margin tab moves to a dashboard of its own for the money readers is an open owner
+decision.
 
 ## Rules and form buttons
 
@@ -465,6 +617,34 @@ that is short, *Execute now* moves nothing into it and buys nothing for it. It t
 for <Model sys_id> not topped up: another run holds the spare_pool_... lock and tops it up* (info).
 Delete the row and the next run tops it up.
 
+### Return locks
+
+Returns and the customer page ([how a job lock behaves](#how-a-job-lock-behaves)). Every Return puts
+each unit on it under the job lock `return_asset_<Asset sys_id>`, and the customer page raises a
+Customer's return requests under `return_request_<Customer sys_id>`. With a row named
+`return_request_<Customer sys_id>` in *Job lock*, *Return selected* on the customer page answers
+HTTP 503 *Another return request of yours is being raised: try again in a moment* and raises
+nothing. Delete the row and the request raises the Return. Sending the same request again then
+answers HTTP 409 *Each device is already on a return* and raises nothing. With a row named
+`return_asset_<sys_id of an in-service Asset>`, a Return raised for that Asset (record producer or
+customer page) tries the lock 5 times (up to 10 *Unique Key violation* errors), leaves it off and,
+as the Asset awaits no return, warns *[x_daas_ham] Asset <sys_id> left off return <number>: its
+return lock was held through every try, yet it awaits no return: put it on one by hand if it is due
+back*. A Return left with no unit closes at once, noting *No unit could be added (see the system
+log).* The customer page then answers HTTP 422 *No device could be added: each is already on a
+return or was refused*. Where another Return did take the unit, the line is info instead, ending
+*another return held its lock and took it*, and a Return left with no unit notes *No equipment to
+bring back.* On the customer page, a second click on *Return selected* while the first is on its way
+sends nothing, a device pending return has no checkbox, and the selection clears once the Return is
+raised.
+
+### OEM claim run lock
+
+OEM claims and provisioning ([how a job lock behaves](#how-a-job-lock-behaves)). The *NaaS - OEM
+claim and provisioning* run holds the job lock `oem_claim_run` for the whole run. With a row of that
+name in *Job lock*, *Execute now* sends nothing and logs *[x_daas_ham] OEM claims not sent: another
+run holds the oem_claim_run lock and sends them* (info). Delete the row and the next run sends them.
+
 ### Return label, Ship and tracking locks
 
 [How a job lock behaves](#how-a-job-lock-behaves).
@@ -528,10 +708,28 @@ units then ends it.
   so its first run after the upgrade may move free stock into those Customers' pools (and buy for
   them when `x_daas_ham.spare_pool.auto_purchase` is true). Withdraw a returned lease's spare-pool
   units the same way.
+- The spare-pool top-up now sizes one Spare pool per Customer and Model across all their
+  Agreements, and nets the open top-up purchases described *Spare-pool top-up <Customer sys_id>:*.
+  Purchase orders requested by an earlier run are described *Spare-pool top-up <Agreement
+  sys_id>:* and are not netted. Cancel them, or let them be received, before the first run with
+  `x_daas_ham.spare_pool.auto_purchase` true, or that run may buy their units again.
 - Each fee type is now charged at most once per Asset and Return order. Before this release, a
   damage fee could be charged twice when an evaluation was chosen again after the lifecycle refused
   the move: list Fee events (not waived) that share type, Asset and Return order, and waive the
   duplicates.
+
+### Replacement SLA stop
+
+Completing a replacement Order queues the event `x_daas_ham.replacement.complete` on it. Its script
+action *NaaS - note replacement on its case* runs as system, outside any interactive session, and
+saves the case with the work note *Replacement order <number> is complete: the replacement is
+installed.* Check this as a user without `sn_customerservice.case_admin` whose CSM query rules do
+not grant them the case: an asset manager moving the replacement unit to in service on the Asset
+form, and a customer contact using *Confirm installed* on a self-install replacement. In each case
+the event is processed within seconds (*System Logs > Events*). The case gets the work note,
+written by *system*. Its *NaaS replacement* Task SLA stops (stage *Completed*, not breached). No
+*... its case ... was not found* or *... the case save was refused* warning is logged. Repeat once
+through the device-events API or the in-service detection job.
 
 ### Meraki coverage
 
@@ -550,10 +748,11 @@ with lines in EUR and USD, a period's *Totals per currency* reads `EUR <amount>;
 *Total (lines in one currency)* is blank, and its Margin has one row per Customer, Site and
 currency.
 
-**After an upgrade.** Agreements saved before have no currency: set it on each before the next
-Billing period is generated. Until then each of their lines and fees fails to bill, counted on the
-period (*Lines that failed to bill*, with a *Last generation error* ending *no currency: its
-Agreement <number> has no currency: set the Agreement's currency*), and *Close period* refuses
+**After an upgrade.** Agreements saved before have no currency: list `x_daas_ham_agreement` with
+`currencyISEMPTY` and set it on each before the next Billing period is generated. Until then each
+of their lines and fees fails to bill, counted on the period (*Lines that failed to bill*, with a
+*Last generation error* ending *no currency: its Agreement <number> has no currency: set the
+Agreement's currency*), and *Close period* refuses
 until a *Regenerate* bills them. Running **NaaS - load demo data** again gives the demo Agreements
 EUR.
 

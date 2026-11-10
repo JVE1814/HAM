@@ -76,6 +76,10 @@ The manufacturer's product identifier for a Model (e.g. a Cisco product ID).
 **Device class**:
 The functional category of a Model (switch, AP, router, firewall, module, PSU, optic).
 
+**Model category**:
+The platform's classification of a Model (e.g. Network Gear), which decides the asset and CI class of its units; Procurement buys no Model without one.
+_Avoid_: device class (the application's own category)
+
 **Configuration item**:
 The monitored/discovered representation of an Asset in the CMDB.
 _Avoid_: CI (in prose), device
@@ -139,7 +143,7 @@ A named bill of materials describing the standard equipment for a kind of Site.
 _Avoid_: BOM, bundle, kit
 
 **Spare pool**:
-In-stock Assets of one Model reserved for one Customer's replacements, sized from all the Customer's deployed Assets of that Model, each Agreement's spare-pool ratio applied to the Assets it covers.
+In-stock Assets of one Model reserved for one Customer's replacements, sized from all of the Customer's deployed Assets of that Model across their Agreements, each Agreement's spare-pool ratio applied to its own Assets.
 _Avoid_: spares, buffer stock
 
 **Fee event**:
@@ -264,7 +268,7 @@ The days one Asset delivered a Subscription line, from the day it went in servic
 _Avoid_: usage, billable period
 
 **Cost fact**:
-A cost of one kind (purchase write-off, lease, OEM support, field labour) attributed to a Customer and Site for one Billing period, in one currency.
+A cost of one kind (purchase write-off, lease, OEM support, field labour, shipping) attributed to a Customer and Site for one Billing period, in one currency.
 
 **Margin**:
 A Billing period's subscription and fee revenue minus its Cost facts, per Customer, Site and currency: amounts in two currencies are never added.
@@ -278,4 +282,4 @@ Some names users and the platform already see keep a word avoided above. Each me
 - **over_quota**, the stored value of that verdict: its label reads *Over contracted quantity*, and a stored choice value cannot change without rewriting the Orders that hold it.
 - **allocated**, in the Order line's `quantity_allocated`: the Assets an Order line holds, from whatever source; the column is installed.
 - **warehouse**, in the warehouse app (*Warehouse scanning*, `x_daas_ham_warehouse.do`): the scanning page, used in every kind of Stockroom, not a kind of Stockroom; its URL is installed and linked.
-- **device**, in what Customers and the NMS see (the customer page and its API's errors such as *Unknown device*, a *Device removal* return, device events): their word for one physical unit; they never see an Asset record, and staff language keeps Asset.
+- **device**, in what Customers and the NMS see (the customer page and its API's errors such as *Unknown device*, a *Device removal* return, device events): their word for one physical unit; they never work on the Asset form or in the platform's UI, and staff language keeps Asset.

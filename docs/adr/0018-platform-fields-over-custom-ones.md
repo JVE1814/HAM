@@ -77,7 +77,8 @@ Order's *Requested by* contact (`x_daas_ham_order.requested_by_contact`; the tas
   *Initiated from* are filled in again ([Platform fields](../verify-on-instance.md#platform-fields)).
 - **`change_request` carries no column of the app any more.** For a table whose last app column goes, the build
   carries a delete of the table label SDK 4.14 wrote for it, under the app's own sys_id; the platform kept its own
-  label then and should now (to confirm on the first install: README, *Install*).
+  label then and should now (to confirm on the first install:
+  [Install log](../verify-on-instance.md#install-log)).
 - **Labels**: a lease's form and list read *Vendor* and *Contract number*, the platform's labels, where they read
   *Lessor* and *Schedule number*. The Contract number holds 40 characters (the schedule number held 60) and is
   required; the Vendor picker offers companies marked as vendors only.

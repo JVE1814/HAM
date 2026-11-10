@@ -15,15 +15,23 @@
 - **Start site audit** on a Site lists its installed fleet assets (pending in service, in service,
   temporary deployment) and dispatches a site-audit work order under a standard change.
 - An Asset whose audit line the platform refuses is left out of the expected count (logged), and the
-  user is told how many.
+  user is told how many. An expected count or work order the platform refuses to save on a started
+  audit is logged and the user told; the audit stands.
 - Technicians scan in the warehouse app's **Audit** mode. Scans are blind: no unit details are
-  shown. A scan the platform refuses to record answers HTTP 422, to scan again.
+  shown. A scan the platform refuses to record answers HTTP 422 with a generic message (why is
+  logged), to scan again.
 - An inventory tech sees, scans and closes only the blind counts of their Stockrooms; site audits
   are for field techs. Field techs and asset managers scan and close any open audit; other staff
   (NOC, account managers, finance) only read audits. An audit the user may not see answers *No open
   audit with that number*.
 - **Close audit**:
-  - scans are matched to expected Assets by serial, provider tag or customer tag (case-insensitive);
+  - the audit is closed first: one the platform refuses to close stays open (the user is told why),
+    with no line marked and no exception raised. A line result refused after the close, or a
+    *missing in audit* exception that is not open afterwards (read back, so a refused insert
+    counts), is logged and counted to the user, to fix by hand;
+  - a scan names the expected Asset whose serial it is, else whose Provider tag, else whose Customer
+    tag (case-insensitive), as everywhere a code is resolved; a code two expected Assets carry in
+    the same field names neither and is marked unexpected, for a person to resolve;
   - unmatched expected Assets become *missing in audit* exceptions;
   - scans matching nothing are marked unexpected;
   - counts are stored.
@@ -91,7 +99,9 @@ rack exception are re-checked as well (see Racks), and their rack exceptions ope
   counted (ADR 0016). The elevation page and its power figure still show only what the viewer may
   see.
 - The **rack elevation** page (`x_daas_ham_racks.do`) shows the front and rear of the racks in a
-  Site's rooms. Colours are by stage, customer, or risk:
+  Site's rooms. A device links to its Asset form for provider staff only (the six NaaS staff roles,
+  and administrators); Customer contacts, external users the platform UI does not open for, see its
+  tag and Model as plain text. Colours are by stage, customer, or risk:
   - *high*: past end of support, or no current coverage;
   - *medium*: end of sale, or refresh due within 180 days.
 - The page and its endpoints show Customer contacts only the racks at Sites they can see (their
@@ -126,7 +136,12 @@ before-query rule's filter reaches only the last clause of a query with `^NQ` (A
 reported, and a return requested, for fleet assets only: another device answers HTTP 404 *Unknown
 device* on `POST /customer/faults`, and is left out of the devices a return request lists.
 
-The page calls the app's REST API under `/api/x_daas_ham/naas`. A call the platform refuses answers
+The page calls the app's REST API under `/api/x_daas_ham/naas`. Its routes, and the rack page's
+(`/sites`, `/racks`), do not require the `snc_internal` role, which customer users (`snc_external`)
+lack. They admit a user who passes either the platform's *Scripted REST External Default* ACL
+(internal users) or the app's REST ACL for customer admins and site contacts
+(`security/rest-acls.now.ts`), and each handler checks the role and the Customer. A call the
+platform refuses answers
 HTTP 422, so it can be sent again:
 
 - `POST /customer/faults` when the case is refused;

@@ -71,8 +71,10 @@ ACL of its own `alm_hardware` inherits `alm_asset`'s: Asset Management's (`snc_i
 `sn_itam_restrict_asset_read`, keeps a user holding only a base role to the Assets that name them, as assigned to,
 managed by, owned by and the like) and Customer Service's (`sn_esm_user`, `sn_customerservice.requester`, which checks
 each row against its query rules). The app's earlier ACLs on `alm_hardware` were the only ones there, so they decided
-every hardware read: everyone without a NaaS role lost all hardware. On `alm_asset` the app's Allow-If ACLs (NaaS
-provider staff, Customer contacts) are ORed with the platform's, apply to hardware (*Applies To*
+every hardware read: everyone without a NaaS role lost all hardware. (Field ACLs on the app's own columns of
+`alm_hardware` are another matter: one decides its field only, and the record's ACLs are still `alm_asset`'s.) On
+`alm_asset` the app's Allow-If ACLs (NaaS provider staff, Customer contacts) are ORed with the platform's, apply to
+hardware (*Applies To*
 `sys_class_name=alm_hardware`) and grant only fleet assets the reader's scope keeps (`entry/visibility`
 `grantsFleetAsset`), so they add readers of fleet assets and decide nothing else.
 
@@ -91,6 +93,21 @@ the platform's Allow-If read ACLs on `alm_asset`, `alm_stockroom` (`snc_internal
 applies must pass, before an Allow-If one grants. The rules stay the efficient narrowing: a list without `^NQ` holds
 only records the check passes, so it shows no "removed by security constraints" gaps.
 
+Changes by hand are checked on hardware the same way. The platform's `asset` role, which inventory and field techs
+hold, passes its write and delete ACLs on `alm_asset` for every Asset (and `snc_internal` its field write ACLs), so a
+tech could change a fleet asset's company, Agreement, subscription line, lease or cost, or delete it, from a form, a
+list (an `alm_asset` list too) or the Table API. Deny-Unless ACLs on `alm_asset` (`security/acls-hardware.now.ts`),
+applying to hardware and beside the platform's Allow-If ACLs of the same name, keep a fleet asset's saves to the asset
+editors (`assetEditors`, `domain/visibility` `ASSET_EDITOR_ROLES`) whose scope keeps it, its deletion to app
+administrators (a fleet asset leaves by disposal, ADR 0016), and its company and cost to asset managers; every other
+Asset passes, left to the platform. The app's own columns on hardware have Allow-If field ACLs of their own: the
+Agreement, subscription line, lease and Legal owner are changed by hand by asset managers, the Fleet flag by
+administrators, and the Provider's figures (support cost, claim code, lease) are read by provider staff only.
+A Customer contact does not read a fleet asset's cost, which Customer Service's ACLs grant its contacts, nor a
+Shipment's carrier cost. Each Deny-Unless field ACL sits beside an Allow-If ACL of its own name (the platform's, or,
+for `alm_asset.cost` write, one repeating `alm_asset.*`'s), so no verdict depends on how the platform matches ACLs
+across levels. The app's own logic saves through GlideRecord, which no ACL checks.
+
 ## Consequences
 
 - Whether a record is left to the platform depends on the reader (an inventory tech's hardware outside the fleet, not
@@ -104,6 +121,10 @@ only records the check passes, so it shows no "removed by security constraints" 
   transaction (external-contracts N37), as it does their Stockrooms and Sites, so a row costs no query. A row of an
   `alm_asset` list, which carries no hardware field, is checked on its `alm_hardware` record, read once for the row
   and only for a user holding a NaaS role.
+- The write, delete and field checks on hardware run whenever someone saves, deletes or edits a field of hardware.
+  For a user they do not restrict (an Asset outside the fleet, an asset manager on the company and cost, an
+  administrator deleting) they stop at the class, the role or the Fleet flag; an `alm_asset` row reads its
+  `alm_hardware` record once per check, as for reads.
 - An inventory tech's `alm_asset` list is not narrowed by a rule: the `alm_hardware` rule does not run on it, and a
   rule on `alm_asset` would also run on every query of its child tables. Its row check removes other Stockrooms'
   fleet assets, so such a list can show "removed by security constraints" gaps. The app's lists and forms use
@@ -117,5 +138,7 @@ only records the check passes, so it shows no "removed by security constraints" 
   if it has `^NQ` clauses, carries the user's filter in each clause itself: the customer page's equipment
   (`customerEquipmentQuery` ANDs the reader's `visibilityFilter` into each stage's clause).
 - What only an instance can confirm (a Deny-Unless ACL with no role and a module function as its script, on a parent
-  table, applying to its child table's records; *Applies To* on `alm_asset`; the row check on a New form) is on the
-  first-install checklist.
+  table, applying to its child table's records; *Applies To* on `alm_asset`; the row check on a New form; the field
+  ACLs on `alm_asset` applying to an `alm_asset` list's hardware rows; a create rule's script seeing the posted values
+  on a Table API insert) is checked in
+  [docs/verify-on-instance.md](../verify-on-instance.md#access-and-visibility-adr-0005).

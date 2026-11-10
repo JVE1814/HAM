@@ -34,7 +34,16 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   - the OEM's replacement unit is received with the RMA number in the PO field (ASN or warehouse
     app), allocated to the waiting line, and the RMA becomes *replacement received*.
 - SLAs on the case: next business day 24 h, same day 8 h, 24x7x4 4 h (wall clock). They stop when the
-  replacement Order completes (in service). A replacement served from a hot spare at the Site reaches
+  replacement Order completes (in service). Completing the Order queues the event
+  `x_daas_ham.replacement.complete` on it (`platform/fulfilment.ts` `recomputeOrder`). Its script
+  action saves the case with a work note (*Replacement order <number> is complete: the replacement
+  is installed.*), because the SLA engine weighs a case's SLAs only when the case is saved. The
+  script action runs as system, outside any interactive session. So Customer Service's case query
+  rules, which apply in the interactive sessions of users without case_admin, cannot hide the case
+  from it, whoever completed the Order: an asset manager on the Asset form, a customer contact
+  confirming the install, or the device-events API. Only an open case that still links that Order,
+  now complete, is saved. A refused save, or a case not found, is logged, so the case can be saved
+  by hand. A replacement served from a hot spare at the Site reaches
   *installing* at Ship (the spare is handed over as shipped), so its install can then be confirmed or
   its swap work order closed. A hot spare that Ship refused stays in the spare pool: neither
   *Confirm installed* nor closing the swap work order installs it until a later Ship hands it over.
@@ -62,8 +71,8 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
 |---|---|
 | Site decommission / device removal | Record producer *Return or decommission network equipment*, or the customer page |
 | Refresh swap-back, defective return | Install completion of refresh / replacement Orders, for each replaced unit whose own replacement is installed (collected by the same work order); a Return the platform refuses is logged, the replaced units stay in service, and completing the install again raises it |
-| Agreement end | Daily job, once per Agreement after its end date: one Return per Site for all equipment installed or still shipped there, each a field de-install with its own normal change and de-install work order |
-| Temporary end | Daily job, `x_daas_ham.returns.temporary_lead_days` before a temporary Order's end date |
+| Agreement end | Daily job, once per Agreement after its end date: one Return per Site for all equipment installed or still shipped there, each a field de-install with its own normal change and de-install work order; each Site's Return is raised once per end, so a run whose mark on the Agreement is refused (logged) raises nothing twice and saves the mark again |
+| Temporary end | Daily job, `x_daas_ham.returns.temporary_lead_days` before a temporary Order's end date; raised once per Order, and a refused mark is logged and saved again on the next run |
 
 - Through the record producer, a return is raised only when the Return create rule lets its requester
   in (asset managers, account managers, NOC, the service desk and Customer admins): a Customer admin
@@ -76,6 +85,17 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   leaves the caller out, and HTTP 400 when the Site is not one of their Customer's Sites. The Return
   is raised for the caller's own Customer. Provider staff and platform admins get HTTP 403 there and
   use the record producer.
+- A Customer's requests from the customer page are raised one at a time, under the job lock
+  `return_request_<Customer sys_id>` (ADR 0013), and only for devices not already awaiting a return.
+  A request that finds the lock held answers HTTP 503 and raises nothing. A request whose devices all
+  await a return already answers HTTP 409. So a request sent twice raises one Return order (and, for
+  a field de-install, one de-install work order and one change). The page sends one action at a
+  time, offers no device pending return for another return, and clears the selection once a Return
+  is raised. Every Return, whoever raises it, puts each unit on it under `return_asset_<Asset
+  sys_id>` and checks under that lock that the unit awaits no other return, so a unit is on one
+  awaiting line at a time. A unit whose lock is held through 5 tries is left off. If it then still
+  awaits no return (the holder was slow, refused or died holding the lock), it counts as refused and
+  a warning says to put it on a return by hand if it is due back.
 - Only fleet assets go on a Return: one of the Provider IT's that a request or a job lists is left off,
   logged (*... left off return ...: it is not a fleet asset*), and a Return left with no unit closes at
   once. The units a site decommission, an agreement end or a temporary end returns are the fleet assets
@@ -144,8 +164,9 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
     day's run, so a unit scanned in that day is never also declared missing or charged a lost-asset
     fee;
   - a line whose unit is neither at nor on its way to the Site nor missing (for example received at
-    the depot while its line could not be saved), or is not a fleet asset (a line raised before the
-    Fleet flag), is not declared missing. It is logged on each run, to settle by hand.
+    the depot while its line could not be saved), is in a stage the lifecycle does not move to
+    missing, or is not a fleet asset (a line raised before the Fleet flag), is not declared missing,
+    and no move is tried. It is logged on each run, to settle by hand.
 - Fees use the Agreement's lost / late / damage amounts. A zero amount records nothing. Each fee type
   is charged at most once per Asset and Return order (a waived fee aside), so a step retried after a
   refused save never charges twice. Two steps charging the same fee at once (two users saving one
@@ -158,9 +179,12 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
 
 - Daily, fully automatic. It covers in-service fleet assets of an Agreement with a refresh due date
   within `x_daas_ham.refresh.horizon_days` that are not already on an open replacing line, grouped
-  per Agreement and Site.
+  per Agreement and Site. A run raises at most 2000, earliest due first, and Assets already on an
+  open replacing line take none of those places (ADR 0007).
 - **Successor model**: the same Model while it is a current catalog entry and not past end of sale.
-  Otherwise, the catalogued Model of the same device class with the latest end of support.
+  Otherwise, the catalogued Model of the same device class with the latest end of support. A Model
+  whose end of support is not known (not synced from its OEM yet, or with no date) ranks after every
+  Model with one, in catalog order.
 - Waves where some Asset has no successor stay **draft** with a work note for review. All others are
   submitted (within the agreement) and fulfilled like any Order; one that Submit refuses stays a draft
   with the reasons in its work notes.

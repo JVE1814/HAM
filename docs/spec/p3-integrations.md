@@ -63,6 +63,12 @@
   The Shipment's status, latest update and estimated delivery are updated and new tracking events
   added; the first *delivered* update puts a work note on the Order. Late or out-of-order updates
   do not move a delivered, returned or voided shipment back; *unknown* never replaces a known status.
+  A webhook is also placed by its newest event, as a queued update is: when an event already stored
+  happened after the update's newest (an aggregator resending, typically 30 minutes later, a
+  delivery it was answered 500 for, after a newer update was applied), only its new events are
+  added. Its status, latest update and estimated delivery are left as they are, so it cannot move
+  the Shipment back (say from *Out for delivery* to *In transit*, or to *Label created*, which would
+  offer *Mark label voided* again); a delivery or return is still taken.
   Unknown tracking numbers are acknowledged and ignored.
   Each update is applied under the job lock `track_shipment_<Shipment sys_id>`, from the Shipment and
   its events read again there. So overlapping deliveries of the same history store each event once
@@ -131,6 +137,17 @@
   `x_daas_ham.oem.claim.max_calls` calls per vendor per run (Meraki allows 10 claims per 5 minutes).
   Only the steps of fleet assets are sent (ADR 0016): no serial of the Provider IT's reaches an OEM
   cloud. A step whose staging task names another Asset is never sent, and is left to do by hand.
+- The run holds the job lock `oem_claim_run` throughout (ADR 0013). A run that finds it held (the
+  scheduled run beside *Execute now*) sends nothing and leaves the steps to the run holding it, so
+  no step is sent twice in one rate-limit window. The run checks that it still holds the lock
+  before every vendor call: one that has lost it (ADR 0013) sends no further call, saves what the
+  calls already made returned, and leaves the steps it did not send to the run that took the lock
+  over. A step found done when a failed attempt is saved stays done. Each run first releases waiting
+  licence and zero-touch steps whose active staging task has no open claim step left, checking 200
+  waiting steps a run in sys_id order, from where the last run stopped (job cursor
+  `oem_claim_stranded`) and starting over after the last, so every waiting step gets its turn. These
+  are steps whose release, saved one step at a time, was refused when the claim step was ticked done
+  (logged *OEM step "<label>" of <task> still waiting, not released: ...*).
 - A failure records the reason and counts an attempt; after 5 attempts the step is left for a
   person (*OEM claims to do by hand* in the workspace). Licence and zero-touch steps start as
   *Waiting for the OEM claim step* when their staging task also has a claim step: they are not

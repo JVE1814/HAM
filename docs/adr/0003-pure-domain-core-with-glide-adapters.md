@@ -19,8 +19,9 @@ quickly and exhaustively (Vitest); everything Glide-facing is kept thin and cove
   `event` and `current` (script action), `producer` and `current` (record producer), `request` and
   `response` (REST), `current` (UI action). `src/server/built-metadata.test.ts` checks every
   function wired from Fluent.
-- The layering is linted (`eslint.config.js`): the domain imports neither Glide nor the layers above
-  it, platform never imports entry, and no entry module imports another (the files still listed there
-  as exceptions each wait for one operation to move to a platform service).
+- The layering is linted (`eslint.config.js`), type-only imports included: the domain imports neither
+  Glide nor the layers above it, platform never imports entry, and no entry module imports another
+  (the files still listed there as exceptions each wait for one operation to move to a platform
+  service).
 - Decisions are covered by unit tests in `domain/`; a platform service gets a unit test, against a
   fake of `@servicenow/glide`, where one would catch a real regression.

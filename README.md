@@ -44,7 +44,7 @@ an OEM PID ([ADR 0016](docs/adr/0016-fleet-assets.md)).
 | Leases | Lease schedules make their assets lessor-owned; mismatch alerts when a lease ends before the service; end-of-lease decisions (buy out, extend, return; one buy out or return per lease, returned stock withdrawn to pending wipe and swapped-back units evaluated into wiping, not stock) ([spec](docs/spec/p3-contracts.md)) |
 | Renewals | Agreement renewal warnings and *Renew agreement*; OEM coverage expiry warnings per customer |
 | Billing | Service intervals per asset; monthly billing periods prorated by day (site packages) and device-day (per-device lines, within the line's own dates) plus fees; review, regenerate, reset a stuck generation (admin), close and lock; CSV attachment and pull API ([spec](docs/spec/p3-billing.md)) |
-| Margin | Cost facts (purchase write-off, lease, OEM support, field labour) and margin per customer and site on period close; dashboard tab |
+| Margin | Cost facts (purchase write-off, lease, OEM support, field labour, shipping) and margin per customer, site and currency on period close (two currencies are never added); dashboard tab |
 | Shipping | Labels bought through a shipping aggregator at *Ship* and for ship-back returns; tracking webhooks ([spec](docs/spec/p3-integrations.md)) |
 | OEM claims | Staging steps done by the OEM cloud: Meraki and Mist claim, GreenLake device add and subscription, FortiCloud registration and FortiZTP, Check Point Zero Touch |
 | Racks | Power budget per rack from model typical power, with a *Rack over power budget* exception when simultaneous placements exceed it |
@@ -97,14 +97,8 @@ npx now-sdk install --auth <alias> --no-demoData   # production: demo data loads
 npx now-sdk install --auth <alias>                  # dev/test: demo data included
 ```
 
-The install log (*System Applications > Application install history*, `sys_upgrade_history_log`)
-lists one *Skipped Error* row per global table the app adds columns to
-(`sys_documentation_<table>__en`, seven of them): SDK 4.14 writes a table label for each augmented
-table, and the platform keeps the table's own. Any other *Skipped Error* row is a defect. The app
-no longer adds a column to `change_request` (ADR 0018), so the build now carries a delete for the
-label it used to write there (`sys_documentation_change_request__en`, under the app's own sys_id,
-which the platform never stored): after the install, check that the *Change Request* table still
-has its label (*System Definition > Tables*).
+The install log lists seven expected *Skipped Error* rows; any other is a defect
+([install log](docs/verify-on-instance.md#install-log)).
 
 Then configure (System Properties, `x_daas_ham.*`):
 
@@ -113,7 +107,7 @@ Then configure (System Properties, `x_daas_ham.*`):
 | `x_daas_ham.provider_company` | sys_id of the provider's own `core_company` (company of unassigned stock) |
 | `x_daas_ham.staging.default_stockroom` | sys_id of the staging-centre stockroom |
 | `x_daas_ham.tag.prefix` / `.digits` | provider tag format (default `NAAS-0000001`) |
-| `x_daas_ham.job.batch_size` / `.budget_seconds` | chunked-job tuning (defaults 500 / 120 s; a batch size below 1 counts as 1, and a budget of 0 or less handles one record per run); the OEM coverage sync shares the budget among the enabled vendors one batch at a time and gives each at least one batch per run |
+| `x_daas_ham.job.batch_size` / `.budget_seconds` | chunked-job tuning (defaults 500 / 120 s; a batch size below 1 counts as 1, and a budget of 0 or less handles one record per run); the OEM coverage sync shares the budget among the enabled vendors one batch at a time and gives each at least one batch per run, and the refresh run reads no further page of due Assets once it is spent |
 | `x_daas_ham.events.max_batch` / `.retention_days` | NMS event API limits (500 / 90 days) |
 | `x_daas_ham.spare_pool.auto_purchase` | `true` to raise POs for spare-pool shortfalls |
 | `x_daas_ham.oem.<vendor>.enabled`, `x_daas_ham.meraki.*`, `x_daas_ham.mist.*` | OEM API access, see [OEM spec](docs/spec/p2-oem.md) |
@@ -136,16 +130,46 @@ works at the NaaS stockrooms whose *Assignment group* they are a member of. Sett
 a user to a group takes `user_admin`.
 
 Mark what is NaaS ([ADR 0016](docs/adr/0016-fleet-assets.md)): give each NaaS stockroom its
-*Stockroom type* (central depot, staging centre or customer site) and each NaaS Model its *OEM PID*.
-A stockroom with no type and a Model without an OEM PID are the Provider IT's. Assets the app
-creates (ASN rows, first scans without an ASN) and units it receives join the fleet. Equipment the
-Provider already runs joins it with *Add to fleet* on the Asset form or list (asset managers): an
-Asset on order, in transit, available in a NaaS stockroom, or in service with its Site and
-Agreement, whose Model has an OEM PID.
+*Stockroom type* (central depot, staging centre or customer site) and each NaaS Model its *OEM PID*
+and a *Model category* (e.g. *Network Gear*). A stockroom with no type and a Model without an OEM
+PID are the Provider IT's. Procurement refuses a purchase order line item whose Model has no
+category (its rule *Model Category of Model not empty*), so the app requests no purchase order for
+such a Model and says why; a purchase order left without its line item is cancelled, as
+Procurement lets no other scope delete one
+([purchase orders](docs/verify-on-instance.md#purchase-orders)). Assets the app creates (ASN rows,
+first scans without an ASN) and units it receives join the fleet. Equipment the Provider already
+runs joins it with *Add to fleet* on the Asset form or list (asset managers): an Asset on order, in
+transit, available in a NaaS stockroom, or in service with its Site and Agreement, whose Model has
+an OEM PID.
 
 Give each Agreement its *Currency*, a three-letter ISO code with no default: the Agreement bills in
 that one currency, and its lines and fees fail to bill until it is set
 ([Agreement currency](docs/spec/p3-contracts.md#agreement-currency)).
+
+### Upgrading
+
+On an instance where an earlier version was installed:
+
+- Set *Currency* on every Agreement saved before the field existed, before the next Billing period
+  is generated ([currency](docs/verify-on-instance.md#currency)); the demo job sets EUR on the demo
+  Agreements when it runs again.
+- Give every NaaS Model its *Model category*
+  ([purchase orders](docs/verify-on-instance.md#purchase-orders)).
+- Enter again what the app now keeps in the platform's own tables and fields
+  ([ADR 0017](docs/adr/0017-model-lifecycle-in-the-platform-table.md),
+  [ADR 0018](docs/adr/0018-platform-fields-over-custom-ones.md)). The earlier version's tables and
+  columns stay on the instance with their values, unread: the build deletes none of them, and
+  nothing is migrated.
+  - Give each NaaS stockroom an *Assignment group* holding the inventory techs who were its
+    stockroom members ([stockroom assignment](docs/verify-on-instance.md#stockroom-assignment)).
+  - Fill in each lease's *Vendor* (its Lessor) and *Contract number* and each racked Model's *Power
+    (watts)*, and set *Initiated from* to its NaaS Order on each work order still open
+    ([platform fields](docs/verify-on-instance.md#platform-fields)).
+  - Load the Models' lifecycle milestones again through the lifecycle import, or enter them by hand
+    ([model lifecycle](docs/verify-on-instance.md#model-lifecycle)).
+- Work through the checks marked **After an upgrade** in
+  [docs/verify-on-instance.md](docs/verify-on-instance.md): adopting the fleet and clearing the
+  earlier version's column defaults, and clean-ups of returns, fees and spare-pool purchases.
 
 ### Demo data
 
@@ -161,6 +185,11 @@ The demo depot and staging centre are assigned to the group *NaaS demo depot tea
 the demo data and gets `naas.inventory` as its member.
 Lifecycle dates in the demo data are illustrative, not vendor bulletins.
 
+It loads nothing on an instance whose Provider (`x_daas_ham.provider_company`) names a company
+other than *Demo NaaS Provider*, as an instance in use does, and logs why as an error: on a
+dev/test instance, clear the property first. The demo Agreements bill in EUR; run again, the job
+gives that currency to any demo Agreement an earlier version loaded without one.
+
 ## Integrations
 
 **Provider NMS → device events** (`POST /api/x_daas_ham/naas/device_events`, role
@@ -170,26 +199,31 @@ Lifecycle dates in the demo data are illustrative, not vendor bulletins.
 { "events": [ { "identifier": "FOC1234X0AB", "event": "seen", "observed_at": "2026-11-06T10:00:00Z", "source": "nms" } ] }
 ```
 
-`identifier` is a serial number, provider tag or customer tag; `event` is `seen`, `down` or `up`.
-`observed_at` is an ISO-8601 timestamp with a UTC offset (`Z`, `±hh:mm` or `±hhmm`), to the minute,
-second or fraction of a second; a time without an offset, another date format or a time that does not
-exist (2026-02-31, 24:00) is a rejected row. Responds `202` with accepted / unknown identifiers /
-busy identifiers / rejected rows. `accepted` counts only the events applied: unknown and busy
-identifiers and rejected rows are not counted in it. `busy_identifiers` lists the events not applied
-because another request was applying a sighting to the same Asset (job lock
-`seen_asset_<Asset sys_id>`) or because the platform refused the Asset's save (logged as an error):
-send those again. That is safe, because a repeated *seen* is not stored twice and last_seen only
-moves forward. Only state changes are stored.
+`identifier` is a serial number, provider tag or customer tag, matched in that order (the first
+field any fleet asset carries it in); one that two fleet assets carry in that field, such as a
+customer tag two Customers share, is refused, logged, and reported in `unknown_identifiers`. `event`
+is `seen`, `down` or `up`. `observed_at` is an ISO-8601 timestamp with a UTC offset (`Z`, `±hh:mm`
+or `±hhmm`), to the minute, second or fraction of a second; a time without an offset, another date
+format or a time that does not exist (2026-02-31, 24:00) is a rejected row. Events are applied in
+the order they were observed, oldest first, whatever their order in the request. Responds `202` with
+accepted / unknown identifiers / busy identifiers / rejected rows. `accepted` counts only the events
+applied: unknown and busy identifiers and rejected rows are not counted in it. `busy_identifiers`
+lists the events not applied because another request was applying a sighting to the same Asset (job
+lock `seen_asset_<Asset sys_id>`) or because the platform refused the Asset's save (logged as an
+error): send those again. That is safe, because a repeated *seen* is not stored twice and last_seen
+only moves forward. Only state changes are stored.
 
 **Imports**: load CSVs into *ASN import rows* (`x_daas_ham_asn_import`, including MAC address and
 OEM claim code), *Lifecycle import rows* (`x_daas_ham_eox_import`) and *OEM coverage import rows*
 (`x_daas_ham_coverage_import`, optionally with the contract's annual cost) with System Import Sets >
-Load Data; each row is processed on insert and its import state/comment shows the outcome. An ASN
-row's check that no Asset has its serial sees every Asset, past the importer's stockroom rule. A
-lifecycle row's milestones are stored in the platform's Model lifecycle table, one row per Model and
-milestone ([ADR 0017](docs/adr/0017-model-lifecycle-in-the-platform-table.md)): a milestone the row
-leaves blank keeps the date stored, and a row with no date at all is marked *ignored*. Asset managers
-keep milestones by hand in *NaaS Asset Management > Model lifecycle* (the platform's `model_manager`
+Load Data; loading takes the platform's `import_set_loader` role (`import_admin` contains it), which
+no NaaS role contains, and the NaaS menu's *Load data* module is shown to holders of that role; each
+row is processed on insert and its import state/comment shows the outcome. An ASN row's check that
+no Asset has its serial sees every Asset, past the importer's stockroom rule. A lifecycle row's
+milestones are stored in the platform's Model lifecycle table, one row per Model and milestone
+([ADR 0017](docs/adr/0017-model-lifecycle-in-the-platform-table.md)): a milestone the row leaves
+blank keeps the date stored, and a row with no date at all is marked *ignored*. Asset managers keep
+milestones by hand in *NaaS Asset Management > Model lifecycle* (the platform's `model_manager`
 role, which the asset manager role contains): lifecycle type *Publisher*, the phase, its start date.
 The list shows the *Publisher* rows of NaaS Models, the ones the app reads; a row left on the form's
 default type, *Internal*, is an organisation's own plan for the Model, which the app ignores.
@@ -197,7 +231,15 @@ default type, *Internal*, is an organisation's own plan for the Model, which the
 **Billing pull API** (role `x_daas_ham.finance` or `x_daas_ham.integration`):
 `GET /api/x_daas_ham/naas/billing_periods` and
 `GET /api/x_daas_ham/naas/billing_periods/{id}/lines?offset=0&limit=1000` (`final` once the period is
-closed, `nextOffset` null on the last page).
+closed, `nextOffset` null on the last page). Each line carries its `currency`, and a period its
+`totals`, one per currency: there is no single `total`, as two currencies are never added
+([billing spec](docs/spec/p3-billing.md)).
+
+The NMS and billing integrations sign in as an internal user, one without the `snc_external` role
+(the Explicit Roles plugin gives such a user `snc_internal`). Their routes, like the warehouse ones,
+require `snc_internal` and the platform's *Scripted REST External Default* ACL. Only the site, rack
+and `/customer/...` routes admit customer admins and site contacts (`security/rest-acls.now.ts`).
+The tracking webhook needs no sign-in and checks its token itself.
 
 **Shipping aggregator**: labels through the *NaaS Shipping aggregator* REST message (ShipEngine label
 API, billed to `x_daas_ham.shipping.carrier_id`). Register the tracking webhook at
@@ -227,7 +269,7 @@ documentation in [docs/research/external-contracts.md](docs/research/external-co
 | `npm run lint` | ESLint |
 | `npm test` | Vitest unit tests for the domain core and client helpers, and the checks of the built metadata (build first) |
 | `npm run build` | `now-sdk build` (Fluent type check, client bundle, app package) |
-| `npx now-sdk cicd testsuite run ...` | ATF suites **NaaS - P1**, **NaaS - P2** and **NaaS - P3** on an instance |
+| `npx now-sdk cicd testsuite run ...` | ATF suites **NaaS - P1**, **NaaS - P2** and **NaaS - P3** on an instance (`src/server/atf-scripts.test.ts` checks their server-side scripts beforehand; [running ATF](docs/verify-on-instance.md#running-atf)) |
 
 Layout:
 
@@ -278,6 +320,9 @@ Conventions that the build or tests enforce:
   the entry and falls back to that value) and REST messages with their functions
   (`domain/rest-message-names.ts` `REST_MESSAGE`). `built-metadata.test.ts` holds what was built to
   each list.
+- The name of a business rule, UI action, script action, notification, SLA, REST message or REST
+  route fits the instance's 40 characters, which cut a longer one off unseen
+  (`built-metadata.test.ts`).
 - Substatus values added to `alm_asset` are the `choice` entries of `STAGE_FIELDS` there, which
   `fluent/data/substatus-choices.now.ts` ships one Record each (`built-metadata.test.ts` compares
   the built choice set with them).
@@ -286,10 +331,10 @@ Conventions that the build or tests enforce:
 
 ## Verify on an instance
 
-What only an instance or a vendor login can confirm (platform choices and cross-scope access, the
-platform's Model lifecycle table and the fields that replaced the app's own, the Fleet flag and the
-clean-up after an upgrade, stockroom assignment, visibility and row checks, the rules' refusals,
-on-site work links, transfer orders, every job lock, rack re-checks, vendor contracts) is listed by
-area in
+What only an instance or a vendor login can confirm (the install log and preflight, platform
+choices, cross-scope access and purchase orders, the platform's Model lifecycle table and the fields
+that replaced the app's own, running ATF, the Fleet flag and the clean-up after an upgrade,
+stockroom assignment, visibility, row checks and REST access, the rules' refusals, on-site work
+links, transfer orders, every job lock, rack re-checks, vendor contracts) is listed by area in
 [docs/verify-on-instance.md](docs/verify-on-instance.md). Work through it on the first install and
 after upgrading an instance where an earlier version was installed.
