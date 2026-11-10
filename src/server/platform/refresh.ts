@@ -3,9 +3,19 @@ import { addDays } from '../domain/calendar.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import type { LifecycleDates } from '../domain/model-lifecycle.ts'
-import { refreshWaves, replacementModel, type RefreshCandidate, type RefreshWave } from '../domain/refresh.ts'
+import {
+    dueAfter,
+    firstCandidatesDue,
+    REFRESH_DUE_FIELD,
+    refreshWaves,
+    replacementModel,
+    type DueKey,
+    type DueRow,
+    type RefreshCandidate,
+    type RefreshWave,
+} from '../domain/refresh.ts'
 import { catalogModels } from './agreements.ts'
-import { todayIso } from './clock.ts'
+import { nowMs, todayIso } from './clock.ts'
 import { readModelLifecycle } from './model-lifecycle.ts'
 import type { NewLine } from './order-lines.ts'
 import { createOrder, submitOrder } from './orders.ts'
@@ -14,6 +24,9 @@ import { pluck, str, warnRefused } from './records.ts'
 import { OPEN_ORDERS_QUERY } from '../domain/fulfilment.ts'
 
 /** Refresh Orders for in-service Assets due within the horizon (P2.2, D48: fully automatic). */
+
+/** Candidates a run raises at most, and the Assets due it reads per query. */
+const CANDIDATES_PER_RUN = 2000
 
 /**
  * Raise the refresh Orders due, a wave at a time, holding the run's `lock`. A run that outlasts it (ADR 0013) stops
@@ -32,31 +45,44 @@ export function raiseDueRefreshOrders(lock: HeldLock): void {
 
 /**
  * In-service fleet assets (ADR 0016) of an Agreement due within the horizon and on no open replacing line, earliest
- * due first. The Provider IT's equipment in use is in service by its install status too, and is left out.
+ * due first. The Provider IT's equipment in use is in service by its install status too, and is left out. Read a page
+ * at a time past those on order (domain/refresh `firstCandidatesDue`), within the job time budget.
  */
 function dueCandidates(): RefreshCandidate[] {
     const horizon = addDays(todayIso(), intProperty(PROPERTY.refreshHorizonDays))
     const onOrder = new Set(
         pluck('x_daas_ham_order_line', `replaces_assetISNOTEMPTY^order.${OPEN_ORDERS_QUERY}`, 'replaces_asset'),
     )
-    const candidates: RefreshCandidate[] = []
-    const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(fleetStagesQuery(['in_service'], `x_daas_ham_refresh_due<=${horizon}^x_daas_ham_agreementISNOTEMPTY`))
-    asset.orderBy('x_daas_ham_refresh_due')
-    asset.setLimit(2000)
-    asset.query()
-    while (asset.next()) {
-        if (onOrder.has(asset.getUniqueValue())) continue
-        candidates.push({
-            assetId: asset.getUniqueValue(),
-            agreementId: str(asset, 'x_daas_ham_agreement'),
-            customerId: str(asset, 'company'),
-            siteId: str(asset, 'x_daas_ham_site'),
-            modelId: str(asset, 'model'),
-            deviceClass: str(asset, 'model.x_daas_ham_device_class'),
-        })
+    const due = fleetStagesQuery(['in_service'], `${REFRESH_DUE_FIELD}<=${horizon}^x_daas_ham_agreementISNOTEMPTY`)
+    const started = nowMs()
+    const budgetMs = intProperty(PROPERTY.jobBudgetSeconds) * 1000
+    const readPage = (after: DueKey | null, size: number): DueRow[] => {
+        const asset = new GlideRecord('alm_hardware')
+        asset.addEncodedQuery(dueAfter(due, after))
+        asset.orderBy(REFRESH_DUE_FIELD)
+        asset.orderBy('sys_id')
+        asset.setLimit(size)
+        asset.query()
+        const rows: DueRow[] = []
+        while (asset.next()) {
+            const id = asset.getUniqueValue()
+            const key = { due: str(asset, REFRESH_DUE_FIELD), id }
+            rows.push({ key, candidate: onOrder.has(id) ? null : candidateOf(asset) })
+        }
+        return rows
     }
-    return candidates
+    return firstCandidatesDue(readPage, CANDIDATES_PER_RUN, () => nowMs() - started >= budgetMs)
+}
+
+function candidateOf(asset: GlideRecord): RefreshCandidate {
+    return {
+        assetId: asset.getUniqueValue(),
+        agreementId: str(asset, 'x_daas_ham_agreement'),
+        customerId: str(asset, 'company'),
+        siteId: str(asset, 'x_daas_ham_site'),
+        modelId: str(asset, 'model'),
+        deviceClass: str(asset, 'model.x_daas_ham_device_class'),
+    }
 }
 
 /**

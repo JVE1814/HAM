@@ -27,6 +27,29 @@ export interface Placement {
     powerW?: number
 }
 
+/** A device placed in a rack, as its callers read it: the Asset's fields, and its Model's height and draw. */
+export interface RackedDevice {
+    /** The Asset's sys_id. */
+    id: string
+    tag: string
+    serial: string
+    ruStart: number
+    face: RackFace
+    /** Rack units its Model takes; under 1 counts as 1. */
+    height: number
+    powerW?: number
+}
+
+/**
+ * The device's Placement, keyed by its sys_id and named by its asset tag, else its serial number. Every caller builds
+ * its placements with it, so one device has one key wherever it is read, and as the candidate it is never counted as
+ * overlapping itself.
+ */
+export function devicePlacement(device: RackedDevice): Placement {
+    const { id, tag, serial, ruStart, face, height, powerW } = device
+    return { assetId: id, label: tag || serial, ruStart, height: Math.max(1, height), face, powerW }
+}
+
 export interface RackSpec {
     units: number
     /** Power the rack can supply; 0 = no budget recorded. */

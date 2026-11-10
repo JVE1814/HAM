@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { overlaps, placementProblem, powerBudget, rackElevation } from './rack'
+import { devicePlacement, overlaps, placementProblem, powerBudget, rackElevation } from './rack'
 
 const rack42 = { units: 42, powerCapacityW: 0 }
 const placed = [
@@ -147,6 +147,37 @@ describe('rackElevation', () => {
             { unit: 4, assetId: null, label: null, span: 1 },
             { unit: 3, assetId: 'sys-a', label: 'NAAS-0001', span: 2 },
             { unit: 1, assetId: null, label: null, span: 1 },
+        ])
+    })
+})
+
+describe('devicePlacement', () => {
+    const device = { id: 'sys-a', tag: 'NAAS-0001', serial: 'FOC1', ruStart: 30, height: 2, face: 'front' as const, powerW: 250 }
+
+    it('keys the device by its sys_id and names it by its asset tag, else its serial number', () => {
+        expect(devicePlacement(device)).toEqual({ assetId: 'sys-a', label: 'NAAS-0001', ruStart: 30, height: 2, face: 'front', powerW: 250 })
+        expect(devicePlacement({ ...device, tag: '' }).label).toBe('FOC1')
+        expect(devicePlacement({ ...device, height: 0 }).height).toBe(1)
+    })
+
+    it('never counts a device re-saved in its own units as overlapping itself, whatever its tag', () => {
+        // The rule reads the device among the rack's placements and as the candidate, the same sys_id both times.
+        const others = [devicePlacement(device), devicePlacement({ ...device, id: 'sys-b', ruStart: 10, height: 1 })]
+        expect(placementProblem(rack42, others, devicePlacement({ ...device, tag: 'NAAS-0099' }))).toBeNull()
+        // A device that only shares its tag is another device, and still takes its units.
+        expect(placementProblem(rack42, others, devicePlacement({ ...device, id: 'sys-c', ruStart: 31, height: 1 }))).toBe('Rack unit 31 is taken by NAAS-0001')
+    })
+
+    it('draws two devices sharing a tag, and one with neither a tag nor a serial, as separate devices', () => {
+        const shared = [
+            devicePlacement({ ...device, ruStart: 3, height: 1 }),
+            devicePlacement({ ...device, id: 'sys-b', ruStart: 2, height: 1 }),
+            devicePlacement({ ...device, id: 'sys-c', tag: '', serial: '', ruStart: 1, height: 1 }),
+        ]
+        expect(rackElevation(3, shared, 'front')).toEqual([
+            { unit: 3, assetId: 'sys-a', label: 'NAAS-0001', span: 1 },
+            { unit: 2, assetId: 'sys-b', label: 'NAAS-0001', span: 1 },
+            { unit: 1, assetId: 'sys-c', label: 'sys-c', span: 1 },
         ])
     })
 })

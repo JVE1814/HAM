@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { rackElevation, type PowerBudget } from '../../server/domain/rack'
+import { devicePlacement, rackElevation, type PowerBudget } from '../../server/domain/rack'
 import type { AssetStage, RackDevice, RackElevation, RackListing, Site } from '../../server/domain/rest-contracts'
 import { supportRisk, type SupportRisk } from '../../server/domain/support-risk'
-import { ROLE } from '../../server/domain/visibility'
+import { PROVIDER_STAFF } from '../../server/domain/visibility'
 import { RACK_FACE_CHOICES, type RackFace } from '../../server/domain/vocabulary'
 import { stageText } from '../stage'
 import { rackApi } from './api'
@@ -26,11 +26,11 @@ function hashColour(text: string): string {
 }
 
 /**
- * The roles that open an Asset's form (roles.now.ts `providerStaff`, which alm_hardware's read ACLs admit). Customer
- * admins and site contacts are external users (snc_external) the platform UI does not open for, so their rack shows
- * no link.
+ * The roles that open an Asset's form: provider staff, which alm_hardware's read ACLs admit (domain/visibility
+ * PROVIDER_STAFF, the list the metadata's `providerStaff` is). Customer admins and site contacts are external users
+ * (snc_external) the platform UI does not open for, so their rack shows no link.
  */
-const STAFF_ROLES = [ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance].join(',')
+const STAFF_ROLES = PROVIDER_STAFF.join(',')
 
 /**
  * Whether the user may open an Asset's form, read from g_user, which the page's sdk:now-ux-globals tag defines (admin
@@ -85,7 +85,8 @@ export default function App() {
         return latest((signal) => rackApi.rack(rackId, signal), setDetail, setError)
     }, [rackId])
 
-    const byId = useMemo(() => new Map((detail?.devices ?? []).map((d) => [d.tag || d.serial, d])), [detail])
+    // Keyed by sys_id, as the elevation's rows are: two devices can share a tag, or have neither a tag nor a serial.
+    const byId = useMemo(() => new Map((detail?.devices ?? []).map((d) => [d.id, d])), [detail])
     const colour = (device: RackDevice) =>
         colourBy === 'customer' ? hashColour(device.customer) : colourBy === 'risk' ? RISK_COLOURS[supportRisk(device, today)] : STAGE_COLOURS[device.stage] ?? 'var(--neutral)'
 
@@ -134,11 +135,7 @@ export default function App() {
                                 {detail.rack.name} · {face}
                             </h2>
                             <ol className="units">
-                                {rackElevation(
-                                    detail.rack.units,
-                                    detail.devices.map((d) => ({ assetId: d.tag || d.serial, ruStart: d.ruStart, height: d.height, face: d.face })),
-                                    face,
-                                ).map((row) => {
+                                {rackElevation(detail.rack.units, detail.devices.map(devicePlacement), face).map((row) => {
                                     const device = row.assetId ? byId.get(row.assetId) : undefined
                                     return (
                                         <li key={row.unit} className={device ? 'device' : 'empty'} style={{ ['--span' as string]: row.span, ...(device ? { background: colour(device) } : {}) }}>
@@ -146,11 +143,11 @@ export default function App() {
                                             {device &&
                                                 (linkAssets ? (
                                                     <a href={`/alm_hardware.do?sys_id=${device.id}`} target="_blank" rel="noreferrer" title={`${device.serial} · ${stageText(device.stage)}`}>
-                                                        {device.tag || device.serial} · {device.model}
+                                                        {row.label} · {device.model}
                                                     </a>
                                                 ) : (
                                                     <span className="device-name" title={`${device.serial} · ${stageText(device.stage)}`}>
-                                                        {device.tag || device.serial} · {device.model}
+                                                        {row.label} · {device.model}
                                                     </span>
                                                 ))}
                                         </li>

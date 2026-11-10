@@ -18,7 +18,7 @@ import { CLAIM_ROUTES } from './domain/oem/claims'
 import { REST_MESSAGE } from './domain/rest-message-names'
 import { RMA_AT_OEM } from './domain/oem-rma'
 import { buyLabel, labelVoidable } from './domain/shipping'
-import { BROAD_STAFF, PLATFORM_ROLE, ROLE, SCOPED_TABLES, type TableScoping } from './domain/visibility'
+import { BROAD_STAFF, PLATFORM_ROLE, PROVIDER_STAFF as PROVIDER_STAFF_IN_ORDER, ROLE, SCOPED_TABLES, type TableScoping } from './domain/visibility'
 import {
     ORDER_STAGE_CHOICES,
     REPLACEMENT_TIER_CHOICES,
@@ -738,8 +738,12 @@ function builtAcls(): BuiltAcl[] {
 const recordAcls = (): BuiltAcl[] => builtAcls().filter((acl) => !acl.field)
 
 const isCustomerRole = (role: string) => role === ROLE.customerAdmin || role === ROLE.siteContact
-/** Every provider-staff role (security/roles.now.ts `providerStaff`), sorted. */
-const PROVIDER_STAFF = [...BROAD_STAFF, ROLE.inventoryTech].sort()
+/**
+ * Every provider-staff role, sorted: domain/visibility PROVIDER_STAFF, the one list security/roles.now.ts
+ * `providerStaff` and the rack page (which links a device to its Asset form for these roles only) both are. The checks
+ * below hold the built ACLs, audience and dashboard to it, so a role the metadata admits is one the page links for.
+ */
+const PROVIDER_STAFF = [...PROVIDER_STAFF_IN_ORDER].sort()
 /** The roles that read the money tables (security/roles.now.ts `moneyReaders`), sorted. */
 const MONEY_READERS = [ROLE.finance, ROLE.accountManager, ROLE.assetManager].sort()
 
@@ -1045,6 +1049,7 @@ describe('workspace audiences', () => {
     it('are the role groups the navigator and the ACLs name', () => {
         const workspaceModule = records('sys_app_module').find((module) => module.title === 'NaaS Asset Workspace')
         expect(audience('NaaS provider staff')).toEqual(workspaceModule?.roles?.split(','))
+        expect(audience('NaaS provider staff')).toEqual(PROVIDER_STAFF_IN_ORDER)
         expect(audience('NaaS provider staff except inventory techs')).toEqual(BROAD_STAFF)
         expect(audience('NaaS billing and margin readers').sort()).toEqual(grantedOn('x_daas_ham_margin', 'read').sort())
     })

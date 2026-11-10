@@ -94,7 +94,7 @@ export function reconcileRack(rack: RackSpec, placements: readonly Placement[]):
     const found: RackException[] = []
     const shared = overlaps(placements)
     if (shared.length > 0) {
-        const detail = shared.map(({ assetIds: [a, b], face, unit }) => `${a} and ${b} share rack unit ${unit} (${face})`).join('; ')
+        const detail = shared.map(({ labels: [a, b], face, unit }) => `${a} and ${b} share rack unit ${unit} (${face})`).join('; ')
         found.push({ type: 'rack_overlap', detail })
     }
     const budget = powerBudget(rack.powerCapacityW, placements)

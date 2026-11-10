@@ -44,6 +44,13 @@ export const PLATFORM_ROLE = {
  */
 export const BROAD_STAFF = [ROLE.assetManager, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance]
 
+/**
+ * Every provider-staff role: who reads the installed base, and so opens an Asset's form (the rack page links a device
+ * to it for them only). The metadata's `providerStaff` (security/roles.now.ts) is this list, in the order the
+ * navigator's modules store it.
+ */
+export const PROVIDER_STAFF = [ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance]
+
 const BROAD_STAFF_ROLES = [ROLE.admin, ...BROAD_STAFF]
 
 /**

@@ -59,6 +59,14 @@ describe('reconcileRack', () => {
         expect(reconcileRack(rack, placed)).toEqual([])
     })
 
+    it('names the overlapping devices by their label, not their sys_id', () => {
+        const keyed = [
+            { assetId: 'a1b2', label: 'NAAS-0001', ruStart: 20, height: 1, face: 'front' as const },
+            { assetId: 'c3d4', label: 'FOC222', ruStart: 20, height: 1, face: 'front' as const },
+        ]
+        expect(reconcileRack(rack, keyed)).toEqual([{ type: 'rack_overlap', detail: 'NAAS-0001 and FOC222 share rack unit 20 (front)' }])
+    })
+
     it('raises an overlap naming each pair that shares units', () => {
         const twoSaves = [
             ...placed,

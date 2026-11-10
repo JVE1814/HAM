@@ -3,9 +3,11 @@ import { fleetCondition, SITE_CONDITION } from '../domain/fleet.ts'
 import {
     DEFAULT_RACK_FACE,
     DEFAULT_RACK_UNITS,
+    devicePlacement,
     PLACEMENT_FIELDS,
     placementProblem,
     powerBudget,
+    RACK_FACES,
     type Placement,
     type RackSpec,
 } from '../domain/rack.ts'
@@ -16,7 +18,7 @@ import type { RackFace } from '../domain/vocabulary.ts'
 import { isFleetAsset, readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { cisWithOpenException, settleExceptions } from './exceptions.ts'
-import { exists, findById, num, recordsById, str, type ForeignRecord } from './records.ts'
+import { choice, exists, findById, num, recordsById, str, type ForeignRecord } from './records.ts'
 import { currentSession } from './session.ts'
 
 /**
@@ -26,7 +28,10 @@ import { currentSession } from './session.ts'
 
 /** Where an Asset sits in its rack, and its Model (whose name, size and draw are read separately). */
 interface Slot {
-    assetId: string
+    /** The Asset's sys_id: the Placement's key, read the same way for the candidate and for the rack's other devices. */
+    id: string
+    tag: string
+    serial: string
     ruStart: number
     face: RackFace
     modelId: string
@@ -34,9 +39,11 @@ interface Slot {
 
 function slotOf(asset: ForeignRecord): Slot {
     return {
-        assetId: str(asset, 'asset_tag') || str(asset, 'serial_number'),
+        id: asset.getUniqueValue(),
+        tag: str(asset, 'asset_tag'),
+        serial: str(asset, 'serial_number'),
         ruStart: num(asset, PLACEMENT_FIELDS.ruStart),
-        face: (str(asset, PLACEMENT_FIELDS.face) || DEFAULT_RACK_FACE) as RackFace,
+        face: choice(asset, PLACEMENT_FIELDS.face, RACK_FACES, DEFAULT_RACK_FACE),
         modelId: str(asset, 'model'),
     }
 }
@@ -62,7 +69,7 @@ function rackModels(modelIds: readonly string[]): Map<string, RackModel> {
 
 function placementOf(slot: Slot, models: ReadonlyMap<string, RackModel>): Placement {
     const model = models.get(slot.modelId) ?? NO_MODEL
-    return { assetId: slot.assetId, ruStart: slot.ruStart, height: Math.max(1, model.rackUnits), face: slot.face, powerW: model.powerW }
+    return devicePlacement({ ...slot, height: model.rackUnits, powerW: model.powerW })
 }
 
 function rackSpec(rack: GlideRecord): RackSpec {
@@ -111,8 +118,8 @@ export function placementRefusal(current: ForeignRecord, previous: ForeignRecord
     if (!rackId || !str(current, PLACEMENT_FIELDS.ruStart)) return null
     const rack = findById('cmdb_ci_rack', rackId)
     if (!rack) return null
-    const others = slotsIn(rackId, current.getUniqueValue())
-    const candidate = { ...slotOf(current), assetId: current.getUniqueValue() }
+    const candidate = slotOf(current)
+    const others = slotsIn(rackId, candidate.id)
     // The Model this device already had in this rack, as a fleet asset; undefined when it is new to the rack or to
     // the fleet.
     const previousModelId =

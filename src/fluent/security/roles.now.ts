@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Role } from '@servicenow/sdk/core'
-import { BROAD_STAFF, PLATFORM_ROLE, ROLE } from '../../server/domain/visibility'
+import { BROAD_STAFF, PLATFORM_ROLE, PROVIDER_STAFF, ROLE } from '../../server/domain/visibility'
 
 /*
  * The base-platform roles contained below must exist on the instance, as must the service desk's, which the ACLs grant
@@ -74,7 +74,7 @@ export const integration = Role({
  */
 
 /** Every provider-staff role: reads the installed base and the tables of stockroom work, the only app tables an inventory tech reads. */
-export const providerStaff = [ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance]
+export const providerStaff = PROVIDER_STAFF
 
 /** Provider staff without inventory techs: the read list for customer, commercial and configuration tables. */
 export const broadStaff = BROAD_STAFF
