@@ -13,6 +13,7 @@ import { guardStagingClosure, onStagingClosed, releaseWaitingSteps, stampStaging
 import { CURRENT_IS_FLEET } from '../../server/domain/fleet'
 import { ENTRY_MODULES } from './server-modules.now'
 import { STAGING_TASK_STATE } from '../../server/domain/staging'
+import { TASK_STATE } from '../../server/domain/vocabulary'
 
 /* Record-change rules driving the Order lifecycle (ADR 0004). */
 
@@ -170,6 +171,6 @@ BusinessRule({
     when: 'after',
     action: ['update'],
     order: 200,
-    condition: "current.state.changes() && current.state == 3 && current.initiated_from.sys_class_name == 'x_daas_ham_order'",
+    condition: `current.state.changes() && current.state == ${TASK_STATE.closedComplete} && current.initiated_from.sys_class_name == 'x_daas_ham_order'`,
     script: onWorkOrderClosed,
 })
