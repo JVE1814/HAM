@@ -64,7 +64,6 @@ export function fleetStagesQuery(stages: readonly Stage[], base = '', via = ''):
 export const FLEET_IN_STAGE = {
     in_service: `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${FLEET_CONDITION}`,
     pending_in_service: `install_status=${STAGE_FIELDS.pending_in_service.installStatus}^substatus=${STAGE_FIELDS.pending_in_service.substatus}^${FLEET_CONDITION}`,
-    temporary_deployment: `install_status=${STAGE_FIELDS.temporary_deployment.installStatus}^substatus=${STAGE_FIELDS.temporary_deployment.substatus}^${FLEET_CONDITION}`,
     available: `install_status=${STAGE_FIELDS.available.installStatus}^substatus=${STAGE_FIELDS.available.substatus}^${FLEET_CONDITION}`,
     spare_pool: `install_status=${STAGE_FIELDS.spare_pool.installStatus}^substatus=${STAGE_FIELDS.spare_pool.substatus}^${FLEET_CONDITION}`,
     in_transit: `install_status=${STAGE_FIELDS.in_transit.installStatus}^substatusISEMPTY^${FLEET_CONDITION}`,

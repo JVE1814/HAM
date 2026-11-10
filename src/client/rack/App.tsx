@@ -11,7 +11,6 @@ type ColourBy = 'stage' | 'customer' | 'risk'
 const STAGE_COLOURS: Partial<Record<AssetStage, string>> = {
     in_service: 'var(--ok)',
     pending_in_service: 'var(--warn)',
-    pending_return: 'var(--neutral)',
     temporary_deployment: 'var(--accent)',
 }
 
