@@ -1,8 +1,9 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { normalizeSerial } from '../domain/serials.ts'
-import { naasStockroomType, receiptProblem, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
+import { naasStockroomType, OEM_PID_FIELD, receiptProblem, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
+import type { AssetSummary } from '../domain/rest-contracts.ts'
 import {
     allocationProblem,
     awaitsReceipt,
@@ -44,6 +45,21 @@ export interface ScanRefusal {
 
 /** What a scan came to: the Asset as it now stands, or why the scan did nothing. */
 export type Scan = { asset: GlideRecord } | ScanRefusal
+
+/** The unit a scan found or changed, as the warehouse API answers with it (domain/rest-contracts `AssetSummary`). */
+export function assetSummary(asset: GlideRecord): AssetSummary {
+    return {
+        id: asset.getUniqueValue(),
+        serial: str(asset, 'serial_number'),
+        providerTag: str(asset, 'asset_tag'),
+        model: asset.getDisplayValue('model'),
+        pid: str(asset, `model.${OEM_PID_FIELD}`),
+        stage: readStage(asset) ?? 'unknown',
+        stockroom: asset.getDisplayValue('stockroom'),
+        customer: asset.getDisplayValue('company'),
+        orderLine: asset.getDisplayValue('x_daas_ham_order_line'),
+    }
+}
 
 const SCAN_AGAIN: ScanRefusal = { reason: 'busy', why: 'Another scan is receiving this unit: scan again' }
 

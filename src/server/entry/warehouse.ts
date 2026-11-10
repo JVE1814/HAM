@@ -1,28 +1,10 @@
-import type { GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import type { AssetSummary, StockroomList } from '../domain/rest-contracts.ts'
+import type { StockroomList } from '../domain/rest-contracts.ts'
 import { ROLE } from '../domain/visibility.ts'
-import { readStage } from '../platform/assets.ts'
-import { lookUp, pick, putAway, receive, receivingStockrooms, type Scan, type ScanRefusal } from '../platform/receiving.ts'
-import { str } from '../platform/records.ts'
+import { assetSummary, lookUp, pick, putAway, receive, receivingStockrooms, type Scan, type ScanRefusal } from '../platform/receiving.ts'
 import { pathParam, reply, requireRole, requireScanner, textBodyOf } from '../platform/rest-api.ts'
-import { OEM_PID_FIELD } from '../domain/fleet.ts'
 
 /** Warehouse scanning API used by the warehouse React app (P1.5): platform/receiving. */
-
-function summarise(asset: GlideRecord): AssetSummary {
-    return {
-        id: asset.getUniqueValue(),
-        serial: str(asset, 'serial_number'),
-        providerTag: str(asset, 'asset_tag'),
-        model: asset.getDisplayValue('model'),
-        pid: str(asset, `model.${OEM_PID_FIELD}`),
-        stage: readStage(asset) ?? 'unknown',
-        stockroom: asset.getDisplayValue('stockroom'),
-        customer: asset.getDisplayValue('company'),
-        orderLine: asset.getDisplayValue('x_daas_ham_order_line'),
-    }
-}
 
 /** The HTTP status each kind of refused scan answers with (platform/receiving `ScanRefusal`). */
 const REFUSAL_STATUS: Record<ScanRefusal['reason'], number> = {
@@ -35,7 +17,7 @@ const REFUSAL_STATUS: Record<ScanRefusal['reason'], number> = {
 
 /** Answer a scan: the Asset as it now stands, or the error and status of its refusal. */
 function answer(response: RESTAPIResponse, scan: Scan): void {
-    if ('asset' in scan) return reply(response, 200, summarise(scan.asset))
+    if ('asset' in scan) return reply(response, 200, assetSummary(scan.asset))
     reply(response, REFUSAL_STATUS[scan.reason], { error: scan.why })
 }
 

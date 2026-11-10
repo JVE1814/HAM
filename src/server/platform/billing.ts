@@ -533,13 +533,36 @@ function lineReader(): (line: GlideRecord) => StoredBillingLine {
     })
 }
 
+/*
+ * What the billing pull API answers (finance and the ERP integration read it; no page of the app does, so the shapes
+ * are declared here and not in domain/rest-contracts).
+ */
+
+/** GET /billing_periods: the most recent periods, newest first. */
+export interface BillingPeriodList {
+    periods: Array<{ id: string; period: string; status: string; lines: number; total: number }>
+}
+
+/** GET /billing_periods/{id}/lines: one page of a period's lines. */
+export interface BillingLinesPage {
+    period: string
+    status: string
+    /** Whether the period is closed: its lines no longer change. */
+    final: boolean
+    total: number
+    offset: number
+    lines: Array<ReturnType<typeof billingLineJson>>
+    /** Where the next page starts; null after the last one. */
+    nextOffset: number | null
+}
+
 /** The `limit` most recent periods, as the pull API lists them. */
-export function recentPeriods(limit: number): object[] {
+export function recentPeriods(limit: number): BillingPeriodList {
     const period = new GlideRecord(PERIOD)
     period.orderByDesc('period')
     period.setLimit(limit)
     period.query()
-    const periods: object[] = []
+    const periods: BillingPeriodList['periods'] = []
     while (period.next()) {
         periods.push({
             id: period.getUniqueValue(),
@@ -549,18 +572,18 @@ export function recentPeriods(limit: number): object[] {
             total: num(period, 'total_amount'),
         })
     }
-    return periods
+    return { periods }
 }
 
 /** One page of a period's lines as the pull API gives it (a closed period's are final), or null for an unknown period. */
-export function linesPage(periodId: string, offset: number, limit: number): object | null {
+export function linesPage(periodId: string, offset: number, limit: number): BillingLinesPage | null {
     const period = findById(PERIOD, periodId)
     if (!period) return null
     const stored = lineReader()
     const line = linesOf(periodId)
     line.chooseWindow(offset, offset + limit, false)
     line.query()
-    const lines: object[] = []
+    const lines: BillingLinesPage['lines'] = []
     while (line.next()) lines.push(billingLineJson(line.getUniqueValue(), stored(line)))
     return {
         period: str(period, 'period'),

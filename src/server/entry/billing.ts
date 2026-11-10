@@ -116,7 +116,7 @@ function canPull(response: RESTAPIResponse): boolean {
 /** GET /billing_periods: the most recent periods. */
 export function listBillingPeriods(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!canPull(response)) return
-    reply(response, 200, { periods: recentPeriods(Math.min(Math.max(queryInt(request, 'limit', 24), 1), 120)) })
+    reply(response, 200, recentPeriods(Math.min(Math.max(queryInt(request, 'limit', 24), 1), 120)))
 }
 
 /** GET /billing_periods/{id}/lines?offset&limit: one page of a period's lines (closed periods are final). */
