@@ -56,8 +56,9 @@ const CLAIM_ENABLED: Partial<Record<OemVendor, PropertyOf<boolean>>> = PROPERTY.
  * now*) would load the same due steps and send each to its vendor twice, spending two runs' calls in one rate-limit
  * window (Meraki allows 10 calls in 5 minutes), and the second claim of a device already claimed fails, marking a step
  * the first run ticked done failed again. A run that finds the lock held sends nothing and leaves the steps to the run
- * holding it. A run that outlasts the lock sends nothing more once it has lost it: it saves what its calls so far
- * returned, and the run that took the lock over goes on.
+ * holding it. A run that outlasts the lock sends nothing more once it has lost it, checked before every call
+ * (runVendorClaims): it saves what its calls so far returned, leaves the steps it did not send to the run that took the
+ * lock over, and that run goes on.
  */
 export function runClaims(): void {
     const lockName = LOCK.oemClaimRun()
@@ -71,7 +72,7 @@ function runHolding(lock: HeldLock): void {
     const store = whileHeld(lock, glideClaimStore())
     for (const vendor of CLAIM_VENDORS) {
         const enabled = CLAIM_ENABLED[vendor]
-        if (enabled && boolProperty(enabled)) runVendorClaims(vendor, store, restMessagePort, maxCalls)
+        if (enabled && boolProperty(enabled)) runVendorClaims(vendor, store, restMessagePort, maxCalls, () => lock.held())
     }
 }
 

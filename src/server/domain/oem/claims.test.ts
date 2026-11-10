@@ -424,6 +424,29 @@ describe('runVendorClaims', () => {
         expect(messages).toEqual(['NaaS FortiCare', 'NaaS FortiZTP'])
     })
 
+    it('sends nothing once the run loses its lock, settling only the calls already made', () => {
+        const { store, loads, settled } = fakeStore({
+            oem_claim: [target('A', { account: '' }), target('B', { account: '' })],
+            oem_licence: many('L', 5),
+        })
+        const { transport, calls } = fakeTransport([succeed])
+        let checks = 0
+        // Held for the first call only: GreenLake's add sends both devices in one call, then the licence steps wait.
+        runVendorClaims('aruba', store, transport, 8, () => ++checks <= 1)
+        expect(calls.map((c) => c.fn)).toEqual(['add_devices'])
+        expect(settled.map((o) => o.stepId)).toEqual(['A', 'B'])
+        expect(loads).toEqual(['oem_claim', 'oem_licence'])
+    })
+
+    it('loads no later action after the lock is lost', () => {
+        const { store, loads, settled } = fakeStore({ oem_claim: [target('A', { account: '' })], oem_ztp: [target('B', { account: 'FMG-1' })] })
+        const { transport, calls } = fakeTransport([succeed])
+        runVendorClaims('fortinet', store, transport, 8, () => false)
+        expect(calls).toEqual([])
+        expect(settled).toEqual([])
+        expect(loads).toEqual(['oem_claim'])
+    })
+
     it('spends no calls on an action with no due steps', () => {
         const { store, loads } = fakeStore()
         const { transport, messages } = fakeTransport([succeed])
