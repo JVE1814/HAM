@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { encodeCode128 } from './code128'
+import { barsOf, encodeCode128 } from './code128'
 
 describe('encodeCode128', () => {
     it('encodes with start code B, checksum and stop pattern', () => {
@@ -22,5 +22,29 @@ describe('encodeCode128', () => {
 
     it('rejects characters outside printable ASCII', () => {
         expect(() => encodeCode128('é')).toThrow(/printable ASCII/)
+    })
+})
+
+describe('barsOf', () => {
+    it('draws each run of bar modules as one bar', () => {
+        expect(barsOf('1101100')).toEqual([
+            { x: 0, width: 2 },
+            { x: 3, width: 2 },
+        ])
+        expect(barsOf('0011100101')).toEqual([
+            { x: 2, width: 3 },
+            { x: 7, width: 1 },
+            { x: 9, width: 1 },
+        ])
+        expect(barsOf('000')).toEqual([])
+    })
+
+    it('covers exactly the bar modules of an encoded tag', () => {
+        const modules = encodeCode128('PJJ123C')
+        const drawn = Array.from({ length: modules.length }, () => '0')
+        for (const { x, width } of barsOf(modules)) for (let i = x; i < x + width; i++) drawn[i] = '1'
+        expect(drawn.join('')).toBe(modules)
+        // The stop pattern ends in a two-module bar, drawn as one shape.
+        expect(barsOf(modules).at(-1)).toEqual({ x: modules.length - 2, width: 2 })
     })
 })

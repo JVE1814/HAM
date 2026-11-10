@@ -18,11 +18,12 @@ export function path(parts: TemplateStringsArray, ...values: string[]): string {
     return parts.reduce((text, part, i) => text + encodeURIComponent(values[i - 1]) + part)
 }
 
-async function call<T>(method: 'GET' | 'POST', to: string, body?: object): Promise<T> {
+async function call<T>(method: 'GET' | 'POST', to: string, body?: object, signal?: AbortSignal): Promise<T> {
     const response = await fetch(`${BASE}${to}`, {
         method,
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-UserToken': window.g_ck },
         body: body ? JSON.stringify(body) : undefined,
+        signal,
     })
     const payload = await response.json().catch(() => ({}))
     const result = payload.result ?? payload
@@ -30,8 +31,9 @@ async function call<T>(method: 'GET' | 'POST', to: string, body?: object): Promi
     return result as T
 }
 
-export function get<T>(to: string): Promise<T> {
-    return call<T>('GET', to)
+/** A GET of the API; `signal` aborts it when the view no longer wants its answer. */
+export function get<T>(to: string, signal?: AbortSignal): Promise<T> {
+    return call<T>('GET', to, undefined, signal)
 }
 
 export function post<T>(to: string, body?: object): Promise<T> {

@@ -81,18 +81,29 @@ select {
 .label-meta {
     font-size: 0.75rem;
 }
+.scan-pending,
+.scan-error {
+    margin: 6px 0 0;
+    font-size: 0.9rem;
+    color: var(--muted);
+}
+.scan-error {
+    color: var(--error);
+}
+/* Only the label sheet prints. The rest is taken out of the layout (display, not visibility), so the scan log and the
+   controls leave no blank pages after the labels. The page body holds only #root, which holds .warehouse. */
 @media print {
-    body * {
-        visibility: hidden;
+    .warehouse > :not(.labels),
+    .labels-header {
+        display: none;
     }
-    .label-sheet,
-    .label-sheet * {
-        visibility: visible;
+    body {
+        background: #fff;
     }
-    .label-sheet {
-        position: absolute;
-        left: 0;
-        top: 0;
+    .warehouse {
+        max-width: none;
+        margin: 0;
+        padding: 0;
     }
     .label {
         border: none;

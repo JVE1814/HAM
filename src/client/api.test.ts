@@ -27,6 +27,13 @@ describe('a call', () => {
         })
     })
 
+    it('sends a GET with the signal that aborts it', async () => {
+        answer(200, JSON.stringify({ result: { sites: [] } }))
+        const controller = new AbortController()
+        await get('/sites', controller.signal)
+        expect(fetch).toHaveBeenCalledWith('/api/x_daas_ham/naas/sites', expect.objectContaining({ method: 'GET', signal: controller.signal }))
+    })
+
     it("fails with the HTTP status and the app's error text", async () => {
         answer(403, JSON.stringify({ result: { error: 'Requires the inventory tech role' } }))
         const error = await get('/stockrooms').catch((e: unknown) => e)
