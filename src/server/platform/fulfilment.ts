@@ -41,14 +41,22 @@ export function unitsOnLine(lineId: string): number {
 
 /** The stages of the Order's lines and of every Asset on them, read past the user's before-query rules (as above). */
 export function orderShipment(orderId: string): OrderShipment {
+    return { lineStages: lineStagesOf(orderId), unitStages: assetStages('x_daas_ham_order_line.order', orderId) }
+}
+
+/**
+ * The stage of each of the Order's lines: the one read of them, for what the Order has shipped and for the stage it
+ * derives from them. Read past the user's before-query rules, the way the Assets on the lines are
+ * (platform/beyond-visibility). The rules scope a line by its Order's Customer and Site (domain/visibility), so
+ * whoever sees the Order sees each of its lines anyway: a stage is never derived from some of them.
+ */
+function lineStagesOf(orderId: string): LineStage[] {
     const line = new GlideRecord('x_daas_ham_order_line')
-    // Only read, never saved, so the rules need not be turned back on.
-    line.setWorkflow(false)
     line.addQuery('order', orderId)
-    line.query()
-    const lineStages: LineStage[] = []
-    while (line.next()) lineStages.push(str(line, 'line_stage') as LineStage)
-    return { lineStages, unitStages: assetStages('x_daas_ham_order_line.order', orderId) }
+    beyondVisibility(line, () => line.query())
+    const stages: LineStage[] = []
+    while (line.next()) stages.push(str(line, 'line_stage') as LineStage)
+    return stages
 }
 
 function assetStages(field: string, id: string): Array<Stage | null> {
@@ -153,11 +161,7 @@ function deriveLine(line: GlideRecord, refill: boolean): LineStage | null {
 export function recomputeOrder(orderId: string): void {
     const order = findById('x_daas_ham_order', orderId)
     if (!order || !followsLines(str(order, 'stage'))) return
-    const line = new GlideRecord('x_daas_ham_order_line')
-    line.addQuery('order', orderId)
-    line.query()
-    const stages: LineStage[] = []
-    while (line.next()) stages.push(str(line, 'line_stage') as LineStage)
+    const stages = lineStagesOf(orderId)
     if (stages.length === 0) return
     const next = orderStageFor(stages)
     if (next === str(order, 'stage')) return
