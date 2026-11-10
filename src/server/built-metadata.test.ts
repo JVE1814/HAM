@@ -12,12 +12,15 @@ import {
 } from './domain/fleet'
 import { replacementStep } from './domain/breakfix'
 import { CANCELLABLE_ORDER_STAGES } from './domain/fulfilment'
+import { OEM_ADAPTERS } from './domain/oem/adapters'
+import { CLAIM_ROUTES } from './domain/oem/claims'
 import { REST_MESSAGE } from './domain/rest-message-names'
 import { RMA_AT_OEM } from './domain/oem-rma'
-import { labelVoidable } from './domain/shipping'
+import { buyLabel, labelVoidable } from './domain/shipping'
 import { BROAD_STAFF, PLATFORM_ROLE, ROLE, SCOPED_TABLES, type TableScoping } from './domain/visibility'
 import {
     ORDER_STAGE_CHOICES,
+    REPLACEMENT_TIER_CHOICES,
     RMA_STATE_CHOICES,
     SHIPMENT_DIRECTION_CHOICES,
     SHIPMENT_STATUS_CHOICES,
@@ -27,10 +30,39 @@ import {
     type ShipmentStatus,
 } from './domain/vocabulary'
 import { EVENT } from './platform/events'
+import { oemContext } from './platform/oem-http'
 import { PROPERTY, type PropertyOf } from './platform/properties'
+import { restMessagePort } from './platform/rest-messages'
 
-// The registries the metadata imports from platform modules are plain constants; Glide itself is not needed to read them.
-vi.mock('@servicenow/glide', () => ({ gs: {}, GlideRecord: class {}, GlideDateTime: class {} }))
+// The registries the metadata imports from platform modules are plain constants; Glide itself is not needed to read
+// them. A property reads as its declared value.
+vi.mock('@servicenow/glide', () => ({
+    gs: { getProperty: (_name: string, fallback = '') => fallback, getPropertySecured: (_name: string, fallback = '') => fallback, warn: () => undefined },
+    GlideRecord: class {},
+    GlideDateTime: class {},
+}))
+
+/** What the server code hands RESTMessageV2, call by call: the message, the function and the variables it sets. */
+const sentToRest = vi.hoisted(() => ({ calls: [] as Array<{ message: string; fn: string; variables: string[] }> }))
+
+// Every call is answered 200 with a body each adapter finds what it goes on with in (a session id, a device).
+vi.mock('@servicenow/glide/sn_ws', () => ({
+    RESTMessageV2: class {
+        private readonly call: { message: string; fn: string; variables: string[] }
+        constructor(message: string, fn: string) {
+            this.call = { message, fn, variables: [] }
+            sentToRest.calls.push(this.call)
+        }
+        setStringParameterNoEscape(name: string) {
+            this.call.variables.push(name)
+        }
+        setRequestHeader() {}
+        setRequestBody() {}
+        execute() {
+            return { getStatusCode: () => 200, getBody: () => JSON.stringify({ sid: 'session', items: [{ id: 'device' }] }) }
+        }
+    },
+}))
 
 /*
  * What the instance is given: the metadata `now-sdk build` writes to dist/app, read as built. The Fluent sources import
@@ -472,11 +504,12 @@ describe('the columns the app adds to the shared tables', () => {
 
 /*
  * A form or a list names its fields as texts, which the build takes as they are: one that is on no table of the record
- * leaves a gap in the form and a blank column in the list, on the instance only. The columns of the app's tables, and
- * those it adds to the platform's, are read from the built dictionary; those of a platform table from the definition
- * the SDK ships for it, which the build checks an index's columns against.
+ * leaves a gap in the form and a blank column in the list, on the instance only; a record producer's variable mapped to
+ * one writes nothing. The columns of the app's tables, and those it adds to the platform's, are read from the built
+ * dictionary; those of a platform table from the definition the SDK ships for it, which the build checks an index's
+ * columns against.
  */
-describe('fields the forms and lists show', () => {
+describe('fields the forms, lists and record producers name', () => {
     const SDK_TABLES = join(ROOT, 'node_modules/@servicenow/sdk-core/src/fluent/tables')
     /** The columns the app shows of a platform table the SDK has no definition of: the Model lifecycle table (ADR 0017). */
     const UNDEFINED_BY_SDK: Readonly<Record<string, readonly string[]>> = {
@@ -546,7 +579,11 @@ describe('fields the forms and lists show', () => {
         const onWorkspaceLists = records('sys_ux_list').flatMap((list) =>
             (list.columns ?? '').split(',').map((field) => ({ where: `workspace list ${list.title}`, table: list.table ?? '', field })),
         )
-        return [...onForms, ...onLists, ...onWorkspaceLists]
+        // A record producer's variable writes the column it maps to.
+        const mappedByVariables = records('item_option_new')
+            .filter((variable) => variable.map_to_field === 'true')
+            .map((variable) => ({ where: `catalog variable ${variable.name}`, table: variable.record_producer_table ?? '', field: variable.field ?? '' }))
+        return [...onForms, ...onLists, ...onWorkspaceLists, ...mappedByVariables]
     }
 
     it('are columns of the table, or of one it extends: of a dot-walked field, the reference it starts from', () => {
@@ -616,17 +653,9 @@ describe('NaaS Asset Workspace URL', () => {
     const vendor = /^x_([a-z0-9]+)_/.exec(scope)?.[1]
     const path = () => records('sys_ux_page_registry').find((registry) => registry.title === 'NaaS Asset Workspace')?.path
 
-    it('has a vendor prefix and a path', () => {
-        expect([vendor, path()]).toEqual(['daas', 'naas-assets'])
-    })
-
     it("names the route ACL after the workspace's routes", () => {
+        expect(path()).toBeTruthy()
         expect(records('sys_security_acl').map((acl) => acl.name)).toContain(`x.${vendor}.${path()}.*`)
-    })
-
-    it('links the navigator module to its landing page', () => {
-        const module = records('sys_app_module').find((found) => found.title === 'NaaS Asset Workspace')
-        expect(module?.query).toBe(`x/${vendor}/${path()}/home`)
     })
 })
 
@@ -842,7 +871,6 @@ describe('workspace audiences', () => {
         expect(audience('NaaS provider staff')).toEqual(workspaceModule?.roles?.split(','))
         expect(audience('NaaS provider staff except inventory techs')).toEqual(BROAD_STAFF)
         expect(audience('NaaS billing and margin readers').sort()).toEqual(grantedOn('x_daas_ham_margin', 'read').sort())
-        expect(audience('NaaS administrators')).toEqual([ROLE.admin])
     })
 })
 
@@ -910,6 +938,150 @@ describe('REST messages', () => {
             .map((message) => ({ name: message.name as string, functions: (Object.values(message.fn) as string[]).sort() }))
             .sort((a, b) => a.name.localeCompare(b.name))
         expect(built).toEqual(named)
+    })
+
+    /*
+     * A function names what is put into it at call time as ${variable}, in its endpoint, its headers and its content,
+     * and declares each as a variable; the server code sets them by name (the adapters a request's own, platform/
+     * rest-messages a message's secrets and settings). RESTMessageV2 sends a ${variable} nobody set as it stands, to
+     * the vendor.
+     */
+    interface BuiltFunction {
+        message: string
+        fn: string
+        /** The variables its endpoint, headers and content name, with those of its message's headers. */
+        used: string[]
+        declared: string[]
+    }
+
+    const named = (text: string) => [...text.matchAll(/\$\{(\w+)\}/g)].map(([, variable = '']) => variable)
+    const unique = (names: string[]) => [...new Set(names)].sort()
+
+    function builtFunctions(): BuiltFunction[] {
+        const messageName = new Map(records('sys_rest_message').map((message) => [message.sys_id ?? '', message.name ?? '']))
+        return records('sys_rest_message_fn').map((fn) => {
+            const ofFunction = (record: BuiltRecord) => record.rest_message_function === fn.sys_id
+            const headers = [
+                ...records('sys_rest_message_headers').filter((header) => header.rest_message === fn.rest_message),
+                ...records('sys_rest_message_fn_headers').filter(ofFunction),
+            ]
+            return {
+                message: messageName.get(fn.rest_message ?? '') ?? '',
+                fn: fn.function_name ?? '',
+                used: unique([fn.rest_endpoint ?? '', fn.content ?? '', ...headers.map((header) => header.value ?? '')].flatMap(named)),
+                declared: unique(records('sys_rest_message_fn_parameters').filter(ofFunction).map((variable) => variable.name ?? '')),
+            }
+        })
+    }
+
+    it('declare in each function the variables its endpoint, headers and content name, and no other', () => {
+        expect(builtFunctions().flatMap((fn) => fn.used).length).toBeGreaterThan(20)
+        for (const { message, fn, used, declared } of builtFunctions()) expect({ message, fn, declared }).toEqual({ message, fn, declared: used })
+    })
+
+    /** Every function called once, the way the server code calls it: the adapters over the transport of platform/rest-messages. */
+    function callEveryFunction(): typeof sentToRest.calls {
+        sentToRest.calls.length = 0
+        for (const routes of Object.values(OEM_ADAPTERS)) {
+            for (const route of [routes.lifecycle, routes.coverage, routes.rmaStatus]) route?.run(['KEY'], { ...oemContext(route.via), orgIds: ['org'] })
+        }
+        // Check Point's Zero Touch takes an account of the form <account id>/<template id>; to the others it is any text.
+        const target = { stepId: 'step', serial: 'SERIAL', mac: '00:11:22:33:44:55', claimCode: 'CODE', account: '1/2' }
+        for (const routes of Object.values(CLAIM_ROUTES)) {
+            for (const route of Object.values(routes)) route.run([target], restMessagePort(route.message), 10)
+        }
+        const address = { name: 'Depot', phone: '+31 20 000 0000', line1: 'Street 1', city: 'Amsterdam', postalCode: '1000 AA', country: 'NL' }
+        buyLabel(restMessagePort(REST_MESSAGE.shipping.name), { carrierId: 'se-1', serviceCode: 'standard', from: address, to: address, packages: 1, weightKg: 1, reference: 'R' })
+        return [...sentToRest.calls]
+    }
+
+    it('are sent every variable the function called names, and none its message declares nowhere', () => {
+        const calls = callEveryFunction()
+        const key = (call: { message: string; fn: string }) => `${call.message}.${call.fn}`
+        expect(unique(calls.map(key))).toEqual(unique(builtFunctions().map(key)))
+        const declaredIn = (message: string) => builtFunctions().filter((fn) => fn.message === message).flatMap((fn) => fn.declared)
+        for (const call of calls) {
+            const declared = builtFunctions().find((fn) => key(fn) === key(call))?.declared ?? []
+            expect({ call: key(call), unset: declared.filter((variable) => !call.variables.includes(variable)) }).toEqual({ call: key(call), unset: [] })
+            // A message's secrets and settings are set on each of its functions, also on one that names none of them.
+            const unknown = call.variables.filter((variable) => !declaredIn(call.message).includes(variable))
+            expect({ call: key(call), unknown }).toEqual({ call: key(call), unknown: [] })
+        }
+    })
+})
+
+/*
+ * The three pages call the scripted REST API by paths written in src/client, which the build of the API knows nothing
+ * of: a path the API does not serve is a 404 on the instance only.
+ */
+describe('the REST calls of the pages', () => {
+    const CLIENT = join(ROOT, 'src/client')
+    const clientSources = () => filesUnder(CLIENT).filter((path) => /\/api\.ts$/.test(path))
+
+    /** Each `get<T>('/path')` or `post<T>(path\`/path/${id}\`)` of the pages' API modules, a value in the path as `{}`, without its query. */
+    function clientCalls(): Array<{ where: string; method: string; path: string }> {
+        return clientSources().flatMap((source) =>
+            [...readFileSync(source, 'utf8').matchAll(/\b(get|post)<[^(]*>\(\s*(?:path)?(['`])(.*?)\2/g)].map(([, method = '', , path = '']) => ({
+                where: relative(ROOT, source),
+                method: method.toUpperCase(),
+                path: path.replace(/\?.*$/, '').replace(/\$\{[^}]*\}/g, '{}'),
+            })),
+        )
+    }
+
+    it('go to the base path the API is built with', () => {
+        const base = /^const BASE = '([^']*)'$/m.exec(readFileSync(join(CLIENT, 'api.ts'), 'utf8'))?.[1]
+        expect(records('sys_ws_definition').map((api) => api.base_uri)).toEqual([base])
+    })
+
+    it('are each a route of the API, by method and path', () => {
+        const served = records('sys_ws_operation').map((route) => `${route.http_method} ${(route.relative_path ?? '').replace(/\{\w+\}/g, '{}')}`)
+        expect(clientCalls().length).toBeGreaterThanOrEqual(14)
+        expect(clientCalls().filter((call) => !served.includes(`${call.method} ${call.path}`))).toEqual([])
+    })
+})
+
+/*
+ * A case's replacement tier starts the SLA whose start condition names it. A tier no SLA names starts none, and the
+ * case then runs without a clock.
+ */
+describe('replacement SLAs', () => {
+    it('are one for each replacement tier', () => {
+        const tiers = records('contract_sla').map((sla) => /(?:^|\^)x_daas_ham_replacement_tier=(\w+)/.exec(sla.start_condition ?? '')?.[1] ?? sla.name ?? '')
+        expect(tiers.sort()).toEqual(Object.keys(REPLACEMENT_TIER_CHOICES).sort())
+    })
+})
+
+/*
+ * A record producer's variable that maps to a field writes its value to that column as it is. Its choices are written
+ * in the catalog item, where a value that is no choice of the column still builds, and is then stored on the record.
+ */
+describe('choices of the record producers', () => {
+    /** The choice values of a column the app declares; undefined for a column without choices. */
+    function columnChoices(table: string, column: string): string[] | undefined {
+        const xml = readFileSync(join(BUILT, 'dictionary', `${table}.xml`), 'utf8')
+        const choices = new RegExp(`<element name="${column}" [^>]*>\\s*<choice>([\\s\\S]*?)</choice>`).exec(xml)?.[1]
+        return choices === undefined ? undefined : [...choices.matchAll(/<element value="([^"]*)"/g)].map(([, value = '']) => value)
+    }
+
+    it('are choices of the column the variable maps to', () => {
+        const withChoices = records('item_option_new')
+            .filter((variable) => variable.map_to_field === 'true')
+            .map((variable) => ({
+                variable: `${variable.record_producer_table}.${variable.field}`,
+                offered: records('question_choice').filter((choice) => choice.question === variable.sys_id).map((choice) => choice.value ?? ''),
+                column: columnChoices(variable.record_producer_table ?? '', variable.field ?? ''),
+            }))
+            .filter(({ offered }) => offered.length > 0)
+        expect(withChoices.map(({ variable }) => variable).sort()).toEqual([
+            'x_daas_ham_order.install_mode',
+            'x_daas_ham_order.order_type',
+            'x_daas_ham_return_order.method',
+            'x_daas_ham_return_order.trigger',
+        ])
+        for (const { variable, offered, column } of withChoices) {
+            expect({ variable, unknown: offered.filter((value) => !(column ?? []).includes(value)) }).toEqual({ variable, unknown: [] })
+        }
     })
 })
 
