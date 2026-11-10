@@ -300,14 +300,14 @@ Confidence tags:
 
 | Role | Persona | Contains (base roles, verify names in PR 1) | Main surfaces |
 |---|---|---|---|
-| `x_daas_ham.admin` | App administrator | all app roles, `asset`, `inventory_admin`, `procurement_admin`, `catalog_manager`, `report_user` | Workspace, config |
-| `x_daas_ham.asset_manager` | Provider asset manager | `asset`, `inventory_user`, `procurement_user`, `report_user` | Workspace (all) |
+| `x_daas_ham.admin` | App administrator | all app staff roles, `inventory_admin`, `procurement_admin` | Workspace, config |
+| `x_daas_ham.asset_manager` | Provider asset manager | `asset`, `inventory_user`, `procurement_user`, `model_manager`, `report_user`, and the inventory tech and NOC roles | Workspace (all) |
 | `x_daas_ham.inventory_tech` | Depot / staging centre technician | `asset`, `inventory_user` | Warehouse scanning app, Workspace (stock, staging) |
 | `x_daas_ham.field_tech` | FSM field engineer (on top of FSM roles) | `asset` (read and update deployed assets) | FSM mobile; scan page for site audits |
 | `x_daas_ham.account_manager` | Customer account owner | `asset` (read) | Approves over-quota requests; owns agreements, site templates and customer catalogs |
 | `x_daas_ham.finance` | Finance / billing | `report_user` | Subscription lines, billing periods (P3), margin (P3) |
 | `x_daas_ham.noc` | Network operations centre | `asset` (read) | Opens proactive cases; sees installed base, coverage and EoX |
-| CSM customer admin role (`sn_customerservice.customer_admin`, verify) | Customer network/IT admin | `snc_external` | CSM portal: installed base, orders, faults, decommission, attestation |
+| `x_daas_ham.customer_admin` | Customer network/IT admin | `snc_external` | CSM portal: installed base, orders, faults, decommission, attestation |
 | `x_daas_ham.site_contact` | Customer site contact | `snc_external` | CSM portal: confirm delivery/install, self-install, swap simple devices, ship-back |
 
 ## 8. Security and visibility model
@@ -321,16 +321,16 @@ Confidence tags:
   - They see only records whose account matches their own CSM account.
   - Site contacts are further limited to their assigned site(s).
 - **How it's enforced:**
-  - Before-query business rules add indexed filters (`company`, `x_daas_ham_account`,
-    `stockroom`, `location`). This avoids "rows removed by security constraints" and slow lists at
-    1M rows.
+  - Before-query business rules add indexed filters (`company`, `x_daas_ham_customer`,
+    `stockroom`, `x_daas_ham_site`; `customer` and `site` on the app's own tables). This avoids
+    "rows removed by security constraints" and slow lists at 1M rows.
   - ACLs back up every table and field. External contacts get explicit `snc_external` ACLs.
 - **Cross-scope:** we create `CrossScopePrivilege` records for every global table we read or write:
   - `alm_hardware`, `alm_asset`, `alm_stockroom`, `alm_transfer_order(_line)`;
   - `cmdb_model`, `cmdb_model_lifecycle`, `cmdb_ci_*`, `cmn_location`, `cmn_schedule`, `ast_contract`;
   - Procurement tables;
   - `change_request`;
-  - `wm_order` / `wm_task`;
+  - `wm_order`;
   - CSM case, `customer_account` and `customer_contact`.
 - **Data policies** protect key invariants:
   - a deployed asset must have an agreement and a site;
@@ -341,7 +341,9 @@ Confidence tags:
 **Conventions:**
 - Scoped tables are `x_daas_ham_<name>`. Columns we add to base tables are `x_daas_ham_<name>`.
 - Each table is defined in its own file under `src/fluent/tables/`.
-- Field lists below are indicative. Each module spec finalises them.
+- Field lists below are indicative. Each module spec finalises them, and the Fluent table
+  definitions under `src/fluent` are the tables as built: they name the Customer `customer` where
+  the lists below say account.
 
 ### 9.1 Base tables used (system of record)
 
@@ -360,7 +362,7 @@ Confidence tags:
 | Purchase order | Procurement `proc_po` / `proc_po_item` (verify) |
 | Contracts | `ast_contract` |
 | Case | CSM case table |
-| Field work | FSM `wm_order` / `wm_task` |
+| Field work | FSM `wm_order` |
 | Change | `change_request` (+ standard change templates) |
 | Maintenance windows | `cmn_schedule` |
 
@@ -384,7 +386,7 @@ Confidence tags:
 | `cmdb_model` | `device_class` | choice: switch / ap / router / firewall / module / psu / optic / other | P1 | Drives catalog, billing and KPIs |
 | | `oem_pid` | string | P1 | Canonical vendor product ID. Indexed. |
 | `alm_stockroom` | `stockroom_type` | choice: central depot / staging centre / customer site | P1 | |
-| | `account` | ref `customer_account` | P1 | For customer-site stockrooms |
+| | `customer` | ref `customer_account` | P1 | For customer-site stockrooms |
 | `cmn_location` | `maintenance_schedule` | ref `cmn_schedule` | P1 | Change scheduling |
 | | `site_contacts` | glide_list `customer_contact` | P1 | |
 
@@ -395,13 +397,13 @@ Confidence tags:
 | `agreement` | `ast_contract` | account, term start/end, refresh_cycle_months, replacement_sla_tier, spare_pool_ratio, overdue_return_days, lost/damage fee rules, status |
 | `agreement_quantity` | — | agreement, device_class or model, contracted_qty (for quota checks) |
 | `subscription_line` | — | agreement, account, site, line_type (site package / device class), quantity, monthly_rate, currency, start_date (in-service), end_date, status |
-| `customer_catalog_entry` | — | account, model **or** site_template, monthly_rate, active, valid_from/to |
+| `catalog_entry` | — | account, model **or** site_template, monthly_rate, active, valid_from/to |
 | `site_template` | — | name, account (blank = global), description, active |
 | `site_template_item` | — | site_template, model or device_class, quantity, optional (bool), kit (optics/PSU) |
 | `order` | `task` | order_type (site rollout / device add / device replace), account, site, agreement, install_mode, requested_date, ritm, approval_reason, stage |
 | `order_line` | — | order, model, quantity, sourcing_result (reserved spare / central stock / PO), transfer_order, po_line, staging_task(s), fsm_work_order, change_request, stage |
 | `staging_task` | `task` | asset, order_line, staging_source, checklist_template, firmware_target, verified_by, result |
-| `staging_checklist_template` | — | account (optional), device_class / model family, vendor, items (child table `staging_checklist_item`) |
+| `staging_template` | — | account (optional), device_class / model family, vendor, items (child table `staging_tmpl_item`); a Staging task's own steps are `staging_step` rows |
 | `manufacturer_alias` | — | alias_string, canonical manufacturer (`core_company`) |
 | `model_match_rule` | — | order, manufacturer, pattern (regex / prefix / exact on PID or model name), canonical model, active |
 | `asn_import` (import set staging) | `sys_import_set_row` | distributor, po_number, ship date, carrier, tracking, serial, PID, MAC, quantity |
@@ -412,24 +414,24 @@ Confidence tags:
 
 | Table | Extends | Key fields |
 |---|---|---|
-| `refresh_order` | `task` | account, site, agreement, reason (cycle / EoX), assets (m2m), new order link, change_request, customer approval, return deadline |
-| `replacement_order` | `task` | case (CSM), failed asset, replacement asset, source (site spare / depot / OEM advance replacement), fsm_work_order, change_request, oem_rma |
+| refresh Order (an `order` of type `refresh`) | `task` | account, site, agreement, reason (cycle / EoX), assets (m2m), new order link, change_request, customer approval, return deadline |
+| replacement Order (an `order` of type `device_replace`, linked from its case) | `task` | case (CSM), failed asset, replacement asset, source (site spare / depot / OEM advance replacement), fsm_work_order, change_request, oem_rma |
 | `oem_coverage` | — | asset or serial, vendor, contract number, service level (e.g. 8x5xNBD, 24x7x4), start/end, source, last_checked |
-| `oem_rma` | — | vendor, RMA number, replacement_order, defective asset, replacement serial, status (synced for Cisco), ship-back deadline |
+| `oem_rma` | — | vendor, RMA number, replacement Order, defective asset, replacement serial, status (synced for Cisco), ship-back deadline |
 | `return_order` / `return_order_line` | `task` / — | trigger (site decommission / device removal / refresh swap-back / agreement end / defective), account, site, assets, method (FSM de-install / site-contact ship-back), tracking, due date, received date, evaluation result |
 | `fee_event` | — | asset, account, agreement, type (lost / damaged / late return), amount, date, billed_in_period |
 | `disposal_order` / `disposal_line` | `task` / — | asset, method (broker resale / OEM takeback-trade-in / ITAD recycle / return to customer / return to lessor), wipe evidence (reset / zeroise / credential clear + certificate attachment), credit amount, certificate number, approvals |
-| `temporary_deployment` | `task` | account, site (event / pop-up / POC), start/end, assets, auto return_order |
+| temporary Order (an `order` of type `temporary`) | `task` | account, site (event / pop-up / POC), start/end, assets, auto return_order |
 | `audit` / `audit_line` | `task` / — | audit type (depot blind count / site audit), stockroom or site, expected vs scanned, discrepancy type, resolution |
 | `attestation` / `attestation_item` | `task` / — | account, site, period, contact, items (asset, confirmed / missing / unknown) |
-| `reconciliation_exception` | — | type (seen-not-in-assets / deployed-not-seen-N-days / serial mismatch / location mismatch), asset or CI, detected_at, status, resolution |
+| `recon_exception` | — | type (seen-not-in-assets / deployed-not-seen-N-days / serial mismatch / location mismatch), asset or CI, detected_at, status, resolution |
 
 ### 9.5 Scoped tables — Phase 3
 
 | Table | Extends | Key fields |
 |---|---|---|
 | Lease schedule | `ast_contract` (contract model "Lease") | lessor (the contract's vendor), schedule number (its contract number), covered assets, end date, buyout price |
-| `end_of_lease_decision` | `task` | lease, decision (buyout / extend / return), due date, mismatch flag (lease end before subscription end) |
+| `lease_decision` | `task` | lease, decision (buyout / extend / return), due date, mismatch flag (lease end before subscription end) |
 | `billing_period` | — | month, status (open / closed / locked), generated_at, CSV attachment |
 | `billing_line` | — | period, account, subscription_line, days, prorated amount, fee events |
 | `shipment` | — | carrier, tracking, label, status, events (from aggregator webhooks), related order / return |
@@ -515,9 +517,10 @@ Phase 1 gives every persona a working path:
     counters.
 
 ### P1.4 Ordering, approvals and sourcing
-- **One catalog item**, "Request network equipment" (`CatalogItem`). Variables:
+- **One catalog item**, "Request network equipment" (built as a record producer, with the
+  fulfilment below in server code instead of a flow: ADR 0004). Variables:
   - account, site, order type;
-  - site template **or** individual models, with choices filtered by `customer_catalog_entry` for
+  - site template **or** individual models, with choices filtered by `catalog_entry` for
     the account;
   - install mode, requested date.
 - **Agent-side only in P1:** the service desk orders on the customer's behalf.
@@ -627,8 +630,8 @@ Phase 1 gives every persona a working path:
 ### P2.2 Refresh
 - **Eligibility:** `refresh_due` comes from the agreement's refresh cycle (months since in-service)
   or the model reaching end of support (whichever is earlier, per agreement settings).
-- **Fully automatic order creation:** a nightly chunked job groups eligible assets per
-  account/site → `refresh_order`.
+- **Fully automatic order creation:** a nightly job groups eligible assets per account/site → a
+  refresh Order (an `order` of type `refresh`).
   - It creates a **normal change** for customer approval, scheduled inside the site's maintenance
     windows.
   - It creates a new device `order` (sourcing → staging → install).
@@ -637,7 +640,7 @@ Phase 1 gives every persona a working path:
 ### P2.3 Break-fix (CSM case is the master record)
 - **Opening the case:** the NOC opens proactive cases through the UI or monitoring integration, and
   customers can open cases too.
-- **`replacement_order`** is created from the case.
+- **A replacement Order** (an `order` of type `device_replace`) is created from the case.
   - Source priority: site hot spare → customer reserved spare → depot → OEM advance replacement.
   - The FSM work order and standard change follow.
 - **"Replace within X" SLA:** `Sla` definitions on the case, keyed by the Agreement's replacement
@@ -674,7 +677,8 @@ Phase 1 gives every persona a working path:
   - return to lessor. Leased assets can **only** take this method; a data policy enforces it.
 
 ### P2.6 Temporary deployments
-- **`temporary_deployment`** covers events, pop-up sites, temporary sites and POC/trial kits.
+- **A temporary Order** (an `order` of type `temporary`) covers events, pop-up sites, temporary
+  sites and POC/trial kits.
 - Each has an end date, and the return order is created automatically ahead of it.
 
 ### P2.7 Audits, attestation and reconciliation
@@ -684,7 +688,7 @@ Phase 1 gives every persona a working path:
   and scans rack contents, which are compared against the site's expected assets.
 - **Customer-admin attestation** per site happens periodically in the portal, on an
   agreement-defined cadence.
-- **Monitoring reconciliation** is a nightly chunked job that raises `reconciliation_exception`s:
+- **Monitoring reconciliation** is a nightly chunked job that raises `recon_exception`s:
   - CI seen with no asset;
   - deployed and not seen for N days;
   - serial mismatch after a swap;
@@ -722,7 +726,7 @@ Phase 1 gives every persona a working path:
 
 - **Leases:**
   - Lease schedules are `ast_contract` records of type lease, with covered assets.
-  - An `end_of_lease_decision` task is raised N days before lease end (buyout / extend / return).
+  - A `lease_decision` task is raised N days before lease end (buyout / extend / return).
   - An alert fires when a lease ends before the subscription it serves.
 - **Renewals:** customer agreement renewal, and OEM coverage expiry warnings and renewals.
 - **Billing export:**
@@ -790,8 +794,8 @@ Phase 1 gives every persona a working path:
     set by `Property`.
   - It stops when it runs out of time and saves its position in `job_cursor`, so the next run
     resumes there.
-  - It is used by every bulk process: lifecycle phase, spare-pool top-up, refresh eligibility,
-    reconciliation, OEM sync, billing.
+  - ADR 0007 lists the jobs that use it (lifecycle phase, spare-pool top-up, reconciliation,
+    billing among them) and how the others (refresh Orders, OEM sync) bound their work.
 - **Event-driven over scans:** model lifecycle changes, CI updates and device events queue only the
   affected assets.
 - **Indexes** are declared on every column we query: agreement, subscription_line, site,

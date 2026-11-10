@@ -342,9 +342,9 @@ Conventions that the build or tests enforce:
 - The name of a business rule, UI action, script action, notification, SLA, REST message or REST
   route fits the instance's 40 characters, which cut a longer one off unseen
   (`built-metadata.test.ts`).
-- Substatus values added to `alm_asset` are the `choice` entries of `STAGE_FIELDS` there, which
-  `fluent/data/substatus-choices.now.ts` ships one Record each (`built-metadata.test.ts` compares
-  the built choice set with them).
+- Substatus values added to `alm_asset` are the `choice` entries of `STAGE_FIELDS` in
+  `domain/vocabulary.ts`, which `fluent/data/substatus-choices.now.ts` ships one Record each
+  (`built-metadata.test.ts` compares the built choice set with them).
 - Commit `src/fluent/generated/keys.ts`. Deleting Fluent code that was installed generates delete
   records; see the SDK's `fluent-overview` before removing metadata.
 
