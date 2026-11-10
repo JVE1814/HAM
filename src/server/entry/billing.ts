@@ -4,13 +4,11 @@ import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { billingMonthProblem, monthBounds, previousMonth } from '../domain/billing.ts'
 import { ROLE } from '../domain/visibility.ts'
-import { BILLING_PERIOD_STATUS } from '../domain/vocabulary.ts'
 import {
     attachExport,
     closedLineRefusal,
     closedPeriodRefusal,
     closePeriod,
-    exportOf,
     generateChunk,
     generateNewPeriod,
     linesPage,
@@ -18,6 +16,7 @@ import {
     queueExport,
     recentPeriods,
     regeneratePeriod,
+    requestExport,
     resetGeneration,
     type PeriodOutcome,
 } from '../platform/billing.ts'
@@ -72,13 +71,12 @@ export function uiCloseBillingPeriod(current: GlideRecord): void {
     report(closed, `${str(current, 'period')} closed and locked; the CSV export and margin are being prepared`)
 }
 
-/** UI action "Re-export CSV" on a closed period whose export is missing (never saves the period). */
+/** UI action "Re-export CSV" on a closed period whose export is missing (platform/billing `requestExport`). */
 export function uiExportBillingPeriod(current: GlideRecord): void {
-    if (str(current, 'status') !== BILLING_PERIOD_STATUS.closed) return void gs.addErrorMessage('Only a closed period can be exported')
-    const { fileName, attached } = exportOf(current)
-    if (attached) return void gs.addInfoMessage(`${fileName} is already attached; delete it to export again`)
-    queueExport(current)
-    gs.addInfoMessage(`The CSV export of ${str(current, 'period')} is being prepared`)
+    const request = requestExport(current)
+    if (request.queued) return void gs.addInfoMessage(`The CSV export of ${str(current, 'period')} is being prepared`)
+    if (request.why === 'attached') return void gs.addInfoMessage(`${request.fileName} is already attached; delete it to export again`)
+    gs.addErrorMessage('Only a closed period can be exported')
 }
 
 /** Script action on x_daas_ham.billing.export (parm1 = period): attach the CSV of a closed period's lines. */

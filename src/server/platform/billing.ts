@@ -449,10 +449,28 @@ export function queueExport(period: GlideRecord): void {
     queueJob(EVENT.billingExport, period)
 }
 
-/** The CSV export of a period: its file name, and whether it is attached. */
-export function exportOf(period: GlideRecord): { fileName: string; attached: boolean } {
+/**
+ * Where a period's CSV export stands: only a closed period is exported, and only while its file is not attached. Asked
+ * when an export is requested and again when it runs in the background, of the period as it is then.
+ */
+type ExportState = { state: 'not_closed' } | { state: 'attached'; fileName: string } | { state: 'missing'; fileName: string }
+
+function exportState(period: GlideRecord): ExportState {
+    if (str(period, 'status') !== BILLING_PERIOD_STATUS.closed) return { state: 'not_closed' }
     const fileName = `billing-${str(period, 'period')}.csv`
-    return { fileName, attached: exists('sys_attachment', exportQuery(period, fileName)) }
+    return { state: exists('sys_attachment', exportQuery(period, fileName)) ? 'attached' : 'missing', fileName }
+}
+
+/** What came of asking for a period's CSV again: its export is queued, or why not (the file that is `attached` named). */
+export type ExportRequest = { queued: true } | { queued: false; why: 'not_closed' } | { queued: false; why: 'attached'; fileName: string }
+
+/** Re-export CSV: queue the export of a closed period whose file is missing (never saves the period). */
+export function requestExport(period: GlideRecord): ExportRequest {
+    const found = exportState(period)
+    if (found.state === 'not_closed') return { queued: false, why: 'not_closed' }
+    if (found.state === 'attached') return { queued: false, why: 'attached', fileName: found.fileName }
+    queueExport(period)
+    return { queued: true }
 }
 
 /**
@@ -462,9 +480,10 @@ export function exportOf(period: GlideRecord): { fileName: string; attached: boo
  */
 export function attachExport(periodId: string): void {
     const period = findById(PERIOD, periodId)
-    if (!period || str(period, 'status') !== BILLING_PERIOD_STATUS.closed) return
-    const { fileName, attached } = exportOf(period)
-    if (attached) return
+    if (!period) return
+    const found = exportState(period)
+    if (found.state !== 'missing') return
+    const { fileName } = found
     try {
         const rows: Array<Array<string | number>> = [billingCsvHeader()]
         const stored = lineReader()
