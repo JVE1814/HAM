@@ -23,6 +23,18 @@ import { intProperty, PROPERTY } from './properties.ts'
 /**
  * The chunked-job runner over a table's records (ADR 0007), for a scheduled job (`runTableJob`, its cursor kept in
  * x_daas_ham_job_cursor) and for an event job (`runEventTableJob`, its cursor carried by its events).
+ *
+ * An event job whose passes replace each other (`PassJob`) runs in one of two modes, each with one user. Both exist
+ * because the two jobs are kept from an old pass's writes in different ways:
+ * - the margin recompute runs under the job's lock (`underLock`, ADR 0013). A fresh recompute may start while one is
+ *   running, and an old pass writing after it would leave its Cost facts beside the fresh pass's or replace the fresh
+ *   Margin. So a pass's start, each flush and its completion check that the pass is still current and write in one
+ *   critical section;
+ * - billing generation takes no lock (ADR 0007). A period is regenerated only once it is ready for review, never
+ *   while it is generating, so no fresh pass starts beside a running one: a pass starts where it is triggered
+ *   (`queuePass`), and its token only drops the chunks still queued of a pass reset by hand or replaced
+ *   (`inCurrentPass`).
+ *
  * Each record is read into a row `R`; the item handled is `T`, the row itself unless `prepare` is set.
  */
 interface TableSourceFields<T, R> {
