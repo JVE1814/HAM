@@ -58,12 +58,25 @@ function ruleMatches(rule: ModelMatchRule, model: string): boolean {
         case 'prefix':
             return modelKey(model).startsWith(modelKey(rule.pattern))
         case 'regex':
-            try {
-                return new RegExp(rule.pattern, 'i').test(model.trim())
-            } catch {
-                return false
-            }
+            return regexOf(rule.pattern)?.test(model.trim()) ?? false
     }
+}
+
+/** The regular expression of a regex rule's pattern, or null when the pattern is not one: the rule then matches nothing. */
+function regexOf(pattern: string): RegExp | null {
+    try {
+        return new RegExp(pattern, 'i')
+    } catch {
+        return null
+    }
+}
+
+/**
+ * The regex rules whose pattern is no regular expression. Normalization goes on without them, as if they were inactive,
+ * so the raw models they were meant for stay unmapped until the pattern is corrected: the caller says so once.
+ */
+export function unusableRules(rules: readonly ModelMatchRule[]): ModelMatchRule[] {
+    return rules.filter((rule) => rule.matchType === 'regex' && regexOf(rule.pattern) === null)
 }
 
 export function normalizeModel(

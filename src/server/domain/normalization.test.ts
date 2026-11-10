@@ -8,6 +8,7 @@ import {
     rawModelsToNormalizeQuery,
     siteCiOnRawModelQuery,
     shouldLearnAlias,
+    unusableRules,
     type ModelMatchRule,
 } from './normalization'
 import { seenWithoutFleetAssetQuery } from './reconciliation'
@@ -63,6 +64,12 @@ describe('normalizeModel', () => {
     it('skips inactive rules and rules with an invalid pattern', () => {
         const result = normalizeModel({ manufacturer: 'cisco', model: 'ISR4331' }, aliases, rules)
         expect(result).toEqual({ matched: false, manufacturerId: 'cisco', reason: 'no_matching_rule' })
+    })
+
+    it('names the regex rules whose pattern is no regular expression, which it skipped', () => {
+        expect(unusableRules(rules).map((rule) => rule.id)).toEqual(['r4'])
+        expect(unusableRules(rules.filter((rule) => rule.id !== 'r4'))).toEqual([])
+        expect(unusableRules([{ ...rules[0], pattern: '([' }])).toEqual([])
     })
 
     it('reports an unknown manufacturer', () => {
