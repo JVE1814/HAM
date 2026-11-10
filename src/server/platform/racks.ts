@@ -143,7 +143,7 @@ function placementsIn(rackId: string): Placement[] {
  * (domain/reconciliation `reconcileRack`), and resolve the others. A rack no longer there holds nothing, so its
  * exceptions resolve.
  */
-export function recheckRack(rackId: string): void {
+function recheckRack(rackId: string): void {
     const rack = findById('cmdb_ci_rack', rackId)
     const found = rack ? reconcileRack(rackSpec(rack), placementsIn(rackId)) : []
     settleExceptions({ ciId: rackId }, rack ? str(rack, 'company') : '', RACK_EXCEPTION_TYPES, found)

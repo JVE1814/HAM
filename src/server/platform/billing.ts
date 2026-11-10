@@ -25,7 +25,7 @@ import { glideToMs, nowGlide, nowMs } from './clock.ts'
 import { EVENT, queueJob, type JobEvent } from './events.ts'
 import { billableFees, markBilled, putOnPeriod, takeOffPeriod, visitWaivedFees } from './fees.ts'
 import { findJobCursor, retirePass } from './job-cursor.ts'
-import { deleteWhere, exists, findById, num, refusal, str, throwRefused, warnRefused } from './records.ts'
+import { deleteWhere, exists, findById, noneLeft, num, refusal, str, throwRefused, warnRefused } from './records.ts'
 import { BILLING_PERIOD_STATUS, type BillingLineKind, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
@@ -614,5 +614,10 @@ export function closedLineRefusal(current: GlideRecord, previous: GlideRecord): 
  * the lock has nothing to stop. False when a line is left.
  */
 function dropLinesForRegeneration(period: GlideRecord): boolean {
-    return deleteWhere(LINE, `billing_period=${period.getUniqueValue()}`, { businessRules: false })
+    const lines = `billing_period=${period.getUniqueValue()}`
+    const line = new GlideRecord(LINE)
+    line.addEncodedQuery(lines)
+    line.setWorkflow(false)
+    line.deleteMultiple()
+    return noneLeft(LINE, lines)
 }

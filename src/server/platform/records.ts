@@ -54,17 +54,24 @@ export function addAnyOf(gr: GlideRecord, field: string, values: readonly string
 }
 
 /**
- * Delete every record matching an encoded query with one set-based delete (business rules run unless `businessRules`
- * is false), and return whether none is left. deleteMultiple reports nothing and a rule can keep a record, so a
- * caller that must not go on past one checks this. It looks past before-query rules, so a record hidden from the user
- * still counts as left: past every rule on an app table, and past the app's visibility rules on a table of another
- * scope, where the platform refuses setWorkflow from this scope (platform/beyond-visibility).
+ * Delete every record matching an encoded query with one set-based delete (business rules run), and return whether
+ * none is left (`noneLeft`). deleteMultiple reports nothing and a rule can keep a record, so a caller that must not go
+ * on past one checks this.
  */
-export function deleteWhere(table: string, encodedQuery: string, options: { businessRules?: boolean } = {}): boolean {
+export function deleteWhere(table: string, encodedQuery: string): boolean {
     const gr = new GlideRecord(table)
     gr.addEncodedQuery(encodedQuery)
-    if (options.businessRules === false) gr.setWorkflow(false)
     gr.deleteMultiple()
+    return noneLeft(table, encodedQuery)
+}
+
+/**
+ * Whether no record matches an encoded query any more, after a set-based delete. It looks past before-query rules, so
+ * a record hidden from the user still counts as left: past every rule on an app table, and past the app's visibility
+ * rules on a table of another scope, where the platform refuses setWorkflow from this scope
+ * (platform/beyond-visibility).
+ */
+export function noneLeft(table: string, encodedQuery: string): boolean {
     const left = new GlideRecord(table)
     left.addEncodedQuery(encodedQuery)
     left.setWorkflow(false)

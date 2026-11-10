@@ -83,7 +83,7 @@ export function queueJobAt(queued: JobEvent, position: string, when: 'now' | 'la
  * Queue `event` on `record` again, to run a minute from now: a request that could not run under its lock
  * (domain/job-lock `REQUEUE`).
  */
-export function requeue(event: string, record: GlideRecord, parm1: string, parm2: string): void {
+function requeue(event: string, record: GlideRecord, parm1: string, parm2: string): void {
     const when = new GlideDateTime()
     when.addSeconds(REQUEUE.delaySeconds)
     gs.eventQueueScheduled(event, record, parm1, parm2, when)
