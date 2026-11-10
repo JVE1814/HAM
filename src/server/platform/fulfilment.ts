@@ -14,6 +14,7 @@ import type { LineStage } from '../domain/vocabulary.ts'
 import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { EVENT, fire } from './events.ts'
+import { saveLineStage } from './order-lines.ts'
 import { exists, findById, num, str, warnRefused } from './records.ts'
 
 /**
@@ -140,12 +141,9 @@ function deriveLine(line: GlideRecord, refill: boolean): LineStage | null {
     if (current === 'new') return current // not sourced yet
     const assetStages = lineAssetStages(line.getUniqueValue())
     const next = lineStageFor({ current, quantity: num(line, 'quantity'), assetStages, refill })
-    if (next !== current) {
-        line.setValue('line_stage', next)
-        if (!line.update()) {
-            notMoved(line, next)
-            return null
-        }
+    if (next !== current && !saveLineStage(line, next)) {
+        notMoved(line, next)
+        return null
     }
     recomputeOrder(str(line, 'order'))
     return next

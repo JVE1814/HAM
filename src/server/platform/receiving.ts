@@ -17,6 +17,7 @@ import { sourceOrderAgain, unitsOnLine } from './fulfilment.ts'
 import { withLock } from './locks.ts'
 import { loadNormalizationData, resolveModel } from './normalization.ts'
 import { lineAwaitingRma, markReplacementReceived } from './oem-rma.ts'
+import { takeUnitOffOrder } from './order-lines.ts'
 import { purchaseOrderId } from './procurement.ts'
 import { findById, num, refusal, str, warnRefused } from './records.ts'
 import { receiveReturnedAsset } from './returns.ts'
@@ -281,9 +282,8 @@ function receivingLine(line: GlideRecord): ReceivingLine {
 function takeOffOrder(lineLock: HeldLock, line: GlideRecord): void {
     // Arrived, so no longer on order: re-sourcing covers quantity - allocated - on order and must not wait for it.
     // A refused count is logged to correct by hand; the unit still goes to the line, which would otherwise wait.
-    line.setValue('quantity_to_purchase', Math.max(0, num(line, 'quantity_to_purchase') - 1))
     const number = str(line, 'number')
-    if (!line.update()) return void warnRefused(line, `${number} keeps a unit on order`)
+    if (!takeUnitOffOrder(line)) return void warnRefused(line, `${number} keeps a unit on order`)
     // A holder that outlasted the lock (ADR 0013) may have counted beside a sourcing pass that took it over.
     lineLock.lostAfter(`${number} counted`, { check: 'check its On order count' })
 }

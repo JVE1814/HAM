@@ -1,13 +1,7 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { approvalAwaited } from '../domain/approvals.ts'
-import {
-    cancelOrder,
-    rollUpOrderApprovals,
-    submitOrder,
-    submitProducedOrder,
-    type NewLine,
-    type Submission,
-} from '../platform/orders.ts'
+import type { NewLine } from '../platform/order-lines.ts'
+import { cancelOrder, rollUpOrderApprovals, submitOrder, submitProducedOrder, type Submission } from '../platform/orders.ts'
 import { str } from '../platform/records.ts'
 import { runSourcingPass } from '../platform/sourcing.ts'
 

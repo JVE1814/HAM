@@ -29,6 +29,7 @@ import {
 import { moveAndSave, readStage } from './assets.ts'
 import { orderShipment, queueSourcing } from './fulfilment.ts'
 import { withLock } from './locks.ts'
+import { addOrderLines, cancelLine, type NewLine, type RefusedLine } from './order-lines.ts'
 import { bool, findById, num, refusal, str, warnRefused } from './records.ts'
 import { currentSession } from './session.ts'
 import { skipOpenStagingTasks } from './staging-tasks.ts'
@@ -40,38 +41,6 @@ import { SITE_FIELD } from '../domain/fleet.ts'
  * roll its approvals up, and cancel it. None of it tells the user anything: each gives what came of it, for the
  * trigger that asked (a form button, the record producer, the refresh job) to report.
  */
-
-/** A line to add to an Order. */
-export interface NewLine {
-    modelId: string
-    quantity: number
-    /** It came from the Order's Site template; left unset, the column's default (false) stands. */
-    fromSiteTemplate?: boolean
-    /** The Asset it replaces like-for-like (break-fix, refresh). */
-    replacesAssetId?: string
-}
-
-/** A line the platform refused to save, and why. */
-export interface RefusedLine {
-    line: NewLine
-    reason: string
-}
-
-/** Add `lines` to `order`, in order; those the platform refused (for the caller to report: nothing is logged here). */
-export function addOrderLines(order: GlideRecord, lines: readonly NewLine[]): RefusedLine[] {
-    const refused: RefusedLine[] = []
-    for (const line of lines) {
-        const record = new GlideRecord('x_daas_ham_order_line')
-        record.initialize()
-        record.setValue('order', order.getUniqueValue())
-        record.setValue('model', line.modelId)
-        record.setValue('quantity', line.quantity)
-        if (line.fromSiteTemplate !== undefined) record.setValue('from_site_template', line.fromSiteTemplate)
-        if (line.replacesAssetId) record.setValue('replaces_asset', line.replacesAssetId)
-        if (!record.insert()) refused.push({ line, reason: refusal(record) })
-    }
-    return refused
-}
 
 /**
  * Remove an Order raised in vain (one its raiser may not raise, or none of whose lines was saved): why the platform
@@ -362,8 +331,7 @@ function cancelOpenLines(orderId: string): boolean {
         asset.addQuery('x_daas_ham_order_line', line.getUniqueValue())
         asset.query()
         while (asset.next()) done = releaseAsset(asset) && done
-        line.setValue('line_stage', 'cancelled')
-        if (line.update()) continue
+        if (cancelLine(line)) continue
         // Left open, it is still given the units received on its purchase orders.
         warnRefused(line, `order cancelled: ${str(line, 'number')} left open, cancel it`)
         done = false

@@ -23,6 +23,7 @@ import { todayIso } from './clock.ts'
 import { EVENT, requeue } from './events.ts'
 import { lineLostUnit, recomputeLine, recomputeOrder, unitsOnLine } from './fulfilment.ts'
 import { withLock, withLockTries, type LockRun } from './locks.ts'
+import { saveLineSourcing } from './order-lines.ts'
 import { openOemRma, openRmaCount, openRmasFor, reuseOemRma } from './oem-rma.ts'
 import { requestPurchase } from './procurement.ts'
 import { stagingStockroom } from './properties.ts'
@@ -259,23 +260,12 @@ function settleHolding(
             description: `${str(order, 'number')} ${number}: ${missing} x ${str(line, 'model.display_name')}`,
         })
     const outcome = shortfallOutcome(route, { planSummary, missing, unmoved }, purchase)
-    if (transfers.length > 0) {
-        line.setValue('transfer_orders', [str(line, 'transfer_orders'), ...transfers].filter(Boolean).join(','))
-    }
-    if (outcome.purchaseOrder) {
-        // Every purchase order stays listed, so units of an earlier one are still allocated to the line on receipt.
-        const listed = [str(line, 'purchase_orders'), outcome.purchaseOrder].filter(Boolean)
-        line.setValue('purchase_order', outcome.purchaseOrder)
-        line.setValue('purchase_orders', listed.join(','))
-    }
-    // Counted again: a receipt may have allocated a unit to the line since this pass read it.
-    line.setValue('quantity_allocated', allocated)
-    line.setValue('quantity_to_purchase', num(line, 'quantity_to_purchase') + outcome.purchased)
-    line.setValue('sourcing_summary', `${outcome.summary}${rmaNote}`)
-    line.setValue('line_stage', outcome.stage)
-    if (!line.update()) {
+    // `allocated` as counted here: a receipt may have allocated a unit to the line since this pass read it.
+    const { purchaseOrder, purchased, stage } = outcome
+    const summary = `${outcome.summary}${rmaNote}`
+    if (!saveLineSourcing(line, { transfers, purchaseOrder, allocated, purchased, summary, stage })) {
         // Unlisted, a purchase order's units are not allocated on receipt, and the next run buys the shortfall again.
-        const unlisted = [outcome.purchaseOrder ?? '', ...transfers].filter(Boolean)
+        const unlisted = [purchaseOrder ?? '', ...transfers].filter(Boolean)
         const listThem = unlisted.length > 0 ? `; it does not list ${unlisted.join(', ')}, add them by hand` : ''
         warnRefused(line, `${number} not saved after sourcing${listThem}`)
         return 'unsaved'

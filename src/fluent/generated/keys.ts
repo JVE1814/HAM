@@ -3114,6 +3114,10 @@ declare global {
                         table: 'sys_module'
                         id: '682ac7bc1a7740a5a8ebb99ac6abc885'
                     }
+                    'src_server_platform_order-lines_ts': {
+                        table: 'sys_module'
+                        id: '8b541d437de749c5bdf7b606fde5458c'
+                    }
                     src_server_platform_orders_ts: {
                         table: 'sys_module'
                         id: '13e07b43815f4b939cf2dace76c02a4a'
