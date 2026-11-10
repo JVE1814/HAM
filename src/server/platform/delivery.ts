@@ -5,7 +5,7 @@ import type { HeldLock } from '../domain/job-lock.ts'
 import { isDeployed, stagesQuery } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { collectionMethod } from '../domain/returns.ts'
-import { type InstallMode, type OrderStage, type OrderType, SHIPMENT_DIRECTION } from '../domain/vocabulary.ts'
+import type { InstallMode, OrderStage, OrderType } from '../domain/vocabulary.ts'
 import { moveAndSave, moveAsset, readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { nowGlide } from './clock.ts'
@@ -14,7 +14,7 @@ import { lineAssetStages, recomputeOrder } from './fulfilment.ts'
 import { withLock } from './locks.ts'
 import { choice, findById, num, refusal, str } from './records.ts'
 import { raiseReturn } from './returns.ts'
-import { labelOrder, shippingEnabled } from './shipping.ts'
+import { labelOrder, orderLabelBought, shippingEnabled } from './shipping.ts'
 
 /**
  * Shipping Orders to their Site, the on-site work, and install completion (P1.7). None of it tells the user anything:
@@ -91,7 +91,7 @@ function shipHolding(lock: HeldLock, order: GlideRecord): ShipOutcome {
         orderType: str(order, 'order_type') as OrderType,
         installMode: str(order, 'install_mode') as InstallMode,
         hasTrackingNumber: !!trackingNumber,
-        trackingNumberBought: !!trackingNumber && labelBought(order.getUniqueValue(), trackingNumber),
+        trackingNumberBought: !!trackingNumber && orderLabelBought(order.getUniqueValue(), trackingNumber),
         hasWorkOrder: !!str(order, 'work_order'),
         staged: found.staged.length,
         refused: found.refused,
@@ -105,10 +105,7 @@ function shipHolding(lock: HeldLock, order: GlideRecord): ShipOutcome {
         const label = labelOrder(order, plan.labelPackages, lock)
         if (!label.ok) return { problems: [...problems, `No shipping label: ${label.error}`], shipped: null }
         // The label is paid for and its Shipment saved, so the units still ship; only the Order lacks its tracking.
-        if (!order.update()) {
-            const tracking = str(order, 'tracking_number')
-            problems.push(`Tracking number ${tracking} not saved on the Order: ${refusal(order)}`)
-        }
+        if (label.orderRefusal) problems.push(`Tracking number ${label.trackingNumber} not saved on the Order: ${label.orderRefusal}`)
     }
     const hotSpares = new Set(found.hotSpares)
     const asset = new GlideRecord('alm_hardware')
@@ -154,20 +151,6 @@ function shippable(orderId: string, siteId: string): { staged: string[]; hotSpar
         }
     }
     return found
-}
-
-/**
- * Whether `trackingNumber` is a label an earlier Ship of the Order bought, not one entered by hand: that
- * label covers only the boxes it was bought for, so Assets staged since need one of their own.
- */
-function labelBought(orderId: string, trackingNumber: string): boolean {
-    const shipment = new GlideRecord('x_daas_ham_shipment')
-    shipment.addQuery('order', orderId)
-    shipment.addQuery('direction', SHIPMENT_DIRECTION.to_site)
-    shipment.addQuery('tracking_number', trackingNumber)
-    shipment.setLimit(1)
-    shipment.query()
-    return shipment.hasNext()
 }
 
 /** Put an Asset at the Order's Site (the caller saves). */

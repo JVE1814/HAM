@@ -135,17 +135,34 @@ function createShipment(
     return { ok: false, error: `the label bought (${label}) was not recorded: ${reason}. Void it with the carrier` }
 }
 
+/** What came of labelling an Order: the label bought, with why the Order did not take its tracking number ('' once saved), or why none was. */
+export type OrderLabel = { ok: true; trackingNumber: string; orderRefusal: string } | { ok: false; error: string }
+
 /**
- * Buy the outbound label for an Order's staged Assets and put its tracking number on the Order (does not save). The
- * caller holds `lock` on the Order (platform/delivery `shipOrder`).
+ * Buy the outbound label for an Order's staged Assets and save its carrier and tracking number on the Order. The
+ * label is paid for and its Shipment saved before the Order is: a refused Order save is reported (`orderRefusal`) and
+ * the label stands, so the units still ship. The caller holds `lock` on the Order (platform/delivery `shipOrder`).
  */
-export function labelOrder(order: GlideRecord, packages: number, lock: HeldLock): LabelResult {
+export function labelOrder(order: GlideRecord, packages: number, lock: HeldLock): OrderLabel {
     const result = createShipment(SHIPMENT_DIRECTION.to_site, order, packages, lock)
-    if (result.ok) {
-        order.setValue('carrier', result.carrier)
-        order.setValue('tracking_number', result.trackingNumber)
-    }
-    return result
+    if (!result.ok) return result
+    order.setValue('carrier', result.carrier)
+    order.setValue('tracking_number', result.trackingNumber)
+    return { ok: true, trackingNumber: result.trackingNumber, orderRefusal: order.update() ? '' : refusal(order) }
+}
+
+/**
+ * Whether `trackingNumber` is a label an earlier Ship of the Order bought, not one entered by hand: that
+ * label covers only the boxes it was bought for, so Assets staged since need one of their own.
+ */
+export function orderLabelBought(orderId: string, trackingNumber: string): boolean {
+    const shipment = new GlideRecord(SHIPMENT)
+    shipment.addQuery('order', orderId)
+    shipment.addQuery('direction', SHIPMENT_DIRECTION.to_site)
+    shipment.addQuery('tracking_number', trackingNumber)
+    shipment.setLimit(1)
+    shipment.query()
+    return shipment.hasNext()
 }
 
 /** What came of asking for a return label: the label bought, or why none was. */
