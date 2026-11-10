@@ -197,6 +197,8 @@ const TEXT_LIMITS: ReadonlyArray<{ table: string; field: string; limit: number }
     { table: 'sysauto_script', field: 'name', limit: 100 },
     { table: 'sys_properties', field: 'name', limit: 100 },
     { table: 'sysevent_register', field: 'description', limit: 100 },
+    { table: 'sys_atf_test', field: 'name', limit: 100 },
+    { table: 'sys_atf_test', field: 'description', limit: 1000 },
     // A condition is a script the platform runs as written: one cut off never holds, and its rule or action is gone.
     { table: 'sys_script', field: 'condition', limit: 254 },
     { table: 'sys_ui_action', field: 'condition', limit: 254 },
@@ -1339,26 +1341,236 @@ describe('built substatus choice set', () => {
     )
     const ADDED_VALUES = ADDED.map((choice) => choice.value).sort()
 
-    it('holds every substatus the app adds and deletes nothing else', () => {
+    /** A choice the built set inserts, or the choice one clause of its delete query matches: each field as built. */
+    type BuiltChoice = Record<string, string>
+
+    /** The set as built: its wrapper (tag, field, table, version), the choices it inserts and those its delete matches. */
+    function choiceSet(): { wrapper: string[]; inserted: BuiltChoice[]; deleted: BuiltChoice[] } {
         const xml = readFileSync(SET, 'utf8')
         const wrapper = /<(sys_choice_v2|sys_choice_set) action="INSERT_OR_UPDATE" field="([^"]*)" table="([^"]*)" version="(\d+)"/.exec(xml)
-        const tag = (body: string, name: string) => new RegExp(`<${name}>([^<]*)</${name}>`).exec(body)?.[1] ?? ''
-        const inserted = [...xml.matchAll(/<sys_choice action="INSERT_OR_UPDATE"[^>]*>([\s\S]*?)<\/sys_choice>/g)].map(([, body = '']) => ({
-            value: tag(body, 'value'),
-            label: tag(body, 'label'),
-            dependentValue: tag(body, 'dependent_value'),
-        }))
+        const inserted = [...xml.matchAll(/<sys_choice action="INSERT_OR_UPDATE"[^>]*>([\s\S]*?)<\/sys_choice>/g)].map(
+            ([, body = '']) => Object.fromEntries([...body.matchAll(/<(\w+)>([^<]*)<\/\1>/g)].map(([, field = '', value = '']) => [field, value])) as BuiltChoice,
+        )
         const deleted = [...xml.matchAll(/<sys_choice action="delete_multiple" query="([^"]*)"\s*\/>/g)]
             .flatMap(([, query = '']) => query.split('^NQ'))
-            .map((clause) => Object.fromEntries(clause.split('^').map((part) => part.split('=', 2))) as Record<string, string>)
+            .map((clause) => Object.fromEntries(clause.split('^').map((part) => part.split('=', 2))) as BuiltChoice)
+        return { wrapper: wrapper?.slice(1) ?? [], inserted, deleted }
+    }
 
+    it('holds every substatus the app adds and deletes nothing else', () => {
+        const { wrapper, inserted, deleted } = choiceSet()
         // The v3 sys_choice_set wrapper deletes every choice of the field before inserting; the v4 sys_choice_v2 one
         // deletes only what its delete_multiple queries match.
-        expect(wrapper?.slice(1)).toEqual(['sys_choice_v2', 'substatus', 'alm_asset', '4'])
+        expect(wrapper).toEqual(['sys_choice_v2', 'substatus', 'alm_asset', '4'])
         expect(inserted.map((choice) => choice.value).sort()).toEqual(ADDED_VALUES)
-        for (const choice of ADDED) expect(inserted, choice.value).toContainEqual(choice)
+        for (const { value, label, dependentValue } of ADDED) {
+            expect(inserted, value).toContainEqual(expect.objectContaining({ value, label, dependent_value: dependentValue }))
+        }
         expect(deleted.map((choice) => choice.value).sort()).toEqual(ADDED_VALUES)
         expect(deleted.every((choice) => choice.name === 'alm_asset' && choice.element === 'substatus')).toBe(true)
         expect(existsSync(WITHOUT_PARENT)).toBe(false)
+    })
+
+    /**
+     * The alm_asset.substatus choices a Brazil instance ships, as [value, install status (dependent_value)]: the
+     * platform's own choice set (application Global), the first version of sys_choice_alm_asset_substatus the dev
+     * instance recorded. A value may sit under several install statuses.
+     */
+    const OUT_OF_BOX: ReadonlyArray<readonly [string, string]> = [
+        ['available', '6'], ['available', '9'], ['disposed', '7'], ['lost', '8'], ['pending_fulfillment', '1'],
+        ['pending_retirement', '1'], ['reserved', '6'], ['reserved', '9'], ['sold', '7'], ['stolen', '8'], ['defective', '9'],
+        ['defective', '6'], ['donated', '7'], ['end_of_support', '1'], ['pending_install', '9'], ['pending_repair', '1'],
+        ['pending_repair', '6'], ['vendor_credit', '7'], ['in_repair', '1'], ['pending_disposal', '7'], ['pending_disposal', '9'],
+        ['pending_donation', '9'], ['pending_donation', '6'], ['pending_install', '6'], ['is_shutdown', '1'],
+        ['pending_disposal', '6'], ['pre_allocated', '9'], ['pending_transfer', '6'], ['lease_return', '7'], ['pre_allocated', '6'],
+        ['pending_evaluation', '6'], ['pending_resale', '9'], ['pending_resale', '7'], ['obsolete', '7'], ['rma', '7'],
+        ['buy_out', '7'], ['recalled', '7'], ['pending_resale', '6'], ['on_hold', '6'], ['legal_hold', '6'], ['quarantine', '6'],
+        ['pending_return', '6'], ['pending_certificate', '6'], ['test', '6'], ['in_repair', '6'],
+    ]
+    const pair = (value = '', installStatus = '') => `${value}/${installStatus}`
+    const OUT_OF_BOX_PAIRS = new Set(OUT_OF_BOX.map(([value, installStatus]) => pair(value, installStatus)))
+
+    // The v4 delete matches a choice by its value, language and install status together: one of the platform's under
+    // the same three would be deleted with the app's own, and come back as the app's.
+    it("deletes each choice it inserts by its value, language and install status, none of them one of the platform's", () => {
+        const { inserted, deleted } = choiceSet()
+        const matched = ({ value, language, dependent_value }: BuiltChoice) => ({ value, language, dependent_value })
+        const byValue = (a: BuiltChoice, b: BuiltChoice) => (a.value ?? '').localeCompare(b.value ?? '')
+        expect(deleted.map(matched).sort(byValue)).toEqual(inserted.map(matched).sort(byValue))
+        expect(inserted.filter((choice) => choice.language !== 'en' || choice.inactive !== 'false').map((choice) => choice.value)).toEqual([])
+        expect(inserted.filter((choice) => OUT_OF_BOX_PAIRS.has(pair(choice.value, choice.dependent_value))).map((choice) => choice.value)).toEqual([])
+    })
+
+    it("lists each choice it adds at a place of its own, after the platform's", () => {
+        const sequences = choiceSet().inserted.map((choice) => Number(choice.sequence))
+        expect(sequences.filter((sequence) => !(sequence >= 500))).toEqual([])
+        expect(new Set(sequences).size).toBe(sequences.length)
+    })
+
+    it('leaves no Lifecycle stage stored as a substatus the installed field has no choice for', () => {
+        const added = new Set(choiceSet().inserted.map((choice) => pair(choice.value, choice.dependent_value)))
+        const stored = Object.values(STAGE_FIELDS)
+            .filter((fields) => fields.substatus)
+            .map((fields) => pair(fields.substatus, fields.installStatus))
+        expect(stored.length).toBeGreaterThan(15)
+        expect(stored.filter((found) => !added.has(found) && !OUT_OF_BOX_PAIRS.has(found))).toEqual([])
+    })
+})
+
+/*
+ * The ATF tests (src/fluent/tests) run on an instance only, after an install. Read here, from the built tests, is what
+ * goes wrong before that. A test in no suite is never run (`now-sdk cicd testsuite run` runs suites). A "Run Server
+ * Side Script" step's script is text to the build: it loads server modules by the path the instance keeps them under,
+ * which names the package version (logic/server-modules), and what it calls of them is checked by no compiler.
+ */
+describe('ATF tests', () => {
+    const tests = () => records('sys_atf_test')
+
+    it('are each in one suite, which is what runs them', () => {
+        const inSuites = records('sys_atf_test_suite_test').map((member) => member.test ?? '')
+        expect(tests().length).toBeGreaterThan(15)
+        expect(inSuites.sort()).toEqual(tests().map((test) => test.sys_id ?? '').sort())
+    })
+
+    it('have each a name of their own and a description', () => {
+        const names = tests().map((test) => test.name ?? '')
+        expect(names.filter((name, i) => !name || names.indexOf(name) !== i)).toEqual([])
+        expect(tests().filter((test) => !test.description).map((test) => test.name)).toEqual([])
+    })
+
+    interface StepScript {
+        /** The step, as `<its test's name> step <its order>`. */
+        step: string
+        script: string
+    }
+
+    /** The script of every "Run Server Side Script" step: the one input of the step that is a function. */
+    function stepScripts(): StepScript[] {
+        const testName = new Map(tests().map((test) => [test.sys_id ?? '', test.name ?? '']))
+        return readdirSync(UPDATES)
+            .filter((name) => name.startsWith('sys_atf_step_'))
+            .flatMap((name) => {
+                const xml = readFileSync(join(UPDATES, name), 'utf8')
+                if (!xml.includes('<display_name>Run Server Side Script</display_name>')) return []
+                const field = (tag: string) => new RegExp(`^ {4}<${tag}>([^<]*)</${tag}>$`, 'm').exec(xml)?.[1] ?? ''
+                const inputs = [...xml.matchAll(/<sys_variable_value action="INSERT_OR_UPDATE"[^>]*>([\s\S]*?)<\/sys_variable_value>/g)].map(
+                    ([, input = '']) => unescapeXml(/<value>([\s\S]*?)<\/value>/.exec(input)?.[1] ?? ''),
+                )
+                return [{ step: `${testName.get(field('test'))} step ${field('order')}`, script: inputs.find((input) => input.startsWith('(function')) ?? '' }]
+            })
+    }
+
+    /** The modules a script loads, each with the name the script calls it by. */
+    const loaded = (script: string) => [...script.matchAll(/\bvar\s+(\w+)\s*=\s*require\('([^']+)'\)/g)].map(([, binding = '', path = '']) => ({ binding, path }))
+
+    it('have server-side scripts to read', () => {
+        expect(stepScripts().length).toBeGreaterThanOrEqual(8)
+        expect(stepScripts().filter(({ script }) => !script).map(({ step }) => step)).toEqual([])
+    })
+
+    it('load in their scripts server modules by the path the build installs them under, and call what those export', () => {
+        const modules = new Map(records('sys_module').map((module) => [module.path ?? '', module.content ?? '']))
+        for (const { step, script } of stepScripts()) {
+            expect(loaded(script).length, step).toBeGreaterThan(0)
+            expect([...script.matchAll(/\brequire\(/g)].length, `${step}: every require is read`).toBe(loaded(script).length)
+            // What the script calls, not the text of its strings (a module path, a message).
+            const code = script.replace(/'[^'\n]*'/g, "''")
+            for (const { binding, path } of loaded(script)) {
+                expect(modules.has(path), `${step}: ${path}`).toBe(true)
+                const called = [...code.matchAll(new RegExp(`\\b${binding}\\.(\\w+)`, 'g'))].map(([, fn = '']) => fn)
+                expect(called.length, `${step}: ${binding}`).toBeGreaterThan(0)
+                const exported = (fn: string) => new RegExp(`^export function ${fn}\\(`, 'm').test(modules.get(path) ?? '')
+                expect({ step, path, unknown: called.filter((fn) => !exported(fn)) }).toEqual({ step, path, unknown: [] })
+            }
+        }
+    })
+
+    it('name in their scripts only system properties the app declares', () => {
+        const scope = (JSON.parse(readFileSync(join(ROOT, 'now.config.json'), 'utf8')) as { scope: string }).scope
+        const declared = records('sys_properties').map((property) => property.name)
+        const named = stepScripts().flatMap(({ script }) => [...script.matchAll(new RegExp(`'(${scope}\\.[\\w.]+)'`, 'g'))].map(([, name = '']) => name))
+        expect(named.length).toBeGreaterThan(0)
+        expect(named.filter((name) => !declared.includes(name))).toEqual([])
+    })
+
+    // The platform puts a step's output into the other inputs of a later step, never into its script: there the
+    // placeholder the build writes for `${step.record_id}` stays as text.
+    it('are given no step output in their scripts', () => {
+        expect(stepScripts().filter(({ script }) => script.includes('{{')).map(({ step }) => step)).toEqual([])
+    })
+
+    /** A GlideRecord that finds one record, whatever is asked. */
+    class FoundRecord {
+        private found = false
+        addQuery() {
+            return { addOrCondition: () => undefined }
+        }
+        addEncodedQuery() {}
+        addActiveQuery() {}
+        setLimit() {}
+        query() {}
+        next() {
+            this.found = !this.found
+            return this.found
+        }
+        hasNext() {
+            return true
+        }
+        get() {
+            return true
+        }
+        getUniqueValue() {
+            return 'a'.repeat(32)
+        }
+        getValue() {
+            return 'FOUND'
+        }
+        getRowCount() {
+            return 1
+        }
+    }
+
+    /** A loaded module whose every function answers a REST request HTTP 599; its beyondVisibility runs the read. */
+    function standInModule(): unknown {
+        return new Proxy(
+            {},
+            {
+                get:
+                    (_target, name) =>
+                    (...args: unknown[]): unknown => {
+                        if (name === 'beyondVisibility') return (args[1] as () => unknown)()
+                        const response = args[1] as { setStatus?: (status: number) => void; setBody?: (body: unknown) => void } | undefined
+                        response?.setStatus?.(599)
+                        response?.setBody?.({ error: 'stand-in' })
+                        return undefined
+                    },
+            },
+        )
+    }
+
+    /** A script run as its step runs it, against stand-ins for what it calls: what it returns and its output message. */
+    function run(script: string): { verdict: unknown; message: string } {
+        let message = ''
+        const stepResult = { setOutputMessage: (text: string) => void (message = text) }
+        const properties = new Map<string, string>()
+        const gs = {
+            getPropertySecured: (name: string, fallback: string) => properties.get(name) || fallback,
+            setProperty: (name: string, value: string) => void properties.set(name, value),
+            generateGUID: () => 'b'.repeat(32),
+        }
+        const body = script.replace(/^\(function/, 'return (function')
+        const step = new Function('outputs', 'steps', 'params', 'stepResult', 'assertEqual', 'require', 'GlideRecord', 'gs', body)
+        return { verdict: step({}, () => ({}), {}, stepResult, () => undefined, standInModule, FoundRecord, gs), message }
+    }
+
+    // A step passes or fails by what its script returns. Run here, a script fails only on the reply it checks, which a
+    // stand-in answers HTTP 599: one that fails for another reason, or returns nothing, has an error of its own.
+    it('run their scripts to a verdict', () => {
+        for (const { step, script } of stepScripts()) {
+            const { verdict, message } = run(script)
+            expect({ step, verdict: typeof verdict }).toEqual({ step, verdict: 'boolean' })
+            if (verdict === false) expect(message, step).toMatch(/expected HTTP/)
+            expect(message, step).not.toMatch(/TypeError|ReferenceError|is not a function|is not defined|undefined/)
+        }
     })
 })
