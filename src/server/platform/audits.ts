@@ -2,7 +2,7 @@ import { GlideRecord } from '@servicenow/glide'
 import { AUDIT_STATE, closedLineResult, compareAudit, onTheShelfQuery, type ExpectedAsset } from '../domain/audit.ts'
 import { naasStockroomType, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import { SCOPED_TABLES, visibilityFilter } from '../domain/visibility.ts'
-import type { AuditType } from '../domain/vocabulary.ts'
+import type { AuditLineResult, AuditType } from '../domain/vocabulary.ts'
 import { nowGlide } from './clock.ts'
 import { openException } from './exceptions.ts'
 import { openFieldWork } from './field-work.ts'
@@ -135,7 +135,8 @@ export function recordScan(audit: GlideRecord, code: string): string {
     line.initialize()
     line.setValue('audit', audit.getUniqueValue())
     line.setValue('scanned_code', code)
-    line.setValue('result', 'found')
+    const found: AuditLineResult = 'found'
+    line.setValue('result', found)
     line.setValue('scanned_at', nowGlide())
     return line.insert() ? '' : refusal(line)
 }

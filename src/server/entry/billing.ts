@@ -4,6 +4,7 @@ import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { billingMonthProblem, monthBounds, previousMonth } from '../domain/billing.ts'
 import { ROLE } from '../domain/visibility.ts'
+import { BILLING_PERIOD_STATUS } from '../domain/vocabulary.ts'
 import {
     attachExport,
     closedLineRefusal,
@@ -72,7 +73,7 @@ export function uiCloseBillingPeriod(current: GlideRecord): void {
 
 /** UI action "Re-export CSV" on a closed period whose export is missing (never saves the period). */
 export function uiExportBillingPeriod(current: GlideRecord): void {
-    if (str(current, 'status') !== 'closed') return void gs.addErrorMessage('Only a closed period can be exported')
+    if (str(current, 'status') !== BILLING_PERIOD_STATUS.closed) return void gs.addErrorMessage('Only a closed period can be exported')
     const { fileName, attached } = exportOf(current)
     if (attached) return void gs.addInfoMessage(`${fileName} is already attached; delete it to export again`)
     queueExport(current)

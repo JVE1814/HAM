@@ -3,12 +3,12 @@ import { isStateChange, type DeviceEvent } from '../domain/device-events.ts'
 import { decideInService, seenSourceOf } from '../domain/in-service.ts'
 import { LONG_HOLD_LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import type { SeenSource } from '../domain/vocabulary.ts'
+import type { OrderType, SeenSource } from '../domain/vocabulary.ts'
 import { moveAndSave, readStage } from './assets.ts'
 import { glideToMs, msToGlide } from './clock.ts'
 import { applyLifecycleDates, type LifecycleReaders } from './lifecycle-dates.ts'
 import { withLockTries } from './locks.ts'
-import { deleteWhere, findById, refusal, str } from './records.ts'
+import { choice, deleteWhere, findById, refusal, str } from './records.ts'
 import { attachToSubscription } from './subscriptions.ts'
 
 /** In-service detection: Seen signals in, billing start out (P1.8), and the device events they are kept as. */
@@ -33,7 +33,7 @@ function goLiveIfSeen(lock: HeldLock, asset: GlideRecord, readers: LifecycleRead
         installCompletedAt: glideToMs(str(asset, 'x_daas_ham_install_completed')),
         lastSeenAt: glideToMs(str(asset, 'x_daas_ham_last_seen')),
         // Only a pending Asset can go live, so only it pays for the dot-walk to its Order.
-        temporary: stage === 'pending_in_service' && str(asset, 'x_daas_ham_order_line.order.order_type') === 'temporary',
+        temporary: stage === 'pending_in_service' && choice<OrderType>(asset, 'x_daas_ham_order_line.order.order_type') === 'temporary',
     })
     if (!lock.held()) return false
     // An Asset whose Subscription line could not be started stays pending, so a later sighting or run attaches it.

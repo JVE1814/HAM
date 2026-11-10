@@ -15,7 +15,7 @@ import { anythingShipped, OPEN_LINE_STAGES, ORDER_TASK_STATE } from '../domain/f
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { cancelledUnit } from '../domain/sourcing.ts'
-import type { EntitlementVerdict, InstallMode, OrderType } from '../domain/vocabulary.ts'
+import { type EntitlementVerdict, type InstallMode, LINE_STAGE, ORDER_STAGE, type OrderType } from '../domain/vocabulary.ts'
 import { entitlementContext } from './agreements.ts'
 import {
     cancelPendingApprovals,
@@ -219,7 +219,7 @@ function submitAccepted(order: GlideRecord): Submission {
 function requestedLines(orderId: string): RequestedLine[] {
     const line = new GlideRecord('x_daas_ham_order_line')
     line.addQuery('order', orderId)
-    line.addQuery('line_stage', '!=', 'cancelled')
+    line.addQuery('line_stage', '!=', LINE_STAGE.cancelled)
     line.query()
     const lines: RequestedLine[] = []
     while (line.next()) {
@@ -237,7 +237,7 @@ function requestedLines(orderId: string): RequestedLine[] {
 /** Approve the Order and source it; why the platform refused the save ('' once saved), when nothing is sourced. */
 function startSourcing(order: GlideRecord): string {
     order.setValue('approval', 'approved')
-    order.setValue('stage', 'sourcing')
+    order.setValue('stage', ORDER_STAGE.sourcing)
     order.setValue('state', ORDER_TASK_STATE.inProgress)
     if (!order.update()) return warnRefused(order, `${str(order, 'number')} not saved as approved, not sourced`)
     queueSourcing(order)
@@ -250,7 +250,7 @@ function startSourcing(order: GlideRecord): string {
  */
 function rejectOrder(order: GlideRecord): string {
     order.setValue('approval', 'rejected')
-    order.setValue('stage', 'rejected')
+    order.setValue('stage', ORDER_STAGE.rejected)
     order.setValue('state', ORDER_TASK_STATE.rejected)
     if (!order.update()) return warnRefused(order, `${str(order, 'number')} not saved as rejected`)
     cancelOpenLines(order.getUniqueValue())
@@ -381,7 +381,7 @@ function cancelHolding(locks: { sourcing: HeldLock; ship: HeldLock }, order: Gli
         return notCancelled('equipment has already shipped. Use a Return order instead')
     }
     const purchases = openPurchaseOrders(order.getUniqueValue())
-    order.setValue('stage', 'cancelled')
+    order.setValue('stage', ORDER_STAGE.cancelled)
     order.setValue('state', ORDER_TASK_STATE.cancelled)
     if (purchases.length > 0) order.setValue('work_notes', `Cancel these purchase orders in Procurement: ${purchases.join(', ')}`)
     if (!order.update()) return notCancelled(warnRefused(order, `${str(order, 'number')} not cancelled`))

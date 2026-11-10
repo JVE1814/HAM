@@ -1,7 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { toIsoDate } from '../domain/calendar.ts'
-import { collectionMethod } from '../domain/returns.ts'
-import type { InstallMode } from '../domain/vocabulary.ts'
+import { collectionMethod, TEMPORARY_RETURN_STAGES } from '../domain/returns.ts'
+import { type InstallMode, ORDER_STAGE, type OrderType } from '../domain/vocabulary.ts'
 import { nowMs, todayIso } from './clock.ts'
 import { installedAssetIds, installedAssetIdsBySite } from './installed-assets.ts'
 import { intProperty, PROPERTY } from './properties.ts'
@@ -71,18 +71,19 @@ function returnTemporaryDeployments(today: string): void {
     const leadDays = intProperty(PROPERTY.temporaryReturnLeadDays)
     const horizon = toIsoDate(nowMs() + leadDays * 86_400_000)
     const order = new GlideRecord('x_daas_ham_order')
-    order.addQuery('order_type', 'temporary')
+    const temporary: OrderType = 'temporary'
+    order.addQuery('order_type', temporary)
     order.addQuery('return_raised', false)
     order.addNotNullQuery('end_date')
     order.addQuery('end_date', '<=', horizon)
-    order.addQuery('stage', 'IN', 'installing,complete')
+    order.addQuery('stage', 'IN', TEMPORARY_RETURN_STAGES.join(','))
     order.orderBy('end_date')
     order.setLimit(50)
     order.query()
     while (order.next()) {
         const assetIds = installedAssetIds({ orderId: order.getUniqueValue() })
         // Still being installed and not yet ended: wait for the equipment to arrive before raising.
-        if (assetIds.length === 0 && str(order, 'stage') === 'installing' && str(order, 'end_date') >= today) continue
+        if (assetIds.length === 0 && str(order, 'stage') === ORDER_STAGE.installing && str(order, 'end_date') >= today) continue
         if (assetIds.length > 0) {
             const raised = raiseReturn({
                 trigger: 'temporary_end',

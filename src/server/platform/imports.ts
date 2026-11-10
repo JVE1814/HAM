@@ -6,11 +6,12 @@ import { LOCK } from '../domain/lock-names.ts'
 import { parseLifecycleRow } from '../domain/model-lifecycle.ts'
 import { normalizeSerial } from '../domain/serials.ts'
 import { DEFAULT_STAGING_SOURCE } from '../domain/staging.ts'
+import type { StagingSource } from '../domain/vocabulary.ts'
 import { findAnyAsset, newAsset } from './assets.ts'
 import { attemptLock } from './locks.ts'
 import { writeModelLifecycle } from './model-lifecycle.ts'
 import { loadNormalizationData, recordNormalizationException, resolveModel } from './normalization.ts'
-import { refusal, str } from './records.ts'
+import { choice, refusal, str } from './records.ts'
 
 /** Import-set rows processed on insert (ASN, lifecycle CSV): what each row comes to. */
 
@@ -93,7 +94,7 @@ function insertHolding(lock: HeldLock, row: GlideRecord, serial: string, modelId
     asset.setValue('x_daas_ham_customer_tag', str(row, 'customer_tag'))
     asset.setValue('x_daas_ham_mac_address', str(row, 'mac_address'))
     asset.setValue('x_daas_ham_claim_code', str(row, 'claim_code'))
-    const stagingSource = str(row, 'staging_source') === 'distributor' ? 'distributor' : DEFAULT_STAGING_SOURCE
+    const stagingSource: StagingSource = choice<StagingSource>(row, 'staging_source') === 'distributor' ? 'distributor' : DEFAULT_STAGING_SOURCE
     asset.setValue('x_daas_ham_staging_source', stagingSource)
     const saved = lock.save(`Asset ${serial} created`, () => asset.insert(), { check: 'check it exists once' })
     if (saved === 'lock lost') return loadAgain(serial, 'its lock was lost while checking it')

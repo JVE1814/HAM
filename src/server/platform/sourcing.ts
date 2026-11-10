@@ -6,6 +6,7 @@ import type { ShortfallRoute } from '../domain/returns.ts'
 import {
     advanceReplacementRma,
     lineShortfall,
+    LINES_TO_SOURCE,
     lineStillOpen,
     needsTransfer,
     planSourcing,
@@ -64,7 +65,7 @@ export function runSourcingPass(order: GlideRecord, queuedAgain: number): void {
         let again: Exclude<LineSourcing, 'done'> | null = null
         const line = new GlideRecord('x_daas_ham_order_line')
         line.addQuery('order', orderId)
-        line.addQuery('line_stage', 'IN', 'new,awaiting_stock')
+        line.addQuery('line_stage', 'IN', LINES_TO_SOURCE.join(','))
         line.query()
         while (again !== 'lock lost' && line.next()) {
             const sourced = sourceLine(lock, order, line)

@@ -16,13 +16,15 @@ import {
     type RequestedReturn,
     type ReturnRequester,
 } from '../domain/returns.ts'
-import type {
-    EvaluationOutcome,
-    LeaseEndAction,
-    LegalOwner,
-    ReturnLineStatus,
-    ReturnMethod,
-    ReturnTrigger,
+import {
+    type EvaluationOutcome,
+    type LeaseEndAction,
+    type LegalOwner,
+    RETURN_LINE_STATUS,
+    type ReturnCondition,
+    type ReturnLineStatus,
+    type ReturnMethod,
+    type ReturnTrigger,
 } from '../domain/vocabulary.ts'
 import { customerAdminIds } from './approvals.ts'
 import { clearRackPlacement, clearWipeEvidence, isFleetAsset, moveAndSave, moveAsset, readStage } from './assets.ts'
@@ -34,7 +36,7 @@ import { openFieldWork } from './field-work.ts'
 import { installedAssetIds } from './installed-assets.ts'
 import { withLock } from './locks.ts'
 import { intProperty, PROPERTY } from './properties.ts'
-import { bool, exists, findById, num, refusal, str, warnRefused } from './records.ts'
+import { bool, choice, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { currentSession } from './session.ts'
 import { releaseToProviderStock } from './stock.ts'
 import { endSitePackageIfEmpty } from './subscriptions.ts'
@@ -290,8 +292,8 @@ export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): R
 
 /** Mark the line of a unit just received, and charge or waive what its arrival settles. */
 function settleReceivedLine(line: GlideRecord, asset: GlideRecord): void {
-    const turnedUp = str(line, 'status') === 'missing'
-    line.setValue('status', 'received')
+    const turnedUp = str(line, 'status') === RETURN_LINE_STATUS.missing
+    line.setValue('status', RETURN_LINE_STATUS.received)
     line.setValue('received_at', nowGlide())
     // The unit is received all the same; a line left unreceived cannot be evaluated, so it is logged to fix by hand.
     const serial = str(asset, 'serial_number')
@@ -330,11 +332,11 @@ export function evaluateReturnLine(line: GlideRecord): Evaluation {
         leaseEndAction: str(asset, 'x_daas_ham_lease.end_action') as LeaseEndAction | '',
     })
     // Charged before refurbishing hands the unit back to the Provider; choosing the evaluation again charges it once.
-    if (str(line, 'condition') === 'damaged') recordFee('damaged', asset, str(line, 'return_order'))
+    if (choice<ReturnCondition>(line, 'condition') === 'damaged') recordFee('damaged', asset, str(line, 'return_order'))
     if (target === 'available') releaseToProviderStock(asset)
     if (!moveAsset(asset, target).allowed) return notEvaluated(`The asset cannot go to ${target} from its current stage`)
     if (!asset.update()) return notEvaluated(`The asset was not moved to ${target}: ${refusal(asset)}`)
-    line.setValue('status', 'evaluated')
+    line.setValue('status', RETURN_LINE_STATUS.evaluated)
     if (!line.update()) {
         return notEvaluated(`The asset went to ${target}, but its return line was not marked evaluated: ${refusal(line)}`)
     }
@@ -428,7 +430,7 @@ function declareHolding(lock: HeldLock, overdue: OverdueLine): boolean {
         // back in service, it bills on that line again while it is open (entry/assets.ts onAssetServiceChange).
         endSitePackageIfEmpty(str(asset, 'x_daas_ham_site'), str(asset, 'x_daas_ham_agreement'))
     }
-    record.setValue('status', 'missing')
+    record.setValue('status', RETURN_LINE_STATUS.missing)
     // Left awaiting, it is declared again on the next run, which finds the unit missing and charges no second fee
     // (platform/fees `recordFee`).
     if (record.update()) return true

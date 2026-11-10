@@ -137,6 +137,14 @@ export function str(gr: GlideRecord, field: string): string {
     return value === null || value === undefined ? '' : String(value)
 }
 
+/**
+ * The value of a choice `field` as its list's type (domain/vocabulary; '' when blank), so that comparing it with a
+ * value the list does not have fails to compile. It checks nothing: a value stored past the list reads as it is.
+ */
+export function choice<Value extends string>(gr: GlideRecord, field: string): Value | '' {
+    return str(gr, field) as Value | ''
+}
+
 export function num(gr: GlideRecord, field: string): number {
     const value = Number(valueOf(gr, field))
     return Number.isFinite(value) ? value : 0

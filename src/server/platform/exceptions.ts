@@ -103,7 +103,7 @@ export function resolveExceptionsWhere(encodedQuery: string): void {
 function resolveEach(exception: GlideRecord): void {
     exception.query()
     while (exception.next()) {
-        exception.setValue('status', 'resolved')
+        exception.setValue('status', EXCEPTION_STATUS.resolved)
         if (exception.update()) continue
         const subjectId = str(exception, 'asset') || str(exception, 'ci')
         gs.warn(`[x_daas_ham] ${str(exception, 'exception_type')} exception for ${subjectId} not resolved: ${refusal(exception)}`)

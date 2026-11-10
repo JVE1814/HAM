@@ -21,7 +21,7 @@ import {
     type TrackingEvent,
     type TrackingUpdate,
 } from '../domain/shipping.ts'
-import type { ShipmentDirection, ShipmentStatus } from '../domain/vocabulary.ts'
+import { SHIPMENT_DIRECTION, SHIPMENT_STATUS, type ShipmentDirection, type ShipmentStatus } from '../domain/vocabulary.ts'
 import { msToGlide, nowMs } from './clock.ts'
 import { EVENT, fire, requeue } from './events.ts'
 import { withLock, withLockTries } from './locks.ts'
@@ -101,8 +101,8 @@ function createShipment(
     const result = buyLabel(aggregator(), {
         carrierId,
         serviceCode,
-        from: direction === 'to_site' ? depotAddress : siteAddress,
-        to: direction === 'to_site' ? siteAddress : depotAddress,
+        from: direction === SHIPMENT_DIRECTION.to_site ? depotAddress : siteAddress,
+        to: direction === SHIPMENT_DIRECTION.to_site ? siteAddress : depotAddress,
         packages,
         weightKg: intProperty(PROPERTY.shippingPackageKg),
         reference: str(parent, 'number'),
@@ -111,7 +111,7 @@ function createShipment(
     const shipment = new GlideRecord(SHIPMENT)
     shipment.initialize()
     shipment.setValue('direction', direction)
-    shipment.setValue(direction === 'to_site' ? 'order' : 'return_order', parent.getUniqueValue())
+    shipment.setValue(direction === SHIPMENT_DIRECTION.to_site ? 'order' : 'return_order', parent.getUniqueValue())
     shipment.setValue('customer', str(parent, 'customer'))
     shipment.setValue('site', siteId)
     shipment.setValue('stockroom', stockroom.getUniqueValue())
@@ -123,7 +123,7 @@ function createShipment(
     shipment.setValue('label_url', result.labelUrl)
     shipment.setValue('cost', result.cost)
     shipment.setValue('currency', result.currency)
-    shipment.setValue('status', 'label_created')
+    shipment.setValue('status', SHIPMENT_STATUS.label_created)
     const label = `${result.carrier} ${result.trackingNumber}, label ${result.labelId}`
     if (shipment.insert()) {
         const bought = `Label ${label} bought for ${str(parent, 'number')}`
@@ -140,7 +140,7 @@ function createShipment(
  * caller holds `lock` on the Order (platform/delivery `shipOrder`).
  */
 export function labelOrder(order: GlideRecord, packages: number, lock: HeldLock): LabelResult {
-    const result = createShipment('to_site', order, packages, lock)
+    const result = createShipment(SHIPMENT_DIRECTION.to_site, order, packages, lock)
     if (result.ok) {
         order.setValue('carrier', result.carrier)
         order.setValue('tracking_number', result.trackingNumber)
@@ -167,7 +167,7 @@ export function labelReturn(returnOrder: GlideRecord): ReturnLabelOutcome {
     const label = withLock(LOCK.returnLabel(returnOrderId), (lock): LabelResult => {
         const open = returnLabels([returnOrderId]).get(returnOrderId)
         if (open) return { ok: false, error: returnLabelRefusal(open.trackingNumber, open.status) }
-        const bought = createShipment('return', returnOrder, packages, lock)
+        const bought = createShipment(SHIPMENT_DIRECTION.return, returnOrder, packages, lock)
         return bought.ok ? bought : { ok: false, error: `No label: ${bought.error}` }
     })
     if (!label.ran) return { bought: false, why: 'A return label is already being bought for this return: reload it to see it' }
@@ -191,7 +191,7 @@ export function returnLabels(returnOrderIds: readonly string[]): Map<string, Ret
     const labels = new Map<string, ReturnLabel>()
     if (returnOrderIds.length === 0) return labels
     const shipment = new GlideRecord(SHIPMENT)
-    shipment.addEncodedQuery(`direction=return^${OPEN_SHIPMENTS}^return_orderIN${returnOrderIds.join(',')}`)
+    shipment.addEncodedQuery(`direction=${SHIPMENT_DIRECTION.return}^${OPEN_SHIPMENTS}^return_orderIN${returnOrderIds.join(',')}`)
     // Oldest first, so that the latest of a Return order is the one kept.
     shipment.orderBy('sys_created_on')
     shipment.query()
@@ -226,7 +226,7 @@ export function voidLabel(shipmentId: string, trackingNumber: string): VoidOutco
     const shipment = findById(SHIPMENT, shipmentId)
     if (!shipment) return notVoided(`Label ${trackingNumber} no longer exists`)
     const orderId = str(shipment, 'order')
-    const outbound = str(shipment, 'direction') === 'to_site' && orderId
+    const outbound = str(shipment, 'direction') === SHIPMENT_DIRECTION.to_site && orderId
     if (outbound) return voidOutboundLabel(shipmentId, trackingNumber, orderId)
     const voiding = saveVoided(shipmentId, trackingNumber)
     if ('why' in voiding) return notVoided(voiding.why)
@@ -303,7 +303,7 @@ function voidHolding(shipmentId: string, trackingNumber: string): Voiding {
         const status = shipment.getDisplayValue('status')
         return { why: `Label ${trackingNumber} is ${status}, so it cannot be marked voided` }
     }
-    shipment.setValue('status', 'voided')
+    shipment.setValue('status', SHIPMENT_STATUS.voided)
     shipment.setValue('status_detail', `Voided with the carrier (marked by ${gs.getUserDisplayName()})`)
     // A refused save leaves the label open: its Order or Return order is not told it is voided.
     if (!shipment.update()) return { why: `Label ${trackingNumber} not marked voided: ${refusal(shipment)}` }

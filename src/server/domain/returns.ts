@@ -10,6 +10,8 @@ import {
     type InstallMode,
     type LeaseEndAction,
     type LegalOwner,
+    ORDER_STAGE,
+    type OrderStage,
     type ReturnLineStatus,
     type ReturnMethod,
     type ReturnTrigger,
@@ -63,6 +65,9 @@ export function returnRequestFindings(request: RequestedReturn, requester: Retur
  * Complete once every line is settled (or it has none).
  */
 export const RETURN_TASK_STATE = { inProgress: 2, closed: 3 } as const
+
+/** The stages of a temporary deployment whose end date is watched: its equipment is being installed or is installed. */
+export const TEMPORARY_RETURN_STAGES: readonly OrderStage[] = [ORDER_STAGE.installing, ORDER_STAGE.complete]
 
 /** The status of a Return line whose unit is still expected back: not at the depot yet, nor declared missing. */
 export const AWAITED: ReturnLineStatus = 'awaiting'

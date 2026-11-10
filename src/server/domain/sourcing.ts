@@ -2,7 +2,15 @@ import { OPEN_LINE_STAGES, UNFULFILLED_ORDER_STAGES } from './fulfilment.ts'
 import { fleetStagesQuery, naasStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
 import { STOCK_STAGES, type Stage } from './lifecycle.ts'
 import { shortfallRoute, type ShortfallRoute } from './returns.ts'
-import { RMA_STATE, type LeaseEndAction, type LineStage, type OrderType, type RmaState, type StockroomType } from './vocabulary.ts'
+import {
+    type LeaseEndAction,
+    LINE_STAGE,
+    type LineStage,
+    type OrderType,
+    RMA_STATE,
+    type RmaState,
+    type StockroomType,
+} from './vocabulary.ts'
 
 /**
  * Sourcing: where an Order line's Assets come from.
@@ -287,6 +295,9 @@ function routedOutcome(route: ShortfallRoute, line: { planSummary: string; missi
     if (!bought.ok) return { ...sourced, stage: 'awaiting_stock', summary: `${line.planSummary} (no purchase order: ${bought.reason})` }
     return { ...sourced, purchaseOrder: bought.poId, purchased: line.missing }
 }
+
+/** The stages of the lines a sourcing pass sources: not sourced yet, or short of stock again. */
+export const LINES_TO_SOURCE: readonly LineStage[] = [LINE_STAGE.new, LINE_STAGE.awaiting_stock]
 
 /** Whether an Order line still waits to be filled: not shipped or cancelled, its Order not cancelled or rejected. */
 export function lineStillOpen(line: { lineStage: string; orderStage: string }): boolean {

@@ -182,7 +182,7 @@ function closeNonNaasExceptions(naasRawModelIds: readonly string[]): void {
     exception.addQuery('source_record', 'IN', notNaas.join(','))
     exception.query()
     while (exception.next()) {
-        exception.setValue('status', 'resolved')
+        exception.setValue('status', NORM_EXCEPTION_STATUS.resolved)
         exception.setValue('reason', NOT_NAAS_REASON)
         if (exception.update()) continue
         const rawPair = `${str(exception, 'raw_manufacturer')} / ${str(exception, 'raw_model')}`
@@ -231,7 +231,7 @@ function learned(record: GlideRecord, what: string, rawPair: string): boolean {
  */
 export function resolveNormalizationException(exception: GlideRecord): boolean {
     if (!learnFromResolution(exception, loadNormalizationData())) return false
-    exception.setValue('status', 'resolved')
+    exception.setValue('status', NORM_EXCEPTION_STATUS.resolved)
     if (!exception.update()) warnRefused(exception, `Normalization exception ${str(exception, 'raw_manufacturer')} / ${str(exception, 'raw_model')} not resolved`)
     return true
 }

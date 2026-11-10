@@ -7,7 +7,7 @@ import {
     type DisposalAsset,
 } from '../domain/disposal.ts'
 import { disposalStage, type Stage } from '../domain/lifecycle.ts'
-import type { DisposalMethod, LegalOwner } from '../domain/vocabulary.ts'
+import { DISPOSAL_STAGE, type DisposalLineStatus, type DisposalMethod, type LegalOwner } from '../domain/vocabulary.ts'
 import {
     customerAdminIds,
     providerApproverIds,
@@ -17,7 +17,7 @@ import {
     type ApprovalRollup,
 } from './approvals.ts'
 import { isFleetAsset, moveAsset, readStage, transitionFacts } from './assets.ts'
-import { findById, refusal, str, warnRefused } from './records.ts'
+import { choice, findById, refusal, str, warnRefused } from './records.ts'
 
 /**
  * Disposal orders: approve, then retire each wiped Asset by its method (P2.5, D61). None of it tells the user anything:
@@ -91,7 +91,7 @@ const DISPOSAL_APPROVAL: ApprovalFlow = {
     required: (order) => disposalApprovers(ownersOf(order.getUniqueValue())),
     decide: (order, outcome) => {
         order.setValue('approval', outcome)
-        order.setValue('stage', outcome === 'approved' ? 'approved' : 'rejected')
+        order.setValue('stage', outcome === 'approved' ? DISPOSAL_STAGE.approved : DISPOSAL_STAGE.rejected)
         if (outcome === 'rejected') order.setValue('state', DISPOSAL_TASK_STATE.rejected)
         // Refused: it still awaits approval with its requests open, so the next decision on them rolls it up again.
         return order.update() ? '' : warnRefused(order, `Disposal ${str(order, 'number')} not saved as ${outcome}`)
@@ -123,10 +123,11 @@ export function completeDisposal(order: GlideRecord): DisposalCompletion {
     let unsaved = 0
     const line = lines(order.getUniqueValue())
     while (line.next()) {
-        if (str(line, 'status') === 'done') continue
+        if (choice<DisposalLineStatus>(line, 'status') === 'done') continue
         const blockers = retire(line, order)
         if (blockers) blocked++
-        line.setValue('status', blockers ? 'blocked' : 'done')
+        const status: DisposalLineStatus = blockers ? 'blocked' : 'done'
+        line.setValue('status', status)
         line.setValue('blockers', blockers)
         if (line.update()) continue
         // A line not saved as done keeps the order open: its Asset may be retired already, so it is set done by hand.
@@ -136,7 +137,7 @@ export function completeDisposal(order: GlideRecord): DisposalCompletion {
         gs.warn(`[x_daas_ham] ${what} not saved (${blockers ? 'blocked' : 'done, its asset retired'}): ${reason}`)
     }
     if (blocked > 0 || unsaved > 0) return { completed: false, blocked, unsaved }
-    order.setValue('stage', 'completed')
+    order.setValue('stage', DISPOSAL_STAGE.completed)
     order.setValue('state', DISPOSAL_TASK_STATE.complete)
     // Refused, it stays approved with every line done: completing it again saves only the order.
     return { completed: !!order.update(), blocked, unsaved }
@@ -205,7 +206,8 @@ export function orderChangeRefusal(previous: GlideRecord): string {
 export function draftLessorDisposal(lease: GlideRecord): GlideRecord | null {
     const order = new GlideRecord('x_daas_ham_disposal_order')
     order.initialize()
-    order.setValue('method', 'return_to_lessor')
+    const method: DisposalMethod = 'return_to_lessor'
+    order.setValue('method', method)
     order.setValue('disposal_vendor', str(lease, 'vendor'))
     order.setValue('short_description', `Return stock to the lessor at the end of lease ${str(lease, 'number')}`)
     if (order.insert()) return order

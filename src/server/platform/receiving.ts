@@ -11,7 +11,7 @@ import {
     receivingProblem,
     type ReceivingLine,
 } from '../domain/warehouse.ts'
-import type { StockroomType } from '../domain/vocabulary.ts'
+import { LINE_STAGE, type StockroomType } from '../domain/vocabulary.ts'
 import { findAnyAsset, findAssetByIdentifier, fleetCandidate, isFleetAsset, joinFleet, moveAsset, newAsset, readStage } from './assets.ts'
 import { sourceOrderAgain, unitsOnLine } from './fulfilment.ts'
 import { withLock } from './locks.ts'
@@ -229,7 +229,7 @@ function waitingLine(asset: GlideRecord): WaitingLine | null {
     if (!poId) return null
     line.addQuery('purchase_orders', 'CONTAINS', poId)
     line.addQuery('model', str(asset, 'model'))
-    line.addQuery('line_stage', 'awaiting_stock')
+    line.addQuery('line_stage', LINE_STAGE.awaiting_stock)
     line.setLimit(1)
     line.query()
     return line.next() ? { line, rmaId: '' } : null

@@ -14,7 +14,7 @@ import {
 } from '../domain/leases.ts'
 import { isRetired, SERVING_STAGES, type Stage, stagesQuery, STOCK_STAGES } from '../domain/lifecycle.ts'
 import { isFree } from '../domain/sourcing.ts'
-import { LEGAL_OWNER, type LeaseEndAction } from '../domain/vocabulary.ts'
+import { LEASE_END_ACTION, type LeaseEndAction, LEGAL_OWNER } from '../domain/vocabulary.ts'
 import { providerApproverIds } from './approvals.ts'
 import { moveAsset, readStage } from './assets.ts'
 import { runEventTableJob } from './chunked.ts'
@@ -53,7 +53,7 @@ export function runLeaseReview(): void {
     resumeBuyouts()
     const today = todayIso()
     const lease = new GlideRecord(LEASE)
-    lease.addQuery('end_action', 'undecided')
+    lease.addQuery('end_action', LEASE_END_ACTION.undecided)
     lease.addNotNullQuery('ends')
     lease.addQuery('ends', '>=', earliestReviewedEnd(today))
     lease.query()
@@ -73,7 +73,7 @@ export function runLeaseReview(): void {
 /** Queue the transfer again for each bought-out lease that still covers Assets (retired ones stay on it). */
 function resumeBuyouts(): void {
     const ga = new GlideAggregate('alm_hardware')
-    ga.addEncodedQuery(stillCovered('x_daas_ham_lease.end_action=buyout'))
+    ga.addEncodedQuery(stillCovered(`x_daas_ham_lease.end_action=${LEASE_END_ACTION.buyout}`))
     ga.addAggregate('COUNT', '')
     ga.groupBy('x_daas_ham_lease')
     ga.query()

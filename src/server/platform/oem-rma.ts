@@ -1,7 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
 import { lineStillOpen, RMA_AT_OEM, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse } from '../domain/sourcing.ts'
-import type { OemVendor, RmaState } from '../domain/vocabulary.ts'
+import { LINE_STAGE, type OemVendor, RMA_STATE, type RmaState } from '../domain/vocabulary.ts'
 import { isFleetAsset, moveAsset } from './assets.ts'
 import { nowGlide, todayIso } from './clock.ts'
 import { findById, refusal, str, warnRefused } from './records.ts'
@@ -17,7 +17,7 @@ export function openOemRma(input: { defectiveAsset: GlideRecord; orderLineId: st
     rma.setValue('order_line', input.orderLineId)
     rma.setValue('case', input.caseId)
     rma.setValue('advance_replacement', true)
-    rma.setValue('state', 'to_open')
+    rma.setValue('state', RMA_STATE.to_open)
     rma.setValue('ship_back_due', addDays(todayIso(), 10))
     const rmaId = rma.insert()
     if (rmaId) return rmaId
@@ -73,7 +73,7 @@ export function reuseOemRma(reuse: RmaReuse, orderLineId: string): boolean {
 export function markReplacementReceived(rmaId: string, replacementSerial: string): void {
     const rma = findById('x_daas_ham_oem_rma', rmaId)
     if (!rma) return
-    rma.setValue('state', 'replacement_received')
+    rma.setValue('state', RMA_STATE.replacement_received)
     rma.setValue('replacement_serial', replacementSerial)
     if (!rma.update()) warnRefused(rma, `RMA ${str(rma, 'rma_number')} not marked replacement received`)
 }
@@ -92,7 +92,7 @@ export function lineAwaitingRma(rmaNumber: string, modelId: string): { lineId: s
     if (!rmaNumber) return null
     const rma = new GlideRecord('x_daas_ham_oem_rma')
     rma.addQuery('rma_number', rmaNumber)
-    rma.addQuery('order_line.line_stage', 'awaiting_stock')
+    rma.addQuery('order_line.line_stage', LINE_STAGE.awaiting_stock)
     rma.addQuery('order_line.model', modelId)
     rma.setLimit(1)
     rma.query()

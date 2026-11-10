@@ -26,12 +26,15 @@ import { EVENT, fire, type JobEvent } from './events.ts'
 import { billableFees, markBilled, putOnPeriod, takeOffPeriod, visitWaivedFees } from './fees.ts'
 import { findJobCursor, retirePass } from './job-cursor.ts'
 import { deleteWhere, exists, findById, num, refusal, str } from './records.ts'
-import { BILLING_PERIOD_STATUS } from '../domain/vocabulary.ts'
+import { BILLING_PERIOD_STATUS, type BillingLineKind, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
 
 /** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
 
 const PERIOD = 'x_daas_ham_billing_period'
 const LINE = 'x_daas_ham_billing_line'
+
+/** The kinds of Billing line, by name (the domain's line values carry `kind` as text). */
+const LINE_KIND = { subscription: 'subscription', fee: 'fee' } as const satisfies { [Kind in BillingLineKind]: Kind }
 
 /**
  * What became of an action on a period: done, or not done and why. `why` is '' when the platform has told the user
@@ -107,7 +110,7 @@ export function generateChunk(queued: JobEvent): void {
         // The period was deleted, or the event names none: nothing can be held for review, so this is all that tells.
         return void gs.warn(`[x_daas_ham] ${queued.name}: dropped a generation chunk, as there is no billing period '${queued.subject}'`)
     }
-    if (str(period, 'status') !== 'generating') return
+    if (str(period, 'status') !== BILLING_PERIOD_STATUS.generating) return
     const job = generationJob(queued.subject)
     try {
         recordActivity(job)
@@ -144,7 +147,7 @@ function billLines(period: GlideRecord, bounds: MonthBounds, queued: JobEvent, j
     return runEventTableJob(queued, {
         pass: { job },
         table: 'x_daas_ham_subscription_line',
-        query: `status!=pending^${overlapsMonth(bounds)}`,
+        query: `status!=${SUBSCRIPTION_LINE_STATUS.pending}^${overlapsMonth(bounds)}`,
         read: (line) => ({
             lineId: line.getUniqueValue(),
             terms: {
@@ -171,7 +174,7 @@ function billLines(period: GlideRecord, bounds: MonthBounds, queued: JobEvent, j
             if (line.intervalsUnread) throw line.intervalsUnread.error
             for (const charge of subscriptionCharges(line.terms, bounds, { intervals: line.intervals, siteName })) {
                 insertLine(period, {
-                    kind: 'subscription',
+                    kind: LINE_KIND.subscription,
                     customer: line.customerId,
                     agreement: line.agreementId,
                     subscription_line: lineId,
@@ -293,7 +296,7 @@ function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
     while (fee.next()) {
         try {
             insertLine(period, {
-                kind: 'fee',
+                kind: LINE_KIND.fee,
                 customer: str(fee, 'customer'),
                 agreement: str(fee, 'agreement'),
                 fee_event: fee.getUniqueValue(),
@@ -341,7 +344,7 @@ function feeLabel(fee: GlideRecord): string {
 
 /** Regenerate a period ready for review: rebuild its lines from current data. */
 export function regeneratePeriod(period: GlideRecord): PeriodOutcome {
-    if (str(period, 'status') !== 'ready') return notDone('Only a period ready for review can be regenerated')
+    if (str(period, 'status') !== BILLING_PERIOD_STATUS.ready) return notDone('Only a period ready for review can be regenerated')
     period.setValue('status', BILLING_PERIOD_STATUS.generating)
     period.setValue('failed_lines', 0)
     period.setValue('last_error', '')
@@ -405,7 +408,7 @@ function dropWaivedFeeLines(period: GlideRecord): string[] {
         // Lines first, by the fee's id (a set-based delete is not relied on to follow a dot-walked condition).
         // A fee whose line survives stays on the period: unlinked, the closed period would keep a line it no
         // longer bills.
-        const lines = `billing_period=${periodId}^kind=fee^fee_event=${fee.getUniqueValue()}`
+        const lines = `billing_period=${periodId}^kind=${LINE_KIND.fee}^fee_event=${fee.getUniqueValue()}`
         if (!deleteWhere(LINE, lines)) return void stuck.push(`${feeLabel(fee)}: its billing line could not be removed`)
         const kept = takeOffPeriod(fee)
         if (kept) stuck.push(`${feeLabel(fee)}: ${kept}`)
@@ -415,7 +418,7 @@ function dropWaivedFeeLines(period: GlideRecord): string[] {
 
 /** Close a period ready for review: lock it and mark its fees billed. Its export and margin are for the caller to queue. */
 export function closePeriod(period: GlideRecord): PeriodOutcome {
-    if (str(period, 'status') !== 'ready') return notDone('Only a period ready for review can be closed')
+    if (str(period, 'status') !== BILLING_PERIOD_STATUS.ready) return notDone('Only a period ready for review can be closed')
     const name = str(period, 'period')
     const failed = num(period, 'failed_lines')
     const lastError = str(period, 'last_error')
@@ -458,7 +461,7 @@ export function exportOf(period: GlideRecord): { fileName: string; attached: boo
  */
 export function attachExport(periodId: string): void {
     const period = findById(PERIOD, periodId)
-    if (!period || str(period, 'status') !== 'closed') return
+    if (!period || str(period, 'status') !== BILLING_PERIOD_STATUS.closed) return
     const { fileName, attached } = exportOf(period)
     if (attached) return
     try {
@@ -583,7 +586,7 @@ export function closedLineRefusal(current: GlideRecord, previous: GlideRecord): 
     if (current.operation() === 'update' && str(previous, 'billing_period') !== str(current, 'billing_period')) {
         statuses.push(str(previous, 'billing_period.status'))
     }
-    return statuses.includes('closed') ? 'This billing period is closed; its lines cannot change' : null
+    return statuses.includes(BILLING_PERIOD_STATUS.closed) ? 'This billing period is closed; its lines cannot change' : null
 }
 
 /**

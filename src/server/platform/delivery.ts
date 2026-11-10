@@ -5,13 +5,13 @@ import type { HeldLock } from '../domain/job-lock.ts'
 import { isDeployed, stagesQuery } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { collectionMethod } from '../domain/returns.ts'
-import type { InstallMode, OrderStage, OrderType } from '../domain/vocabulary.ts'
+import { type InstallMode, type OrderStage, type OrderType, SHIPMENT_DIRECTION } from '../domain/vocabulary.ts'
 import { moveAndSave, moveAsset, readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { openFieldWork, type WorkContext } from './field-work.ts'
 import { lineAssetStages, recomputeOrder } from './fulfilment.ts'
 import { withLock } from './locks.ts'
-import { findById, num, refusal, str } from './records.ts'
+import { choice, findById, num, refusal, str } from './records.ts'
 import { raiseReturn } from './returns.ts'
 import { labelOrder, shippingEnabled } from './shipping.ts'
 
@@ -162,7 +162,7 @@ function shippable(orderId: string, siteId: string): { staged: string[]; hotSpar
 function labelBought(orderId: string, trackingNumber: string): boolean {
     const shipment = new GlideRecord('x_daas_ham_shipment')
     shipment.addQuery('order', orderId)
-    shipment.addQuery('direction', 'to_site')
+    shipment.addQuery('direction', SHIPMENT_DIRECTION.to_site)
     shipment.addQuery('tracking_number', trackingNumber)
     shipment.setLimit(1)
     shipment.query()
@@ -244,7 +244,7 @@ function retireReplacedAssets(order: GlideRecord): void {
  */
 function returnReplacedAssets(order: GlideRecord, assetIds: readonly string[]): void {
     if (assetIds.length === 0) return
-    const refresh = str(order, 'order_type') === 'refresh'
+    const refresh = choice<OrderType>(order, 'order_type') === 'refresh'
     raiseReturn({
         trigger: refresh ? 'refresh_swap_back' : 'defective_return',
         customerId: str(order, 'customer'),

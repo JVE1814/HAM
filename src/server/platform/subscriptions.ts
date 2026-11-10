@@ -4,6 +4,7 @@ import { chooseSubscriptionLine, type SubscriptionLineView } from '../domain/in-
 import { TRY_AGAIN, type HeldLock, type TryAgain } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { sitePackageHoldersQuery } from '../domain/returns.ts'
+import { SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
 import { nowMs } from './clock.ts'
 import { withLockTries } from './locks.ts'
 import { exists, findById, refusal, str, warnRefused } from './records.ts'
@@ -20,7 +21,7 @@ export function attachToSubscription(asset: GlideRecord, inServiceAt: number): b
     const lines: SubscriptionLineView[] = []
     const gr = new GlideRecord('x_daas_ham_subscription_line')
     gr.addQuery('agreement', str(asset, 'x_daas_ham_agreement'))
-    gr.addQuery('status', '!=', 'ended')
+    gr.addQuery('status', '!=', SUBSCRIPTION_LINE_STATUS.ended)
     gr.query()
     while (gr.next()) {
         lines.push({
@@ -68,9 +69,9 @@ function startHolding(lock: HeldLock, lineId: string, inServiceAt: number): stri
     const line = findById('x_daas_ham_subscription_line', lineId)
     if (!line) return 'the line is gone'
     const status = str(line, 'status')
-    if (status === 'active') return ''
-    if (status !== 'pending') return `the line is ${status || 'without a status'} now`
-    line.setValue('status', 'active')
+    if (status === SUBSCRIPTION_LINE_STATUS.active) return ''
+    if (status !== SUBSCRIPTION_LINE_STATUS.pending) return `the line is ${status || 'without a status'} now`
+    line.setValue('status', SUBSCRIPTION_LINE_STATUS.active)
     line.setValue('start_date', toIsoDate(inServiceAt))
     // The go-live that took a lost lock over may have read the line pending too, and saved its own start date.
     const late = { check: 'check its start date', level: 'error' } as const
@@ -92,12 +93,12 @@ export function endSitePackageIfEmpty(siteId: string, agreementId: string): void
     line.addQuery('agreement', agreementId)
     line.addQuery('site', siteId)
     line.addQuery('line_type', 'site_package')
-    line.addQuery('status', 'active')
+    line.addQuery('status', SUBSCRIPTION_LINE_STATUS.active)
     line.query()
     if (!line.hasNext()) return
     if (exists('alm_hardware', sitePackageHoldersQuery({ siteId, agreementId }), { beyondVisibility: true })) return
     while (line.next()) {
-        line.setValue('status', 'ended')
+        line.setValue('status', SUBSCRIPTION_LINE_STATUS.ended)
         line.setValue('end_date', toIsoDate(nowMs()))
         // A site package bills its own dates, and no later unit leaving ends it: logged for finance to end by hand.
         if (!line.update()) warnRefused(line, `Site package "${str(line, 'description')}" not ended`)
