@@ -92,6 +92,9 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
 - A line or Order stage the platform refuses to save is logged: it is derived again only when one of
   its Assets next changes, and until then the line or Order keeps its old stage, with the actions
   that stage offers (Ship, Confirm installed).
+- A line read afresh as cancelled, or on an Order cancelled or rejected, is never moved on by its
+  Assets, and a line whose Order ended while its derived stage was saved is cancelled again (logged
+  if refused): a stage derived beside a cancel never reopens a cancelled line (P1 ordering spec).
 
 ## Inbound
 
@@ -114,9 +117,9 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
   has one). A unit whose ASN PO number is one of the *Purchase orders* of a line awaiting stock (same
   Model) is allocated to that line and comes off its *On order* count (reserved, then staging once its
   Staging task is created; without one, or when the move to staging is refused, it stays reserved and
-  the reply shows it reserved). That holds while the line, read again under its lock, still awaits
-  stock and has room; otherwise the unit is received as free stock (available) and the reply shows it
-  unallocated. An unknown serial with a PID is received without an ASN. Returned units
+  the reply shows it reserved). That holds while the line, read again under its lock with its Order,
+  still awaits stock and has room, on an Order neither cancelled nor rejected; otherwise the unit is
+  received as free stock (available) and the reply shows it unallocated. An unknown serial with a PID is received without an ASN. Returned units
   (pending return or missing) are received by the returns process (P2 after-sales spec), and a unit
   in transfer on its transfer order line, in Inventory (Lifecycle stages); any other scanned Asset is
   refused as not awaiting receipt.
@@ -146,15 +149,22 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
   re-checked there, so two first scans create one Asset. ASN rows take the same lock (above), so a
   scan and an ASN row of one serial create one Asset too. A scan that finds the lock held is told to
   scan again (HTTP 503), and the rescan finds the Asset by serial.
-- A unit for a waiting line is saved, taken off its *On order* count (or its RMA marked received) and
-  reserved under the line's job lock (`order_line_<sys_id>`, P1 ordering spec). So sourcing's count
-  of the line (allocated, *On order*, OEM RMAs whose replacement is still to come) sees all of a
-  receipt or none of it. A receipt that cannot take the lock after 10 tries saves nothing and
-  answers HTTP 503 *Its order line is being sourced or received: scan again*. Under the line's lock
-  the line is read again. The unit is allocated only while the line is still awaiting stock and has
-  fewer Assets than its quantity. Otherwise it stays received as free stock (available), the line's
-  *On order* count and any OEM RMA are left as they are, and a warning *Received <serial> left in
-  stock, not given to <line>: ...* is logged.
+- A unit for a waiting line is saved, taken off its *On order* count (or its RMA marked received),
+  reserved and staged (its Staging task opened and its move into staging saved) under the line's job
+  lock (`order_line_<sys_id>`, P1 ordering spec). So sourcing's count of the line (allocated, *On
+  order*, OEM RMAs whose replacement is still to come) sees all of a receipt or none of it, and so
+  does *Cancel order*, which holds the lock of each of its lines while it releases their units: a
+  receipt lands wholly before the cancel, or finds the line cancelled. A receipt that cannot take the
+  lock after 10 tries saves nothing and answers HTTP 503 *Its order line is being sourced, received
+  or cancelled: scan again*. Under the line's lock the line and its Order are read again. The unit is
+  allocated only while the Order is neither cancelled nor rejected and the line is still awaiting
+  stock with fewer Assets than its quantity. Otherwise it stays received as free stock (available),
+  the line's *On order* count and any OEM RMA are left as they are, and a warning *Received <serial>
+  left in stock, not given to <line>: ...* is logged, for example *...: its Order is cancelled*; for
+  an advance replacement it adds *RMA <number> left open, update it by hand*. A receipt that
+  outlasted the line's lock (ADR 0013) stages no further after it is lost, and logs *<line>:
+  <serial> reserved (or given a Staging task, or moved into staging) after its lock
+  order_line_<sys_id> was lost: check it is still on the line*.
 - **Put-away** records the stockroom an Asset now sits in (for an inventory tech, one of theirs):
   - available stock and returned units awaiting evaluation, wipe or disposal go into any stockroom;
   - a unit being staged (one received for a waiting PO line among them) goes only into a staging
@@ -175,8 +185,39 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
 - A Staging task is kept only with every step of its template. If the platform refuses a step, the task
   and its steps are removed (a task that cannot be deleted is named in a warning, to cancel) and the
   Asset stays reserved for its line.
-- Steps stamp who and when. A task can be closed complete only when all mandatory steps are done,
-  unless its result is *failed*. A failed Asset goes to pending evaluation and leaves the line.
+- Steps stamp who and when. A task can be closed complete only when closing can move its Asset to
+  the stage it sends it to (staged, or pending evaluation when its result is *failed*), the task
+  still stands for the Asset, and, unless it failed, all mandatory steps are done. Otherwise the
+  closure is refused and the user is told what to do:
+  - a unit still in transfer to the staging centre (its task opened at sourcing, P1 ordering spec):
+    *<serial> is still in transfer to the staging centre: close <task> once the staging centre
+    receives it*; received there with its task open, it goes into staging (Lifecycle stages, In
+    transfer). Closed before, it would be left reserved there with no task;
+  - a unit no longer on the task's Order line (released, or sourced for another line): *<serial> is
+    no longer on the order line <task> stages for: close <task> skipped*;
+  - a unit put back and sourced again under a newer open task: *<serial> has a newer Staging task,
+    <newer>: close <task> skipped and stage the unit under <newer>*, so it is never staged against
+    the older checklist;
+  - a unit in any stage closing cannot move on from (shipped, staged on a failed close, available,
+    ...): *<serial> is <stage>, not in staging, so closing <task> cannot move it to <stage>: close
+    <task> skipped if it is no longer needed*;
+  - an Asset that cannot be read: *The asset of <task> cannot be read: close <task> skipped*.
+
+  A unit in staging, or still reserved for the task's line (its move into staging refused when the
+  task opened, which closing makes first), can be closed. So can one already at the stage closing
+  sends it to (the task reopened and closed again), which moves nothing more. A failed Asset goes to
+  pending evaluation and leaves the line. A move the platform refuses is reported to the user, who
+  reopens the task and closes it again. A failed Asset whose move to pending evaluation is refused
+  still leaves its line, which is derived and sourced again, and stays in staging until the task is
+  closed as failed again. An Asset that changed between the closure check and the move is left as it
+  is, and the user is told *<task> is closed but moved nothing (reopen it to close it again): ...*.
+- Closing a task *Closed Skipped* or *Closed Incomplete* moves nothing, so it is refused only while
+  the unit, on the task's line with that line and its Order still open and no newer task, still
+  needs the task: in transfer to the staging centre (*... which needs <task>: close <task> complete
+  once the staging centre receives it*) or in staging (*... close <task> complete, or failed to send
+  the unit for evaluation*). The app's own skips (a cancel or rejection, a transfer that fell
+  through, a move into staging refused at sourcing) pass. The check runs only where the closure
+  guard's condition (`br_staging_guard_closure`) takes states 4 and 7 as well as 3.
 
 ## Delivery and install
 

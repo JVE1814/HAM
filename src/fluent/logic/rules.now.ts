@@ -136,7 +136,7 @@ BusinessRule({
     when: 'before',
     action: ['update'],
     order: 100,
-    condition: `current.state.changes() && current.state == ${STAGING_TASK_STATE.closed}`,
+    condition: `current.state.changes() && (current.state == ${STAGING_TASK_STATE.closed} || current.state == ${STAGING_TASK_STATE.incomplete} || current.state == ${STAGING_TASK_STATE.skipped})`,
     script: guardStagingClosure,
 })
 

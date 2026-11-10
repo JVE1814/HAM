@@ -19,6 +19,7 @@ import {
     identifyAsset,
     isFleetAsset,
     joinFleet,
+    moveAndSave,
     moveAsset,
     newAsset,
     readStage,
@@ -33,7 +34,7 @@ import { purchaseOrderId } from './procurement.ts'
 import { findById, num, refusal, str, warnRefused } from './records.ts'
 import { receiveReturnedAsset } from './returns.ts'
 import { withOrderLineLock } from './sourcing.ts'
-import { startStaging } from './staging-tasks.ts'
+import { openStagingTask } from './staging-tasks.ts'
 import { changeStock, reserveAsset } from './stock.ts'
 import { nextProviderTag } from './tags.ts'
 
@@ -74,7 +75,7 @@ export function assetSummary(asset: GlideRecord): AssetSummary {
 
 const SCAN_AGAIN: ScanRefusal = { reason: 'busy', why: 'Another scan is receiving this unit: scan again' }
 
-const LINE_BUSY: ScanRefusal = { reason: 'busy', why: 'Its order line is being sourced or received: scan again' }
+const LINE_BUSY: ScanRefusal = { reason: 'busy', why: 'Its order line is being sourced, received or cancelled: scan again' }
 
 const STOCK_BUSY: ScanRefusal = { reason: 'busy', why: 'This unit is being reserved or moved: scan again' }
 
@@ -133,9 +134,10 @@ export interface ScannedUnit {
  * receipt, each take a Provider tag and allocate it. So the receipt is made under a lock on the Asset, from a fresh
  * read; a scan that finds the lock held saves nothing and is told to scan again, and the rescan finds it received.
  * Two first scans of one unknown serial would both create its Asset, so that is done under a lock on the serial the
- * same way. A unit for a waiting Order line is also received under the line's lock (`receiveHolding`), and given to it
- * only while the line, read again there, still waits and has room (`allocateHolding`). Taking a lock throws only when
- * an insert is refused with no lock row (platform/locks); that error escapes.
+ * same way. A unit for a waiting Order line is also received, reserved and staged under the line's lock
+ * (`receiveHolding`), and given to it only while the line, read again there, still waits and has room on an Order
+ * neither cancelled nor rejected (`allocateHolding`). Taking a lock throws only when an insert is refused with no lock
+ * row (platform/locks); that error escapes.
  */
 export function receive(unit: ScannedUnit, stockroomId: string): Scan {
     const stockroom = visibleStockroom(stockroomId)
@@ -188,9 +190,10 @@ function receiveHolding(lock: HeldLock, assetId: string, stockroomId: string): S
     asset.setValue('stockroom', stockroomId)
     const waiting = waitingLine(asset)
     if (!waiting) return saveReceipt(lock, asset) ?? { asset }
-    // Saved, taken off order and reserved under the line's lock, where sourcing counts the line's units and on-order
-    // count (platform/sourcing), so that count sees all of the receipt or none of it. A scan that cannot take it is told to
-    // scan again and saves nothing, so the rescan finds the unit still awaiting receipt.
+    // Saved, taken off order, reserved and staged under the line's lock, where sourcing counts the line's units and
+    // on-order count (platform/sourcing) and a cancel of its Order releases them (platform/orders), so each sees all of
+    // the receipt or none of it. A scan that cannot take it is told to scan again and saves nothing, so the rescan finds
+    // the unit still awaiting receipt.
     const lineId = waiting.line.getUniqueValue()
     const underLine = withOrderLineLock(lineId, (lineLock) => saveReceipt(lock, asset) ?? allocateHolding(lineLock, asset, waiting))
     const received = underLine.ran ? underLine.value : LINE_BUSY
@@ -205,7 +208,7 @@ function receiveHolding(lock: HeldLock, assetId: string, stockroomId: string): S
         sourceOrderAgain(str(waiting.line, 'order'))
         return { asset: findById('alm_hardware', assetId) ?? asset }
     }
-    return { asset: stageReserved(received.reserved, lineId) }
+    return { asset: received.reserved }
 }
 
 /** Save the receipt holding the Asset's `lock`: null once saved, or why not. */
@@ -281,16 +284,19 @@ type Allocation = { reserved: GlideRecord | null } | { leftFree: true }
 /**
  * Give the saved receipt to the line waiting for it, holding the line's `lineLock`: a purchase comes off its on-order
  * count, an advance replacement marks its RMA received, and the unit is reserved for the line (null when it is not,
- * logged). The line was found before its lock was taken, so it is read again here: one another receipt or a sourcing
- * run filled since, or that moved on (domain/warehouse `allocationProblem`), is left as it is and the unit stays free
- * stock (logged), its RMA, if any, still open.
+ * logged) and staged (`stageReserved`). The line was found before its lock was taken, so it is read again here, with
+ * its Order: one another receipt or a sourcing run filled since, that moved on, or whose Order was cancelled or
+ * rejected (domain/warehouse `allocationProblem`), is left as it is and the unit stays free stock (logged), its RMA, if
+ * any, still open and named.
  */
 function allocateHolding(lineLock: HeldLock, asset: GlideRecord, waiting: WaitingLine): Allocation {
     const line = findById('x_daas_ham_order_line', waiting.line.getUniqueValue())
     const problem = line ? allocationProblem(receivingLine(line)) : 'it no longer exists'
     if (!line || problem) {
         const unit = `${str(asset, 'serial_number')} left in stock, not given to ${str(waiting.line, 'number')}`
-        gs.warn(`[x_daas_ham] Received ${unit}: ${problem ?? ''}`)
+        // The RMA number came in the PO field (`waitingLine`).
+        const rma = waiting.rmaId ? `; RMA ${str(asset, 'po_number')} left open, update it by hand` : ''
+        gs.warn(`[x_daas_ham] Received ${unit}: ${problem ?? ''}${rma}`)
         return { leftFree: true }
     }
     if (waiting.rmaId) markReplacementReceived(waiting.rmaId, str(asset, 'serial_number'))
@@ -305,14 +311,16 @@ function allocateHolding(lineLock: HeldLock, asset: GlideRecord, waiting: Waitin
     if (!reserved) {
         const why = 'another run claimed it, or the save was refused'
         gs.warn(`[x_daas_ham] Received ${str(asset, 'serial_number')} not reserved for ${str(line, 'number')}: ${why}`)
+        return { reserved: null }
     }
-    return { reserved }
+    return { reserved: stageReserved(lineLock, reserved, line) }
 }
 
 /** The line as `allocationProblem` judges it; its Assets are counted past the user's stockroom rule (ADR 0005). */
 function receivingLine(line: GlideRecord): ReceivingLine {
     return {
         stage: str(line, 'line_stage') as ReceivingLine['stage'],
+        orderStage: str(line, 'order.stage'),
         quantity: num(line, 'quantity'),
         allocated: unitsOnLine(line.getUniqueValue()),
     }
@@ -328,11 +336,21 @@ function takeOffOrder(lineLock: HeldLock, line: GlideRecord): void {
     lineLock.lostAfter(`${number} counted`, { check: 'check its On order count' })
 }
 
-/** Stage a unit reserved on receipt for `lineId`; the Asset as it now stands, for the caller. */
-function stageReserved(reserved: GlideRecord, lineId: string): GlideRecord {
-    // Without its Staging task the Asset stays reserved for the line. A refused move (logged) leaves it reserved too,
-    // with the unsaved move on the record, so it is read again for the caller.
-    if (startStaging(reserved, lineId, 'receiving') === 'not_moved') reserved.get(reserved.getUniqueValue())
+/**
+ * Stage a unit reserved on receipt for `line`, still holding its `lineLock`: a cancel of its Order, which takes the lock
+ * (platform/orders `cancelOrder`), then finds the unit and its Staging task, or neither. The Asset as it now stands,
+ * for the caller.
+ */
+function stageReserved(lineLock: HeldLock, reserved: GlideRecord, line: GlideRecord): GlideRecord {
+    // Checked after each write: a holder that outlasted the lock (ADR 0013) may overlap a cancel that took it over, so
+    // it stages no further.
+    const lost = (what: string): boolean =>
+        lineLock.lostAfter(`${str(line, 'number')}: ${str(reserved, 'serial_number')} ${what}`, { check: 'check it is still on the line' })
+    // Without its Staging task the Asset stays reserved for the line, not staging with no task to finish. A refused
+    // move (logged) leaves it reserved too, with the unsaved move on the record, so it is read again for the caller.
+    if (lost('reserved') || !openStagingTask(reserved, line.getUniqueValue()) || lost('given a Staging task')) return reserved
+    if (moveAndSave(reserved, 'staging', 'receiving')) lost('moved into staging')
+    else reserved.get(reserved.getUniqueValue())
     return reserved
 }
 

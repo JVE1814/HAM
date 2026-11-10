@@ -12,13 +12,14 @@ import { bool, findById, refusal, str, warnRefused } from './records.ts'
 
 /**
  * What came of "Raise replacement" on a case:
- * - `raised`: the replacement Order went ahead, to approval or sourcing;
+ * - `raised`: the replacement Order went ahead, to approval or sourcing (`already` says so, for the user, when another
+ *   submission of it had taken it ahead: platform/orders `Submission`);
  * - `already_raised`: the Order the case links is going ahead, in the stage `stageLabel` names, and is kept;
  * - `draft`: the Order could not be submitted (`why`) and is left a draft, linked to the case, to correct and submit;
  * - `not_raised`: nothing was raised or submitted, and why.
  */
 export type Replacement =
-    | { outcome: 'raised'; number: string }
+    | { outcome: 'raised'; number: string; already?: string }
     | { outcome: 'already_raised'; number: string; stageLabel: string }
     | { outcome: 'draft'; number: string; why: string }
     | { outcome: 'not_raised'; why: string }
@@ -78,7 +79,8 @@ export function raiseReplacement(kase: GlideRecord): Replacement {
 function submitReplacement(order: GlideRecord): Replacement {
     const submission = submitOrder(order)
     const number = str(order, 'number')
-    return submission.submitted ? { outcome: 'raised', number } : { outcome: 'draft', number, why: submission.message }
+    if (!submission.submitted) return { outcome: 'draft', number, why: submission.message }
+    return { outcome: 'raised', number, already: submission.already }
 }
 
 /**

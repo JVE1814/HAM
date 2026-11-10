@@ -1,4 +1,4 @@
-import { OPEN_LINE_STAGES, UNFULFILLED_ORDER_STAGES } from './fulfilment.ts'
+import { endedUnfulfilled, OPEN_LINE_STAGES } from './fulfilment.ts'
 import { fleetStagesQuery, providerStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
 import { STOCK_STAGES, type Stage } from './lifecycle.ts'
 import {
@@ -295,7 +295,7 @@ export const LINES_TO_SOURCE: readonly LineStage[] = [LINE_STAGE.new, LINE_STAGE
 
 /** Whether an Order line still waits to be filled: not shipped or cancelled, its Order not cancelled or rejected. */
 export function lineStillOpen(line: { lineStage: string; orderStage: string }): boolean {
-    return OPEN_LINE_STAGES.includes(line.lineStage as LineStage) && !(UNFULFILLED_ORDER_STAGES as readonly string[]).includes(line.orderStage)
+    return OPEN_LINE_STAGES.includes(line.lineStage as LineStage) && !endedUnfulfilled(line.orderStage)
 }
 
 /**

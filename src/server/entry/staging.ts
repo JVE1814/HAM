@@ -1,11 +1,11 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { stagingOutcome } from '../domain/staging.ts'
+import { stagingClosing, type ClosedStagingTask } from '../domain/staging.ts'
 import type { StagingResult } from '../domain/vocabulary.ts'
 import { releaseStepsWaitingOn } from '../platform/claim-steps.ts'
 import { nowGlide } from '../platform/clock.ts'
 import { bool, choice, str } from '../platform/records.ts'
 import { abortWith } from '../platform/rule-api.ts'
-import { completeStaging, stagingSteps } from '../platform/staging-tasks.ts'
+import { completeStaging, stagingClosureProblem } from '../platform/staging-tasks.ts'
 
 /** Before-update rule on staging steps: stamp who completed a step and when. */
 export function stampStagingStep(current: GlideRecord): void {
@@ -23,11 +23,19 @@ export function releaseWaitingSteps(current: GlideRecord): void {
     releaseStepsWaitingOn(str(current, 'staging_task'), str(current, 'automation'))
 }
 
-/** Before-update rule on staging tasks being closed: every mandatory step must be done unless it failed. */
+/**
+ * Before-update rule on Staging tasks being closed: refused, with what to do, while closing cannot move the Asset to the
+ * stage it sends it to, or would leave a unit that still needs the task without one (platform/staging-tasks
+ * `stagingClosureProblem`). The rule's condition decides which closed states reach it (logic/rules.now.ts).
+ */
 export function guardStagingClosure(current: GlideRecord): void {
-    if (choice<StagingResult>(current, 'result') === 'failed') return
-    const outcome = stagingOutcome(stagingSteps(current.getUniqueValue()))
-    if (!outcome.complete) abortWith(current, `${outcome.remaining} mandatory staging step(s) are still open`)
+    const closing = stagingClosing(str(current, 'state'))
+    if (closing) abortWith(current, stagingClosureProblem(current, closedTask(current), closing))
+}
+
+/** The task as both closure rules read it. */
+function closedTask(current: GlideRecord): ClosedStagingTask {
+    return { number: str(current, 'number'), lineId: str(current, 'order_line'), failed: choice<StagingResult>(current, 'result') === 'failed' }
 }
 
 /**
@@ -36,10 +44,6 @@ export function guardStagingClosure(current: GlideRecord): void {
  * `completeStaging`).
  */
 export function onStagingClosed(current: GlideRecord): void {
-    const unmoved = completeStaging(str(current, 'asset'), {
-        number: str(current, 'number'),
-        lineId: str(current, 'order_line'),
-        failed: choice<StagingResult>(current, 'result') === 'failed',
-    })
+    const unmoved = completeStaging(str(current, 'asset'), closedTask(current))
     if (unmoved) gs.addErrorMessage(unmoved)
 }

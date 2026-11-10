@@ -28,6 +28,7 @@ export function uiRaiseReplacement(current: GlideRecord): void {
     const replacement = raiseReplacement(current)
     switch (replacement.outcome) {
         case 'raised':
+            if (replacement.already) gs.addInfoMessage(replacement.already)
             return void gs.addInfoMessage(`Replacement order ${replacement.number} raised`)
         case 'already_raised':
             return void gs.addInfoMessage(`Replacement order ${replacement.number} is already raised (${replacement.stageLabel})`)

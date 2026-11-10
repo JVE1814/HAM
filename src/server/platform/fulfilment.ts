@@ -1,6 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import {
     closedStateFor,
+    endedUnfulfilled,
     followsLines,
     leftInTransit,
     lineStageFor,
@@ -10,11 +11,11 @@ import {
 } from '../domain/fulfilment.ts'
 import type { Stage } from '../domain/lifecycle.ts'
 import { siteRecoveryLineQuery } from '../domain/returns.ts'
-import { ORDER_STAGE, type LineStage } from '../domain/vocabulary.ts'
+import { LINE_STAGE, ORDER_STAGE, type LineStage } from '../domain/vocabulary.ts'
 import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { EVENT, fire } from './events.ts'
-import { saveLineStage } from './order-lines.ts'
+import { cancelLine, saveLineStage } from './order-lines.ts'
 import { exists, findById, num, str, warnRefused, type ForeignRecord } from './records.ts'
 import { takeOffOrderLine } from './stock.ts'
 
@@ -144,18 +145,37 @@ function takeOffLine(assetId: string, line: GlideRecord, to: Stage): boolean {
 /**
  * Derive `line`'s stage again (`refill`: domain/fulfilment `LineFacts`), save it and move its Order on: the stage it
  * now has, or null when the platform refused the save (logged).
+ *
+ * A cancel or rejection saves its Order before it cancels the lines, under their locks, but a derive takes no lock: one
+ * that read the line before the cancel could save its stage after, reopening the line. So a line read afresh as
+ * cancelled, or on an Order that ended unfulfilled (domain/fulfilment `endedUnfulfilled`), is not moved on, and one
+ * whose Order ended while its stage was saved is cancelled again: either the cancel's save came after this one, or the
+ * Order was cancelled before this save and the line with it.
  */
 function deriveLine(line: GlideRecord, refill: boolean): LineStage | null {
     const current = str(line, 'line_stage') as LineStage
     if (current === 'new') return current // not sourced yet
     const assetStages = lineAssetStages(line.getUniqueValue())
     const next = lineStageFor({ current, quantity: num(line, 'quantity'), assetStages, refill })
-    if (next !== current && !saveLineStage(line, next)) {
-        notMoved(line, next)
-        return null
+    if (next !== current) {
+        if (closedNow(line)) return LINE_STAGE.cancelled
+        if (!saveLineStage(line, next)) {
+            notMoved(line, next)
+            return null
+        }
+        if (next !== LINE_STAGE.cancelled && closedNow(line)) {
+            if (!cancelLine(line)) warnRefused(line, `${str(line, 'number')} moved to ${next} beside its Order's cancel, not cancelled again`)
+            return LINE_STAGE.cancelled
+        }
     }
     recomputeOrder(str(line, 'order'))
     return next
+}
+
+/** Whether the line, read afresh past the user's rules, is cancelled or on an Order cancelled or rejected. */
+function closedNow(line: GlideRecord): boolean {
+    const fresh = findById('x_daas_ham_order_line', line.getUniqueValue(), { beyondVisibility: true })
+    return !!fresh && (str(fresh, 'line_stage') === LINE_STAGE.cancelled || endedUnfulfilled(str(fresh, 'order.stage')))
 }
 
 export function recomputeOrder(orderId: string): void {

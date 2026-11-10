@@ -5,6 +5,7 @@ import {
     inFlightLinesQuery,
     ownershipFindings,
     raiserRefusal,
+    readsUsage,
     siteTemplateOffered,
     type EntitlementContext,
     type Orderer,
@@ -90,6 +91,38 @@ describe('assessOrder', () => {
         )
         expect(result.verdict).toBe('over_quota')
         expect(result.findings).toHaveLength(2)
+    })
+})
+
+describe('an Order already submitted', () => {
+    it('counts against the next one, which the Agreement lock makes read it', () => {
+        const capped: EntitlementContext = { ...context, quantities: [{ deviceClass: 'switch', contracted: 1 }], usage: [] }
+        const request = { lines: [{ modelId: 'c9300', deviceClass: 'switch', quantity: 1 }] }
+        expect(assessOrder(request, capped).verdict).toBe('within_agreement')
+        const firstInFlight = { ...capped, usage: [{ deviceClass: 'switch', modelId: 'c9300', count: 1 }] }
+        expect(assessOrder(request, firstInFlight)).toEqual({
+            verdict: 'over_quota',
+            approvers: ['customer_admin', 'account_manager'],
+            findings: ['switch: 1 in use + 1 requested exceeds 1 contracted'],
+        })
+    })
+})
+
+describe('readsUsage', () => {
+    const replacing = { modelId: 'c9300', deviceClass: 'switch', quantity: 1, replacesAsset: true }
+    const adding = { modelId: 'c9300', deviceClass: 'switch', quantity: 1 }
+
+    it('is any line that adds a unit; an Order replacing Assets only reads none', () => {
+        expect(readsUsage([replacing, replacing])).toBe(false)
+        expect(readsUsage([replacing, adding])).toBe(true)
+        expect(readsUsage([adding])).toBe(true)
+        expect(readsUsage([])).toBe(false)
+    })
+
+    it('holds for assessOrder: an Order replacing Assets only is assessed the same whatever is in flight', () => {
+        const request = { lines: [replacing, { ...replacing, modelId: 'old-switch' }] }
+        const crowded = { ...context, usage: [{ deviceClass: 'switch', modelId: 'c9300', count: 1000 }, { deviceClass: 'ap', modelId: 'mr46', count: 1000 }] }
+        expect(assessOrder(request, crowded)).toEqual(assessOrder(request, { ...context, usage: [] }))
     })
 })
 

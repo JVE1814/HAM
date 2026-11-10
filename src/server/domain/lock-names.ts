@@ -17,6 +17,12 @@ function named(name: string): string {
 export const LOCK = {
     /** Held by the daily refresh run from its read of the Assets due to its last Order. */
     refreshOrders: () => named('refresh_orders'),
+    /**
+     * An Agreement's submissions take turns under it: each reads the Agreement's usage, assesses its Order and saves it
+     * out of draft, which makes it count in flight, before the next reads. Two read at once would each miss the other
+     * and could both go ahead within a Contracted quantity only one fits.
+     */
+    agreementUsage: (agreementId: string) => named(`agreement_usage_${agreementId}`),
     /** Held by an OEM claim run throughout, so two runs never send a step to its vendor twice. */
     oemClaimRun: () => named('oem_claim_run'),
     /** An Asset's sightings (the device-events REST handler, the in-service detection job) take turns under it. */

@@ -92,8 +92,9 @@ function queuePassAgain(order: GlideRecord, tries: number, why: string): void {
 
 /**
  * Run `work` holding the Order line's lock and give what it returned, or `ran: false` when other holders kept it through
- * every try: a holder keeps it for a receipt (the Asset, the line and the reservation saved) or for sourcing's read of
- * the line or its purchase and save. Taking the lock throws only when an insert is refused with no lock row
+ * every try: a holder keeps it for a receipt (the Asset, the line, the reservation and the move into staging saved),
+ * for sourcing's read of the line or its purchase and save, or for a cancel or rejection of its Order (platform/orders
+ * `withOrderLineLocks`). Taking the lock throws only when an insert is refused with no lock row
  * (platform/locks `withLockTries` tries again, and that error escapes only when every try threw), as does an error
  * from `work`.
  */

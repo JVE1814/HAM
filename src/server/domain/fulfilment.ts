@@ -171,6 +171,14 @@ export function closedStateFor(stage: OrderStage): number | undefined {
  */
 export const UNFULFILLED_ORDER_STAGES: readonly OrderStage[] = [ORDER_STAGE.rejected, ORDER_STAGE.cancelled]
 
+/**
+ * Whether an Order ended unfulfilled (cancelled or rejected): nothing is sourced, received or derived for its lines,
+ * even one a refused save left open. Its cancel or rejection saves it before its lines.
+ */
+export function endedUnfulfilled(orderStage: string): boolean {
+    return (UNFULFILLED_ORDER_STAGES as readonly string[]).includes(orderStage)
+}
+
 /** Stages in which an Order has ended, fulfilled or not. Every other Order is open (`OPEN_ORDERS_QUERY`). */
 export const ENDED_ORDER_STAGES: readonly OrderStage[] = [ORDER_STAGE.complete, ORDER_STAGE.cancelled, ORDER_STAGE.rejected]
 

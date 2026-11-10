@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { endedUnfulfilled } from './fulfilment'
 import { ALL_STAGES, type Stage } from './lifecycle'
 import {
     cancelledUnit,
@@ -248,6 +249,22 @@ describe('shortfallOutcome', () => {
         const outcome = shortfallOutcome('purchase', { ...line, unmoved: [{ units: 1, from: 'Depot North', reason: 'Inventory did not create it' }] }, buy)
         expect(outcome).toMatchObject({ stage: 'awaiting_stock', purchaseOrder: 'po1', purchased: 2 })
         expect(buy).toHaveBeenCalledOnce()
+    })
+})
+
+describe('endedUnfulfilled', () => {
+    it('is an Order cancelled or rejected, and no other', () => {
+        expect(['cancelled', 'rejected'].map(endedUnfulfilled)).toEqual([true, true])
+        const live = ['draft', 'awaiting_approval', 'sourcing', 'preparing', 'delivering', 'installing', 'complete', '']
+        expect(live.filter(endedUnfulfilled)).toEqual([])
+    })
+
+    it('ends every line of the Order for sourcing, whatever its own stage', () => {
+        for (const orderStage of ['cancelled', 'rejected']) {
+            for (const lineStage of ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship']) {
+                expect(lineStillOpen({ lineStage, orderStage })).toBe(false)
+            }
+        }
     })
 })
 

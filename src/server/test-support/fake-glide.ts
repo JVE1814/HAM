@@ -62,6 +62,13 @@ function state() {
         constraints: {} as Record<string, (row: Row, others: Row[]) => string>,
         /** Why an insert, update or delete of `row` is refused beyond those ('' lets it through). */
         refuses: (() => '') as (table: string, row: Row, operation: Operation) => string,
+        /**
+         * Whether the user may create a record of a table (GlideRecord#canCreate): the answer of its create ACLs, which
+         * the fake does not work out, so a test that reaches it says.
+         */
+        creatable: ((table) => {
+            throw new Error(`fake Glide: canCreate is asked of ${table} but platform.creatable is not set`)
+        }) as (table: string) => boolean,
         /** Called with each row as it is inserted or updated, once nothing refused it and before it is stored. */
         onSave: (() => undefined) as (table: string, row: Row, operation: Exclude<Operation, 'delete'>) => void,
         events: [] as QueuedEvent[],
@@ -310,6 +317,9 @@ class GlideRecord extends Conditions {
     }
     getLastErrorMessage(): string {
         return this.error
+    }
+    canCreate(): boolean {
+        return platform.creatable(this.table)
     }
 
     private refusal(operation: Operation, stored: Row | undefined): string {

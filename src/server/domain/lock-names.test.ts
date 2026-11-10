@@ -8,6 +8,7 @@ const fee = { type: 'late_return' as const, assetId: sysId('a'), returnOrderId: 
 function oneOfEach(id: string): string[] {
     return [
         LOCK.refreshOrders(),
+        LOCK.agreementUsage(id),
         LOCK.oemClaimRun(),
         LOCK.seenAsset(id),
         LOCK.receiveSerial(id),
@@ -35,6 +36,7 @@ describe('LOCK', () => {
         const a = sysId('a')
         const b = sysId('b')
         expect(LOCK.refreshOrders()).toBe('refresh_orders')
+        expect(LOCK.agreementUsage(a)).toBe(`agreement_usage_${a}`)
         expect(LOCK.oemClaimRun()).toBe('oem_claim_run')
         expect(LOCK.seenAsset(a)).toBe(`seen_asset_${a}`)
         expect(LOCK.receiveSerial('FOC123')).toBe('receive_serial_FOC123')

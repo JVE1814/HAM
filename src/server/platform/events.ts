@@ -8,7 +8,10 @@ import { str } from './records.ts'
  * server code fires and answers it by the same constant. Each entry says what the event's record and parameters carry.
  */
 export const EVENT = {
-    /** An approved Order needs its lines sourced. Record: the Order; parm2: how often it was queued again. */
+    /**
+     * An approved Order needs its lines sourced. Record: the Order; parm2: how often it was queued again. With parm1
+     * `submit` (platform/orders `SUBMIT_AGAIN`) it carries a submission of the Order queued again instead.
+     */
     sourceOrder: 'x_daas_ham.order.source',
     /** A Model's lifecycle milestones changed or one was crossed (event job). Record and parm1: the Model; parm2: cursor. */
     lifecycleChanged: 'x_daas_ham.model.lifecycle',

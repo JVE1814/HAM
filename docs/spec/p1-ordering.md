@@ -41,6 +41,23 @@
   quantity are uncapped.
 - Verdict: **over quota** if any cap would be exceeded, else **off catalog** if anything is not
   catalogued, else **within agreement**. All findings are recorded on the Order.
+- Submissions of one Agreement take turns under the job lock `agreement_usage_<Agreement sys_id>`
+  (ADR 0013): each reads the Order, its lines and the Agreement's quantities and usage afresh,
+  assesses it and saves it out of draft before the next reads, so two Orders submitted at once never
+  both fit a quantity only one fits. Only an Order with a line that adds a unit takes it: one whose
+  lines all replace Assets (break-fix, refresh) reads no usage. A submission goes on only from
+  draft: one that finds the Order already submitted says *Order <number> was already submitted* and
+  counts as gone ahead (a second *Raise replacement* says it is raised); one whose Customer or
+  Agreement changed meanwhile, or that gained a line adding a unit, stays a draft, to submit again.
+- A submission that finds the lock held through 10 tries leaves the Order a draft, its work notes
+  saying why, and it is submitted again automatically a minute later, at most 15 times, then left
+  for staff to submit (logged). *Submit* says *Order not submitted yet: another Order of its
+  Agreement was being submitted at the same time. It is submitted again automatically in a minute*.
+  Through the record producer, whose requester may have no *Submit*, it says *Order <number> is
+  saved and is submitted within a few minutes: another order of the same agreement was being
+  submitted at that moment. There is no need to raise it again*.
+- The lock orders submissions only. A line added to an Order already submitted, a quantity or
+  Agreement changed on one, or an Asset adopted into the Agreement changes its usage unassessed.
 
 ## Approvals (`domain/approvals.ts`, ADR 0004)
 
@@ -70,8 +87,12 @@
   work notes. An Order the platform will not save as approved (within agreement) or awaiting approval
   also stays a draft, and the user is told why; requests already made are cancelled again.
 - A rejected Order cancels its lines, so they stop counting as usage. It is saved as rejected first,
-  so one the platform refuses keeps its lines. Usage also ignores draft and cancelled Orders. Units a
-  cancelled line had already shipped count as deployed again, since cancelling closes the line.
+  so one the platform refuses keeps its lines. Both are done holding each open line's lock
+  (`order_line_<sys_id>`, as **Cancel** below): a rejection that finds one held changes nothing, is
+  logged and leaves the Order awaiting approval, and *Re-check approvals* says *Order not saved as
+  rejected: one of its lines is being received or cancelled*. Usage also ignores draft and cancelled
+  Orders. Units a cancelled line had already shipped count as deployed again, since cancelling closes
+  the line.
 
 ## Sourcing (`domain/sourcing.ts`)
 
@@ -110,7 +131,8 @@
   saved available, still on its Order line and claimed by nobody else, just before its line is
   inserted, and Inventory then puts it *in transfer*. Its Staging task is opened at once, and the
   unit goes into *staging* when Inventory receives the line at the staging centre (in the stockroom
-  Inventory sets). Meanwhile the line counts it as sourced. If Inventory cancels or deletes the line
+  Inventory sets); the task cannot be closed before then (P1 fulfilment spec, Staging). Meanwhile the
+  line counts it as sourced. If Inventory cancels or deletes the line
   instead, the transfer has fallen through: the unit, reserved for the line again where it was, is
   put back as free stock, its Staging task is skipped, and the line goes back to awaiting stock and
   is sourced again (P1 fulfilment spec, In transfer), with a warning.
@@ -142,7 +164,7 @@
   finds it held, by another pass or a cancel, runs again about a minute later, up to 15 times, then
   is dropped with a warning.
 - A line's need is counted under a job lock on the line (`order_line_<sys_id>`), which a receipt for
-  the line takes too. The stock pick runs outside that lock, each claim under its Asset's lock. The
+  the line, **Cancel** and a rejection take too. The stock pick runs outside that lock, each claim under its Asset's lock. The
   pass then buys and saves the line under its lock again. There the line is counted again and the
   pass buys only what is still missing: what its first count left to buy, less any need met since
   (for example a unit received for the line with nothing left on order to take off). The line's
@@ -173,13 +195,20 @@
   (`ship_order_<sys_id>`), so no Ship sends units between its shipped check and its release of the
   lines: pressed while a Ship (or *Mark label voided* on one of the Order's outbound labels) holds
   it, it changes nothing and says *Order not cancelled: a Ship of the Order is running. Try again
-  once it is done*. Otherwise it:
+  once it is done*. Under that, it takes the lock of each line not shipped (`order_line_<sys_id>`,
+  in sys_id order, 10 tries each), which a receipt holds while it gives its unit to the line and
+  stages it (P1 fulfilment spec): so no unit is given to a line between the cancel's release of its
+  units and its cancel. Pressed while a receipt (or a rejection) holds one, it changes nothing and
+  says *Order not cancelled: a unit is being received for one of its lines. Try again shortly*.
+  Otherwise it:
   - saves the Order as cancelled first, listing every purchase order of its lines in its work notes
     for cancelling in Procurement (if the platform refuses, the user is told and nothing is
     released);
-  - releases the stock: hot spares stay in the pool, other Assets return to free stock under the
-    Provider company; a unit in transfer leaves its line but stays in transfer, and is free stock
-    once Inventory lets it go (P1 fulfilment spec, In transfer);
+  - releases the stock of each line it locked, whatever stage the line now shows: hot spares stay in
+    the pool, other Assets return to free stock under the Provider company; a unit in transfer
+    leaves its line but stays in transfer, and is free stock once Inventory lets it go (P1
+    fulfilment spec, In transfer). A line added to the Order meanwhile is new and is cancelled with
+    the rest;
   - skips open staging tasks;
   - cancels the Order's pending approvals.
 
@@ -195,7 +224,13 @@
   units still on it to release and the transfer orders to cancel. A cancel that outlasted its lock
   (ADR 0013) logs *<Order> cancelled after its lock source_order_<sys_id> was lost*, to check its
   lines for stock reserved or bought meanwhile. One that outlasted the Ship lock logs *<Order>
-  cancelled after its lock ship_order_<sys_id> was lost*, to check for units shipped meanwhile.
+  cancelled after its lock ship_order_<sys_id> was lost*, to check for units shipped meanwhile, and
+  one that outlasted a line's lock logs *<Order>: lines cancelled after its lock order_line_<sys_id>
+  was lost*, to check them for units received meanwhile. A receipt reads the line and its Order
+  again under the line's lock and gives its unit only to a line awaiting stock on an Order neither
+  cancelled nor rejected (P1 fulfilment spec). A line's stage derived from its Assets is never saved
+  on a cancelled line or one whose Order ended, and a line whose Order ended while its stage was
+  saved is cancelled again, so nothing reopens a line its Order's cancel or rejection closed.
 
 ## Spare-pool top-up (daily)
 

@@ -2,7 +2,15 @@ import { gs, type GlideRecord } from '@servicenow/glide'
 import { approvalAwaited } from '../domain/approvals.ts'
 import { messageOf } from '../domain/errors.ts'
 import type { NewLine } from '../platform/order-lines.ts'
-import { cancelOrder, rollUpOrderApprovals, submitOrder, submitProducedOrder, type Submission } from '../platform/orders.ts'
+import {
+    cancelOrder,
+    rollUpOrderApprovals,
+    SUBMIT_AGAIN,
+    submitOrder,
+    submitProducedOrder,
+    submitQueuedOrder,
+    type Submission,
+} from '../platform/orders.ts'
 import { timesRequeued } from '../platform/events.ts'
 import { str, type ForeignRecord } from '../platform/records.ts'
 import { runSourcingPass } from '../platform/sourcing.ts'
@@ -31,7 +39,7 @@ export function afterOrderProduced(producer: Record<string, unknown>, current: u
     for (const row of asked.rows) {
         if (row.model) devices.push({ modelId: String(row.model), quantity: Math.max(1, Number(row.quantity) || 1), fromSiteTemplate: false })
     }
-    tellUnlessSubmitted(submitProducedOrder(current as GlideRecord, devices, asked.unread))
+    tellSubmission(submitProducedOrder(current as GlideRecord, devices, asked.unread))
 }
 
 /**
@@ -51,15 +59,22 @@ function deviceRows(value: unknown): { rows: DeviceRow[]; unread: string } {
     }
 }
 
-function tellUnlessSubmitted(submission: Submission): void {
-    if (!submission.submitted) gs.addErrorMessage(submission.message)
+/**
+ * Tell the user what came of a submission, unless it simply went ahead: why it did not, or that another submission of
+ * the Order had already taken it ahead. An Order saved to be submitted again without them is information, not an error.
+ */
+function tellSubmission(submission: Submission): void {
+    if (submission.submitted) {
+        if (submission.already) gs.addInfoMessage(submission.already)
+    } else if (submission.info) gs.addInfoMessage(submission.message)
+    else gs.addErrorMessage(submission.message)
 }
 
 /** UI action "Submit" on a draft Order. */
 export function uiSubmitOrder(current: GlideRecord): void {
     // Submit assesses the Order as the form holds it and may ask approvers to decide it: never on values not saved.
     if (!current.update()) return
-    tellUnlessSubmitted(submitOrder(current))
+    tellSubmission(submitOrder(current))
 }
 
 /** After-update rule on sysapproval_approver: roll the decisions up to the Order. */
@@ -85,8 +100,13 @@ export function uiRecheckApprovals(current: GlideRecord): void {
     gs.addInfoMessage(rollup.outcome === 'approved' ? 'Order approved: sourcing has started' : 'Order rejected')
 }
 
-/** Script action on x_daas_ham.order.source (parm2: how many times this request was queued again). */
+/**
+ * Script action on x_daas_ham.order.source (parm2: how many times this request was queued again): a sourcing pass
+ * over the Order. With parm1 SUBMIT_AGAIN it carries a submission queued again instead (platform/orders
+ * `submitQueuedOrder`), which it runs: one event serves both.
+ */
 export function sourceOrder(event: GlideRecord, current: GlideRecord): void {
+    if (str(event, 'parm1') === SUBMIT_AGAIN) return submitQueuedOrder(current.getUniqueValue(), timesRequeued(event))
     runSourcingPass(current, timesRequeued(event))
 }
 

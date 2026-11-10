@@ -6,13 +6,14 @@ import {
     assessOrder,
     ownershipFindings,
     raiserRefusal,
+    readsUsage,
     siteTemplateOffered,
     type Orderer,
     type OrderParties,
     type RequestedLine,
 } from '../domain/entitlement.ts'
-import { anythingShipped, OPEN_LINE_STAGES, ORDER_TASK_STATE } from '../domain/fulfilment.ts'
-import type { HeldLock } from '../domain/job-lock.ts'
+import { anythingShipped, endedUnfulfilled, OPEN_LINE_STAGES, ORDER_TASK_STATE } from '../domain/fulfilment.ts'
+import { LONG_HOLD_LOCK_TRIES, REQUEUE, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { cancelledUnit } from '../domain/sourcing.ts'
 import { type EntitlementVerdict, type InstallMode, LINE_STAGE, ORDER_STAGE, type OrderType } from '../domain/vocabulary.ts'
@@ -27,11 +28,13 @@ import {
     type ApprovalRollup,
 } from './approvals.ts'
 import { moveAndSave, readStage } from './assets.ts'
+import { EVENT, requeueCounted } from './events.ts'
 import { orderShipment, queueSourcing } from './fulfilment.ts'
-import { withLock } from './locks.ts'
+import { withLock, withLockTries, type LockRun } from './locks.ts'
 import { addOrderLines, cancelLine, type NewLine, type RefusedLine } from './order-lines.ts'
 import { bool, findById, num, refusal, str, warnRefused } from './records.ts'
 import { creatorOf } from './session.ts'
+import { withOrderLineLock } from './sourcing.ts'
 import { skipOpenStagingTasks } from './staging-tasks.ts'
 import { releaseToProviderStock, takeOffOrderLine } from './stock.ts'
 import { SITE_FIELD } from '../domain/fleet.ts'
@@ -98,8 +101,12 @@ export function createOrder(header: NewOrder, lines: readonly NewLine[]): OrderC
     return { created: false, step: 'lines', number: str(order, 'number'), refused, kept: removeOrder(order) }
 }
 
-/** What came of submitting an Order: it went ahead (to approval or sourcing), or it did not, with why as the user is told. */
-export type Submission = { submitted: true } | { submitted: false; message: string }
+/**
+ * What came of submitting an Order. It went ahead (to approval or sourcing): `already` says so, for the user, when
+ * another submission of it had taken it ahead. Or it did not, with why as the user is told: as information (`info`)
+ * rather than an error when the Order is saved and is submitted again without them (`submitLater`).
+ */
+export type Submission = { submitted: true; already?: string } | { submitted: false; message: string; info?: true }
 
 function notSubmitted(message: string): Submission {
     return { submitted: false, message }
@@ -131,7 +138,7 @@ export function submitProducedOrder(order: GlideRecord, devices: readonly NewLin
         gs.warn(`[x_daas_ham] ${number}: the devices asked for could not be read, so it has no line for them: ${devicesUnread}`)
         missing.push('The devices asked for could not be read (see the system log): add them as order lines')
     }
-    return submitAsRaised(order, parties, raiser, missing)
+    return submitAsRaised(order, parties, raiser, missing, { via: 'producer', tries: 0 })
 }
 
 /** The Site template's non-optional items, as lines. */
@@ -172,29 +179,71 @@ function orderParties(order: GlideRecord): OrderParties {
 }
 
 /**
+ * How a submission came, which says who is told its outcome: the record producer (its raiser, often a Customer admin,
+ * has no Submit action), a submission queued again (`submitLater`, run as the system), or any other (Submit, Raise
+ * replacement, the refresh run); and how many times it was queued again.
+ */
+interface SubmissionSource {
+    via: 'submit' | 'producer' | 'queued'
+    tries: number
+}
+
+/**
  * Submit a draft Order (the form's Submit, a break-fix or refresh Order just raised): it goes ahead, to approval or
- * sourcing, or stays a draft.
+ * sourcing, also when another submission of it took it ahead; otherwise it stays a draft.
  */
 export function submitOrder(order: GlideRecord): Submission {
-    return submitAsRaised(order, orderParties(order), orderingUser(order))
+    return submitAsRaised(order, orderParties(order), orderingUser(order), [], { via: 'submit', tries: 0 })
 }
 
 /**
  * Submit the Order unless it cannot go ahead as raised (domain/entitlement `ownershipFindings`, or the `unsaved`
  * lines); then it stays a draft and the reasons are noted on it.
  */
-function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Orderer, unsaved: string[] = []): Submission {
+function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Orderer, unsaved: string[], source: SubmissionSource): Submission {
     const findings = [...ownershipFindings(parties, raiser), ...unsaved]
-    if (findings.length === 0) return submitAccepted(order)
+    if (findings.length === 0) return submitAccepted(order, source)
     order.setValue('work_notes', `Not submitted:\n${findings.join('\n')}`)
     // A refresh Order the daily job raised has only this note to say why it is a draft.
     if (!order.update()) warnRefused(order, `${str(order, 'number')} not submitted (${findings.join('; ')}), and its note not saved`)
     return notSubmitted(`Order not submitted. ${findings.join('. ')}.`)
 }
 
-function submitAccepted(order: GlideRecord): Submission {
+/**
+ * Assess and submit the Order. Two submissions of one Agreement reading its usage at once would each miss the other
+ * and could both go ahead within a Contracted quantity only one fits, so an Order whose lines read usage
+ * (domain/entitlement `readsUsage`) is assessed and saved out of draft holding the Agreement's job lock
+ * (domain/lock-names `agreementUsage`, ADR 0013); one replacing Assets only reads none and takes no lock. A holder
+ * keeps the lock only to read the Order, its lines and the Agreement's usage, ask approvers and save the Order, so it
+ * is tried as often as an Order line's. A submission that finds the lock held through every try is queued again
+ * (`submitLater`). Taking the lock throws only when an insert is refused with no lock row (platform/locks): that error
+ * escapes.
+ */
+function submitAccepted(order: GlideRecord, source: SubmissionSource): Submission {
     const lines = requestedLines(order.getUniqueValue())
     if (lines.length === 0) return notSubmitted('Add at least one order line before submitting')
+    if (!readsUsage(lines)) return submitHolding(null, order)
+    const usageLock = LOCK.agreementUsage(str(order, 'agreement'))
+    const underUsage = withLockTries(usageLock, (lock) => submitHolding(lock, order), LONG_HOLD_LOCK_TRIES)
+    return underUsage.ran ? underUsage.value : submitLater(order, source)
+}
+
+/**
+ * The submission, holding the Agreement's `usageLock` (null for an Order that reads no usage). The Order, its lines and
+ * the Agreement's quantities and usage are read afresh here, so what is assessed is what is saved; it goes on only
+ * from draft, under the Agreement and Customer whose lock and ownership check were taken. The caller's `order` is
+ * saved, so its in-memory record shows the outcome.
+ */
+function submitHolding(usageLock: HeldLock | null, order: GlideRecord): Submission {
+    const fresh = findById('x_daas_ham_order', order.getUniqueValue())
+    if (!fresh) return notSubmitted('Order not submitted: it can no longer be read')
+    if (str(fresh, 'stage') !== ORDER_STAGE.draft) return alreadySubmitted(fresh)
+    if (str(fresh, 'agreement') !== str(order, 'agreement') || str(fresh, 'customer') !== str(order, 'customer')) {
+        return notSubmitted('Order not submitted: its Customer or Agreement changed while it was submitted. Submit it again')
+    }
+    const lines = requestedLines(order.getUniqueValue())
+    if (lines.length === 0) return notSubmitted('Order not submitted: add at least one order line first')
+    if (!usageLock && readsUsage(lines)) return notSubmitted('Order not submitted: a line was added while it was submitted. Submit it again')
     const assessment = assessOrder(
         { siteTemplateId: str(order, 'site_template') || undefined, lines },
         entitlementContext(str(order, 'customer'), str(order, 'agreement'), order.getUniqueValue()),
@@ -204,7 +253,9 @@ function submitAccepted(order: GlideRecord): Submission {
 
     if (assessment.approvers.length === 0) {
         const refused = startSourcing(order)
-        return refused ? notSubmitted(`Order not submitted: ${refused}`) : { submitted: true }
+        if (refused) return notSubmitted(`Order not submitted: ${refused}`)
+        warnIfUsageLockLost(usageLock, order)
+        return { submitted: true }
     }
     const customerAdmins = customerAdminIds(str(order, 'customer'))
     // The account manager, or else the asset managers, on the Provider's side.
@@ -216,11 +267,76 @@ function submitAccepted(order: GlideRecord): Submission {
         customerAdmins,
         noApprover: 'no account manager or asset manager to approve it',
     })
-    if (asked.awaiting) return { submitted: true }
+    if (asked.awaiting) {
+        warnIfUsageLockLost(usageLock, order)
+        return { submitted: true }
+    }
     if (asked.step === 'save') return notSubmitted(`Order not submitted: ${asked.reason}`)
     order.setValue('work_notes', `Not submitted: ${asked.reason}`)
     if (!order.update()) warnRefused(order, `${str(order, 'number')} not submitted (${asked.reason}), and its note not saved`)
     return notSubmitted(`Order not submitted: ${asked.reason}.`)
+}
+
+/** An Order a submission finds out of draft: gone ahead, through another submission of it (submitted), or ended (not). */
+function alreadySubmitted(fresh: GlideRecord): Submission {
+    const stage = fresh.getDisplayValue('stage')
+    if (endedUnfulfilled(str(fresh, 'stage'))) return notSubmitted(`Order not submitted: it is ${stage}`)
+    return { submitted: true, already: `Order ${str(fresh, 'number')} was already submitted (${stage})` }
+}
+
+/** A holder that outlasted the lock (ADR 0013) may have assessed beside a submission that took it over. */
+function warnIfUsageLockLost(usageLock: HeldLock | null, order: GlideRecord): void {
+    usageLock?.lostAfter(`${str(order, 'number')} submitted`, { check: "check the Agreement's Orders against its contracted quantities" })
+}
+
+/**
+ * parm1 of the sourcing event (platform/events `EVENT.sourceOrder`) when it carries a submission queued again
+ * (`submitLater`), which its script action runs instead of a sourcing pass (`submitQueuedOrder`).
+ */
+export const SUBMIT_AGAIN = 'submit'
+
+/**
+ * A submission that found its Agreement's usage lock held through every try. Unless another submission of this same
+ * Order took it ahead (then it went ahead), the Order stays a draft for now, noted, and is submitted again a minute
+ * later from the event queue, as often as a sourcing request is queued again (domain/job-lock `REQUEUE`), then left
+ * for staff to submit (logged). Each is told in words that fit them: the record producer's raiser has no Submit action,
+ * so is told, as information, not to raise it again.
+ */
+function submitLater(order: GlideRecord, source: SubmissionSource): Submission {
+    const fresh = findById('x_daas_ham_order', order.getUniqueValue())
+    if (!fresh) return notSubmitted('Order not submitted: it can no longer be read')
+    if (str(fresh, 'stage') !== ORDER_STAGE.draft) return alreadySubmitted(fresh)
+    const number = str(order, 'number')
+    const lockName = LOCK.agreementUsage(str(order, 'agreement'))
+    if (!requeueCounted(EVENT.sourceOrder, order, SUBMIT_AGAIN, source.tries)) {
+        gs.warn(`[x_daas_ham] ${number} left a draft: ${lockName} stayed held through ${source.tries} submissions queued again; submit it`)
+        const kept = 'other Orders of its Agreement kept being submitted at the same time. Submit it'
+        noteDraft(order, `Not submitted: ${kept}`)
+        return notSubmitted(`Order not submitted: ${kept}`)
+    }
+    const busy = 'another Order of its Agreement was being submitted at the same time. It is submitted again automatically'
+    if (source.tries === 0) noteDraft(order, `Not submitted yet: ${busy}`)
+    gs.info(`[x_daas_ham] ${number} submitted again in ${REQUEUE.delaySeconds} s: another submission holds ${lockName}`)
+    if (source.via !== 'producer') return notSubmitted(`Order not submitted yet: ${busy} in a minute`)
+    const saved = `Order ${number} is saved and is submitted within a few minutes: another order of the same agreement was being submitted at that moment`
+    return { submitted: false, message: `${saved}. There is no need to raise it again`, info: true }
+}
+
+/** Note on a draft why it is one; a refused note is logged. */
+function noteDraft(order: GlideRecord, note: string): void {
+    order.setValue('work_notes', note)
+    if (!order.update()) warnRefused(order, `${str(order, 'number')} left a draft, its note not saved (${note})`)
+}
+
+/**
+ * A submission queued again (`submitLater`) `tries` times, run as the system from the event queue: the Order read
+ * afresh is submitted as Submit does, its records' ownership checked again, unless it is no longer a draft (submitted
+ * or cancelled meanwhile).
+ */
+export function submitQueuedOrder(orderId: string, tries: number): void {
+    const order = findById('x_daas_ham_order', orderId)
+    if (!order || str(order, 'stage') !== ORDER_STAGE.draft) return
+    submitAsRaised(order, orderParties(order), orderingUser(order), [], { via: 'queued', tries })
 }
 
 function requestedLines(orderId: string): RequestedLine[] {
@@ -253,15 +369,46 @@ function startSourcing(order: GlideRecord): string {
 
 /**
  * A rejected Order cancels its lines, so they stop counting as usage. The Order is saved first: one the platform
- * refuses keeps its lines. Why it was refused ('' once saved).
+ * refuses keeps its lines. Both are done holding each open line's lock, as Cancel order does (`cancelOrder`), so no
+ * receipt gives a unit to a line being cancelled; one that finds a line's lock held changes nothing (logged) and the
+ * Order stays awaiting approval, to re-check. Why it was not rejected ('' once saved).
  */
 function rejectOrder(order: GlideRecord): string {
-    order.setValue('approval', 'rejected')
-    order.setValue('stage', ORDER_STAGE.rejected)
-    order.setValue('state', ORDER_TASK_STATE.rejected)
-    if (!order.update()) return warnRefused(order, `${str(order, 'number')} not saved as rejected`)
-    cancelOpenLines(order.getUniqueValue())
-    return ''
+    const orderId = order.getUniqueValue()
+    const number = str(order, 'number')
+    const lineIds = openLineIds(orderId)
+    const underLines = withOrderLineLocks(lineIds, (locks) => {
+        order.setValue('approval', 'rejected')
+        order.setValue('stage', ORDER_STAGE.rejected)
+        order.setValue('state', ORDER_TASK_STATE.rejected)
+        if (!order.update()) return warnRefused(order, `${number} not saved as rejected`)
+        cancelOpenLines(orderId, lineIds)
+        warnIfLineLockLost(locks, number)
+        return ''
+    })
+    if (underLines.ran) return underLines.value
+    gs.warn(`[x_daas_ham] ${number} not rejected: a line's lock stayed held through every try; re-check its approvals`)
+    return 'one of its lines is being received or cancelled: re-check its approvals shortly'
+}
+
+/**
+ * Run `work` holding the lock of every line in `lineIds` (platform/sourcing `withOrderLineLock` each), taken one under
+ * another in sys_id order (ADR 0013), and give what it returned, or `ran: false`, with nothing run, when one stayed
+ * held through its tries.
+ */
+function withOrderLineLocks<T>(lineIds: readonly string[], work: (locks: HeldLock[]) => T): LockRun<T> {
+    const ids = [...lineIds].sort()
+    const holdFrom = (next: number, held: HeldLock[]): LockRun<T> => {
+        if (next === ids.length) return { ran: true, value: work(held) }
+        const under = withOrderLineLock(ids[next], (lock) => holdFrom(next + 1, [...held, lock]))
+        return under.ran ? under.value : { ran: false }
+    }
+    return holdFrom(0, [])
+}
+
+/** A cancel or rejection that outlasted a line's lock (ADR 0013) may have overlapped a receipt that took it over: logged once. */
+function warnIfLineLockLost(locks: readonly HeldLock[], number: string): void {
+    locks.some((lock) => lock.lostAfter(`${number}: lines cancelled`, { check: 'check them for units received meanwhile' }))
 }
 
 /** How an Order's approvals are decided (platform/approvals): by its entitlement verdict, approved and sourced or rejected. */
@@ -320,6 +467,13 @@ function openLines(orderId: string): GlideRecord {
     return line
 }
 
+function openLineIds(orderId: string): string[] {
+    const line = openLines(orderId)
+    const ids: string[] = []
+    while (line.next()) ids.push(line.getUniqueValue())
+    return ids
+}
+
 /** The purchase orders of the Order's lines that have not shipped, to cancel in Procurement. */
 function openPurchaseOrders(orderId: string): string[] {
     const line = openLines(orderId)
@@ -330,21 +484,38 @@ function openPurchaseOrders(orderId: string): string[] {
     return purchases
 }
 
-/** Cancel every line that has not shipped, releasing its stock; false when the platform refused any of it (logged). */
-function cancelOpenLines(orderId: string): boolean {
+/**
+ * Cancel every line that has not shipped, releasing its stock; false when the platform refused any of it (logged). The
+ * `lockedIds` are the lines read as open before their locks were taken: each is cancelled and its units released
+ * whatever stage it is read in now, as a stage derived beside the cancel may already show it cancelled
+ * (platform/fulfilment `deriveLine`). A line added to the Order since is new, which no receipt or sourcing reaches, so
+ * it is cancelled without its lock.
+ */
+function cancelOpenLines(orderId: string, lockedIds: readonly string[]): boolean {
     let done = true
-    const line = openLines(orderId)
-    while (line.next()) {
-        const asset = new GlideRecord('alm_hardware')
-        asset.addQuery('x_daas_ham_order_line', line.getUniqueValue())
-        asset.query()
-        while (asset.next()) done = releaseAsset(asset) && done
-        if (cancelLine(line)) continue
-        // Left open, it is still given the units received on its purchase orders.
-        warnRefused(line, `order cancelled: ${str(line, 'number')} left open, cancel it`)
-        done = false
+    for (const lineId of lockedIds) {
+        const line = findById('x_daas_ham_order_line', lineId)
+        if (line) done = releaseAndCancel(line) && done
+    }
+    const added = openLines(orderId)
+    while (added.next()) {
+        if (!lockedIds.includes(added.getUniqueValue())) done = releaseAndCancel(added) && done
     }
     return done
+}
+
+/** Release the line's stock and cancel it; false when the platform refused any of it (logged). */
+function releaseAndCancel(line: GlideRecord): boolean {
+    let done = true
+    const asset = new GlideRecord('alm_hardware')
+    asset.addQuery('x_daas_ham_order_line', line.getUniqueValue())
+    asset.query()
+    while (asset.next()) done = releaseAsset(asset) && done
+    if (str(line, 'line_stage') === LINE_STAGE.cancelled) return done
+    if (cancelLine(line)) return done
+    // Left open, it is still given the units received on its purchase orders, unless its Order's stage is read too.
+    warnRefused(line, `order cancelled: ${str(line, 'number')} left open, cancel it`)
+    return false
 }
 
 /**
@@ -367,24 +538,38 @@ function notCancelled(reason: string): Cancellation {
  * and the two take turns; a cancel that finds it held changes nothing and says so. A Ship running between the cancel's
  * shipped check and its release of the lines would send units of lines being cancelled, so the cancel holds the
  * Order's Ship lock too (platform/delivery `shipOrder`), taken under the sourcing lock as in ADR 0013's order (Ship
- * never takes the sourcing lock); one that finds it held changes nothing and says a Ship is running. Taking either lock
- * throws only when an insert is refused with no lock row (platform/locks): that error escapes.
+ * never takes the sourcing lock); one that finds it held changes nothing and says a Ship is running. A receipt
+ * allocating its unit to a line between the cancel's read of the line's units and the line's cancel would leave the
+ * unit on a cancelled line, so under the Ship lock the cancel holds each open line's lock too (`withOrderLineLocks`),
+ * which a receipt takes to allocate and stage its unit (platform/receiving `receive`); one that finds a line's lock
+ * held changes nothing and asks to try again. Taking a lock throws only when an insert is refused with no lock row
+ * (platform/locks): that error escapes.
  */
 export function cancelOrder(order: GlideRecord): Cancellation {
     const orderId = order.getUniqueValue()
     const underSourcing = withLock(LOCK.sourceOrder(orderId), (sourcing) => {
-        return withLock(LOCK.shipOrder(orderId), (ship) => cancelHolding({ sourcing, ship }, order))
+        return withLock(LOCK.shipOrder(orderId), (ship) => {
+            const lineIds = openLineIds(orderId)
+            return withOrderLineLocks(lineIds, (lines) => cancelHolding({ sourcing, ship, lines }, order, lineIds))
+        })
     })
     if (!underSourcing.ran) return notCancelled('sourcing is running on it. Try again in a minute')
     const underShip = underSourcing.value
-    return underShip.ran ? underShip.value : notCancelled('a Ship of the Order is running. Try again once it is done')
+    if (!underShip.ran) return notCancelled('a Ship of the Order is running. Try again once it is done')
+    const underLines = underShip.value
+    return underLines.ran ? underLines.value : notCancelled('a unit is being received for one of its lines. Try again shortly')
 }
 
 /**
- * The cancel, holding the Order's sourcing and Ship `locks`. It is refused once anything of the Order has shipped
- * (domain/fulfilment `anythingShipped`), a unit of a line not delivered whole included, whoever asks for it.
+ * The cancel, holding the Order's sourcing and Ship `locks` and those of its open lines, `lineIds`. It is refused once
+ * anything of the Order has shipped (domain/fulfilment `anythingShipped`), a unit of a line not delivered whole
+ * included, whoever asks for it.
  */
-function cancelHolding(locks: { sourcing: HeldLock; ship: HeldLock }, order: GlideRecord): Cancellation {
+function cancelHolding(
+    locks: { sourcing: HeldLock; ship: HeldLock; lines: HeldLock[] },
+    order: GlideRecord,
+    lineIds: readonly string[],
+): Cancellation {
     if (anythingShipped(orderShipment(order.getUniqueValue()))) {
         return notCancelled('equipment has already shipped. Use a Return order instead')
     }
@@ -393,14 +578,16 @@ function cancelHolding(locks: { sourcing: HeldLock; ship: HeldLock }, order: Gli
     order.setValue('state', ORDER_TASK_STATE.cancelled)
     if (purchases.length > 0) order.setValue('work_notes', `Cancel these purchase orders in Procurement: ${purchases.join(', ')}`)
     if (!order.update()) return notCancelled(warnRefused(order, `${str(order, 'number')} not cancelled`))
-    const complete = cancelOpenLines(order.getUniqueValue())
+    const complete = cancelOpenLines(order.getUniqueValue(), lineIds)
     // A cancel that outlasted a lock (ADR 0013) may have overlapped the pass or Ship that took it over. A pass skips
     // the lines it reads after the Order was saved cancelled (platform/sourcing `openLine`), not those it reached
     // first; a Ship may have sent units before the cancel released them.
     const cancelled = `${str(order, 'number')} cancelled`
     locks.sourcing.lostAfter(cancelled, { check: 'check its lines for stock reserved or bought meanwhile' })
     locks.ship.lostAfter(cancelled, { check: 'check for units shipped meanwhile' })
-    // After the save, so the approval rule each cancellation runs finds the Order no longer awaiting approval.
+    warnIfLineLockLost(locks.lines, str(order, 'number'))
+    // After the save, so the approval rule each cancellation runs finds the Order no longer awaiting approval: it takes
+    // no lock then, nor rejects the Order, which takes these lines' locks.
     cancelPendingApprovals(order.getUniqueValue())
     return { cancelled: true, complete }
 }

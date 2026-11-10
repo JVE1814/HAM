@@ -183,6 +183,16 @@ export function deployedUsageQuery(agreementId: string): string {
     return fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}^${notInFlight}`)
 }
 
+/**
+ * Whether assessing these lines reads the Agreement's usage: only lines that add a unit do (`assessOrder` exempts those
+ * replacing an Asset). An Order with none gets the same verdict whatever is in flight, and its lines going into flight
+ * beside a submission that reads usage read as if it had come first or last, so its submission need not take turns
+ * (domain/lock-names `agreementUsage`).
+ */
+export function readsUsage(lines: readonly RequestedLine[]): boolean {
+    return lines.some((line) => !line.replacesAsset)
+}
+
 /** Order stages whose lines use nothing of an Agreement: a draft is not asked for yet, and one that ended unfulfilled never will be. */
 const NOT_YET_LIVE_OR_UNFULFILLED: readonly OrderStage[] = [ORDER_STAGE.draft, ...UNFULFILLED_ORDER_STAGES]
 
