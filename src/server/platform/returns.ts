@@ -1,5 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import type { HeldLock } from '../domain/job-lock.ts'
+import { messageOf } from '../domain/errors.ts'
+import { TRY_AGAIN, type HeldLock } from '../domain/job-lock.ts'
 import { checkTransition, isDeployed, type Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import {
@@ -37,7 +38,7 @@ import { EVENT, fire } from './events.ts'
 import { recordFee, waiveOpenFees } from './fees.ts'
 import { openFieldWork } from './field-work.ts'
 import { installedAssetIds } from './installed-assets.ts'
-import { withLock } from './locks.ts'
+import { attemptLock, withLock } from './locks.ts'
 import { intProperty, PROPERTY } from './properties.ts'
 import { bool, choice, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { creatorOf } from './session.ts'
@@ -96,7 +97,8 @@ export function raiseReturn(request: ReturnRequest): RaisedReturn | null {
 /**
  * Fill in a saved Return order header: due date, lines, de-install work (unless a swap's work order collects the units,
  * domain/returns `opensDeinstallWork`). Only fleet assets (ADR 0016) get a line: one of the Provider IT's that a caller
- * lists is left off (logged), so no app job ever chases, declares or charges it.
+ * lists is left off (logged), so no app job ever chases, declares or charges it. Each Asset is put on it under its
+ * return lock (`addUnderLock`), so it awaits one Return at a time.
  */
 function fillReturn(order: GlideRecord, request: ReturnRequest): RaisedReturn {
     const agreement = findById('x_daas_ham_agreement', request.agreementId)
@@ -107,37 +109,9 @@ function fillReturn(order: GlideRecord, request: ReturnRequest): RaisedReturn {
     let lines = 0
     let refused = 0
     for (const assetId of request.assetIds) {
-        const asset = findById('alm_hardware', assetId)
-        if (!asset || latestReturnLine(assetId, [AWAITED])) continue
-        if (!isFleetAsset(asset)) {
-            gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left off return ${str(order, 'number')}: it is not a fleet asset`)
-            refused++
-            continue
-        }
-        // The line first: an Asset whose line is refused stays as it is, off this Return order.
-        const line = new GlideRecord(RETURN_LINE)
-        line.initialize()
-        line.setValue('return_order', order.getUniqueValue())
-        line.setValue('asset', assetId)
-        if (!line.insert()) {
-            warnRefused(line, `${str(asset, 'serial_number')} left off return ${str(order, 'number')}`)
-            refused++
-            continue
-        }
-        const stage = readStage(asset)
-        const moving = isDeployed(stage) && stage !== 'pending_return'
-        // Leaving service closes the Asset's service interval (entry/assets.ts onAssetServiceChange). A refused move
-        // (moveAndSave warns) takes the line off again: it would await a unit still in service, later declared missing.
-        // One that cannot be taken off is logged, to remove by hand before the overdue job gets to it.
-        if (moving && !moveAndSave(asset, 'pending_return', `return ${str(order, 'number')}`)) {
-            if (line.deleteRecord()) {
-                refused++
-                continue
-            }
-            const kept = `${str(asset, 'serial_number')} not pending return but kept on return ${str(order, 'number')}`
-            gs.warn(`[x_daas_ham] ${kept}: ${refusal(line, 'delete refused')}; remove its line`)
-        }
-        lines++
+        const added = addUnderLock(order, assetId)
+        if (added === 'added') lines++
+        else if (added === 'refused') refused++
     }
 
     if (lines === 0) {
@@ -165,6 +139,75 @@ function fillReturn(order: GlideRecord, request: ReturnRequest): RaisedReturn {
     return { number: str(order, 'number'), lines }
 }
 
+/** What came of putting an Asset on a Return order: a line added, refused (logged), or none needed. */
+type LineResult = 'added' | 'refused' | 'skipped'
+
+/** Whether the Asset is on a Return order line still awaiting it. */
+function awaitsReturn(assetId: string): boolean {
+    return latestReturnLine(assetId, [AWAITED]) !== null
+}
+
+/**
+ * Put the Asset on the Return order under its return lock (domain/lock-names `returnAsset`, ADR 0013). The check that
+ * it awaits no other return and the insert of its line are one critical section, so two Returns raised at once (a
+ * request sent twice, the record producer beside the customer page or an Agreement's end) never both take the unit,
+ * which would leave the line it is not received on to be declared missing and charged as lost. No unique index can
+ * hold it: an Asset is on one awaiting line at a time, but on any number of settled ones.
+ *
+ * 'skipped' when the Asset is not found, already awaits a return, or another Return holds its lock through every try,
+ * back to back (a holder holds it for one check, one line and one move), and is taking it. A lock that cannot be taken
+ * leaves the unit off the order, logged; the line's own errors escape.
+ */
+function addUnderLock(order: GlideRecord, assetId: string): LineResult {
+    // Lost before the line was written: the try is given up, and the next checks afresh.
+    const attempt = attemptLock(LOCK.returnAsset(assetId), (lock) => addLineHolding(lock, order, assetId) ?? TRY_AGAIN)
+    if (attempt.ran) return attempt.value
+    const left = `Asset ${assetId} left off return ${str(order, 'number')}`
+    if (attempt.held) {
+        gs.info(`[x_daas_ham] ${left}: another return holds its lock and takes it`)
+        return 'skipped'
+    }
+    gs.warn(`[x_daas_ham] ${left}: ${messageOf(attempt.error)}`)
+    return 'refused'
+}
+
+/**
+ * Add the Asset's line and make it pending return, holding its return `lock`. A holder that outlasts the lock (ADR
+ * 0013) and lost it before the insert writes nothing (null); one that lost it during the insert is logged, to check
+ * the unit is on one Return.
+ */
+function addLineHolding(lock: HeldLock, order: GlideRecord, assetId: string): LineResult | null {
+    const asset = findById('alm_hardware', assetId)
+    if (!asset || awaitsReturn(assetId)) return 'skipped'
+    const number = str(order, 'number')
+    if (!isFleetAsset(asset)) {
+        gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left off return ${number}: it is not a fleet asset`)
+        return 'refused'
+    }
+    // The line first: an Asset whose line is refused stays as it is, off this Return order.
+    const line = new GlideRecord(RETURN_LINE)
+    line.initialize()
+    line.setValue('return_order', order.getUniqueValue())
+    line.setValue('asset', assetId)
+    const saved = lock.save(`${str(asset, 'serial_number')} put on return ${number}`, () => line.insert(), { check: 'check it is on one return' })
+    if (saved === 'lock lost') return null
+    if (saved === 'refused') {
+        warnRefused(line, `${str(asset, 'serial_number')} left off return ${number}`)
+        return 'refused'
+    }
+    const stage = readStage(asset)
+    const moving = isDeployed(stage) && stage !== 'pending_return'
+    // Leaving service closes the Asset's service interval (entry/assets.ts onAssetServiceChange). A refused move
+    // (moveAndSave warns) takes the line off again: it would await a unit still in service, later declared missing.
+    // One that cannot be taken off is logged, to remove by hand before the overdue job gets to it.
+    if (moving && !moveAndSave(asset, 'pending_return', `return ${number}`)) {
+        if (line.deleteRecord()) return 'refused'
+        const kept = `${str(asset, 'serial_number')} not pending return but kept on return ${number}`
+        gs.warn(`[x_daas_ham] ${kept}: ${refusal(line, 'delete refused')}; remove its line`)
+    }
+    return 'added'
+}
+
 /** A request to take equipment back from a Site, as the record producer and the customer page make it. */
 export interface RequestedEquipment {
     /**
@@ -183,16 +226,18 @@ export interface RequestedEquipment {
     describe(siteName: string): string
 }
 
+/** Why a return request raised no Return (`RequestOutcome`). */
+type NotRaised = 'forbidden' | 'invalid' | 'nothing' | 'awaited' | 'busy' | 'refused'
+
 /**
  * What came of a return request: the Return raised (it may have no line: each Asset already awaits another return, or
  * was refused), or why none was. `forbidden`: the requester may not ask; `invalid`: the Customer or Site it names;
- * `nothing`: it names nothing to bring back; `refused`: the platform refused the Return order (logged).
+ * `nothing`: it names nothing to bring back; `awaited`: each device it names already awaits a return; `busy`: another
+ * request of the Customer is being raised; `refused`: the platform refused the Return order (logged).
  */
-export type RequestOutcome =
-    | ({ raised: true } & RaisedReturn)
-    | { raised: false; reason: 'forbidden' | 'invalid' | 'nothing' | 'refused'; why: string }
+export type RequestOutcome = ({ raised: true } & RaisedReturn) | { raised: false; reason: NotRaised; why: string }
 
-function notRaised(reason: 'forbidden' | 'invalid' | 'nothing' | 'refused', why: string): RequestOutcome {
+function notRaised(reason: NotRaised, why: string): RequestOutcome {
     return { raised: false, reason, why }
 }
 
@@ -209,17 +254,33 @@ function notRaised(reason: 'forbidden' | 'invalid' | 'nothing' | 'refused', why:
  * A request that names nothing to bring back is refused when it has saved nothing yet, so the customer page leaves no
  * empty Return behind. The producer's Return order is saved already: it is filled in and, with no line, closes at once
  * like any Return with nothing to bring back.
+ *
+ * A request that has saved nothing yet (the customer page's) is raised under its Customer's return-request lock
+ * (domain/lock-names `returnRequest`, ADR 0013), one at a time, and only for devices not already awaiting a return: a
+ * request sent twice raises one Return order, with one de-install work order and change. One that finds the lock held
+ * raises nothing (`busy`), nor does one whose devices all await a return already (`awaited`).
  */
 export function requestReturn(request: RequestedEquipment): RequestOutcome {
     const { produced, customerId, siteId } = request
     const site = findById('cmn_location', siteId)
     const [finding] = returnRequestFindings({ customerId, site: requestedSite(siteId, site) }, returnRequester(produced))
     if (finding) return notRaised(finding.about === 'requester' ? 'forbidden' : 'invalid', finding.message)
+    if (produced) return raiseRequested(request, site)
+    const raised = withLock(LOCK.returnRequest(customerId), () => raiseRequested(request, site))
+    return raised.ran ? raised.value : notRaised('busy', 'Another return request of yours is being raised: try again in a moment')
+}
+
+/** Raise the requested Return, its requester and Site checked (`requestReturn`); the customer page's holding its Customer's return-request lock. */
+function raiseRequested(request: RequestedEquipment, site: GlideRecord | null): RequestOutcome {
+    const { produced, customerId, siteId } = request
     const trigger = requestedTrigger(request.decommission)
-    const assetIds = isSiteRecovery(trigger) ? installedAssetIds({ siteId, returning: trigger }) : fleetAssetsAt(siteId, request.listedAssetIds)
-    if (!produced && assetIds.length === 0) {
+    const requested = isSiteRecovery(trigger) ? installedAssetIds({ siteId, returning: trigger }) : fleetAssetsAt(siteId, request.listedAssetIds)
+    if (!produced && requested.length === 0) {
         return notRaised('nothing', request.decommission ? 'The site has no installed devices' : "Choose at least one of the site's devices")
     }
+    // Read under the lock: a request sent again after the first was raised finds its devices awaiting that Return.
+    const assetIds = produced ? requested : requested.filter((id) => !awaitsReturn(id))
+    if (!produced && assetIds.length === 0) return notRaised('awaited', 'Each device is already on a return')
     const firstAsset = findById('alm_hardware', assetIds[0] ?? '')
     const details: ReturnRequest = {
         trigger,

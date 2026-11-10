@@ -1,5 +1,8 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
+import type { HeldLock } from '../domain/job-lock.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import {
+    CLAIM_PREREQUISITE,
     CLAIM_VENDORS,
     dependentActions,
     dueStepsQuery,
@@ -10,17 +13,19 @@ import {
     type ClaimStore,
     type ClaimTarget,
 } from '../domain/oem/claims.ts'
+import { withLock } from './locks.ts'
 import { boolProperty, intProperty, PROPERTY, type PropertyOf } from './properties.ts'
 import { restMessagePort } from './rest-messages.ts'
-import { num, pluck, recordsById, str, warnRefused } from './records.ts'
+import { bool, num, pluck, recordsById, str, warnRefused } from './records.ts'
 import { memoized } from '../domain/memo.ts'
 import type { ClaimAction, OemVendor } from '../domain/vocabulary.ts'
 
 /**
  * The automated steps of a Staging task (x_daas_ham_staging_step rows with an `automation`) and the OEM claims they
  * stand for. Of a step's state (domain/oem/claims `STEP_STATUS`), this module owns what follows its creation: a step
- * waiting on another is released once that one is ticked (`releaseStepsWaitingOn`: waiting to due), and the claim run
- * settles each step it sent (`settle`: done and ticked, or failed with one more attempt and the vendor's message).
+ * waiting on another is released once that one is ticked (`releaseStepsWaitingOn`: waiting to due), or by the next
+ * claim run when that release was refused (`releaseStranded`), and the claim run settles each step it sent (`settle`:
+ * done and ticked, or failed with one more attempt and the vendor's message).
  * The rest is platform/staging-tasks': it creates a task's steps, each automated one in its
  * `initialAutomationStatus`, and removes them with a task that could not be opened. A person ticks the steps done by
  * hand; who and when is stamped by the before rule (entry/staging `stampStagingStep`).
@@ -44,14 +49,42 @@ const CLAIM_ENABLED: Partial<Record<OemVendor, PropertyOf<boolean>>> = PROPERTY.
 
 /**
  * For each enabled vendor, send its due automated staging steps (pending, and failed ones due a retry) through the
- * vendor's adapters, within `x_daas_ham.oem.claim.max_calls` calls a vendor (domain/oem/claims `runVendorClaims`).
+ * vendor's adapters, within `x_daas_ham.oem.claim.max_calls` calls a vendor (domain/oem/claims `runVendorClaims`),
+ * holding the run's lock (domain/lock-names `oemClaimRun`, ADR 0013). Two runs at once (the 5-minute job and an *Execute
+ * now*) would load the same due steps and send each to its vendor twice, spending two runs' calls in one rate-limit
+ * window (Meraki allows 10 calls in 5 minutes), and the second claim of a device already claimed fails, marking a step
+ * the first run ticked done failed again. A run that finds the lock held sends nothing and leaves the steps to the run
+ * holding it. A run that outlasts the lock sends nothing more once it has lost it: it saves what its calls so far
+ * returned, and the run that took the lock over goes on.
  */
 export function runClaims(): void {
+    const lockName = LOCK.oemClaimRun()
+    if (withLock(lockName, runHolding).ran) return
+    gs.info(`[x_daas_ham] OEM claims not sent: another run holds the ${lockName} lock and sends them`)
+}
+
+function runHolding(lock: HeldLock): void {
     const maxCalls = intProperty(PROPERTY.claimMaxCalls)
-    const store = glideClaimStore()
+    releaseStranded()
+    const store = whileHeld(lock, glideClaimStore())
     for (const vendor of CLAIM_VENDORS) {
         const enabled = CLAIM_ENABLED[vendor]
         if (enabled && boolProperty(enabled)) runVendorClaims(vendor, store, restMessagePort, maxCalls)
+    }
+}
+
+/** `store`, finding no step due once `lock` is lost (logged once), so the run calls no vendor after that. */
+function whileHeld(lock: HeldLock, store: ClaimStore): ClaimStore {
+    let lost = false
+    return {
+        due: (vendor, action, limit) => {
+            if (!lost && !lock.held()) {
+                lost = true
+                gs.warn(`[x_daas_ham] OEM claim run stopped: job lock lost while sending, to the run that took it over`)
+            }
+            return lost ? [] : store.due(vendor, action, limit)
+        },
+        settle: store.settle,
     }
 }
 
@@ -101,9 +134,53 @@ export function releaseStepsWaitingOn(taskId: string, action: string): void {
     step.addQuery('automation', 'IN', dependents.join(','))
     step.addQuery('done', false)
     step.addQuery('automation_status', STEP_STATUS.waiting)
-    // One set-based update: the staging step rules still run, and they react only to done changing.
+    step.query()
+    while (step.next()) release(step)
+}
+
+/** Waiting steps a claim run checks for a prerequisite no longer open, at most: the longest waiting first. */
+const STRANDED_LOAD = 200
+
+/**
+ * Release the waiting steps whose staging task (still active) has no open step of their prerequisite action
+ * (CLAIM_PREREQUISITE) left to wait on: its release was refused when it was ticked done (logged), or it is gone. A
+ * waiting step is never due, so left waiting it would never be sent. Run by each claim run, before it loads due steps.
+ */
+function releaseStranded(): void {
+    const waiting = new GlideRecord(STEP)
+    waiting.addEncodedQuery(`automation_status=${STEP_STATUS.waiting}^done=false^staging_task.active=true`)
+    waiting.orderBy('sys_updated_on')
+    waiting.setLimit(STRANDED_LOAD)
+    waiting.query()
+    const steps: Array<{ stepId: string; taskId: string; prerequisite: string }> = []
+    while (waiting.next()) {
+        const prerequisite = CLAIM_PREREQUISITE[str(waiting, 'automation') as ClaimAction] ?? ''
+        steps.push({ stepId: waiting.getUniqueValue(), taskId: str(waiting, 'staging_task'), prerequisite })
+    }
+    if (steps.length === 0) return
+    const open = new Set<string>()
+    const openStep = new GlideRecord(STEP)
+    openStep.addQuery('staging_task', 'IN', [...new Set(steps.map((s) => s.taskId))].join(','))
+    openStep.addQuery('automation', 'IN', [...new Set(Object.values(CLAIM_PREREQUISITE))].join(','))
+    openStep.addQuery('done', false)
+    openStep.query()
+    while (openStep.next()) open.add(`${str(openStep, 'staging_task')}|${str(openStep, 'automation')}`)
+    const stranded = steps.filter((s) => !open.has(`${s.taskId}|${s.prerequisite}`)).map((s) => s.stepId)
+    if (stranded.length === 0) return
+    const step = new GlideRecord(STEP)
+    step.addQuery('sys_id', 'IN', stranded.join(','))
+    step.query()
+    while (step.next()) release(step)
+}
+
+/**
+ * A waiting step becomes due to the next run. Saved one at a time, so a refused save is logged: left waiting, the step
+ * is never sent, until a claim run releases it again (`releaseStranded`). The staging step rules run on the save and
+ * react only to done changing.
+ */
+function release(step: GlideRecord): void {
     step.setValue('automation_status', STEP_STATUS.due)
-    step.updateMultiple()
+    if (!step.update()) warnRefused(step, `OEM step "${str(step, 'label')}" of ${step.getDisplayValue('staging_task')} still waiting, not released`)
 }
 
 /** The Customer's OEM cloud account for `action`, looked up once per customer and action. */
@@ -114,8 +191,9 @@ function cloudAccount(key: string): string {
 
 /**
  * Tick each step of a run done, or count its failed attempt (it is left for a person after the last one); one query
- * for the run. A step the platform refuses stays due, so the next run sends it again: that is logged, as nothing else
- * would say why a claim repeats or a failing step is never left for a person.
+ * for the run. A step found done already (ticked by hand meanwhile, or by a run that took over the claim run's lock) is
+ * not marked failed. A step the platform refuses stays due, so the next run sends it again: that is logged, as nothing
+ * else would say why a claim repeats or a failing step is never left for a person.
  */
 function settle(outcomes: readonly ClaimOutcome[]): void {
     if (outcomes.length === 0) return
@@ -125,7 +203,7 @@ function settle(outcomes: readonly ClaimOutcome[]): void {
     step.query()
     while (step.next()) {
         const outcome = byStep.get(step.getUniqueValue())
-        if (!outcome) continue
+        if (!outcome || (!outcome.ok && bool(step, 'done'))) continue
         const status = settledStatus(outcome)
         step.setValue('automation_message', outcome.message)
         step.setValue('automation_status', status)

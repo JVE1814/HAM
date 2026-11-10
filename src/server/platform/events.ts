@@ -34,6 +34,8 @@ export const EVENT = {
     marginCompute: 'x_daas_ham.margin.compute',
     /** A Shipment's lock held off a tracking update. Record: the Shipment; parm1: the update (JSON); parm2: how often it was queued again. */
     trackShipment: 'x_daas_ham.shipment.track',
+    /** A replacement Order is complete: its case is saved, so that its replacement SLA stops. Record: the Order. */
+    replacementComplete: 'x_daas_ham.replacement.complete',
 } as const
 
 export function fire(event: string, record: GlideRecord, parm1 = '', parm2 = ''): void {

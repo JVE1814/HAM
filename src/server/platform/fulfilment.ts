@@ -10,7 +10,7 @@ import {
 } from '../domain/fulfilment.ts'
 import type { Stage } from '../domain/lifecycle.ts'
 import { siteRecoveryLineQuery } from '../domain/returns.ts'
-import type { LineStage } from '../domain/vocabulary.ts'
+import { ORDER_STAGE, type LineStage } from '../domain/vocabulary.ts'
 import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { EVENT, fire } from './events.ts'
@@ -168,7 +168,9 @@ export function recomputeOrder(orderId: string): void {
     order.setValue('stage', next)
     const closed = closedStateFor(next)
     if (closed !== undefined) order.setValue('state', closed)
-    if (!order.update()) notMoved(order, next)
+    if (!order.update()) return notMoved(order, next)
+    // Its case is saved by the event's script action (platform/breakfix `noteReplacementComplete`), not in this save.
+    if (next === ORDER_STAGE.complete && str(order, 'case')) fire(EVENT.replacementComplete, order)
 }
 
 /**

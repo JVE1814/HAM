@@ -55,10 +55,11 @@ would be. A take never waits either: it tries and gives up. So locks are taken i
 holder only takes locks later in it than those it holds (`domain/lock-names.ts` names every lock, in
 this order):
 
-`refresh_orders` < `seen_asset` < `receive_serial` < `receive_asset` < `source_order` <
-`ship_order` < `track_shipment` < `return_label` < `order_line` < `provider_tag_sequence` <
-`spare_pool` < `reserve_asset` < `fee` < `recon_exception` < `subscription_line` <
-`service_interval` < job locks (the margin recompute's).
+`refresh_orders` < `oem_claim_run` < `seen_asset` < `receive_serial` < `receive_asset` <
+`source_order` < `ship_order` < `track_shipment` < `return_label` < `order_line` <
+`provider_tag_sequence` < `spare_pool` < `reserve_asset` < `return_request` < `return_asset` <
+`fee` < `recon_exception` < `subscription_line` < `service_interval` < job locks (the margin
+recompute's).
 
 Only the device-events REST handler and the in-service detection job take `seen_asset_<sys_id>`, and
 they hold no other lock when they do. The go-live under it starts its pending Subscription line
@@ -86,5 +87,24 @@ for one shortfall. It holds no other lock when it takes it, tries 5 times back t
 pool held through them to the run holding it. Under it, it takes only the `reserve_asset_` lock of
 each unit it moves (and what that unit's save takes under it), so it comes just before
 `reserve_asset`.
+The 5-minute OEM claim run holds `oem_claim_run` for the whole run, so a run and an *Execute now* at
+once never send a step to its vendor twice: that would spend two runs' calls in one rate-limit window,
+and the second claim of a device already claimed fails, marking the step the first run ticked done
+failed. It holds no other lock when it takes it, does not retry, and sends nothing when it finds it
+held. Under it, it saves staging steps, whose rules take no lock. A run that outlasts it loads no
+more due steps once it has lost it, so it calls no vendor after that, and it saves what its calls so
+far returned. A step found done when a failure is saved is left done.
+A unit is put on a Return order under `return_asset_<Asset sys_id>`: the check that it awaits no other
+return and the insert of its line are one critical section, so two Returns raised at once (a request
+sent twice, the record producer beside the customer page or an Agreement's end) never both take it.
+No unique index could hold that, as an Asset is on any number of settled lines. It is tried 5 times
+back to back; a unit held through them is left to the Return holding it, which takes it. Under it,
+the unit's move to pending return is saved, with what that save takes (`service_interval_`). The
+customer page raises a Customer's return requests under `return_request_<Customer sys_id>`, holding
+no other lock, without retrying: a request that finds it held raises nothing and asks the user to try
+again, and one whose devices all await a return already raises nothing either. So a request sent twice
+raises one Return order, with one de-install work order and change. Under it, the Return order is
+raised and each unit put on it under its `return_asset_` lock, so `return_request` comes just before
+`return_asset`. Neither is taken under `reserve_asset`, nor takes it, so both come after it.
 
 Whether the instance behaves as expected is on the first-install checklist.

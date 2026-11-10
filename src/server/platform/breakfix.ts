@@ -1,9 +1,9 @@
-import type { GlideRecord } from '@servicenow/glide'
+import { gs, type GlideRecord } from '@servicenow/glide'
 import { replacementProblem, replacementStep } from '../domain/breakfix.ts'
-import type { OrderStage } from '../domain/vocabulary.ts'
+import { ORDER_STAGE, type OrderStage } from '../domain/vocabulary.ts'
 import { isFleetAsset, readStage } from './assets.ts'
 import { createOrder, submitOrder } from './orders.ts'
-import { findById, refusal, str } from './records.ts'
+import { bool, findById, refusal, str, warnRefused } from './records.ts'
 
 /**
  * Break-fix replacements (P2.3, D58): the device-replace Order a CSM case raises for its failed Asset. It tells the
@@ -79,4 +79,29 @@ function submitReplacement(order: GlideRecord): Replacement {
     const submission = submitOrder(order)
     const number = str(order, 'number')
     return submission.submitted ? { outcome: 'raised', number } : { outcome: 'draft', number, why: submission.message }
+}
+
+/**
+ * A replacement Order completed: its case is saved with a work note. The replacement SLAs on the case stop once the Order
+ * it links is complete (logic/aftersales.now.ts), but the SLA engine weighs a case's SLAs only when the case is saved,
+ * and completing the Order does not save it. Only an open case that still links this Order, now complete, is saved. A
+ * case not found, or a refused save, leaves the SLA running, to breach: that is logged, to save the case by hand.
+ *
+ * Run from the event queue (platform/events `EVENT.replacementComplete`, fired by platform/fulfilment
+ * `recomputeOrder`), never in the save that completes the Order: that save is often made in a user's interactive session
+ * (an asset manager moving the unit to in service on the form, a customer contact confirming the install), where
+ * Customer Service's before-query rule 'Case query rules' narrows every read of a case to the CSM query rules of a user
+ * without case_admin: one whose rules do not grant them the case would not find it. A script action runs as system
+ * outside any interactive session, where that rule does not apply (it requires gs.isInteractive()).
+ */
+export function noteReplacementComplete(orderId: string): void {
+    const order = findById('x_daas_ham_order', orderId, { beyondVisibility: true })
+    if (!order || str(order, 'stage') !== ORDER_STAGE.complete) return
+    const caseId = str(order, 'case')
+    if (!caseId) return
+    const kase = findById('sn_customerservice_case', caseId)
+    if (!kase) return void gs.warn(`[x_daas_ham] ${str(order, 'number')} complete, but its case ${caseId} was not found: save the case to stop its SLA`)
+    if (!bool(kase, 'active') || str(kase, 'x_daas_ham_replacement_order') !== order.getUniqueValue()) return
+    kase.setValue('work_notes', `Replacement order ${str(order, 'number')} is complete: the replacement is installed.`)
+    if (!kase.update()) warnRefused(kase, `${str(kase, 'number')}: replacement SLA not stopped, the case save was refused; save the case`)
 }

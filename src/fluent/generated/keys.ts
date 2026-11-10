@@ -1915,6 +1915,10 @@ declare global {
                         table: 'sysevent_register'
                         id: 'd4fddacdde31412b82b69e2d52b83261'
                     }
+                    event_replacement_complete: {
+                        table: 'sysevent_register'
+                        id: 'fdcce1cccac747cda4ab819a54e9e8f8'
+                    }
                     event_return_overdue: {
                         table: 'sysevent_register'
                         id: 'a5716908b10d4a8eac0d9cd19328f52b'
@@ -2766,6 +2770,10 @@ declare global {
                         table: 'sysevent_script_action'
                         id: '0adefbcda0cf4aaab63825b57a928fe4'
                     }
+                    sa_replacement_complete: {
+                        table: 'sysevent_script_action'
+                        id: 'a21ac0aa9ce9405f993eb5e06d1fd493'
+                    }
                     sa_shipment_track: {
                         table: 'sysevent_script_action'
                         id: '1af7527311dd46e5915c1a60b7810643'
@@ -3094,6 +3102,10 @@ declare global {
                     src_server_entry_refresh_ts: {
                         table: 'sys_module'
                         id: '1103f50a93384eb2afc4a3119bbd23e8'
+                    }
+                    src_server_entry_replacements_ts: {
+                        table: 'sys_module'
+                        id: '5db7011938264dba8bcedc5c375ee2ed'
                     }
                     src_server_entry_returns_ts: {
                         table: 'sys_module'

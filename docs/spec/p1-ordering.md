@@ -199,12 +199,28 @@
 
 ## Spare-pool top-up (daily)
 
-For each active Agreement with a spare-pool ratio, and each Model it has deployed:
-`shortfall = ceil(deployed × ratio) − reserved spares`. Reserved spares are the Customer's spare-pool
-units, leaving out units on a lease being returned to its Lessor: sourcing can no longer claim them,
-so the top-up replaces them (`domain/sourcing.ts` `reservedSparesQuery`). Free central stock is moved
-into the pool, each unit claimed under the same Asset lock as sourcing and only while it is still
-available on no Order line and not on a lease being returned: a unit sourcing took in the meantime, or
-whose save is refused, is not moved and stays in the shortfall. If `x_daas_ham.spare_pool.auto_purchase`
-is true, purchase orders are requested for the rest, net of top-up purchases still open for that
-Agreement and Model.
+A Customer has one Spare pool per Model (owner decision), sized from all their deployed fleet units
+of that Model across their active Agreements with a spare-pool ratio, each Agreement's ratio applied
+to its own units and the sum rounded up once: `size = ceil(Σ deployed × ratio)` and
+`shortfall = size − reserved spares` (`domain/sourcing.ts` `sparePools`). Units on an Agreement
+without a ratio, or not active, add nothing to the pool. The daily pass runs over those Agreements;
+each Customer's pools are topped up once, from the row of their first Agreement by sys_id
+(`sparePoolLead`), and their other Agreements' rows are passed over.
+
+Reserved spares are counted per Customer and Model (`reservedSparesQuery`): the Customer's fleet
+units in the pool, and the Customer's spares in transfer on no Order line, such as a spare on a
+transfer order line between two stockrooms. Inventory gives such a unit back to the pool when it lets
+it go, received or not (`domain/lifecycle.ts` `stageAfterTransfer`, ADR 0002), so it is still a spare
+and is not replaced meanwhile. A unit in transfer on an Order line is sourcing's, on its way to
+staging for that line, and is no spare. Units on a lease being returned to its Lessor are left out:
+sourcing can no longer claim them, so the top-up replaces them.
+
+Free central stock is moved into the pool, each unit claimed under the same Asset lock as sourcing
+and only while it is still available on no Order line and not on a lease being returned: a unit
+sourcing took in the meantime, or whose save is refused, is not moved and stays in the shortfall. A
+spare moved in carries the Agreement with the largest share of the pool (the first by sys_id on a
+tie); sourcing gives it its line's Agreement when it is used. A pool is counted again, filled and
+bought for under its lock `spare_pool_<Customer sys_id>_<Model sys_id>` (ADR 0013). If
+`x_daas_ham.spare_pool.auto_purchase` is true, purchase orders are requested for the rest, net of
+top-up purchases still open for that Customer and Model (described *Spare-pool top-up <Customer
+sys_id>: <n> unit(s)*).

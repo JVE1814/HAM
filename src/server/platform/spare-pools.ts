@@ -1,10 +1,19 @@
-import { gs } from '@servicenow/glide'
+import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
 import { andEachClause } from '../domain/encoded-query.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { DEPLOYED_STAGES } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { freeStockOf, pickForSparePool, reservedSparesQuery, sparePoolShortfall } from '../domain/sourcing.ts'
+import {
+    freeStockOf,
+    pickForSparePool,
+    reservedSparesQuery,
+    sparePoolLead,
+    sparePools,
+    sparePoolShortfall,
+    type DeployedShare,
+    type SparePool,
+} from '../domain/sourcing.ts'
 import { ACTIVE_AGREEMENTS } from './agreements.ts'
 import { runTableJob } from './chunked.ts'
 import { withLockTries } from './locks.ts'
@@ -14,19 +23,27 @@ import { countBy, num, str } from './records.ts'
 import { moveToSparePool, stockCandidates } from './stock.ts'
 
 /**
- * Keeping a Customer's Spare pool at its Agreement's spare-pool ratio (P1.4), counting and moving fleet assets only
- * (ADR 0016): the pool, the deployed units it is sized by, and the free stock it is filled from.
+ * Keeping each Customer's Spare pool of each Model at the size their Agreements' spare-pool ratios give (P1.4,
+ * domain/sourcing `sparePools`), counting and moving fleet assets only (ADR 0016): the pool, the deployed units it is
+ * sized by, and the free stock it is filled from.
  */
 
-/** One chunk of the daily top-up (a scheduled chunked job): each active Agreement that keeps spares, its pools topped up. */
+/** The Agreements whose deployed units size their Customer's Spare pools. */
+const POOL_AGREEMENTS = `${ACTIVE_AGREEMENTS}^spare_pool_ratio>0`
+
+/**
+ * One chunk of the daily top-up (a scheduled chunked job). The pass runs over the Agreements that keep spares; a
+ * Customer's pools are topped up from the row of their lead Agreement (`sparePoolLead`) and the rows of their other
+ * Agreements are passed over.
+ */
 export function runSparePoolTopUp(): void {
     const autoPurchase = sparePurchasesEnabled()
     runTableJob({
         job: 'spare_pool_top_up',
         table: 'x_daas_ham_agreement',
-        query: `${ACTIVE_AGREEMENTS}^spare_pool_ratio>0`,
-        read: (agreement) => ({ customerId: str(agreement, 'customer'), ratio: num(agreement, 'spare_pool_ratio') }),
-        handle: (agreement, agreementId) => topUpAgreementPools({ agreementId, ...agreement }, autoPurchase),
+        query: POOL_AGREEMENTS,
+        read: (agreement) => str(agreement, 'customer'),
+        handle: (customerId, agreementId) => topUpCustomerPools(customerId, agreementId, autoPurchase),
     })
 }
 
@@ -45,37 +62,54 @@ function countByModel(query: string): Map<string, number> {
     return countBy('alm_hardware', query, 'model')
 }
 
-/** An Agreement whose Spare pools a run tops up: its Customer and the share of deployed units it keeps as spares. */
-interface PooledAgreement {
-    agreementId: string
-    customerId: string
-    ratio: number
+/** The Customer's Agreements the top-up runs over, with their spare-pool ratios. */
+function poolAgreements(customerId: string): Map<string, number> {
+    const agreement = new GlideRecord('x_daas_ham_agreement')
+    agreement.addEncodedQuery(`${POOL_AGREEMENTS}^customer=${customerId}`)
+    agreement.query()
+    const ratios = new Map<string, number>()
+    while (agreement.next()) ratios.set(agreement.getUniqueValue(), num(agreement, 'spare_pool_ratio'))
+    return ratios
+}
+
+/** The deployed fleet units (ADR 0016) of each of the Agreements, by Model, each with its Agreement's ratio. */
+function deployedShares(ratios: ReadonlyMap<string, number>): DeployedShare[] {
+    const ga = new GlideAggregate('alm_hardware')
+    ga.addEncodedQuery(fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreementIN${[...ratios.keys()].join(',')}`))
+    ga.addAggregate('COUNT', '')
+    ga.groupBy('x_daas_ham_agreement')
+    ga.groupBy('model')
+    ga.query()
+    const shares: DeployedShare[] = []
+    while (ga.next()) {
+        const agreementId = String(ga.getValue('x_daas_ham_agreement') ?? '')
+        const modelId = String(ga.getValue('model') ?? '')
+        // A unit with no Model has no pool: no stock is free for it.
+        if (modelId) shares.push({ agreementId, modelId, deployed: Number(ga.getAggregate('COUNT', '')), ratio: ratios.get(agreementId) ?? 0 })
+    }
+    return shares
 }
 
 /**
- * Move free central stock into the Customer's Spare pool, and buy what is still missing when `autoPurchase`, one Model
- * at a time under that pool's lock (ADR 0013). Two runs at once (the scheduled job and an *Execute now*) would both
+ * From the row of the Customer's lead Agreement only: move free central stock into each of the Customer's Spare pools,
+ * and buy what is still missing when `autoPurchase`, one Model at a time under that pool's lock (ADR 0013). Two runs at once (the scheduled job and an *Execute now*) would both
  * count the same shortfall and no open purchase, and each buy all of it, so a pool is counted, filled and bought for
  * holding its lock. One held through every try, back to back, is left to the run holding it, which counted it afresh.
  * Taking it throws only when an insert is refused with no lock row (platform/locks): that error escapes, and the
  * Agreement fails as a record of the run.
  */
-function topUpAgreementPools({ agreementId, customerId, ratio }: PooledAgreement, autoPurchase: boolean): void {
-    const deployed = countByModel(fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}`))
+function topUpCustomerPools(customerId: string, agreementId: string, autoPurchase: boolean): void {
+    if (!customerId) return
+    const ratios = poolAgreements(customerId)
+    if (sparePoolLead([...ratios.keys()]) !== agreementId) return
     const reserved = countByModel(reservedSparesQuery(customerId))
-    for (const [modelId, deployedCount] of deployed) {
+    for (const pool of sparePools(deployedShares(ratios))) {
         // A pool these counts show full is left without its lock: another run's top-up meanwhile only fills it.
-        if (sparePoolShortfall({ deployed: deployedCount, reserved: reserved.get(modelId) ?? 0, ratio }) === 0) continue
-        const pool = { agreementId, customerId, modelId, deployed: deployedCount, ratio }
-        const lockName = LOCK.sparePool(customerId, modelId)
-        if (withLockTries(lockName, (lock) => topUpPool(pool, autoPurchase, lock)).ran) continue
-        gs.info(`[x_daas_ham] Spare pool of ${customerId} for ${modelId} not topped up: another run holds the ${lockName} lock and tops it up`)
+        if (sparePoolShortfall(pool.size, reserved.get(pool.modelId) ?? 0) === 0) continue
+        const lockName = LOCK.sparePool(customerId, pool.modelId)
+        if (withLockTries(lockName, (lock) => topUpPool(customerId, pool, autoPurchase, lock)).ran) continue
+        gs.info(`[x_daas_ham] Spare pool of ${customerId} for ${pool.modelId} not topped up: another run holds the ${lockName} lock and tops it up`)
     }
-}
-
-interface Pool extends PooledAgreement {
-    modelId: string
-    deployed: number
 }
 
 /**
@@ -83,19 +117,19 @@ interface Pool extends PooledAgreement {
  * its `lock`. A run that outlasts the lock (ADR 0013) buys nothing once it has lost it: the run that took it over
  * counted the pool afresh and buys for it, though it may have counted before this run's moves were saved.
  */
-function topUpPool(pool: Pool, autoPurchase: boolean, lock: HeldLock): void {
-    const { agreementId, customerId, modelId } = pool
+function topUpPool(customerId: string, pool: SparePool, autoPurchase: boolean, lock: HeldLock): void {
+    const { modelId } = pool
     const reserved = countByModel(andEachClause(reservedSparesQuery(customerId), `model=${modelId}`)).get(modelId) ?? 0
-    const shortfall = sparePoolShortfall({ deployed: pool.deployed, reserved, ratio: pool.ratio })
+    const shortfall = sparePoolShortfall(pool.size, reserved)
     if (shortfall === 0) return
     const picked = pickForSparePool(stockCandidates(freeStockOf(modelId), shortfall), modelId, shortfall)
     // A unit sourcing claimed in the meantime (or whose save was refused) is not moved and stays in the shortfall.
-    const moved = picked.filter((assetId) => moveToSparePool(assetId, customerId, agreementId)).length
+    const moved = picked.filter((assetId) => moveToSparePool(assetId, customerId, pool.agreementId)).length
     if (!autoPurchase) return
     if (!lock.held()) {
         gs.warn(`[x_daas_ham] Spare pool of ${customerId} for ${modelId}: nothing bought, its lock was lost to the run that took it over`)
         return
     }
-    const missing = shortfall - moved - openSparePurchaseQuantity(agreementId, modelId)
-    if (missing > 0) requestSparePurchase(agreementId, modelId, missing)
+    const missing = shortfall - moved - openSparePurchaseQuantity(customerId, modelId)
+    if (missing > 0) requestSparePurchase(customerId, modelId, missing)
 }

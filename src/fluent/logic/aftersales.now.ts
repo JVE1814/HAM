@@ -1,6 +1,7 @@
 import '@servicenow/sdk/global'
-import { BusinessRule, EmailNotification, Record, ScheduledScript, Sla, UiAction } from '@servicenow/sdk/core'
+import { BusinessRule, EmailNotification, Record, ScheduledScript, ScriptAction, Sla, UiAction } from '@servicenow/sdk/core'
 import { onCaseFailedAsset, uiDefectiveReturnedToOem, uiRaiseReplacement } from '../../server/entry/breakfix'
+import { onReplacementComplete } from '../../server/entry/replacements'
 import { chaseOverdueReturns, onReturnEvaluated, raiseScheduledReturns } from '../../server/entry/returns'
 import { assetManager, noc, stockroomWorkers } from '../security/roles.now'
 import { ORDER_STAGE, RETURN_LINE_STATUS, RMA_STATE } from '../../server/domain/vocabulary'
@@ -53,6 +54,31 @@ UiAction({
 /** The replacement SLAs stop once the case's replacement Order is complete, and are cancelled when the case closes without that. */
 const REPLACEMENT_COMPLETE = `x_daas_ham_replacement_order.stage=${ORDER_STAGE.complete}`
 const CASE_CLOSED_UNREPLACED = `active=false^x_daas_ham_replacement_order.stage!=${ORDER_STAGE.complete}`
+
+// The SLA engine weighs a case's SLAs only when the case is saved, so the Order's completion queues
+// x_daas_ham.replacement.complete (platform/fulfilment recomputeOrder), whose script action saves the case with a work
+// note. It runs as system, outside the interactive session that completed the Order, where Customer Service's case query
+// rules could hide the case.
+Record({
+    $id: Now.ID['event_replacement_complete'],
+    table: 'sysevent_register',
+    data: {
+        suffix: 'replacement.complete',
+        event_name: EVENT.replacementComplete,
+        table: 'x_daas_ham_order',
+        description: 'A replacement Order is complete: its case is saved, so that its replacement SLA stops.',
+        priority: 100,
+    },
+})
+
+ScriptAction({
+    $id: Now.ID['sa_replacement_complete'],
+    name: 'NaaS - note replacement on its case',
+    eventName: EVENT.replacementComplete,
+    active: true,
+    script: onReplacementComplete,
+    description: "Saves a completed replacement Order's open case with a work note, so the SLA engine stops its replacement SLA.",
+})
 
 Sla({
     $id: Now.ID['sla_replace_nbd'],

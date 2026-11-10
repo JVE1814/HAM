@@ -17,6 +17,8 @@ function named(name: string): string {
 export const LOCK = {
     /** Held by the daily refresh run from its read of the Assets due to its last Order. */
     refreshOrders: () => named('refresh_orders'),
+    /** Held by an OEM claim run throughout, so two runs never send a step to its vendor twice. */
+    oemClaimRun: () => named('oem_claim_run'),
     /** An Asset's sightings (the device-events REST handler, the in-service detection job) take turns under it. */
     seenAsset: (assetId: string) => named(`seen_asset_${assetId}`),
     /**
@@ -49,6 +51,10 @@ export const LOCK = {
     sparePool: (customerId: string, modelId: string) => named(`spare_pool_${customerId}_${modelId}`),
     /** An Asset's stock lock: every claim of it, and every change a claim could race, is made under it. */
     reserveAsset: (assetId: string) => named(`reserve_asset_${assetId}`),
+    /** A Customer's return requests from the customer page are raised under it, one at a time. */
+    returnRequest: (customerId: string) => named(`return_request_${customerId}`),
+    /** An Asset is put on a Return order under it: the check that it awaits no other return, and the insert of its line. */
+    returnAsset: (assetId: string) => named(`return_asset_${assetId}`),
     /** A fee is checked and charged under it: one per fee identity. */
     fee: (fee: FeeIdentity) => named(`fee_${fee.type}_${fee.assetId}_${fee.returnOrderId}`),
     /** An exception of one type on one subject (an Asset, or a CI such as a rack) is checked and opened under it. */

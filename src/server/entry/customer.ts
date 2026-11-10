@@ -112,6 +112,10 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
  * POST /customer/returns { site, assets: [ids], decommission, method }: request equipment to be taken back, under the
  * record producer's rule (platform/returns `requestReturn`) for the caller's own Customer: 403 when the Return create
  * rule leaves them out, 400 when the Site is not one of their Customer's Sites or the request names no device there.
+ *
+ * The Customer's requests are raised one at a time, and only for devices not already awaiting a return: a request sent
+ * twice raises one Return order. One sent while another is being raised raises nothing (503), nor does one whose
+ * devices all await a return already (409).
  */
 export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
@@ -127,6 +131,8 @@ export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPI
     })
     if (!outcome.raised) {
         if (outcome.reason === 'forbidden') return reply(response, 403, { error: outcome.why })
+        if (outcome.reason === 'busy') return reply(response, 503, { error: outcome.why })
+        if (outcome.reason === 'awaited') return reply(response, 409, { error: outcome.why })
         if (outcome.reason !== 'refused') return reply(response, 400, { error: outcome.why })
         // Refused: nothing was moved, so the request can be sent again.
         return reply(response, 422, { error: 'Return not raised: the platform refused it' })

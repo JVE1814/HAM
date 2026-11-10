@@ -8,6 +8,7 @@ const fee = { type: 'late_return' as const, assetId: sysId('a'), returnOrderId: 
 function oneOfEach(id: string): string[] {
     return [
         LOCK.refreshOrders(),
+        LOCK.oemClaimRun(),
         LOCK.seenAsset(id),
         LOCK.receiveSerial(id),
         LOCK.receiveAsset(id),
@@ -19,6 +20,8 @@ function oneOfEach(id: string): string[] {
         LOCK.providerTagSequence(),
         LOCK.sparePool(id, id),
         LOCK.reserveAsset(id),
+        LOCK.returnRequest(id),
+        LOCK.returnAsset(id),
         LOCK.fee({ ...fee, assetId: id }),
         LOCK.reconException('rack_overlap', id),
         LOCK.subscriptionLine(id),
@@ -32,6 +35,7 @@ describe('LOCK', () => {
         const a = sysId('a')
         const b = sysId('b')
         expect(LOCK.refreshOrders()).toBe('refresh_orders')
+        expect(LOCK.oemClaimRun()).toBe('oem_claim_run')
         expect(LOCK.seenAsset(a)).toBe(`seen_asset_${a}`)
         expect(LOCK.receiveSerial('FOC123')).toBe('receive_serial_FOC123')
         expect(LOCK.receiveAsset(a)).toBe(`receive_asset_${a}`)
@@ -43,6 +47,8 @@ describe('LOCK', () => {
         expect(LOCK.providerTagSequence()).toBe('provider_tag_sequence')
         expect(LOCK.sparePool(a, b)).toBe(`spare_pool_${a}_${b}`)
         expect(LOCK.reserveAsset(a)).toBe(`reserve_asset_${a}`)
+        expect(LOCK.returnRequest(a)).toBe(`return_request_${a}`)
+        expect(LOCK.returnAsset(a)).toBe(`return_asset_${a}`)
         expect(LOCK.fee(fee)).toBe(`fee_late_return_${sysId('a')}_${sysId('r')}`)
         expect(LOCK.reconException('audit_missing', a)).toBe(`recon_exception_audit_missing_${a}`)
         expect(LOCK.reconException('rack_overlap', '')).toBe('recon_exception_rack_overlap_')
@@ -54,8 +60,8 @@ describe('LOCK', () => {
     it('gives every lock, and every record of one, a name of its own', () => {
         expect(oneOfEach(sysId('a'))).toHaveLength(Object.keys(LOCK).length)
         const names = [...oneOfEach(sysId('a')), ...oneOfEach(sysId('b'))]
-        // The two locks that name no record are the same whatever the record.
-        expect(new Set(names).size).toBe(names.length - 2)
+        // The three locks that name no record are the same whatever the record.
+        expect(new Set(names).size).toBe(names.length - 3)
     })
 
     it('locks each fee identity on its own', () => {
