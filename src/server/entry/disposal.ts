@@ -8,6 +8,7 @@ import {
     submitDisposal,
 } from '../platform/disposal.ts'
 import { str } from '../platform/records.ts'
+import { abortWith } from '../platform/rule-api.ts'
 
 /** Disposal orders: approve, then retire each wiped Asset by its method (P2.5, D61): platform/disposal. */
 
@@ -41,17 +42,10 @@ export function uiCompleteDisposal(current: GlideRecord): void {
  */
 export function guardDisposalLine(current: GlideRecord, previous: GlideRecord): void {
     if (current.operation() === 'delete' && gs.hasRole(ROLE.admin)) return
-    refuse(current, lineChangeRefusal(current, previous))
+    abortWith(current, lineChangeRefusal(current, previous))
 }
 
 /** Before-update rule on disposal orders whose method or Customer changes: both are fixed at submit, like the lines. */
 export function guardDisposalOrder(current: GlideRecord, previous: GlideRecord): void {
-    refuse(current, orderChangeRefusal(previous))
-}
-
-/** Abort the save or delete of `current` with `why`, unless there is none. */
-function refuse(current: GlideRecord, why: string): void {
-    if (!why) return
-    gs.addErrorMessage(why)
-    current.setAbortAction(true)
+    abortWith(current, orderChangeRefusal(previous))
 }

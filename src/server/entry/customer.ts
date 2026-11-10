@@ -28,7 +28,7 @@ import { currentSession } from '../platform/session.ts'
 import { findById, str } from '../platform/records.ts'
 import { requestReturn } from '../platform/returns.ts'
 import { completeInstall, installState } from '../platform/delivery.ts'
-import { reply } from '../platform/rest-api.ts'
+import { bodyOf, pathParam, reply, requireRole } from '../platform/rest-api.ts'
 
 /*
  * Customer self-service API (P2.9, D49). Every query runs as the signed-in customer contact, so the
@@ -43,13 +43,7 @@ function isCustomerAdmin(): boolean {
 }
 
 function allowed(response: RESTAPIResponse): boolean {
-    if (gs.hasRole(ROLE.customerAdmin) || gs.hasRole(ROLE.siteContact) || gs.hasRole(ROLE.assetManager)) return true
-    reply(response, 403, { error: 'Requires a customer admin or site contact role' })
-    return false
-}
-
-function data(request: RESTAPIRequest): Record<string, unknown> {
-    return (request.body.data as Record<string, unknown> | null) ?? {}
+    return requireRole(response, [ROLE.customerAdmin, ROLE.siteContact, ROLE.assetManager], 'Requires a customer admin or site contact role')
 }
 
 /** GET /customer/overview: what the customer sees on their page (platform/customer-page). */
@@ -69,7 +63,7 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
 /** POST /customer/faults { asset, description }: report a faulty device as a CSM case. */
 export function reportFault(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    const input = data(request)
+    const input = bodyOf(request)
     const fault = openFaultCase(String(input.asset ?? ''), String(input.description ?? ''))
     if (fault.opened) return reply(response, 201, { case: fault.number } satisfies FaultReport)
     if (fault.reason === 'unknown') return reply(response, 404, { error: 'Unknown device' })
@@ -82,7 +76,7 @@ export function reportFault(request: RESTAPIRequest, response: RESTAPIResponse):
  */
 export function confirmInstalled(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    const order = findById('x_daas_ham_order', String(request.pathParams.id ?? ''))
+    const order = findById('x_daas_ham_order', pathParam(request, 'id'))
     if (!order || !awaitsSelfInstallConfirmation(installState(order))) {
         return reply(response, 409, { error: 'This order is not waiting for a self-install confirmation' })
     }
@@ -98,9 +92,9 @@ export function confirmInstalled(request: RESTAPIRequest, response: RESTAPIRespo
 export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     if (!isCustomerAdmin()) return reply(response, 403, { error: 'Only customer admins attest equipment' })
-    const attestation = findUnclosedAttestation(String(request.pathParams.id ?? ''))
+    const attestation = findUnclosedAttestation(pathParam(request, 'id'))
     if (!attestation) return reply(response, 404, { error: 'No open attestation' })
-    const input = data(request)
+    const input = bodyOf(request)
     const refused = saveAttestationAnswers(attestation, Array.isArray(input.items) ? (input.items as AttestationAnswer[]) : [])
     // Submitted, the attestation would complete on the earlier answer, or none.
     if (refused > 0) return reply(response, 422, { error: `${refused} answer(s) not saved: the platform refused them` })
@@ -122,7 +116,7 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
 export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     if (!isCustomerAdmin()) return reply(response, 403, { error: 'Only customer admins can request returns' })
-    const input = data(request)
+    const input = bodyOf(request)
     const outcome = requestReturn({
         customerId: currentSession().customerId,
         siteId: String(input.site ?? ''),

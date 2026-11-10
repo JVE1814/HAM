@@ -1,4 +1,3 @@
-import { gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { parseDeviceEvents } from '../domain/device-events.ts'
 import { ROLE } from '../domain/visibility.ts'
@@ -7,7 +6,7 @@ import { nowMs } from '../platform/clock.ts'
 import { applyDeviceEvent, detectPendingInService, purgeDeviceEventsOlderThan } from '../platform/in-service.ts'
 import { lifecycleReaders } from '../platform/lifecycle-dates.ts'
 import { intProperty, PROPERTY } from '../platform/properties.ts'
-import { reply } from '../platform/rest-api.ts'
+import { reply, requireRole } from '../platform/rest-api.ts'
 
 /** In-service detection: Seen signals in, billing start out (P1.8). */
 
@@ -17,7 +16,7 @@ import { reply } from '../platform/rest-api.ts'
  * Asset carries, is reported in `unknown_identifiers` and stored as no event.
  */
 export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIResponse): void {
-    if (!gs.hasRole(ROLE.integration) && !gs.hasRole(ROLE.assetManager)) return reply(response, 403, { error: 'Requires the x_daas_ham.integration role' })
+    if (!requireRole(response, [ROLE.integration, ROLE.assetManager], 'Requires the x_daas_ham.integration role')) return
     const parsed = parseDeviceEvents(request.body.data, intProperty(PROPERTY.eventsMaxBatch), nowMs())
     if ('error' in parsed) return reply(response, 400, { error: parsed.error })
     const readers = lifecycleReaders()

@@ -3182,6 +3182,10 @@ declare global {
                         table: 'sys_module'
                         id: 'd236066f0a2640a4ae36f40a2e385776'
                     }
+                    'src_server_platform_rule-api_ts': {
+                        table: 'sys_module'
+                        id: 'e04ec88f875e43aab2cfec312f2733a1'
+                    }
                     'src_server_platform_scheduled-returns_ts': {
                         table: 'sys_module'
                         id: 'edb6ce637e6f495caecd560dafe8076f'

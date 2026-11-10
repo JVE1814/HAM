@@ -1,11 +1,11 @@
-import { gs, type GlideRecord } from '@servicenow/glide'
+import type { GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import type { AssetSummary, StockroomList } from '../domain/rest-contracts.ts'
 import { ROLE } from '../domain/visibility.ts'
 import { readStage } from '../platform/assets.ts'
 import { lookUp, pick, putAway, receive, receivingStockrooms, type Scan, type ScanRefusal } from '../platform/receiving.ts'
 import { str } from '../platform/records.ts'
-import { reply } from '../platform/rest-api.ts'
+import { pathParam, reply, requireRole, requireScanner, textBodyOf } from '../platform/rest-api.ts'
 import { OEM_PID_FIELD } from '../domain/fleet.ts'
 
 /** Warehouse scanning API used by the warehouse React app (P1.5): platform/receiving. */
@@ -41,27 +41,16 @@ function answer(response: RESTAPIResponse, scan: Scan): void {
 
 /** Receive, put away, pick and the stockroom list are depot work: inventory techs (asset managers and admins too). */
 function allowed(response: RESTAPIResponse): boolean {
-    if (gs.hasRole(ROLE.inventoryTech)) return true
-    reply(response, 403, { error: 'Requires the inventory tech role' })
-    return false
+    return requireRole(response, [ROLE.inventoryTech], 'Requires the inventory tech role')
 }
 
-/** A look-up only reads the Asset, so field techs, who read every Asset, may look up too. */
-function allowedLookup(response: RESTAPIResponse): boolean {
-    if (gs.hasRole(ROLE.inventoryTech) || gs.hasRole(ROLE.fieldTech)) return true
-    reply(response, 403, { error: 'Requires the inventory tech or field tech role' })
-    return false
-}
-
-function body(request: RESTAPIRequest): Record<string, string> {
-    const data = request.body.data as Record<string, unknown> | null
-    return Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [k, String(v ?? '').trim()]))
-}
-
-/** GET /assets/{code}: look a fleet asset up by serial, Provider tag or Customer tag (not the Provider IT's). */
+/**
+ * GET /assets/{code}: look a fleet asset up by serial, Provider tag or Customer tag (not the Provider IT's). A look-up
+ * only reads the Asset, so field techs, who read every Asset, may look up too.
+ */
 export function lookupAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
-    if (!allowedLookup(response)) return
-    answer(response, lookUp(String(request.pathParams.code ?? '')))
+    if (!requireScanner(response)) return
+    answer(response, lookUp(pathParam(request, 'code')))
 }
 
 /**
@@ -70,7 +59,7 @@ export function lookupAsset(request: RESTAPIRequest, response: RESTAPIResponse):
  */
 export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    const input = body(request)
+    const input = textBodyOf(request)
     if (!input.code || !input.stockroom) return reply(response, 400, { error: 'code and stockroom are required' })
     answer(response, receive({ code: input.code, pid: input.pid, manufacturer: input.manufacturer }, input.stockroom))
 }
@@ -78,14 +67,14 @@ export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse)
 /** POST /putaway { code, stockroom }: record the stockroom an in-stock asset now sits in (platform/receiving `putAway`). */
 export function putAwayAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    const input = body(request)
+    const input = textBodyOf(request)
     answer(response, putAway(input.code ?? '', input.stockroom ?? ''))
 }
 
 /** POST /pick { code, order }: confirm a scanned fleet asset is a staged asset of this Order. */
 export function pickAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    const input = body(request)
+    const input = textBodyOf(request)
     answer(response, pick(input.code ?? '', input.order))
 }
 

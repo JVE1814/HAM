@@ -4,6 +4,7 @@ import type { StagingResult } from '../domain/vocabulary.ts'
 import { releaseStepsWaitingOn } from '../platform/claim-steps.ts'
 import { nowGlide } from '../platform/clock.ts'
 import { bool, choice, str } from '../platform/records.ts'
+import { abortWith } from '../platform/rule-api.ts'
 import { completeStaging, stagingSteps } from '../platform/staging-tasks.ts'
 
 /** Before-update rule on staging steps: stamp who completed a step and when. */
@@ -26,10 +27,7 @@ export function releaseWaitingSteps(current: GlideRecord): void {
 export function guardStagingClosure(current: GlideRecord): void {
     if (choice<StagingResult>(current, 'result') === 'failed') return
     const outcome = stagingOutcome(stagingSteps(current.getUniqueValue()))
-    if (!outcome.complete) {
-        gs.addErrorMessage(`${outcome.remaining} mandatory staging step(s) are still open`)
-        current.setAbortAction(true)
-    }
+    if (!outcome.complete) abortWith(current, `${outcome.remaining} mandatory staging step(s) are still open`)
 }
 
 /** After-update rule on staging tasks closed complete: the Asset is staged, or goes for evaluation if it failed. */

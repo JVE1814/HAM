@@ -3,7 +3,7 @@ import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_in
 import { raiseDueAttestations } from '../platform/attestations.ts'
 import { closeAudit, findOpenVisibleAudit, recordScan, startSiteAudit, startStockroomAudit } from '../platform/audits.ts'
 import { str } from '../platform/records.ts'
-import { pathParam, reply, requireScanner } from '../platform/rest-api.ts'
+import { pathParam, reply, requireScanner, textBodyOf } from '../platform/rest-api.ts'
 
 /** Audits and attestations (P2.7, D63). */
 
@@ -34,7 +34,7 @@ export function uiStartSiteAudit(current: GlideRecord): void {
 export function scanAudit(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!requireScanner(response)) return
     const audit = findOpenVisibleAudit(pathParam(request, 'id'))
-    const code = String((request.body.data as { code?: string } | null)?.code ?? '').trim()
+    const code = textBodyOf(request).code ?? ''
     if (!audit) return reply(response, 404, { error: 'No open audit with that number' })
     if (!code) return reply(response, 400, { error: 'code is required' })
     // An unrecorded scan would count its unit missing at close, so the technician is told to scan again.

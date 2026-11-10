@@ -24,6 +24,16 @@ export function requireScanner(response: RESTAPIResponse): boolean {
     return requireRole(response, [ROLE.inventoryTech, ROLE.fieldTech], 'Requires the inventory tech or field tech role')
 }
 
+/** The JSON object a request was sent with ({} when it carries none), its values as the client sent them. */
+export function bodyOf(request: RESTAPIRequest): Record<string, unknown> {
+    return (request.body.data as Record<string, unknown> | null) ?? {}
+}
+
+/** `bodyOf` a request whose values are plain text (a scan): each one trimmed; a value the body does not name is absent here too. */
+export function textBodyOf(request: RESTAPIRequest): Record<string, string> {
+    return Object.fromEntries(Object.entries(bodyOf(request)).map(([name, value]) => [name, String(value ?? '').trim()]))
+}
+
 /** A path parameter, '' when absent. */
 export function pathParam(request: RESTAPIRequest, name: string): string {
     return String(request.pathParams[name] ?? '')
