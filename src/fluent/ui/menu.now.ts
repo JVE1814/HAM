@@ -9,6 +9,9 @@ import { OPEN_NORM_EXCEPTIONS_QUERY } from '../../server/domain/normalization'
 import { OPEN_EXCEPTIONS_QUERY } from '../../server/domain/reconciliation'
 import { FLEET_IN_STAGE, NAAS_MODEL_MILESTONES } from '../../server/domain/fleet'
 import { WORKSPACE_HOME } from '../workspace/workspace.now'
+import { WAREHOUSE_PAGE } from './warehouse-page.now'
+import { CUSTOMER_PAGE } from './customer-page.now'
+import { RACKS_PAGE } from '../logic/assurance.now'
 
 /*
  * Navigator menu "NaaS Asset Management".
@@ -47,7 +50,7 @@ Record({
         title: 'Warehouse scanning',
         application: naasMenu,
         link_type: 'DIRECT',
-        query: 'x_daas_ham_warehouse.do',
+        query: `${WAREHOUSE_PAGE}.do`,
         roles: stockroomWorkers,
         active: true,
         order: 110,
@@ -471,7 +474,7 @@ Record({
         title: 'Rack elevations',
         application: naasMenu,
         link_type: 'DIRECT',
-        query: 'x_daas_ham_racks.do',
+        query: `${RACKS_PAGE}.do`,
         roles: providerStaff,
         active: true,
         order: 130,
@@ -485,7 +488,7 @@ Record({
         title: 'Customer self-service (preview)',
         application: naasMenu,
         link_type: 'DIRECT',
-        query: 'x_daas_ham_customer.do',
+        query: `${CUSTOMER_PAGE}.do`,
         roles: [ROLE.assetManager],
         active: true,
         order: 140,

@@ -126,9 +126,12 @@ ScheduledScript({
     script: raiseAttestations,
 })
 
+/** The rack page's name: its address is this with .do, and its ACL is named by it. */
+export const RACKS_PAGE = 'x_daas_ham_racks'
+
 UiPage({
     $id: Now.ID['page_racks'],
-    endpoint: 'x_daas_ham_racks.do',
+    endpoint: `${RACKS_PAGE}.do`,
     description: 'Front and rear rack elevations per site, coloured by stage, customer or EoX / coverage risk.',
     category: 'general',
     html: rackPage,
@@ -138,7 +141,7 @@ UiPage({
 Acl({
     $id: Now.ID['acl_page_racks'],
     type: 'ui_page',
-    name: 'x_daas_ham_racks',
+    name: RACKS_PAGE,
     operation: 'read',
     roles: staffAndCustomers,
 })
