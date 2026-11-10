@@ -153,6 +153,14 @@ describe('passes on a job cursor', () => {
         completePass('job1')
         expect(cursorRow('job1')).toMatchObject({ cursor: token, last_status: 'complete', last_run: '2025-11-09 12:01:00' })
     })
+
+    it('logs a completion the platform refuses instead of throwing: the pass itself is complete', () => {
+        const token = startPass('job1', JOB_STATUS.running)
+        platform.refuses = () => 'read only'
+        expect(() => completePass('job1')).not.toThrow()
+        expect(cursorRow('job1')).toMatchObject({ cursor: token, last_status: 'running' })
+        expect(platform.logs).toEqual(['warn [x_daas_ham] job1: the pass completed, but its job cursor still reads running (as if stalled): read only'])
+    })
 })
 
 describe('runTableJob', () => {
@@ -172,6 +180,31 @@ describe('runTableJob', () => {
         runTableJob({ ...spec, job: 'scan' })
         expect(handled).toEqual(['a'])
         expect(cursorRow('scan')).toMatchObject({ cursor: 'a', last_status: 'paused (time budget)', processed_total: '1' })
+    })
+
+    it("counts a run's failed records on the cursor and logs them, and does not read complete", () => {
+        items('a', 'b', 'c')
+        const { spec, handled } = job(undefined, ['b'])
+        expect(runTableJob({ ...spec, job: 'scan' })).toMatchObject({ processed: 2, failed: 1, done: true })
+        expect(handled).toEqual(['a', 'c'])
+        expect(cursorRow('scan')).toMatchObject({ last_status: 'complete with 1 failed record(s)', processed_total: '2', failed_total: '1', last_error: 'b: boom b' })
+        expect(openJobCursor('scan').cursor).toBe('')
+        expect(platform.logs).toEqual(['error [x_daas_ham] scan: in this run: 1 record(s) failed, the last: b: boom b'])
+    })
+
+    it("keeps a pass's failures over its runs, and drops them once a run starts a fresh pass", () => {
+        items('a', 'b', 'c')
+        platform.properties['x_daas_ham.job.budget_seconds'] = '0'
+        runTableJob({ ...job(undefined, ['a']).spec, job: 'scan' })
+        expect(cursorRow('scan')).toMatchObject({ cursor: 'a', last_status: 'paused (time budget), 1 failed record(s) so far', failed_total: '1', last_error: 'a: boom a' })
+
+        platform.properties['x_daas_ham.job.budget_seconds'] = '120'
+        runTableJob({ ...job().spec, job: 'scan' })
+        expect(cursorRow('scan')).toMatchObject({ cursor: '', last_status: 'complete with 1 failed record(s)', failed_total: '1', last_error: 'a: boom a' })
+
+        runTableJob({ ...job().spec, job: 'scan' })
+        expect(cursorRow('scan')).toMatchObject({ cursor: '', last_status: 'complete', failed_total: '0', last_error: '' })
+        expect(platform.logs).toEqual(['error [x_daas_ham] scan: in this run: 1 record(s) failed, the last: a: boom a'])
     })
 
     it('does not run without a cursor row, and says why', () => {
@@ -200,6 +233,14 @@ describe('an event job', () => {
         expect(second.handled).toEqual(['b', 'c'])
         expect(platform.events).toHaveLength(1)
         expect(platform.tables[CURSORS]).toBeUndefined()
+    })
+
+    it("logs a chunk's failed records, and hands them to its flush", () => {
+        items('a', 'b')
+        const run = job(undefined, ['b'])
+        expect(runEventTableJob(queued(''), run.spec)).toMatchObject({ processed: 1, failed: 1, done: true })
+        expect(run.flushed).toEqual([{ failed: 1 }])
+        expect(platform.logs).toEqual([`error [x_daas_ham] ${EVENT_NAME} ${SUBJECT}: in this chunk: 1 record(s) failed, the last: b: boom b`])
     })
 })
 

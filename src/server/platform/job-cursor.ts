@@ -1,7 +1,7 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { isCurrentPass as namesCurrentPass } from '../domain/chunked-job.ts'
 import { nowGlide, nowMs } from './clock.ts'
-import { refusal, str } from './records.ts'
+import { num, refusal, str } from './records.ts'
 
 /**
  * The rows of x_daas_ham_job_cursor (ADR 0007): one per job, behind a unique index on its name. Only this module reads
@@ -15,7 +15,10 @@ const TABLE = 'x_daas_ham_job_cursor'
 
 /** What a job's `last_status` reads (the preflight check writes its result there instead). */
 export const JOB_STATUS = {
-    /** A scheduled job's run reached the end of its pass, or a pass its runner started is complete. */
+    /**
+     * A scheduled job's run reached the end of its pass, or a pass its runner started is complete. A scheduled job's
+     * status is worded by domain/chunked-job `cursorReport`, which adds the pass's failed records to these two.
+     */
     complete: 'complete',
     paused: 'paused (time budget)',
     /** A pass its runner started and marks complete: one still running with an old last run has stalled. */
@@ -32,6 +35,10 @@ export interface JobCursorValues {
     status?: string
     /** The records the run handled. */
     processed?: number
+    /** The records of the pass that failed so far, over all its runs. */
+    failed?: number
+    /** The last error of the pass, '' when no record failed (kept up to the column's length). */
+    lastError?: string
     /** Set the row's last run to now. */
     ranNow?: boolean
 }
@@ -41,6 +48,9 @@ export interface JobCursor {
     readonly cursor: string
     /** The stored date/time of the last run, '' when there was none. */
     readonly lastRun: string
+    /** A scheduled job's records that failed in its pass so far, over all its runs, and the last error ('' when none did). */
+    readonly failed: number
+    readonly lastError: string
     /** Save `values` on the row: null once saved, else why the platform refused. */
     save(values: JobCursorValues): string | null
 }
@@ -70,14 +80,21 @@ function find(job: string): GlideRecord | null {
     return record.get('job', job) ? record : null
 }
 
+/** The length of the Last error column (data/operations.now.ts). */
+const LAST_ERROR_LENGTH = 1000
+
 function rowOf(record: GlideRecord): JobCursor {
     return {
         cursor: str(record, 'cursor'),
         lastRun: str(record, 'last_run'),
+        failed: num(record, 'failed_total'),
+        lastError: str(record, 'last_error'),
         save: (values) => {
             if (values.cursor !== undefined) record.setValue('cursor', values.cursor)
             if (values.status !== undefined) record.setValue('last_status', values.status)
             if (values.processed !== undefined) record.setValue('processed_total', values.processed)
+            if (values.failed !== undefined) record.setValue('failed_total', values.failed)
+            if (values.lastError !== undefined) record.setValue('last_error', values.lastError.slice(0, LAST_ERROR_LENGTH))
             if (values.ranNow) record.setValue('last_run', nowGlide())
             return record.update() ? null : refusal(record)
         },
@@ -108,9 +125,13 @@ export function isCurrentPass(job: string, token: string): boolean {
     return row !== null && namesCurrentPass(row.cursor, token)
 }
 
-/** Mark the job's current pass complete (the save is not checked: the pass's results are written by then). */
+/**
+ * Mark the job's current pass complete (a pass still 'running' with an old last run has stalled). Called once the
+ * pass's own completion is written, so a refusal here is only logged: thrown, it would stop a pass that completed.
+ */
 export function completePass(job: string): void {
-    openJobCursor(job).save({ status: JOB_STATUS.complete, ranNow: true })
+    const refused = openJobCursor(job).save({ status: JOB_STATUS.complete, ranNow: true })
+    if (refused) gs.warn(`[x_daas_ham] ${job}: the pass completed, but its job cursor still reads running (as if stalled): ${refused}`)
 }
 
 /**

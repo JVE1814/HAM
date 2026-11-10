@@ -15,7 +15,7 @@ export interface ChunkedJobPorts<T> {
     keyOf(record: T): string
     handle(record: T): void
     /** Save where the run got to; `failures` are the records of this run that failed and the last error. */
-    saveCursor(cursor: string, processed: number, done: boolean, failures: { failed: number; lastError: string }): void
+    saveCursor(cursor: string, processed: number, done: boolean, failures: Failures): void
     now(): number
 }
 
@@ -69,6 +69,31 @@ export function runChunked<T>(ports: ChunkedJobPorts<T>, options: ChunkedJobOpti
             return { processed, failed, done: true, cursor: '', lastError }
         }
     }
+}
+
+/** Records of a pass, or of one run or chunk of it, that failed, with the last error ('' when none did). */
+export interface Failures {
+    failed: number
+    lastError: string
+}
+
+/** What a scheduled job's cursor says once a run of its pass saved it: the pass's failures so far, and its status. */
+export interface CursorReport extends Failures {
+    status: string
+}
+
+/**
+ * What a scheduled job's cursor says once a run saved it (ADR 0007). A pass may take several runs, each ending on its
+ * time budget, so the failures counted are the pass's: those the cursor holds from its earlier runs (`stored`) and the
+ * run's own, unless the run started a fresh pass (`resumed` false), which drops what the last pass left. The status
+ * reads *complete* only for a pass that reached the end with no record failed.
+ */
+export function cursorReport(stored: Failures, run: Failures & { resumed: boolean; done: boolean }): CursorReport {
+    const failed = (run.resumed ? stored.failed : 0) + run.failed
+    const lastError = run.lastError || (run.resumed && failed > 0 ? stored.lastError : '')
+    const failedText = `${failed} failed record(s)`
+    if (run.done) return { failed, lastError, status: failed > 0 ? `complete with ${failedText}` : 'complete' }
+    return { failed, lastError, status: failed > 0 ? `paused (time budget), ${failedText} so far` : 'paused (time budget)' }
 }
 
 /**

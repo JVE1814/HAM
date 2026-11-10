@@ -8,7 +8,7 @@ import { runEventTableJob } from './chunked.ts'
 import { glideToIsoDate, todayIso } from './clock.ts'
 import { EVENT, jobEvent, queueJob } from './events.ts'
 import { readModelLifecycle } from './model-lifecycle.ts'
-import { choice, findById, num, str, warnRefused } from './records.ts'
+import { choice, findById, num, str, throwRefused } from './records.ts'
 
 /**
  * Lifecycle phase and Refresh due date of an Asset, from its Model lifecycle, Agreement and Lease schedule: the stamp
@@ -136,7 +136,8 @@ export function runRefreshPass(pass: RefreshPass, event: GlideRecord, current: G
             if (inputs.phase === phase && inputs.refreshDue === refreshDue) return
             const asset = findById('alm_hardware', assetId)
             if (!asset || !applyLifecycleDates(asset, readers)) return
-            if (!asset.update()) warnRefused(asset, `Lifecycle dates of ${str(asset, 'serial_number')} not saved`)
+            // Refused, it fails as a record of the chunk, which the runner logs: the Asset keeps its old dates until the next pass.
+            if (!asset.update()) throwRefused(asset, 'lifecycle dates not saved')
         },
     })
 }

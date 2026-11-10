@@ -1,5 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import {
+    cursorReport,
     lockLostIn,
     passParm,
     readPassParm,
@@ -9,6 +10,7 @@ import {
     type ChunkedJobPorts,
     type ChunkedJobResult,
     type ChunkWrite,
+    type Failures,
 } from '../domain/chunked-job.ts'
 import { andEachClause } from '../domain/encoded-query.ts'
 import { messageOf } from '../domain/errors.ts'
@@ -36,6 +38,8 @@ import { intProperty, PROPERTY } from './properties.ts'
  *   (`inCurrentPass`).
  *
  * Each record is read into a row `R`; the item handled is `T`, the row itself unless `prepare` is set.
+ * A record whose handling throws is a failure: the pass moves on past it, the run logs its failures as an
+ * error, and the cursor counts the pass's (`failed_total`, `last_error`), reading complete only without any.
  */
 interface TableSourceFields<T, R> {
     table: string
@@ -59,6 +63,17 @@ type TableSource<T, R> = TableSourceFields<T, R> & { prepare?: PrepareBatch<T, R
 
 type TableJob<T, R = T> = TableSourceFields<T, R> & Prepare<T, R> & { job: string }
 
+/** Log the records of a run or chunk that failed as an error (`where` names it): the pass has moved on past them. */
+function logFailures(where: string, failures: Failures): void {
+    if (failures.failed === 0) return
+    gs.error(`[x_daas_ham] ${where}: ${failures.failed} record(s) failed, the last: ${failures.lastError}`)
+}
+
+/** How the log names a chunk of an event job, for its failed records. */
+function chunkOf(queued: JobEvent): string {
+    return `${queued.name} ${queued.subject}: in this chunk`
+}
+
 // The row type comes first so that, without `prepare`, the item type defaults to it.
 export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
     let row: JobCursor
@@ -70,10 +85,15 @@ export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
         gs.error(`[x_daas_ham] ${spec.job}: not run: ${reason}`)
         return { processed: 0, failed: 0, done: false, cursor: '', lastError: reason }
     }
+    // A run that starts from a saved cursor goes on with a pass that earlier runs began, and adds to their failures.
+    const resumed = row.cursor !== ''
     return runOverTable(spec, {
         loadCursor: () => row.cursor,
-        saveCursor: (cursor, processed, done) => {
-            const refused = row.save({ cursor, processed, status: done ? JOB_STATUS.complete : JOB_STATUS.paused, ranNow: true })
+        saveCursor: (cursor, processed, done, failures) => {
+            // The pass moves on past a failed record: the log and the cursor are where it shows.
+            logFailures(`${spec.job}: in this run`, failures)
+            const report = cursorReport({ failed: row.failed, lastError: row.lastError }, { ...failures, resumed, done })
+            const refused = row.save({ cursor, processed, status: report.status, failed: report.failed, lastError: report.lastError, ranNow: true })
             // The next run starts again from the cursor last saved, and would do so unseen.
             if (refused) gs.warn(`[x_daas_ham] ${spec.job}: cursor not saved, so the next run repeats this one: ${refused}`)
         },
@@ -82,8 +102,11 @@ export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
 
 type EventJob<T, R = T> = TableSourceFields<T, R> &
     Prepare<T, R> & {
-        /** Write out what the chunk accumulated in memory, with its records that failed, before the next chunk can start. */
-        flush?: (failures: { failed: number; lastError: string }) => void
+        /**
+         * Write out what the chunk accumulated in memory, with its records that failed, before the next chunk can start.
+         * The runner logs a chunk's failures either way; `flush` records them where the pass's outcome is kept.
+         */
+        flush?: (failures: Failures) => void
         /** Make the job's passes replace each other (see runEventTableJob). */
         pass?: PassJob
     }
@@ -111,7 +134,8 @@ export interface EventJobResult extends ChunkedJobResult {
 
 /**
  * The same runner driven by an event instead of a schedule: the cursor travels in the event's parm2 and the event is
- * queued again until the pass is complete.
+ * queued again until the pass is complete. A chunk's failed records are logged as an error; without `flush` they are
+ * kept nowhere else.
  *
  * With `pass`, the events also carry the pass's token, and a chunk checks that its pass is still the job's current one
  * as it starts and again before it writes: a chunk of a pass replaced or retired since neither flushes nor queues the
@@ -131,6 +155,7 @@ export function runEventTableJob<R, T = R>(queued: JobEvent, spec: EventJob<T, R
     const result = runOverTable(spec, {
         loadCursor: () => queued.position,
         saveCursor: (next, _processed, done, failures) => {
+            logFailures(chunkOf(queued), failures)
             spec.flush?.(failures)
             if (!done) queueJobAt(queued, next)
         },
@@ -195,7 +220,11 @@ function runPassChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, pass: PassJo
                         {
                             isCurrent: () => isCurrentPass(job, token),
                             held: () => lock.held(),
-                            flush: () => spec.flush?.(failures),
+                            // Logged only as the chunk is written: a superseded chunk's work is dropped, a locked one runs again.
+                            flush: () => {
+                                logFailures(chunkOf(queued), failures)
+                                spec.flush?.(failures)
+                            },
                             queueNext: () => queueJobAt(queued, passParm({ token, cursor: next })),
                             complete: () => {
                                 if (!locked) return

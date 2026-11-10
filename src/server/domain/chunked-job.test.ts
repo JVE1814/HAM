@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+    cursorReport,
     isCurrentPass,
     lockLostIn,
     passParm,
@@ -95,6 +96,50 @@ describe('runChunked', () => {
         expect(handled).toEqual(['a'])
         expect(result).toMatchObject({ done: false, cursor: 'a' })
         expect(saved).toEqual([{ cursor: 'a', processed: 1, done: false }])
+    })
+})
+
+describe('cursorReport', () => {
+    const none = { failed: 0, lastError: '' }
+
+    it('reads complete for a pass that reached the end with no record failed', () => {
+        expect(cursorReport(none, { ...none, resumed: false, done: true })).toEqual({ ...none, status: 'complete' })
+    })
+
+    it('reads paused for a run that spent its budget with no record failed', () => {
+        expect(cursorReport(none, { ...none, resumed: true, done: false })).toEqual({ ...none, status: 'paused (time budget)' })
+    })
+
+    it('never reads complete when a record of the run failed', () => {
+        const report = cursorReport(none, { failed: 2, lastError: 'b: boom', resumed: false, done: true })
+        expect(report).toEqual({ failed: 2, lastError: 'b: boom', status: 'complete with 2 failed record(s)' })
+    })
+
+    it('says how many records failed so far when it pauses', () => {
+        const report = cursorReport(none, { failed: 1, lastError: 'a: boom', resumed: false, done: false })
+        expect(report.status).toBe('paused (time budget), 1 failed record(s) so far')
+    })
+
+    it("adds an earlier run's failures to a run that resumes the pass, so a clean last run does not hide them", () => {
+        const stored = { failed: 3, lastError: 'c: refused' }
+        expect(cursorReport(stored, { ...none, resumed: true, done: true })).toEqual({
+            failed: 3,
+            lastError: 'c: refused',
+            status: 'complete with 3 failed record(s)',
+        })
+        expect(cursorReport(stored, { failed: 1, lastError: 'x: boom', resumed: true, done: false })).toEqual({
+            failed: 4,
+            lastError: 'x: boom',
+            status: 'paused (time budget), 4 failed record(s) so far',
+        })
+    })
+
+    it("drops the last pass's failures when a run starts a fresh pass", () => {
+        expect(cursorReport({ failed: 3, lastError: 'c: refused' }, { ...none, resumed: false, done: true })).toEqual({ ...none, status: 'complete' })
+    })
+
+    it('keeps no error text once no record of the pass failed', () => {
+        expect(cursorReport({ failed: 0, lastError: 'stale' }, { ...none, resumed: true, done: true })).toEqual({ ...none, status: 'complete' })
     })
 })
 
