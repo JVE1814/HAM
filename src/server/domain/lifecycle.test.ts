@@ -3,6 +3,7 @@ import {
     ALL_STAGES,
     billingChange,
     checkTransition,
+    DEPLOYED_STAGES,
     disposalStage,
     fieldsOf,
     isBillable,
@@ -54,9 +55,8 @@ describe('stage mapping', () => {
         expect(stageOf({ installStatus: '9', substatus: '' })).toBe('in_transit')
     })
 
-    it('reads the combination every stage is stored as back as that stage', () => {
-        const stored = ALL_STAGES.map((stage) => fieldsOf(stage))
-        for (const [i, fields] of stored.entries()) expect(stageOf(fields)).toBe(ALL_STAGES[i])
+    it.each(ALL_STAGES)('reads the combination %s is stored as back as that stage', (stage) => {
+        expect(stageOf(fieldsOf(stage))).toBe(stage)
     })
 })
 
@@ -192,6 +192,18 @@ describe('checkTransition', () => {
 
     it('accepts a no-op move to the same stage', () => {
         expect(checkTransition('in_service', 'in_service', deployable)).toEqual({ allowed: true })
+    })
+
+    it.each(['shipped', 'pending_in_service', 'in_service', 'temporary_deployment', 'pending_return'] as const)(
+        'lets a unit at or towards its Site (%s) be declared missing, as an overdue return does',
+        (from) => {
+            expect(checkTransition(from, 'missing', deployable)).toEqual({ allowed: true })
+            expect(checkTransition(from, 'missing', { ...deployable, hasSite: false, hasAgreement: false })).toEqual({ allowed: true })
+        },
+    )
+
+    it('lets every deployed stage go missing, so no overdue return is refused for the stage its unit is in', () => {
+        for (const from of DEPLOYED_STAGES) expect(checkTransition(from, 'missing', deployable), from).toEqual({ allowed: true })
     })
 })
 

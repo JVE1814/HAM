@@ -105,6 +105,37 @@ describe('parseDeviceEvents', () => {
         expect(result.events.map((e) => e.identifier)).toEqual(['A'])
         expect(result.rejected).toEqual([{ index: 1, reason: 'observed_at is in the future' }])
     })
+
+    it('gives the events oldest first, so a later sighting listed first does not put a unit in service late', () => {
+        const result = parseDeviceEvents(
+            {
+                events: [
+                    { identifier: 'A', event: 'seen', observed_at: '2026-11-06T09:00:00Z' },
+                    { identifier: 'A', event: 'seen', observed_at: '2026-11-05T09:00:00Z' },
+                    { identifier: 'B', event: 'bogus', observed_at: '2026-11-04T09:00:00Z' },
+                    { identifier: 'A', event: 'down', observed_at: '2026-11-05T10:00:00+01:00' },
+                ],
+            },
+            10,
+            NOW,
+        )
+        if ('error' in result) throw new Error(result.error)
+        expect(result.events.map((e) => [e.event, new Date(e.observedAt).toISOString()])).toEqual([
+            ['seen', '2026-11-05T09:00:00.000Z'],
+            ['down', '2026-11-05T09:00:00.000Z'],
+            ['seen', '2026-11-06T09:00:00.000Z'],
+        ])
+        // A rejected event keeps its index in the batch as sent.
+        expect(result.rejected).toEqual([{ index: 2, reason: 'event must be one of seen, down, up' }])
+    })
+
+    it('keeps events observed at the same instant in their order in the batch', () => {
+        const at = '2026-11-06T10:00:00Z'
+        const kinds = ['down', 'up', 'seen', 'down', 'up'] as const
+        const result = parseDeviceEvents({ events: kinds.map((event) => ({ identifier: 'A', event, observed_at: at })) }, 10, NOW)
+        if ('error' in result) throw new Error(result.error)
+        expect(result.events.map((e) => e.event)).toEqual([...kinds])
+    })
 })
 
 describe('isStateChange', () => {

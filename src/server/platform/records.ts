@@ -1,4 +1,5 @@
 import { GlideAggregate, type GlideElement, GlideRecord, gs } from '@servicenow/glide'
+import { oneOf } from '../domain/exhaustive.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 
 /** Small Glide helpers shared by repositories and gateways. Keep this module free of business rules. */
@@ -164,16 +165,36 @@ export function str(gr: ForeignRecord, field: string): string {
 }
 
 /**
- * The value of a choice `field` as its list's type (domain/vocabulary; '' when blank), so that comparing it with a
- * value the list does not have fails to compile. It checks nothing: a value stored past the list reads as it is.
+ * The number in `field`; 0 when it is blank. A value that is not a number (a corrupt or hand-edited row, a dot-walk to a
+ * text field) reads as 0 too, which would bill or cost nothing without a word, so it is logged as a warning naming the
+ * record, the field and the value.
  */
-export function choice<Value extends string>(gr: GlideRecord, field: string): Value | '' {
-    return str(gr, field) as Value | ''
+export function num(gr: ForeignRecord, field: string): number {
+    const raw = valueOf(gr, field)
+    if (raw === null || raw === undefined) return 0
+    const value = Number(raw)
+    if (Number.isFinite(value)) return value
+    gs.warn(`[x_daas_ham] ${gr.getTableName()} ${gr.getUniqueValue()}: ${field} holds '${String(raw)}', not a number; read as 0`)
+    return 0
 }
 
-export function num(gr: ForeignRecord, field: string): number {
-    const value = Number(valueOf(gr, field))
-    return Number.isFinite(value) ? value : 0
+/**
+ * The value of a choice `field`.
+ *
+ * With the list's values (`allowed`) it is checked (domain/exhaustive `oneOf`): the value when it is one of them, else
+ * `fallback`, or undefined when none is given. A value the app does not know, such as a choice an administrator added, a
+ * corrupt row or a blank not in `allowed`, is never read as one it does, as a cast (`str(...) as T`) would.
+ *
+ * Without `allowed` it is the value as its list's type (domain/vocabulary; '' when blank), so that comparing it with a
+ * value the list does not have fails to compile. That form checks nothing: a value stored past the list reads as it is.
+ */
+export function choice<T extends string>(gr: ForeignRecord, field: string): T | ''
+export function choice<T extends string>(gr: ForeignRecord, field: string, allowed: readonly T[]): T | undefined
+export function choice<T extends string>(gr: ForeignRecord, field: string, allowed: readonly T[], fallback: T): T
+export function choice<T extends string>(gr: ForeignRecord, field: string, allowed?: readonly T[], fallback?: T): T | '' | undefined {
+    const value = str(gr, field)
+    if (!allowed) return value as T | ''
+    return oneOf(value, allowed) ?? fallback
 }
 
 export function bool(gr: ForeignRecord, field: string): boolean {

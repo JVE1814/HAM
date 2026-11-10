@@ -1,12 +1,25 @@
-import type { RackFace } from './vocabulary.ts'
+import { RACK_FACE_CHOICES, type RackFace } from './vocabulary.ts'
 
 /**
  * Rack placement (P2.8) and power budget (P3.29): units are numbered from 1 at the bottom; a device
  * occupies ruStart..ruStart+height-1.
  */
 
+/** Every rack face, to read x_daas_ham_rack_face with (platform/records `choice`). */
+export const RACK_FACES: readonly RackFace[] = Object.keys(RACK_FACE_CHOICES) as RackFace[]
+
 export interface Placement {
+    /**
+     * The key that tells the device from every other. Pass its sys_id: an asset tag or a serial number can be blank,
+     * or shared by two devices. It must be the same for one device among `placements` and as the candidate, because
+     * placementProblem leaves out the candidate's earlier placement by it. Shown only for a device with no `label`.
+     */
     assetId: string
+    /**
+     * How messages and the elevation name the device (its asset tag, else its serial number). Two devices can share
+     * one, so it is never compared. Left out or blank, the device is named by `assetId`.
+     */
+    label?: string
     ruStart: number
     height: number
     face: RackFace
@@ -43,7 +56,7 @@ export function placementProblem(rack: RackSpec, placements: readonly Placement[
     const others = placements.filter((other) => other.assetId !== candidate.assetId)
     for (const other of others) {
         const unit = sharedUnit(candidate, other)
-        if (unit !== null) return `Rack unit ${unit} is taken by ${other.assetId}`
+        if (unit !== null) return `Rack unit ${unit} is taken by ${labelOf(other)}`
     }
     const budget = powerBudget(rack.powerCapacityW, [...others, candidate])
     // The other devices draw the same before and after, so only the candidate's own draw can raise it.
@@ -52,6 +65,10 @@ export function placementProblem(rack: RackSpec, placements: readonly Placement[
         return `The rack's power budget would be exceeded: ${budget.usedW} W of ${budget.capacityW} W`
     }
     return null
+}
+
+function labelOf(placement: Placement): string {
+    return placement.label || placement.assetId
 }
 
 function drawW(placement: Placement): number {
@@ -72,7 +89,10 @@ function sharedUnit(a: Placement, b: Placement): number | null {
 
 /** Two devices on one face of a rack that share units; `unit` is the lowest unit they share. */
 export interface Overlap {
+    /** The two devices' keys (Placement `assetId`), in list order, to tell them apart. Messages name them by `labels`. */
     assetIds: [string, string]
+    /** Their names (Placement `label`, else `assetId`), for messages. */
+    labels: [string, string]
     face: RackFace
     unit: number
 }
@@ -87,7 +107,7 @@ export function overlaps(placements: readonly Placement[]): Overlap[] {
     placements.forEach((a, i) => {
         for (const b of placements.slice(i + 1)) {
             const unit = sharedUnit(a, b)
-            if (unit !== null) found.push({ assetIds: [a.assetId, b.assetId], face: a.face, unit })
+            if (unit !== null) found.push({ assetIds: [a.assetId, b.assetId], labels: [labelOf(a), labelOf(b)], face: a.face, unit })
         }
     })
     return found.sort((x, y) => x.unit - y.unit)
@@ -109,7 +129,10 @@ export function powerBudget(capacityW: number, placements: readonly Placement[])
 
 export interface ElevationRow {
     unit: number
+    /** The device in these units (Placement `assetId`), null for an empty unit. */
     assetId: string | null
+    /** Its name (Placement `label`), null for an empty unit. */
+    label: string | null
     span: number
 }
 
@@ -121,10 +144,10 @@ export function rackElevation(rackUnits: number, placements: readonly Placement[
         const device = placements.find((p) => p.face === face && unit >= p.ruStart && unit <= topUnit(p))
         if (device) {
             const span = unit - device.ruStart + 1
-            rows.push({ unit, assetId: device.assetId, span })
+            rows.push({ unit, assetId: device.assetId, label: labelOf(device), span })
             unit -= span
         } else {
-            rows.push({ unit, assetId: null, span: 1 })
+            rows.push({ unit, assetId: null, label: null, span: 1 })
             unit--
         }
     }

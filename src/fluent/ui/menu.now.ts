@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { ApplicationMenu, Record } from '@servicenow/sdk/core'
-import { broadStaff, providerStaff, staffOrderRaisers, stockroomWorkers } from '../security/roles.now'
+import { broadStaff, providerStaff, scanners, staffOrderRaisers, stockroomWorkers } from '../security/roles.now'
 import { ROLE } from '../../server/domain/visibility'
 import { requestNetworkEquipment } from './order-producer.now'
 import { requestReturn } from './return-producer.now'
@@ -51,7 +51,8 @@ Record({
         application: naasMenu,
         link_type: 'DIRECT',
         query: `${WAREHOUSE_PAGE}.do`,
-        roles: stockroomWorkers,
+        // The roles the page's ACL grants (ui/warehouse-page.now.ts).
+        roles: scanners,
         active: true,
         order: 110,
     },
@@ -419,7 +420,9 @@ Record({
         application: naasMenu,
         link_type: 'DIRECT',
         query: 'sys_import.do',
-        roles: stockroomWorkers,
+        // Loading an import set takes the platform's import_set_loader role (import_admin contains it), which no NaaS
+        // role contains: offered to those who hold it.
+        roles: ['import_set_loader'],
         active: true,
         order: 630,
     },

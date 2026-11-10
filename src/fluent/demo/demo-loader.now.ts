@@ -2,7 +2,11 @@ import '@servicenow/sdk/global'
 import { Record, ScheduledScript } from '@servicenow/sdk/core'
 import { DEMO_DEPOT_GROUP, loadDemoData } from '../../server/entry/demo-seed'
 
-/* Installed only with `now-sdk install --demo-data`; run it once with "Execute Now". */
+/*
+ * Demo data (installMethod demo): the SDK installs it unless the app is installed with `now-sdk install --no-demoData`,
+ * so install production that way (README "Install"). Run it once with "Execute Now"; it loads nothing on an instance in
+ * use (entry/demo-seed `demoRefusal`).
+ */
 
 /*
  * The group the demo depots are assigned to (ADR 0018). It ships as a record because the job cannot create it:

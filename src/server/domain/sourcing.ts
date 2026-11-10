@@ -209,18 +209,23 @@ const LABEL: Record<Source, string> = {
     central_stock: 'from central stock',
 }
 
+/**
+ * Which stock serves `request`, in its Sources' priority order, and how many units are left to purchase. A quantity
+ * below one, or not a whole number of units, wants no more than its whole part: none takes no stock and buys nothing.
+ */
 export function planSourcing(request: SourcingRequest, stock: readonly StockCandidate[]): SourcingPlan {
+    const wanted = Number.isFinite(request.quantity) ? Math.max(0, Math.floor(request.quantity)) : 0
     const picks: SourcingPlan['picks'] = []
     for (const source of PRIORITY[request.purpose]) {
         const matching = stock
             .filter((c) => c.modelId === request.modelId && c.source === source)
             .sort((a, b) => a.stockroomId.localeCompare(b.stockroomId) || a.assetId.localeCompare(b.assetId))
         for (const candidate of matching) {
-            if (picks.length === request.quantity) break
+            if (picks.length >= wanted) break
             picks.push({ assetId: candidate.assetId, source })
         }
     }
-    const toPurchase = request.quantity - picks.length
+    const toPurchase = wanted - picks.length
     const parts = (Object.keys(LABEL) as Source[])
         .filter((s) => PRIORITY[request.purpose].includes(s))
         .map((s) => [picks.filter((p) => p.source === s).length, LABEL[s]] as const)

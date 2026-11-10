@@ -3,8 +3,8 @@ import { StringColumn, Table } from '@servicenow/sdk/core'
 
 /*
  * Import-set staging tables. Load a CSV into them with System Import Sets > Load Data; rows are
- * processed by the rules in logic/model-rules.now.ts (no transform map), which set the row's import
- * state and comment.
+ * processed by after-insert rules in logic/model-rules.now.ts (no transform map), which set the
+ * row's import state and comment. (The OEM coverage import table is in data/oem.now.ts.)
  */
 
 /** Advance shipment notice lines from a distributor. */
