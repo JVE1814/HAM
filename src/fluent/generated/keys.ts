@@ -573,6 +573,10 @@ declare global {
                         table: 'sys_security_acl'
                         id: 'a85ce9474e8d4648ab2ca442f624c4a3'
                     }
+                    acl_rest_customer: {
+                        table: 'sys_security_acl'
+                        id: 'e8bbd4c2ce364a56a21fe696fdde08b7'
+                    }
                     acl_return_order_create: {
                         table: 'sys_security_acl'
                         id: '329dd7567eb6468c89b791161613b181'
@@ -17239,6 +17243,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '43e68687d9e14cfe9e214e596feb12ae'
+                        key: {
+                            sys_security_acl: 'e8bbd4c2ce364a56a21fe696fdde08b7'
+                            sys_user_role: {
+                                id: '104c293b21934f30966cd88c879e4008'
+                                key: {
+                                    name: 'x_daas_ham.site_contact'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '43ea04610f1e4ac0b3e557ed647c07b9'
                         key: {
@@ -27578,6 +27595,19 @@ declare global {
                         key: {
                             document_key: '85473c150a0e41508d6bdec66c6f5a12'
                             variable: 'dd54cf535320220002c6435723dc34fd'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: '77382cd5e60b488cad8e57ec7775042c'
+                        key: {
+                            sys_security_acl: 'e8bbd4c2ce364a56a21fe696fdde08b7'
+                            sys_user_role: {
+                                id: 'fd154cb7b91e4ef5aa4da43a7344134d'
+                                key: {
+                                    name: 'x_daas_ham.customer_admin'
+                                }
+                            }
                         }
                     },
                     {

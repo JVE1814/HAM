@@ -7,8 +7,21 @@ import { getRack, listRacks, listSites } from '../../server/entry/racks'
 import { answerAttestation, confirmInstalled, customerOverview, reportFault, requestCustomerReturn } from '../../server/entry/customer'
 import { getBillingLines, listBillingPeriods } from '../../server/entry/billing'
 import { postTrackingUpdate } from '../../server/entry/shipping'
+import { customerRestAcl } from '../security/rest-acls.now'
 
-/* Scripted REST API: /api/x_daas_ham/naas/... */
+/*
+ * Scripted REST API: /api/x_daas_ham/naas/... A route that sets nothing requires the snc_internal role and enforces
+ * the platform's "Scripted REST External Default" ACL, which admits internal users only: the staff and integration
+ * routes. The routes built for customer users too (sites, racks, customer/...) turn the snc_internal requirement off and
+ * enforce that ACL or the app's customer one (security/rest-acls.now.ts); a user passes either. The shipping webhook
+ * runs unauthenticated (as guest, who holds no role) and checks its token itself. Each handler checks the caller's role.
+ */
+
+/** The platform's "Scripted REST External Default" ACL (global): role snc_internal and no snc_external. */
+const SCRIPTED_REST_EXTERNAL_DEFAULT = 'cf9d01d3e73003009d6247e603f6a990'
+
+/** Staff pass the platform's default ACL, customer admins and site contacts the app's. */
+const staffOrCustomer = [SCRIPTED_REST_EXTERNAL_DEFAULT, customerRestAcl]
 
 RestApi({
     $id: Now.ID['rest_naas'],
@@ -91,6 +104,8 @@ RestApi({
             path: '/sites',
             shortDescription: 'Customer sites visible to the user.',
             authentication: true,
+            internalRole: false,
+            enforceAcl: staffOrCustomer,
             script: listSites,
         },
         {
@@ -100,6 +115,8 @@ RestApi({
             path: '/racks',
             shortDescription: 'Racks in the rooms of a site (?site=sys_id).',
             authentication: true,
+            internalRole: false,
+            enforceAcl: staffOrCustomer,
             script: listRacks,
         },
         {
@@ -109,6 +126,8 @@ RestApi({
             path: '/racks/{id}',
             shortDescription: 'A rack and the devices placed in it.',
             authentication: true,
+            internalRole: false,
+            enforceAcl: staffOrCustomer,
             script: getRack,
         },
         {
@@ -118,6 +137,8 @@ RestApi({
             path: '/customer/overview',
             shortDescription: "The signed-in customer contact's equipment, orders, returns and attestations.",
             authentication: true,
+            internalRole: false,
+            enforceAcl: staffOrCustomer,
             script: customerOverview,
         },
         {
@@ -127,6 +148,8 @@ RestApi({
             path: '/customer/faults',
             shortDescription: 'Report a faulty device (creates a CSM case).',
             authentication: true,
+            internalRole: false,
+            enforceAcl: staffOrCustomer,
             script: reportFault,
         },
         {
@@ -136,6 +159,8 @@ RestApi({
             path: '/customer/orders/{id}/installed',
             shortDescription: 'Confirm a self-installed order is installed.',
             authentication: true,
+            internalRole: false,
+            enforceAcl: staffOrCustomer,
             script: confirmInstalled,
         },
         {
@@ -145,6 +170,8 @@ RestApi({
             path: '/customer/attestations/{id}',
             shortDescription: 'Answer (and optionally submit) an attestation.',
             authentication: true,
+            internalRole: false,
+            enforceAcl: staffOrCustomer,
             script: answerAttestation,
         },
         {
@@ -154,6 +181,8 @@ RestApi({
             path: '/customer/returns',
             shortDescription: 'Request selected devices or a whole site to be taken back.',
             authentication: true,
+            internalRole: false,
+            enforceAcl: staffOrCustomer,
             script: requestCustomerReturn,
         },
         {
@@ -182,6 +211,7 @@ RestApi({
             shortDescription: 'Tracking webhook from the shipping aggregator (ShipEngine or EasyPost shape); authenticated by the X-NaaS-Webhook-Token header (or ?token=).',
             authentication: false,
             authorization: false,
+            internalRole: false,
             script: postTrackingUpdate,
         },
     ],
