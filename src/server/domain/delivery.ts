@@ -28,11 +28,19 @@ export interface ShipFacts {
     shippingEnabled: boolean
 }
 
+/** What the on-site work an Order opens is for: installing its units, or swapping them for those they replace. */
+const ORDER_WORK_PURPOSES = ['install', 'swap'] as const satisfies readonly FieldPurpose[]
+
 /** The change request and FSM work order to open at the Site (D57). */
 export interface OnSiteWork {
     changeType: 'standard' | 'normal'
-    purpose: Extract<FieldPurpose, 'install' | 'swap'>
+    purpose: (typeof ORDER_WORK_PURPOSES)[number]
     subcontracted: boolean
+}
+
+/** Whether a work order of this purpose (as stored) is an Order's on-site work, whose closing completes the install. */
+export function installsOrder(purpose: string): boolean {
+    return (ORDER_WORK_PURPOSES as readonly string[]).includes(purpose)
 }
 
 /**

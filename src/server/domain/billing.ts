@@ -256,7 +256,7 @@ interface BillingLineColumn<Field extends string = string> {
  * period and the pull API's lines are both read off this list (`billingCsvRow`, `billingLineJson`), and a generated
  * line sets these fields (`BillingLineValues`).
  */
-export const BILLING_LINE_COLUMNS = [
+const BILLING_LINE_COLUMNS = [
     { field: 'kind', type: 'text', csv: true, json: 'kind' },
     { field: 'customer', type: 'reference', csv: true, json: 'customerId', jsonDisplay: 'customer' },
     { field: 'agreement', type: 'reference', csv: true, jsonDisplay: 'agreement' },

@@ -270,9 +270,9 @@ export function stagesQuery(stages: readonly Stage[], base = '', via = ''): stri
     return base ? andEachClause(clauses, base) : clauses
 }
 
-/** Encoded condition matching Assets not retired, whatever their stage otherwise (`via` as for stagesQuery). */
-export function notRetiredCondition(via = ''): string {
-    return `${via}install_status!=${INSTALL_STATUS.retired}`
+/** Encoded condition matching Assets not retired, whatever their stage otherwise. */
+export function notRetiredCondition(): string {
+    return `install_status!=${INSTALL_STATUS.retired}`
 }
 
 export function isBillable(stage: Stage | null): boolean {

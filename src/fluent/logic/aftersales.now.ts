@@ -42,7 +42,7 @@ UiAction({
     table: 'x_daas_ham_oem_rma',
     actionName: 'x_daas_ham_rma_defective_returned',
     hint: 'Record that the defective unit was shipped back to the manufacturer (needs wipe evidence on the asset).',
-    // domain/sourcing RMA_AT_OEM, which built-metadata.test.ts holds the built condition to.
+    // domain/oem-rma RMA_AT_OEM, which built-metadata.test.ts holds the built condition to.
     condition: `['${RMA_STATE.open}','${RMA_STATE.replacement_received}'].indexOf(current.state + '') >= 0`,
     roles: stockroomWorkers,
     form: { showButton: true },

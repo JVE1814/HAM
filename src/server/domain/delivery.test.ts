@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { planShipment, replacementInstalled, type ShipFacts } from './delivery'
-import type { InstallMode, OrderType } from './vocabulary'
+import { installsOrder, planShipment, replacementInstalled, type ShipFacts } from './delivery'
+import { ORDER_TYPE_CHOICES, type InstallMode, type OrderType } from './vocabulary'
 
 const order: ShipFacts = {
     orderType: 'site_rollout',
@@ -140,6 +140,15 @@ describe('planShipment', () => {
 
     it.each<OrderType>(['site_rollout', 'device_add', 'temporary'])('runs a %s as a normal change that installs Assets', (orderType) => {
         expect(onSiteWork({ orderType })).toMatchObject({ changeType: 'normal', purpose: 'install' })
+    })
+
+    it("completes the install as the work it opens is closed, and on no other work order's closing", () => {
+        for (const orderType of Object.keys(ORDER_TYPE_CHOICES) as OrderType[]) {
+            expect(installsOrder(onSiteWork({ orderType })!.purpose), orderType).toBe(true)
+        }
+        expect(installsOrder('de_install')).toBe(false)
+        expect(installsOrder('site_audit')).toBe(false)
+        expect(installsOrder('')).toBe(false)
     })
 
     it('subcontracts the work for a subcontractor but not for a field engineer', () => {

@@ -2700,6 +2700,10 @@ declare global {
                         table: 'sys_module'
                         id: '02bd27b0af66429589216a33a7904d12'
                     }
+                    'src_server_domain_customer-page_ts': {
+                        table: 'sys_module'
+                        id: '2b3b4b7974894a42846bbd63648c184d'
+                    }
                     'src_server_domain_customer-parties_ts': {
                         table: 'sys_module'
                         id: '6f43ccbaa5a344348008627ef2bc5652'
@@ -2809,6 +2813,10 @@ declare global {
                         table: 'sys_module'
                         id: '300abf5a6e4f44b8a34f21b962e05a03'
                     }
+                    'src_server_domain_oem-rma_ts': {
+                        table: 'sys_module'
+                        id: '7afae68bf4604bc89ef41079b5187da8'
+                    }
                     src_server_domain_preflight_ts: {
                         table: 'sys_module'
                         id: 'e09a575f75f4414892295f6c99476267'
@@ -2828,6 +2836,10 @@ declare global {
                     src_server_domain_refresh_ts: {
                         table: 'sys_module'
                         id: 'fd1e31be05fa4ed8bbea0b137ba3cb52'
+                    }
+                    src_server_domain_renewals_ts: {
+                        table: 'sys_module'
+                        id: '900127860c3f4dcd8af8898dd3907d41'
                     }
                     'src_server_domain_rest-contracts_ts': {
                         table: 'sys_module'

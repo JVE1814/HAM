@@ -13,8 +13,8 @@ import {
 import { replacementStep } from './domain/breakfix'
 import { CANCELLABLE_ORDER_STAGES } from './domain/fulfilment'
 import { REST_MESSAGE } from './domain/rest-message-names'
+import { RMA_AT_OEM } from './domain/oem-rma'
 import { labelVoidable } from './domain/shipping'
-import { RMA_AT_OEM } from './domain/sourcing'
 import { BROAD_STAFF, PLATFORM_ROLE, ROLE, SCOPED_TABLES, type TableScoping } from './domain/visibility'
 import {
     ORDER_STAGE_CHOICES,

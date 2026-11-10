@@ -4,7 +4,6 @@ import {
     chargedFeeQuery,
     collectionMethod,
     evaluationTarget,
-    feeAmount,
     isSiteRecovery,
     opensDeinstallWork,
     overdueStep,
@@ -13,7 +12,6 @@ import {
     returnDueDate,
     returnRequestFindings,
     returnRequesterRefusal,
-    shortfallRoute,
     SITE_RECOVERY_STAGES,
     sitePackageHoldersQuery,
     siteRecoveryLineQuery,
@@ -247,14 +245,6 @@ describe('evaluationTarget', () => {
     })
 })
 
-describe('feeAmount', () => {
-    it('takes the agreement fee for the event type', () => {
-        const fees = { lost: 1500, damaged: 400, late_return: 150 }
-        expect(feeAmount('lost', fees)).toBe(1500)
-        expect(feeAmount('late_return', fees)).toBe(150)
-    })
-})
-
 describe('fee identity', () => {
     const sysId = (c: string) => c.repeat(32)
     const fee = { type: 'late_return' as const, assetId: sysId('a'), returnOrderId: sysId('r') }
@@ -262,17 +252,5 @@ describe('fee identity', () => {
     it('counts every charge of the same type, Asset and Return order but a waived one', () => {
         const charged = `fee_type=late_return^asset=${sysId('a')}^return_order=${sysId('r')}^status!=waived`
         expect(chargedFeeQuery(fee)).toBe(charged)
-    })
-})
-
-describe('shortfallRoute', () => {
-    it('asks the OEM for an advance replacement when a covered unit fails and no stock is left', () => {
-        expect(shortfallRoute({ missing: 1, purpose: 'replace', coveredToday: true })).toBe('oem_advance_replacement')
-    })
-
-    it('purchases otherwise', () => {
-        expect(shortfallRoute({ missing: 1, purpose: 'replace', coveredToday: false })).toBe('purchase')
-        expect(shortfallRoute({ missing: 2, purpose: 'new', coveredToday: true })).toBe('purchase')
-        expect(shortfallRoute({ missing: 0, purpose: 'replace', coveredToday: true })).toBe('none')
     })
 })

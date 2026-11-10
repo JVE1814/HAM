@@ -42,7 +42,7 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   installed, collected by the swap work order.
 - A replacement lost in transit (or failed in staging) is sourced again by the usual routes (P1
   fulfilment spec). When that would open an OEM RMA, the RMA already open for the same defective
-  unit (*to open*, *open* or *replacement received*) is reused instead (`domain/sourcing.ts`
+  unit (*to open*, *open* or *replacement received*) is reused instead (`domain/oem-rma.ts`
   `advanceReplacementRma`): it is put under the line, one whose replacement was received goes back
   to *open*, and the line waits for its replacement. The line's own RMA comes first, then one whose
   replacement is still to come; one another open line waits for is left to it. The sourcing summary

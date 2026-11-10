@@ -1,5 +1,4 @@
-import { FLEET_FIELD, fleetStagesQuery, NAAS_STOCKROOM_TYPES, naasStockroomType, outsideFleetCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
-import { DEPLOYED_STAGES } from './lifecycle.ts'
+import { FLEET_FIELD, naasStockroomType, outsideFleetCondition, outsideNaasStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
 
 /**
  * Which slice of the installed base a user may see (ADR 0005).
@@ -63,17 +62,6 @@ export function resolveVisibility(hasRole: (role: string) => boolean): Visibilit
  */
 export function actsAsCustomerAdmin(hasRole: (role: string) => boolean): boolean {
     return resolveVisibility(hasRole) === 'own_customer'
-}
-
-/**
- * The equipment the customer page lists (D49), as an encoded alm_hardware query: the fleet assets (ADR 0016) shipped to
- * a Site, serving there or awaiting return. The Fleet flag tells them from the Provider IT's hardware, laptops in use
- * included, whatever their Agreement: a deployed fleet unit missing its Agreement (a data gap) is still its Customer's
- * equipment. `visible` (the reader's `visibilityFilter` on alm_hardware, null for staff who see every Customer) is put
- * into every stage's clause: the before-query rule's filter would bind to the last clause only (ADR 0005).
- */
-export function customerEquipmentQuery(visible: string | null = null): string {
-    return fleetStagesQuery(DEPLOYED_STAGES, visible ?? '')
 }
 
 /**
@@ -142,15 +130,6 @@ export function scopingOf(tables: readonly string[]): TableScoping | null {
     const scoped: Readonly<Record<string, TableScoping>> = SCOPED_TABLES
     const found = tables.find((table) => Object.prototype.hasOwnProperty.call(scoped, table))
     return found === undefined ? null : scoped[found]
-}
-
-/**
- * Encoded condition matching stockrooms outside NaaS (through `via`, e.g. `from_stockroom.`): another type, or none,
- * which is not left to how `NOT IN` treats an empty value. The complement of domain/fleet `naasStockroomCondition`.
- */
-export function outsideNaasStockroomCondition(via = ''): string {
-    const type = `${via}${STOCKROOM_TYPE_FIELD}`
-    return `${type}NOT IN${NAAS_STOCKROOM_TYPES.join(',')}^OR${type}ISEMPTY`
 }
 
 function columnsOf(stockroom: string | readonly string[]): readonly string[] {

@@ -69,7 +69,7 @@ function partRequired(part: (typeof ADDRESS_PARTS)[number], side: 'from' | 'to',
 }
 
 /** What is missing from the sender (`from`) or recipient (`to`) address before a carrier will accept it, or null. */
-export function addressProblem(address: Address, side: 'from' | 'to' = 'to'): string | null {
+export function addressProblem(address: Address, side: 'from' | 'to'): string | null {
     const country = countryCode(address.country)
     const missing = ADDRESS_PARTS.filter((part) => !address[part] && partRequired(part, side, country))
     if (missing.length > 0) return `missing ${missing.join(', ')}`
@@ -96,7 +96,7 @@ function toAggregatorAddress(address: Address): Record<string, string> {
 }
 
 /** The most boxes one label covers; larger shipments get their tracking numbers by hand. */
-export const MAX_LABEL_PACKAGES = 20
+const MAX_LABEL_PACKAGES = 20
 
 /** How many boxes a label covers: a whole number, at least 1 (buyLabel refuses more than MAX_LABEL_PACKAGES first). */
 export function packageCount(n: number): number {

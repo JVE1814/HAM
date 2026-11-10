@@ -5,14 +5,10 @@ import {
     decidedLease,
     earliestReviewedEnd,
     evenShare,
-    groupExpiringCoverage,
     leaseDecisionProblem,
     leaseMismatch,
-    recoversAgainAt,
-    renewedEnd,
     stillCovered,
     stockReturnMoves,
-    withinLead,
 } from './leases'
 import { ALL_STAGES, checkTransition, type TransitionFacts } from './lifecycle'
 
@@ -50,30 +46,6 @@ describe('buyoutTerms', () => {
     it('fixes none for any other decision', () => {
         expect(buyoutTerms('return', { fixedAssets: 0, price: 1000 }, () => 4)).toBeNull()
         expect(buyoutTerms('extend', { fixedAssets: 0, price: 1000 }, () => 4)).toBeNull()
-    })
-})
-
-describe('recoversAgainAt', () => {
-    it('recovers the equipment again when the Agreement now ends today or later', () => {
-        expect(recoversAgainAt('2026-11-09', '2026-11-09')).toBe(true)
-        expect(recoversAgainAt('2027-01-31', '2026-11-09')).toBe(true)
-    })
-
-    it('does not when the end only moved to another past day, or was cleared', () => {
-        expect(recoversAgainAt('2026-11-08', '2026-11-09')).toBe(false)
-        expect(recoversAgainAt('', '2026-11-09')).toBe(false)
-    })
-})
-
-describe('withinLead', () => {
-    it('is due from lead days before the end date onwards', () => {
-        expect(withinLead('2027-03-01', '2026-11-01', 120)).toBe(true)
-        expect(withinLead('2027-03-01', '2026-10-31', 120)).toBe(false)
-        expect(withinLead('2026-01-01', '2026-11-07', 30)).toBe(true)
-    })
-
-    it('never fires without an end date', () => {
-        expect(withinLead('', '2026-11-07', 30)).toBe(false)
     })
 })
 
@@ -175,38 +147,6 @@ describe('buyoutPurchase', () => {
 
     it('records no purchase without a buyout price, so the Asset keeps its cost and purchase date', () => {
         expect(buyoutPurchase(0, '2026-11-07')).toBeUndefined()
-    })
-})
-
-describe('renewedEnd', () => {
-    it('adds the renewal term (at least one month)', () => {
-        expect(renewedEnd('2026-12-31', 12)).toBe('2027-12-31')
-        expect(renewedEnd('2026-12-31', 0)).toBe('2027-01-31')
-        expect(renewedEnd('2026-11-15', 3)).toBe('2027-02-15')
-    })
-
-    it('keeps a month-end end at month end, so a day clamped in a short month is not lost', () => {
-        expect(renewedEnd('2026-11-30', 3)).toBe('2027-02-28')
-        expect(renewedEnd('2027-02-28', 3)).toBe('2027-05-31')
-        expect(renewedEnd('2027-02-28', 12)).toBe('2028-02-29')
-        expect(renewedEnd('2026-09-30', 3)).toBe('2026-12-31')
-        expect(renewedEnd('2027-04-30', 1)).toBe('2027-05-31')
-    })
-
-    it('clamps an end past the last day of a shorter month, as before', () => {
-        expect(renewedEnd('2027-01-30', 1)).toBe('2027-02-28')
-    })
-})
-
-describe('groupExpiringCoverage', () => {
-    it('counts contracts per customer and keeps the first end date', () => {
-        const groups = groupExpiringCoverage([
-            { customerId: 'acme', endDate: '2026-12-20' },
-            { customerId: 'acme', endDate: '2026-12-01' },
-            { customerId: 'globex', endDate: '2027-01-05' },
-        ])
-        expect(groups.get('acme')).toEqual({ count: 2, firstEnd: '2026-12-01' })
-        expect(groups.get('globex')).toEqual({ count: 1, firstEnd: '2027-01-05' })
     })
 })
 

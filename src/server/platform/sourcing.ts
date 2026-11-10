@@ -2,9 +2,8 @@ import { gs, GlideRecord } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
 import { LONG_HOLD_LOCK_TRIES, REQUEUE, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import type { ShortfallRoute } from '../domain/returns.ts'
+import { advanceReplacementRma } from '../domain/oem-rma.ts'
 import {
-    advanceReplacementRma,
     lineShortfall,
     LINES_TO_SOURCE,
     lineStillOpen,
@@ -14,6 +13,7 @@ import {
     shortfallRouteFor,
     sourcingPurpose,
     stillToBuy,
+    type ShortfallRoute,
     type Source,
     type SourcingRequest,
     type UnmovedStock,
@@ -278,7 +278,7 @@ function settleHolding(
 
 /**
  * Put the line's shortfall under an OEM advance replacement for the Asset it `replaced`: the RMA already open for that
- * unit when there is one to reuse (domain/sourcing `advanceReplacementRma`), else a new one. What the line's sourcing
+ * unit when there is one to reuse (domain/oem-rma `advanceReplacementRma`), else a new one. What the line's sourcing
  * summary adds. Unrecorded, the line would wait for a replacement nobody asked the OEM for: logged and in its summary.
  */
 function putUnderRma(order: GlideRecord, line: GlideRecord, replaced: GlideRecord): string {

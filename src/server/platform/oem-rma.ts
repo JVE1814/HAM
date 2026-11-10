@@ -1,6 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
-import { lineStillOpen, RMA_AT_OEM, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse } from '../domain/sourcing.ts'
+import { RMA_AT_OEM, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse } from '../domain/oem-rma.ts'
+import { lineStillOpen } from '../domain/sourcing.ts'
 import { LINE_STAGE, type OemVendor, RMA_STATE, type RmaState } from '../domain/vocabulary.ts'
 import { isFleetAsset, moveAsset } from './assets.ts'
 import { nowGlide, todayIso } from './clock.ts'
@@ -25,7 +26,7 @@ export function openOemRma(input: { defectiveAsset: GlideRecord; orderLineId: st
     return ''
 }
 
-/** The RMAs still open for a defective Asset (domain/sourcing `RMA_OPEN`), oldest first, with the line each serves. */
+/** The RMAs still open for a defective Asset (domain/oem-rma `RMA_OPEN`), oldest first, with the line each serves. */
 export function openRmasFor(defectiveAssetId: string): OpenRma[] {
     const rma = new GlideRecord('x_daas_ham_oem_rma')
     rma.addQuery('defective_asset', defectiveAssetId)
@@ -48,7 +49,7 @@ export function openRmasFor(defectiveAssetId: string): OpenRma[] {
 }
 
 /**
- * Put the RMA `reuse` names (domain/sourcing `advanceReplacementRma`) under the Order line, in the state it takes, so
+ * Put the RMA `reuse` names (domain/oem-rma `advanceReplacementRma`) under the Order line, in the state it takes, so
  * the line counts its replacement as on its way; false (logged) when the platform refuses.
  */
 export function reuseOemRma(reuse: RmaReuse, orderLineId: string): boolean {

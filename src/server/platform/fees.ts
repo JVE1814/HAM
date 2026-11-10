@@ -2,7 +2,7 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import { messageOf } from '../domain/errors.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { chargedFeeQuery, feeAmount, type FeeIdentity } from '../domain/returns.ts'
+import { chargedFeeQuery, type FeeIdentity } from '../domain/returns.ts'
 import { FEE_STATUS, type FeeType } from '../domain/vocabulary.ts'
 import { visitInKeyOrder } from './chunked.ts'
 import { todayIso } from './clock.ts'
@@ -15,6 +15,9 @@ import { exists, findById, num, refusal, str, warnRefused } from './records.ts'
  */
 
 const FEE = 'x_daas_ham_fee_event'
+
+/** The Agreement field that holds what a Fee event of each type is charged. */
+const AGREEMENT_FEE: Record<FeeType, string> = { lost: 'lost_asset_fee', damaged: 'damage_fee', late_return: 'late_return_fee' }
 
 /**
  * Charge a Fee event of `type` for the Asset on the Return order, once (domain/returns `chargedFeeQuery`): a step
@@ -32,11 +35,7 @@ export function recordFee(type: FeeType, asset: GlideRecord, returnOrderId: stri
     // A retried step mostly finds the fee charged already: that needs no lock.
     if (isCharged(fee)) return
     const agreement = findById('x_daas_ham_agreement', str(asset, 'x_daas_ham_agreement'))
-    const amount = feeAmount(type, {
-        lost: agreement ? num(agreement, 'lost_asset_fee') : 0,
-        damaged: agreement ? num(agreement, 'damage_fee') : 0,
-        late_return: agreement ? num(agreement, 'late_return_fee') : 0,
-    })
+    const amount = agreement ? num(agreement, AGREEMENT_FEE[type]) : 0
     if (amount <= 0) return
     const attempt = attemptLock(LOCK.fee(fee), (lock) => {
         if (!isCharged(fee)) chargeHolding(lock, fee, asset, amount)

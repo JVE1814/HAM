@@ -1,5 +1,6 @@
+import { chunks } from '../collections.ts'
 import { errorText, isSuccess, type HttpPort } from '../http.ts'
-import { asArray, chunks, field, isoDate, parseJson, text } from '../json.ts'
+import { asArray, field, isoDate, parseJson, text } from '../json.ts'
 import type { OemVendor } from '../vocabulary.ts'
 import type { CoverageFact, CoverageFetched, Fetched, LifecycleFact, RmaFact } from './types.ts'
 import { fortiCloudError } from './forticloud.ts'

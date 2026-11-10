@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { annualSupportCost, answersByContract, contractKey, coverageBySerial, coverageDisposition, coverageSummary, mergeCoverage, staleCoverageQuery } from './coverage'
+import {
+    annualSupportCost,
+    answersByContract,
+    contractKey,
+    coverageBySerial,
+    coverageDisposition,
+    coverageSummary,
+    groupExpiringCoverage,
+    mergeCoverage,
+    staleCoverageQuery,
+} from './coverage'
 import type { CoverageFact } from './oem/types'
 
 describe('coverageSummary', () => {
@@ -160,5 +170,17 @@ describe('staleCoverageQuery', () => {
             'x_daas_ham_coverage_checkedISEMPTY',
             'ORx_daas_ham_coverage_checked<2026-11-01 00:00:00',
         ])
+    })
+})
+
+describe('groupExpiringCoverage', () => {
+    it('counts contracts per customer and keeps the first end date', () => {
+        const groups = groupExpiringCoverage([
+            { customerId: 'acme', endDate: '2026-12-20' },
+            { customerId: 'acme', endDate: '2026-12-01' },
+            { customerId: 'globex', endDate: '2027-01-05' },
+        ])
+        expect(groups.get('acme')).toEqual({ count: 2, firstEnd: '2026-12-01' })
+        expect(groups.get('globex')).toEqual({ count: 1, firstEnd: '2027-01-05' })
     })
 })

@@ -46,6 +46,11 @@ export function daysBetween(from: string, to: string): number {
     return Math.round((toEpoch(to) - toEpoch(from)) / DAY_MS)
 }
 
+/** True once `today` is within `leadDays` of `endDate` (or past it); never without an end date. */
+export function withinLead(endDate: string, today: string, leadDays: number): boolean {
+    return !!endDate && today >= addDays(endDate, -Math.max(0, leadDays))
+}
+
 export function earliest(dates: ReadonlyArray<string | undefined | null>): string | undefined {
     const present = dates.filter((d): d is string => !!d)
     return present.length === 0 ? undefined : present.reduce((a, b) => (a <= b ? a : b))

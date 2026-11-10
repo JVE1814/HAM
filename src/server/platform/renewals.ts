@@ -1,5 +1,6 @@
 import { GlideRecord } from '@servicenow/glide'
-import { recoversAgainAt, renewedEnd, withinLead } from '../domain/leases.ts'
+import { withinLead } from '../domain/calendar.ts'
+import { recoversAgainAt, renewedEnd } from '../domain/renewals.ts'
 import { providerApproverIds } from './approvals.ts'
 import { todayIso } from './clock.ts'
 import { EVENT, fire } from './events.ts'
@@ -31,7 +32,7 @@ export function warnAgreementRenewals(today: string): void {
 
 /**
  * An Agreement's end date changed (the caller saves it): the renewal warning goes again ahead of the new end, and an
- * Agreement that has not ended by it has its equipment recovered again once it has (domain/leases `recoversAgainAt`).
+ * Agreement that has not ended by it has its equipment recovered again once it has (domain/renewals `recoversAgainAt`).
  */
 export function rearmForNewEnd(agreement: GlideRecord): void {
     agreement.setValue(RENEWAL_WARNED, false)
@@ -45,7 +46,7 @@ export function rearmForNewEnd(agreement: GlideRecord): void {
 export type Renewal = { renewed: true; until: string } | { renewed: false; why: string }
 
 /**
- * Renew an Agreement: its end date moves on by its renewal term (domain/leases `renewedEnd`), and its warning and its
+ * Renew an Agreement: its end date moves on by its renewal term (domain/renewals `renewedEnd`), and its warning and its
  * end-of-agreement return are re-armed, whatever the new end. Saves the Agreement, the record of the form it was asked
  * from.
  */

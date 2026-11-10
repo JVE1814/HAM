@@ -1,7 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
+import { groupExpiringCoverage, type ExpiringCoverage } from '../domain/coverage.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
-import { groupExpiringCoverage, type ExpiringCoverage } from '../domain/leases.ts'
 import { SERVING_STAGES } from '../domain/lifecycle.ts'
 import { providerApproverIds } from './approvals.ts'
 import { EVENT, fire } from './events.ts'

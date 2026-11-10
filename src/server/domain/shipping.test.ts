@@ -92,8 +92,8 @@ describe('packageCount', () => {
 
 describe('addressProblem', () => {
     it('names the missing parts', () => {
-        expect(addressProblem({ ...site, line1: '', postalCode: '' })).toBe('missing line1, postalCode')
-        expect(addressProblem(site)).toBeNull()
+        expect(addressProblem({ ...site, line1: '', postalCode: '' }, 'to')).toBe('missing line1, postalCode')
+        expect(addressProblem(site, 'to')).toBeNull()
     })
 
     it('needs the phone on the sender (ship_from) side only', () => {
@@ -101,20 +101,19 @@ describe('addressProblem', () => {
         expect(addressProblem(noPhone, 'from')).toBe('missing phone')
         expect(addressProblem({ ...noPhone, city: '' }, 'from')).toBe('missing phone, city')
         expect(addressProblem(noPhone, 'to')).toBeNull()
-        expect(addressProblem(noPhone)).toBeNull()
         expect(addressProblem(depot, 'from')).toBeNull()
     })
 
     it('needs a state in the U.S. and Canada', () => {
         const austin: Address = { name: 'Acme Austin', phone: '+1 512 000 0000', line1: '1 Congress Ave', city: 'Austin', postalCode: '78701', country: 'US' }
-        expect(addressProblem(austin)).toBe('missing state')
+        expect(addressProblem(austin, 'to')).toBe('missing state')
         expect(addressProblem({ ...austin, country: 'Canada' }, 'from')).toBe('missing state')
-        expect(addressProblem({ ...austin, state: 'TX' })).toBeNull()
-        expect(addressProblem(site)).toBeNull()
+        expect(addressProblem({ ...austin, state: 'TX' }, 'to')).toBeNull()
+        expect(addressProblem(site, 'to')).toBeNull()
     })
 
     it('needs a country it can turn into an ISO code', () => {
-        expect(addressProblem({ ...site, country: 'Atlantis' })).toBe('unknown country "Atlantis" (use the ISO code)')
+        expect(addressProblem({ ...site, country: 'Atlantis' }, 'to')).toBe('unknown country "Atlantis" (use the ISO code)')
     })
 })
 

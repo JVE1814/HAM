@@ -19,7 +19,7 @@ import {
     TASK_STATE,
 } from './vocabulary.ts'
 
-/** Returns, depot evaluation, Fee events and break-fix shortfalls (P2.3–P2.4). */
+/** Returns, depot evaluation and Fee events (P2.4). */
 
 /** The Customer a requested Return is for and the Site it names, with the Customer that Site belongs to. */
 export interface RequestedReturn {
@@ -191,10 +191,6 @@ function ownerTakesBack({ legalOwner, leaseEndAction }: EvaluatedOwnership): boo
     return legalOwner === 'customer' || (legalOwner === 'lessor' && leaseEndAction === 'return')
 }
 
-export function feeAmount(type: FeeType, agreementFees: Record<FeeType, number>): number {
-    return agreementFees[type]
-}
-
 /** What makes two Fee events the same charge: one type, for one Asset on one Return order (that is, its line). */
 export interface FeeIdentity {
     type: FeeType
@@ -205,12 +201,4 @@ export interface FeeIdentity {
 /** The x_daas_ham_fee_event query for the charges of `fee` that count, any not waived: it is charged at most once. */
 export function chargedFeeQuery(fee: FeeIdentity): string {
     return `fee_type=${fee.type}^asset=${fee.assetId}^return_order=${fee.returnOrderId}^status!=${FEE_STATUS.waived}`
-}
-
-export type ShortfallRoute = 'none' | 'purchase' | 'oem_advance_replacement'
-
-/** A covered unit that fails with no stock left is replaced by the OEM in advance; anything else is purchased. */
-export function shortfallRoute(input: { missing: number; purpose: 'new' | 'replace'; coveredToday: boolean }): ShortfallRoute {
-    if (input.missing <= 0) return 'none'
-    return input.purpose === 'replace' && input.coveredToday ? 'oem_advance_replacement' : 'purchase'
 }

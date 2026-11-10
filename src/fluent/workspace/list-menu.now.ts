@@ -4,7 +4,7 @@ import { admin, broadStaffRecords, moneyReaderRecords, providerStaffRecords } fr
 import { OPEN_ORDERS_QUERY, ORDERS_AWAITING_APPROVAL_QUERY } from '../../server/domain/fulfilment'
 import { FLEET_CONDITION, FLEET_IN_STAGE, FLEET_INSTALLED, NAAS_MODEL_CONDITION, NAAS_MODEL_MILESTONES } from '../../server/domain/fleet'
 import { OPEN_SHIPMENTS } from '../../server/domain/shipping'
-import { OPEN_RMAS_QUERY } from '../../server/domain/sourcing'
+import { OPEN_RMAS_QUERY } from '../../server/domain/oem-rma'
 import { INSTALLED_PAST_SUPPORT } from '../../server/domain/model-lifecycle'
 import { INSTALLED_WITHOUT_COVERAGE } from '../../server/domain/coverage'
 import { OPEN_NORM_EXCEPTIONS_QUERY } from '../../server/domain/normalization'

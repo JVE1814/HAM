@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { fleetCondition, naasStockroomCondition } from './fleet'
-import { DEPLOYED_STAGES } from './lifecycle'
+import { naasStockroomCondition, outsideNaasStockroomCondition } from './fleet'
 import {
     actsAsCustomerAdmin,
     contactScope,
-    customerEquipmentQuery,
     grantsContactRecord,
     grantsNaasRecord,
     outsideNaasConditions,
-    outsideNaasStockroomCondition,
     resolveVisibility,
     rowVisible,
     SCOPED_TABLES,
@@ -59,31 +56,6 @@ describe('actsAsCustomerAdmin', () => {
         expect(actsAsCustomerAdmin(roles('x_daas_ham.asset_manager'))).toBe(false)
         expect(actsAsCustomerAdmin(roles('x_daas_ham.asset_manager', 'x_daas_ham.customer_admin'))).toBe(false)
         expect(actsAsCustomerAdmin(() => true)).toBe(false) // a platform admin holds every role
-    })
-})
-
-describe('customerEquipmentQuery', () => {
-    const clauses = customerEquipmentQuery().split('^NQ')
-
-    it('lists every deployed stage, from shipped to awaiting return', () => {
-        expect(clauses).toHaveLength(DEPLOYED_STAGES.length)
-        expect(clauses[0]).toContain('install_status=9^substatus=shipped_to_site')
-        expect(clauses.at(-1)).toContain('install_status=1^substatus=pending_return')
-    })
-
-    it("keeps only fleet assets in each stage: the Provider IT's hardware in use, such as laptops, is left out", () => {
-        for (const clause of clauses) expect(clause).toMatch(new RegExp(`\\^${fleetCondition()}$`))
-    })
-
-    it('keeps a deployed fleet unit that has lost its Agreement (a data gap) on its Customer\'s page', () => {
-        expect(customerEquipmentQuery()).not.toContain('x_daas_ham_agreement')
-    })
-
-    it("puts the reader's filter in every stage's clause, which a before-query rule's filter would not reach", () => {
-        const scoped = customerEquipmentQuery('company=cust1^x_daas_ham_siteINsite1').split('^NQ')
-        expect(scoped).toHaveLength(DEPLOYED_STAGES.length)
-        for (const clause of scoped) expect(clause).toContain('^company=cust1^x_daas_ham_siteINsite1')
-        expect(customerEquipmentQuery(null)).toBe(customerEquipmentQuery())
     })
 })
 

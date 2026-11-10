@@ -1,4 +1,5 @@
 import { GlideDateTime, GlideSchedule, gs, type GlideRecord } from '@servicenow/glide'
+import { installsOrder } from '../domain/delivery.ts'
 import { beingInstalled, mayConfirmInstall } from '../domain/install-confirmation.ts'
 import { checkJobWindow } from '../domain/scheduling.ts'
 import { glideToMs } from '../platform/clock.ts'
@@ -44,7 +45,7 @@ export function uiConfirmInstalled(current: GlideRecord): void {
 /** After-update rule on wm_order closed complete for a NaaS Order: the work order was initiated from it. */
 export function onWorkOrderClosed(current: GlideRecord): void {
     const order = findById('x_daas_ham_order', str(current, 'initiated_from'))
-    if (order && ['install', 'swap'].includes(str(current, 'x_daas_ham_purpose'))) completeInstall(order)
+    if (order && installsOrder(str(current, 'x_daas_ham_purpose'))) completeInstall(order)
 }
 
 /**

@@ -1,9 +1,9 @@
-import { addDays, addMonths, endOfMonth, isMonthEnd } from './calendar.ts'
+import { addDays } from './calendar.ts'
 import { inFleet } from './fleet.ts'
 import { notRetiredCondition, type Stage } from './lifecycle.ts'
 import type { LeaseEndAction } from './vocabulary.ts'
 
-/** Lease schedules, end-of-lease decisions and renewals (P3.23–P3.24). */
+/** Lease schedules and end-of-lease decisions (P3.23). */
 
 /**
  * `leaseCondition` (an encoded query on the Asset's lease) narrowed to the fleet assets (ADR 0016) the lease still
@@ -12,11 +12,6 @@ import type { LeaseEndAction } from './vocabulary.ts'
  */
 export function stillCovered(leaseCondition: string): string {
     return inFleet(`${leaseCondition}^${notRetiredCondition()}`)
-}
-
-/** True once `today` is within `leadDays` of `endDate` (or past it). */
-export function withinLead(endDate: string, today: string, leadDays: number): boolean {
-    return !!endDate && today >= addDays(endDate, -Math.max(0, leadDays))
 }
 
 /**
@@ -94,15 +89,6 @@ export function buyoutTerms(
     return { assets, share: evenShare(lease.price, assets) }
 }
 
-/**
- * Whether an Agreement whose end date changed to `ends` has its equipment recovered again at that end: one that ends
- * today or later has not ended, so its agreement-end Return is raised (again) once the day has passed. One moved to a
- * past day ended before, and what was installed then has been recovered.
- */
-export function recoversAgainAt(ends: string, today: string): boolean {
-    return ends >= today
-}
-
 /** One share of `amount` split evenly over `count` Assets (0 without any): a lease payment's or a buyout price's. */
 export function evenShare(amount: number, count: number): number {
     return count > 0 ? amount / count : 0
@@ -118,15 +104,6 @@ export function buyoutPurchase(buyoutShare: number, buyoutDay: string): { cost: 
 }
 
 /**
- * The Agreement's end after renewing it for `termMonths`. A term ending on a month end renews to a month end
- * (28 Feb + 3 months is 31 May, not 28 May), so a day clamped in a short month is not lost for good.
- */
-export function renewedEnd(currentEnd: string, termMonths: number): string {
-    const renewed = addMonths(currentEnd, Math.max(1, termMonths))
-    return isMonthEnd(currentEnd) ? endOfMonth(renewed) : renewed
-}
-
-/**
  * The moves, one save each, that take a returned lease's stock out of circulation: to pending wipe, where its
  * return-to-lessor disposal starts and sourcing and the spare-pool top-up no longer find it. Spare-pool stock leaves
  * its pool through available (the lifecycle has no direct move); anything else is not stock and has none.
@@ -135,20 +112,4 @@ export function stockReturnMoves(stage: Stage | null): readonly Stage[] {
     if (stage === 'available') return ['pending_wipe']
     if (stage === 'spare_pool') return ['available', 'pending_wipe']
     return []
-}
-
-export interface ExpiringCoverage {
-    customerId: string
-    endDate: string
-}
-
-/** Expiring coverage per Customer: how many contracts, and the first one to end. */
-export function groupExpiringCoverage(rows: readonly ExpiringCoverage[]): Map<string, { count: number; firstEnd: string }> {
-    const groups = new Map<string, { count: number; firstEnd: string }>()
-    for (const row of rows) {
-        const group = groups.get(row.customerId)
-        if (!group) groups.set(row.customerId, { count: 1, firstEnd: row.endDate })
-        else groups.set(row.customerId, { count: group.count + 1, firstEnd: row.endDate < group.firstEnd ? row.endDate : group.firstEnd })
-    }
-    return groups
 }

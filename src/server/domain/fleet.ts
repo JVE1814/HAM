@@ -27,12 +27,7 @@ export const FLEET_CONDITION = `${FLEET_FIELD}=true`
 /** The same as a script condition on `current`, an Asset: what a business rule's or UI action's condition tests. */
 export const CURRENT_IS_FLEET = `current.${FLEET_FIELD} == true`
 
-/** The Fleet flag, dot-walked from another table through `via` (e.g. `asset.`, `x_daas_ham_failed_asset.`). */
-export function fleetField(via = ''): string {
-    return `${via}${FLEET_FIELD}`
-}
-
-/** Encoded condition matching fleet assets only (through `via` from another table). */
+/** Encoded condition matching fleet assets only (through `via` from another table, e.g. `asset.`). */
 export function fleetCondition(via = ''): string {
     return `${via}${FLEET_CONDITION}`
 }
@@ -42,7 +37,8 @@ export function fleetCondition(via = ''): string {
  * not left to how `!=` treats an empty value.
  */
 export function outsideFleetCondition(via = ''): string {
-    return `${fleetField(via)}=false^OR${fleetField(via)}ISEMPTY`
+    const flag = `${via}${FLEET_FIELD}`
+    return `${flag}=false^OR${flag}ISEMPTY`
 }
 
 /**
@@ -97,6 +93,15 @@ export function naasStockroomType(value: string): StockroomType | null {
 /** Encoded condition matching NaaS stockrooms (through `via`, e.g. `stockroom.` from an Asset). */
 export function naasStockroomCondition(via = ''): string {
     return `${via}${NAAS_STOCKROOM_CONDITION}`
+}
+
+/**
+ * Encoded condition matching stockrooms outside NaaS (through `via`, e.g. `from_stockroom.`): another type, or none,
+ * which is not left to how `NOT IN` treats an empty value. The complement of `naasStockroomCondition`.
+ */
+export function outsideNaasStockroomCondition(via = ''): string {
+    const type = `${via}${STOCKROOM_TYPE_FIELD}`
+    return `${type}NOT IN${NAAS_STOCKROOM_TYPES.join(',')}^OR${type}ISEMPTY`
 }
 
 /**

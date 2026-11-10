@@ -1,8 +1,9 @@
 import { normalizeSerial } from '../serials.ts'
+import { chunks } from '../collections.ts'
 import { andEachClause } from '../encoded-query.ts'
 import { fleetCondition } from '../fleet.ts'
 import { errorText, isSuccess, type HttpPort, type HttpRequest, type HttpResponse } from '../http.ts'
-import { asArray, chunks, field, parseJson, text } from '../json.ts'
+import { asArray, field, parseJson, text } from '../json.ts'
 import type { AutomationStatus, ClaimAction, OemVendor } from '../vocabulary.ts'
 import { fortiCloudError } from './forticloud.ts'
 import { REST_MESSAGE } from '../rest-message-names.ts'
@@ -15,7 +16,7 @@ import { REST_MESSAGE } from '../rest-message-names.ts'
  */
 
 /** The automated checklist actions, in the order a vendor's actions run: a device is claimed before it is licensed or provisioned. */
-export const CLAIM_ORDER: readonly ClaimAction[] = ['oem_claim', 'oem_licence', 'oem_ztp']
+const CLAIM_ORDER: readonly ClaimAction[] = ['oem_claim', 'oem_licence', 'oem_ztp']
 
 export interface ClaimTarget {
     stepId: string

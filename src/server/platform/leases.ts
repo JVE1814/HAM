@@ -1,6 +1,7 @@
 import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
+import { withinLead } from '../domain/calendar.ts'
 import {
     buyoutPurchase,
     buyoutTerms,
@@ -10,7 +11,6 @@ import {
     leaseMismatch,
     stillCovered,
     stockReturnMoves,
-    withinLead,
 } from '../domain/leases.ts'
 import { isRetired, SERVING_STAGES, type Stage, stagesQuery, STOCK_STAGES } from '../domain/lifecycle.ts'
 import { isFree } from '../domain/sourcing.ts'

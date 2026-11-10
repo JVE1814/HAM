@@ -1,14 +1,11 @@
 import { OPEN_LINE_STAGES, UNFULFILLED_ORDER_STAGES } from './fulfilment.ts'
 import { fleetStagesQuery, providerStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
 import { STOCK_STAGES, type Stage } from './lifecycle.ts'
-import { shortfallRoute, type ShortfallRoute } from './returns.ts'
 import {
     type LeaseEndAction,
     LINE_STAGE,
     type LineStage,
     type OrderType,
-    RMA_STATE,
-    type RmaState,
     STOCKROOM_TYPE,
 } from './vocabulary.ts'
 
@@ -70,7 +67,7 @@ export interface LineNeed {
     allocated: number
     /** Units bought for it and not yet received (its On order count). */
     onOrder: number
-    /** OEM advance replacements still to come for it (`RMA_AWAITED`). */
+    /** OEM advance replacements still to come for it (domain/oem-rma `RMA_AWAITED`). */
     awaitedRmas: number
 }
 
@@ -105,15 +102,19 @@ export interface ReplacedUnit {
     coverageEnd: string
 }
 
+/** Where what a line still misses goes: nowhere (nothing is missing), to a purchase, or to the OEM for an advance replacement. */
+export type ShortfallRoute = 'none' | 'purchase' | 'oem_advance_replacement'
+
 /**
- * Where what a line of `modelId` still misses goes (domain/returns `shortfallRoute`). Only a break-fix line for the same
- * Model as the unit it replaces, covered by the OEM today, can be served by an advance replacement; pass `replaced`
- * for a break-fix line only (null otherwise): a refresh line also names the Asset it replaces, but that Asset is healthy.
+ * Where what a line of `modelId` still misses goes: a covered unit that fails with no stock left is replaced by the OEM
+ * in advance, anything else is purchased. Only a break-fix line for the same Model as the unit it replaces, covered by
+ * the OEM today, can be served by an advance replacement; pass `replaced` for a break-fix line only (null otherwise): a
+ * refresh line also names the Asset it replaces, but that Asset is healthy.
  */
 export function shortfallRouteFor(modelId: string, replaced: ReplacedUnit | null, today: string, missing: number): ShortfallRoute {
-    const sameModel = !!replaced && replaced.modelId === modelId
-    const coveredToday = !!replaced && sameModel && replaced.coverageEnd >= today
-    return shortfallRoute({ missing, purpose: sameModel ? 'replace' : 'new', coveredToday })
+    if (missing <= 0) return 'none'
+    const coveredToday = !!replaced && replaced.modelId === modelId && replaced.coverageEnd >= today
+    return coveredToday ? 'oem_advance_replacement' : 'purchase'
 }
 
 /**
@@ -290,63 +291,6 @@ export const LINES_TO_SOURCE: readonly LineStage[] = [LINE_STAGE.new, LINE_STAGE
 /** Whether an Order line still waits to be filled: not shipped or cancelled, its Order not cancelled or rejected. */
 export function lineStillOpen(line: { lineStage: string; orderStage: string }): boolean {
     return OPEN_LINE_STAGES.includes(line.lineStage as LineStage) && !(UNFULFILLED_ORDER_STAGES as readonly string[]).includes(line.orderStage)
-}
-
-/** RMAs whose replacement is still to come: their line counts each as a unit on its way. */
-export const RMA_AWAITED: readonly RmaState[] = [RMA_STATE.to_open, RMA_STATE.open]
-
-/** RMAs still open, the defective unit not yet back with the OEM. */
-export const RMA_OPEN: readonly RmaState[] = [...RMA_AWAITED, RMA_STATE.replacement_received]
-
-/**
- * The open RMAs the OEM knows of: its status can be asked for, and the defective unit can be recorded as returned to it
- * (the action's condition is written from these states; the built action is checked against them).
- */
-export const RMA_AT_OEM: readonly RmaState[] = RMA_OPEN.filter((state) => state !== RMA_STATE.to_open)
-
-/**
- * Encoded query on x_daas_ham_oem_rma: the open RMAs, as the workspace lists them. A constant written out from the
- * state names for Fluent metadata to import (domain/sourcing.test.ts holds it to `RMA_OPEN`).
- */
-export const OPEN_RMAS_QUERY = `stateIN${RMA_STATE.to_open},${RMA_STATE.open},${RMA_STATE.replacement_received}`
-
-/** An RMA for the Asset a break-fix line replaces, as `advanceReplacementRma` weighs it. */
-export interface OpenRma {
-    rmaId: string
-    rmaNumber: string
-    state: RmaState
-    /** The Order line it serves; '' for none. */
-    lineId: string
-    /** Whether that line still waits to be filled (`lineStillOpen`); false for none. */
-    lineOpen: boolean
-}
-
-/** An open RMA a line's advance replacement goes under, and the state it is saved in. */
-export interface RmaReuse {
-    rma: OpenRma
-    state: RmaState
-    /** Its replacement was received (then lost in transit or failed staging): the vendor is asked for another. */
-    askAgain: boolean
-}
-
-/**
- * Whether a break-fix line whose shortfall goes to an OEM advance replacement reuses an RMA already open for the unit
- * it replaces, or (null) opens one: the OEM is not asked twice for one defective unit. Reused, the RMA serves the line
- * and its replacement is awaited, so the line waits for it; one whose replacement was received goes back to open. The
- * line's own RMA comes first, then one still awaited, then the first given (`rmas` oldest first). One that another
- * open line waits for is that line's.
- */
-export function advanceReplacementRma(lineId: string, rmas: readonly OpenRma[]): RmaReuse | null {
-    const rank = (rma: OpenRma) => (rma.lineId === lineId ? 0 : 2) + (RMA_AWAITED.includes(rma.state) ? 0 : 1)
-    // A scan, not a sort: the platform's Array sort need not keep equals in the order given.
-    let best: OpenRma | null = null
-    for (const rma of rmas) {
-        const reusable = RMA_OPEN.includes(rma.state) && (rma.lineId === lineId || !rma.lineOpen)
-        if (reusable && (!best || rank(rma) < rank(best))) best = rma
-    }
-    if (!best) return null
-    const askAgain = !RMA_AWAITED.includes(best.state)
-    return { rma: best, state: askAgain ? 'open' : best.state, askAgain }
 }
 
 /**

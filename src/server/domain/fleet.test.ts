@@ -7,7 +7,6 @@ import {
     FLEET_FIELD,
     FLEET_IN_STAGE,
     fleetCondition,
-    fleetField,
     fleetStagesQuery,
     inFleet,
     isNaasModel,
@@ -31,7 +30,7 @@ import { STOCKROOM_TYPE_CHOICES } from './vocabulary'
 
 describe('the fleet condition', () => {
     it('names the Fleet flag, dot-walked from another table when asked', () => {
-        expect(fleetField()).toBe('x_daas_ham_fleet')
+        expect(FLEET_FIELD).toBe('x_daas_ham_fleet')
         expect(fleetCondition()).toBe('x_daas_ham_fleet=true')
         expect(fleetCondition('asset.')).toBe('asset.x_daas_ham_fleet=true')
     })

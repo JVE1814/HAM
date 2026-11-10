@@ -425,6 +425,5 @@ describe('billingChange', () => {
 describe('notRetiredCondition', () => {
     it('leaves out the retired stages, which are all stored as install status Retired', () => {
         expect(notRetiredCondition()).toBe('install_status!=7')
-        expect(notRetiredCondition('asset.')).toBe('asset.install_status!=7')
     })
 })

@@ -126,6 +126,23 @@ export function coverageBySerial(serials: Iterable<string>, contracts: readonly 
     return coverage
 }
 
+/** A coverage contract about to end, and the Customer whose equipment it covers. */
+export interface ExpiringCoverage {
+    customerId: string
+    endDate: string
+}
+
+/** Expiring coverage per Customer: how many contracts, and the first one to end. */
+export function groupExpiringCoverage(rows: readonly ExpiringCoverage[]): Map<string, { count: number; firstEnd: string }> {
+    const groups = new Map<string, { count: number; firstEnd: string }>()
+    for (const row of rows) {
+        const group = groups.get(row.customerId)
+        if (!group) groups.set(row.customerId, { count: 1, firstEnd: row.endDate })
+        else groups.set(row.customerId, { count: group.count + 1, firstEnd: row.endDate < group.firstEnd ? row.endDate : group.firstEnd })
+    }
+    return groups
+}
+
 /** The Asset field that holds when its OEM coverage was last checked. */
 export const COVERAGE_CHECKED_FIELD = 'x_daas_ham_coverage_checked'
 

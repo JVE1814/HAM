@@ -110,7 +110,7 @@ contacts: their Sites).
 | Everyone | see installed equipment by Site; report a faulty device (CSM case with the failed asset); see open orders and returns; confirm self-installed orders, including the units already shipped of an Order back in preparing after a unit was lost in transit |
 | Customer admins | request returns of selected devices or a site decommission; answer attestations |
 
-The equipment listed is the Customer's fleet assets (ADR 0016; `domain/visibility.ts`
+The equipment listed is the Customer's fleet assets (ADR 0016; `domain/customer-page.ts`
 `customerEquipmentQuery`), from shipped to a Site to awaiting return, grouped by Site; one with no
 Site (a data gap) is listed under *No site*, and one that has lost its Agreement (another) is listed
 all the same. The Provider IT's hardware, such as laptops in use, is outside the fleet and is not
