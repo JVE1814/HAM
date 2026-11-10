@@ -559,7 +559,7 @@ under `order_line_<line sys_id>`, which a receipt for a waiting line takes too.
 - A line lock is tried 10 times (up to 20 errors). Held through them all, sourcing leaves the line
   to the pass queued again (after picking stock, it logs *[x_daas_ham] <line> left to the next
   sourcing pass (...)*, naming any transfer orders the line does not list), and a receipt answers
-  HTTP 503 *Its order line is being sourced or received: scan again* and saves nothing. A received
+  HTTP 503 *Its order line is being sourced, received or cancelled: scan again* and saves nothing. A received
   unit whose reservation fails queues `x_daas_ham.order.source` for its Order: one *not reserved
   for <line>* warning is followed by a sourcing pass, not by a stalled line.
 - *Cancel order* takes `source_order_<Order sys_id>` too: with a row of that name in *Job lock*, it
