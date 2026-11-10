@@ -31,7 +31,7 @@ import { orderShipment, queueSourcing } from './fulfilment.ts'
 import { withLock } from './locks.ts'
 import { addOrderLines, cancelLine, type NewLine, type RefusedLine } from './order-lines.ts'
 import { bool, findById, num, refusal, str, warnRefused } from './records.ts'
-import { currentSession } from './session.ts'
+import { creatorOf } from './session.ts'
 import { skipOpenStagingTasks } from './staging-tasks.ts'
 import { releaseToProviderStock, takeOffOrderLine } from './stock.ts'
 import { SITE_FIELD } from '../domain/fleet.ts'
@@ -142,8 +142,8 @@ function siteTemplateLines(siteTemplateId: string): NewLine[] {
 
 /** The signed-in user as the raiser of `order`: an Order raiser when the Order create rule lets them create it. */
 function orderingUser(order: GlideRecord): Orderer {
-    const { scope, customerId } = currentSession()
-    return { mayRaise: order.canCreate(), scope, customerId }
+    const { permitted, scope, customerId } = creatorOf(order)
+    return { mayRaise: permitted, scope, customerId }
 }
 
 /**

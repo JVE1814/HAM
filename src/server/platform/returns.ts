@@ -23,6 +23,7 @@ import {
     type LeaseEndAction,
     type LegalOwner,
     RETURN_LINE_STATUS,
+    RETURN_TRIGGER,
     type ReturnCondition,
     type ReturnLineStatus,
     type ReturnMethod,
@@ -39,7 +40,7 @@ import { installedAssetIds } from './installed-assets.ts'
 import { withLock } from './locks.ts'
 import { intProperty, PROPERTY } from './properties.ts'
 import { bool, choice, exists, findById, num, refusal, str, warnRefused } from './records.ts'
-import { currentSession } from './session.ts'
+import { creatorOf } from './session.ts'
 import { releaseToProviderStock } from './stock.ts'
 import { endSitePackageIfEmpty } from './subscriptions.ts'
 import { SITE_FIELD } from '../domain/fleet.ts'
@@ -233,6 +234,27 @@ export function requestReturn(request: RequestedEquipment): RequestOutcome {
     return raised ? { raised: true, ...raised } : notRaised('refused', 'the platform refused it')
 }
 
+/**
+ * Raise the Return the record producer just saved (`requestReturn`, which reads the request from it and the Assets it
+ * `listedAssetIds`). The producer does not apply the Return create rule, so a Return that is not raised (its requester
+ * may not ask for it, its Site is not its Customer's, or the platform refused it) is removed again, as an Order raised
+ * in vain is (platform/orders `submitProducedOrder`): never filled in, it moves nothing. One the platform keeps is
+ * logged, to cancel by hand.
+ */
+export function requestProducedReturn(order: GlideRecord, listedAssetIds: readonly string[]): RequestOutcome {
+    const outcome = requestReturn({
+        produced: order,
+        customerId: str(order, 'customer'),
+        siteId: str(order, 'site'),
+        decommission: str(order, 'trigger') === RETURN_TRIGGER.site_decommission,
+        listedAssetIds,
+        method: str(order, 'method') as ReturnMethod | '',
+        describe: () => str(order, 'short_description') || `Return from ${order.getDisplayValue('site')}`,
+    })
+    if (!outcome.raised && !order.deleteRecord()) warnRefused(order, `Refused return ${str(order, 'number')} not removed`)
+    return outcome
+}
+
 /** The location a request names, as domain/returns reads it: whose it is and whether it is a Site at all. */
 function requestedSite(siteId: string, site: GlideRecord | null): RequestedReturn['site'] {
     if (!siteId) return undefined
@@ -241,8 +263,8 @@ function requestedSite(siteId: string, site: GlideRecord | null): RequestedRetur
 
 /** The signed-in user as a Return requester: one the Return create rule lets create a Return order. */
 function returnRequester(produced: GlideRecord | undefined): ReturnRequester {
-    const { scope, customerId } = currentSession()
-    return { mayRequest: (produced ?? new GlideRecord(RETURN)).canCreate(), scope, customerId }
+    const { permitted, scope, customerId } = creatorOf(produced ?? new GlideRecord(RETURN))
+    return { mayRequest: permitted, scope, customerId }
 }
 
 /** Those of `listed` that are fleet assets at the Site (visibility rules apply). */

@@ -1,6 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { naasStockroomCondition } from '../domain/fleet.ts'
 import { memoized } from '../domain/memo.ts'
+import type { CustomerActor } from '../domain/customer-parties.ts'
 import { contactScope, resolveVisibility, type ContactScope, type VisibilityScope } from '../domain/visibility.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { pluck } from './records.ts'
@@ -43,6 +44,17 @@ function assignedStockrooms(userId: string): string[] {
     const ids: string[] = []
     while (stockroom.next()) ids.push(stockroom.getUniqueValue())
     return ids
+}
+
+/**
+ * The signed-in user as the person asking for `record` to be created for a Customer (domain/customer-parties
+ * `actorRefusal`): whether its table's create rule lets them create it, how far they see and their own Customer. A
+ * record producer saves its record without applying the create rule, so the service that takes the record on (an
+ * Order, a Return) asks here, and removes a record its requester may not raise.
+ */
+export function creatorOf(record: GlideRecord): CustomerActor {
+    const { scope, customerId } = currentSession()
+    return { permitted: record.canCreate(), scope, customerId }
 }
 
 export function currentSession(): SessionScope {
