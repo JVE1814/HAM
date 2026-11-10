@@ -1,7 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { isNaasModel, naasModelCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
 import { createMarks } from '../domain/marks.ts'
-import { mergeLifecycle, type LifecycleDates } from '../domain/model-lifecycle.ts'
+import { mergeLifecycle, MILESTONES, type LifecycleDates } from '../domain/model-lifecycle.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
 import { EVENT, fire } from './events.ts'
 import { findById, refusal, str } from './records.ts'
@@ -33,18 +33,11 @@ const PUBLISHER = 'publisher'
 /** `source` of the rows the app writes (and of those maintained by hand); ServiceNow's content rows carry another. */
 const OWN_SOURCE = 'internal'
 
-/** The platform's `lifecycle_phase` of each milestone. Its General availability phase is no milestone of the app's. */
-const PHASE_OF: Readonly<Record<keyof LifecycleDates, string>> = {
-    endOfSale: 'end_of_sale',
-    endOfSupport: 'end_of_support',
-    endOfExtendedSupport: 'end_of_extended_support',
-    endOfLife: 'end_of_life',
-}
-
-const MILESTONES = Object.keys(PHASE_OF) as Array<keyof LifecycleDates>
-
-/** Active manufacturer milestone rows, of any class and source. */
-const MILESTONE_ROWS = `active=true^lifecycle_type=${PUBLISHER}^lifecycle_phaseIN${Object.values(PHASE_OF).join(',')}`
+/**
+ * Active manufacturer milestone rows, of any class and source: those in the `lifecycle_phase` of a milestone
+ * (domain/model-lifecycle `MILESTONES`). The platform's General availability phase is no milestone of the app's.
+ */
+const MILESTONE_ROWS = `active=true^lifecycle_type=${PUBLISHER}^lifecycle_phaseIN${MILESTONES.map(({ phase }) => phase).join(',')}`
 
 /** The Model's rows the app writes: the platform keeps them to one per milestone. */
 const OWN_ROWS = `${MILESTONE_ROWS}^source=${OWN_SOURCE}`
@@ -90,7 +83,7 @@ export interface LifecycleWrite {
 const writing = createMarks<string>()
 
 function milestoneOf(phase: string): keyof LifecycleDates | undefined {
-    return MILESTONES.find((milestone) => PHASE_OF[milestone] === phase)
+    return MILESTONES.find((milestone) => milestone.phase === phase)?.field
 }
 
 /**
@@ -128,9 +121,9 @@ export function readModelLifecycle(modelId: string): LifecycleDates {
 export function writeModelLifecycle(modelId: string, dates: LifecycleDates, provenance: LifecycleProvenance): LifecycleWrite {
     const result: LifecycleWrite = { inserted: 0, updated: 0, unchanged: 0, refused: [] }
     const pending = new Map<string, string>()
-    for (const milestone of MILESTONES) {
-        const date = dates[milestone]
-        if (date) pending.set(PHASE_OF[milestone], date)
+    for (const { field, phase } of MILESTONES) {
+        const date = dates[field]
+        if (date) pending.set(phase, date)
     }
     if (!modelId || pending.size === 0) return result
     const description = provenanceLine(provenance)

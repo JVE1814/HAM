@@ -10,11 +10,16 @@ export interface LifecycleDates {
     endOfLife?: string
 }
 
-const MILESTONES: ReadonlyArray<[keyof LifecycleDates, LifecyclePhase]> = [
-    ['endOfLife', 'end_of_life'],
-    ['endOfExtendedSupport', 'end_of_extended_support'],
-    ['endOfSupport', 'end_of_support'],
-    ['endOfSale', 'end_of_sale'],
+/**
+ * The milestones in the order a manufacturer reaches them: the date each is kept in, the Lifecycle phase an Asset is in
+ * once its Model has reached it (also the `lifecycle_phase` of its row in the platform's Model lifecycle table, ADR
+ * 0017), and its name in messages. Reading, checking, merging and storing milestones all go through this list.
+ */
+export const MILESTONES: ReadonlyArray<{ field: keyof LifecycleDates; phase: LifecyclePhase; label: string }> = [
+    { field: 'endOfSale', phase: 'end_of_sale', label: 'end of sale' },
+    { field: 'endOfSupport', phase: 'end_of_support', label: 'end of support' },
+    { field: 'endOfExtendedSupport', phase: 'end_of_extended_support', label: 'end of extended support' },
+    { field: 'endOfLife', phase: 'end_of_life', label: 'end of life' },
 ]
 
 /** What an Asset contributes to its Lifecycle phase and Refresh due date. */
@@ -45,11 +50,11 @@ export function assetLifecycleStamp(asset: AssetLifecycleFacts, model: Lifecycle
 }
 
 function lifecyclePhaseOn(dates: LifecycleDates, today: string): LifecyclePhase {
-    for (const [field, phase] of MILESTONES) {
+    const reached = MILESTONES.filter(({ field }) => {
         const date = dates[field]
-        if (date && date <= today) return phase
-    }
-    return 'available'
+        return !!date && date <= today
+    })
+    return reached.length > 0 ? reached[reached.length - 1].phase : 'available'
 }
 
 function refreshDueDate(asset: AssetLifecycleFacts, model: LifecycleDates): string {
@@ -83,30 +88,23 @@ export type LifecycleRow = { pid: string } & { [K in keyof LifecycleDates]?: str
 
 export type ParsedLifecycleRow = { ok: true; pid: string; dates: LifecycleDates } | { ok: false; reason: string }
 
-const MILESTONE_ORDER: ReadonlyArray<[keyof LifecycleDates, string]> = [
-    ['endOfSale', 'end of sale'],
-    ['endOfSupport', 'end of support'],
-    ['endOfExtendedSupport', 'end of extended support'],
-    ['endOfLife', 'end of life'],
-]
-
 /** Validate one CSV row of manufacturer milestones. */
 export function parseLifecycleRow(row: LifecycleRow): ParsedLifecycleRow {
     const pid = row.pid.trim()
     if (!pid) return { ok: false, reason: 'PID is required' }
     const dates: LifecycleDates = {}
-    for (const [field] of MILESTONE_ORDER) {
+    for (const { field } of MILESTONES) {
         const value = (row[field] ?? '').trim()
         if (!value) continue
         if (!isIsoDate(value)) return { ok: false, reason: `${field} must be YYYY-MM-DD` }
         dates[field] = value
     }
-    const present = MILESTONE_ORDER.filter(([field]) => dates[field])
+    const present = MILESTONES.filter(({ field }) => dates[field])
     for (let i = 1; i < present.length; i++) {
-        const [earlierField, earlierLabel] = present[i - 1]
-        const [laterField, laterLabel] = present[i]
-        if (dates[earlierField]! > dates[laterField]!) {
-            return { ok: false, reason: `Milestones must not go backwards (${earlierLabel} after ${laterLabel})` }
+        const earlier = present[i - 1]
+        const later = present[i]
+        if (dates[earlier.field]! > dates[later.field]!) {
+            return { ok: false, reason: `Milestones must not go backwards (${earlier.label} after ${later.label})` }
         }
     }
     return { ok: true, pid, dates }
@@ -114,12 +112,9 @@ export function parseLifecycleRow(row: LifecycleRow): ParsedLifecycleRow {
 
 /** Combine stored milestones with a newer source: present values win, missing ones keep what was there. */
 export function mergeLifecycle(existing: LifecycleDates, incoming: LifecycleDates): LifecycleDates {
-    return {
-        endOfSale: incoming.endOfSale || existing.endOfSale,
-        endOfSupport: incoming.endOfSupport || existing.endOfSupport,
-        endOfExtendedSupport: incoming.endOfExtendedSupport || existing.endOfExtendedSupport,
-        endOfLife: incoming.endOfLife || existing.endOfLife,
-    }
+    const merged: LifecycleDates = {}
+    for (const { field } of MILESTONES) merged[field] = incoming[field] || existing[field]
+    return merged
 }
 
 /**
