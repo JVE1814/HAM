@@ -21,12 +21,24 @@ interface Entry {
     message: string
 }
 
+/** What the scans of a mode are made against: the Stockroom chosen, the Order or Audit number typed, the PID typed. */
+interface ScanContext {
+    stockroom: string
+    orderNumber: string
+    auditNumber: string
+    pid: string
+}
+
+/** What a scan answered: the unit as it now stands, or, for an audit scan, which is blind, only that the code was counted. */
+type Scanned = { mode: Exclude<Mode, 'audit'>; asset: AssetSummary } | { mode: 'audit'; code: string }
+
 export default function App() {
     const [mode, setMode] = useState<Mode>('receive')
     const [stockrooms, setStockrooms] = useState<Stockroom[]>([])
     const [depotWork, setDepotWork] = useState(true)
     const [stockroom, setStockroom] = useState('')
-    const [order, setOrder] = useState('')
+    const [orderNumber, setOrderNumber] = useState('')
+    const [auditNumber, setAuditNumber] = useState('')
     const [pid, setPid] = useState('')
     const [busy, setBusy] = useState(false)
     const [log, setLog] = useState<Entry[]>([])
@@ -52,9 +64,9 @@ export default function App() {
         async (code: string) => {
             setBusy(true)
             try {
-                const asset = await perform(mode, code, { stockroom, order, pid })
-                setLog((l) => [{ ok: true, message: describe(mode, asset) }, ...l].slice(0, 50))
-                if (mode === 'receive' && asset.providerTag) setLabels((current) => [asset, ...current])
+                const scanned = await perform(mode, code, { stockroom, orderNumber, auditNumber, pid })
+                setLog((l) => [{ ok: true, message: describe(scanned) }, ...l].slice(0, 50))
+                if (scanned.mode === 'receive' && scanned.asset.providerTag) setLabels((current) => [scanned.asset, ...current])
                 setPid('')
             } catch (error) {
                 setLog((l) => [{ ok: false, message: `${code}: ${(error as Error).message}` }, ...l].slice(0, 50))
@@ -62,7 +74,7 @@ export default function App() {
                 setBusy(false)
             }
         },
-        [mode, stockroom, order, pid],
+        [mode, stockroom, orderNumber, auditNumber, pid],
     )
 
     const current = MODES.find((m) => m.id === mode)!
@@ -102,13 +114,13 @@ export default function App() {
                 {mode === 'audit' && (
                     <label className="field">
                         Audit number
-                        <input value={order} onChange={(e) => setOrder(e.target.value.trim())} placeholder="NAUD0001000" />
+                        <input value={auditNumber} onChange={(e) => setAuditNumber(e.target.value.trim())} placeholder="NAUD0001000" />
                     </label>
                 )}
                 {mode === 'pick' && (
                     <label className="field">
                         Order number
-                        <input value={order} onChange={(e) => setOrder(e.target.value.trim())} placeholder="NORD0001000" />
+                        <input value={orderNumber} onChange={(e) => setOrderNumber(e.target.value.trim())} placeholder="NORD0001000" />
                     </label>
                 )}
             </section>
@@ -141,39 +153,35 @@ export default function App() {
     )
 }
 
-function perform(mode: Mode, code: string, context: { stockroom: string; order: string; pid: string }): Promise<AssetSummary> {
+async function perform(mode: Mode, code: string, context: ScanContext): Promise<Scanned> {
     switch (mode) {
         case 'receive':
-            return warehouseApi.receive({ code, stockroom: context.stockroom, pid: context.pid || undefined })
+            return { mode, asset: await warehouseApi.receive({ code, stockroom: context.stockroom, pid: context.pid || undefined }) }
         case 'putaway':
-            return warehouseApi.putAway({ code, stockroom: context.stockroom })
+            return { mode, asset: await warehouseApi.putAway({ code, stockroom: context.stockroom }) }
         case 'pick':
-            if (!context.order) return Promise.reject(new Error('Enter the order number first'))
-            return warehouseApi.pick({ code, order: context.order })
+            if (!context.orderNumber) throw new Error('Enter the order number first')
+            return { mode, asset: await warehouseApi.pick({ code, order: context.orderNumber }) }
         case 'audit':
-            if (!context.order) return Promise.reject(new Error('Enter the audit number first'))
-            return warehouseApi.auditScan({ audit: context.order, code }).then(() => scannedOnly(code))
+            if (!context.auditNumber) throw new Error('Enter the audit number first')
+            await warehouseApi.auditScan({ audit: context.auditNumber, code })
+            return { mode, code }
         case 'lookup':
-            return warehouseApi.lookup(code)
+            return { mode, asset: await warehouseApi.lookup(code) }
     }
 }
 
-/** Audit scans are blind: nothing about the unit is shown back. */
-function scannedOnly(code: string): AssetSummary {
-    return { id: code, serial: code, providerTag: '', model: '', pid: '', stage: 'unknown', stockroom: '', customer: '', orderLine: '' }
-}
-
-function describe(mode: Mode, asset: AssetSummary): string {
+function describe(scanned: Scanned): string {
+    if (scanned.mode === 'audit') return `${scanned.code} counted`
+    const { asset } = scanned
     const name = `${asset.serial} (${asset.pid || asset.model})`
-    switch (mode) {
+    switch (scanned.mode) {
         case 'receive':
             return `Received ${name} as ${asset.providerTag}${asset.orderLine ? `, allocated to ${asset.orderLine}` : ''}`
         case 'putaway':
             return `${name} put away in ${asset.stockroom}`
         case 'pick':
             return `${name} picked`
-        case 'audit':
-            return `${asset.serial} counted`
         case 'lookup':
             return `${name}: ${stageText(asset.stage)}, ${asset.stockroom || asset.customer || 'no location'}${asset.providerTag ? `, tag ${asset.providerTag}` : ''}`
     }
