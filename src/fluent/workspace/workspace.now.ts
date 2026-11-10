@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Acl, Workspace } from '@servicenow/sdk/core'
-import { providerStaff } from '../security/roles.now'
+import { providerStaff } from '../shared/roles.now'
 import { naasListMenu } from './list-menu.now'
 
 /*

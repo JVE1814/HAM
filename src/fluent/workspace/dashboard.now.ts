@@ -422,9 +422,9 @@ export const naasDashboard = Dashboard({
     ],
     visibilities: [{ $id: Now.ID['dash_naas_visibility'], experience: naasWorkspace }],
     /*
-     * Read by the workspace's six roles (its route ACL in workspace.now.ts, security/roles.now.ts `providerStaff`); an app
+     * Read by the workspace's six roles (its route ACL in workspace.now.ts, shared/roles.now.ts `providerStaff`); an app
      * administrator holds them all. A dashboard's tabs take no permissions of their own, so each widget's data is its
-     * table's read ACL's: the Margin tab's margin and cost facts are `moneyReaders`' alone (acls-commercial.now.ts), and
+     * table's read ACL's: the Margin tab's margin and cost facts are `moneyReaders`' alone (margin/margin.now.ts), and
      * an inventory tech reads no subscription lines or reconciliation exceptions, so those widgets show the others
      * nothing. built-metadata.test.ts holds this list to the workspace's roles.
      */

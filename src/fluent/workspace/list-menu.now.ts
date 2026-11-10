@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Applicability, UxListMenuConfig } from '@servicenow/sdk/core'
-import { admin, broadStaffRecords, moneyReaderRecords, providerStaffRecords } from '../security/roles.now'
+import { admin, broadStaffRecords, moneyReaderRecords, providerStaffRecords } from '../shared/roles.now'
 import { OPEN_ORDERS_QUERY, ORDERS_AWAITING_APPROVAL_QUERY } from '../../server/domain/fulfilment'
 import { FLEET_CONDITION, FLEET_IN_STAGE, FLEET_INSTALLED, INSTALLED_CONDITION, NAAS_MODEL_CONDITION, NAAS_MODEL_MILESTONES } from '../../server/domain/fleet'
 import { OPEN_SHIPMENTS } from '../../server/domain/shipping'
