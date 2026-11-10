@@ -323,32 +323,39 @@ class GlideRecord extends Conditions {
         return platform.refuses(this.table, this.row, operation)
     }
 
+    // The hooks of a save may change the tables themselves (another transaction's write landing meanwhile), so the
+    // row is put where the table is once they have run.
     insert(): string | null {
-        const rows = store(this.table)
         this.error = this.refusal('insert', undefined)
         if (this.error) return null
-        if (!this.row.sys_id || rows.some((row) => row.sys_id === this.row.sys_id)) this.row.sys_id = `id${String(++platform.ids).padStart(4, '0')}`
+        const taken = (sysId: string) => store(this.table).some((row) => row.sys_id === sysId)
+        if (!this.row.sys_id || taken(this.row.sys_id)) this.row.sys_id = `id${String(++platform.ids).padStart(4, '0')}`
         if (inHierarchy(this.table)) this.row.sys_class_name ||= this.table
         this.row.sys_created_on = this.row.sys_updated_on = stamp(platform.clock)
         for (const [field, value] of Object.entries(platform.defaults[this.table]?.(this.row) ?? {})) this.row[field] ||= value
         platform.onSave(this.table, this.row, 'insert')
-        rows.push({ ...this.row })
+        store(this.table).push({ ...this.row })
         this.hold(this.row, false)
         return this.row.sys_id
     }
-    update(): string | null {
+    private stored(): Row {
         const stored = this.read && store(this.table).find((row) => row.sys_id === this.read?.sys_id)
-        if (!this.read || !stored) throw new Error(`fake Glide: update of a ${this.table} record that is not stored (sys_id "${this.getUniqueValue()}")`)
-        const read = this.read
+        if (!stored) throw new Error(`fake Glide: update of a ${this.table} record that is not stored (sys_id "${this.getUniqueValue()}")`)
+        return stored
+    }
+    update(): string | null {
+        const read = this.read ?? {}
+        const sysId = this.stored().sys_id ?? null
         const changed = Object.keys(this.row).filter((field) => (this.row[field] ?? '') !== (read[field] ?? ''))
-        if (changed.length === 0) return stored.sys_id ?? null
-        this.error = this.refusal('update', stored)
+        if (changed.length === 0) return sysId
+        this.error = this.refusal('update', this.stored())
         if (this.error) return null
         this.row.sys_updated_on = stamp(platform.clock)
         platform.onSave(this.table, this.row, 'update')
+        const stored = this.stored()
         for (const field of [...changed, 'sys_updated_on']) stored[field] = this.row[field] ?? ''
         this.read = { ...this.row }
-        return stored.sys_id ?? null
+        return sysId
     }
     deleteRecord(): boolean {
         const rows = store(this.table)
