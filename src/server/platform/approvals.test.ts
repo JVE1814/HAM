@@ -126,6 +126,7 @@ function decide(approverId: string, state: 'approved' | 'rejected'): void {
 }
 
 const request = (approverIds: string[], required: ApprovalRequest['required']): ApprovalRequest => ({
+    awaitingStage: 'awaiting_approval',
     approverIds,
     required,
     customerAdmins: ['ca'],
@@ -185,6 +186,7 @@ describe('rollUpApprovals', () => {
         const decided: string[] = []
         return {
             decided,
+            awaitingStage: 'awaiting_approval',
             required: () => required,
             decide: (task, outcome) => {
                 decided.push(outcome)

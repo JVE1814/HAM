@@ -10,7 +10,7 @@ import { disposalStage } from '../domain/lifecycle.ts'
 import { DISPOSAL_STAGE, type DisposalLineStatus, type DisposalMethod, type LegalOwner, TASK_STATE } from '../domain/vocabulary.ts'
 import {
     customerAdminIds,
-    providerApproverIds,
+    assetManagerIds,
     putToApproval,
     rollUpApprovals,
     type ApprovalFlow,
@@ -74,9 +74,10 @@ export function submitDisposal(order: GlideRecord): DisposalSubmission {
     const customerAdmins = customerAdminIds(str(order, 'customer'))
     const approvers = new Set<string>()
     for (const group of required) {
-        for (const id of group === 'customer_admin' ? customerAdmins : providerApproverIds('')) approvers.add(id)
+        for (const id of group === 'customer_admin' ? customerAdmins : assetManagerIds()) approvers.add(id)
     }
     const asked = putToApproval(order, {
+        awaitingStage: DISPOSAL_APPROVAL.awaitingStage,
         approverIds: [...approvers],
         required,
         customerAdmins,
@@ -88,6 +89,7 @@ export function submitDisposal(order: GlideRecord): DisposalSubmission {
 
 /** How a Disposal order's approvals are decided (platform/approvals): by its Assets' owners, approved or rejected and closed. */
 const DISPOSAL_APPROVAL: ApprovalFlow = {
+    awaitingStage: DISPOSAL_STAGE.awaiting_approval,
     required: (order) => disposalApprovers(ownersOf(order.getUniqueValue())),
     decide: (order, outcome) => {
         order.setValue('approval', outcome)

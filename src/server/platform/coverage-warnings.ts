@@ -3,7 +3,7 @@ import { addDays } from '../domain/calendar.ts'
 import { groupExpiringCoverage, type ExpiringCoverage } from '../domain/coverage.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import { SERVING_STAGES } from '../domain/lifecycle.ts'
-import { providerApproverIds } from './approvals.ts'
+import { assetManagerIds } from './approvals.ts'
 import { markExpiryWarned } from './coverage.ts'
 import { EVENT, fire } from './events.ts'
 import { intProperty, PROPERTY } from './properties.ts'
@@ -34,7 +34,7 @@ export function warnExpiringCoverage(today: string): void {
             warnRefused(coverage, `Coverage ${contract} not marked warned`)
         }
     }
-    const recipients = providerApproverIds('').join(',')
+    const recipients = assetManagerIds().join(',')
     for (const [customerId, group] of groupExpiringCoverage(rows)) {
         const customer = findById('customer_account', customerId)
         if (customer) fire(EVENT.coverageExpiring, customer, recipients, `${group.count} OEM coverage contract(s), the first ending ${group.firstEnd}`)

@@ -15,7 +15,7 @@ import {
 import { isRetired, SERVING_STAGES, type Stage, STOCK_STAGES } from '../domain/lifecycle.ts'
 import { isFree } from '../domain/sourcing.ts'
 import { LEASE_END_ACTION, type LeaseEndAction, LEGAL_OWNER, TASK_STATE } from '../domain/vocabulary.ts'
-import { providerApproverIds } from './approvals.ts'
+import { assetManagerIds } from './approvals.ts'
 import { moveAsset, readStage } from './assets.ts'
 import { runEventTableJob } from './chunked.ts'
 import { todayIso } from './clock.ts'
@@ -64,7 +64,7 @@ export function runLeaseReview(): void {
             lease.setValue('mismatch', mismatch)
             // Refused: tomorrow's review alerts again, which beats not alerting at all.
             if (!lease.update()) warnRefused(lease, `Lease ${str(lease, 'number')} mismatch flag not saved`)
-            if (mismatch) fire(EVENT.leaseMismatch, lease, providerApproverIds('').join(','))
+            if (mismatch) fire(EVENT.leaseMismatch, lease, assetManagerIds().join(','))
         }
         if (withinLead(str(lease, 'ends'), today, num(lease, 'decision_lead_days')) && !openDecision(leaseId)) raiseDecision(lease, mismatch)
     }

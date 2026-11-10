@@ -205,6 +205,7 @@ function submitAccepted(order: GlideRecord): Submission {
     // The account manager, or else the asset managers, on the Provider's side.
     const provider = providerApproverIds(str(order, 'agreement.account_manager'))
     const asked = putToApproval(order, {
+        awaitingStage: ORDER_APPROVAL.awaitingStage,
         approverIds: approversToAsk(assessment.approvers, customerAdmins, provider),
         required: assessment.approvers,
         customerAdmins,
@@ -261,6 +262,7 @@ function rejectOrder(order: GlideRecord): string {
 
 /** How an Order's approvals are decided (platform/approvals): by its entitlement verdict, approved and sourced or rejected. */
 const ORDER_APPROVAL: ApprovalFlow = {
+    awaitingStage: ORDER_STAGE.awaiting_approval,
     required: (order) => approversFor(str(order, 'entitlement_verdict') as EntitlementVerdict),
     decide: (order, outcome) => (outcome === 'approved' ? startSourcing(order) : rejectOrder(order)),
 }
