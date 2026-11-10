@@ -1,32 +1,31 @@
-import type { OemContext } from '../domain/oem/adapters.ts'
+import { isSyncVendor, SYNC_MESSAGE, type OemContext, type SyncVendor } from '../domain/oem/adapters.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
 import { boolProperty, PROPERTY, stringProperty, type PropertyOf } from './properties.ts'
 import { restMessagePort } from './rest-messages.ts'
-import { REST_MESSAGE } from '../domain/rest-message-names.ts'
 
 /** RESTMessageV2 transport for the OEM adapters (REST messages in fluent/logic/oem-messages.now.ts). */
 
-/** The message serving each vendor's lifecycle / coverage / RMA data. */
-const MESSAGE: Partial<Record<OemVendor, string>> = {
-    cisco: REST_MESSAGE.ciscoSupport.name,
-    meraki: REST_MESSAGE.meraki.name,
-    fortinet: REST_MESSAGE.fortiCare.name,
-    mist: REST_MESSAGE.mist.name,
-}
+/**
+ * The switch of each vendor whose API the sync jobs read, and the organizations of those read per organization. Every
+ * such vendor (domain/oem/adapters `SYNC_MESSAGE`) must have its switch, and neither table may name another vendor.
+ */
+const ENABLED: Record<SyncVendor, PropertyOf<boolean>> = PROPERTY.oemEnabled
+const ORG_IDS: Partial<Record<SyncVendor, PropertyOf<string>>> = PROPERTY.oemOrgIds
 
-const ENABLED: Partial<Record<OemVendor, PropertyOf<boolean>>> = PROPERTY.oemEnabled
-const ORG_IDS: Partial<Record<OemVendor, PropertyOf<string>>> = PROPERTY.oemOrgIds
+type Holds<T extends true> = T
+type _OnlySyncVendorsHaveASwitch = Holds<[keyof typeof PROPERTY.oemEnabled] extends [SyncVendor] ? true : false>
+type _OnlySyncVendorsHaveOrgIds = Holds<[keyof typeof PROPERTY.oemOrgIds] extends [SyncVendor] ? true : false>
 
+/** Whether `vendor`'s API is read: it has one, and its switch is on. */
 export function oemEnabled(vendor: OemVendor): boolean {
-    const enabled = ENABLED[vendor]
-    return !!MESSAGE[vendor] && !!enabled && boolProperty(enabled)
+    return isSyncVendor(vendor) && boolProperty(ENABLED[vendor])
 }
 
 /** The adapter context for calls served by `vendor`'s REST message. */
-export function oemContext(vendor: OemVendor): OemContext {
+export function oemContext(vendor: SyncVendor): OemContext {
     const orgProperty = ORG_IDS[vendor]
     return {
-        http: restMessagePort(MESSAGE[vendor] ?? ''),
+        http: restMessagePort(SYNC_MESSAGE[vendor]),
         orgIds: orgProperty ? stringProperty(orgProperty).split(',').map((id) => id.trim()).filter(Boolean) : [],
     }
 }

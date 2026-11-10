@@ -4,7 +4,7 @@ import { asArray, field, isoDate, parseJson, text } from '../json.ts'
 import type { OemVendor } from '../vocabulary.ts'
 import type { CoverageFact, CoverageFetched, Fetched, LifecycleFact, RmaFact } from './types.ts'
 import { fortiCloudError } from './forticloud.ts'
-import { REST_MESSAGE } from '../rest-message-names.ts'
+import { REST_MESSAGE, type RestFunction } from '../rest-message-names.ts'
 
 /*
  * Vendor adapters (ADR 0008). Response shapes follow the vendors' public API documentation; mappers
@@ -20,7 +20,7 @@ export interface OemContext {
 
 type Capability<Result> = (keys: readonly string[], context: OemContext) => Result
 
-function call(context: OemContext, fn: string, params: Record<string, string>, errors: string[]): unknown {
+function call(context: OemContext, fn: RestFunction, params: Record<string, string>, errors: string[]): unknown {
     const response = context.http({ fn, params })
     if (!isSuccess(response.status)) {
         errors.push(`${fn} ${JSON.stringify(params)}: ${errorText(response.status, response.body)}`)
@@ -269,9 +269,27 @@ const mistCoverage: Capability<CoverageFetched> = (serials, context) => {
     return { facts, errors, failed, rejected: [] }
 }
 
+/**
+ * The REST message that serves each vendor's lifecycle, coverage and RMA calls: the vendors whose API the sync jobs
+ * read (`SyncVendor`). Only these may have routes below, a route names one of them as its `via`, and platform/oem-http
+ * must hold the enabled property of each: a vendor given a route without its message or its switch does not compile.
+ */
+export const SYNC_MESSAGE = {
+    cisco: REST_MESSAGE.ciscoSupport.name,
+    meraki: REST_MESSAGE.meraki.name,
+    fortinet: REST_MESSAGE.fortiCare.name,
+    mist: REST_MESSAGE.mist.name,
+} as const satisfies Partial<Record<OemVendor, string>>
+
+export type SyncVendor = keyof typeof SYNC_MESSAGE
+
+export function isSyncVendor(vendor: OemVendor): vendor is SyncVendor {
+    return vendor in SYNC_MESSAGE
+}
+
 interface Route<Result> {
     /** Vendor whose REST message serves the call (Meraki hardware coverage comes from Cisco SN2INFO). */
-    via: OemVendor
+    via: SyncVendor
     run: Capability<Result>
 }
 
@@ -286,8 +304,10 @@ interface VendorRoutes {
     rmaStatus?: Route<Fetched<RmaFact>>
 }
 
-/** What each vendor's API can do; missing capabilities fall back to CSV import. */
-export const OEM_ADAPTERS: Record<OemVendor, VendorRoutes> = {
+type NoRoutes = { [K in keyof VendorRoutes]?: never }
+
+/** What each vendor's API can do; missing capabilities fall back to CSV import. A vendor outside SYNC_MESSAGE has none. */
+export const OEM_ADAPTERS: { [V in OemVendor]: V extends SyncVendor ? VendorRoutes : NoRoutes } = {
     cisco: {
         lifecycle: { via: 'cisco', run: ciscoLifecycle },
         coverage: { via: 'cisco', run: ciscoCoverage },
