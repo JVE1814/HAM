@@ -2,15 +2,15 @@ import { addMonths } from './calendar.ts'
 import { fleetStagesQuery } from './fleet.ts'
 import type { Stage } from './lifecycle.ts'
 import { normalizeSerial } from './serials.ts'
-import { INSTALL_STATUS, type AuditLineResult } from './vocabulary.ts'
+import { INSTALL_STATUS, TASK_STATE, type AuditLineResult } from './vocabulary.ts'
 
 /** Audits (blind counts, site audits) and Attestations (P2.7, D63). */
 
 /** The task states an audit takes: in progress from the moment it is started, closed once its scans are compared. */
-export const AUDIT_STATE = { inProgress: 2, closed: 3 } as const
+export const AUDIT_STATE = { inProgress: TASK_STATE.workInProgress, closed: TASK_STATE.closedComplete } as const
 
 /** The task states an attestation takes: pending while its Assets are listed, open to answer, closed once attested. */
-export const ATTESTATION_STATE = { pending: -5, open: 1, closed: 3 } as const
+export const ATTESTATION_STATE = { pending: TASK_STATE.pending, open: TASK_STATE.open, closed: TASK_STATE.closedComplete } as const
 
 /**
  * The stages of the units on a stockroom's shelves, which its blind count expects there. A unit in transfer is one of

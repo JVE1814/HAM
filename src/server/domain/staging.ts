@@ -1,4 +1,4 @@
-import type { StagingSource } from './vocabulary.ts'
+import { TASK_STATE, type StagingSource } from './vocabulary.ts'
 
 /** Staging: choosing the checklist for an Asset and telling when it is done. */
 
@@ -45,4 +45,4 @@ export function stagingOutcome(steps: ReadonlyArray<{ mandatory: boolean; done: 
 }
 
 /** The platform's task states a Staging task is closed with: Closed Complete once staged, Closed Skipped when its unit left staging. */
-export const STAGING_TASK_STATE = { closed: 3, skipped: 7 } as const
+export const STAGING_TASK_STATE = { closed: TASK_STATE.closedComplete, skipped: TASK_STATE.closedSkipped } as const

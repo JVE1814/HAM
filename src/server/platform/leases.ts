@@ -14,7 +14,7 @@ import {
 } from '../domain/leases.ts'
 import { isRetired, SERVING_STAGES, type Stage, stagesQuery, STOCK_STAGES } from '../domain/lifecycle.ts'
 import { isFree } from '../domain/sourcing.ts'
-import { LEASE_END_ACTION, type LeaseEndAction, LEGAL_OWNER } from '../domain/vocabulary.ts'
+import { LEASE_END_ACTION, type LeaseEndAction, LEGAL_OWNER, TASK_STATE } from '../domain/vocabulary.ts'
 import { providerApproverIds } from './approvals.ts'
 import { moveAsset, readStage } from './assets.ts'
 import { runEventTableJob } from './chunked.ts'
@@ -34,8 +34,8 @@ import { changeStock, releaseToProviderStock, stockUnit } from './stock.ts'
 
 const LEASE = 'x_daas_ham_lease_schedule'
 
-/** The task state an applied decision is closed with (Closed Complete). */
-const DECISION_CLOSED = 3
+/** The task state an applied decision is closed with. */
+const DECISION_CLOSED = TASK_STATE.closedComplete
 
 /**
  * An Asset on a Lease schedule is owned by that schedule's Lessor (the lease's Vendor, which the Asset reaches through

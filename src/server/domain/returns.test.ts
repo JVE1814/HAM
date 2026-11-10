@@ -5,9 +5,11 @@ import {
     collectionMethod,
     evaluationTarget,
     feeAmount,
+    isSiteRecovery,
     opensDeinstallWork,
     overdueStep,
     receivedLate,
+    requestedTrigger,
     returnDueDate,
     returnRequestFindings,
     returnRequesterRefusal,
@@ -15,10 +17,11 @@ import {
     SITE_RECOVERY_STAGES,
     sitePackageHoldersQuery,
     siteRecoveryLineQuery,
+    stagesTakenBack,
     type RequestedReturn,
     type ReturnRequester,
 } from './returns'
-import type { LeaseEndAction } from './vocabulary'
+import { type LeaseEndAction, RETURN_TRIGGER_CHOICES, type ReturnTrigger } from './vocabulary'
 
 describe('returnRequestFindings', () => {
     const acmeSite: RequestedReturn = { customerId: 'acme', site: { id: 'acme-hq', customerId: 'acme', isSite: true } }
@@ -189,6 +192,27 @@ describe('SITE_RECOVERY_STAGES', () => {
 describe('siteRecoveryLineQuery', () => {
     it('finds the Asset awaited back on a site decommission or agreement end', () => {
         expect(siteRecoveryLineQuery('a1')).toBe('asset=a1^status=awaiting^return_order.triggerINsite_decommission,agreement_end')
+    })
+})
+
+describe('a whole-Site recovery, by the trigger of its Return', () => {
+    const triggers = Object.keys(RETURN_TRIGGER_CHOICES) as ReturnTrigger[]
+
+    it('is a site decommission or an agreement end, and no other Return', () => {
+        expect(triggers.filter(isSiteRecovery)).toEqual(['site_decommission', 'agreement_end'])
+    })
+
+    it('takes the units still shipped to the Site too; any other Return the installed ones', () => {
+        for (const trigger of triggers) {
+            expect(stagesTakenBack(trigger)).toBe(isSiteRecovery(trigger) ? SITE_RECOVERY_STAGES : INSTALLED_STAGES)
+        }
+    })
+
+    it('is what a Customer requests for a whole Site: a decommission, else a device removal', () => {
+        expect(requestedTrigger(true)).toBe('site_decommission')
+        expect(requestedTrigger(false)).toBe('device_removal')
+        expect(isSiteRecovery(requestedTrigger(true))).toBe(true)
+        expect(isSiteRecovery(requestedTrigger(false))).toBe(false)
     })
 })
 

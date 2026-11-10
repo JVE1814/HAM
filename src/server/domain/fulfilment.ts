@@ -1,5 +1,5 @@
 import type { Stage } from './lifecycle.ts'
-import { ORDER_STAGE, type LineStage, type OrderStage } from './vocabulary.ts'
+import { ORDER_STAGE, TASK_STATE, type LineStage, type OrderStage } from './vocabulary.ts'
 
 /**
  * Order-line and Order stages are derived, never set by hand: a line follows the slowest of its
@@ -139,7 +139,12 @@ export function anythingShipped(order: OrderShipment): boolean {
  * The platform's task states an Order takes: Work in Progress from its approval on, and the state it closes with as
  * it ends complete (Closed Complete), rejected (Closed Incomplete) or cancelled (Closed Skipped).
  */
-export const ORDER_TASK_STATE = { inProgress: 2, complete: 3, rejected: 4, cancelled: 7 } as const
+export const ORDER_TASK_STATE = {
+    inProgress: TASK_STATE.workInProgress,
+    complete: TASK_STATE.closedComplete,
+    rejected: TASK_STATE.closedIncomplete,
+    cancelled: TASK_STATE.closedSkipped,
+} as const
 
 /** The task state an Order is closed with as it enters `stage`; undefined for a stage that leaves it open. */
 export function closedStateFor(stage: OrderStage): number | undefined {

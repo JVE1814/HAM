@@ -1,7 +1,7 @@
 import { addDays } from './calendar.ts'
 import { actorRefusal, CHOOSE_CUSTOMER, siteFinding, type ActWording, type NamedSite } from './customer-parties.ts'
 import { fleetStagesQuery } from './fleet.ts'
-import { DEPLOYED_STAGES, SERVING_STAGES, type Stage } from './lifecycle.ts'
+import { DEPLOYED_STAGES, INSTALLED_STAGES, SERVING_STAGES, type Stage } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
 import {
     type EvaluationOutcome,
@@ -14,7 +14,9 @@ import {
     type OrderStage,
     type ReturnLineStatus,
     type ReturnMethod,
+    RETURN_TRIGGER,
     type ReturnTrigger,
+    TASK_STATE,
 } from './vocabulary.ts'
 
 /** Returns, depot evaluation, Fee events and break-fix shortfalls (P2.3–P2.4). */
@@ -64,7 +66,7 @@ export function returnRequestFindings(request: RequestedReturn, requester: Retur
  * The platform's task states a Return order takes: Work in Progress while units are awaited or evaluated, Closed
  * Complete once every line is settled (or it has none).
  */
-export const RETURN_TASK_STATE = { inProgress: 2, closed: 3 } as const
+export const RETURN_TASK_STATE = { inProgress: TASK_STATE.workInProgress, closed: TASK_STATE.closedComplete } as const
 
 /** The stages of a temporary deployment whose end date is watched: its equipment is being installed or is installed. */
 export const TEMPORARY_RETURN_STAGES: readonly OrderStage[] = [ORDER_STAGE.installing, ORDER_STAGE.complete]
@@ -126,8 +128,21 @@ export function sitePackageHoldersQuery(line: { siteId: string; agreementId: str
     return fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_site=${line.siteId}^x_daas_ham_agreement=${line.agreementId}`)
 }
 
-/** Return triggers that bring back all of a Site, units in transit too (`SITE_RECOVERY_STAGES`). */
-const SITE_RECOVERY_TRIGGERS: readonly ReturnTrigger[] = ['site_decommission', 'agreement_end']
+/**
+ * A whole-Site recovery: the Returns that bring back all of a Site, by their trigger. What makes a Return one, the
+ * stages it takes units in and the lines that await them are all said here.
+ */
+const SITE_RECOVERY_TRIGGERS: readonly ReturnTrigger[] = [RETURN_TRIGGER.site_decommission, RETURN_TRIGGER.agreement_end]
+
+/** Whether a Return with this trigger is a whole-Site recovery. */
+export function isSiteRecovery(trigger: ReturnTrigger): boolean {
+    return SITE_RECOVERY_TRIGGERS.includes(trigger)
+}
+
+/** The trigger of a Return its Customer requests: for the whole Site (a decommission), or for the devices it lists. */
+export function requestedTrigger(decommission: boolean): ReturnTrigger {
+    return decommission ? RETURN_TRIGGER.site_decommission : RETURN_TRIGGER.device_removal
+}
 
 /** Encoded query on x_daas_ham_return_order_line: the Asset is awaited back on a whole-Site recovery. */
 export function siteRecoveryLineQuery(assetId: string): string {
@@ -140,6 +155,14 @@ export function siteRecoveryLineQuery(assetId: string): string {
  * miss the agreement-end Return, raised only once, and hold the site package open for good (`sitePackageHoldersQuery`).
  */
 export const SITE_RECOVERY_STAGES: readonly Stage[] = SERVING_STAGES
+
+/**
+ * The stages of the units at a Site a Return with this trigger takes back: a whole-Site recovery those still shipped
+ * there too, any other the installed ones.
+ */
+export function stagesTakenBack(trigger: ReturnTrigger): readonly Stage[] {
+    return isSiteRecovery(trigger) ? SITE_RECOVERY_STAGES : INSTALLED_STAGES
+}
 
 /** Who an evaluated Asset belongs to: its Legal owner and the end action of its lease ('' without one). */
 export interface EvaluatedOwnership {

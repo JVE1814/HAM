@@ -7,7 +7,7 @@ import {
     type DisposalAsset,
 } from '../domain/disposal.ts'
 import { disposalStage, type Stage } from '../domain/lifecycle.ts'
-import { DISPOSAL_STAGE, type DisposalLineStatus, type DisposalMethod, type LegalOwner } from '../domain/vocabulary.ts'
+import { DISPOSAL_STAGE, type DisposalLineStatus, type DisposalMethod, type LegalOwner, TASK_STATE } from '../domain/vocabulary.ts'
 import {
     customerAdminIds,
     providerApproverIds,
@@ -25,7 +25,7 @@ import { choice, findById, refusal, str, warnRefused } from './records.ts'
  */
 
 /** The task states a Disposal order closes with: Closed Complete once every line is retired, Closed Incomplete when rejected. */
-const DISPOSAL_TASK_STATE = { complete: 3, rejected: 4 } as const
+const DISPOSAL_TASK_STATE = { complete: TASK_STATE.closedComplete, rejected: TASK_STATE.closedIncomplete } as const
 
 /** Line fields that say what is retired and how; the rest (status, blockers, amounts) stays writable after submit. */
 const LINE_SCOPE = ['disposal_order', 'asset', 'method']

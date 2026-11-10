@@ -1,5 +1,5 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import type { ReturnMethod } from '../domain/vocabulary.ts'
+import { RETURN_TRIGGER, type ReturnMethod } from '../domain/vocabulary.ts'
 import { str, warnRefused } from '../platform/records.ts'
 import { chaseOverdue, evaluateReturnLine, requestReturn } from '../platform/returns.ts'
 import { raiseDueReturns } from '../platform/scheduled-returns.ts'
@@ -17,7 +17,7 @@ export function afterReturnProduced(producer: Record<string, unknown>, current: 
         produced: order,
         customerId: str(order, 'customer'),
         siteId: str(order, 'site'),
-        decommission: str(order, 'trigger') === 'site_decommission',
+        decommission: str(order, 'trigger') === RETURN_TRIGGER.site_decommission,
         listedAssetIds: String(producer.assets ?? '')
             .split(',')
             .map((id) => id.trim()),

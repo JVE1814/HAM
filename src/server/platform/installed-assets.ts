@@ -1,7 +1,8 @@
 import { GlideRecord } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
-import { SITE_RECOVERY_STAGES } from '../domain/returns.ts'
+import { stagesTakenBack } from '../domain/returns.ts'
+import type { ReturnTrigger } from '../domain/vocabulary.ts'
 import { str } from './records.ts'
 import { INSTALLED_STAGES } from '../domain/lifecycle.ts'
 
@@ -11,8 +12,11 @@ interface InstalledFilter {
     agreementId?: string
     siteId?: string
     orderId?: string
-    /** A whole-Site recovery: also the units still shipped there (domain/returns `SITE_RECOVERY_STAGES`). */
-    wholeSite?: boolean
+    /**
+     * The trigger of the Return the units are listed for: a whole-Site recovery also takes those still shipped there
+     * (domain/returns `stagesTakenBack`). None for a list that is no Return's.
+     */
+    returning?: ReturnTrigger
 }
 
 /**
@@ -43,7 +47,7 @@ function queryInstalled(filter: InstalledFilter): GlideRecord {
         .filter(Boolean)
         .join('^')
     const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(fleetStagesQuery(filter.wholeSite ? SITE_RECOVERY_STAGES : INSTALLED_STAGES, base))
+    asset.addEncodedQuery(fleetStagesQuery(filter.returning ? stagesTakenBack(filter.returning) : INSTALLED_STAGES, base))
     asset.query()
     return asset
 }

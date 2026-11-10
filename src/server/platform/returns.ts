@@ -5,10 +5,12 @@ import { LOCK } from '../domain/lock-names.ts'
 import {
     AWAITED,
     evaluationTarget,
+    isSiteRecovery,
     KEEPS_RETURN_OPEN,
     opensDeinstallWork,
     overdueStep,
     receivedLate,
+    requestedTrigger,
     RETURN_TASK_STATE,
     returnDueDate,
     returnRequestFindings,
@@ -212,13 +214,14 @@ export function requestReturn(request: RequestedEquipment): RequestOutcome {
     const site = findById('cmn_location', siteId)
     const [finding] = returnRequestFindings({ customerId, site: requestedSite(siteId, site) }, returnRequester(produced))
     if (finding) return notRaised(finding.about === 'requester' ? 'forbidden' : 'invalid', finding.message)
-    const assetIds = request.decommission ? installedAssetIds({ siteId, wholeSite: true }) : fleetAssetsAt(siteId, request.listedAssetIds)
+    const trigger = requestedTrigger(request.decommission)
+    const assetIds = isSiteRecovery(trigger) ? installedAssetIds({ siteId, returning: trigger }) : fleetAssetsAt(siteId, request.listedAssetIds)
     if (!produced && assetIds.length === 0) {
         return notRaised('nothing', request.decommission ? 'The site has no installed devices' : "Choose at least one of the site's devices")
     }
     const firstAsset = findById('alm_hardware', assetIds[0] ?? '')
     const details: ReturnRequest = {
-        trigger: request.decommission ? 'site_decommission' : 'device_removal',
+        trigger,
         customerId,
         siteId,
         agreementId: (produced ? str(produced, 'agreement') : '') || (firstAsset ? str(firstAsset, 'x_daas_ham_agreement') : ''),

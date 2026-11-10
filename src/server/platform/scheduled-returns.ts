@@ -43,7 +43,7 @@ function recoverEndedAgreements(today: string): void {
         const recover = `Agreement ${str(agreement, 'number')} ended ${str(agreement, 'ends')}: recover all equipment`
         // One Return per Site, each a field de-install with its own change and work order there. Units still shipped
         // there go too (domain/returns `SITE_RECOVERY_STAGES`): once all are raised, the job leaves this Agreement.
-        const bySite = installedAssetIdsBySite({ agreementId: agreement.getUniqueValue(), wholeSite: true })
+        const bySite = installedAssetIdsBySite({ agreementId: agreement.getUniqueValue(), returning: 'agreement_end' })
         let refused = false
         for (const [siteId, assetIds] of bySite) {
             const site = findById('cmn_location', siteId)

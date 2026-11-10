@@ -17,6 +17,21 @@
 /** Every value of a choice list by its own name: complete, and no key names another value. */
 type Named<Value extends string> = { readonly [V in Value]: V }
 
+/* Tasks (task and the tables extending it) */
+
+/**
+ * The platform's task states (task.state) the app sets or tests, on its own task tables and on work orders. Each
+ * module names the ones its tasks take from here, so a state's number is written once.
+ */
+export const TASK_STATE = {
+    pending: -5,
+    open: 1,
+    workInProgress: 2,
+    closedComplete: 3,
+    closedIncomplete: 4,
+    closedSkipped: 7,
+} as const
+
 /* Assets (alm_hardware) */
 
 /** Platform install_status values (alm_asset.install_status). */
@@ -487,6 +502,14 @@ export const RETURN_TRIGGER_CHOICES = {
     temporary_end: { label: 'Temporary deployment end', sequence: 5 },
 } as const
 export type ReturnTrigger = keyof typeof RETURN_TRIGGER_CHOICES
+export const RETURN_TRIGGER = {
+    site_decommission: 'site_decommission',
+    device_removal: 'device_removal',
+    refresh_swap_back: 'refresh_swap_back',
+    defective_return: 'defective_return',
+    agreement_end: 'agreement_end',
+    temporary_end: 'temporary_end',
+} as const satisfies Named<ReturnTrigger>
 
 export const RETURN_METHOD_CHOICES = {
     fsm_deinstall: { label: 'Field engineer de-installs', sequence: 0 },
