@@ -10,6 +10,9 @@ export const x_daas_ham_shipment = Table({
     label: 'Shipment',
     display: 'tracking_number',
     schema: {
+        // The table extends none that has a number, so the column autoNumber counts for is declared here, as on the
+        // Order line.
+        number: StringColumn({ label: 'Number', default: 'javascript:global.getNextObjNumberPadded();', readOnly: true }),
         direction: ChoiceColumn({
             label: 'Direction',
             choices: SHIPMENT_DIRECTION_CHOICES,

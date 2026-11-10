@@ -481,8 +481,8 @@ Form({
             content: [
                 {
                     layout: 'two-column',
-                    leftElements: [{ field: 'serial_number', type: 'table_field' }, { field: 'asset', type: 'table_field' }, { field: 'vendor', type: 'table_field' }, { field: 'contract_number', type: 'table_field' }, { field: 'service_level', type: 'table_field' }],
-                    rightElements: [{ field: 'covered', type: 'table_field' }, { field: 'start_date', type: 'table_field' }, { field: 'end_date', type: 'table_field' }, { field: 'source', type: 'table_field' }, { field: 'last_checked', type: 'table_field' }],
+                    leftElements: [{ field: 'serial_number', type: 'table_field' }, { field: 'asset', type: 'table_field' }, { field: 'vendor', type: 'table_field' }, { field: 'contract_number', type: 'table_field' }, { field: 'service_level', type: 'table_field' }, { field: 'annual_cost', type: 'table_field' }],
+                    rightElements: [{ field: 'covered', type: 'table_field' }, { field: 'start_date', type: 'table_field' }, { field: 'end_date', type: 'table_field' }, { field: 'source', type: 'table_field' }, { field: 'last_checked', type: 'table_field' }, { field: 'expiry_notified', type: 'table_field' }],
                 },
             ],
         },
@@ -578,7 +578,7 @@ Form({
                 {
                     layout: 'two-column',
                     leftElements: [{ field: 'fee_type', type: 'table_field' }, { field: 'customer', type: 'table_field' }, { field: 'agreement', type: 'table_field' }, { field: 'asset', type: 'table_field' }, { field: 'return_order', type: 'table_field' }],
-                    rightElements: [{ field: 'amount', type: 'table_field' }, { field: 'currency', type: 'table_field' }, { field: 'occurred_on', type: 'table_field' }, { field: 'status', type: 'table_field' }],
+                    rightElements: [{ field: 'amount', type: 'table_field' }, { field: 'currency', type: 'table_field' }, { field: 'occurred_on', type: 'table_field' }, { field: 'status', type: 'table_field' }, { field: 'billing_period', type: 'table_field' }],
                 },
             ],
         },

@@ -471,6 +471,94 @@ describe('the columns the app adds to the shared tables', () => {
 })
 
 /*
+ * A form or a list names its fields as texts, which the build takes as they are: one that is on no table of the record
+ * leaves a gap in the form and a blank column in the list, on the instance only. The columns of the app's tables, and
+ * those it adds to the platform's, are read from the built dictionary; those of a platform table from the definition
+ * the SDK ships for it, which the build checks an index's columns against.
+ */
+describe('fields the forms and lists show', () => {
+    const SDK_TABLES = join(ROOT, 'node_modules/@servicenow/sdk-core/src/fluent/tables')
+    /** The columns the app shows of a platform table the SDK has no definition of: the Model lifecycle table (ADR 0017). */
+    const UNDEFINED_BY_SDK: Readonly<Record<string, readonly string[]>> = {
+        cmdb_model_lifecycle: ['model', 'lifecycle_phase', 'start_date', 'source', 'description'],
+    }
+
+    interface Shown {
+        where: string
+        table: string
+        field: string
+    }
+
+    let builtDictionary: { columns: Map<string, Set<string>>; parents: Map<string, string> } | undefined
+
+    /** The columns each table is built with, and the table each of the app's tables extends. */
+    function dictionary() {
+        if (builtDictionary) return builtDictionary
+        const columns = new Map<string, Set<string>>()
+        for (const column of builtColumns()) columns.set(column.table, (columns.get(column.table) ?? new Set()).add(column.name))
+        const parents = new Map(records('sys_db_object').map((table) => [table.name ?? '', table['super_class.name'] ?? '']))
+        return (builtDictionary = { columns, parents })
+    }
+
+    /** A platform table as the SDK defines it: its own columns and the table it extends; null where the SDK has none. */
+    function sdkTable(table: string): { columns: Set<string>; parent: string } | null {
+        const path = join(SDK_TABLES, `${table}.now.ts`)
+        if (!existsSync(path)) return null
+        const source = readFileSync(path, 'utf8')
+        return {
+            columns: new Set([...source.matchAll(/^ {8}(\w+): \w+\(/gm)].map(([, column = '']) => column)),
+            parent: /^ {4}extends: '(\w+)'/m.exec(source)?.[1] ?? '',
+        }
+    }
+
+    /** Whether `table` or a table it extends has the column. Every table has the platform's sys_ columns. */
+    function hasColumn(table: string, column: string): boolean {
+        if (column.startsWith('sys_') || dictionary().columns.get(table)?.has(column) || UNDEFINED_BY_SDK[table]?.includes(column)) return true
+        const sdk = sdkTable(table)
+        if (sdk?.columns.has(column)) return true
+        const parent = dictionary().parents.get(table) || sdk?.parent
+        return parent ? hasColumn(parent, column) : false
+    }
+
+    /** The elements of the files the build writes one form section or one list in (`<sys_ui_section>`, `<sys_ui_list>`). */
+    function elementsOf(prefix: string, tag: string): Array<{ table: string; element: string; type: string }> {
+        return readdirSync(UPDATES)
+            .filter((name) => name.startsWith(prefix))
+            .flatMap((name) => {
+                const xml = readFileSync(join(UPDATES, name), 'utf8')
+                const table = new RegExp(`<${prefix.slice(0, -1)} [^>]*table="(\\w+)"`).exec(xml)?.[1] ?? name
+                return [...xml.matchAll(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'g'))].map(([, body = '']) => ({
+                    table,
+                    element: /<element>([^<]*)<\/element>/.exec(body)?.[1] ?? '',
+                    type: /<type>([^<]*)<\/type>/.exec(body)?.[1] ?? '',
+                }))
+            })
+    }
+
+    function shown(): Shown[] {
+        const onForms = elementsOf('sys_ui_section_', 'sys_ui_element').flatMap(({ table, element, type }): Shown[] => {
+            // A related list is named 12M.<table>.<listed table>.<its reference to the table>.
+            if (type === 'list') return [{ where: `form ${table}`, table: element.split('.')[2] ?? '', field: element.split('.')[3] ?? '' }]
+            // Formatters and the splits of a two-column layout are no fields.
+            return type ? [] : [{ where: `form ${table}`, table, field: element }]
+        })
+        const onLists = elementsOf('sys_ui_list_', 'sys_ui_list_element').map(({ table, element }) => ({ where: `list ${table}`, table, field: element }))
+        const onWorkspaceLists = records('sys_ux_list').flatMap((list) =>
+            (list.columns ?? '').split(',').map((field) => ({ where: `workspace list ${list.title}`, table: list.table ?? '', field })),
+        )
+        return [...onForms, ...onLists, ...onWorkspaceLists]
+    }
+
+    it('are columns of the table, or of one it extends: of a dot-walked field, the reference it starts from', () => {
+        expect(shown().length).toBeGreaterThan(800)
+        const missing = shown()
+            .filter(({ table, field }) => !hasColumn(table, field.split('.')[0] ?? ''))
+            .map(({ where, table, field }) => `${where}: ${table}.${field}`)
+        expect(missing).toEqual([])
+    })
+})
+
+/*
  * A UI action's condition is a script in the metadata, so one that offers the action exactly where a rule of the
  * server code allows it is that rule written a second time, from the same named values. The built condition is run
  * here against each value and held to the rule.

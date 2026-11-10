@@ -22,7 +22,7 @@ Form({
             content: [
                 {
                     layout: 'two-column',
-                    leftElements: [{ field: 'monthly_payment', type: 'table_field' }, { field: 'buyout_price', type: 'table_field' }],
+                    leftElements: [{ field: 'monthly_payment', type: 'table_field' }, { field: 'buyout_price', type: 'table_field' }, { field: 'buyout_share', type: 'table_field' }, { field: 'buyout_assets', type: 'table_field' }],
                     rightElements: [{ field: 'end_action', type: 'table_field' }, { field: 'mismatch', type: 'table_field' }],
                 },
             ],
@@ -75,7 +75,7 @@ Form({
                 {
                     layout: 'two-column',
                     leftElements: [{ field: 'period', type: 'table_field' }, { field: 'period_start', type: 'table_field' }, { field: 'period_end', type: 'table_field' }, { field: 'status', type: 'table_field' }],
-                    rightElements: [{ field: 'line_count', type: 'table_field' }, { field: 'total_amount', type: 'table_field' }, { field: 'generated_at', type: 'table_field' }, { field: 'failed_lines', type: 'table_field' }, { field: 'last_error', type: 'table_field' }, { field: 'closed_at', type: 'table_field' }, { field: 'closed_by', type: 'table_field' }],
+                    rightElements: [{ field: 'line_count', type: 'table_field' }, { field: 'total_amount', type: 'table_field' }, { field: 'generated_at', type: 'table_field' }, { field: 'failed_lines', type: 'table_field' }, { field: 'last_error', type: 'table_field' }, { field: 'closed_at', type: 'table_field' }, { field: 'closed_by', type: 'table_field' }, { field: 'margin_failed', type: 'table_field' }, { field: 'margin_error', type: 'table_field' }],
                 },
             ],
         },
