@@ -320,6 +320,11 @@ export const REPLACEMENT_TIER_CHOICES = {
     four_hour: { label: '24x7x4', sequence: 2 },
 } as const
 export type ReplacementTier = keyof typeof REPLACEMENT_TIER_CHOICES
+export const REPLACEMENT_TIER = {
+    nbd: 'nbd',
+    same_day: 'same_day',
+    four_hour: 'four_hour',
+} as const satisfies Named<ReplacementTier>
 
 export const SUBSCRIPTION_LINE_TYPE_CHOICES = {
     site_package: { label: 'Site package', sequence: 0 },

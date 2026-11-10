@@ -108,11 +108,14 @@ export const MODEL_TABLE = 'cmdb_model'
 /** The raw model field that records the canonical Model it was mapped to. */
 export const NORMALIZED_TO = 'x_daas_ham_normalized_to'
 
+/** The order a model match rule gets when none is entered: the default of its `order` column. */
+export const DEFAULT_RULE_ORDER = 100
+
 /**
  * The rule learned from a resolved exception: an exact match on its raw model, at the order a rule gets when none is
- * entered (the column's default), so a rule given a lower order still wins.
+ * entered, so a rule given a lower order still wins.
  */
-export const LEARNED_RULE = { order: 100, matchType: 'exact' } as const satisfies Pick<ModelMatchRule, 'order' | 'matchType'>
+export const LEARNED_RULE = { order: DEFAULT_RULE_ORDER, matchType: 'exact' } as const satisfies Pick<ModelMatchRule, 'order' | 'matchType'>
 
 /** Encoded condition: the Model in `field` has no OEM PID (it is a raw model, ADR 0016) and is not yet normalized. */
 function onUnmappedRawModel(field: string): string {

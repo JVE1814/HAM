@@ -70,8 +70,14 @@ export const FLEET_IN_STAGE = {
     in_transit: `install_status=${STAGE_FIELDS.in_transit.installStatus}^substatusISEMPTY^${FLEET_CONDITION}`,
 } as const
 
+/**
+ * Encoded condition on alm_hardware: installed at a Site, which is In use by install status, whatever the substatus.
+ * Every query about installed fleet assets starts from it.
+ */
+export const INSTALLED_CONDITION = `install_status=${INSTALL_STATUS.inUse}`
+
 /** Fleet assets In use by install status: installed at a Site, whatever their substatus. */
-export const FLEET_INSTALLED = `install_status=${INSTALL_STATUS.inUse}^${FLEET_CONDITION}`
+export const FLEET_INSTALLED = `${INSTALLED_CONDITION}^${FLEET_CONDITION}`
 
 /** The Stockroom field that holds its type (alm_stockroom.x_daas_ham_stockroom_type). */
 export const STOCKROOM_TYPE_FIELD = 'x_daas_ham_stockroom_type'
@@ -123,10 +129,16 @@ export const OEM_PID_FIELD = 'x_daas_ham_oem_pid'
 export const NAAS_MODEL_CONDITION = `${OEM_PID_FIELD}ISNOTEMPTY`
 
 /**
+ * The platform's `lifecycle_type` of a milestone a manufacturer publishes (cmdb_model_lifecycle, ADR 0017); the other,
+ * Internal, is an organisation's own plan for a Model.
+ */
+export const PUBLISHER_LIFECYCLE_TYPE = 'publisher'
+
+/**
  * Encoded query on cmdb_model_lifecycle: the milestones the manufacturers publish for NaaS Models, by Model and date
  * (ADR 0017: the table holds the milestones of the Provider IT's Models too).
  */
-export const NAAS_MODEL_MILESTONES = `model.${NAAS_MODEL_CONDITION}^lifecycle_type=publisher^ORDERBYmodel^ORDERBYstart_date`
+export const NAAS_MODEL_MILESTONES = `model.${NAAS_MODEL_CONDITION}^lifecycle_type=${PUBLISHER_LIFECYCLE_TYPE}^ORDERBYmodel^ORDERBYstart_date`
 
 /** Whether a Model with this OEM PID is a NaaS Model: it has one. */
 export function isNaasModel(oemPid: string): boolean {

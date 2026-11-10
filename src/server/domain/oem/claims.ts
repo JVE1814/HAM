@@ -340,8 +340,8 @@ const MAX_CLAIM_ATTEMPTS = 5
 /** How long a failed step waits before a run sends it again. */
 const RETRY_AFTER_MINUTES = 30
 
-/** Length of a staging step's automation_message. */
-const MESSAGE_LENGTH = 255
+/** Length of a staging step's `automation_message`. */
+export const AUTOMATION_MESSAGE_LENGTH = 255
 
 /** Where a run reads its due steps and records their outcomes (the Glide store is in platform/claim-steps.ts). */
 export interface ClaimStore {
@@ -353,7 +353,7 @@ export interface ClaimStore {
     due(vendor: OemVendor, action: ClaimAction, limit: number): ClaimTarget[]
     /**
      * Record the outcomes of one action's run (each step at most once), each in its settledStatus: ok ticks the step
-     * (done=true); otherwise it has failed one more attempt. Messages are at most 255 characters.
+     * (done=true); otherwise it has failed one more attempt. Messages are at most AUTOMATION_MESSAGE_LENGTH long.
      */
     settle(outcomes: readonly ClaimOutcome[]): void
 }
@@ -381,7 +381,7 @@ export function runVendorClaims(vendor: OemVendor, store: ClaimStore, transport:
         if (targets.length === 0) continue
         const run = route.run(targets, transport(route.message), remaining)
         calls += run.calls
-        store.settle(run.outcomes.map((outcome) => ({ ...outcome, message: outcome.message.slice(0, MESSAGE_LENGTH) })))
+        store.settle(run.outcomes.map((outcome) => ({ ...outcome, message: outcome.message.slice(0, AUTOMATION_MESSAGE_LENGTH) })))
     }
     return calls
 }
