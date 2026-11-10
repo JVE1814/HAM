@@ -1,6 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { putToApproval, rollUpApprovals, type ApprovalFlow, type ApprovalRequest } from './approvals.ts'
+import { platform, type Row } from '../test-support/fake-glide.ts'
 
 /*
  * The approval flow run against in-memory tables: a task (an Order), its sysapproval_approver requests and the
@@ -8,98 +9,16 @@ import { putToApproval, rollUpApprovals, type ApprovalFlow, type ApprovalRequest
  * before the requests still waiting are cancelled, and a refused save leaves it waiting with them.
  */
 
-type Row = Record<string, string>
-
-const platform = vi.hoisted(() => ({
-    tables: {} as Record<string, Array<Record<string, string>>>,
-    /** Why a save of `row` to `table` is refused ('' when it is not). */
-    refuses: (() => '') as (table: string, row: Record<string, string>) => string,
-    ids: 0,
-}))
-
-vi.mock('@servicenow/glide', () => {
-    const rowsOf = (table: string): Row[] => (platform.tables[table] ??= [])
-    class GlideRecord {
-        private terms: Array<[string, string]> = []
-        private limit = Infinity
-        private found: Row[] = []
-        private at = -1
-        private row: Row = {}
-        private error = ''
-        constructor(private readonly table: string) {}
-        addQuery(field: string, value: string | boolean): void {
-            this.terms.push([field, String(value)])
-        }
-        addEncodedQuery(query: string): void {
-            for (const term of query.split('^')) {
-                const [field, value] = term.split('=')
-                this.terms.push([field ?? '', value ?? ''])
-            }
-        }
-        setLimit(limit: number): void {
-            this.limit = limit
-        }
-        query(): void {
-            this.found = rowsOf(this.table)
-                .filter((row) => this.terms.every(([field, value]) => (row[field] ?? '') === value))
-                .slice(0, this.limit)
-            this.at = -1
-        }
-        hasNext(): boolean {
-            return this.at + 1 < this.found.length
-        }
-        next(): boolean {
-            this.at++
-            const row = this.found[this.at]
-            if (row) this.row = { ...row }
-            return row !== undefined
-        }
-        get(sysId: string): boolean {
-            this.addQuery('sys_id', sysId)
-            this.query()
-            return this.next()
-        }
-        initialize(): void {
-            this.row = {}
-        }
-        getValue(field: string): string | null {
-            return this.row[field] ?? null
-        }
-        setValue(field: string, value: string | boolean): void {
-            this.row[field] = String(value)
-        }
-        getUniqueValue(): string {
-            return this.row.sys_id ?? ''
-        }
-        getTableName(): string {
-            return this.table
-        }
-        getLastErrorMessage(): string {
-            return this.error
-        }
-        insert(): string | null {
-            this.error = platform.refuses(this.table, this.row)
-            if (this.error) return null
-            this.row.sys_id = `${this.table}-${++platform.ids}`
-            rowsOf(this.table).push({ ...this.row })
-            return this.row.sys_id
-        }
-        update(): string | null {
-            this.error = platform.refuses(this.table, this.row)
-            if (this.error) return null
-            Object.assign(rowsOf(this.table).find((row) => row.sys_id === this.row.sys_id) ?? {}, this.row)
-            return this.row.sys_id ?? null
-        }
-    }
-    return { GlideRecord, GlideAggregate: class {}, gs: { warn: () => undefined } }
-})
+vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const ORDERS = 'x_daas_ham_order'
 const APPROVALS = 'sysapproval_approver'
 
+let orders = 0
+
 /** A saved Order of Customer `acme`, read as a rule or a form button gets it. */
 function order(stage: string): GlideRecord {
-    const sysId = `order-${++platform.ids}`
+    const sysId = `order-${++orders}`
     ;(platform.tables[ORDERS] ??= []).push({ sys_id: sysId, number: 'ORD0001', customer: 'acme', stage })
     const record = new GlideRecord(ORDERS)
     record.get(sysId)
@@ -110,9 +29,10 @@ function stored(record: GlideRecord): Row {
     return (platform.tables[ORDERS] ?? []).find((row) => row.sys_id === record.getUniqueValue()) ?? {}
 }
 
+/** An active user of Customer `acme` who holds the Customer admin role. */
 function customerAdmin(userId: string): void {
-    const role = { 'role.name': 'x_daas_ham.customer_admin', 'user.company': 'acme', 'user.active': 'true', state: 'active', user: userId }
-    ;(platform.tables.sys_user_has_role ??= []).push(role)
+    ;(platform.tables.sys_user ??= []).push({ sys_id: userId, company: 'acme', active: 'true' })
+    ;(platform.tables.sys_user_has_role ??= []).push({ sys_id: `role-of-${userId}`, role: 'customer_admin_role', user: userId, state: 'active' })
 }
 
 /** The Order's approval requests as stored: approver -> state. */
@@ -134,9 +54,10 @@ const request = (approverIds: string[], required: ApprovalRequest['required']): 
 })
 
 beforeEach(() => {
-    platform.tables = {}
-    platform.refuses = () => ''
-    platform.ids = 0
+    platform.reset()
+    platform.references = { 'sys_user_has_role.role': 'sys_user_role', 'sys_user_has_role.user': 'sys_user' }
+    platform.tables.sys_user_role = [{ sys_id: 'customer_admin_role', name: 'x_daas_ham.customer_admin' }]
+    orders = 0
     customerAdmin('ca')
 })
 
