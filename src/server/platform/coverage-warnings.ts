@@ -4,13 +4,15 @@ import { groupExpiringCoverage, type ExpiringCoverage } from '../domain/coverage
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import { SERVING_STAGES } from '../domain/lifecycle.ts'
 import { providerApproverIds } from './approvals.ts'
+import { markExpiryWarned } from './coverage.ts'
 import { EVENT, fire } from './events.ts'
 import { intProperty, PROPERTY } from './properties.ts'
 import { findById, str, warnRefused } from './records.ts'
 
 /**
  * The warning ahead of expiring OEM coverage (P3.24). It goes once per contract, which the contract's `expiry_notified`
- * mark records; the coverage sync clears the mark when the contract's end date moves (domain/coverage).
+ * mark records: platform/coverage sets it for this module (`markExpiryWarned`) and clears it when the contract's end
+ * date moves.
  */
 
 /**
@@ -27,8 +29,7 @@ export function warnExpiringCoverage(today: string): void {
     const rows: ExpiringCoverage[] = []
     while (coverage.next()) {
         rows.push({ customerId: str(coverage, 'asset.company'), endDate: str(coverage, 'end_date') })
-        coverage.setValue('expiry_notified', true)
-        if (!coverage.update()) {
+        if (!markExpiryWarned(coverage)) {
             const contract = `${str(coverage, 'contract_number')} of ${str(coverage, 'serial_number')}`
             warnRefused(coverage, `Coverage ${contract} not marked warned`)
         }

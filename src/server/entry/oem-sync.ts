@@ -1,6 +1,5 @@
 import type { GlideRecord } from '@servicenow/glide'
-import { importCoverageRow } from '../platform/coverage.ts'
-import { finishImportRow } from '../platform/imports.ts'
+import { finishImportRow, importCoverageRow } from '../platform/imports.ts'
 import { syncCoverage, syncLifecycle, syncRmaStatus } from '../platform/oem-sync.ts'
 
 /** OEM lifecycle, coverage and RMA-status synchronisation (P2.1, ADR 0008): the jobs and the coverage CSV import. */

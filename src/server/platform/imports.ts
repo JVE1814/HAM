@@ -1,18 +1,24 @@
-import type { GlideRecord } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { validateAsnRows, type AsnRowCheck } from '../domain/asn.ts'
+import { isIsoDate } from '../domain/calendar.ts'
+import type { CoverageAnswer } from '../domain/coverage.ts'
+import { fleetCondition } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { parseLifecycleRow } from '../domain/model-lifecycle.ts'
+import { SYNC_ORDER } from '../domain/oem/adapters.ts'
+import type { CoverageFact } from '../domain/oem/types.ts'
 import { normalizeSerial } from '../domain/serials.ts'
 import { DEFAULT_STAGING_SOURCE } from '../domain/staging.ts'
-import type { StagingSource } from '../domain/vocabulary.ts'
+import type { OemVendor, StagingSource } from '../domain/vocabulary.ts'
 import { findAnyAsset, newAsset } from './assets.ts'
+import { applyCoverage } from './coverage.ts'
 import { attemptLock, whyNotRun } from './locks.ts'
 import { writeModelLifecycle } from './model-lifecycle.ts'
 import { loadNormalizationData, recordNormalizationException, resolveModel } from './normalization.ts'
 import { choice, refusal, str, warnRefused } from './records.ts'
 
-/** Import-set rows processed on insert (ASN, lifecycle CSV): what each row comes to. */
+/** Import-set rows processed on insert (ASN, lifecycle CSV, coverage CSV): what each row comes to. */
 
 type ImportState = 'inserted' | 'updated' | 'error' | 'ignored'
 
@@ -100,6 +106,47 @@ function insertHolding(lock: HeldLock, row: GlideRecord, serial: string, modelId
     if (saved === 'lock lost') return loadAgain(serial, 'its lock was lost while checking it')
     if (saved === 'refused') return failed(`Asset insert failed: ${refusal(asset)}`)
     return { state: 'inserted', comment: `Asset ${serial} in transit` }
+}
+
+/**
+ * Import a coverage row (vendors without an API): the coverage of a fleet asset's serial only. A row whose coverage
+ * the platform refuses is marked error with why, to load again once the cause is fixed.
+ */
+export function importCoverageRow(row: GlideRecord): RowOutcome {
+    const vendor = str(row, 'vendor') as OemVendor
+    const serial = normalizeSerial(str(row, 'serial_number'))
+    const start = str(row, 'start_date')
+    const end = str(row, 'end_date')
+    const cost = str(row, 'annual_cost').trim()
+    if (!SYNC_ORDER.includes(vendor)) return failed(`vendor must be one of ${SYNC_ORDER.join(', ')}`)
+    if (!serial) return failed('serial number is required')
+    if ((start && !isIsoDate(start)) || (end && !isIsoDate(end))) return failed('dates must be real calendar dates (YYYY-MM-DD)')
+    if (cost && !Number.isFinite(Number(cost))) return failed('annual cost must be a number')
+    const asset = fleetAssetWithSerial(serial)
+    if (!asset) return failed(`no fleet asset with serial ${serial}`)
+    const assetId = asset.getUniqueValue()
+    const fact: CoverageFact = {
+        serial,
+        covered: true,
+        contractNumber: str(row, 'contract_number'),
+        serviceLevel: str(row, 'service_level'),
+        startDate: start || undefined,
+        endDate: end || undefined,
+    }
+    const answer: CoverageAnswer = { assetId, fact, annualCost: cost ? Number(cost) : undefined }
+    const refused = applyCoverage(vendor, 'csv', new Map([[assetId, serial]]), [answer], [])
+    if (refused.length > 0) return failed(refused.join('; '))
+    return { state: 'inserted', comment: `Coverage for ${serial}` }
+}
+
+/** The first fleet asset (ADR 0016) with this serial: one of the Provider IT's that carries it is not covered here. */
+function fleetAssetWithSerial(serial: string): GlideRecord | null {
+    const asset = new GlideRecord('alm_hardware')
+    asset.addQuery('serial_number', serial)
+    asset.addEncodedQuery(fleetCondition())
+    asset.setLimit(1)
+    asset.query()
+    return asset.next() ? asset : null
 }
 
 /**
