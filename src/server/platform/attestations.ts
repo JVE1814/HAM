@@ -2,6 +2,7 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import { ATTESTATION_STATE, attestationDue } from '../domain/audit.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import { ATTESTATION_RESPONSE_CHOICES } from '../domain/vocabulary.ts'
+import { ACTIVE_AGREEMENTS } from './agreements.ts'
 import { customerAdminIds } from './approvals.ts'
 import { glideToIsoDate, nowGlide, todayIso } from './clock.ts'
 import { openException } from './exceptions.ts'
@@ -18,6 +19,12 @@ const ATTESTATION = 'x_daas_ham_attestation'
 const ITEM = 'x_daas_ham_attestation_item'
 
 /**
+ * The attestations still open: those whose task is active, pending or open to answer. What keeps a second one from
+ * being raised at a Site, and what the customer page lists.
+ */
+export const OPEN_ATTESTATIONS = 'active=true'
+
+/**
  * Open an attestation for each Site with fleet assets of an attesting Agreement, once none is open there and the last
  * one was attested longer ago than the Agreement's interval (or never). One attestation covers every fleet asset
  * installed at the Site, so a Site that several Agreements serve follows the shortest of their intervals; the
@@ -26,7 +33,7 @@ const ITEM = 'x_daas_ham_attestation_item'
 export function raiseDueAttestations(): void {
     const today = todayIso()
     const agreement = new GlideRecord('x_daas_ham_agreement')
-    agreement.addQuery('state', 'active')
+    agreement.addEncodedQuery(ACTIVE_AGREEMENTS)
     agreement.addQuery('attestation_interval_months', '>', 0)
     agreement.query()
     while (agreement.next()) {
@@ -36,7 +43,7 @@ export function raiseDueAttestations(): void {
         asset.query()
         while (asset.next()) if (str(asset, 'x_daas_ham_site')) sites.add(str(asset, 'x_daas_ham_site'))
         for (const siteId of sites) {
-            if (exists(ATTESTATION, `site=${siteId}^active=true`)) continue
+            if (exists(ATTESTATION, `site=${siteId}^${OPEN_ATTESTATIONS}`)) continue
             const last = lastAttestedOn(siteId)
             if (!attestationDue({ lastAttestedOn: last, intervalMonths: num(agreement, 'attestation_interval_months'), today })) continue
             openAttestation(agreement, siteId)
@@ -94,7 +101,10 @@ function listAttested(attestationId: string, assetIds: readonly string[]): strin
     return ''
 }
 
-/** The attestation the reader may see (their visibility rules apply) while it is not closed: one still to answer. */
+/**
+ * The attestation the reader may see (their visibility rules apply) while it is not closed complete. Wider than
+ * `OPEN_ATTESTATIONS`: it also finds one cancelled by hand, which `completeAttestation` then refuses to close (logged).
+ */
 export function findUnclosedAttestation(attestationId: string): GlideRecord | null {
     const attestation = findById(ATTESTATION, attestationId)
     return attestation && num(attestation, 'state') !== ATTESTATION_STATE.closed ? attestation : null

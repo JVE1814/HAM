@@ -5,6 +5,7 @@ import type { HeldLock } from '../domain/job-lock.ts'
 import { DEPLOYED_STAGES } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { freeStockOf, pickForSparePool, reservedSparesQuery, sparePoolShortfall } from '../domain/sourcing.ts'
+import { ACTIVE_AGREEMENTS } from './agreements.ts'
 import { runTableJob } from './chunked.ts'
 import { withLockTries } from './locks.ts'
 import { openSparePurchaseQuantity, requestSparePurchase } from './procurement.ts'
@@ -23,7 +24,7 @@ export function runSparePoolTopUp(): void {
     runTableJob({
         job: 'spare_pool_top_up',
         table: 'x_daas_ham_agreement',
-        query: 'state=active^spare_pool_ratio>0',
+        query: `${ACTIVE_AGREEMENTS}^spare_pool_ratio>0`,
         read: (agreement) => ({ customerId: str(agreement, 'customer'), ratio: num(agreement, 'spare_pool_ratio') }),
         handle: (agreement, agreementId) => topUpAgreementPools({ agreementId, ...agreement }, autoPurchase),
     })

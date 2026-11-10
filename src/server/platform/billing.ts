@@ -33,6 +33,9 @@ import { BILLING_PERIOD_STATUS, type BillingLineKind, SUBSCRIPTION_LINE_STATUS }
 const PERIOD = 'x_daas_ham_billing_period'
 const LINE = 'x_daas_ham_billing_line'
 
+/** The currency a Subscription line or Fee event is billed in when it names none: the default of their currency columns. */
+const DEFAULT_CURRENCY = 'EUR'
+
 /** The kinds of Billing line, by name (the domain's line values carry `kind` as text). */
 const LINE_KIND = { subscription: 'subscription', fee: 'fee' } as const satisfies { [Kind in BillingLineKind]: Kind }
 
@@ -160,7 +163,7 @@ function billLines(period: GlideRecord, bounds: MonthBounds, queued: JobEvent, j
             },
             customerId: str(line, 'customer'),
             agreementId: str(line, 'agreement'),
-            currency: str(line, 'currency') || 'EUR',
+            currency: str(line, 'currency') || DEFAULT_CURRENCY,
         }),
         prepare: (lines: readonly LineRow[]) => withIntervals(lines, bounds),
         // Before the next chunk is queued: a line that could not be billed must not vanish from the bill, so a count
@@ -303,7 +306,7 @@ function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
                 description: feeLabel(fee),
                 units: 1,
                 amount: num(fee, 'amount'),
-                currency: str(fee, 'currency') || 'EUR',
+                currency: str(fee, 'currency') || DEFAULT_CURRENCY,
             })
         } catch (error) {
             // The fee stays open without a period, so a regeneration bills it.

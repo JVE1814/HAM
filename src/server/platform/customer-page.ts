@@ -4,6 +4,7 @@ import { awaitsSelfInstallConfirmation } from '../domain/install-confirmation.ts
 import type { Attestation, AttestationItem, CustomerAsset, CustomerOrder, CustomerReturn } from '../domain/rest-contracts.ts'
 import { SCOPED_TABLES, visibilityFilter } from '../domain/visibility.ts'
 import { isFleetAsset, readStage } from './assets.ts'
+import { OPEN_ATTESTATIONS } from './attestations.ts'
 import { installState } from './delivery.ts'
 import { findById, str, warnRefused } from './records.ts'
 import type { SessionScope } from './session.ts'
@@ -97,7 +98,7 @@ export function openReturns(): CustomerReturn[] {
 export function openAttestations(): Attestation[] {
     const attestations: Attestation[] = []
     const attestation = new GlideRecord('x_daas_ham_attestation')
-    attestation.addQuery('active', true)
+    attestation.addEncodedQuery(OPEN_ATTESTATIONS)
     attestation.setLimit(50)
     attestation.query()
     while (attestation.next()) {

@@ -5,21 +5,27 @@ import { lineStillOpen } from '../domain/sourcing.ts'
 import { LINE_STAGE, type OemVendor, RMA_STATE, type RmaState } from '../domain/vocabulary.ts'
 import { isFleetAsset, moveRefusal } from './assets.ts'
 import { nowGlide, todayIso } from './clock.ts'
-import { findById, refusal, str, warnRefused } from './records.ts'
+import { count, findById, refusal, str, warnRefused } from './records.ts'
 
 /** OEM RMA records (opening the RMA with the vendor is manual, ADR 0008). */
+
+/** The vendor an RMA is opened with when the defective Asset's Model names no OEM source. */
+const DEFAULT_RMA_VENDOR: OemVendor = 'cisco'
+
+/** How many days after its RMA is opened the defective unit is due back at the OEM. */
+const SHIP_BACK_DAYS = 10
 
 /** Open an OEM RMA for an advance replacement: its sys_id, or '' (logged) when the platform refuses it. */
 export function openOemRma(input: { defectiveAsset: GlideRecord; orderLineId: string; caseId: string }): string {
     const rma = new GlideRecord('x_daas_ham_oem_rma')
     rma.initialize()
-    rma.setValue('vendor', str(input.defectiveAsset, 'model.x_daas_ham_oem_source') || 'cisco')
+    rma.setValue('vendor', str(input.defectiveAsset, 'model.x_daas_ham_oem_source') || DEFAULT_RMA_VENDOR)
     rma.setValue('defective_asset', input.defectiveAsset.getUniqueValue())
     rma.setValue('order_line', input.orderLineId)
     rma.setValue('case', input.caseId)
     rma.setValue('advance_replacement', true)
     rma.setValue('state', RMA_STATE.to_open)
-    rma.setValue('ship_back_due', addDays(todayIso(), 10))
+    rma.setValue('ship_back_due', addDays(todayIso(), SHIP_BACK_DAYS))
     const rmaId = rma.insert()
     if (rmaId) return rmaId
     warnRefused(rma, `No OEM RMA for ${str(input.defectiveAsset, 'serial_number')}`)
@@ -81,11 +87,7 @@ export function markReplacementReceived(rmaId: string, replacementSerial: string
 
 /** OEM advance replacements still expected for an Order line. */
 export function openRmaCount(orderLineId: string): number {
-    const rma = new GlideRecord('x_daas_ham_oem_rma')
-    rma.addQuery('order_line', orderLineId)
-    rma.addQuery('state', 'IN', RMA_AWAITED.join(','))
-    rma.query()
-    return rma.getRowCount()
+    return count('x_daas_ham_oem_rma', `order_line=${orderLineId}^stateIN${RMA_AWAITED.join(',')}`)
 }
 
 /** The Order line waiting for the OEM replacement announced under this RMA number. */

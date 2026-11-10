@@ -13,6 +13,12 @@ import { bool, num, str } from './records.ts'
 
 /** Read models of an Agreement and its Customer catalog, as the entitlement module needs them. */
 
+/**
+ * The Agreements in force: an Agreement is a contract (it extends ast_contract), and this is the state the platform's
+ * Contract Management gives one that is active. What the daily jobs that act for running Agreements select.
+ */
+export const ACTIVE_AGREEMENTS = 'state=active'
+
 export function entitlementContext(customerId: string, agreementId: string, excludeOrderId: string): EntitlementContext {
     return {
         catalog: catalogEntries(customerId),

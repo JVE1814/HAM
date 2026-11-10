@@ -1,4 +1,5 @@
 import { GlideDateTime, GlideRecord, GlideSchedule, gs } from '@servicenow/glide'
+import type { OnSiteWork } from '../domain/delivery.ts'
 import { checkJobWindow } from '../domain/scheduling.ts'
 import type { FieldPurpose } from '../domain/vocabulary.ts'
 import { glideToMs } from './clock.ts'
@@ -21,12 +22,12 @@ export interface WorkContext {
     sourceId: string
 }
 
-/** The job: the change type it runs under, what it is for and whether a subcontractor does it. */
-export interface FieldJob {
-    changeType: 'standard' | 'normal'
-    purpose: FieldPurpose
-    subcontracted: boolean
-}
+/**
+ * The job: the change type it runs under, what it is for and whether a subcontractor does it. The on-site work an Order
+ * plans (domain/delivery `OnSiteWork`) is one, and a job of any other purpose (a de-install, a site audit) has its
+ * shape.
+ */
+export type FieldJob = Omit<OnSiteWork, 'purpose'> & { purpose: FieldPurpose }
 
 /** The saved change and the work order that runs under it. */
 export interface FieldWork {
