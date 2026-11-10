@@ -5,7 +5,9 @@ billing proration, ...) live in `src/server/domain/` as plain TypeScript that ne
 `@servicenow/glide`. Glide access lives in `src/server/platform/` (repositories and gateways), and
 `src/server/entry/` wires platform triggers (business rules, scheduled scripts, REST) to the two.
 There is no instance in the development loop, so the domain core is the only part we can test
-quickly and exhaustively (Vitest); everything Glide-facing is kept thin and covered by ATF.
+quickly and exhaustively (Vitest); of the Glide-facing code, `entry/` is kept thin and `platform/`
+holds the operations, covered by ATF and, where a fake of Glide catches a real regression, by unit
+tests.
 
 ## Consequences
 
@@ -20,8 +22,6 @@ quickly and exhaustively (Vitest); everything Glide-facing is kept thin and cove
   `response` (REST), `current` (UI action). `src/server/built-metadata.test.ts` checks every
   function wired from Fluent.
 - The layering is linted (`eslint.config.js`), type-only imports included: the domain imports neither
-  Glide nor the layers above it, platform never imports entry, and no entry module imports another
-  (the files still listed there as exceptions each wait for one operation to move to a platform
-  service).
+  Glide nor the layers above it, platform never imports entry, and no entry module imports another.
 - Decisions are covered by unit tests in `domain/`; a platform service gets a unit test, against a
   fake of `@servicenow/glide`, where one would catch a real regression.

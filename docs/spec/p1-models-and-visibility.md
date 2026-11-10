@@ -68,8 +68,8 @@ rule: their ACL is the only check. Each table's scoping fields are written once,
 `grantsCustomerRecord`, `grantsFleetAsset`, all in `entry/visibility.ts`) find them by the record's table. Users with no stockroom, Site or
 Customer see nothing in the restricted tables. For inventory techs the rules only narrow rows: tables they
 may not read at all are closed by the read ACLs' role lists, not by a match-nothing filter, because a rule
-also applies to the server logic their actions set off (`domain/visibility.test.ts` lists what they
-read and checks the ACLs against it). For Customer contacts, a rule on a table with no Customer field (or no Site field,
+also applies to the server logic their actions set off (`built-metadata.test.ts` lists what they
+read and checks the built ACLs against it). For Customer contacts, a rule on a table with no Customer field (or no Site field,
 for Site contacts) matches nothing: Site contacts get no NaaS Stockrooms, Agreements, subscription lines,
 catalog entries or Fee events, and no Customer contact gets Staging tasks or transfer orders of NaaS
 stockrooms.

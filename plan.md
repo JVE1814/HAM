@@ -1,9 +1,11 @@
 # x_daas_ham — Hardware Asset Management for a NaaS Provider (ServiceNow Fluent)
 
-> Status: **Phases 1–3 built** (AI deferred, D68); the instance-only checks are listed in the
-> README under "Verify on the first install". This document is the outcome of a structured design
-> interview (76 questions, recorded in the [Decision log](#20-decision-log)). It is the plan of record
-> for building the app. Each module gets its own written spec in `docs/spec/` before it is built.
+> Status: **Phases 1–3 built** (AI deferred, D68); the instance-only checks are listed in
+> [`docs/verify-on-instance.md`](docs/verify-on-instance.md). This document is the outcome of a
+> structured design interview (76 questions, recorded in the [Decision log](#20-decision-log)). It is
+> the plan of record for building the app. Each module gets its own written spec in `docs/spec/`
+> before it is built. Where this plan and the code differ, the ADRs and `docs/spec/` are current;
+> §5 and §18–§20 are kept as written.
 
 ---
 
@@ -438,20 +440,21 @@ Confidence tags:
 - **Single source of truth:** `install_status` + `substatus` on `alm_hardware`. We add choices
   with `ChoiceSet` (`legacyChoices: false`, additive). PR 1 maps the OOB values on the instance
   first and reuses them wherever they fit.
-- **Proposed added `substatus` values** (final list in `docs/spec/state-model.md`):
+- **Added `substatus` values** (the stages are in `docs/spec/p1-fulfilment.md`, Lifecycle stages;
+  the values in `domain/vocabulary.ts` `STAGE_FIELDS`):
   - `reserved_spare_pool` — in stock, reserved for a customer's spare pool;
   - `staging`, `staged` — in the staging centre;
-  - `pending_install` — shipped, or at the site awaiting install;
+  - `shipped_to_site` — shipped, or at the site awaiting install;
   - `pending_in_service` — installed, not yet seen by monitoring;
-  - `pending_return`, `pending_evaluation`, `pending_wipe`, `pending_oem_rma`;
-  - `temporary_deployment`.
+  - `pending_return`, `pending_wipe`, `pending_oem_rma` (`pending_evaluation` is out-of-box);
+  - `temporary_deployment`, `returned_to_customer`.
 - **Enforcement:**
-  - Transitions are defined in `src/server/lifecycle/transitions.ts` as an allowed-moves matrix,
-    with guards such as "deployed requires site and agreement".
+  - Transitions are defined in `domain/lifecycle.ts` (`checkTransition`) as an allowed-moves
+    matrix, with guards such as "deployed requires site and agreement".
   - One before-update business rule on `alm_hardware` calls the matrix and rejects illegal moves
     with a clear message.
-  - Flows and UI actions change state only through a single `transition(asset, to, context)`
-    module function.
+  - The app's own logic changes a stage only through `platform/assets.ts` `moveAsset` /
+    `moveAndSave(asset, to, context)`.
 
 **Indicative happy path:**
 
@@ -483,7 +486,7 @@ Phase 1 gives every persona a working path:
   privileges, application menu and modules (`Record()`).
 - **Preflight check** (a scheduled script or fix script run on demand) verifies that the required
   plugins and roles exist.
-- **Demo data** (installed only with `--demo-data`):
+- **Demo data** (installed unless `--no-demoData`):
   - 2 customers, each with sites, rooms and racks;
   - central depot, staging centre and customer-site stockrooms;
   - models for all 4 vendors (chassis, FRUs, optics);
@@ -491,7 +494,7 @@ Phase 1 gives every persona a working path:
   - users for every role.
 
 ### P1.2 Models, normalisation and lifecycle data
-- **Normalisation module** (`src/server/normalization`):
+- **Normalisation module** (`src/server/domain/normalization.ts`):
   - Inputs are the manufacturer string and the model/PID string from Discovery, SGCs or ASNs.
   - It looks up the manufacturer alias, then applies `model_match_rule` in order.
   - The result is the canonical `cmdb_model`, which gets `oem_pid` and `device_class`.
@@ -504,11 +507,12 @@ Phase 1 gives every persona a working path:
 ### P1.3 Agreements, customer catalog and site templates
 - Agreement maintenance (account manager), quantities, subscription lines, customer catalog entries,
   and site templates (BOMs).
-- **Entitlement module** (`src/server/entitlement`):
-  - `checkRequest(account, lines)` returns `within_agreement | off_catalog | over_quota` with
+- **Entitlement module** (`src/server/domain/entitlement.ts`):
+  - `assessOrder(request, context)` returns `within_agreement`, `off_catalog` or `over_quota` with
     reasons.
-  - Counts come from deployed and reserved assets per agreement and device class, kept as indexed
-    counters on `agreement_quantity`. The counters are refreshed incrementally, never by scanning.
+  - Usage is counted by query when an Order is assessed (`deployedUsageQuery`,
+    `inFlightLinesQuery`), against the contracted quantities in `agreement_quantity`, with no stored
+    counters.
 
 ### P1.4 Ordering, approvals and sourcing
 - **One catalog item**, "Request network equipment" (`CatalogItem`). Variables:
@@ -521,7 +525,8 @@ Phase 1 gives every persona a working path:
   - **within agreement** → auto-approved;
   - **off catalog** → customer admin approval;
   - **over quota** → customer admin plus account manager approval.
-- **Sourcing module** (`src/server/sourcing`), per line:
+- **Sourcing module** (`src/server/domain/sourcing.ts` decides, `src/server/platform/sourcing.ts`
+  carries it out), per line:
   1. customer's reserved spares;
   2. customer-site stockroom (for replacements);
   3. central depot stock → `alm_transfer_order`;
@@ -574,15 +579,16 @@ Phase 1 gives every persona a working path:
 - **"Seen" sources:**
   - **Discovery and SGCs** update the CI's last-discovered timestamp. A chunked job (or a
     CI-update rule on the relevant classes only) copies it to `x_daas_ham_last_seen`.
-  - **NMS push:** a Scripted REST API `POST /api/x_daas_ham/device_events` takes batched
-    `{serial|asset_tag|mac, event, timestamp, source}`. Auth is an integration user with a dedicated
+  - **NMS push:** a Scripted REST API `POST /api/x_daas_ham/naas/device_events` takes batched
+    `{identifier, event, observed_at, source}`. Auth is an integration user with a dedicated
     role; it is idempotent and rate-limited by batch size.
 - **In-service rule:** `pending_in_service` plus a "seen" signal after the install completion time
   sets:
   - `In use` (in service);
   - `in_service_date`;
   - the subscription line's start date, or adds the asset to an already running line.
-- **Manual override:** a `UiAction` with a mandatory reason, for sources that are not yet connected.
+- **Manual override:** a `UiAction` with a mandatory reason, for sources that are not yet connected
+  (not built).
 
 ### P1.9 Workspace and P1 dashboards
 - **Fluent `Workspace`** with lists and forms per staff persona:
@@ -603,19 +609,18 @@ Phase 1 gives every persona a working path:
 ## 12. Phase 2 — Lifecycle processes
 
 ### P2.1 OEM EoX and coverage adapters
-- **Interface** (`src/server/oem/types.ts`):
-  - `getLifecycle(pids[])`
-  - `getCoverage(serials[])`
-  - `getRmaStatus(rmaNumbers[])` (optional)
-  - Each returns normalised DTOs plus rate-limit metadata.
+- **Interface:** `src/server/domain/oem/types.ts` holds the normalised DTOs; each vendor's routes
+  are `OEM_ADAPTERS[vendor].lifecycle`, `.coverage` and `.rmaStatus` (optional) in
+  `src/server/domain/oem/adapters.ts`.
 - **Adapters:**
-  - **Cisco:** EoX v5 + SN2INFO v2 + RMA status. OAuth2 client credentials through `RestMessage`
-    and `Alias`.
+  - **Cisco:** EoX v5 + SN2INFO v2 + RMA status. OAuth2 client credentials through an OAuth
+    profile on its `RestMessage`.
   - **Meraki:** inventory EoX fields.
   - **Fortinet:** Asset Management API v3.
   - **Mist:** JSI inventory.
   - **CSV fallback:** Aruba EoX and coverage, Check Point EoX and coverage, HPE coverage.
-- **Credentials** are held in connection and credential aliases. They are never in code.
+- **Credentials** are held in OAuth profiles on the REST messages and in password2 properties
+  (README, Integrations). They are never in code.
 - **Scheduling:** chunked jobs work through changed or new PIDs and serials, respecting each vendor's
   rate limits (e.g. Cisco ≤20 PIDs per EoX call, Fortinet 100/min and 1,000/h).
 
@@ -635,8 +640,8 @@ Phase 1 gives every persona a working path:
 - **`replacement_order`** is created from the case.
   - Source priority: site hot spare → customer reserved spare → depot → OEM advance replacement.
   - The FSM work order and standard change follow.
-- **"Replace within X" SLA:** `Sla` definitions on the case, keyed by site tier, agreement
-  replacement tier and OEM coverage level.
+- **"Replace within X" SLA:** `Sla` definitions on the case, keyed by the Agreement's replacement
+  service level.
 - **Defective unit:** a return line is created, then evaluated → **OEM RMA**. The RMA number is
   entered manually, and status is synced for Cisco. Repaired or replacement units go back to the
   spare pool.
@@ -723,7 +728,8 @@ Phase 1 gives every persona a working path:
 - **Billing export:**
   - A monthly `billing_period` is generated by a chunked job. It prorates daily from subscription
     lines and in-service/end dates, and includes fee events.
-  - Output is a CSV attachment plus a pull API, `GET /api/x_daas_ham/billing_periods/{id}/lines`.
+  - Output is a CSV attachment plus a pull API,
+    `GET /api/x_daas_ham/naas/billing_periods/{id}/lines`.
   - Closing the period **locks** it.
 - **Shipping aggregator** (EasyPost/ShipEngine-style): labels and tracking webhooks feed `shipment`.
   It replaces manual tracking numbers.
@@ -778,7 +784,8 @@ Phase 1 gives every persona a working path:
 ## 16. Performance and scale
 
 - **Target:** 100k–1M `alm_hardware` rows, plus FRU children and consumables.
-- **Chunked-job helper** (`src/server/jobs/chunked.ts`):
+- **Chunked-job helper** (`src/server/domain/chunked-job.ts`, run by `src/server/platform/chunked.ts`
+  with its cursors in `src/server/platform/job-cursor.ts`):
   - It works through records with a keyset cursor (`sys_id` or an indexed date), with a batch size
     set by `Property`.
   - It stops when it runs out of time and saves its position in `job_cursor`, so the next run
@@ -791,8 +798,8 @@ Phase 1 gives every persona a working path:
   customer_tag, last_seen, refresh_due and `oem_pid`.
 - **`device_event`** stores state changes only, with a retention job (property-driven, e.g. 90
   days). `last_seen` on the asset is the derived cache.
-- **No GlideAggregate over all assets in synchronous code.** Quota counters are maintained
-  incrementally.
+- **No GlideAggregate over all assets in synchronous code.** Contracted-quantity usage is counted
+  per Agreement when an Order is assessed (P1.3), with no stored counters.
 - **Scale test:** a dev-only generator script creates ~200k assets in the demo dataset. Every job
   and the key list views are timed before each phase is signed off.
 
@@ -801,6 +808,7 @@ Phase 1 gives every persona a working path:
 ```text
 now.config.json                 # scope x_daas_ham, static content config for React pages
 package.json                    # scripts: build, typecheck, test, lint, check
+eslint.config.js                # lint rules, the layer rules of src/server among them
 src/
   fluent/
     tables/ augments/ choices/ roles/ acls/ cross-scope/
@@ -809,15 +817,21 @@ src/
     tests/                       # ATF Test / TestSuite
     demo-data/                   # records installed only with --demo-data
     generated/keys.ts            # committed
-  server/                        # TypeScript domain modules → sys_module
-    lifecycle/ entitlement/ sourcing/ normalization/ eox/
-    in-service/ visibility/ jobs/ oem/ billing/
-  client/                        # React UiPages (Vite)
-    warehouse-scan/ rack-elevation/
-test/                            # Vitest unit tests (Glide mocked)
+  server/                        # TypeScript server modules → sys_module
+    domain/                      # pure rules; vocabulary.ts holds every stored choice value
+    platform/                    # Glide access: operations as services, repositories, gateways,
+                                 # and the lists of events and system properties
+    entry/                       # one thin adapter per trigger
+    test-support/                # the tests' stand-in for Glide (not built into the app)
+    built-metadata.test.ts       # reads dist/app: checks what the build wrote
+  client/                        # React UiPages
+    warehouse/ rack/ customer/
+                                 # Vitest tests are *.test.ts files beside the module they test
 docs/
   adr/                           # architecture decision records
   spec/                          # per-module behavioural specs (from public docs + this plan)
+  research/                      # external contracts checked against primary sources
+  verify-on-instance.md          # what only an instance or a vendor login can confirm
 plan.md                          # this document
 README.md                        # required plugins, install, demo data, local checks
 ```
@@ -827,15 +841,14 @@ README.md                        # required plugins, install, demo data, local c
 - `.now.ts` files contain no runtime logic. Logic lives in `src/server` and is imported.
 - Every property is prefixed `x_daas_ham.`.
 - Every cross-scope access has a matching `CrossScopePrivilege`.
-- No hard-coded sys_ids. Credentials only through `Alias`.
+- No hard-coded sys_ids. Credentials only through OAuth profiles on the REST messages and password2
+  properties (README, Integrations).
 
 ## 18. Testing, quality gates and delivery
 
-**Local gates, before every manual install (no CI by decision):**
-- `now-sdk build --frozenKeys`
-- `tsc --noEmit`
-- `vitest run`
-- `eslint`
+**Local gates, before every manual install (no CI by decision):** `npm run check`, which runs the
+typecheck (server, client, tests), ESLint, `now-sdk build`, then Vitest, in that order: the
+built-metadata tests read the build.
 
 **Unit tests (Vitest)** cover every server module: the transition matrix, entitlement, sourcing
 priority, normalisation rules, lifecycle phase calculation, in-service detection, chunked cursor,
@@ -895,7 +908,8 @@ scoping).
 ## 20. Decision log
 
 The design interview asked 76 questions. Superseded answers are marked ~~struck~~ and point to the
-question that replaced them.
+question that replaced them. Elsewhere in the docs and the code, decision D*n* is the answer to Q*n*
+below.
 
 | Q | Topic | Decision |
 |---|---|---|

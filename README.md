@@ -267,7 +267,7 @@ documentation in [docs/research/external-contracts.md](docs/research/external-co
 |---|---|
 | `npm run typecheck` | server modules, client app and tests |
 | `npm run lint` | ESLint |
-| `npm test` | Vitest unit tests for the domain core and client helpers, and the checks of the built metadata (build first) |
+| `npm test` | Vitest: the domain core, the platform services and visibility scripts against an in-memory stand-in for Glide, the client helpers, and the checks of the built metadata. Those checks all fail once any file under `src/fluent` or `src/server` (tests aside) is newer than `dist/app`: run `npm run build` first, or `npx vitest run src/server/domain` while working on rules |
 | `npm run build` | `now-sdk build` (Fluent type check, client bundle, app package) |
 | `npx now-sdk cicd testsuite run ...` | ATF suites **NaaS - P1**, **NaaS - P2** and **NaaS - P3** on an instance (`src/server/atf-scripts.test.ts` checks their server-side scripts beforehand; [running ATF](docs/verify-on-instance.md#running-atf)) |
 
@@ -277,13 +277,30 @@ Layout:
 src/fluent/      Fluent metadata (*.now.ts): data/, security/, logic/, ui/, workspace/, tests/, demo/
 src/server/
   domain/        pure TypeScript business rules, unit-tested (ADR 0003)
-  platform/      Glide adapters: repositories and gateways
-  entry/         business-rule / job / REST / UI-action entry points
+  platform/      Glide access: the operations (raise, source, ship, receive, bill) as services,
+                 with their repositories and gateways
+  entry/         one thin adapter per trigger (business rule, job, REST, UI action): reads its
+                 inputs, calls a platform service, reports the outcome
+  test-support/  the tests' in-memory stand-in for Glide and their encoded-query evaluator
 src/client/      React UI pages (warehouse, rack elevation, customer self-service)
 ```
 
 Conventions that the build or tests enforce:
 
+- `domain/` imports neither Glide nor `platform/` or `entry/`; `platform/` never imports `entry/`;
+  no entry module imports another; a relative import in `src/server` names the `.ts` file, because
+  the instance resolves a module by its exact path (`.now.ts` imports are written without it).
+  ESLint enforces all four (`eslint.config.js`), and no domain module imports another in a cycle
+  (`domain/import-cycles.test.ts`).
+- A test is a `*.test.ts` file beside the module it tests. `src/server/tsconfig.json` and
+  `now.config.json` leave those files and `src/server/test-support/` out, so none reaches the
+  instance.
+- A test of a platform service or an entry adapter runs against `test-support/fake-glide.ts`, the
+  one stand-in for `@servicenow/glide`: tables in memory, queried through the tests' encoded-query
+  evaluator (`test-support/encoded-query.ts`), with the refusals, clock, user, queued events and log
+  a test sets up. It keeps the platform's behaviour where that is known and throws on what it does
+  not know (an operator, a dot-walk through a reference the test did not declare, a Glide method it
+  lacks), so no test passes on a guess. It runs no business rule, ACL or flow: those are ATF's.
 - `.now.ts` files are evaluated by the SDK, not run: they hold constants, template literals over
   constants and property access, and imports of constants (from `src/server/domain` and
   `src/server/platform` too), but no function call, loop, spread or array element. A value the SDK
@@ -296,13 +313,15 @@ Conventions that the build or tests enforce:
   `producer`, `request`, `response`): the SDK wrapper passes them by name (`built-metadata.test.ts`).
 - A business rule condition fits the 254-character field and loads a module by its installed path,
   `x_daas_ham/<package name>/<version>/src/...` (`fluent/logic/server-modules.now.ts` builds it from
-  `package.json` and `now.config.json`), calling a function it exports
-  (`built-metadata.test.ts`). A before rule on a table of another scope (`alm_hardware`, `wm_order`)
-  refuses that way, with its Abort action, and its script only adds the reason: the platform ignores
-  `current.setAbortAction` and `setWorkflow` called from this scope on such a table. So no entry
-  point wired on one calls `setAbortAction`, and a rule with an Abort action has a condition
-  (`built-metadata.test.ts`). The platform runs a condition on every save of the table, whatever the
-  rule's filter, so it starts with the change test that keeps the module unloaded on other saves
+  `package.json` and `now.config.json`), calling a function it exports (`built-metadata.test.ts`). A
+  before rule on a table of another scope (`alm_hardware`, `wm_order`) refuses that way, with its
+  Abort action, and its script only adds the reason: the platform ignores `current.setAbortAction`
+  and `setWorkflow` called from this scope on such a table. So an entry point wired on one takes its
+  record as a `ForeignRecord` (`platform/records.ts`), a type without those two methods: neither it
+  nor a helper it hands the record to compiles with such a call. `built-metadata.test.ts` holds the
+  entry points the rules on those tables call to that type, and a rule with an Abort action to
+  having a condition. The platform runs a condition on every save of the table, whatever the rule's
+  filter, so it starts with the change test that keeps the module unloaded on other saves
   ([external-contracts.md](docs/research/external-contracts.md#servicenow-platform)).
 - Every stored choice value is defined once, in `domain/vocabulary.ts`: a Fluent column imports the
   list as its `choices:`, server code imports the type derived from it. Fluent evaluates that file
