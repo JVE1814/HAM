@@ -110,9 +110,10 @@ function notSubmitted(message: string): Submission {
  * asked for) and submit it. The producer does not apply the Order create rule, so an Order its requester may not raise
  * for that Customer is removed again (one the platform keeps is logged, to cancel). One that names records that are
  * not its Customer's stays a draft to correct, without the lines of a Site template not offered to it, and so does one
- * missing a line the platform refused (logged): it would be assessed and sourced short of what was asked for.
+ * missing a line the platform refused (logged), or whose devices could not be read (`devicesUnread` says why, '' when
+ * they were; logged): it would be assessed and sourced short of what was asked for.
  */
-export function submitProducedOrder(order: GlideRecord, devices: readonly NewLine[]): Submission {
+export function submitProducedOrder(order: GlideRecord, devices: readonly NewLine[], devicesUnread: string): Submission {
     const parties = orderParties(order)
     const raiser = orderingUser(order)
     const number = str(order, 'number')
@@ -126,6 +127,10 @@ export function submitProducedOrder(order: GlideRecord, devices: readonly NewLin
     const refused = addOrderLines(order, [...fromTemplate, ...devices])
     for (const { line, reason } of refused) gs.warn(`[x_daas_ham] ${number}: no line for model ${line.modelId}: ${reason}`)
     const missing = refused.length > 0 ? [`${refused.length} order line(s) not saved (see the system log): add them`] : []
+    if (devicesUnread) {
+        gs.warn(`[x_daas_ham] ${number}: the devices asked for could not be read, so it has no line for them: ${devicesUnread}`)
+        missing.push('The devices asked for could not be read (see the system log): add them as order lines')
+    }
     return submitAsRaised(order, parties, raiser, missing)
 }
 

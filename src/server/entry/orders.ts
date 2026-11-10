@@ -1,5 +1,6 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { approvalAwaited } from '../domain/approvals.ts'
+import { messageOf } from '../domain/errors.ts'
 import type { NewLine } from '../platform/order-lines.ts'
 import { cancelOrder, rollUpOrderApprovals, submitOrder, submitProducedOrder, type Submission } from '../platform/orders.ts'
 import { timesRequeued } from '../platform/events.ts'
@@ -25,19 +26,28 @@ interface DeviceRow {
  * (`current` is typed unknown because the SDK passes its own GlideRecord type here.)
  */
 export function afterOrderProduced(producer: Record<string, unknown>, current: unknown): void {
+    const asked = deviceRows(producer.devices)
     const devices: NewLine[] = []
-    for (const row of parseRows(producer.devices)) {
+    for (const row of asked.rows) {
         if (row.model) devices.push({ modelId: String(row.model), quantity: Math.max(1, Number(row.quantity) || 1), fromSiteTemplate: false })
     }
-    tellUnlessSubmitted(submitProducedOrder(current as GlideRecord, devices))
+    tellUnlessSubmitted(submitProducedOrder(current as GlideRecord, devices, asked.unread))
 }
 
-function parseRows(value: unknown): DeviceRow[] {
+/**
+ * The device rows of the producer's multi-row variable, which arrives as JSON text; none when it is blank. Rows that
+ * were sent but cannot be read are not taken for none: `unread` says why ('' when they were read), and the Order then
+ * stays a draft rather than go ahead without the devices asked for.
+ */
+function deviceRows(value: unknown): { rows: DeviceRow[]; unread: string } {
+    const text = String(value ?? '').trim()
+    if (!text) return { rows: [], unread: '' }
     try {
-        const rows = JSON.parse(String(value ?? '[]'))
-        return Array.isArray(rows) ? rows : []
-    } catch {
-        return []
+        const rows: unknown = JSON.parse(text)
+        if (rows === null) return { rows: [], unread: '' }
+        return Array.isArray(rows) ? { rows, unread: '' } : { rows: [], unread: 'they are not a list of rows' }
+    } catch (error) {
+        return { rows: [], unread: messageOf(error) }
     }
 }
 
