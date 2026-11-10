@@ -3,7 +3,7 @@ import { addDays } from '../domain/calendar.ts'
 import { RMA_AT_OEM, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse } from '../domain/oem-rma.ts'
 import { lineStillOpen } from '../domain/sourcing.ts'
 import { LINE_STAGE, type OemVendor, RMA_STATE, type RmaState } from '../domain/vocabulary.ts'
-import { isFleetAsset, moveAsset } from './assets.ts'
+import { isFleetAsset, moveRefusal } from './assets.ts'
 import { nowGlide, todayIso } from './clock.ts'
 import { findById, refusal, str, warnRefused } from './records.ts'
 
@@ -154,10 +154,9 @@ export function returnDefectiveToOem(rma: GlideRecord): string {
     const asset = findById('alm_hardware', str(rma, 'defective_asset'))
     if (!asset) return ''
     if (!isFleetAsset(asset)) return 'The defective asset is not a fleet asset: it is not retired here'
-    const verdict = moveAsset(asset, 'returned_to_oem')
-    if (!verdict.allowed) return verdict.reason
     const serial = str(asset, 'serial_number')
-    if (!asset.update()) return `${serial} not retired: ${refusal(asset)}`
+    const refused = moveRefusal(asset, 'returned_to_oem')
+    if (refused) return `${serial} not retired: ${refused}`
     const returned: RmaState = 'defective_returned'
     rma.setValue('state', returned)
     if (rma.update()) return ''

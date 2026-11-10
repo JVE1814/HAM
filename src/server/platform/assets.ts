@@ -59,14 +59,24 @@ export function clearWipeEvidence(asset: GlideRecord): void {
 }
 
 /**
- * Move and save; false (and a warning, not a throw) when the lifecycle or the platform refuses, so the caller stops
- * before work that needs the move. A refused record keeps the unsaved move: it is not re-read, as it may be a query's
- * cursor or found past the before-query rules.
+ * Move the Asset to `to` and save it; why it was not moved ('' once saved): the lifecycle's reason for a move it
+ * refuses, the platform's for a save it refuses. Nothing is logged: the caller puts the reason where it belongs (on a
+ * line, in the log, before the user). A refused record keeps the unsaved move: it is not re-read, as it may be a
+ * query's cursor or found past the before-query rules.
+ */
+export function moveRefusal(asset: GlideRecord, to: Stage): string {
+    const verdict = moveAsset(asset, to)
+    if (!verdict.allowed) return verdict.reason
+    return asset.update() ? '' : refusal(asset, `the asset could not be saved as ${to}`)
+}
+
+/**
+ * Move and save (`moveRefusal`); false (and a warning, not a throw) when the lifecycle or the platform refuses, so the
+ * caller stops before work that needs the move.
  */
 export function moveAndSave(asset: GlideRecord, to: Stage, context: string): boolean {
-    const verdict = moveAsset(asset, to)
-    if (verdict.allowed && asset.update()) return true
-    const reason = verdict.allowed ? refusal(asset) : verdict.reason
+    const reason = moveRefusal(asset, to)
+    if (!reason) return true
     gs.warn(`[x_daas_ham] ${context}: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
     return false
 }

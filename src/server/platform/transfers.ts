@@ -2,7 +2,7 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import { transferFellThrough, type TransferContext } from '../domain/lifecycle.ts'
 import { createMarks } from '../domain/marks.ts'
 import type { TransferResult } from '../domain/sourcing.ts'
-import { moveAsset } from './assets.ts'
+import { moveRefusal } from './assets.ts'
 import { PROPERTY, stagingStockroom, stringProperty } from './properties.ts'
 import { bool, deleteWhere, refusal, str } from './records.ts'
 import { hasOpenStagingTask } from './staging-tasks.ts'
@@ -52,10 +52,8 @@ export function requestTransfer(input: {
 
 /** Save the Asset In stock / Available for Inventory to take onto a line; why not, or null once saved. */
 function handOver(asset: GlideRecord): string | null {
-    const serial = str(asset, 'serial_number')
-    const verdict = moveAsset(asset, 'available')
-    if (!verdict.allowed) return `${serial} could not be handed over: ${verdict.reason}`
-    return asset.update() ? null : `${serial} could not be handed over: ${refusal(asset)}`
+    const refused = moveRefusal(asset, 'available')
+    return refused ? `${str(asset, 'serial_number')} could not be handed over: ${refused}` : null
 }
 
 /** Insert the Asset's line on the transfer order; why not, or null once inserted. */

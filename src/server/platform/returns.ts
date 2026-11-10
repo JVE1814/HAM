@@ -29,7 +29,7 @@ import {
     type ReturnTrigger,
 } from '../domain/vocabulary.ts'
 import { customerAdminIds } from './approvals.ts'
-import { clearRackPlacement, clearWipeEvidence, isFleetAsset, moveAndSave, moveAsset, readStage } from './assets.ts'
+import { clearRackPlacement, clearWipeEvidence, isFleetAsset, moveAndSave, moveRefusal, readStage } from './assets.ts'
 import { runTableJob } from './chunked.ts'
 import { nowGlide, todayIso } from './clock.ts'
 import { EVENT, fire } from './events.ts'
@@ -285,9 +285,8 @@ export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): R
     // A wipe recorded before this receipt does not cover what it picked up at the Site, so it must be wiped again.
     clearWipeEvidence(asset)
     clearRackPlacement(asset)
-    const verdict = moveAsset(asset, 'pending_evaluation')
-    if (!verdict.allowed) return { refused: verdict.reason }
-    if (!asset.update()) return { refused: refusal(asset) }
+    const refused = moveRefusal(asset, 'pending_evaluation')
+    if (refused) return { refused }
     endSitePackageIfEmpty(siteId, str(asset, 'x_daas_ham_agreement'))
     if (line) settleReceivedLine(line, asset)
     return 'received'
@@ -337,8 +336,8 @@ export function evaluateReturnLine(line: GlideRecord): Evaluation {
     // Charged before refurbishing hands the unit back to the Provider; choosing the evaluation again charges it once.
     if (choice<ReturnCondition>(line, 'condition') === 'damaged') recordFee('damaged', asset, str(line, 'return_order'))
     if (target === 'available') releaseToProviderStock(asset)
-    if (!moveAsset(asset, target).allowed) return notEvaluated(`The asset cannot go to ${target} from its current stage`)
-    if (!asset.update()) return notEvaluated(`The asset was not moved to ${target}: ${refusal(asset)}`)
+    const refused = moveRefusal(asset, target)
+    if (refused) return notEvaluated(`The asset was not moved to ${target}: ${refused}`)
     line.setValue('status', RETURN_LINE_STATUS.evaluated)
     if (!line.update()) {
         return notEvaluated(`The asset went to ${target}, but its return line was not marked evaluated: ${refusal(line)}`)

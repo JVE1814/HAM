@@ -6,7 +6,7 @@ import {
     disposalScopeRefusal,
     type DisposalAsset,
 } from '../domain/disposal.ts'
-import { disposalStage, type Stage } from '../domain/lifecycle.ts'
+import { disposalStage } from '../domain/lifecycle.ts'
 import { DISPOSAL_STAGE, type DisposalLineStatus, type DisposalMethod, type LegalOwner, TASK_STATE } from '../domain/vocabulary.ts'
 import {
     customerAdminIds,
@@ -16,7 +16,7 @@ import {
     type ApprovalFlow,
     type ApprovalRollup,
 } from './approvals.ts'
-import { isFleetAsset, moveAsset, readStage, transitionFacts } from './assets.ts'
+import { isFleetAsset, moveRefusal, readStage, transitionFacts } from './assets.ts'
 import { choice, findById, refusal, str, warnRefused } from './records.ts'
 
 /**
@@ -165,20 +165,11 @@ function retire(line: GlideRecord, order: GlideRecord): string {
     })
     if (blockers.length > 0) return blockers.join('; ')
     if (stage === 'pending_wipe') {
-        const refusal = moveAndKeep(asset, 'pending_disposal')
-        if (refusal) return refusal
+        const refused = moveRefusal(asset, 'pending_disposal')
+        if (refused) return refused
     }
-    return moveAndKeep(asset, disposalStage(method))
-}
-
-/**
- * Move the Asset and save it; why that was refused (empty once saved). Unlike platform/assets `moveAndSave`, a refusal
- * is not logged: it goes on the line as what blocks it.
- */
-function moveAndKeep(asset: GlideRecord, to: Stage): string {
-    const verdict = moveAsset(asset, to)
-    if (!verdict.allowed) return verdict.reason
-    return asset.update() ? '' : refusal(asset, `the asset could not be saved as ${to}`)
+    // Not logged: a refusal goes on the line as what blocks it.
+    return moveRefusal(asset, disposalStage(method))
 }
 
 /**
