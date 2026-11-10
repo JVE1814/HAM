@@ -1,5 +1,10 @@
 import '@servicenow/sdk/global'
 import { Test } from '@servicenow/sdk/core'
+import { DEVICE_CLASS } from '../../server/domain/vocabulary'
+
+// The vocabulary's values the fixtures below are created with, each under a name: for a value, a Test takes a
+// name, but no property access (VOCABULARY.value).
+const SWITCH = DEVICE_CLASS.switch
 
 /*
  * ATF: a Model's manufacturer milestones are kept in the platform's Model lifecycle table (ADR 0017; suite "NaaS - P1").
@@ -21,7 +26,7 @@ export const lifecycleImportTest = Test(
         const model = atf.server.recordInsert({
             $id: Now.ID['atf_lci_model'],
             table: 'cmdb_hardware_product_model',
-            fieldValues: { name: 'ATF Lifecycle Switch', x_daas_ham_oem_pid: 'ATF-EOX-24', x_daas_ham_device_class: 'switch' },
+            fieldValues: { name: 'ATF Lifecycle Switch', x_daas_ham_oem_pid: 'ATF-EOX-24', x_daas_ham_device_class: SWITCH },
         })
         const row = atf.server.recordInsert({
             $id: Now.ID['atf_lci_row'],

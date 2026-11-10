@@ -1,6 +1,13 @@
 import '@servicenow/sdk/global'
 import { Test } from '@servicenow/sdk/core'
 import { customerAdmin, inventoryTech } from '../security/roles.now'
+import { INSTALL_STATUS, STOCKROOM_TYPE } from '../../server/domain/vocabulary'
+
+// The vocabulary's values the fixtures below are created with, each under a name: for a value, a Test takes a
+// name, but no property access (VOCABULARY.value).
+const IN_STOCK = INSTALL_STATUS.inStock
+const IN_USE = INSTALL_STATUS.inUse
+const CENTRAL_DEPOT = STOCKROOM_TYPE.central_depot
 
 /*
  * ATF: before-query visibility rules (ADR 0005) on the hardware the app shares with the Provider's IT (ADR 0016). Run:
@@ -30,20 +37,20 @@ export const customerAdminVisibilityTest = Test(
         atf.server.recordInsert({
             $id: Now.ID['atf_cav_asset_a'],
             table: 'alm_hardware',
-            fieldValues: { serial_number: 'ATF-CAV-A-0001', company: customerA.record_id, install_status: 1, quantity: 1, x_daas_ham_fleet: true },
+            fieldValues: { serial_number: 'ATF-CAV-A-0001', company: customerA.record_id, install_status: IN_USE, quantity: 1, x_daas_ham_fleet: true },
             enforceSecurity: false,
         })
         atf.server.recordInsert({
             $id: Now.ID['atf_cav_asset_b'],
             table: 'alm_hardware',
-            fieldValues: { serial_number: 'ATF-CAV-B-0001', company: customerB.record_id, install_status: 1, quantity: 1, x_daas_ham_fleet: true },
+            fieldValues: { serial_number: 'ATF-CAV-B-0001', company: customerB.record_id, install_status: IN_USE, quantity: 1, x_daas_ham_fleet: true },
             enforceSecurity: false,
         })
         // Outside the fleet: the rules keep a Customer contact to their Customer on every record, unlike an inventory tech.
         atf.server.recordInsert({
             $id: Now.ID['atf_cav_asset_b_outside'],
             table: 'alm_hardware',
-            fieldValues: { serial_number: 'ATF-CAV-B-IT-0001', company: customerB.record_id, install_status: 1, quantity: 1, x_daas_ham_fleet: false },
+            fieldValues: { serial_number: 'ATF-CAV-B-IT-0001', company: customerB.record_id, install_status: IN_USE, quantity: 1, x_daas_ham_fleet: false },
             enforceSecurity: false,
         })
         atf.server.createUser({
@@ -94,30 +101,30 @@ export const inventoryTechVisibilityTest = Test(
         const assigned = atf.server.recordInsert({
             $id: Now.ID['atf_itv_stockroom_assigned'],
             table: 'alm_stockroom',
-            fieldValues: { x_daas_ham_stockroom_type: 'central_depot', assignment_group: team.record_id },
+            fieldValues: { x_daas_ham_stockroom_type: CENTRAL_DEPOT, assignment_group: team.record_id },
         })
         const other = atf.server.recordInsert({
             $id: Now.ID['atf_itv_stockroom_other'],
             table: 'alm_stockroom',
-            fieldValues: { x_daas_ham_stockroom_type: 'central_depot' },
+            fieldValues: { x_daas_ham_stockroom_type: CENTRAL_DEPOT },
         })
         atf.server.recordInsert({
             $id: Now.ID['atf_itv_asset_assigned'],
             table: 'alm_hardware',
-            fieldValues: { serial_number: 'ATF-ITV-IN-0001', stockroom: assigned.record_id, install_status: 6, quantity: 1, x_daas_ham_fleet: true },
+            fieldValues: { serial_number: 'ATF-ITV-IN-0001', stockroom: assigned.record_id, install_status: IN_STOCK, quantity: 1, x_daas_ham_fleet: true },
             enforceSecurity: false,
         })
         atf.server.recordInsert({
             $id: Now.ID['atf_itv_asset_other'],
             table: 'alm_hardware',
-            fieldValues: { serial_number: 'ATF-ITV-OUT-0001', stockroom: other.record_id, install_status: 6, quantity: 1, x_daas_ham_fleet: true },
+            fieldValues: { serial_number: 'ATF-ITV-OUT-0001', stockroom: other.record_id, install_status: IN_STOCK, quantity: 1, x_daas_ham_fleet: true },
             enforceSecurity: false,
         })
         // The same unit outside the fleet: the rule keeps it in (domain/visibility `outsideNaasConditions`), for the platform to decide.
         atf.server.recordInsert({
             $id: Now.ID['atf_itv_asset_outside'],
             table: 'alm_hardware',
-            fieldValues: { serial_number: 'ATF-ITV-IT-0001', stockroom: other.record_id, install_status: 6, quantity: 1, x_daas_ham_fleet: false },
+            fieldValues: { serial_number: 'ATF-ITV-IT-0001', stockroom: other.record_id, install_status: IN_STOCK, quantity: 1, x_daas_ham_fleet: false },
             enforceSecurity: false,
         })
         const tech = atf.server.createUser({

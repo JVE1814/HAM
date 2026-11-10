@@ -1,6 +1,14 @@
 import '@servicenow/sdk/global'
 import { Test } from '@servicenow/sdk/core'
 import { inventoryTech } from '../security/roles.now'
+import { DEVICE_CLASS, INSTALL_STATUS, STAGE_FIELDS, STOCKROOM_TYPE } from '../../server/domain/vocabulary'
+
+// The vocabulary's values the fixtures below are created with, each under a name: for a value, a Test takes a
+// name, but no property access (VOCABULARY.value).
+const IN_STOCK = INSTALL_STATUS.inStock
+const AVAILABLE = STAGE_FIELDS.available.substatus
+const CENTRAL_DEPOT = STOCKROOM_TYPE.central_depot
+const SWITCH = DEVICE_CLASS.switch
 
 /*
  * ATF: the In transfer stage (ADR 0002), on a fleet asset (suite "NaaS - P1"). Inventory's transfer order logic saves
@@ -42,17 +50,17 @@ export const transferStageTest = Test(
         const depot = atf.server.recordInsert({
             $id: Now.ID['atf_xfer_from'],
             table: 'alm_stockroom',
-            fieldValues: { name: 'ATF Transfer Depot', x_daas_ham_stockroom_type: 'central_depot', assignment_group: depotGroup.record_id },
+            fieldValues: { name: 'ATF Transfer Depot', x_daas_ham_stockroom_type: CENTRAL_DEPOT, assignment_group: depotGroup.record_id },
         })
         const destination = atf.server.recordInsert({
             $id: Now.ID['atf_xfer_to'],
             table: 'alm_stockroom',
-            fieldValues: { name: 'ATF Transfer Destination', x_daas_ham_stockroom_type: 'central_depot' },
+            fieldValues: { name: 'ATF Transfer Destination', x_daas_ham_stockroom_type: CENTRAL_DEPOT },
         })
         const model = atf.server.recordInsert({
             $id: Now.ID['atf_xfer_model'],
             table: 'cmdb_model',
-            fieldValues: { name: 'ATF Transfer Switch', x_daas_ham_oem_pid: 'ATF-XFER-24', x_daas_ham_device_class: 'switch' },
+            fieldValues: { name: 'ATF Transfer Switch', x_daas_ham_oem_pid: 'ATF-XFER-24', x_daas_ham_device_class: SWITCH },
         })
         // A Customer's spare unit handed over to Inventory, which takes a unit onto a line only from In stock / Available
         // in the line's from-stockroom (its rule "Validate TOL and check availibility").
@@ -64,8 +72,8 @@ export const transferStageTest = Test(
                 model: model.record_id,
                 company: customer.record_id,
                 stockroom: depot.record_id,
-                install_status: 6,
-                substatus: 'available',
+                install_status: IN_STOCK,
+                substatus: AVAILABLE,
                 quantity: 1,
                 x_daas_ham_fleet: true,
             },

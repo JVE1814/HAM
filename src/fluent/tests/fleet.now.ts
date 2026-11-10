@@ -1,6 +1,14 @@
 import '@servicenow/sdk/global'
 import { Test } from '@servicenow/sdk/core'
 import { assetManager } from '../security/roles.now'
+import { DEVICE_CLASS, INSTALL_STATUS, STAGE_FIELDS, STOCKROOM_TYPE } from '../../server/domain/vocabulary'
+
+// The vocabulary's values the fixtures below are created with, each under a name: for a value, a Test takes a
+// name, but no property access (VOCABULARY.value).
+const IN_STOCK = INSTALL_STATUS.inStock
+const AVAILABLE = STAGE_FIELDS.available.substatus
+const CENTRAL_DEPOT = STOCKROOM_TYPE.central_depot
+const SWITCH = DEVICE_CLASS.switch
 
 /*
  * ATF: adopting the Provider's existing equipment into the fleet with "Add to fleet" (ADR 0016; suite "NaaS - P1").
@@ -21,7 +29,7 @@ export const addToFleetTest = Test(
         const depot = atf.server.recordInsert({
             $id: Now.ID['atf_adopt_stockroom'],
             table: 'alm_stockroom',
-            fieldValues: { name: 'ATF Adoption Depot', x_daas_ham_stockroom_type: 'central_depot' },
+            fieldValues: { name: 'ATF Adoption Depot', x_daas_ham_stockroom_type: CENTRAL_DEPOT },
         })
         // The asset form requires a model category, a model and a quantity before it submits.
         const category = atf.server.recordInsert({
@@ -41,7 +49,7 @@ export const addToFleetTest = Test(
             fieldValues: {
                 name: 'ATF NaaS Switch',
                 x_daas_ham_oem_pid: 'ATF-ADOPT-24',
-                x_daas_ham_device_class: 'switch',
+                x_daas_ham_device_class: SWITCH,
                 cmdb_model_category: category.record_id,
             },
         })
@@ -54,8 +62,8 @@ export const addToFleetTest = Test(
                 model: itModel.record_id,
                 model_category: category.record_id,
                 stockroom: depot.record_id,
-                install_status: 6,
-                substatus: 'available',
+                install_status: IN_STOCK,
+                substatus: AVAILABLE,
                 quantity: 1,
                 x_daas_ham_fleet: false,
             },
@@ -69,8 +77,8 @@ export const addToFleetTest = Test(
                 model: naasModel.record_id,
                 model_category: category.record_id,
                 stockroom: depot.record_id,
-                install_status: 6,
-                substatus: 'available',
+                install_status: IN_STOCK,
+                substatus: AVAILABLE,
                 quantity: 1,
                 x_daas_ham_fleet: false,
             },

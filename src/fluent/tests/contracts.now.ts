@@ -1,6 +1,14 @@
 import '@servicenow/sdk/global'
 import { Test, TestSuite } from '@servicenow/sdk/core'
 import { assetManager, finance } from '../security/roles.now'
+import { DEVICE_CLASS, INSTALL_STATUS, STAGE_FIELDS } from '../../server/domain/vocabulary'
+
+// The vocabulary's values the fixtures below are created with, each under a name: for a value, a Test takes a
+// name, but no property access (VOCABULARY.value).
+const IN_STOCK = INSTALL_STATUS.inStock
+const IN_USE = INSTALL_STATUS.inUse
+const AVAILABLE = STAGE_FIELDS.available.substatus
+const SWITCH = DEVICE_CLASS.switch
 
 /*
  * ATF: lessor ownership and lease extension (D65), billing period lock (D66), rack power budget (P3.29). The lease and
@@ -34,8 +42,8 @@ export const leasedAssetOwnershipTest = Test(
             table: 'alm_hardware',
             fieldValues: {
                 serial_number: 'ATF-LAO-0001',
-                install_status: 6,
-                substatus: 'available',
+                install_status: IN_STOCK,
+                substatus: AVAILABLE,
                 quantity: 1,
                 x_daas_ham_fleet: true,
                 x_daas_ham_lease: lease.record_id,
@@ -166,7 +174,7 @@ export const rackPowerBudgetTest = Test(
         const model = atf.server.recordInsert({
             $id: Now.ID['atf_rp_model'],
             table: 'cmdb_model',
-            fieldValues: { name: 'ATF 80 W switch', x_daas_ham_oem_pid: 'ATF-80W', x_daas_ham_device_class: 'switch', power_consumption: 80 },
+            fieldValues: { name: 'ATF 80 W switch', x_daas_ham_oem_pid: 'ATF-80W', x_daas_ham_device_class: SWITCH, power_consumption: 80 },
         })
         const rack = atf.server.recordInsert({
             $id: Now.ID['atf_rp_rack'],
@@ -179,7 +187,7 @@ export const rackPowerBudgetTest = Test(
             fieldValues: {
                 serial_number: 'ATF-RP-0001',
                 model: model.record_id,
-                install_status: 1,
+                install_status: IN_USE,
                 quantity: 1,
                 x_daas_ham_fleet: true,
                 x_daas_ham_rack: rack.record_id,
@@ -191,7 +199,7 @@ export const rackPowerBudgetTest = Test(
         const second = atf.server.recordInsert({
             $id: Now.ID['atf_rp_second'],
             table: 'alm_hardware',
-            fieldValues: { serial_number: 'ATF-RP-0002', model: model.record_id, install_status: 1, quantity: 1, x_daas_ham_fleet: true },
+            fieldValues: { serial_number: 'ATF-RP-0002', model: model.record_id, install_status: IN_USE, quantity: 1, x_daas_ham_fleet: true },
             enforceSecurity: false,
         })
         atf.server.recordUpdate({

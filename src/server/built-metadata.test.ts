@@ -148,11 +148,12 @@ const records = (table: string): BuiltRecord[] => builtRecords().filter((record)
 describe('the built metadata', () => {
     // The SDK evaluates the Fluent sources without running them. A value it cannot read (a function call, an array
     // element, an object where a text is expected) is no build error: the record is built with a placeholder in it.
+    // Nor is a computed key ({ [FLEET_FIELD]: true } in an ATF step's field values), built as the text `[FLEET_FIELD]=true`.
     it('holds no value the SDK could not evaluate', () => {
         // The client bundles (sys_ux_lib_asset) are code, which may well hold such a text.
         const placeholders = filesUnder(BUILT)
             .filter((path) => path.endsWith('.xml') && !path.includes('/sys_ux_lib_asset_'))
-            .filter((path) => /Symbol\(|\[object Object\]/.test(readFileSync(path, 'utf8')))
+            .filter((path) => /Symbol\(|\[object Object\]|\[[A-Za-z_]\w*\]=/.test(readFileSync(path, 'utf8')))
             .map((path) => relative(BUILT, path))
         expect(placeholders).toEqual([])
     })

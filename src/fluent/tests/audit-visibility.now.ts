@@ -1,6 +1,11 @@
 import '@servicenow/sdk/global'
 import { Test } from '@servicenow/sdk/core'
 import { inventoryTech } from '../security/roles.now'
+import { STOCKROOM_TYPE } from '../../server/domain/vocabulary'
+
+// The vocabulary's values the fixtures below are created with, each under a name: for a value, a Test takes a
+// name, but no property access (VOCABULARY.value).
+const CENTRAL_DEPOT = STOCKROOM_TYPE.central_depot
 
 /* ATF: the audit before-query rules (ADR 0005) keep an inventory tech to the blind counts of their stockrooms (suite "NaaS - P1"). */
 
@@ -22,12 +27,12 @@ export const inventoryTechAuditVisibilityTest = Test(
         const assigned = atf.server.recordInsert({
             $id: Now.ID['atf_itav_stockroom_assigned'],
             table: 'alm_stockroom',
-            fieldValues: { x_daas_ham_stockroom_type: 'central_depot', assignment_group: team.record_id },
+            fieldValues: { x_daas_ham_stockroom_type: CENTRAL_DEPOT, assignment_group: team.record_id },
         })
         const other = atf.server.recordInsert({
             $id: Now.ID['atf_itav_stockroom_other'],
             table: 'alm_stockroom',
-            fieldValues: { x_daas_ham_stockroom_type: 'central_depot' },
+            fieldValues: { x_daas_ham_stockroom_type: CENTRAL_DEPOT },
         })
         const ownCount = atf.server.recordInsert({
             $id: Now.ID['atf_itav_audit_own'],

@@ -1,6 +1,18 @@
 import '@servicenow/sdk/global'
 import { Test, TestSuite } from '@servicenow/sdk/core'
 import { assetManager, inventoryTech } from '../security/roles.now'
+import { DEVICE_CLASS, INSTALL_MODE, INSTALL_STATUS, LEGAL_OWNER, ORDER_TYPE, STAGE_FIELDS, STOCKROOM_TYPE } from '../../server/domain/vocabulary'
+
+// The vocabulary's values the fixtures below are created with, each under a name: for a value, a Test takes a
+// name, but no property access (VOCABULARY.value).
+const IN_STOCK = INSTALL_STATUS.inStock
+const IN_USE = INSTALL_STATUS.inUse
+const PENDING_EVALUATION = STAGE_FIELDS.pending_evaluation.substatus
+const CENTRAL_DEPOT = STOCKROOM_TYPE.central_depot
+const DEVICE_REPLACE = ORDER_TYPE.device_replace
+const FSM_ENGINEER = INSTALL_MODE.fsm_engineer
+const SWITCH = DEVICE_CLASS.switch
+const PROVIDER_OWNED = LEGAL_OWNER.provider
 
 /*
  * ATF: break-fix entitlement neutrality (D46) and depot evaluation routing (D60), on fleet assets: the app counts and
@@ -30,7 +42,7 @@ export const replacementWithinAgreementTest = Test(
         const model = atf.server.recordInsert({
             $id: Now.ID['atf_rwa_model'],
             table: 'cmdb_model',
-            fieldValues: { name: 'ATF Legacy Switch', x_daas_ham_oem_pid: 'ATF-LEGACY-24', x_daas_ham_device_class: 'switch' },
+            fieldValues: { name: 'ATF Legacy Switch', x_daas_ham_oem_pid: 'ATF-LEGACY-24', x_daas_ham_device_class: SWITCH },
         })
         const agreement = atf.server.recordInsert({
             $id: Now.ID['atf_rwa_agreement'],
@@ -40,7 +52,7 @@ export const replacementWithinAgreementTest = Test(
         atf.server.recordInsert({
             $id: Now.ID['atf_rwa_quantity'],
             table: 'x_daas_ham_agreement_quantity',
-            fieldValues: { agreement: agreement.record_id, device_class: 'switch', contracted_quantity: 1 },
+            fieldValues: { agreement: agreement.record_id, device_class: SWITCH, contracted_quantity: 1 },
         })
         // In service under the Agreement, a fleet asset puts it at its cap of one switch: the usage counts fleet assets only.
         const failed = atf.server.recordInsert({
@@ -50,7 +62,7 @@ export const replacementWithinAgreementTest = Test(
                 serial_number: 'ATF-RWA-FAILED',
                 model: model.record_id,
                 company: customer.record_id,
-                install_status: 1,
+                install_status: IN_USE,
                 quantity: 1,
                 x_daas_ham_fleet: true,
                 x_daas_ham_agreement: agreement.record_id,
@@ -65,8 +77,8 @@ export const replacementWithinAgreementTest = Test(
                 customer: customer.record_id,
                 site: site.record_id,
                 agreement: agreement.record_id,
-                order_type: 'device_replace',
-                install_mode: 'fsm_engineer',
+                order_type: DEVICE_REPLACE,
+                install_mode: FSM_ENGINEER,
                 short_description: 'ATF replacement',
             },
         })
@@ -117,7 +129,7 @@ export const returnEvaluationTest = Test(
         const depot = atf.server.recordInsert({
             $id: Now.ID['atf_rev_stockroom'],
             table: 'alm_stockroom',
-            fieldValues: { name: 'ATF Return Depot', x_daas_ham_stockroom_type: 'central_depot', assignment_group: depotGroup.record_id },
+            fieldValues: { name: 'ATF Return Depot', x_daas_ham_stockroom_type: CENTRAL_DEPOT, assignment_group: depotGroup.record_id },
         })
         const asset = atf.server.recordInsert({
             $id: Now.ID['atf_rev_asset'],
@@ -126,11 +138,11 @@ export const returnEvaluationTest = Test(
                 serial_number: 'ATF-REV-0001',
                 stockroom: depot.record_id,
                 company: customer.record_id,
-                install_status: 6,
-                substatus: 'pending_evaluation',
+                install_status: IN_STOCK,
+                substatus: PENDING_EVALUATION,
                 quantity: 1,
                 x_daas_ham_fleet: true,
-                x_daas_ham_legal_owner: 'provider',
+                x_daas_ham_legal_owner: PROVIDER_OWNED,
             },
             enforceSecurity: false,
         })

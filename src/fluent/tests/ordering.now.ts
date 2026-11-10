@@ -6,6 +6,15 @@ import { addToFleetTest } from './fleet.now'
 import { lifecycleImportTest } from './models.now'
 import { transferStageTest } from './transfers.now'
 import { customerAdminVisibilityTest, inventoryTechVisibilityTest } from './visibility.now'
+import { DEVICE_CLASS, INSTALL_MODE, ORDER_TYPE } from '../../server/domain/vocabulary'
+
+// The vocabulary's values the fixtures below are created with, each under a name: for a value, a Test takes a
+// name, but no property access (VOCABULARY.value).
+const DEVICE_ADD = ORDER_TYPE.device_add
+const FSM_ENGINEER = INSTALL_MODE.fsm_engineer
+const SELF_INSTALL = INSTALL_MODE.self_install
+const SWITCH = DEVICE_CLASS.switch
+const FIREWALL = DEVICE_CLASS.firewall
 
 /* ATF: order entitlement routing. */
 
@@ -31,7 +40,7 @@ export const withinAgreementOrderTest = Test(
         const model = atf.server.recordInsert({
             $id: Now.ID['atf_owa_model'],
             table: 'cmdb_model',
-            fieldValues: { name: 'ATF Switch', x_daas_ham_oem_pid: 'ATF-SW-48', x_daas_ham_device_class: 'switch' },
+            fieldValues: { name: 'ATF Switch', x_daas_ham_oem_pid: 'ATF-SW-48', x_daas_ham_device_class: SWITCH },
         })
         const agreement = atf.server.recordInsert({
             $id: Now.ID['atf_owa_agreement'],
@@ -41,7 +50,7 @@ export const withinAgreementOrderTest = Test(
         atf.server.recordInsert({
             $id: Now.ID['atf_owa_quantity'],
             table: 'x_daas_ham_agreement_quantity',
-            fieldValues: { agreement: agreement.record_id, device_class: 'switch', contracted_quantity: 10 },
+            fieldValues: { agreement: agreement.record_id, device_class: SWITCH, contracted_quantity: 10 },
         })
         atf.server.recordInsert({
             $id: Now.ID['atf_owa_catalog'],
@@ -55,8 +64,8 @@ export const withinAgreementOrderTest = Test(
                 customer: customer.record_id,
                 site: site.record_id,
                 agreement: agreement.record_id,
-                order_type: 'device_add',
-                install_mode: 'fsm_engineer',
+                order_type: DEVICE_ADD,
+                install_mode: FSM_ENGINEER,
                 short_description: 'ATF within-agreement order',
             },
         })
@@ -114,7 +123,7 @@ export const offCatalogOrderTest = Test(
         const model = atf.server.recordInsert({
             $id: Now.ID['atf_ooc_model'],
             table: 'cmdb_model',
-            fieldValues: { name: 'ATF Firewall', x_daas_ham_oem_pid: 'ATF-FW-1', x_daas_ham_device_class: 'firewall' },
+            fieldValues: { name: 'ATF Firewall', x_daas_ham_oem_pid: 'ATF-FW-1', x_daas_ham_device_class: FIREWALL },
         })
         const agreement = atf.server.recordInsert({
             $id: Now.ID['atf_ooc_agreement'],
@@ -128,8 +137,8 @@ export const offCatalogOrderTest = Test(
                 customer: customer.record_id,
                 site: site.record_id,
                 agreement: agreement.record_id,
-                order_type: 'device_add',
-                install_mode: 'self_install',
+                order_type: DEVICE_ADD,
+                install_mode: SELF_INSTALL,
                 short_description: 'ATF off-catalog order',
             },
         })
