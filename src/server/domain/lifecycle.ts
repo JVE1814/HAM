@@ -1,5 +1,5 @@
 import { andEachClause } from './encoded-query.ts'
-import { INSTALL_STATUS, STAGE_FIELDS, type LegalOwner } from './vocabulary.ts'
+import { INSTALL_STATUS, STAGE_FIELDS, type DisposalMethod, type LegalOwner } from './vocabulary.ts'
 
 /**
  * Asset lifecycle stages and the moves allowed between them.
@@ -162,18 +162,41 @@ export function stageChangeRefusal(from: Stage | null, to: Stage | null, facts: 
     return verdict.allowed ? null : verdict.reason
 }
 
+/** Whose an Asset is, from its Legal owner as stored: a blank one is the Provider's (the column has no default). */
+export function legalOwnerOf(stored: LegalOwner | ''): LegalOwner {
+    return stored || 'provider'
+}
+
+/**
+ * How an Asset may leave the Provider (P2.5, D61): each Disposal method, whose Assets it retires and the stage it
+ * leaves them in. The one way out that is no Disposal method is an OEM RMA (`checkRetirement`).
+ */
+const EXIT: Record<DisposalMethod, { owner: LegalOwner; stage: Stage }> = {
+    broker_resale: { owner: 'provider', stage: 'sold' },
+    oem_takeback: { owner: 'provider', stage: 'returned_to_oem' },
+    itad_recycle: { owner: 'provider', stage: 'disposed' },
+    return_to_customer: { owner: 'customer', stage: 'returned_to_customer' },
+    return_to_lessor: { owner: 'lessor', stage: 'returned_to_lessor' },
+}
+
+/** The stage a Disposal method retires an Asset in. */
+export function disposalStage(method: DisposalMethod): Stage {
+    return EXIT[method].stage
+}
+
+/** The Disposal methods open to an Asset of this legal owner. */
+export function disposalMethodsFor(owner: LegalOwner): DisposalMethod[] {
+    return (Object.keys(EXIT) as DisposalMethod[]).filter((method) => EXIT[method].owner === owner)
+}
+
 /** The legal owner decides how an Asset may leave; a Lessor's reaches the OEM only on an OEM RMA, not as a takeback. */
 function checkRetirement(from: Stage, to: Stage, facts: TransitionFacts): TransitionVerdict {
-    const exitFor: Record<LegalOwner, readonly Stage[]> = {
-        provider: ['disposed', 'sold', 'returned_to_oem'],
-        customer: ['returned_to_customer'],
-        lessor: ['returned_to_lessor', 'returned_to_oem'],
-    }
-    const owner = facts.legalOwner || 'provider'
-    if (!exitFor[owner].includes(to)) {
+    const owner = legalOwnerOf(facts.legalOwner)
+    const toOemForLessor = owner === 'lessor' && to === 'returned_to_oem'
+    if (!toOemForLessor && !disposalMethodsFor(owner).some((method) => disposalStage(method) === to)) {
         return { allowed: false, reason: `A ${owner}-owned asset cannot leave as ${to}` }
     }
-    if (owner === 'lessor' && to === 'returned_to_oem' && from !== 'pending_oem_rma') {
+    if (toOemForLessor && from !== 'pending_oem_rma') {
         return { allowed: false, reason: 'A lessor-owned asset goes to the OEM only under an OEM RMA' }
     }
     if (!facts.wipeEvidenceComplete) {

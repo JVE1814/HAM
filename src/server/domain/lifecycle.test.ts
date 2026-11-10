@@ -4,6 +4,7 @@ import {
     billingChange,
     checkTransition,
     DEPLOYED_STAGES,
+    disposalStage,
     fieldsOf,
     isBillable,
     isDeployed,
@@ -56,6 +57,16 @@ describe('stage mapping', () => {
     it('reads the combination every stage is stored as back as that stage', () => {
         const stored = ALL_STAGES.map((stage) => fieldsOf(stage))
         for (const [i, fields] of stored.entries()) expect(stageOf(fields)).toBe(ALL_STAGES[i])
+    })
+})
+
+describe('disposalStage', () => {
+    it('maps each disposal method to the retired stage', () => {
+        expect(disposalStage('broker_resale')).toBe('sold')
+        expect(disposalStage('oem_takeback')).toBe('returned_to_oem')
+        expect(disposalStage('itad_recycle')).toBe('disposed')
+        expect(disposalStage('return_to_customer')).toBe('returned_to_customer')
+        expect(disposalStage('return_to_lessor')).toBe('returned_to_lessor')
     })
 })
 

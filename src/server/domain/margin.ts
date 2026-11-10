@@ -1,6 +1,7 @@
 import { activeDays, monthBounds, type MonthBounds } from './billing.ts'
 import { addDays, addMonths } from './calendar.ts'
 import { evenShare } from './leases.ts'
+import { legalOwnerOf } from './lifecycle.ts'
 import type { CostType, LegalOwner } from './vocabulary.ts'
 
 /** Cost facts and Margin per Customer and Site (P3.28, D72). */
@@ -48,7 +49,7 @@ export function serviceIntervalCosts(
 ): Array<Pick<CostEntry, 'type' | 'amount'>> {
     const share = activeDays(bounds, interval.start, interval.end) / bounds.days
     const costs: Array<Pick<CostEntry, 'type' | 'amount'>> = []
-    const owner = asset.legalOwner || 'provider'
+    const owner = legalOwnerOf(asset.legalOwner)
     if (owner === 'provider' && asset.purchaseCost > 0 && amortisationMonths > 0) {
         const writeOff = writeOffShare(interval, writeOffStart(asset), bounds, amortisationMonths)
         const monthly = asset.purchaseCost / amortisationMonths

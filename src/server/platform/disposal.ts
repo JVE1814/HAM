@@ -4,10 +4,9 @@ import {
     disposalCustomerFindings,
     disposalLineBlockers,
     disposalScopeRefusal,
-    disposalStage,
     type DisposalAsset,
 } from '../domain/disposal.ts'
-import type { Stage } from '../domain/lifecycle.ts'
+import { disposalStage, type Stage } from '../domain/lifecycle.ts'
 import type { DisposalMethod, LegalOwner } from '../domain/vocabulary.ts'
 import {
     customerAdminIds,
