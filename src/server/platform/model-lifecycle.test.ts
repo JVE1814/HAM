@@ -7,130 +7,44 @@ import {
     writeModelLifecycle,
     writingModelLifecycle,
 } from './model-lifecycle.ts'
+import { platform, type Row } from '../test-support/fake-glide.ts'
 
 /*
- * The repository run against an in-memory stand-in for the platform's Model lifecycle table, which applies the
+ * The repository run against the in-memory stand-in for the platform, whose Model lifecycle table applies the
  * platform's own rules as read on the instance (module comment): a start date is required, and one Model has one
  * active row per lifecycle type, phase and source.
  */
 
-type Row = Record<string, string>
+vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
-const platform = vi.hoisted(() => ({
-    rows: [] as Array<Record<string, string>>,
-    /** OEM PID by Model sys_id: a Model without one is the Provider IT's. */
-    pids: {} as Record<string, string>,
-    events: [] as Array<{ name: string; row: string; parm1: string }>,
-    /** Why an insert or update of a row is refused, beyond the platform's rules. */
-    refuses: (() => '') as (row: Record<string, string>) => string,
-    /** Called with each row as it is saved. */
-    onSave: (() => undefined) as (row: Record<string, string>) => void,
-}))
+const TABLE = 'cmdb_model_lifecycle'
 
-vi.mock('@servicenow/glide', () => {
-    const PARENT = 'cmdb_model_lifecycle'
-    const valueOf = (row: Row, field: string): string =>
-        field === 'model.x_daas_ham_oem_pid' ? (platform.pids[row.model ?? ''] ?? '') : (row[field] ?? '')
-    const holds = (row: Row, term: string): boolean => {
-        const empty = /^([\w.]+)ISNOTEMPTY$/.exec(term)
-        if (empty) return valueOf(row, empty[1] ?? '') !== ''
-        const anyOf = /^([\w.]+)IN(.*)$/.exec(term)
-        if (anyOf) return (anyOf[2] ?? '').split(',').includes(valueOf(row, anyOf[1] ?? ''))
-        const [field, value] = term.split('=')
-        return valueOf(row, field ?? '') === value
-    }
-    /** The Models as cmdb_model rows: every one the test names, with its OEM PID. */
-    const models = (): Row[] =>
-        Object.entries(platform.pids).map(([sysId, pid]) => ({ sys_id: sysId, sys_class_name: 'cmdb_model', x_daas_ham_oem_pid: pid }))
-    const refusal = (row: Row): string => {
-        if (!row.start_date) return 'Phase start date is invalid or not provided'
-        const twin = platform.rows.find(
-            (other) =>
-                other !== row &&
-                other.sys_id !== row.sys_id &&
-                row.active === 'true' &&
-                ['model', 'lifecycle_type', 'lifecycle_phase', 'source', 'active'].every((field) => other[field] === row[field]),
-        )
-        return twin ? 'A record with the same combination already exists' : platform.refuses(row)
-    }
-    class GlideRecord {
-        private terms: string[] = []
-        private order = ''
-        private found: Row[] = []
-        private at = -1
-        private row: Row = {}
-        private error = ''
-        constructor(private readonly table: string) {}
-        addQuery(field: string, value: string): void {
-            this.terms.push(`${field}=${value}`)
-        }
-        addEncodedQuery(query: string): void {
-            this.terms.push(...query.split('^'))
-        }
-        orderBy(field: string): void {
-            this.order = field
-        }
-        query(): void {
-            const rows = this.table === 'cmdb_model' ? models() : platform.rows
-            this.found = rows
-                .filter((row) => (this.table === PARENT || row.sys_class_name === this.table) && this.terms.every((term) => holds(row, term)))
-                .sort((a, b) => valueOf(a, this.order).localeCompare(valueOf(b, this.order)))
-            this.at = -1
-        }
-        next(): boolean {
-            this.at++
-            const row = this.found[this.at]
-            if (row) this.row = { ...row }
-            return row !== undefined
-        }
-        get(sysId: string): boolean {
-            this.addQuery('sys_id', sysId)
-            this.query()
-            return this.next()
-        }
-        initialize(): void {
-            this.row = { sys_class_name: this.table }
-        }
-        getValue(field: string): string | null {
-            return this.row[field] || null
-        }
-        setValue(field: string, value: string | boolean): void {
-            this.row[field] = String(value)
-        }
-        getUniqueValue(): string {
-            return this.row.sys_id ?? ''
-        }
-        getLastErrorMessage(): string {
-            return this.error
-        }
-        insert(): string | null {
-            this.row.sys_id = `row${platform.rows.length + 1}`
-            return this.save(() => platform.rows.push({ ...this.row }))
-        }
-        update(): string | null {
-            return this.save(() => Object.assign(platform.rows.find((row) => row.sys_id === this.row.sys_id) ?? {}, this.row))
-        }
-        private save(store: () => void): string | null {
-            this.error = refusal(this.row)
-            if (this.error) return null
-            this.row.sys_updated_on = String(platform.rows.length + platform.events.length).padStart(6, '0')
-            platform.onSave(this.row)
-            store()
-            return this.row.sys_id ?? null
-        }
-    }
-    const gs = {
-        eventQueue: (name: string, record: GlideRecord, parm1: string) => platform.events.push({ name, row: record.getUniqueValue(), parm1 }),
-    }
-    return { GlideRecord, gs }
-})
+function platformRules(row: Row, others: Row[]): string {
+    if (!row.start_date) return 'Phase start date is invalid or not provided'
+    const twin = others.find(
+        (other) =>
+            row.active === 'true' && ['model', 'lifecycle_type', 'lifecycle_phase', 'source', 'active'].every((field) => other[field] === row[field]),
+    )
+    return twin ? 'A record with the same combination already exists' : ''
+}
+
+/** The Models there are, by sys_id, each with its OEM PID: a Model without one is the Provider IT's. */
+function models(pids: Record<string, string>): void {
+    platform.tables.cmdb_model = Object.entries(pids).map(([sysId, pid]) => ({ sys_id: sysId, x_daas_ham_oem_pid: pid }))
+}
+
+/** The Model lifecycle rows of either class. */
+const rows = (): Row[] => (platform.tables[TABLE] ??= [])
+
+/** The events queued: on which record, and its first parameter. */
+const queued = () => platform.events.map(({ name, record, parm1 }) => ({ name, row: record, parm1 }))
 
 const MODEL = 'model1'
 
 /** A row another source keeps: active, a manufacturer's milestone of ServiceNow's content service unless said otherwise. */
 function stored(row: Row): void {
-    const sysId = `row${platform.rows.length + 1}`
-    platform.rows.push({
+    const sysId = `row${rows().length + 1}`
+    rows().push({
         sys_id: sysId,
         sys_class_name: 'cmdb_hardware_model_lifecycle',
         model: MODEL,
@@ -143,21 +57,21 @@ function stored(row: Row): void {
 }
 
 const rowsOf = (modelId: string) =>
-    platform.rows.filter((row) => row.model === modelId).map((row) => `${row.lifecycle_phase} ${row.start_date} ${row.source} ${row.description ?? ''}`.trim())
+    rows().filter((row) => row.model === modelId).map((row) => `${row.lifecycle_phase} ${row.start_date} ${row.source} ${row.description ?? ''}`.trim())
 
 beforeEach(() => {
-    platform.rows = []
-    platform.pids = { [MODEL]: 'C9300-48P-E' }
-    platform.events = []
-    platform.refuses = () => ''
-    platform.onSave = () => undefined
+    platform.reset()
+    platform.parents = { cmdb_hardware_model_lifecycle: [TABLE] }
+    platform.references = { [`${TABLE}.model`]: 'cmdb_model' }
+    platform.constraints[TABLE] = platformRules
+    models({ [MODEL]: 'C9300-48P-E' })
 })
 
 describe('writeModelLifecycle', () => {
     it('stores each milestone given on a row of its own: a hardware lifecycle row of the manufacturer, active, with its provenance', () => {
         const written = writeModelLifecycle(MODEL, { endOfSale: '2028-10-31', endOfSupport: '2033-10-31' }, { source: 'cisco', reference: 'https://example.test/eol.html' })
         expect(written).toEqual({ inserted: 2, updated: 0, unchanged: 0, refused: [] })
-        expect(platform.rows).toEqual([
+        expect(rows()).toEqual([
             expect.objectContaining({
                 sys_class_name: 'cmdb_hardware_model_lifecycle',
                 model: MODEL,
@@ -179,17 +93,17 @@ describe('writeModelLifecycle', () => {
         writeModelLifecycle(MODEL, { endOfSale: '2028-10-31', endOfSupport: '2033-10-31', endOfLife: '2035-10-31' }, { source: 'csv' })
         expect(marked).toEqual([true, true, true])
         expect(writingModelLifecycle(MODEL)).toBe(false)
-        expect(platform.events).toEqual([{ name: EVENT.lifecycleChanged, row: MODEL, parm1: MODEL }])
+        expect(queued()).toEqual([{ name: EVENT.lifecycleChanged, row: MODEL, parm1: MODEL }])
     })
 
     it('leaves a milestone stored as given alone, and queues nothing', () => {
         writeModelLifecycle(MODEL, { endOfSale: '2028-10-31' }, { source: 'csv', reference: 'EOL-1' })
         platform.events = []
         const saves: Row[] = []
-        platform.onSave = (row) => saves.push(row)
+        platform.onSave = (_table, row) => saves.push(row)
         expect(writeModelLifecycle(MODEL, { endOfSale: '2028-10-31' }, { source: 'csv', reference: 'EOL-1' })).toEqual({ inserted: 0, updated: 0, unchanged: 1, refused: [] })
         expect(saves).toEqual([])
-        expect(platform.events).toEqual([])
+        expect(queued()).toEqual([])
     })
 
     it('replaces a date the source gives and keeps the milestones it does not give', () => {
@@ -202,7 +116,7 @@ describe('writeModelLifecycle', () => {
             'end_of_life 2035-10-31 internal CSV import: EOL-1',
             'end_of_support 2033-10-31 internal Cisco EoX API',
         ])
-        expect(platform.events).toHaveLength(1)
+        expect(queued()).toHaveLength(1)
     })
 
     it('records a new provenance of an unchanged date without queueing the recomputation', () => {
@@ -210,7 +124,7 @@ describe('writeModelLifecycle', () => {
         platform.events = []
         expect(writeModelLifecycle(MODEL, { endOfSale: '2028-10-31' }, { source: 'cisco' }).updated).toBe(1)
         expect(rowsOf(MODEL)).toEqual(['end_of_sale 2028-10-31 internal Cisco EoX API'])
-        expect(platform.events).toEqual([])
+        expect(queued()).toEqual([])
     })
 
     it('updates the row kept by hand in the parent class rather than adding a second one the platform would refuse', () => {
@@ -220,17 +134,17 @@ describe('writeModelLifecycle', () => {
     })
 
     it('reports each milestone the platform refuses with its reason, and saves the others', () => {
-        platform.refuses = (row) => (row.lifecycle_phase === 'end_of_support' ? 'aborted by a rule' : '')
+        platform.refuses = (_table, row) => (row.lifecycle_phase === 'end_of_support' ? 'aborted by a rule' : '')
         const written = writeModelLifecycle(MODEL, { endOfSale: '2028-10-31', endOfSupport: '2033-10-31' }, { source: 'csv' })
         expect(written).toEqual({ inserted: 1, updated: 0, unchanged: 0, refused: ['end of support: aborted by a rule'] })
         expect(rowsOf(MODEL)).toEqual(['end_of_sale 2028-10-31 internal CSV import'])
-        expect(platform.events).toHaveLength(1)
+        expect(queued()).toHaveLength(1)
     })
 
     it('writes nothing for a source that gives no milestone', () => {
         expect(writeModelLifecycle(MODEL, {}, { source: 'csv' })).toEqual({ inserted: 0, updated: 0, unchanged: 0, refused: [] })
-        expect(platform.rows).toEqual([])
-        expect(platform.events).toEqual([])
+        expect(rows()).toEqual([])
+        expect(queued()).toEqual([])
     })
 })
 
@@ -264,7 +178,7 @@ describe('readModelLifecycle', () => {
 
 describe('queueModelsReachingMilestone', () => {
     it('queues each NaaS Model with a milestone dated that day once, whatever its source', () => {
-        platform.pids = { [MODEL]: 'C9300-48P-E', model2: 'FG-60F', laptop: '' }
+        models({ [MODEL]: 'C9300-48P-E', model2: 'FG-60F', laptop: '' })
         stored({ lifecycle_phase: 'end_of_sale', start_date: '2026-11-09' })
         stored({ lifecycle_phase: 'end_of_support', start_date: '2026-11-09', source: 'internal' })
         stored({ lifecycle_phase: 'end_of_life', start_date: '2026-11-09', model: 'model2', source: 'internal' })
@@ -272,17 +186,17 @@ describe('queueModelsReachingMilestone', () => {
         stored({ lifecycle_phase: 'end_of_sale', start_date: '2026-11-09', model: 'laptop', source: 'internal' })
         stored({ lifecycle_phase: 'end_of_sale', start_date: '2026-11-09', model: 'model3', active: 'false' })
         queueModelsReachingMilestone('2026-11-09')
-        expect(platform.events.map((event) => event.parm1).sort()).toEqual([MODEL, 'model2'])
-        expect(platform.events.every((event) => event.name === EVENT.lifecycleChanged)).toBe(true)
+        expect(queued().map((event) => event.parm1).sort()).toEqual([MODEL, 'model2'])
+        expect(queued().every((event) => event.name === EVENT.lifecycleChanged)).toBe(true)
     })
 })
 
 describe('queueModelRefresh', () => {
     it('queues the event on the Model, for a NaaS Model only', () => {
-        platform.pids = { [MODEL]: 'C9300-48P-E', laptop: '' }
+        models({ [MODEL]: 'C9300-48P-E', laptop: '' })
         queueModelRefresh(MODEL)
         queueModelRefresh('laptop')
         queueModelRefresh('gone')
-        expect(platform.events).toEqual([{ name: EVENT.lifecycleChanged, row: MODEL, parm1: MODEL }])
+        expect(queued()).toEqual([{ name: EVENT.lifecycleChanged, row: MODEL, parm1: MODEL }])
     })
 })
