@@ -135,6 +135,5 @@ export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPI
     if (outcome.lines === 0) {
         return reply(response, 422, { error: 'No device could be added: each is already on a return or was refused' })
     }
-    const returnOrder = findById('x_daas_ham_return_order', outcome.returnOrderId)?.getDisplayValue('number') ?? outcome.returnOrderId
-    reply(response, 201, { returnOrder } satisfies ReturnRequestReceipt)
+    reply(response, 201, { returnOrder: outcome.number } satisfies ReturnRequestReceipt)
 }

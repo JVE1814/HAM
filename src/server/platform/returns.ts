@@ -66,9 +66,9 @@ export interface ReturnRequest {
     description: string
 }
 
-/** A Return order raised, with how many of its Assets got a line. */
+/** A Return order raised: its number, and how many of its Assets got a line. */
 export interface RaisedReturn {
-    returnOrderId: string
+    number: string
     lines: number
 }
 
@@ -162,7 +162,7 @@ function fillReturn(order: GlideRecord, request: ReturnRequest): RaisedReturn {
     }
     // Its lines and moves are saved, but a Return without its due date is never chased: logged to set it by hand.
     if (!order.update()) warnRefused(order, `Return ${str(order, 'number')} due date, state and links not saved`)
-    return { returnOrderId: order.getUniqueValue(), lines }
+    return { number: str(order, 'number'), lines }
 }
 
 /** A request to take equipment back from a Site, as the record producer and the customer page make it. */
