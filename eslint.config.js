@@ -43,9 +43,10 @@ export default tseslint.config(
     // The instance stores each server module as a sys_module whose path ends in ".ts" and resolves an import by that
     // exact path, so a relative import without the extension builds and passes every unit test, then fails on the
     // instance the first time its module loads.
+    // src/server/test-support/ is test code like *.test.ts: the build leaves it out (src/server/tsconfig.json).
     {
         files: ['src/server/**/*.ts'],
-        ignores: ['**/*.test.ts'],
+        ignores: ['**/*.test.ts', 'src/server/test-support/**'],
         rules: { 'no-restricted-imports': ['error', { patterns: [EXTENSIONLESS] }] },
     },
     // ADR 0003: the domain core never reaches Glide or the layers above it, and platform never reaches entry.

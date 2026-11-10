@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { recordMatches as matches } from '../test-support/encoded-query'
 import { naasStockroomCondition, outsideNaasStockroomCondition } from './fleet'
 import {
     actsAsCustomerAdmin,
@@ -109,31 +110,6 @@ describe('visibilityFilter', () => {
         )
     })
 })
-
-/**
- * Whether a record (its field values, '' for blank) matches an encoded query of the forms visibilityFilter builds:
- * conditions joined by ^ (AND) and ^OR (OR, which binds tighter). A blank value matches neither IN nor NOT IN, as in
- * SQL, so a condition that should take in a blank one must say ISEMPTY.
- */
-function matches(query: string, record: Record<string, string>): boolean {
-    if (!query) return true
-    const groups: string[][] = []
-    for (const token of query.split('^')) {
-        if (token.startsWith('OR') && groups.length > 0) groups[groups.length - 1].push(token.slice(2))
-        else groups.push([token])
-    }
-    const holds = (condition: string): boolean => {
-        const [, field, operator, operand] = /^([\w.]+?)(NOT IN|IN|ISEMPTY|=)(.*)$/.exec(condition) ?? []
-        if (!field) throw new Error(`unparsed condition ${condition}`)
-        const value = record[field] ?? ''
-        if (operator === 'ISEMPTY') return value === ''
-        if (value === '') return false
-        if (operator === 'IN') return operand.split(',').includes(value)
-        if (operator === 'NOT IN') return !operand.split(',').includes(value)
-        return value === operand
-    }
-    return groups.every((group) => group.some(holds))
-}
 
 /** Every combination of `values` for `fields`, as records. */
 function records(values: Record<string, readonly string[]>): Array<Record<string, string>> {

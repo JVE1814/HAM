@@ -86,7 +86,9 @@ function filesUnder(dir: string): string[] {
 /** What the metadata is built from: the Fluent sources, the server code they import, and the two files that name the package. */
 function sources(): string[] {
     const fluent = filesUnder(join(ROOT, 'src/fluent')).filter((path) => !path.includes('/generated/'))
-    const server = filesUnder(join(ROOT, 'src/server')).filter((path) => path.endsWith('.ts') && !path.endsWith('.test.ts'))
+    const server = filesUnder(join(ROOT, 'src/server')).filter(
+        (path) => path.endsWith('.ts') && !path.endsWith('.test.ts') && !path.includes('/test-support/'),
+    )
     return [...fluent, ...server, join(ROOT, 'package.json'), join(ROOT, 'now.config.json')]
 }
 

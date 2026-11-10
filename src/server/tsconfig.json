@@ -21,6 +21,7 @@
     ],
     "exclude": [
         "**/*.now.ts",
-        "**/*.test.ts"
+        "**/*.test.ts",
+        "test-support/**"
     ]
 }
