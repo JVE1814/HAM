@@ -1,9 +1,9 @@
-import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { coverageDisposition, type CoverageAnswer } from '../domain/coverage.ts'
 import { naasModelCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
 import { enabledRoutes, type CoverageRoute } from '../domain/oem/adapters.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
-import { nowMs } from './clock.ts'
+import { daysAgoGlide, nowMs } from './clock.ts'
 import { applyCoverage, staleAssets } from './coverage.ts'
 import { writeModelLifecycle } from './model-lifecycle.ts'
 import { oemContext, oemEnabled } from './oem-http.ts'
@@ -65,14 +65,13 @@ export function syncLifecycle(): void {
 export function syncCoverage(): void {
     const started = nowMs()
     const budgetMs = intProperty(PROPERTY.jobBudgetSeconds) * 1000
-    const staleBefore = new GlideDateTime()
-    staleBefore.addDaysUTC(-intProperty(PROPERTY.coverageRefreshDays))
+    const staleBefore = daysAgoGlide(intProperty(PROPERTY.coverageRefreshDays))
     let due = enabledRoutes('coverage', oemEnabled)
     for (let round = 0; due.length > 0; round++) {
         const behind: typeof due = []
         for (const turn of due) {
             if (round > 0 && nowMs() - started > budgetMs) return
-            if (syncCoverageBatch(turn.vendor, turn.route, staleBefore.getValue())) behind.push(turn)
+            if (syncCoverageBatch(turn.vendor, turn.route, staleBefore)) behind.push(turn)
         }
         due = behind
     }

@@ -5,7 +5,7 @@ import { TRY_AGAIN, type HeldLock, type TryAgain } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { sitePackageHoldersQuery } from '../domain/returns.ts'
 import { SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
-import { nowMs } from './clock.ts'
+import { todayIso } from './clock.ts'
 import { withLockTries } from './locks.ts'
 import { exists, findById, refusal, str, warnRefused } from './records.ts'
 
@@ -99,7 +99,7 @@ export function endSitePackageIfEmpty(siteId: string, agreementId: string): void
     if (exists('alm_hardware', sitePackageHoldersQuery({ siteId, agreementId }), { beyondVisibility: true })) return
     while (line.next()) {
         line.setValue('status', SUBSCRIPTION_LINE_STATUS.ended)
-        line.setValue('end_date', toIsoDate(nowMs()))
+        line.setValue('end_date', todayIso())
         // A site package bills its own dates, and no later unit leaving ends it: logged for finance to end by hand.
         if (!line.update()) warnRefused(line, `Site package "${str(line, 'description')}" not ended`)
     }

@@ -1,4 +1,4 @@
-import { GlideDateTime, GlideRecord } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { planShipment, replacementInstalled, type OnSiteWork } from '../domain/delivery.ts'
 import { awaitsInstall, type InstallState } from '../domain/install-confirmation.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
@@ -8,6 +8,7 @@ import { collectionMethod } from '../domain/returns.ts'
 import { type InstallMode, type OrderStage, type OrderType, SHIPMENT_DIRECTION } from '../domain/vocabulary.ts'
 import { moveAndSave, moveAsset, readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
+import { nowGlide } from './clock.ts'
 import { openFieldWork, type WorkContext } from './field-work.ts'
 import { lineAssetStages, recomputeOrder } from './fulfilment.ts'
 import { withLock } from './locks.ts'
@@ -200,7 +201,7 @@ function openOnSiteWork(order: GlideRecord, work: OnSiteWork): string | null {
  * after a unit was lost in transit, that line's new units, a hot spare allocated to it included, wait for Ship.
  */
 export function completeInstall(order: GlideRecord): number {
-    const now = new GlideDateTime().getValue()
+    const now = nowGlide()
     const asset = orderAssets(order.getUniqueValue())
     let refused = 0
     while (asset.next()) {

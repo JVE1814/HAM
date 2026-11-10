@@ -1,6 +1,6 @@
 /** Calendar dates as ISO strings (YYYY-MM-DD, UTC); instants as epoch milliseconds. */
 
-const DAY_MS = 86_400_000
+export const DAY_MS = 86_400_000
 
 /** A real calendar date written as YYYY-MM-DD: impossible days such as 2026-02-31 are refused, not rolled over into the next month. */
 export function isIsoDate(value: string): boolean {

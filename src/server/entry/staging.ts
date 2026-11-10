@@ -1,7 +1,8 @@
-import { GlideDateTime, gs, type GlideRecord } from '@servicenow/glide'
+import { gs, type GlideRecord } from '@servicenow/glide'
 import { stagingOutcome } from '../domain/staging.ts'
 import type { StagingResult } from '../domain/vocabulary.ts'
 import { releaseStepsWaitingOn } from '../platform/claim-steps.ts'
+import { nowGlide } from '../platform/clock.ts'
 import { bool, choice, str } from '../platform/records.ts'
 import { completeStaging, stagingSteps } from '../platform/staging-tasks.ts'
 
@@ -9,7 +10,7 @@ import { completeStaging, stagingSteps } from '../platform/staging-tasks.ts'
 export function stampStagingStep(current: GlideRecord): void {
     if (bool(current, 'done')) {
         current.setValue('done_by', gs.getUserID())
-        current.setValue('done_at', new GlideDateTime().getValue())
+        current.setValue('done_at', nowGlide())
     } else {
         current.setValue('done_by', '')
         current.setValue('done_at', '')

@@ -1,4 +1,4 @@
-import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import { isStateChange, type DeviceEvent } from '../domain/device-events.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import { decideInService, seenSourceOf } from '../domain/in-service.ts'
@@ -7,7 +7,7 @@ import { LOCK } from '../domain/lock-names.ts'
 import type { OrderType, SeenSource } from '../domain/vocabulary.ts'
 import { moveAndSave, readStage } from './assets.ts'
 import { runTableJob } from './chunked.ts'
-import { glideToMs, msToGlide } from './clock.ts'
+import { daysAgoGlide, glideToMs, msToGlide } from './clock.ts'
 import { applyLifecycleDates, lifecycleReaders, type LifecycleReaders } from './lifecycle-dates.ts'
 import { withLockTries } from './locks.ts'
 import { choice, deleteWhere, findById, refusal, str } from './records.ts'
@@ -142,7 +142,5 @@ function storeEvent(assetId: string, event: DeviceEvent): void {
 
 /** Drop the device events stored more than `retentionDays` ago. */
 export function purgeDeviceEventsOlderThan(retentionDays: number): void {
-    const cutoff = new GlideDateTime()
-    cutoff.addDaysUTC(-retentionDays)
-    deleteWhere('x_daas_ham_device_event', `sys_created_on<${cutoff.getValue()}`)
+    deleteWhere('x_daas_ham_device_event', `sys_created_on<${daysAgoGlide(retentionDays)}`)
 }

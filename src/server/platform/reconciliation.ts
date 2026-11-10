@@ -1,4 +1,4 @@
-import { GlideDateTime, GlideRecord } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import {
     MONITORING_EXCEPTION_TYPES,
@@ -8,7 +8,7 @@ import {
     stillSeenWithoutFleetAssetQuery,
 } from '../domain/reconciliation.ts'
 import { runTableJob } from './chunked.ts'
-import { glideToMs, nowMs } from './clock.ts'
+import { daysAgoGlide, glideToMs, nowMs } from './clock.ts'
 import { cisWithOpenException, openException, resolveExceptions, resolveExceptionsWhere, settleExceptions } from './exceptions.ts'
 import { intProperty, PROPERTY } from './properties.ts'
 import { pluck, str } from './records.ts'
@@ -70,10 +70,8 @@ const SEEN_WITHOUT_ASSET_PER_RUN = 1000
 
 /** Network CIs recently discovered at a customer Site that no fleet asset points at (`seenWithoutFleetAssetQuery`). */
 function reportSeenWithoutAsset(days: number): void {
-    const since = new GlideDateTime()
-    since.addDaysUTC(-days)
     const ci = new GlideRecord('cmdb_ci_netgear')
-    ci.addQuery('last_discovered', '>=', since.getValue())
+    ci.addQuery('last_discovered', '>=', daysAgoGlide(days))
     ci.addEncodedQuery(seenWithoutFleetAssetQuery())
     ci.setLimit(SEEN_WITHOUT_ASSET_PER_RUN)
     ci.query()

@@ -1,8 +1,8 @@
 import { GlideRecord } from '@servicenow/glide'
-import { toIsoDate } from '../domain/calendar.ts'
+import { addDays } from '../domain/calendar.ts'
 import { collectionMethod, TEMPORARY_RETURN_STAGES } from '../domain/returns.ts'
 import { type InstallMode, ORDER_STAGE, type OrderType } from '../domain/vocabulary.ts'
-import { nowMs, todayIso } from './clock.ts'
+import { todayIso } from './clock.ts'
 import { installedAssetIds, installedAssetIdsBySite } from './installed-assets.ts'
 import { intProperty, PROPERTY } from './properties.ts'
 import { findById, str } from './records.ts'
@@ -69,7 +69,7 @@ function recoverEndedAgreements(today: string): void {
 /** Temporary deployments ending within the lead time bring their equipment back, once. */
 function returnTemporaryDeployments(today: string): void {
     const leadDays = intProperty(PROPERTY.temporaryReturnLeadDays)
-    const horizon = toIsoDate(nowMs() + leadDays * 86_400_000)
+    const horizon = addDays(today, leadDays)
     const order = new GlideRecord('x_daas_ham_order')
     const temporary: OrderType = 'temporary'
     order.addQuery('order_type', temporary)
