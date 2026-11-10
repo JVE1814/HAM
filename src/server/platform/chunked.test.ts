@@ -2,142 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { inCurrentPass, queuePass, runEventTableJob, runTableJob, visitInKeyOrder, type PassJob } from './chunked.ts'
 import type { JobEvent } from './events.ts'
 import { completePass, findJobCursor, isCurrentPass, JOB_STATUS, openJobCursor, retirePass, startPass } from './job-cursor.ts'
+import { platform, type Row } from '../test-support/fake-glide.ts'
 
 /*
- * The job-cursor repository and the event runner run against an in-memory stand-in for the platform: tables with the
- * unique indexes the two job tables have (job cursor by job, job lock by name), an event queue and a clock.
+ * The job-cursor repository and the event runner run against the in-memory stand-in for the platform, with the unique
+ * indexes the two job tables have (job cursor by job, job lock by name), an event queue and a clock.
  */
 
-type Row = Record<string, string>
-
-const platform = vi.hoisted(() => ({
-    tables: {} as Record<string, Array<Record<string, string>>>,
-    events: [] as Array<{ name: string; record: string; parm1: string; parm2: string; delayed: boolean }>,
-    logs: [] as string[],
-    properties: {} as Record<string, string>,
-    clock: 1762689600000,
-    /** Why an insert or update of a row is refused, beyond the unique indexes ('' lets it through). */
-    refuses: (() => '') as (table: string, row: Record<string, string>) => string,
-    ids: 0,
-}))
-
-vi.mock('@servicenow/glide', () => {
-    const UNIQUE: Record<string, string> = { x_daas_ham_job_cursor: 'job', x_daas_ham_job_lock: 'name' }
-    const rowsOf = (table: string): Row[] => (platform.tables[table] ??= [])
-    const holds = (row: Row, term: string): boolean => {
-        const after = /^(\w+)>(.*)$/.exec(term)
-        if (after) return (row[after[1] ?? ''] ?? '') > (after[2] ?? '')
-        const before = /^(\w+)<(.*)$/.exec(term)
-        if (before) return (row[before[1] ?? ''] ?? '') < (before[2] ?? '')
-        const [field, value] = term.split('=')
-        return (row[field ?? ''] ?? '') === value
-    }
-    const stamp = (ms: number): string => new Date(ms).toISOString().slice(0, 19).replace('T', ' ')
-    class GlideRecord {
-        private terms: string[] = []
-        private order = ''
-        private limit = Infinity
-        private found: Row[] = []
-        private at = -1
-        private row: Row = {}
-        private error = ''
-        constructor(private readonly table: string) {}
-        addQuery(field: string, operatorOrValue: string, value?: string): void {
-            this.terms.push(value === undefined ? `${field}=${operatorOrValue}` : `${field}${operatorOrValue}${value}`)
-        }
-        addEncodedQuery(query: string): void {
-            this.terms.push(...query.split('^').filter(Boolean))
-        }
-        orderBy(field: string): void {
-            this.order = field
-        }
-        setLimit(limit: number): void {
-            this.limit = limit
-        }
-        setWorkflow(): void {}
-        query(): void {
-            this.found = rowsOf(this.table)
-                .filter((row) => this.terms.every((term) => holds(row, term)))
-                .sort((a, b) => (a[this.order] ?? '').localeCompare(b[this.order] ?? ''))
-                .slice(0, this.limit)
-            this.at = -1
-        }
-        hasNext(): boolean {
-            return this.at + 1 < this.found.length
-        }
-        next(): boolean {
-            this.at++
-            const row = this.found[this.at]
-            if (row) this.row = { ...row }
-            return row !== undefined
-        }
-        get(fieldOrId: string, value?: string): boolean {
-            this.terms = [value === undefined ? `sys_id=${fieldOrId}` : `${fieldOrId}=${value}`]
-            this.query()
-            return this.next()
-        }
-        initialize(): void {
-            this.row = {}
-        }
-        getValue(field: string): string | null {
-            return this.row[field] || null
-        }
-        setValue(field: string, value: string | number): void {
-            this.row[field] = String(value)
-        }
-        getUniqueValue(): string {
-            return this.row.sys_id ?? ''
-        }
-        getLastErrorMessage(): string {
-            return this.error
-        }
-        insert(): string | null {
-            const rows = rowsOf(this.table)
-            const key = UNIQUE[this.table]
-            this.error = key && rows.some((row) => row[key] === this.row[key]) ? 'Unique Key violation detected by database' : platform.refuses(this.table, this.row)
-            if (this.error) return null
-            this.row.sys_id = `id${String(++platform.ids).padStart(4, '0')}`
-            this.row.sys_created_on = stamp(platform.clock)
-            rows.push({ ...this.row })
-            return this.row.sys_id
-        }
-        update(): string | null {
-            this.error = platform.refuses(this.table, this.row)
-            if (this.error) return null
-            Object.assign(rowsOf(this.table).find((row) => row.sys_id === this.row.sys_id) ?? {}, this.row)
-            return this.row.sys_id ?? null
-        }
-        deleteRecord(): void {
-            platform.tables[this.table] = rowsOf(this.table).filter((row) => row.sys_id !== this.row.sys_id)
-        }
-        deleteMultiple(): void {
-            platform.tables[this.table] = rowsOf(this.table).filter((row) => !this.terms.every((term) => holds(row, term)))
-        }
-    }
-    class GlideDateTime {
-        private ms = platform.clock
-        getNumericValue(): number {
-            return this.ms
-        }
-        addSeconds(seconds: number): void {
-            this.ms += seconds * 1000
-        }
-        getValue(): string {
-            return stamp(this.ms)
-        }
-    }
-    class GlideAggregate {}
-    const queue = (delayed: boolean) => (name: string, record: GlideRecord, parm1: string, parm2: string) =>
-        platform.events.push({ name, record: record.getUniqueValue(), parm1, parm2, delayed })
-    const gs = {
-        eventQueue: queue(false),
-        eventQueueScheduled: queue(true),
-        warn: (message: string) => platform.logs.push(`warn ${message}`),
-        error: (message: string) => platform.logs.push(`error ${message}`),
-        getProperty: (name: string, fallback: string) => platform.properties[name] ?? fallback,
-    }
-    return { GlideRecord, GlideDateTime, GlideAggregate, gs }
-})
+vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const CURSORS = 'x_daas_ham_job_cursor'
 const LOCKS = 'x_daas_ham_job_lock'
@@ -194,13 +66,10 @@ function lockedPass(jobName: string, onStart: () => void = () => undefined) {
 }
 
 beforeEach(() => {
-    platform.tables = {}
-    platform.events = []
-    platform.logs = []
+    platform.reset()
+    platform.uniqueKeys = { [CURSORS]: 'job', [LOCKS]: 'name' }
     platform.properties = { 'x_daas_ham.job.batch_size': '2', 'x_daas_ham.job.budget_seconds': '120' }
     platform.clock = 1762689600000
-    platform.refuses = () => ''
-    platform.ids = 0
 })
 
 describe('the job cursor repository', () => {
