@@ -11,6 +11,7 @@ import {
 } from '@servicenow/sdk/core'
 import { MATCH_TYPE_CHOICES, NORM_EXCEPTION_STATUS_CHOICES } from '../../server/domain/vocabulary'
 import { NAAS_MODEL_CONDITION } from '../../server/domain/fleet'
+import { DEFAULT_RULE_ORDER } from '../../server/domain/normalization'
 
 /** A raw manufacturer string seen in discovery, connectors or ASNs, mapped to the canonical manufacturer. */
 export const x_daas_ham_manufacturer_alias = Table({
@@ -29,7 +30,7 @@ export const x_daas_ham_model_match_rule = Table({
     name: 'x_daas_ham_model_match_rule',
     label: 'Model match rule',
     schema: {
-        order: IntegerColumn({ label: 'Order', default: 100, mandatory: true }),
+        order: IntegerColumn({ label: 'Order', default: DEFAULT_RULE_ORDER, mandatory: true }),
         manufacturer: ReferenceColumn({ label: 'Manufacturer', referenceTable: 'core_company', mandatory: true }),
         match_type: ChoiceColumn({
             label: 'Match type',

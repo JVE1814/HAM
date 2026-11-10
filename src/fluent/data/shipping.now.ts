@@ -2,6 +2,7 @@ import '@servicenow/sdk/global'
 import { ChoiceColumn, DateColumn, DateTimeColumn, DecimalColumn, IntegerColumn, ReferenceColumn, StringColumn, Table, UrlColumn } from '@servicenow/sdk/core'
 import { SHIPMENT_DIRECTION_CHOICES, SHIPMENT_STATUS_CHOICES } from '../../server/domain/vocabulary'
 import { NAAS_STOCKROOM_CONDITION } from '../../server/domain/fleet'
+import { TRACKING_DESCRIPTION_LENGTH, TRACKING_LOCATION_LENGTH } from '../../server/domain/shipping'
 
 /* Shipments bought through the shipping aggregator and their tracking events (P3.26, D73). */
 
@@ -38,7 +39,7 @@ export const x_daas_ham_shipment = Table({
         // The carrier's currency for the cost, as the aggregator gives it (no default): Margin counts the cost in it.
         currency: StringColumn({ label: 'Currency', maxLength: 3, readOnly: true }),
         status: ChoiceColumn({ label: 'Status', choices: SHIPMENT_STATUS_CHOICES, default: 'label_created', readOnly: true, dropdown: 'dropdown_without_none' }),
-        status_detail: StringColumn({ label: 'Latest update', maxLength: 255, readOnly: true }),
+        status_detail: StringColumn({ label: 'Latest update', maxLength: TRACKING_DESCRIPTION_LENGTH, readOnly: true }),
         estimated_delivery: DateColumn({ label: 'Estimated delivery', readOnly: true }),
         delivered_at: DateTimeColumn({ label: 'Delivered at', readOnly: true }),
     },
@@ -57,8 +58,8 @@ export const x_daas_ham_shipment_event = Table({
         shipment: ReferenceColumn({ label: 'Shipment', referenceTable: 'x_daas_ham_shipment', mandatory: true, cascadeRule: 'delete' }),
         occurred_at: StringColumn({ label: 'Occurred at (carrier time)', maxLength: 40 }),
         status: ChoiceColumn({ label: 'Status', choices: SHIPMENT_STATUS_CHOICES }),
-        description: StringColumn({ label: 'Description', maxLength: 255 }),
-        location: StringColumn({ label: 'Location', maxLength: 120 }),
+        description: StringColumn({ label: 'Description', maxLength: TRACKING_DESCRIPTION_LENGTH }),
+        location: StringColumn({ label: 'Location', maxLength: TRACKING_LOCATION_LENGTH }),
     },
     index: [{ name: 'x_daas_ham_she_shipment', unique: false, element: 'shipment' }],
 })

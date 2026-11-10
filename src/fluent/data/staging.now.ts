@@ -17,6 +17,8 @@ import {
     STAGING_SOURCE_CHOICES,
 } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION } from '../../server/domain/fleet'
+import { DEFAULT_STAGING_SOURCE } from '../../server/domain/staging'
+import { AUTOMATION_MESSAGE_LENGTH } from '../../server/domain/oem/claims'
 
 /** Preparing one Asset before shipment. */
 export const x_daas_ham_staging_task = Table({
@@ -30,7 +32,7 @@ export const x_daas_ham_staging_task = Table({
             label: 'Staging source',
             choices: STAGING_SOURCE_CHOICES,
             mandatory: true,
-            default: 'in_house',
+            default: DEFAULT_STAGING_SOURCE,
             dropdown: 'dropdown_without_none',
         }),
         template: ReferenceColumn({ label: 'Checklist template', referenceTable: 'x_daas_ham_staging_template' }),
@@ -71,7 +73,7 @@ export const x_daas_ham_staging_step = Table({
             choices: AUTOMATION_STATUS_CHOICES,
             readOnly: true,
         }),
-        automation_message: StringColumn({ label: 'Automation result', maxLength: 255, readOnly: true }),
+        automation_message: StringColumn({ label: 'Automation result', maxLength: AUTOMATION_MESSAGE_LENGTH, readOnly: true }),
         attempts: IntegerColumn({ label: 'Attempts', default: 0, readOnly: true }),
     },
     index: [
@@ -102,7 +104,7 @@ export const x_daas_ham_staging_template = Table({
             label: 'Staging source',
             choices: STAGING_SOURCE_CHOICES,
             mandatory: true,
-            default: 'in_house',
+            default: DEFAULT_STAGING_SOURCE,
             dropdown: 'dropdown_without_none',
         }),
         active: BooleanColumn({ label: 'Active', default: true }),

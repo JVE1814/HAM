@@ -2,7 +2,7 @@ import '@servicenow/sdk/global'
 import { Applicability, UxListMenuConfig } from '@servicenow/sdk/core'
 import { admin, broadStaffRecords, moneyReaderRecords, providerStaffRecords } from '../security/roles.now'
 import { OPEN_ORDERS_QUERY, ORDERS_AWAITING_APPROVAL_QUERY } from '../../server/domain/fulfilment'
-import { FLEET_CONDITION, FLEET_IN_STAGE, FLEET_INSTALLED, NAAS_MODEL_CONDITION, NAAS_MODEL_MILESTONES } from '../../server/domain/fleet'
+import { FLEET_CONDITION, FLEET_IN_STAGE, FLEET_INSTALLED, INSTALLED_CONDITION, NAAS_MODEL_CONDITION, NAAS_MODEL_MILESTONES } from '../../server/domain/fleet'
 import { OPEN_SHIPMENTS } from '../../server/domain/shipping'
 import { OPEN_RMAS_QUERY } from '../../server/domain/oem-rma'
 import { INSTALLED_PAST_SUPPORT } from '../../server/domain/model-lifecycle'
@@ -229,7 +229,7 @@ export const naasListMenu = UxListMenuConfig({
                     title: 'Data gaps (no tag, serial, agreement or site)',
                     order: 50,
                     table: 'alm_hardware',
-                    condition: `install_status=${INSTALL_STATUS.inUse}^asset_tagISEMPTY^ORserial_numberISEMPTY^ORx_daas_ham_agreementISEMPTY^ORx_daas_ham_siteISEMPTY^${FLEET_CONDITION}^EQ`,
+                    condition: `${INSTALLED_CONDITION}^asset_tagISEMPTY^ORserial_numberISEMPTY^ORx_daas_ham_agreementISEMPTY^ORx_daas_ham_siteISEMPTY^${FLEET_CONDITION}^EQ`,
                     columns: `${INSTALLED_ASSET_COLUMNS},x_daas_ham_agreement`,
                     applicabilities: [{ $id: Now.ID['ws_assets_gaps_aud'], applicability: staffAudience }],
                 },

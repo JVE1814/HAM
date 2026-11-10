@@ -2,6 +2,7 @@ import '@servicenow/sdk/global'
 import { ChoiceColumn, DateTimeColumn, IntegerColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 import { DEVICE_EVENT_KIND_CHOICES, DEVICE_EVENT_SOURCE_CHOICES } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION } from '../../server/domain/fleet'
+import { LOCK_NAME_LENGTH } from '../../server/domain/lock-names'
 
 /** A Seen signal (state change only) from monitoring for one Asset. */
 export const x_daas_ham_device_event = Table({
@@ -63,7 +64,7 @@ export const x_daas_ham_job_lock = Table({
     // Locks are taken and released all the time; their deletes are not worth keeping in Deleted Records.
     attributes: { no_audit_delete: true },
     schema: {
-        name: StringColumn({ label: 'Lock', maxLength: 100, mandatory: true }),
+        name: StringColumn({ label: 'Lock', maxLength: LOCK_NAME_LENGTH, mandatory: true }),
     },
     index: [{ name: 'x_daas_ham_jl_name', unique: true, element: 'name' }],
 })

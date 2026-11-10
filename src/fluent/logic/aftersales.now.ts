@@ -4,7 +4,7 @@ import { onCaseFailedAsset, uiDefectiveReturnedToOem, uiRaiseReplacement } from 
 import { onReplacementComplete } from '../../server/entry/replacements'
 import { chaseOverdueReturns, onReturnEvaluated, raiseScheduledReturns } from '../../server/entry/returns'
 import { assetManager, noc, stockroomWorkers } from '../security/roles.now'
-import { ORDER_STAGE, RETURN_LINE_STATUS, RMA_STATE } from '../../server/domain/vocabulary'
+import { ORDER_STAGE, REPLACEMENT_TIER, RETURN_LINE_STATUS, RMA_STATE } from '../../server/domain/vocabulary'
 import { PLATFORM_ROLE } from '../../server/domain/visibility'
 import { EVENT } from '../../server/platform/events'
 
@@ -88,7 +88,7 @@ Sla({
     duration: Duration({ days: 1 }),
     scheduleSource: 'no_schedule',
     conditions: {
-        start: 'x_daas_ham_failed_assetISNOTEMPTY^x_daas_ham_replacement_tier=nbd',
+        start: `x_daas_ham_failed_assetISNOTEMPTY^x_daas_ham_replacement_tier=${REPLACEMENT_TIER.nbd}`,
         stop: REPLACEMENT_COMPLETE,
         cancel: CASE_CLOSED_UNREPLACED,
     },
@@ -102,7 +102,7 @@ Sla({
     duration: Duration({ hours: 8 }),
     scheduleSource: 'no_schedule',
     conditions: {
-        start: 'x_daas_ham_failed_assetISNOTEMPTY^x_daas_ham_replacement_tier=same_day',
+        start: `x_daas_ham_failed_assetISNOTEMPTY^x_daas_ham_replacement_tier=${REPLACEMENT_TIER.same_day}`,
         stop: REPLACEMENT_COMPLETE,
         cancel: CASE_CLOSED_UNREPLACED,
     },
@@ -116,7 +116,7 @@ Sla({
     duration: Duration({ hours: 4 }),
     scheduleSource: 'no_schedule',
     conditions: {
-        start: 'x_daas_ham_failed_assetISNOTEMPTY^x_daas_ham_replacement_tier=four_hour',
+        start: `x_daas_ham_failed_assetISNOTEMPTY^x_daas_ham_replacement_tier=${REPLACEMENT_TIER.four_hour}`,
         stop: REPLACEMENT_COMPLETE,
         cancel: CASE_CLOSED_UNREPLACED,
     },

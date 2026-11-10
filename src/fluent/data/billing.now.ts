@@ -2,6 +2,7 @@ import '@servicenow/sdk/global'
 import { ChoiceColumn, DateColumn, DateTimeColumn, DecimalColumn, IntegerColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 import { BILLING_LINE_KIND_CHOICES, BILLING_PERIOD_STATUS_CHOICES } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION } from '../../server/domain/fleet'
+import { PERIOD_ERROR_LENGTH } from '../../server/domain/billing'
 
 /* Service intervals, billing periods and their lines (P3.25, D52, D66). */
 
@@ -41,13 +42,13 @@ export const x_daas_ham_billing_period = Table({
         }),
         generated_at: DateTimeColumn({ label: 'Generated at', readOnly: true }),
         failed_lines: IntegerColumn({ label: 'Lines that failed to bill', default: 0, readOnly: true }),
-        last_error: StringColumn({ label: 'Last generation error', maxLength: 255, readOnly: true }),
+        last_error: StringColumn({ label: 'Last generation error', maxLength: PERIOD_ERROR_LENGTH, readOnly: true }),
         /**
          * Service intervals, work orders and shipments the latest margin computation failed to cost (its Cost facts and
          * Margin miss them: e.g. an unknown Asset, or no currency), with the last error; both cleared as one starts.
          */
         margin_failed: IntegerColumn({ label: 'Records that failed to cost', default: 0, readOnly: true }),
-        margin_error: StringColumn({ label: 'Last margin error', maxLength: 255, readOnly: true }),
+        margin_error: StringColumn({ label: 'Last margin error', maxLength: PERIOD_ERROR_LENGTH, readOnly: true }),
         line_count: IntegerColumn({ label: 'Lines', readOnly: true }),
         // Amounts of two currencies are never added: Totals holds one total per currency (e.g. 'EUR 1234.56; USD 99.00'),
         // and Total only the one while every line is in one currency (blank when they are in several).
