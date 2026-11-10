@@ -12,7 +12,7 @@ import {
     stillCovered,
     stockReturnMoves,
 } from '../domain/leases.ts'
-import { isRetired, SERVING_STAGES, type Stage, stagesQuery, STOCK_STAGES } from '../domain/lifecycle.ts'
+import { isRetired, SERVING_STAGES, type Stage, STOCK_STAGES } from '../domain/lifecycle.ts'
 import { isFree } from '../domain/sourcing.ts'
 import { LEASE_END_ACTION, type LeaseEndAction, LEGAL_OWNER, TASK_STATE } from '../domain/vocabulary.ts'
 import { providerApproverIds } from './approvals.ts'
@@ -21,7 +21,7 @@ import { runEventTableJob } from './chunked.ts'
 import { todayIso } from './clock.ts'
 import { addDisposalLine, draftLessorDisposal } from './disposal.ts'
 import { EVENT, fire, type JobEvent } from './events.ts'
-import { refreshLifecycleDates } from './lifecycle-dates.ts'
+import { queueRefresh } from './lifecycle-dates.ts'
 import { PROPERTY, stringProperty } from './properties.ts'
 import { bool, count, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { changeStock, releaseToProviderStock, stockUnit } from './stock.ts'
@@ -86,11 +86,6 @@ function resumeBuyouts(): void {
 /** Queue the transfer of the lease's Assets to the Provider (`transferToProvider`). */
 function queueBuyout(lease: GlideRecord): void {
     fire(EVENT.leaseBuyout, lease, lease.getUniqueValue())
-}
-
-/** Queue the recomputation of the Refresh due dates of a returned lease's serving Assets (`refreshLeaseDates`). */
-export function queueRefreshDates(lease: GlideRecord): void {
-    fire(EVENT.leaseAssets, lease, lease.getUniqueValue())
 }
 
 /** Agreement end dates of the fleet assets a lease covers that are serving customers ('' = open-ended). */
@@ -212,7 +207,7 @@ export function applyLeaseDecision(decisionRecord: GlideRecord): DecisionOutcome
             const units = `${stock.unlisted} stock unit(s) of the lease went to pending wipe`
             outcome.problems.push(`${units} but are on no disposal order; see the system log and add them to one by hand`)
         }
-        queueRefreshDates(lease)
+        queueRefresh('lease', lease)
     }
     return outcome
 }
@@ -308,14 +303,6 @@ function moveOutOfStock(lock: HeldLock, asset: GlideRecord): boolean {
 function notMoved(asset: GlideRecord, to: Stage, reason: string): false {
     gs.warn(`[x_daas_ham] Lease return: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
     return false
-}
-
-/**
- * Recompute the Refresh due dates of the lease's serving fleet assets, a chunk at a time (platform/lifecycle-dates
- * keeps the pass to the fleet): the job of the event `queueRefreshDates` queues.
- */
-export function refreshLeaseDates(queued: JobEvent): void {
-    refreshLifecycleDates(queued, stagesQuery(SERVING_STAGES, `x_daas_ham_lease=${queued.subject}`))
 }
 
 /**

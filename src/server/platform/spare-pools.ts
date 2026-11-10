@@ -5,10 +5,11 @@ import type { HeldLock } from '../domain/job-lock.ts'
 import { DEPLOYED_STAGES } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { freeStockOf, pickForSparePool, reservedSparesQuery, sparePoolShortfall } from '../domain/sourcing.ts'
+import { runTableJob } from './chunked.ts'
 import { withLockTries } from './locks.ts'
 import { openSparePurchaseQuantity, requestSparePurchase } from './procurement.ts'
 import { boolProperty, PROPERTY, stagingStockroom } from './properties.ts'
-import { countBy } from './records.ts'
+import { countBy, num, str } from './records.ts'
 import { moveToSparePool, stockCandidates } from './stock.ts'
 
 /**
@@ -16,11 +17,23 @@ import { moveToSparePool, stockCandidates } from './stock.ts'
  * (ADR 0016): the pool, the deployed units it is sized by, and the free stock it is filled from.
  */
 
+/** One chunk of the daily top-up (a scheduled chunked job): each active Agreement that keeps spares, its pools topped up. */
+export function runSparePoolTopUp(): void {
+    const autoPurchase = sparePurchasesEnabled()
+    runTableJob({
+        job: 'spare_pool_top_up',
+        table: 'x_daas_ham_agreement',
+        query: 'state=active^spare_pool_ratio>0',
+        read: (agreement) => ({ customerId: str(agreement, 'customer'), ratio: num(agreement, 'spare_pool_ratio') }),
+        handle: (agreement, agreementId) => topUpAgreementPools({ agreementId, ...agreement }, autoPurchase),
+    })
+}
+
 /**
  * Whether a top-up run buys the spares it cannot find in stock: when the auto-purchase property is on and there is a
  * staging stockroom for them to ship to. Without one, the run buys none and says so, once.
  */
-export function sparePurchasesEnabled(): boolean {
+function sparePurchasesEnabled(): boolean {
     if (!boolProperty(PROPERTY.autoPurchaseSpares)) return false
     if (stagingStockroom()) return true
     gs.warn(`[x_daas_ham] Spare-pool top-up buys no spares: set ${PROPERTY.stagingStockroom.name}`)
@@ -32,7 +45,7 @@ function countByModel(query: string): Map<string, number> {
 }
 
 /** An Agreement whose Spare pools a run tops up: its Customer and the share of deployed units it keeps as spares. */
-export interface PooledAgreement {
+interface PooledAgreement {
     agreementId: string
     customerId: string
     ratio: number
@@ -46,7 +59,7 @@ export interface PooledAgreement {
  * Taking it throws only when an insert is refused with no lock row (platform/locks): that error escapes, and the
  * Agreement fails as a record of the run.
  */
-export function topUpAgreementPools({ agreementId, customerId, ratio }: PooledAgreement, autoPurchase: boolean): void {
+function topUpAgreementPools({ agreementId, customerId, ratio }: PooledAgreement, autoPurchase: boolean): void {
     const deployed = countByModel(fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}`))
     const reserved = countByModel(reservedSparesQuery(customerId))
     for (const [modelId, deployedCount] of deployed) {

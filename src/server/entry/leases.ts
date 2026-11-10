@@ -4,14 +4,8 @@ import { gs, type GlideRecord } from '@servicenow/glide'
 import { todayIso } from '../platform/clock.ts'
 import { warnExpiringCoverage } from '../platform/coverage-warnings.ts'
 import { EVENT, jobEvent } from '../platform/events.ts'
-import {
-    applyLeaseDecision,
-    giveToLessor,
-    queueRefreshDates,
-    refreshLeaseDates,
-    runLeaseReview,
-    transferToProvider,
-} from '../platform/leases.ts'
+import { applyLeaseDecision, giveToLessor, runLeaseReview, transferToProvider } from '../platform/leases.ts'
+import { queueRefresh, runRefreshPass } from '../platform/lifecycle-dates.ts'
 import { rearmForNewEnd, renewAgreement, warnAgreementRenewals } from '../platform/renewals.ts'
 
 /** Leases, end-of-lease decisions and renewals (P3.23–P3.24): platform/leases, platform/renewals. */
@@ -44,12 +38,12 @@ export function uiApplyLeaseDecision(current: GlideRecord): void {
 
 /** After-update rule on returned leases whose end date changed: their deployed Assets' Refresh due dates follow it. */
 export function onReturnedLeaseEndChanged(current: GlideRecord): void {
-    queueRefreshDates(current)
+    queueRefresh('lease', current)
 }
 
 /** Script action on x_daas_ham.lease.assets: recompute Refresh due dates of the lease's serving fleet assets. */
 export function refreshLeaseAssets(event: GlideRecord, current: GlideRecord): void {
-    refreshLeaseDates(jobEvent(EVENT.leaseAssets, event, current))
+    runRefreshPass('lease', event, current)
 }
 
 /** Script action on x_daas_ham.lease.buyout: the Provider owns the Assets the lease covers. */

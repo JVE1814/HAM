@@ -1,12 +1,14 @@
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
 import { isStateChange, type DeviceEvent } from '../domain/device-events.ts'
+import { fleetStagesQuery } from '../domain/fleet.ts'
 import { decideInService, seenSourceOf } from '../domain/in-service.ts'
 import { LONG_HOLD_LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import type { OrderType, SeenSource } from '../domain/vocabulary.ts'
 import { moveAndSave, readStage } from './assets.ts'
+import { runTableJob } from './chunked.ts'
 import { glideToMs, msToGlide } from './clock.ts'
-import { applyLifecycleDates, type LifecycleReaders } from './lifecycle-dates.ts'
+import { applyLifecycleDates, lifecycleReaders, type LifecycleReaders } from './lifecycle-dates.ts'
 import { withLockTries } from './locks.ts'
 import { choice, deleteWhere, findById, refusal, str } from './records.ts'
 import { attachToSubscription } from './subscriptions.ts'
@@ -93,11 +95,28 @@ export function applyDeviceEvent(assetId: string, event: DeviceEvent, readers: L
  * Apply what Discovery or a connector last saw of the Asset's CI, under its sighting lock, and put a pending Asset in
  * service. False when it was not applied (see `underSeenLock`): the next run reads the CI again.
  */
-export function applyCiSighting(assetId: string, readers: LifecycleReaders): boolean {
+function applyCiSighting(assetId: string, readers: LifecycleReaders): boolean {
     return underSeenLock(assetId, (lock, asset) => {
         const discovered = glideToMs(str(asset, 'ci.last_discovered'))
         if (discovered !== undefined) recordSeen(asset, discovered, seenSourceOf(str(asset, 'ci.discovery_source')))
         return goLiveIfSeen(lock, asset, readers)
+    })
+}
+
+/**
+ * One chunk of the detection job (a scheduled chunked job): what Discovery or a connector last saw of each pending
+ * fleet asset (ADR 0016) puts it in service.
+ */
+export function detectPendingInService(): void {
+    const readers = lifecycleReaders()
+    runTableJob({
+        job: 'in_service_detection',
+        table: 'alm_hardware',
+        query: fleetStagesQuery(['pending_in_service']),
+        read: (asset) => asset.getUniqueValue(),
+        // An Asset whose lock an NMS event holds, or whose save is refused, is left to the next run, which reads its CI
+        // again.
+        handle: (assetId) => void applyCiSighting(assetId, readers),
     })
 }
 

@@ -1,12 +1,10 @@
 import { gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { parseDeviceEvents } from '../domain/device-events.ts'
-import { fleetStagesQuery } from '../domain/fleet.ts'
 import { ROLE } from '../domain/visibility.ts'
 import { findAssetByIdentifier } from '../platform/assets.ts'
-import { runTableJob } from '../platform/chunked.ts'
 import { nowMs } from '../platform/clock.ts'
-import { applyCiSighting, applyDeviceEvent, purgeDeviceEventsOlderThan } from '../platform/in-service.ts'
+import { applyDeviceEvent, detectPendingInService, purgeDeviceEventsOlderThan } from '../platform/in-service.ts'
 import { lifecycleReaders } from '../platform/lifecycle-dates.ts'
 import { intProperty, PROPERTY } from '../platform/properties.ts'
 import { reply } from '../platform/rest-api.ts'
@@ -47,16 +45,7 @@ export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIRespo
  * Scheduled job: pick up Discovery / connector sightings of pending fleet assets (ADR 0016) and put them in service.
  */
 export function evaluatePendingInService(): void {
-    const readers = lifecycleReaders()
-    runTableJob({
-        job: 'in_service_detection',
-        table: 'alm_hardware',
-        query: fleetStagesQuery(['pending_in_service']),
-        read: (asset) => asset.getUniqueValue(),
-        // An Asset whose lock an NMS event holds, or whose save is refused, is left to the next run, which reads its CI
-        // again.
-        handle: (assetId) => void applyCiSighting(assetId, readers),
-    })
+    detectPendingInService()
 }
 
 /** Daily job: drop device events older than the retention period. */

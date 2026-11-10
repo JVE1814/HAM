@@ -1,8 +1,6 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { DEPLOYED_STAGES, notRetiredCondition, stagesQuery } from '../domain/lifecycle.ts'
 import { todayIso } from '../platform/clock.ts'
-import { EVENT, fire, jobEvent } from '../platform/events.ts'
-import { refreshLifecycleDates } from '../platform/lifecycle-dates.ts'
+import { queueRefresh, runRefreshPass } from '../platform/lifecycle-dates.ts'
 import { queueModelRefresh, queueModelsReachingMilestone, writingModelLifecycle } from '../platform/model-lifecycle.ts'
 import { normalizeNaasRawModels, resolveNormalizationException } from '../platform/normalization.ts'
 import { str } from '../platform/records.ts'
@@ -42,8 +40,7 @@ export function onModelLifecycleChanged(current: GlideRecord, previous: GlideRec
  * (platform/lifecycle-dates keeps the pass to the fleet, so the Provider IT's units of the Model are not stamped).
  */
 export function refreshModelAssets(event: GlideRecord, current: GlideRecord): void {
-    const queued = jobEvent(EVENT.lifecycleChanged, event, current)
-    refreshLifecycleDates(queued, `model=${queued.subject}^${notRetiredCondition()}`)
+    runRefreshPass('model', event, current)
 }
 
 /** Daily job: models crossing a milestone today change phase without any record changing. */
@@ -53,11 +50,10 @@ export function rollLifecyclePhases(): void {
 
 /** After-update rule on Agreements whose refresh terms changed. */
 export function onAgreementTermsChanged(current: GlideRecord): void {
-    fire(EVENT.agreementTermsChanged, current, current.getUniqueValue(), '')
+    queueRefresh('agreement', current)
 }
 
 /** Script action on x_daas_ham.agreement.terms (parm1 = agreement, parm2 = cursor): its deployed fleet assets. */
 export function refreshAgreementAssets(event: GlideRecord, current: GlideRecord): void {
-    const queued = jobEvent(EVENT.agreementTermsChanged, event, current)
-    refreshLifecycleDates(queued, stagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${queued.subject}`))
+    runRefreshPass('agreement', event, current)
 }
