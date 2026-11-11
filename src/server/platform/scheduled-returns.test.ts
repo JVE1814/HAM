@@ -68,6 +68,7 @@ describe('a temporary Order still being installed', () => {
         expect(readStage(ap)).toBe('pending_return')
         onLineAssetMoved(ap, 'l2', 'shipped', readStage(ap))
         expect(rows('alm_hardware').find((asset) => asset.sys_id === 'ap')?.x_daas_ham_order_line).toBe('l2')
-        expect(rows('x_daas_ham_order_line').find((line) => line.sys_id === 'l2')?.line_stage).not.toBe('awaiting_stock')
+        expect(rows('x_daas_ham_order_line').find((line) => line.sys_id === 'l2')?.line_stage).toBe('shipped')
+        expect(platform.events).toEqual([])
     })
 })

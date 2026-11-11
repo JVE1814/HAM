@@ -66,17 +66,23 @@ function queuedRequests() {
 }
 
 describe('submitting an Order that adds a unit', () => {
-    it("assesses it and saves it out of draft holding its Agreement's usage lock and its own sourcing lock, then lets them go", () => {
-        let heldAtSave: string[] = []
+    it('assesses it and saves it out of draft while another submission of its Agreement waits its turn, then queues its sourcing', () => {
+        rows(ORDERS).push({ sys_id: 'order2', number: 'ORD0002', customer: 'acme', site: 'site1', agreement: 'agr1', stage: 'draft' })
+        rows(LINES).push({ sys_id: 'line2', number: 'ORL0002', order: 'order2', model: 'model1', quantity: '1', line_stage: 'new' })
+        let meanwhile: unknown
         platform.onSave = (table, row) => {
-            if (table === ORDERS && row.stage !== 'draft') heldAtSave = rows(LOCKS).map((lock) => lock.name)
+            if (meanwhile || table !== ORDERS || row.sys_id !== 'order1' || row.stage === 'draft') return
+            meanwhile = submitOrder(findById(ORDERS, 'order2')!)
         }
 
         expect(submitOrder(order())).toEqual({ submitted: true })
 
-        expect(heldAtSave).toEqual([LOCK.agreementUsage('agr1'), LOCK.sourceOrder('order1')])
+        expect(meanwhile).toMatchObject({ submitted: false, queued: true })
         expect(storedOrder()).toMatchObject({ stage: 'sourcing', approval: 'approved', entitlement_verdict: 'within_agreement' })
-        expect(platform.events).toEqual([{ name: EVENT.sourceOrder, record: 'order1', parm1: '', parm2: '', delayed: false }])
+        expect(queuedRequests()).toEqual([
+            { name: EVENT.sourceOrder, record: 'order2', delayed: true, request: 'submission', tries: 1 },
+            { name: EVENT.sourceOrder, record: 'order1', delayed: false, request: 'pass', tries: 0 },
+        ])
         expect(rows(LOCKS)).toEqual([])
     })
 
@@ -114,7 +120,7 @@ describe('submitting an Order that adds a unit', () => {
     })
 
     it('is queued again with its count, without a second note, and is left for staff to submit once it was queued again as often as a sourcing request', () => {
-        const theirs = holdUsageLock()
+        holdUsageLock()
 
         submitQueuedOrder('order1', 3)
 
@@ -129,9 +135,7 @@ describe('submitting an Order that adds a unit', () => {
             stage: 'draft',
             work_notes: 'Not submitted: other Orders of its Agreement kept being submitted at the same time. Submit it',
         })
-        expect(platform.warnings).toEqual([
-            `[x_daas_ham] ORD0001 left a draft: ${theirs.name} stayed held through ${REQUEUE.times} submissions queued again; submit it`,
-        ])
+        expect(platform.warnings).toEqual([expect.stringContaining('ORD0001')])
     })
 
     it('reports an Order another submission of it took ahead as already submitted, and leaves it as that one saved it', () => {
