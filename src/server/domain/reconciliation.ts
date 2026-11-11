@@ -1,3 +1,4 @@
+import { anyOf } from './encoded-query.ts'
 import { fleetStagesQuery, outsideFleetCondition, SITE_CONDITION } from './fleet.ts'
 import { ALL_STAGES, IN_USE_STAGES } from './lifecycle.ts'
 import { overlaps, powerBudget, type Placement, type RackSpec } from './rack.ts'
@@ -48,11 +49,11 @@ export function seenWithoutFleetAssetQuery(): string {
  * ago they were discovered. A *seen without asset* exception whose CI it leaves out has cleared: the CI points at a
  * fleet asset now (an asset manager added its Asset to the fleet), is no longer at a customer Site, or is gone. That
  * includes one raised before the Fleet flag on the Provider IT's own network gear, which is not NaaS's to report. Null
- * for no CI, as an empty id list would not narrow the query.
+ * for no CI.
  */
 export function stillSeenWithoutFleetAssetQuery(ciIds: readonly string[]): string | null {
-    const ids = [...new Set(ciIds.filter(Boolean))]
-    return ids.length > 0 ? `sys_idIN${ids.join(',')}^${seenWithoutFleetAssetQuery()}` : null
+    const ids = anyOf('sys_id', ciIds)
+    return ids && `${ids}^${seenWithoutFleetAssetQuery()}`
 }
 
 /** Encoded query on reconciliation exceptions: the open ones, which the navigator, the workspace and the dashboard list and count. */

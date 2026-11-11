@@ -1,3 +1,4 @@
+import { anyOf } from './encoded-query.ts'
 import { inFleet, OEM_PID_FIELD } from './fleet.ts'
 import { seenWithoutFleetAssetQuery } from './reconciliation.ts'
 import { type MatchType, NORM_EXCEPTION_STATUS } from './vocabulary.ts'
@@ -149,14 +150,10 @@ export function siteCiOnRawModelQuery(): string {
     return `${seenWithoutFleetAssetQuery()}^${onUnmappedRawModel('model_id')}`
 }
 
-/**
- * Encoded query on RAW_MODEL_TABLE: those of `rawModelIds` still to normalize (no OEM PID, not yet mapped). Null when
- * there are none, as an empty id list would not narrow the query at all.
- */
+/** Encoded query on RAW_MODEL_TABLE: those of `rawModelIds` still to normalize (no OEM PID, not yet mapped); null for none. */
 export function rawModelsToNormalizeQuery(rawModelIds: readonly string[]): string | null {
-    const ids = [...new Set(rawModelIds.filter(Boolean))]
-    if (ids.length === 0) return null
-    return `${OEM_PID_FIELD}ISEMPTY^${NORMALIZED_TO}ISEMPTY^sys_idIN${ids.join(',')}`
+    const ids = anyOf('sys_id', rawModelIds)
+    return ids && `${OEM_PID_FIELD}ISEMPTY^${NORMALIZED_TO}ISEMPTY^${ids}`
 }
 
 /** The reason a normalization exception is closed with when its raw model is not NaaS's to map. */
@@ -181,6 +178,6 @@ export const RAW_MODEL_EXCEPTIONS_QUERY = `${OPEN_NORM_EXCEPTIONS_QUERY}^source_
 export function notNaasRawModelsQuery(exceptionModelIds: readonly string[], naasRawModelIds: readonly string[]): string | null {
     const named = rawModelsToNormalizeQuery(exceptionModelIds)
     if (!named) return null
-    const naas = [...new Set(naasRawModelIds.filter(Boolean))]
-    return naas.length > 0 ? `${named}^sys_idNOT IN${naas.join(',')}` : named
+    const naas = anyOf('sys_id', naasRawModelIds, 'NOT IN')
+    return naas ? `${named}^${naas}` : named
 }

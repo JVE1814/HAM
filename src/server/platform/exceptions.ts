@@ -1,4 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
+import { anyOf } from '../domain/encoded-query.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { OPEN_EXCEPTIONS_QUERY } from '../domain/reconciliation.ts'
 import { nowGlide } from './clock.ts'
@@ -91,11 +92,11 @@ export function settleExceptions(subject: ExceptionSubject, customerId: string, 
  */
 export function resolveExceptions(subject: ExceptionSubject, types: readonly ExceptionType[]): void {
     const { field, id } = fieldOf(subject)
-    if (!id || types.length === 0) return
+    const ofTypes = anyOf('exception_type', types)
+    if (!id || !ofTypes) return
     const exception = new GlideRecord(TABLE)
     exception.addQuery(field, id)
-    exception.addQuery('status', EXCEPTION_STATUS.open)
-    exception.addQuery('exception_type', 'IN', types.join(','))
+    exception.addEncodedQuery(`${OPEN_EXCEPTIONS_QUERY}^${ofTypes}`)
     resolveEach(exception)
 }
 
