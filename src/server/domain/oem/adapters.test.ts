@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { enabledRoutes, OEM_ADAPTERS, parseCoverageRow, type SyncApi } from './adapters'
+import { enabledClaims, enabledRoutes, OEM_ADAPTERS, parseCoverageRow, type SyncApi } from './adapters'
 import type { OemContext } from './sync-adapters'
 import type { HttpRequest, HttpResponse } from '../http'
 import type { OemVendor } from '../vocabulary'
@@ -339,6 +339,19 @@ describe('rate limits', () => {
     // FortiCloud answers 100 calls a minute, and its products/list takes one serial per call (external-contracts F1).
     it('ask FortiCloud for fewer serials per run than it answers calls for in a minute', () => {
         expect(OEM_ADAPTERS.fortinet.coverage?.maxKeysPerRun).toBeLessThan(100)
+    })
+})
+
+describe('enabledClaims', () => {
+    const switchedOn = (...vendors: OemVendor[]) => (property: unknown) => vendors.some((vendor) => OEM_ADAPTERS[vendor].claims?.enabled === property)
+
+    it('gives each vendor whose claim switch is on its turn, with its routes, in the claim order', () => {
+        expect(enabledClaims(() => true).map((turn) => turn.vendor)).toEqual(['meraki', 'mist', 'aruba', 'fortinet', 'checkpoint'])
+        expect(enabledClaims(switchedOn('fortinet', 'meraki'))).toEqual([
+            { vendor: 'meraki', routes: OEM_ADAPTERS.meraki.claims!.routes },
+            { vendor: 'fortinet', routes: OEM_ADAPTERS.fortinet.claims!.routes },
+        ])
+        expect(enabledClaims(() => false)).toEqual([])
     })
 })
 

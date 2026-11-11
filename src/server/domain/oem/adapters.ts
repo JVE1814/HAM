@@ -168,3 +168,16 @@ export function claimRouted(vendor: string, action: string): boolean {
 
 /** Vendors with at least one automated step, in the order the claim run takes them. */
 export const CLAIM_VENDORS: readonly OemVendor[] = (Object.keys(OEM_ADAPTERS) as OemVendor[]).filter((vendor) => OEM_ADAPTERS[vendor].claims)
+
+export interface ClaimTurn {
+    vendor: OemVendor
+    routes: VendorClaimRoutes
+}
+
+/** The vendors whose claim switch is on, with their routes, in the order the claim run takes them. */
+export function enabledClaims(enabled: (property: PropertyOf<boolean>) => boolean): ClaimTurn[] {
+    return CLAIM_VENDORS.flatMap((vendor) => {
+        const claims = OEM_ADAPTERS[vendor].claims
+        return claims && enabled(claims.enabled) ? [{ vendor, routes: claims.routes }] : []
+    })
+}
