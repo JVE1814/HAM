@@ -2,6 +2,7 @@ import { GlideRecord } from '@servicenow/glide'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import {
     MONITORING_EXCEPTION_TYPES,
+    outOfUseExceptionsQuery,
     outsideFleetExceptionsQuery,
     reconcileAsset,
     seenWithoutFleetAssetQuery,
@@ -19,8 +20,8 @@ import { IN_USE_STAGES } from '../domain/lifecycle.ts'
 /**
  * Compare installed fleet assets with monitoring; open new exceptions and resolve cleared ones. The Provider IT's
  * equipment in use (laptops, printers) is in service by its install status too, and is left out (ADR 0016): a
- * monitoring exception open on an Asset outside the fleet (raised before the Fleet flag) is resolved, as is a *seen
- * without asset* one whose CI no longer matches.
+ * monitoring exception open on an Asset outside the fleet (raised before the Fleet flag) is resolved, as are one on a
+ * fleet asset no longer in use and a *seen without asset* one whose CI no longer matches.
  */
 export function reconcileInstalledBase(): void {
     const unseenDays = intProperty(PROPERTY.unseenDays)
@@ -49,6 +50,7 @@ export function reconcileInstalledBase(): void {
         },
     })
     resolveExceptionsWhere(outsideFleetExceptionsQuery(MONITORING_EXCEPTION_TYPES))
+    resolveExceptionsWhere(outOfUseExceptionsQuery(MONITORING_EXCEPTION_TYPES))
     resolveClearedSeenWithoutAsset()
     reportSeenWithoutAsset(unseenDays)
 }

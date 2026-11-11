@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+    outOfUseExceptionsQuery,
     outsideFleetExceptionsQuery,
     reconcileAsset,
     reconcileRack,
@@ -165,5 +166,32 @@ describe('outsideFleetExceptionsQuery', () => {
         expect(matches(query, { ...raised, status: 'resolved' })).toBe(false)
         expect(matches(query, { ...raised, exception_type: 'rack_overlap' })).toBe(false)
         expect(matches(query, { ...raised, asset: '', 'asset.x_daas_ham_fleet': '' })).toBe(false)
+    })
+})
+
+describe('outOfUseExceptionsQuery', () => {
+    const query = outOfUseExceptionsQuery(['unseen', 'serial_mismatch'])
+    const onAsset = (installStatus: string, substatus: string, fleet = 'true') => ({
+        status: 'open',
+        exception_type: 'unseen',
+        asset: 'a1',
+        'asset.install_status': installStatus,
+        'asset.substatus': substatus,
+        'asset.x_daas_ham_fleet': fleet,
+    })
+
+    it('finds the open exceptions of the types on a fleet asset out of use: pending return, in stock or retired', () => {
+        expect(matches(query, onAsset('1', 'pending_return'))).toBe(true)
+        expect(matches(query, onAsset('6', 'available'))).toBe(true)
+        expect(matches(query, onAsset('7', 'disposed'))).toBe(true)
+        expect(matches(query, { ...onAsset('7', 'disposed'), exception_type: 'serial_mismatch' })).toBe(true)
+    })
+
+    it('leaves those of an Asset in use to the comparison, those outside the fleet to their own query, and those resolved or of another type', () => {
+        expect(matches(query, onAsset('1', ''))).toBe(false)
+        expect(matches(query, onAsset('1', 'temporary_deployment'))).toBe(false)
+        expect(matches(query, onAsset('7', 'disposed', 'false'))).toBe(false)
+        expect(matches(query, { ...onAsset('7', 'disposed'), status: 'resolved' })).toBe(false)
+        expect(matches(query, { ...onAsset('7', 'disposed'), exception_type: 'rack_overlap' })).toBe(false)
     })
 })

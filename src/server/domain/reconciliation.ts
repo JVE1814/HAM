@@ -1,4 +1,5 @@
-import { outsideFleetCondition, SITE_CONDITION } from './fleet.ts'
+import { fleetStagesQuery, outsideFleetCondition, SITE_CONDITION } from './fleet.ts'
+import { ALL_STAGES, IN_USE_STAGES } from './lifecycle.ts'
 import { overlaps, powerBudget, type Placement, type RackSpec } from './rack.ts'
 import { normalizeSerial } from './serials.ts'
 import { EXCEPTION_STATUS, type ExceptionType } from './vocabulary.ts'
@@ -65,6 +66,16 @@ export const OPEN_EXCEPTIONS_QUERY = `status=${EXCEPTION_STATUS.open}`
  */
 export function outsideFleetExceptionsQuery(types: readonly ExceptionType[]): string {
     return `${OPEN_EXCEPTIONS_QUERY}^exception_typeIN${types.join(',')}^assetISNOTEMPTY^${outsideFleetCondition('asset.')}`
+}
+
+/**
+ * Encoded query on reconciliation exceptions: the open ones of `types` on a fleet asset no longer in use (pending
+ * return, back in a stockroom, disposed). The daily reconciliation compares the Assets in use only, so it would never
+ * find these cleared: they are resolved.
+ */
+export function outOfUseExceptionsQuery(types: readonly ExceptionType[]): string {
+    const outOfUse = ALL_STAGES.filter((stage) => !IN_USE_STAGES.includes(stage))
+    return fleetStagesQuery(outOfUse, `${OPEN_EXCEPTIONS_QUERY}^exception_typeIN${types.join(',')}`, 'asset.')
 }
 
 /** Disagreements between an installed Asset and what monitoring reports. */

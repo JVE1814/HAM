@@ -68,8 +68,10 @@ Each installed Asset is checked for:
 
 Exceptions open once per type and Asset (or CI; a rack's overlap and power exceptions once per
 rack), also when two runs raise the same one at once: the check and the insert are made under a lock
-on the type and subject. They resolve themselves when the condition clears. One the platform refuses
-is logged (an audit or attestation, closed once, does not raise it again).
+on the type and subject. They resolve themselves when the condition clears. An unseen, serial or
+site mismatch exception also resolves once its Asset is no longer in use (pending return, back in
+stock, disposed). One the platform refuses is logged (an audit or attestation, closed once, does not
+raise it again).
 Network-gear CIs discovered recently with no Asset raise *seen without asset*. Racks with an open
 rack exception are re-checked as well (see Racks), and their rack exceptions open or resolve.
 
