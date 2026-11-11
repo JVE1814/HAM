@@ -51,10 +51,6 @@ function assetsOf(orderId: string): DisposalAsset[] {
     return assets
 }
 
-function ownersOf(orderId: string): Array<LegalOwner | ''> {
-    return assetsOf(orderId).map((asset) => asset.legalOwner)
-}
-
 /**
  * What came of submitting a draft Disposal order: it awaits its approvers, or it stays a draft and why. `why` is ''
  * when the platform has told the user already: it refused the save of the form the order was submitted from.
@@ -91,7 +87,7 @@ export function submitDisposal(order: GlideRecord): DisposalSubmission {
 /** How a Disposal order's approvals are decided (platform/approvals): by its Assets' owners, approved or rejected and closed. */
 const DISPOSAL_APPROVAL: ApprovalFlow = {
     awaitingStage: DISPOSAL_STAGE.awaiting_approval,
-    required: (order) => disposalApprovers(ownersOf(order.getUniqueValue())),
+    required: (order) => disposalApprovers(assetsOf(order.getUniqueValue()).map((asset) => asset.legalOwner)),
     decide: (order, outcome) => {
         order.setValue('approval', outcome)
         order.setValue('stage', outcome === 'approved' ? DISPOSAL_STAGE.approved : DISPOSAL_STAGE.rejected)

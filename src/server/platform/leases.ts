@@ -85,13 +85,8 @@ function resumeBuyouts(): void {
     ga.query()
     while (ga.next()) {
         const lease = findById(LEASE, String(ga.getValue('x_daas_ham_lease') ?? ''))
-        if (lease) queueBuyout(lease)
+        if (lease) queueJob(EVENT.leaseBuyout, lease)
     }
-}
-
-/** Queue the transfer of the lease's Assets to the Provider (`transferToProvider`). */
-function queueBuyout(lease: GlideRecord): void {
-    queueJob(EVENT.leaseBuyout, lease)
 }
 
 /** Agreement end dates of the fleet assets a lease covers that are serving customers ('' = open-ended). */
@@ -202,7 +197,7 @@ export function applyLeaseDecision(decisionRecord: GlideRecord): DecisionOutcome
     }
     const outcome: DecisionOutcome = { applied: true, notes: [], problems: [] }
     if (decision === 'buyout') {
-        queueBuyout(lease)
+        queueJob(EVENT.leaseBuyout, lease)
         outcome.notes.push("The lease's assets become Provider-owned in the background")
     }
     if (decision === 'return') {
@@ -316,7 +311,7 @@ function notMoved(asset: GlideRecord, to: Stage, reason: string): false {
 
 /**
  * The Provider owns the Assets the bought-out `lease` covers, each costing its share of the buyout price to the cent
- * (domain/leases `buyoutCost`, for Margin), a chunk at a time: the job of the event `queueBuyout` queues. Retired
+ * (domain/leases `buyoutCost`, for Margin), a chunk at a time: the job of `EVENT.leaseBuyout`. Retired
  * units, which the Lessor or the OEM holds, keep their lease link and are not transferred.
  *
  * Every transferred Asset leaves the query set. The cursor (sys_id > last handled) still holds:
