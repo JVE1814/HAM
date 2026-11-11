@@ -10,7 +10,6 @@ import { disposalStage } from '../domain/lifecycle.ts'
 import { DISPOSAL_STAGE, type DisposalLineStatus, type DisposalMethod, type LegalOwner, TASK_STATE } from '../domain/vocabulary.ts'
 import {
     customerAdminIds,
-    assetManagerIds,
     putToApproval,
     rollUpApprovals,
     type ApprovalFlow,
@@ -18,6 +17,7 @@ import {
 } from './approvals.ts'
 import { isFleetAsset, moveRefusal, readStage, transitionFacts } from './assets.ts'
 import { choice, findById, refusal, str, warnRefused } from './records.ts'
+import { assetManagerIds } from './users.ts'
 
 /**
  * Disposal orders: approve, then retire each wiped Asset by its method (P2.5, Q61). None of it tells the user anything:

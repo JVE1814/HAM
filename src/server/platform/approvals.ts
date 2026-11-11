@@ -10,6 +10,7 @@ import {
 import type { Approver } from '../domain/approvals.ts'
 import { ROLE } from '../domain/roles.ts'
 import { exists, pluck, str, warnRefused } from './records.ts'
+import { assetManagerIds } from './users.ts'
 
 /**
  * Approval of app tasks through sysapproval_approver records (ADR 0004), one flow for every task that is approved: the
@@ -34,11 +35,6 @@ export function customerAdminIds(customerId: string): string[] {
         `role.name=${ROLE.customerAdmin}^user.company=${customerId}^user.active=true^state=active`,
         'user',
     )
-}
-
-/** The asset managers (active users, at most 20): who decides and is warned for the Provider where no one person is named. */
-export function assetManagerIds(): string[] {
-    return pluck('sys_user_has_role', `role.name=${ROLE.assetManager}^user.active=true^state=active`, 'user', 20)
 }
 
 /**
