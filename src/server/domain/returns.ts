@@ -18,8 +18,6 @@ import {
     type ReturnTrigger,
 } from './vocabulary.ts'
 
-/** Returns, depot evaluation and Fee events (P2.4). */
-
 export interface RequestedReturn {
     customerId: string
     site?: NamedSite
@@ -35,8 +33,7 @@ export interface ReturnRequester {
 const REQUESTING_RETURNS: ActWording = { act: 'request returns', actForOwn: 'request returns' }
 
 /**
- * Why this person may not request a Return for the Customer, or null when they may (domain/customer-parties
- * `actorRefusal`, as for an Order): only those the Return create rule lets in ask for returns, a customer admin only
+ * Why this person may not request a Return for the Customer, or null when they may: only those the Return create rule lets in ask for returns, a customer admin only
  * for their own Customer.
  */
 function returnRequesterRefusal(customerId: string, requester: ReturnRequester): string | null {
@@ -116,8 +113,7 @@ export function overdueStep(input: { dueDate: string; today: string; graceDays: 
 }
 
 /**
- * A whole-Site recovery: the Returns that bring back all of a Site, by their trigger. What makes a Return one, the
- * stages it takes units in and the lines that await them are all said here.
+ * A whole-Site recovery: the Returns that bring back all of a Site, by their trigger.
  */
 const SITE_RECOVERY_TRIGGERS: readonly ReturnTrigger[] = [RETURN_TRIGGER.site_decommission, RETURN_TRIGGER.agreement_end]
 

@@ -8,7 +8,6 @@ import { REST_MESSAGE } from '../rest-message-names.ts'
 /*
  * The vendor adapters the sync jobs call for lifecycle, coverage and RMA status (ADR 0008). Response shapes follow the vendors' public API documentation; mappers
  * read tolerantly so optional or renamed fields degrade to "unknown" rather than failing.
- * Request functions name the REST message functions declared in fluent/oem/rest-messages.now.ts.
  */
 
 export interface OemContext {

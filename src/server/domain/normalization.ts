@@ -27,7 +27,6 @@ export type NormalizationResult =
     | { matched: false; manufacturerId: string; reason: 'no_matching_rule' }
     | { matched: false; reason: 'unknown_manufacturer' }
 
-/** ASCII punctuation and symbols, the typographic dashes (U+2010 to U+2015) and quotes (U+2018 to U+201F), and the ©, ® and ™ marks. */
 const PUNCTUATION = /[!-/:-@[-`{-~\u00a9\u00ae\u2010-\u2015\u2018-\u201f\u2122]/g
 
 /**

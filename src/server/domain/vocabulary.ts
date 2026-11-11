@@ -34,7 +34,6 @@ export const TASK_STATE = {
 
 /* Assets (alm_hardware) */
 
-/** Platform install_status values (alm_asset.install_status). */
 export const INSTALL_STATUS = {
     inUse: '1',
     onOrder: '2',
@@ -107,7 +106,7 @@ export const STAGE_FIELDS = {
     returned_to_lessor: { installStatus: INSTALL_STATUS.retired, substatus: 'lease_return' },
 } as const
 
-/** alm_hardware.x_daas_ham_legal_owner. The column has no default: a blank owner counts as the Provider's. */
+/** The column has no default: a blank owner counts as the Provider's. */
 export const LEGAL_OWNER_CHOICES = {
     provider: { label: 'Provider', sequence: 0 },
     customer: { label: 'Customer', sequence: 1 },
@@ -263,7 +262,6 @@ export const COVERAGE_SOURCE_CHOICES = {
 } as const
 export type CoverageSource = keyof typeof COVERAGE_SOURCE_CHOICES
 
-/** x_daas_ham_oem_rma.state. */
 export const RMA_STATE_CHOICES = {
     to_open: { label: 'To open with OEM', sequence: 0 },
     open: { label: 'Open', sequence: 1 },
@@ -282,7 +280,7 @@ export const RMA_STATE = {
 
 /* Stockrooms, Sites and on-site work */
 
-/** alm_stockroom.x_daas_ham_stockroom_type. The column has no default: a stockroom with no type is not a NaaS one. */
+/** The column has no default: a stockroom with no type is not a NaaS one. */
 export const STOCKROOM_TYPE_CHOICES = {
     central_depot: { label: 'Central depot', sequence: 0 },
     staging_centre: { label: 'Staging centre', sequence: 1 },

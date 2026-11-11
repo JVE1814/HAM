@@ -5,7 +5,6 @@ import { RACK_FACE_CHOICES, type ExceptionType, type RackFace } from './vocabula
  * occupies ruStart..ruStart+height-1.
  */
 
-/** Every rack face, to read x_daas_ham_rack_face with (platform/records `choice`). */
 export const RACK_FACES: readonly RackFace[] = Object.keys(RACK_FACE_CHOICES) as RackFace[]
 
 export interface Placement {
@@ -27,7 +26,6 @@ export interface Placement {
     powerW?: number
 }
 
-/** A device placed in a rack, as its callers read it: the Asset's fields, and its Model's height and draw. */
 interface RackedDevice {
     /** The Asset's sys_id. */
     id: string
@@ -61,7 +59,6 @@ export const PLACEMENT_FIELDS = { rack: 'x_daas_ham_rack', ruStart: 'x_daas_ham_
 /** The height taken for a rack that records none (cmdb_ci_rack.rack_units empty or 0): a full-height rack. */
 export const DEFAULT_RACK_UNITS = 42
 
-/** The face a placed Asset is on when it records none. */
 export const DEFAULT_RACK_FACE: RackFace = 'front'
 
 /**
@@ -139,7 +136,6 @@ export interface PowerBudget {
     utilisation: number | null
 }
 
-/** Typical power drawn by the placed devices against the rack's capacity. */
 export function powerBudget(capacityW: number, placements: readonly Placement[]): PowerBudget {
     const usedW = placements.reduce((sum, p) => sum + drawW(p), 0)
     if (capacityW <= 0) return { capacityW: 0, usedW, utilisation: null }

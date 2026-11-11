@@ -336,7 +336,6 @@ describe('Check Point Zero Touch', () => {
     })
 })
 
-/** A ClaimStore over fixed due steps per action (cut to `limit`), recording the actions loaded and what is settled (each settle call's step ids in `settles`). */
 function fakeStore(due: Partial<Record<ClaimAction, ClaimTarget[]>> = {}) {
     const loads: ClaimAction[] = []
     const vendors: string[] = []
@@ -356,7 +355,6 @@ function fakeStore(due: Partial<Record<ClaimAction, ClaimTarget[]>> = {}) {
     return { store, loads, vendors, settled, settles }
 }
 
-/** A transport that hands out one HTTP fake, recording which REST message each action asked for. */
 function fakeTransport(responses: Array<HttpResponse | ((request: HttpRequest) => HttpResponse)>) {
     const { http, calls } = fake(responses)
     const messages: string[] = []
@@ -550,7 +548,6 @@ const pendingStep = (fields: Record<string, string> = {}) => ({
     'staging_task.asset.x_daas_ham_fleet': 'true',
     ...fields,
 })
-/** The same step failed once, a day ago. */
 const failedStep = (fields: Record<string, string> = {}) => pendingStep({ automation_status: 'failed', attempts: '1', sys_updated_on: '2026-11-08 12:00:00', ...fields })
 const due = (step: Record<string, string>) => recordMatches(dueStepsQuery('aruba', 'oem_licence'), step, minutesAgo)
 

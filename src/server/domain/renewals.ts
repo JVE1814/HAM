@@ -1,7 +1,5 @@
 import { addMonths, endOfMonth, isMonthEnd } from './calendar.ts'
 
-/** Agreement renewals (plan §13 Renewals): the end a renewal moves an Agreement to, and what a moved end means for its recovery. */
-
 /**
  * The Agreement's end after renewing it for `termMonths`. A term ending on a month end renews to a month end
  * (28 Feb + 3 months is 31 May, not 28 May), so a day clamped in a short month is not lost for good.

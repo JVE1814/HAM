@@ -134,7 +134,7 @@ const greenLakeAdd: ClaimAdapter = (targets, http, maxCalls) => {
 }
 
 /**
- * HPE GreenLake: find the device by serial, then PATCH its subscription (GREENLAKE_SUBSCRIBE_CALLS = these two calls).
+ * HPE GreenLake: find the device by serial, then PATCH its subscription.
  * The PATCH is asynchronous (202), so a device found already carrying the subscription id is done without a PATCH:
  * a re-run confirms the assignment.
  */

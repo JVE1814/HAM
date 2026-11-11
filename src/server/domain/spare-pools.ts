@@ -1,8 +1,6 @@
 import { fleetStagesQuery } from './fleet.ts'
 import { NOT_LESSOR_BOUND } from './stock.ts'
 
-/** Spare pools (P1.4): how large each Customer's pool of a Model is kept, and the spares it already holds. */
-
 /**
  * An encoded alm_hardware query for the Customer's Spare pool as the top-up counts it: its fleet assets (ADR 0016) in
  * the pool, and those of its spares on a transfer order line. In transfer and on no Order line, a unit held for the
@@ -54,7 +52,6 @@ export function sparePools(shares: readonly DeployedShare[]): SparePool[] {
     return [...byModel].map(([modelId, pool]) => ({ modelId, size: Math.max(0, Math.ceil(pool.spares - 1e-9)), agreementId: pool.lead.agreementId }))
 }
 
-/** Spares a Spare pool of `size` still needs, holding `reserved` (`reservedSparesQuery`). */
 export function sparePoolShortfall(size: number, reserved: number): number {
     return Math.max(0, size - reserved)
 }

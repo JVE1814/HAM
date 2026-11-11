@@ -242,7 +242,6 @@ function keeps(scope: VisibilityScope, scoping: TableScoping | null, row: Scoped
     switch (scope) {
         case 'assigned_stockrooms': {
             if (!scoping.stockroom) return true
-            // This scope leaves the records outside NaaS to the platform (leavesOutsideNaas).
             if (outsideNaas(scoping, row)) return true
             const stockrooms = ids.stockroomIds()
             return columnsOf(scoping.stockroom).some((column) => {

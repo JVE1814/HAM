@@ -13,7 +13,7 @@ export interface LifecycleDates {
 /**
  * The milestones in the order a manufacturer reaches them: the date each is kept in, the Lifecycle phase an Asset is in
  * once its Model has reached it (also the `lifecycle_phase` of its row in the platform's Model lifecycle table, ADR
- * 0017), and its name in messages. Reading, checking, merging and storing milestones all go through this list.
+ * 0017), and its name in messages.
  */
 export const MILESTONES: ReadonlyArray<{ field: keyof LifecycleDates; phase: LifecyclePhase; label: string }> = [
     { field: 'endOfSale', phase: 'end_of_sale', label: 'end of sale' },
@@ -52,10 +52,8 @@ export const OWN_MILESTONE_ROWS = `${MILESTONE_ROWS}^source=${MODEL_LIFECYCLE.ow
 export const MILESTONE_ROW_CHANGED =
     "current.operation() != 'update' || current.start_date.changes() || current.active.changes() || current.lifecycle_phase.changes() || current.lifecycle_type.changes() || current.model.changes() || current.source.changes()"
 
-/** Who can give a milestone's date. */
 export type LifecycleSource = 'manual' | 'csv' | OemVendor
 
-/** Each source as the description of a row the app writes names it. */
 export const LIFECYCLE_SOURCE_LABEL: Readonly<Record<LifecycleSource, string>> = {
     manual: 'Manual',
     csv: 'CSV import',
@@ -67,7 +65,6 @@ export const LIFECYCLE_SOURCE_LABEL: Readonly<Record<LifecycleSource, string>> =
     checkpoint: 'Check Point',
 }
 
-/** What an Asset contributes to its Lifecycle phase and Refresh due date. */
 export interface AssetLifecycleFacts {
     /**
      * The Asset's Agreement refresh basis as stored, or '' when the Asset has no Agreement (`NO_AGREEMENT_BASIS`). A
@@ -130,7 +127,6 @@ function byBasis(asset: AssetLifecycleFacts, inServiceDate: string, endOfSupport
     }
 }
 
-/** The date a leased Asset must be off the network: its lease end, once the decision is to return it. */
 function returnBy(lease: AssetLifecycleFacts['lease']): string | undefined {
     return lease?.endAction === LEASE_END_ACTION.return && lease.ends ? lease.ends.slice(0, 10) : undefined
 }

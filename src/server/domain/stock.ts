@@ -2,11 +2,6 @@ import { fleetStagesQuery, providerStockroomCondition, STOCKROOM_TYPE_FIELD } fr
 import { STOCK_STAGES, type Stage } from './lifecycle.ts'
 import { type LeaseEndAction, STOCKROOM_TYPE } from './vocabulary.ts'
 
-/**
- * Fleet stock (ADR 0016): which Source a unit in stock is stock of, which units may still be claimed, the fields a
- * claim for an Order line writes and the queries that read them, and where a unit taken off its line goes.
- */
-
 export type Source = 'customer_site_stock' | 'spare_pool' | 'central_stock'
 
 /** Stock that may serve a request, under the Source whose query found it (`sourceQuery`). */

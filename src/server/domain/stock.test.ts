@@ -28,7 +28,6 @@ describe('isFree and isClaimable', () => {
 
 const STOCKROOM_TYPE = 'stockroom.x_daas_ham_stockroom_type'
 const LEASE_END = 'x_daas_ham_lease.end_action'
-/** A fleet asset of Model m1 on no Order line, in a central depot unless `fields` say otherwise. */
 const unit = (stage: Stage, fields: SampleRecord = {}) =>
     assetIn(stage, { x_daas_ham_fleet: 'true', model: 'm1', x_daas_ham_order_line: '', [STOCKROOM_TYPE]: 'central_depot', ...fields })
 

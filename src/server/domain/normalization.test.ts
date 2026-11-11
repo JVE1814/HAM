@@ -99,7 +99,6 @@ describe('shouldLearnAlias', () => {
     })
 })
 
-/** A raw model still to normalize: no OEM PID, mapped to no canonical Model. */
 const RAW = { x_daas_ham_oem_pid: '', x_daas_ham_normalized_to: '' }
 const CANONICAL = { x_daas_ham_oem_pid: 'C9300-48P-E', x_daas_ham_normalized_to: '' }
 const MAPPED = { x_daas_ham_oem_pid: '', x_daas_ham_normalized_to: 'c9300-48p' }

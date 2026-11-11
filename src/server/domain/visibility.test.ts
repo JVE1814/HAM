@@ -113,7 +113,6 @@ describe('visibilityFilter', () => {
     })
 })
 
-/** Every combination of `values` for `fields`, as records. */
 function records(values: Record<string, readonly string[]>): Array<Record<string, string>> {
     return Object.entries(values).reduce<Array<Record<string, string>>>(
         (found, [field, options]) => found.flatMap((record) => options.map((value) => ({ ...record, [field]: value }))),
@@ -138,7 +137,6 @@ const READERS: readonly Reader[] = ['tech', 'admin', 'contact']
 const READER_SCOPE: Record<Reader, VisibilityScope> = { tech: 'assigned_stockrooms', admin: 'own_customer', contact: 'own_sites' }
 const READER_IDS: ScopingIds = { customerId: 'cust1', stockroomIds: () => ['sr1'], siteIds: () => ['site1'] }
 
-/** A sample record (its field values) and which of the narrowed readers see it. */
 type Sample = [record: Record<string, string>, seenBy: readonly Reader[]]
 
 const TYPE = 'x_daas_ham_stockroom_type'
@@ -226,7 +224,6 @@ const SAMPLES: Record<ScopedTable, Sample[]> = {
     ],
 }
 
-/** Every combination of the values a table's samples give each of its fields. */
 function recordsLike(table: ScopedTable): Array<Record<string, string>> {
     const values: Record<string, Set<string>> = {}
     for (const [record] of SAMPLES[table]) {
