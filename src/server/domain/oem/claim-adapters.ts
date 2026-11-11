@@ -1,7 +1,7 @@
 import { normalizeSerial } from '../serials.ts'
 import { chunks } from '../collections.ts'
 import { failureText, isSuccess, type HttpResponse } from '../http.ts'
-import { asArray, field, parseJson, text } from '../json.ts'
+import { asArray, field, isJsonObject, parseJson, text } from '../json.ts'
 import { fortiCloudError } from './forticloud.ts'
 import { REST_MESSAGE } from '../rest-message-names.ts'
 import { LOCK_LOST, type ClaimAdapter, type ClaimOutcome, type ClaimRoute, type ClaimTarget } from './claims.ts'
@@ -64,10 +64,10 @@ const merakiClaim: ClaimAdapter = (targets, http, maxCalls) => {
             outcomes.push(...fail(batch, failureText(response)))
             continue
         }
-        // A body that is not a JSON object says nothing about the claim (as FortiCloud's): the batch fails, to be tried
-        // again, rather than release the licence and zero-touch steps waiting on it.
+        // A body that is not a JSON object says nothing about the claim: the batch fails, to be tried again, rather than
+        // release the licence and zero-touch steps waiting on it.
         const json = parseJson(response.body)
-        if (json === null || typeof json !== 'object' || Array.isArray(json)) {
+        if (!isJsonObject(json)) {
             outcomes.push(...fail(batch, `HTTP ${response.status}: the response is not a JSON object`))
             continue
         }

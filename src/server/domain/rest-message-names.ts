@@ -1,7 +1,7 @@
 /**
  * The OEM REST messages and the functions each has, by name: the one list of them. The Fluent RestMessage records take
  * their name and their functions' names from here, the adapters (domain/oem) call a function by its entry and the
- * transport picks the message by its (platform/oem-http, platform/rest-messages), so a function an adapter calls is
+ * transport picks the message by its (platform/oem-sync, platform/rest-messages), so a function an adapter calls is
  * one its message has.
  */
 export const REST_MESSAGE = {

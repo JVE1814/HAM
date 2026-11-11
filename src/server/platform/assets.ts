@@ -15,7 +15,6 @@ import {
     type TransitionVerdict,
     voidsWipeEvidence,
 } from '../domain/lifecycle.ts'
-import { MODEL_TABLE } from '../domain/normalization.ts'
 import { LEGAL_OWNER, type LegalOwner } from '../domain/vocabulary.ts'
 import { stringProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
@@ -102,7 +101,7 @@ export function newAsset(modelId: string, stage: Stage): GlideRecord {
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('model', modelId)
     asset.setValue('quantity', 1)
-    const model = new GlideRecord(MODEL_TABLE)
+    const model = new GlideRecord('cmdb_model')
     if (model.get(modelId)) asset.setValue('model_category', str(model, 'cmdb_model_category').split(',')[0])
     writeStage(asset, stage)
     return asset

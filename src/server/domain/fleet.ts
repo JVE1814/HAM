@@ -97,14 +97,9 @@ export function naasStockroomType(value: string): StockroomType | null {
     return NAAS_STOCKROOM_TYPES.find((type) => type === value) ?? null
 }
 
-/** Encoded condition matching NaaS stockrooms (through `via`, e.g. `stockroom.` from an Asset). */
-export function naasStockroomCondition(via = ''): string {
-    return `${via}${NAAS_STOCKROOM_CONDITION}`
-}
-
 /**
  * Encoded condition matching stockrooms outside NaaS (through `via`, e.g. `from_stockroom.`): another type, or none,
- * which is not left to how `NOT IN` treats an empty value. The complement of `naasStockroomCondition`.
+ * which is not left to how `NOT IN` treats an empty value. The complement of `NAAS_STOCKROOM_CONDITION`.
  */
 export function outsideNaasStockroomCondition(via = ''): string {
     const type = `${via}${STOCKROOM_TYPE_FIELD}`
@@ -163,6 +158,17 @@ export const CURRENT_IS_SITE = `current.${SITE_FIELD} == true`
 
 /** A Customer's Sites, once the Customer's sys_id is appended: what a Site picker's qualifier completes. */
 export const SITES_OF_CUSTOMER_QUERY = `${SITE_CONDITION}^company=`
+
+/**
+ * The Location fields that put a Rack or a Stockroom at a Site: the Site itself or one of its Rooms. A Configuration
+ * item reaches one level further (domain/reconciliation `CI_SITE_LOCATIONS`).
+ */
+export const SITE_OR_ROOM_LOCATIONS = ['location', 'location.parent'] as const
+
+/** Encoded condition: the Location reached through `via` is the Site `siteId` or one of its Rooms. */
+export function atSiteOrRoomCondition(siteId: string, via = ''): string {
+    return SITE_OR_ROOM_LOCATIONS.map((location) => `${via}${location}=${siteId}`).join('^OR')
+}
 
 /** An Asset as adoption into the fleet (or a receipt taking it in) judges it. */
 export interface FleetCandidate {

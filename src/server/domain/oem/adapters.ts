@@ -91,8 +91,8 @@ export const OEM_ADAPTERS: Record<OemVendor, VendorIntegration> = {
 }
 
 /**
- * The order the sync jobs take the vendors in. It is an order, not the list of vendors, which is `OemVendor`: the type
- * below fails when a vendor is missing from it.
+ * The order the sync jobs take the vendors in, and the vendors a coverage CSV row may name (`parseCoverageRow`). The
+ * type below fails when a vendor of `OemVendor` is missing from it.
  */
 const SYNC_ORDER = ['cisco', 'meraki', 'fortinet', 'mist', 'aruba', 'checkpoint'] as const satisfies readonly OemVendor[]
 
@@ -168,3 +168,16 @@ export function claimRouted(vendor: string, action: string): boolean {
 
 /** Vendors with at least one automated step, in the order the claim run takes them. */
 export const CLAIM_VENDORS: readonly OemVendor[] = (Object.keys(OEM_ADAPTERS) as OemVendor[]).filter((vendor) => OEM_ADAPTERS[vendor].claims)
+
+export interface ClaimTurn {
+    vendor: OemVendor
+    routes: VendorClaimRoutes
+}
+
+/** The vendors whose claim switch is on, with their routes, in the order the claim run takes them. */
+export function enabledClaims(enabled: (property: PropertyOf<boolean>) => boolean): ClaimTurn[] {
+    return CLAIM_VENDORS.flatMap((vendor) => {
+        const claims = OEM_ADAPTERS[vendor].claims
+        return claims && enabled(claims.enabled) ? [{ vendor, routes: claims.routes }] : []
+    })
+}

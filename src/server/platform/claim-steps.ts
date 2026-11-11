@@ -1,7 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { CLAIM_VENDORS, OEM_ADAPTERS } from '../domain/oem/adapters.ts'
+import { enabledClaims } from '../domain/oem/adapters.ts'
 import {
     CLAIM_PREREQUISITE,
     dependentActions,
@@ -61,10 +61,8 @@ function runHolding(lock: HeldLock): void {
     const maxCalls = intProperty(PROPERTY.claimMaxCalls)
     releaseStranded()
     const store = glideClaimStore()
-    for (const vendor of CLAIM_VENDORS) {
-        const claims = OEM_ADAPTERS[vendor].claims
-        if (!claims || !boolProperty(claims.enabled)) continue
-        if (runVendorClaims(vendor, claims.routes, store, restMessagePort, maxCalls, () => lock.held()).lockLost) {
+    for (const { vendor, routes } of enabledClaims(boolProperty)) {
+        if (runVendorClaims(vendor, routes, store, restMessagePort, maxCalls, () => lock.held()).lockLost) {
             log.warn(`OEM claim run stopped: job lock lost while sending, to the run that took it over`)
             return
         }

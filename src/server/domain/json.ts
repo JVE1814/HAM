@@ -10,6 +10,11 @@ export function parseJson(body: string): unknown {
     }
 }
 
+/** An object, not null, an array or a scalar: a body a vendor's envelope or fields can be read from. */
+export function isJsonObject(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
 export function asArray(value: unknown): unknown[] {
     if (Array.isArray(value)) return value
     return value === undefined || value === null ? [] : [value]

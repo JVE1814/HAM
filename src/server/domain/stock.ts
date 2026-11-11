@@ -1,4 +1,4 @@
-import { fleetStagesQuery, providerStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
+import { atSiteOrRoomCondition, fleetStagesQuery, providerStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
 import { STOCK_STAGES, type Stage } from './lifecycle.ts'
 import { type LeaseEndAction, STOCKROOM_TYPE } from './vocabulary.ts'
 
@@ -99,7 +99,7 @@ export function sourceQuery(source: Source, scope: StockScope): string {
     if (source === 'central_stock') return freeStockQuery(scope.modelId)
     if (source === 'spare_pool') return fleetStagesQuery(['spare_pool'], `${base}^${providerStockroomCondition('stockroom.')}^company=${scope.customerId}`)
     const customerSite = `${base}^stockroom.${STOCKROOM_TYPE_FIELD}=${STOCKROOM_TYPE.customer_site}^stockroom.x_daas_ham_customer=${scope.customerId}`
-    return fleetStagesQuery(STOCK_STAGES, `${customerSite}^stockroom.location=${scope.siteId}^ORstockroom.location.parent=${scope.siteId}`)
+    return fleetStagesQuery(STOCK_STAGES, `${customerSite}^${atSiteOrRoomCondition(scope.siteId, 'stockroom.')}`)
 }
 
 /**

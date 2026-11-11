@@ -1,7 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
 import { PROPERTY } from '../domain/properties.ts'
-import { collectionMethod, TEMPORARY_RETURN_STAGES } from '../domain/returns.ts'
+import { collectionMethod, stagesTakenBack, TEMPORARY_RETURN_STAGES } from '../domain/returns.ts'
 import { type InstallMode, ORDER_STAGE, type OrderType, RETURN_TRIGGER } from '../domain/vocabulary.ts'
 import { todayIso } from './clock.ts'
 import { installedAssetIds, installedAssetIdsBySite } from './installed-assets.ts'
@@ -42,7 +42,7 @@ function recoverEndedAgreements(today: string): void {
         const recover = `Agreement ${str(agreement, 'number')} ended ${str(agreement, 'ends')}: recover all equipment`
         // One Return per Site, each a field de-install with its own change and work order there. Units still shipped
         // there go too (domain/returns `stagesTakenBack`): once all are raised, the job leaves this Agreement.
-        const bySite = installedAssetIdsBySite({ agreementId, returning: 'agreement_end' })
+        const bySite = installedAssetIdsBySite({ agreementId, stages: stagesTakenBack('agreement_end') })
         // The Returns this end raised: after the end date, so not those of an end before a renewal.
         const raisedForEnd = `trigger=${RETURN_TRIGGER.agreement_end}^agreement=${agreementId}^sys_created_on>=${str(agreement, 'ends')} 00:00:00`
         let refused = false
@@ -85,7 +85,7 @@ function returnTemporaryDeployments(today: string): void {
     order.query()
     while (order.next()) {
         const orderId = order.getUniqueValue()
-        const assetIds = installedAssetIds({ orderId, returning: 'temporary_end' })
+        const assetIds = installedAssetIds({ orderId, stages: stagesTakenBack('temporary_end') })
         // The Return is raised once, so an Order still being installed waits until every unit is installed. Once its
         // end date has passed, the units still shipped come back too.
         const installing = str(order, 'stage') === ORDER_STAGE.installing && str(order, 'end_date') >= today

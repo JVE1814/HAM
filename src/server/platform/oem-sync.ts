@@ -4,8 +4,8 @@ import { coverageDisposition } from '../domain/coverage.ts'
 import { NAAS_MODEL_CONDITION, OEM_PID_FIELD, OEM_SOURCE_FIELD } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { enabledRoutes, type CoverageRoute } from '../domain/oem/adapters.ts'
-import { pidKey } from '../domain/oem/sync-adapters.ts'
+import { enabledRoutes, type CoverageRoute, type SyncApi } from '../domain/oem/adapters.ts'
+import { pidKey, type OemContext } from '../domain/oem/sync-adapters.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
 import { daysAgoGlide, nowMs } from './clock.ts'
@@ -13,10 +13,10 @@ import { applyCoverage, staleAssets, type SerialWrite } from './coverage.ts'
 import { withLock } from './locks.ts'
 import { log } from './log.ts'
 import { writeModelLifecycle } from './model-lifecycle.ts'
-import { apiEnabled, oemContext } from './oem-http.ts'
 import { recordRmaStatuses, rmasToAskAbout } from './oem-rma.ts'
-import { intProperty } from './properties.ts'
+import { boolProperty, intProperty, stringProperty } from './properties.ts'
 import { str } from './records.ts'
+import { restMessagePort } from './rest-messages.ts'
 
 /**
  * OEM synchronisation of NaaS Models and the serials of fleet assets only (ADR 0016): the Provider IT's equipment is
@@ -24,6 +24,17 @@ import { str } from './records.ts'
  */
 
 const COVERAGE_BATCH = 200
+
+function apiEnabled(api: SyncApi): boolean {
+    return boolProperty(api.enabled)
+}
+
+function oemContext(api: SyncApi): OemContext {
+    return {
+        http: restMessagePort(api.message),
+        orgIds: api.orgIds ? stringProperty(api.orgIds).split(',').map((id) => id.trim()).filter(Boolean) : [],
+    }
+}
 
 /** A vendor that is down fails every key the same way. */
 const ERRORS_LOGGED = 20

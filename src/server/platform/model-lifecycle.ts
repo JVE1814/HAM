@@ -15,7 +15,6 @@ import {
     type LifecycleSource,
 } from '../domain/model-lifecycle.ts'
 import { queueJob } from './events.ts'
-import { MODEL_TABLE } from '../domain/normalization.ts'
 import { loadNormalizationData, resolveModel } from './normalization.ts'
 import { findById, refusal, rowError, str, type RowOutcome } from './records.ts'
 
@@ -159,7 +158,7 @@ export function writingModelLifecycle(modelId: string): boolean {
  * Model's: a milestone row may be gone by the time it runs. A Model that is not a NaaS Model (ADR 0016) queues nothing.
  */
 export function queueModelRefresh(modelId: string): void {
-    const model = findById(MODEL_TABLE, modelId)
+    const model = findById('cmdb_model', modelId)
     if (model && isNaasModel(str(model, OEM_PID_FIELD))) queueJob(EVENT.lifecycleChanged, model)
 }
 
