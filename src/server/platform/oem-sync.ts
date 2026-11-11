@@ -1,6 +1,6 @@
 import { GlideRecord } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
-import { coverageDisposition, type CoverageAnswer } from '../domain/coverage.ts'
+import { coverageDisposition } from '../domain/coverage.ts'
 import { NAAS_MODEL_CONDITION, OEM_PID_FIELD, OEM_SOURCE_FIELD } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
@@ -9,7 +9,7 @@ import { pidKey } from '../domain/oem/sync-adapters.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
 import { daysAgoGlide, nowMs } from './clock.ts'
-import { applyCoverage, staleAssets } from './coverage.ts'
+import { applyCoverage, staleAssets, type SerialWrite } from './coverage.ts'
 import { withLock } from './locks.ts'
 import { log } from './log.ts'
 import { writeModelLifecycle } from './model-lifecycle.ts'
@@ -140,19 +140,12 @@ function syncCoverageBatch(vendor: OemVendor, route: CoverageRoute, staleBefore:
     const result = route.run([...assets.keys()], oemContext(route.api))
     errors.push(...ofVendor(vendor, result.errors))
     const dispositionOf = coverageDisposition(result)
-    const answered = new Map<string, string>()
-    const answers: CoverageAnswer[] = []
-    const stamped: string[] = []
+    const writes = new Map<string, SerialWrite>()
     for (const [serial, assetIds] of assets) {
-        const disposition = dispositionOf(serial)
-        if (disposition.kind === 'stamp') stamped.push(...assetIds)
-        if (disposition.kind !== 'apply') continue
-        for (const assetId of assetIds) answered.set(assetId, serial)
-        // The serial's coverage records point at its last answered Asset.
-        const lastAsset = assetIds[assetIds.length - 1]
-        for (const fact of disposition.facts) answers.push({ assetId: lastAsset, fact })
+        const answer = dispositionOf(serial)
+        if (answer.kind !== 'skip') writes.set(serial, { assetIds, answer })
     }
-    const refused = applyCoverage(vendor, 'api', answered, answers, stamped)
+    const refused = applyCoverage(vendor, 'api', writes)
     errors.push(...ofVendor(vendor, refused))
     // A batch with errors ends the vendor's run, as does one with refused saves (its Assets, still stale, would come
     // straight back); a rate-limited vendor (maxKeysPerRun) gets one batch per run.
