@@ -36,7 +36,7 @@ export function afterOrderProduced(producer: Record<string, unknown>, current: u
     const asked = deviceRows(producer.devices)
     const devices: NewLine[] = []
     for (const row of asked.rows) {
-        if (row.model) devices.push({ modelId: String(row.model), quantity: Math.max(1, Number(row.quantity) || 1), fromSiteTemplate: false })
+        if (row.model) devices.push({ modelId: String(row.model), quantity: Math.max(1, Number(row.quantity) || 1) })
     }
     const order = current as GlideRecord
     const submission = submitProducedOrder(order, devices, asked.unread)

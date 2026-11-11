@@ -41,8 +41,8 @@ export function withOrderLineLocks<T>(lineIds: readonly string[], work: (locks: 
 export interface NewLine {
     modelId: string
     quantity: number
-    /** It came from the Order's Site template; left unset, the column's default (false) stands. */
-    fromSiteTemplate?: boolean
+    /** It came from the Order's Site template; otherwise the column's default (false) stands. */
+    fromSiteTemplate?: true
     /** The Asset it replaces like-for-like (break-fix, refresh). */
     replacesAssetId?: string
 }
@@ -62,7 +62,7 @@ export function addOrderLines(order: GlideRecord, lines: readonly NewLine[]): Re
         record.setValue('order', order.getUniqueValue())
         record.setValue('model', line.modelId)
         record.setValue('quantity', line.quantity)
-        if (line.fromSiteTemplate !== undefined) record.setValue('from_site_template', line.fromSiteTemplate)
+        if (line.fromSiteTemplate) record.setValue('from_site_template', true)
         if (line.replacesAssetId) record.setValue('replaces_asset', line.replacesAssetId)
         if (!record.insert()) refused.push({ line, reason: refusal(record) })
     }
