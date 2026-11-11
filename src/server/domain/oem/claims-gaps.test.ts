@@ -157,7 +157,6 @@ describe('Check Point Zero Touch', () => {
 })
 
 describe('a vendor run whose calls fail', () => {
-    /** A store with `due` steps per action, recording what the run settles. */
     function store(due: Record<string, ClaimTarget[]>) {
         const settled: ClaimOutcome[][] = []
         const claimStore: ClaimStore = { due: (_vendor, action) => due[action] ?? [], settle: (outcomes) => void settled.push([...outcomes]) }

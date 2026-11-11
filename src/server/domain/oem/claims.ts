@@ -46,11 +46,9 @@ export type ClaimPort = (request: HttpRequest) => HttpResponse | typeof LOCK_LOS
 
 export type ClaimAdapter = (targets: readonly ClaimTarget[], http: ClaimPort, maxCalls: number) => ClaimRun
 
-/** The adapter a vendor runs for each of its automated actions. */
 export type VendorClaimRoutes = Partial<Record<ClaimAction, ClaimRoute>>
 
 export interface ClaimRoute {
-    /** Name of the REST message that serves the calls. */
     message: OemMessageName
     run: ClaimAdapter
     /**
@@ -135,7 +133,7 @@ function stepsFor(route: ClaimRoute, remaining: number): number {
 
 /**
  * One vendor's 5-minute run of its `routes`. Its actions run in the fixed order oem_claim, oem_licence, oem_ztp and share maxCalls.
- * An action is loaded only while calls remain, with limit = min(200, max(1, ceil(remaining x perCall))).
+ * An action is loaded only while calls remain.
  * The outcomes the adapter returns (attempted or refused steps) are settled together, once per action; loaded
  * steps the budget did not reach are not settled and wait for the next run. Returns the calls made (<= maxCalls).
  * `held` is asked before every load and every call: once it says no (the run's job lock went to another run), nothing
@@ -172,7 +170,6 @@ export function runVendorClaims(
     return { calls, lockLost }
 }
 
-/** Encoded query on x_daas_ham_staging_step: a step not done yet whose staging task is active. */
 export const OPEN_STEP = 'done=false^staging_task.active=true'
 
 /**

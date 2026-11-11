@@ -18,7 +18,6 @@ import {
     type Capability,
 } from './sync-adapters.ts'
 
-/** A vendor API the sync jobs read: the REST message that serves its calls, its switch, and where it is read per organization, which ones. */
 export interface SyncApi {
     message: OemMessageName
     enabled: PropertyOf<boolean>
@@ -50,7 +49,6 @@ interface VendorRoutes {
 /** A vendor's own API, whose switch each of its routes needs on; a vendor without one has no routes. */
 type SyncIntegration = ({ api: SyncApi } & VendorRoutes) | { api?: never; lifecycle?: never; coverage?: never; rmaStatus?: never }
 
-/** The staging steps a vendor's cloud does, and the switch that lets the claim run send them. */
 interface ClaimIntegration {
     enabled: PropertyOf<boolean>
     routes: VendorClaimRoutes
@@ -152,7 +150,6 @@ export function parseCoverageRow(row: CoverageRow): ParsedCoverageRow {
     return { ok: true, vendor, fact, annualCost: cost ? Number(cost) : undefined }
 }
 
-/** The vendors a sync job of `capability` calls, in SYNC_ORDER: those whose route may run (enabledRoute). */
 export function enabledRoutes<K extends keyof VendorRoutes>(capability: K, enabled: (api: SyncApi) => boolean): Array<SyncTurn<K>> {
     return SYNC_ORDER.flatMap((vendor) => {
         const route = enabledRoute(vendor, capability, enabled)
