@@ -110,7 +110,7 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   has passed, its units still shipped come back too).
 - A site decommission returns everything installed at the Site (in service, temporary, pending in
   service), whatever devices the request lists. From the record producer and the customer page it
-  also returns units still shipped to the Site (`domain/returns.ts` `SITE_RECOVERY_STAGES`), so none
+  also returns units still shipped to the Site (`domain/returns.ts` `stagesTakenBack`), so none
   is left holding the site package open.
 - Devices chosen for a device removal must be fleet assets deployed at the chosen Site (shipped,
   pending in service, in service, temporary or pending return); others are ignored, so a unit

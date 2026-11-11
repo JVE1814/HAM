@@ -11,7 +11,6 @@ import {
     returnDueDate,
     returnRequestFindings,
     returnRequesterRefusal,
-    SITE_RECOVERY_STAGES,
     sitePackageHoldersQuery,
     deploymentEndLineQuery,
     stagesTakenBack,
@@ -171,21 +170,22 @@ describe('sitePackageHoldersQuery', () => {
     })
 })
 
-describe('SITE_RECOVERY_STAGES', () => {
+describe('what a whole-Site recovery takes back', () => {
     // Facts a unit at a Site under an Agreement has; pending return needs nothing more.
     const atSite = { hasSite: true, hasAgreement: true, legalOwner: 'provider', wipeEvidenceComplete: false } as const
+    const recovered = stagesTakenBack('agreement_end')
 
     it('takes every unit that holds the site package open, but those already coming back', () => {
-        expect([...SITE_RECOVERY_STAGES, 'pending_return'].sort()).toEqual([...DEPLOYED_STAGES].sort())
+        expect([...recovered, 'pending_return'].sort()).toEqual([...DEPLOYED_STAGES].sort())
     })
 
-    it('takes the units still shipped to the Site, which installed-only lists leave out', () => {
-        expect(SITE_RECOVERY_STAGES).toContain('shipped')
-        expect(INSTALLED_STAGES).not.toContain('shipped')
-        for (const stage of INSTALLED_STAGES) expect(SITE_RECOVERY_STAGES).toContain(stage)
+    it('takes the units still shipped to the Site, which a device removal leaves out', () => {
+        expect(recovered).toContain('shipped')
+        expect(stagesTakenBack('device_removal')).not.toContain('shipped')
+        for (const stage of INSTALLED_STAGES) expect(recovered).toContain(stage)
     })
 
-    it.each(SITE_RECOVERY_STAGES)('can move a unit %s to pending return', (stage) => {
+    it.each(recovered)('can move a unit %s to pending return', (stage) => {
         expect(checkTransition(stage, 'pending_return', atSite)).toEqual({ allowed: true })
     })
 })
@@ -215,7 +215,8 @@ describe('a whole-Site recovery, by the trigger of its Return', () => {
     it('takes the units still shipped to the Site too, as a temporary end does; any other Return the installed ones', () => {
         for (const trigger of triggers) {
             const takesShipped = isSiteRecovery(trigger) || trigger === 'temporary_end'
-            expect(stagesTakenBack(trigger)).toBe(takesShipped ? SITE_RECOVERY_STAGES : INSTALLED_STAGES)
+            expect(stagesTakenBack(trigger).includes('shipped'), trigger).toBe(takesShipped)
+            for (const stage of INSTALLED_STAGES) expect(stagesTakenBack(trigger), trigger).toContain(stage)
         }
     })
 

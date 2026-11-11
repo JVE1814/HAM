@@ -256,7 +256,7 @@ function notRaised(reason: NotRaised, why: string): RequestOutcome {
  * `returnRequestFindings`): the producer does not apply that rule and its Customer and Site are only qualified in the
  * browser, and locations have no visibility rule (ADR 0005), so any location's sys_id is found. All of that is checked
  * before the Site's devices are read. A site decommission returns everything installed or shipped at the Site
- * (domain/returns `SITE_RECOVERY_STAGES`); a device removal the listed fleet assets (ADR 0016) deployed at the Site,
+ * (domain/returns `stagesTakenBack`); a device removal the listed fleet assets (ADR 0016) deployed at the Site,
  * as a list qualified in the browser, or sent to the API, may name any Asset. The Return runs under the Agreement of
  * its first Asset unless the produced Return order names one.
  *

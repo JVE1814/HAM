@@ -154,19 +154,13 @@ export function deploymentEndLineQuery(assetId: string): string {
 }
 
 /**
- * What a whole-Site recovery (agreement end, site decommission) takes back: every unit serving the Site, including
- * those still shipped there, which the lifecycle lets go straight to pending return. Left off, a shipped unit would
- * miss the agreement-end Return, raised only once, and hold the site package open for good (`sitePackageHoldersQuery`).
- */
-export const SITE_RECOVERY_STAGES: readonly Stage[] = SERVING_STAGES
-
-/**
- * The stages of the units a Return with this trigger takes back: one that ends their deployment those still shipped
- * too, any other the installed ones. A temporary Order's units still shipped once its end date has passed would
- * otherwise stay deployed, and billed, with no Return raised again.
+ * The stages of the units a Return with this trigger takes back: one that ends their deployment every unit serving the
+ * Site, those still shipped there too (the lifecycle lets them go straight to pending return), any other the installed
+ * ones. Left off, a shipped unit would miss the agreement-end Return, raised only once, and hold the site package open
+ * for good (`sitePackageHoldersQuery`); a temporary Order's would stay deployed, and billed, with no Return raised again.
  */
 export function stagesTakenBack(trigger: ReturnTrigger): readonly Stage[] {
-    return DEPLOYMENT_END_TRIGGERS.includes(trigger) ? SITE_RECOVERY_STAGES : INSTALLED_STAGES
+    return DEPLOYMENT_END_TRIGGERS.includes(trigger) ? SERVING_STAGES : INSTALLED_STAGES
 }
 
 /** Who an evaluated Asset belongs to: its Legal owner and the end action of its lease ('' without one). */

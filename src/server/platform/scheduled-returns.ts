@@ -44,7 +44,7 @@ function recoverEndedAgreements(today: string): void {
         const agreementId = agreement.getUniqueValue()
         const recover = `Agreement ${str(agreement, 'number')} ended ${str(agreement, 'ends')}: recover all equipment`
         // One Return per Site, each a field de-install with its own change and work order there. Units still shipped
-        // there go too (domain/returns `SITE_RECOVERY_STAGES`): once all are raised, the job leaves this Agreement.
+        // there go too (domain/returns `stagesTakenBack`): once all are raised, the job leaves this Agreement.
         const bySite = installedAssetIdsBySite({ agreementId, returning: 'agreement_end' })
         // The Returns this end raised: after the end date, so not those of an end before a renewal.
         const raisedForEnd = `trigger=${RETURN_TRIGGER.agreement_end}^agreement=${agreementId}^sys_created_on>=${str(agreement, 'ends')} 00:00:00`
