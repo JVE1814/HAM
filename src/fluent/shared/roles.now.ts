@@ -114,6 +114,9 @@ export const returnWorkers = [ROLE.assetManager, ROLE.inventoryTech, ROLE.noc]
 /** Who writes Lease schedules and their decisions. */
 export const leaseEditors = [ROLE.assetManager, ROLE.finance]
 
+/** Who opens or closes a Service interval by hand, when a stage change could not (platform/service-intervals). */
+export const intervalEditors = [ROLE.assetManager, ROLE.finance]
+
 /** Roles that read the money tables (service intervals, billing, cost facts and margin), the NaaS dashboard's Margin tab among them. */
 export const moneyReaders = MONEY_READERS
 
