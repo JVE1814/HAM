@@ -6,9 +6,6 @@ import { str } from '../platform/records.ts'
 /** Break-fix: a CSM case about a failed Asset drives a device-replace Order (P2.3, Q58). */
 
 export function uiRaiseReplacement(current: GlideRecord): void {
-    // A refused form save (the platform says why) raises nothing: the failed asset and linked Order would be values the
-    // case does not hold.
-    if (!current.update()) return
     const replacement = raiseReplacement(current)
     switch (replacement.outcome) {
         case 'raised':
@@ -20,7 +17,7 @@ export function uiRaiseReplacement(current: GlideRecord): void {
             gs.addErrorMessage(replacement.why)
             return void gs.addInfoMessage(`Replacement order ${replacement.number} is left as a draft: correct it and submit it`)
         case 'not_raised':
-            return void gs.addErrorMessage(replacement.why)
+            if (replacement.why) gs.addErrorMessage(replacement.why)
     }
 }
 

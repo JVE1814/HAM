@@ -17,7 +17,7 @@ import { bool, findById, refusal, str, warnRefused, type ForeignRecord } from '.
  *   submission of it had taken it ahead: platform/orders `Submission`);
  * - `already_raised`: the Order the case links is going ahead, in the stage `stageLabel` names, and is kept;
  * - `draft`: the Order could not be submitted (`why`) and is left a draft, linked to the case, to correct and submit;
- * - `not_raised`: nothing was raised or submitted, and why.
+ * - `not_raised`: nothing was raised or submitted, and why ('' when the platform refused the case's save and said so).
  */
 export type Replacement =
     | { outcome: 'raised'; number: string; already?: string }
@@ -42,13 +42,16 @@ function notRaised(why: string): Replacement {
 }
 
 /**
- * Raise an Order replacing the case's failed Asset like-for-like, link it to the case (saves the case) and submit it.
+ * Raise an Order replacing the case's failed Asset like-for-like, link it to the case and submit it. Saves the case,
+ * the record of the form it was asked from, first: a refused save raises nothing, as the failed asset and linked Order
+ * would be values the case does not hold.
  * One that cannot be submitted as raised stays a draft, still linked to the case so a second one is not raised, for
  * the user to correct. "Raise replacement" is offered while the case links no Order or one rejected or cancelled, but
  * a form opened before then can still send it: then a linked draft is submitted again and a linked Order going ahead
  * is kept (domain/breakfix).
  */
 export function raiseReplacement(kase: GlideRecord): Replacement {
+    if (!kase.update()) return notRaised('')
     const linked = findById('x_daas_ham_order', str(kase, 'x_daas_ham_replacement_order'))
     const step = replacementStep(linked ? (str(linked, 'stage') as OrderStage) : null)
     if (linked && step === 'submit_draft') return submitReplacement(linked)

@@ -57,9 +57,11 @@ export type DisposalSubmission = { submitted: true } | { submitted: false; why: 
 /**
  * Put a draft Disposal order to approval (platform/approvals `putToApproval`): the provider-side approvers (the asset
  * managers), and the admins of the order's Customer when a customer-owned Asset is on it. Nobody stands in for a
- * Customer without admins: the order then stays a draft.
+ * Customer without admins: the order then stays a draft. Saves the order, the record of the form it was submitted
+ * from, first: a refused save asks nobody, as the order is not what the approvers would decide.
  */
 export function submitDisposal(order: GlideRecord): DisposalSubmission {
+    if (!order.update()) return { submitted: false, why: '' }
     const assets = assetsOf(order.getUniqueValue())
     if (assets.length === 0) return { submitted: false, why: 'Add the assets to dispose of first' }
     const findings = disposalCustomerFindings(str(order, 'customer'), assets)
@@ -115,8 +117,13 @@ export interface DisposalCompletion {
     refused?: string
 }
 
-/** Retire every ready line of the Disposal order and record what blocks the rest; the order completes once none is left. */
+/**
+ * Retire every ready line of the Disposal order and record what blocks the rest; the order completes once none is left.
+ * Saves the order, the record of the form it was asked from, first: a refused save (a method or Customer changed after
+ * submit, which the platform reports) retires nothing.
+ */
 export function completeDisposal(order: GlideRecord): DisposalCompletion {
+    if (!order.update()) return { completed: false, blocked: 0, unsaved: 0 }
     let blocked = 0
     let unsaved = 0
     const line = lines(order.getUniqueValue())
