@@ -1,9 +1,11 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { agreementCurrencyProblem } from '../domain/billing.ts'
 import { currencyCode } from '../domain/money.ts'
+import { todayIso } from '../platform/clock.ts'
+import { warnExpiringCoverage } from '../platform/coverage-warnings.ts'
 import { queueRefresh, runRefreshPass } from '../platform/lifecycle-dates.ts'
 import { str } from '../platform/records.ts'
-import { rearmForNewEnd, renewAgreement } from '../platform/renewals.ts'
+import { rearmForNewEnd, renewAgreement, warnAgreementRenewals } from '../platform/renewals.ts'
 import { abortWith } from '../platform/rule-api.ts'
 
 /**
@@ -35,4 +37,10 @@ export function uiRenewAgreement(current: GlideRecord): void {
     const renewal = renewAgreement(current)
     if (renewal.renewed) gs.addInfoMessage(`Agreement renewed until ${renewal.until}`)
     else if (renewal.why) gs.addErrorMessage(renewal.why)
+}
+
+export function warnRenewals(): void {
+    const today = todayIso()
+    warnAgreementRenewals(today)
+    warnExpiringCoverage(today)
 }

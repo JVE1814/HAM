@@ -1,8 +1,7 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, EmailNotification, Record, ScheduledScript, UiAction } from '@servicenow/sdk/core'
 import { EVENT } from '../../server/domain/events'
-import { guardAgreementCurrency, onAgreementEndChanged, uiRenewAgreement } from '../../server/entry/agreements'
-import { warnRenewals } from '../../server/entry/leases'
+import { guardAgreementCurrency, onAgreementEndChanged, uiRenewAgreement, warnRenewals } from '../../server/entry/agreements'
 import { commercialEditors } from '../shared/roles.now'
 
 // A mistyped currency is refused as it is entered, not at the next generation (owner decision: one currency per Agreement).
