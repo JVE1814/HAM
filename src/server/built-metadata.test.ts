@@ -1209,7 +1209,7 @@ describe('REST messages', () => {
     function callEveryFunction(): typeof sentToRest.calls {
         sentToRest.calls.length = 0
         for (const routes of Object.values(OEM_ADAPTERS)) {
-            for (const route of [routes.lifecycle, routes.coverage, routes.rmaStatus]) route?.run(['KEY'], { ...oemContext(route.via), orgIds: ['org'] })
+            for (const route of [routes.lifecycle, routes.coverage, routes.rmaStatus]) route?.run(['KEY'], { ...oemContext(route.api), orgIds: ['org'] })
         }
         // Check Point's Zero Touch takes an account of the form <account id>/<template id>; to the others it is any text.
         const target = { stepId: 'step', serial: 'SERIAL', mac: '00:11:22:33:44:55', claimCode: 'CODE', account: '1/2' }

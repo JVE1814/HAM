@@ -1,7 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { claimRoutes, CLAIM_VENDORS } from '../domain/oem/adapters.ts'
+import { CLAIM_VENDORS, OEM_ADAPTERS } from '../domain/oem/adapters.ts'
 import {
     CLAIM_PREREQUISITE,
     dependentActions,
@@ -16,7 +16,7 @@ import {
 import { openJobCursor, type JobCursor } from './job-cursor.ts'
 import { withLock } from './locks.ts'
 import { boolProperty, intProperty } from './properties.ts'
-import { PROPERTY, type PropertyOf } from '../domain/properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { restMessagePort } from './rest-messages.ts'
 import { bool, num, pluck, recordsById, str, warnRefused } from './records.ts'
 import { messageOf } from '../domain/errors.ts'
@@ -46,8 +46,6 @@ interface ClaimAsset {
 
 const NO_ASSET: ClaimAsset = { customerId: '', serial: '', mac: '', claimCode: '' }
 
-const CLAIM_ENABLED: Partial<Record<OemVendor, PropertyOf<boolean>>> = PROPERTY.claimEnabled
-
 /**
  * For each enabled vendor, send its due automated staging steps (pending, and failed ones due a retry) through the
  * vendor's adapters, within `x_daas_ham.oem.claim.max_calls` calls a vendor (domain/oem/claims `runVendorClaims`),
@@ -70,8 +68,8 @@ function runHolding(lock: HeldLock): void {
     releaseStranded()
     const store = whileHeld(lock, glideClaimStore())
     for (const vendor of CLAIM_VENDORS) {
-        const enabled = CLAIM_ENABLED[vendor]
-        if (enabled && boolProperty(enabled)) runVendorClaims(vendor, claimRoutes(vendor), store, restMessagePort, maxCalls, () => lock.held())
+        const claims = OEM_ADAPTERS[vendor].claims
+        if (claims && boolProperty(claims.enabled)) runVendorClaims(vendor, claims.routes, store, restMessagePort, maxCalls, () => lock.held())
     }
 }
 
