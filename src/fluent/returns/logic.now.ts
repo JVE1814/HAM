@@ -8,8 +8,6 @@ import { EVENT } from '../../server/domain/events'
 import { PROPERTY } from '../../server/domain/properties'
 import { admin } from '../shared/roles.now'
 
-/* Returns (Q60): rules, jobs and notifications. */
-
 BusinessRule({
     $id: Now.ID['br_return_evaluated'],
     name: 'NaaS - route evaluated return',

@@ -24,8 +24,6 @@ import { leasedAssetOwnershipTest, leaseExtensionTest } from '../leases/tests.no
 import { closedBillingPeriodLockedTest } from '../billing/tests.now'
 import { rackPowerBudgetTest } from '../racks/tests.now'
 
-/* The ATF suites, one per delivery phase: each lists tests of several features. */
-
 export const phase1Suite = TestSuite({
     $id: Now.ID['atf_suite_p1'],
     name: 'NaaS - P1',

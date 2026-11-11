@@ -106,7 +106,7 @@ List({ table: 'x_daas_ham_fee_event', view: default_view, columns: ['occurred_on
 /*
  * "Return or decommission equipment": customer admins and the service desk raise returns (Q60). The Site choices follow
  * the chosen Customer and the device choices the chosen Site; submitting checks the same again, and that the requester
- * may raise it (domain/returns returnRequestFindings).
+ * may raise it.
  */
 
 export const requestReturn = CatalogItemRecordProducer({
@@ -150,7 +150,7 @@ export const requestReturn = CatalogItemRecordProducer({
         assets: ListCollectorVariable({
             question: 'Devices to return (selected devices only)',
             listTable: 'alm_hardware',
-            // The fleet assets installed at the chosen Site (none before a Site is chosen): the Provider IT's equipment
+            // The Provider IT's equipment
             // shares the table (ADR 0016). Submitting checks the fleet and the Site again.
             referenceQual: `javascript:'${FLEET_INSTALLED}^x_daas_ham_siteISNOTEMPTY^x_daas_ham_site=' + current.variables.site`,
             attributes: 'ref_qual_elements=site',

@@ -4,7 +4,7 @@ import { BROAD_STAFF, CUSTOMER_CONTACTS, EQUIPMENT_HANDLERS, MONEY_READERS, PLAT
 
 /*
  * The base-platform roles contained below must exist on the instance, as must the service desk's, which the ACLs grant
- * directly (`serviceDesk`): domain/roles PLATFORM_ROLE; see README "Required plugins".
+ * directly (`serviceDesk`); see README "Required plugins".
  */
 
 export const inventoryTech = Role({
@@ -69,7 +69,7 @@ export const integration = Role({
 })
 
 /*
- * The role groups the access lists name, each defined here once. They hold role names, which every record that takes
+ * The role groups hold role names, which every record that takes
  * roles reads (a navigator module takes nothing else), and a list keeps the order its module shows the roles in.
  */
 
@@ -95,7 +95,7 @@ export const commercialEditors = [ROLE.accountManager, ROLE.assetManager]
  * Who raises an Order or a Return for any Customer, from the navigator, a record producer or its form: provider roles
  * and the service desk. A customer admin raises them for their own Customer only, through the record producers, and has
  * create ACLs of its own that check the Customer (a Table API insert meets no producer); it creates no Order lines,
- * which the producer's script adds (platform/orders), past ACLs.
+ * which the producer's script adds, past ACLs.
  */
 export const orderRaisers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, PLATFORM_ROLE.serviceDeskAgent]
 
@@ -120,10 +120,10 @@ export const returnWorkers = [ROLE.assetManager, ROLE.inventoryTech, ROLE.noc]
 /** Who writes Lease schedules and their decisions. */
 export const leaseEditors = [ROLE.assetManager, ROLE.finance]
 
-/** Who raises or corrects a Fee event by hand, besides the charges the returns workflow raises (platform/fees). */
+/** Who raises or corrects a Fee event by hand, besides the charges the returns workflow raises. */
 export const feeEditors = [ROLE.assetManager, ROLE.finance]
 
-/** Who opens or closes a Service interval by hand, when a stage change could not (platform/service-intervals). */
+/** Who opens or closes a Service interval by hand, when a stage change could not. */
 export const intervalEditors = [ROLE.assetManager, ROLE.finance]
 
 /** Roles that read the money tables (service intervals, billing, cost facts and margin), the NaaS dashboard's Margin tab among them. */

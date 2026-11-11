@@ -5,8 +5,6 @@ import { broadStaff, providerStaff, stockroomWorkers } from './roles.now'
 import { WORKSPACE_HOME } from '../workspace/workspace.now'
 
 /*
- * Navigator menu "NaaS Asset Management".
- *
  * A module on alm_hardware lists fleet assets only (ADR 0016: the table holds the Provider IT's equipment too): its
  * filter holds the fleet condition in each ^NQ clause, and none opens the table unfiltered (link type LIST), which
  * built-metadata.test.ts checks.

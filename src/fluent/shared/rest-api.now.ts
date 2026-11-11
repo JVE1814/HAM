@@ -11,10 +11,10 @@ import { postTrackingUpdate } from '../../server/entry/shipping'
 import { staffOrCustomer } from './rest-acls.now'
 
 /*
- * Scripted REST API: /api/x_daas_ham/naas/... A route that sets nothing requires the snc_internal role and enforces
+ * A route that sets nothing requires the snc_internal role and enforces
  * the platform's default ACL, which admits internal users only: the staff and integration routes. The routes built for
- * customer users too (sites, racks, customer/...) turn the snc_internal requirement off and enforce `staffOrCustomer`
- * (rest-acls.now.ts). The shipping webhook runs unauthenticated (as guest, who holds no role) and checks its token
+ * customer users too (sites, racks, customer/...) turn the snc_internal requirement off and enforce `staffOrCustomer`.
+ * The shipping webhook runs unauthenticated (as guest, who holds no role) and checks its token
  * itself. Each handler checks the caller's role.
  */
 
