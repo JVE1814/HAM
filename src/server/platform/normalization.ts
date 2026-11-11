@@ -1,9 +1,9 @@
 import { GlideRecord } from '@servicenow/glide'
-import { fleetCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
+import { FLEET_CONDITION, OEM_PID_FIELD } from '../domain/fleet.ts'
 import {
     aliasedManufacturer,
+    DEFAULT_RULE_ORDER,
     fleetOnRawModelQuery,
-    LEARNED_RULE,
     MODEL_TABLE,
     NORMALIZED_TO,
     normalizeModel,
@@ -19,13 +19,17 @@ import {
     unusableRules,
 } from '../domain/normalization.ts'
 import { runTableJob } from './chunked.ts'
-import { bool, countBy, num, pluck, str, warnRefused } from './records.ts'
+import { countBy, num, pluck, str, warnRefused } from './records.ts'
 import { NORM_EXCEPTION_STATUS } from '../domain/vocabulary.ts'
 import { log } from './log.ts'
 
 /** Resolving raw manufacturer/model strings to canonical Models (domain/normalization). */
 
-export interface NormalizationData {
+const ALIAS_TABLE = 'x_daas_ham_manufacturer_alias'
+const RULE_TABLE = 'x_daas_ham_model_match_rule'
+const EXCEPTION_TABLE = 'x_daas_ham_norm_exception'
+
+interface NormalizationData {
     aliases: ManufacturerAlias[]
     rules: ModelMatchRule[]
 }
@@ -33,12 +37,12 @@ export interface NormalizationData {
 /** Load aliases and active rules once per job run or transaction. */
 export function loadNormalizationData(): NormalizationData {
     const aliases: ManufacturerAlias[] = []
-    const alias = new GlideRecord('x_daas_ham_manufacturer_alias')
+    const alias = new GlideRecord(ALIAS_TABLE)
     alias.query()
     while (alias.next()) aliases.push({ alias: str(alias, 'alias'), manufacturerId: str(alias, 'manufacturer') })
 
     const rules: ModelMatchRule[] = []
-    const rule = new GlideRecord('x_daas_ham_model_match_rule')
+    const rule = new GlideRecord(RULE_TABLE)
     rule.addQuery('active', true)
     rule.query()
     while (rule.next()) {
@@ -49,7 +53,6 @@ export function loadNormalizationData(): NormalizationData {
             matchType: str(rule, 'match_type') as ModelMatchRule['matchType'],
             pattern: str(rule, 'pattern'),
             modelId: str(rule, 'model'),
-            active: bool(rule, 'active'),
         })
     }
     return { aliases, rules }
@@ -65,7 +68,7 @@ function modelByPid(pid: string): string {
     return model.next() ? model.getUniqueValue() : ''
 }
 
-export type Resolution = { modelId: string } | { modelId: ''; reason: string }
+type Resolution = { modelId: string } | { modelId: ''; reason: string }
 
 /** PID first, then aliases + match rules. */
 export function resolveModel(raw: { manufacturer: string; model: string }, data: NormalizationData): Resolution {
@@ -88,7 +91,7 @@ export function recordNormalizationException(
     source: { table: string; id: string },
 ): boolean {
     const rawPair = `${raw.manufacturer} / ${raw.model}`
-    const exception = new GlideRecord('x_daas_ham_norm_exception')
+    const exception = new GlideRecord(EXCEPTION_TABLE)
     exception.addQuery('raw_manufacturer', raw.manufacturer)
     exception.addQuery('raw_model', raw.model)
     exception.addQuery('status', NORM_EXCEPTION_STATUS.open)
@@ -119,8 +122,8 @@ export function recordNormalizationException(
  */
 export function normalizeNaasRawModels(): void {
     const naas = [
-        ...distinctValues('alm_hardware', fleetOnRawModelQuery(), 'model'),
-        ...distinctValues('cmdb_ci_netgear', siteCiOnRawModelQuery(), 'model_id'),
+        ...countBy('alm_hardware', fleetOnRawModelQuery(), 'model').keys(),
+        ...countBy('cmdb_ci_netgear', siteCiOnRawModelQuery(), 'model_id').keys(),
     ]
     closeNonNaasExceptions(naas)
     const query = rawModelsToNormalizeQuery(naas)
@@ -147,11 +150,6 @@ export function normalizeNaasRawModels(): void {
     })
 }
 
-/** The distinct values of `field` among the rows of `table` that `query` matches, read with one aggregate query. */
-function distinctValues(table: string, query: string, field: string): string[] {
-    return [...countBy(table, query, field).keys()]
-}
-
 /**
  * Point the raw model's fleet assets at the canonical Model, then mark the raw model normalized. Marked, it leaves the
  * job's query, so an Asset whose save is refused leaves it unmarked for the next run to repoint, as does a refused
@@ -163,7 +161,7 @@ function repointModel(rawModelId: string, canonicalModelId: string): void {
     let refused = 0
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery('model', rawModelId)
-    asset.addEncodedQuery(fleetCondition())
+    asset.addEncodedQuery(FLEET_CONDITION)
     asset.query()
     while (asset.next()) {
         asset.setValue('model', canonicalModelId)
@@ -182,10 +180,10 @@ function repointModel(rawModelId: string, canonicalModelId: string): void {
  * `not_naas`. One the platform refuses to close is logged and stays open for the next run.
  */
 function closeNonNaasExceptions(naasRawModelIds: readonly string[]): void {
-    const query = notNaasRawModelsQuery(pluck('x_daas_ham_norm_exception', RAW_MODEL_EXCEPTIONS_QUERY, 'source_record'), naasRawModelIds)
+    const query = notNaasRawModelsQuery(pluck(EXCEPTION_TABLE, RAW_MODEL_EXCEPTIONS_QUERY, 'source_record'), naasRawModelIds)
     const notNaas = query ? pluck(RAW_MODEL_TABLE, query, 'sys_id') : []
     if (notNaas.length === 0) return
-    const exception = new GlideRecord('x_daas_ham_norm_exception')
+    const exception = new GlideRecord(EXCEPTION_TABLE)
     exception.addEncodedQuery(RAW_MODEL_EXCEPTIONS_QUERY)
     exception.addQuery('source_record', 'IN', notNaas.join(','))
     exception.query()
@@ -213,17 +211,19 @@ function learnFromResolution(exception: GlideRecord, data: NormalizationData): b
     const rawManufacturer = str(exception, 'raw_manufacturer')
     const rawPair = `${rawManufacturer} / ${str(exception, 'raw_model')}`
     if (shouldLearnAlias(rawManufacturer, data.aliases)) {
-        const alias = new GlideRecord('x_daas_ham_manufacturer_alias')
+        const alias = new GlideRecord(ALIAS_TABLE)
         alias.initialize()
         alias.setValue('alias', rawManufacturer)
         alias.setValue('manufacturer', manufacturerId)
         if (!learned(alias, 'alias', rawPair)) return false
     }
-    const rule = new GlideRecord('x_daas_ham_model_match_rule')
+    // An exact match at the order a rule gets when none is entered, so a rule given a lower order still wins.
+    const exact: ModelMatchRule['matchType'] = 'exact'
+    const rule = new GlideRecord(RULE_TABLE)
     rule.initialize()
-    rule.setValue('order', LEARNED_RULE.order)
+    rule.setValue('order', DEFAULT_RULE_ORDER)
     rule.setValue('manufacturer', aliasedManufacturer(rawManufacturer, data.aliases) ?? manufacturerId)
-    rule.setValue('match_type', LEARNED_RULE.matchType)
+    rule.setValue('match_type', exact)
     rule.setValue('pattern', str(exception, 'raw_model'))
     rule.setValue('model', modelId)
     return learned(rule, 'match rule', rawPair)

@@ -4,6 +4,8 @@ import {
     INSTALLED_PAST_SUPPORT,
     backwardsMilestones,
     mergeLifecycle,
+    MILESTONE_ROW_CHANGED,
+    OWN_MILESTONE_ROWS,
     parseLifecycleRow,
     PAST_SUPPORT_PHASES,
     type AssetLifecycleFacts,
@@ -146,5 +148,14 @@ describe('mergeLifecycle', () => {
 describe('PAST_SUPPORT_PHASES', () => {
     it('are the phases INSTALLED_PAST_SUPPORT selects', () => {
         expect(INSTALLED_PAST_SUPPORT).toContain(`^x_daas_ham_lifecycle_phaseIN${PAST_SUPPORT_PHASES.join(',')}^`)
+    })
+})
+
+describe('MILESTONE_ROW_CHANGED', () => {
+    it("holds for a change of every field the app reads a Model's milestones by", () => {
+        const read = `${OWN_MILESTONE_ROWS}^start_dateISNOTEMPTY^model=model1`
+        const fields = read.split('^').map((term) => /^[a-z_]+?(?==|IN|ISNOTEMPTY)/.exec(term)?.[0])
+        expect(fields).not.toContain(undefined)
+        for (const field of new Set(fields)) expect(MILESTONE_ROW_CHANGED).toContain(`current.${field}.changes()`)
     })
 })

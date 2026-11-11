@@ -49,7 +49,7 @@ export function attachToSubscription(asset: GlideRecord, inServiceAt: number): b
             return false
         }
     }
-    // The Service interval opens when the Asset actually enters service (entry/assets.ts onAssetServiceChange).
+    // The Service interval opens when the Asset actually enters service (entry/billing.ts onAssetServiceChange).
     asset.setValue('x_daas_ham_subscription_line', lineId)
     return true
 }

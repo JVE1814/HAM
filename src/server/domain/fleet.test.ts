@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
     adoptionProblem,
     CURRENT_IS_FLEET,
+    CURRENT_IS_FLEET_UNSPACED,
+    CURRENT_NOT_FLEET,
     CURRENT_IS_NAAS_STOCKROOM,
     FLEET_FIELD,
     FLEET_IN_STAGE,
@@ -104,6 +106,10 @@ describe('the conditions the metadata imports', () => {
         expect(holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: true })).toBe(true)
         expect(holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: false })).toBe(false)
         expect(holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: '' })).toBe(false)
+        for (const flag of [true, false, '']) {
+            expect(holds(CURRENT_IS_FLEET_UNSPACED, { [FLEET_FIELD]: flag })).toBe(holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: flag }))
+            expect(holds(CURRENT_NOT_FLEET, { [FLEET_FIELD]: flag })).toBe(!holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: flag }))
+        }
         for (const type of NAAS_STOCKROOM_TYPES) expect(holds(CURRENT_IS_NAAS_STOCKROOM, { [STOCKROOM_TYPE_FIELD]: type }), type).toBe(true)
         expect(holds(CURRENT_IS_NAAS_STOCKROOM, { [STOCKROOM_TYPE_FIELD]: '' })).toBe(false)
         expect(holds(CURRENT_IS_NAAS_STOCKROOM, { [STOCKROOM_TYPE_FIELD]: 'it_storeroom' })).toBe(false)

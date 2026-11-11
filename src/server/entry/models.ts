@@ -1,15 +1,11 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { todayIso } from '../platform/clock.ts'
 import { runRefreshPass } from '../platform/lifecycle-dates.ts'
-import { queueModelRefresh, queueModelsReachingMilestone, writingModelLifecycle } from '../platform/model-lifecycle.ts'
-import { normalizeNaasRawModels, resolveNormalizationException } from '../platform/normalization.ts'
-import { str, type ForeignRecord } from '../platform/records.ts'
+import { importLifecycleRow, queueModelRefresh, queueModelsReachingMilestone, writingModelLifecycle } from '../platform/model-lifecycle.ts'
+import { resolveNormalizationException } from '../platform/normalization.ts'
+import { finishImportRow, str, type ForeignRecord } from '../platform/records.ts'
 
-/** Model normalization and Lifecycle phase / Refresh due date upkeep (P1.2), for fleet assets only (ADR 0016). */
-
-export function normalizeRawModels(): void {
-    normalizeNaasRawModels()
-}
+/** Model normalization, the lifecycle CSV, and Lifecycle phase / Refresh due date upkeep (P1.2), for fleet assets only (ADR 0016). */
 
 export function onNormalizationResolved(current: GlideRecord): void {
     const resolution = resolveNormalizationException(current)
@@ -41,4 +37,8 @@ export function refreshModelAssets(event: GlideRecord, current: GlideRecord): vo
 /** Daily job: models crossing a milestone today change phase without any record changing. */
 export function rollLifecyclePhases(): void {
     queueModelsReachingMilestone(todayIso())
+}
+
+export function processLifecycleRow(current: GlideRecord): void {
+    finishImportRow(current, importLifecycleRow(current))
 }

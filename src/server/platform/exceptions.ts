@@ -1,6 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
+import { anyOf } from '../domain/encoded-query.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { OPEN_EXCEPTIONS_QUERY } from '../domain/reconciliation.ts'
+import { EXCEPTION_DETAIL_MAX_LENGTH, OPEN_EXCEPTIONS_QUERY } from '../domain/reconciliation.ts'
 import { nowGlide } from './clock.ts'
 import { withLockTries } from './locks.ts'
 import { exists, pluck, str, warnRefused } from './records.ts'
@@ -11,7 +12,7 @@ import { EXCEPTION_STATUS, type ExceptionType } from '../domain/vocabulary.ts'
 const TABLE = 'x_daas_ham_recon_exception'
 
 /** What an exception is about: an Asset, or a CI such as a rack. */
-export type ExceptionSubject = { assetId: string } | { ciId: string }
+type ExceptionSubject = { assetId: string } | { ciId: string }
 
 /** The subject as the exception's field and its sys_id. */
 function fieldOf(subject: ExceptionSubject): { field: 'asset' | 'ci'; id: string } {
@@ -24,34 +25,42 @@ interface ExceptionFacts {
 }
 
 /** One exception a check found: its type and what to say of it. */
-export interface FoundException {
+interface FoundException {
     type: ExceptionType
     detail: string
 }
+
+/**
+ * What came of a raise: an exception of its type is `open` for the subject (opened now or before), the platform
+ * `refused` the insert (logged), or other holders kept its lock through every try and none is open yet (`busy`).
+ */
+type ExceptionRaise = 'open' | 'refused' | 'busy'
 
 /**
  * Open an exception of `type` for the subject unless one is already open. Two runs (an overlapping reconciliation, two
  * audits closing at once) may raise the same one, and a unique index cannot allow closed duplicates beside the open
  * one, so the check and the insert are made under a lock on the type and subject, re-checking there. A run that finds
  * the lock held through every try (a holder keeps it for one read and one insert) leaves the exception to the holder,
- * which is raising it. Taking the lock throws only when an insert is refused with no lock row (platform/locks
- * `withLockTries` tries again, and that error escapes only when every try threw), as does an error from the insert.
+ * which is raising it, and reads once more whether it is open. Taking the lock throws only when an insert is refused
+ * with no lock row (platform/locks `withLockTries` tries again, and that error escapes only when every try threw), as
+ * does an error from the insert.
  */
-export function openException(type: ExceptionType, subject: ExceptionSubject, facts: ExceptionFacts): void {
+export function openException(type: ExceptionType, subject: ExceptionSubject, facts: ExceptionFacts): ExceptionRaise {
     // Most calls find the exception already open from an earlier run: those need no lock.
-    if (hasOpenException(type, subject)) return
-    withLockTries(LOCK.reconException(type, fieldOf(subject).id), () => {
-        if (!hasOpenException(type, subject)) insertException(type, subject, facts)
-    })
+    if (hasOpenException(type, subject)) return 'open'
+    const run = withLockTries(LOCK.reconException(type, fieldOf(subject).id), () =>
+        hasOpenException(type, subject) || insertException(type, subject, facts) ? 'open' : 'refused',
+    )
+    if (run.ran) return run.value
+    return hasOpenException(type, subject) ? 'open' : 'busy'
 }
 
-/** Whether an exception of `type` is open for the subject: what a caller that must know its raise stood reads back. */
-export function hasOpenException(type: ExceptionType, subject: ExceptionSubject): boolean {
+function hasOpenException(type: ExceptionType, subject: ExceptionSubject): boolean {
     const { field, id } = fieldOf(subject)
     return exists(TABLE, `exception_type=${type}^${OPEN_EXCEPTIONS_QUERY}^${field}=${id}`)
 }
 
-function insertException(type: ExceptionType, subject: ExceptionSubject, facts: ExceptionFacts): void {
+function insertException(type: ExceptionType, subject: ExceptionSubject, facts: ExceptionFacts): boolean {
     const { field, id } = fieldOf(subject)
     const exception = new GlideRecord(TABLE)
     exception.initialize()
@@ -59,11 +68,12 @@ function insertException(type: ExceptionType, subject: ExceptionSubject, facts: 
     exception.setValue('asset', field === 'asset' ? id : '')
     exception.setValue('ci', field === 'ci' ? id : '')
     exception.setValue('customer', facts.customerId)
-    exception.setValue('detail', facts.detail.slice(0, 255))
+    exception.setValue('detail', facts.detail.slice(0, EXCEPTION_DETAIL_MAX_LENGTH))
     exception.setValue('detected_at', nowGlide())
     // An audit or attestation is closed once and does not raise it again, so a refused one is logged, not lost.
-    if (exception.insert()) return
+    if (exception.insert()) return true
     warnRefused(exception, `No ${type} exception for ${id} (${facts.detail})`)
+    return false
 }
 
 /**
@@ -82,11 +92,11 @@ export function settleExceptions(subject: ExceptionSubject, customerId: string, 
  */
 export function resolveExceptions(subject: ExceptionSubject, types: readonly ExceptionType[]): void {
     const { field, id } = fieldOf(subject)
-    if (!id || types.length === 0) return
+    const ofTypes = anyOf('exception_type', types)
+    if (!id || !ofTypes) return
     const exception = new GlideRecord(TABLE)
     exception.addQuery(field, id)
-    exception.addQuery('status', EXCEPTION_STATUS.open)
-    exception.addQuery('exception_type', 'IN', types.join(','))
+    exception.addEncodedQuery(`${OPEN_EXCEPTIONS_QUERY}^${ofTypes}`)
     resolveEach(exception)
 }
 

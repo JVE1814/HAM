@@ -1,6 +1,7 @@
 import '@servicenow/sdk/global'
 import { default_view, Form, List, Record } from '@servicenow/sdk/core'
 import { NAAS_MODEL_MILESTONES } from '../../server/domain/fleet'
+import { MODEL_LIFECYCLE } from '../../server/domain/model-lifecycle'
 import { OPEN_NORM_EXCEPTIONS_QUERY } from '../../server/domain/normalization'
 import { ROLE } from '../../server/domain/roles'
 import { broadStaff } from '../shared/roles.now'
@@ -71,7 +72,7 @@ Record({
         title: 'Model lifecycle',
         application: naasMenu,
         link_type: 'LIST',
-        name: 'cmdb_model_lifecycle',
+        name: MODEL_LIFECYCLE.table,
         filter: NAAS_MODEL_MILESTONES,
         roles: broadStaff,
         active: true,

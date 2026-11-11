@@ -5,7 +5,8 @@ import { decideInService, seenSourceOf } from '../domain/in-service.ts'
 import { LONG_HOLD_LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import type { OrderType, SeenSource } from '../domain/vocabulary.ts'
-import { findAssetByIdentifier, moveAndSave, readStage } from './assets.ts'
+import { findAssetByIdentifier } from './asset-identifiers.ts'
+import { moveAndSave, readStage } from './assets.ts'
 import { runTableJob } from './chunked.ts'
 import { daysAgoGlide, glideToMs, msToGlide } from './clock.ts'
 import { applyLifecycleDates, lifecycleReaders, type LifecycleReaders } from './lifecycle-dates.ts'
@@ -95,9 +96,9 @@ function applyDeviceEvent(assetId: string, event: DeviceEvent, readers: Lifecycl
 }
 
 /**
- * Apply a batch of NMS events, each to the fleet asset its identifier names (platform/assets `findAssetByIdentifier`,
- * ADR 0016). The identifiers no fleet asset carries, the Provider IT's included, are `unknown` and stored as no event;
- * those `busy` were not wholly applied (`applyDeviceEvent`), for the NMS to send again.
+ * Apply a batch of NMS events, each to the fleet asset its identifier names (platform/asset-identifiers
+ * `findAssetByIdentifier`, ADR 0016). The identifiers no fleet asset carries, the Provider IT's included, are `unknown`
+ * and stored as no event; those `busy` were not wholly applied (`applyDeviceEvent`), for the NMS to send again.
  */
 export function applyDeviceEvents(events: readonly DeviceEvent[]): { unknown: string[]; busy: string[] } {
     const readers = lifecycleReaders()

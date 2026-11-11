@@ -26,6 +26,15 @@ export const FLEET_CONDITION = `${FLEET_FIELD}=true`
 /** The same as a script condition on `current`, an Asset: what a business rule's or UI action's condition tests. */
 export const CURRENT_IS_FLEET = `current.${FLEET_FIELD} == true`
 
+/** `CURRENT_IS_FLEET` without its spaces, for a condition that needs all of the field's 254 characters. */
+export const CURRENT_IS_FLEET_UNSPACED = `current.${FLEET_FIELD}==true`
+
+/** Its complement: an Asset outside the fleet, the flag blank (a row from before the column) or false. */
+export const CURRENT_NOT_FLEET = `current.${FLEET_FIELD} != true`
+
+/** A fleet asset changed its stage: the change test and the Fleet flag every stage rule on alm_hardware starts with. */
+export const CURRENT_FLEET_STAGE_CHANGED = `(current.install_status.changes() || current.substatus.changes()) && ${CURRENT_IS_FLEET}`
+
 /** Encoded condition matching fleet assets only (through `via` from another table, e.g. `asset.`). */
 export function fleetCondition(via = ''): string {
     return `${via}${FLEET_CONDITION}`
@@ -155,6 +164,9 @@ export const SITE_FIELD = 'x_daas_ham_is_site'
 
 /** Encoded condition matching customer Sites, on cmn_location itself. */
 export const SITE_CONDITION = `${SITE_FIELD}=true`
+
+/** The same as a script condition on `current`, a Location. */
+export const CURRENT_IS_SITE = `current.${SITE_FIELD} == true`
 
 /** A Customer's Sites, once the Customer's sys_id is appended: what a Site picker's qualifier completes. */
 export const SITES_OF_CUSTOMER_QUERY = `${SITE_CONDITION}^company=`

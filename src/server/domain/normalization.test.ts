@@ -24,11 +24,10 @@ const aliases = [
 ]
 
 const rules: ModelMatchRule[] = [
-    { id: 'r1', order: 100, manufacturerId: 'cisco', matchType: 'exact', pattern: 'C9300-48P-E', modelId: 'c9300-48p', active: true },
-    { id: 'r2', order: 200, manufacturerId: 'cisco', matchType: 'prefix', pattern: 'C9300', modelId: 'c9300-generic', active: true },
-    { id: 'r3', order: 50, manufacturerId: 'fortinet', matchType: 'regex', pattern: '^FortiGate[- ]?60F', modelId: 'fg60f', active: true },
-    { id: 'r4', order: 10, manufacturerId: 'cisco', matchType: 'regex', pattern: '([', modelId: 'broken', active: true },
-    { id: 'r5', order: 1, manufacturerId: 'cisco', matchType: 'prefix', pattern: 'C', modelId: 'inactive', active: false },
+    { id: 'r1', order: 100, manufacturerId: 'cisco', matchType: 'exact', pattern: 'C9300-48P-E', modelId: 'c9300-48p' },
+    { id: 'r2', order: 200, manufacturerId: 'cisco', matchType: 'prefix', pattern: 'C9300', modelId: 'c9300-generic' },
+    { id: 'r3', order: 50, manufacturerId: 'fortinet', matchType: 'regex', pattern: '^FortiGate[- ]?60F', modelId: 'fg60f' },
+    { id: 'r4', order: 10, manufacturerId: 'cisco', matchType: 'regex', pattern: '([', modelId: 'broken' },
 ]
 
 describe('normalizeModel', () => {
@@ -63,7 +62,7 @@ describe('normalizeModel', () => {
         expect(result).toMatchObject({ matched: true, modelId: 'fg60f' })
     })
 
-    it('skips inactive rules and rules with an invalid pattern', () => {
+    it('skips rules with an invalid pattern', () => {
         const result = normalizeModel({ manufacturer: 'cisco', model: 'ISR4331' }, aliases, rules)
         expect(result).toEqual({ matched: false, manufacturerId: 'cisco', reason: 'no_matching_rule' })
     })

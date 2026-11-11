@@ -3,7 +3,8 @@
  * else its Provider tag, else its Customer tag, the first of these fields any Asset carries it in. A serial and a
  * Provider tag each name one unit; a Customer tag is the Customer's own, so two Customers may both tag a switch SW-01.
  * An identifier that two Assets carry in that field names neither: which one is meant cannot be told, so it is
- * refused, never guessed (a sighting would put the other Customer's Asset in service and start billing it).
+ * refused, never guessed (a sighting would put the other Customer's Asset in service and start billing it). In every
+ * field an identifier is compared as a serial is (domain/serials `normalizeSerial`).
  */
 
 /** The fields an identifier is looked for in, in the order they take precedence. */
@@ -14,6 +15,8 @@ export const IDENTIFIER_FIELDS = [
 ] as const
 
 export type IdentifierField = (typeof IDENTIFIER_FIELDS)[number]
+
+export type IdentifierColumn = IdentifierField['field']
 
 /** How many Assets carrying the identifier in one field are read: two are enough to tell it is ambiguous. */
 export const IDENTIFIER_READ_LIMIT = 2

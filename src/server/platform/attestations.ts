@@ -1,7 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { ATTESTATION_STATE, attestationDue } from '../domain/audit.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
-import { ATTESTATION_RESPONSE_CHOICES } from '../domain/vocabulary.ts'
+import { ATTESTATION_RESPONSE_CHOICES, type AttestationResponse } from '../domain/vocabulary.ts'
 import { ACTIVE_AGREEMENTS } from './agreements.ts'
 import { customerAdminIds } from './approvals.ts'
 import { glideToIsoDate, nowGlide, todayIso } from './clock.ts'
@@ -144,7 +144,8 @@ export function completeAttestation(attestation: GlideRecord): string {
     if (!bool(attestation, 'active')) return notClosed(number, 'it is closed')
     const item = new GlideRecord(ITEM)
     item.addQuery('attestation', attestation.getUniqueValue())
-    item.addQuery('response', 'missing')
+    const missing: AttestationResponse = 'missing'
+    item.addQuery('response', missing)
     item.query()
     while (item.next()) {
         openException('attested_missing', { assetId: str(item, 'asset') }, { customerId: str(attestation, 'customer'), detail: `Reported not present in ${number}` })

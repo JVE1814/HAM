@@ -168,7 +168,7 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
         if (startStaging(asset, lineId, 'sourcing') === 'not_moved') skipOpenStagingTasks(asset.getUniqueValue(), 'Not moved into staging at sourcing')
     }
     // A unit in transfer gets its Staging task now and goes into staging when its line is received at the staging
-    // centre (entry/assets `onTransferReleased`); without the task it is reserved for the line there.
+    // centre (`takeBackStageAfterTransfer`); without the task it is reserved for the line there.
     for (const asset of inTransfer) openStagingTask(asset, lineId)
     // Unmoved stock is not bought (see shortfallOutcome).
     const toPurchase = shortfall - reserved
@@ -306,7 +306,7 @@ function leftUnsaved(line: GlideRecord, why: keyof typeof AGAIN_BECAUSE, transfe
 }
 
 /**
- * A unit's transfer to the staging centre fell through (`current` as its after-update rule sees it, entry/assets
+ * A unit's transfer to the staging centre fell through (`current` as its after-update rule sees it, entry/orders
  * `onAllocatedAssetStageChange`): Inventory let it go short of the staging centre, its transfer order line cancelled
  * or deleted, and it was reserved for its line again where it was, which nothing moves it on from (domain/lifecycle
  * `transferFellThrough`). So it is put back as stock is for want of a transfer order, as free stock: the Source it was

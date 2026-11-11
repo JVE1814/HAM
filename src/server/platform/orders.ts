@@ -406,7 +406,7 @@ export function rollUpOrderApprovals(orderId: string): ApprovalRollup | null {
 /**
  * Give an allocated Asset back to stock (domain/stock `cancelledUnit`). A unit in transfer stays in transfer
  * (domain/lifecycle `checkTransition`): only its reservation goes, and it is free stock once Inventory lets it go
- * (entry/assets `onTransferReleased`). False when the platform refuses that or the closing of its Staging tasks
+ * (`takeBackStageAfterTransfer`). False when the platform refuses that or the closing of its Staging tasks
  * (logged).
  */
 function releaseAsset(asset: GlideRecord): boolean {

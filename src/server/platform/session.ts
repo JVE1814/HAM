@@ -1,5 +1,5 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { naasStockroomCondition } from '../domain/fleet.ts'
+import { NAAS_STOCKROOM_CONDITION } from '../domain/fleet.ts'
 import { memoized } from '../domain/memo.ts'
 import type { CustomerActor } from '../domain/customer-parties.ts'
 import { contactScope, resolveVisibility, type ContactScope, type VisibilityScope } from '../domain/visibility.ts'
@@ -39,7 +39,7 @@ function assignedStockrooms(userId: string): string[] {
     const groups = pluck('sys_user_grmember', `user=${userId}`, 'group').filter(Boolean)
     if (groups.length === 0) return []
     const stockroom = new GlideRecord('alm_stockroom')
-    stockroom.addEncodedQuery(`assignment_groupIN${groups.join(',')}^${naasStockroomCondition()}`)
+    stockroom.addEncodedQuery(`assignment_groupIN${groups.join(',')}^${NAAS_STOCKROOM_CONDITION}`)
     beyondVisibility(stockroom, () => stockroom.query())
     const ids: string[] = []
     while (stockroom.next()) ids.push(stockroom.getUniqueValue())

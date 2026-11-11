@@ -3,7 +3,6 @@ import { TRY_AGAIN, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { formatProviderTag, nextFreeSequence } from '../domain/provider-tag.ts'
-import { beyondVisibility } from './beyond-visibility.ts'
 import { openJobCursor } from './job-cursor.ts'
 import { withLockTries } from './locks.ts'
 import { intProperty, stringProperty } from './properties.ts'
@@ -50,14 +49,13 @@ function advanceCounter(lock: HeldLock, taken: (sequence: number) => boolean): n
 }
 
 /**
- * Whether an Asset of any class carries `tag`, read past the app's visibility rules (ADR 0005, platform/beyond-visibility):
- * a tag is unique across them all. The app's scope rule is on alm_hardware and does not run for this alm_asset query;
- * the mark keeps the read whole should one be added here.
+ * Whether an Asset of any class carries `tag`: a tag is unique across them all. The app's scope rule is on
+ * alm_hardware and does not run for this alm_asset query, so it reads every Asset.
  */
 function onAsset(tag: string): boolean {
     const asset = new GlideRecord('alm_asset')
     asset.addQuery('asset_tag', tag)
     asset.setLimit(1)
-    beyondVisibility(asset, () => asset.query())
+    asset.query()
     return asset.hasNext()
 }

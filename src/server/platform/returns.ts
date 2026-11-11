@@ -31,7 +31,7 @@ import {
     TASK_STATE,
 } from '../domain/vocabulary.ts'
 import { customerAdminIds } from './approvals.ts'
-import { clearRackPlacement, clearWipeEvidence, isFleetAsset, moveAndSave, moveRefusal, readStage, transitionFacts } from './assets.ts'
+import { clearWipeEvidence, isFleetAsset, moveAndSave, moveRefusal, readStage, transitionFacts } from './assets.ts'
 import { runTableJob } from './chunked.ts'
 import { nowGlide, todayIso } from './clock.ts'
 import { fire } from './events.ts'
@@ -39,6 +39,7 @@ import { EVENT } from '../domain/events.ts'
 import { recordFee, waiveOpenFees } from './fees.ts'
 import { openFieldWork } from './field-work.ts'
 import { installedAssetIds } from './installed-assets.ts'
+import { clearRackPlacement } from './racks.ts'
 import { attemptLock, withLock } from './locks.ts'
 import { intProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
@@ -206,7 +207,7 @@ function addLineHolding(lock: HeldLock, order: GlideRecord, assetId: string): Li
     }
     const stage = readStage(asset)
     const moving = isDeployed(stage) && stage !== 'pending_return'
-    // Leaving service closes the Asset's service interval (entry/assets.ts onAssetServiceChange). A refused move
+    // Leaving service closes the Asset's service interval (entry/billing.ts onAssetServiceChange). A refused move
     // (moveAndSave warns) takes the line off again: it would await a unit still in service, later declared missing.
     // One that cannot be taken off is logged, to remove by hand before the overdue job gets to it.
     if (moving && !moveAndSave(asset, 'pending_return', `return ${number}`)) {
@@ -525,7 +526,7 @@ function declareHolding(lock: HeldLock, overdue: OverdueLine): boolean {
         if (!moveAndSave(asset, 'missing', `return ${overdue.number} overdue`)) return false
         recordFee('lost', asset, overdue.returnOrderId)
         // A missing unit no longer holds its site package open. It keeps its Site and line so that, found again and
-        // back in service, it bills on that line again while it is open (entry/assets.ts onAssetServiceChange).
+        // back in service, it bills on that line again while it is open (entry/billing.ts onAssetServiceChange).
         endSitePackageIfEmpty(str(asset, 'x_daas_ham_site'), str(asset, 'x_daas_ham_agreement'))
     }
     record.setValue('status', RETURN_LINE_STATUS.missing)

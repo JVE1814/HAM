@@ -1,4 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
+import { IDENTIFIER_FIELDS, type IdentifierColumn } from '../domain/asset-identifier.ts'
 import { AUDIT_STATE, closedLineResult, compareAudit, onTheShelfQuery, type ExpectedAsset } from '../domain/audit.ts'
 import { messageOf } from '../domain/errors.ts'
 import { naasStockroomType, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
@@ -6,7 +7,7 @@ import { LOCK } from '../domain/lock-names.ts'
 import { SCOPED_TABLES, visibilityFilter } from '../domain/visibility.ts'
 import type { AuditLineResult, AuditType } from '../domain/vocabulary.ts'
 import { nowGlide } from './clock.ts'
-import { hasOpenException, openException } from './exceptions.ts'
+import { openException } from './exceptions.ts'
 import { openFieldWork } from './field-work.ts'
 import { withLockTries } from './locks.ts'
 import { refusal, str, warnRefused } from './records.ts'
@@ -37,9 +38,9 @@ interface StartedAudit {
     unsaved?: string
 }
 
-export type AuditStart = ({ started: true } & StartedAudit) | { started: false; reason: string }
+type AuditStart = ({ started: true } & StartedAudit) | { started: false; reason: string }
 
-export type SiteAuditStart = ({ started: true; workOrderOpened: boolean } & StartedAudit) | { started: false; reason: string }
+type SiteAuditStart = ({ started: true; workOrderOpened: boolean } & StartedAudit) | { started: false; reason: string }
 
 function newAudit(type: AuditType, shortDescription: string): GlideRecord {
     const audit = new GlideRecord(AUDIT)
@@ -132,7 +133,7 @@ export function findOpenVisibleAudit(key: string): GlideRecord | null {
  * What came of a scan: `recorded`; `not_open` when the audit closed since it was found; `busy` when its close (or
  * another scan) held its lock through every try; `refused` by the platform (logged).
  */
-export type ScanRecord = 'recorded' | 'not_open' | 'busy' | 'refused'
+type ScanRecord = 'recorded' | 'not_open' | 'busy' | 'refused'
 
 /** Record one scan against an open audit, under the audit's lock, which its close takes too. */
 export function recordScan(audit: GlideRecord, code: string): ScanRecord {
@@ -159,7 +160,7 @@ export function recordScan(audit: GlideRecord, code: string): ScanRecord {
  * else `closed`, with how many line results and exceptions the platform refused (`unsaved`, each logged), to fix by
  * hand.
  */
-export type AuditClose =
+type AuditClose =
     | { outcome: 'not_open' }
     | { outcome: 'busy' }
     | { outcome: 'not_saved'; reason: string }
@@ -190,12 +191,8 @@ function closeHolding(audit: GlideRecord): AuditClose {
     while (read.next()) {
         if (str(read, 'scanned_code')) scans.push(str(read, 'scanned_code'))
         else if (str(read, 'asset')) {
-            expected.push({
-                assetId: str(read, 'asset'),
-                serial: str(read, 'asset.serial_number'),
-                providerTag: str(read, 'asset.asset_tag'),
-                customerTag: str(read, 'asset.x_daas_ham_customer_tag'),
-            })
+            const codes = Object.fromEntries(IDENTIFIER_FIELDS.map(({ field }) => [field, str(read, `asset.${field}`)]))
+            expected.push({ assetId: str(read, 'asset'), ...(codes as Record<IdentifierColumn, string>) })
         }
     }
     const comparison = compareAudit(expected, scans)
@@ -225,19 +222,17 @@ function closeHolding(audit: GlideRecord): AuditClose {
 
 /**
  * Raise the *missing in audit* exception of the line's Asset (platform/exceptions `openException`); false, logged, when
- * none is open afterwards, as the closed audit does not raise it again. openException returns nothing: an insert the
- * platform refuses is logged there and returns normally, as does a raise whose lock another holds through every try,
- * and one whose lock cannot be taken throws. So whether the exception stands is read back.
+ * none is open afterwards, as the closed audit does not raise it again. A raise whose lock cannot be taken throws, and
+ * is logged as one that left none open, so the other lines are still closed.
  */
 function raiseMissing(line: GlideRecord, number: string): boolean {
     const assetId = str(line, 'asset')
     let why = 'none is open (see the system log)'
     try {
-        openException('audit_missing', { assetId }, { customerId: str(line, 'asset.company'), detail: `Not found in ${number}` })
+        if (openException('audit_missing', { assetId }, { customerId: str(line, 'asset.company'), detail: `Not found in ${number}` }) === 'open') return true
     } catch (error) {
         why = messageOf(error)
     }
-    if (hasOpenException('audit_missing', { assetId })) return true
     log.warn(`Audit ${number}: no missing in audit exception for ${line.getDisplayValue('asset')}: ${why}; raise it by hand`)
     return false
 }

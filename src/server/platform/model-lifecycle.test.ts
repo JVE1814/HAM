@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EVENT } from '../domain/events.ts'
+import type { GlideRecord } from '@servicenow/glide'
 import {
+    importLifecycleRow,
     queueModelRefresh,
     queueModelsReachingMilestone,
     readModelLifecycle,
     writeModelLifecycle,
     writingModelLifecycle,
 } from './model-lifecycle.ts'
-import { platform, type Row } from '../test-support/fake-glide.ts'
+import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 
 /*
  * The repository run against the in-memory stand-in for the platform, whose Model lifecycle table applies the
@@ -198,5 +200,42 @@ describe('queueModelRefresh', () => {
         queueModelRefresh('laptop')
         queueModelRefresh('gone')
         expect(queued()).toEqual([{ name: EVENT.lifecycleChanged, row: MODEL, parm1: MODEL }])
+    })
+})
+
+/** A row of the lifecycle CSV's import set, which the import matches to a Model by OEM PID. */
+function lifecycleRow(row: Row): GlideRecord {
+    return recordOf<GlideRecord>('x_daas_ham_eox_import', { sys_id: 'row1', manufacturer: 'Cisco', ...row })
+}
+
+describe('importLifecycleRow', () => {
+    it('refuses a milestone that goes backwards from the dates stored, and saves none of the row', () => {
+        writeModelLifecycle(MODEL, { endOfSale: '2025-06-30', endOfSupport: '2030-06-30' }, { source: 'csv' })
+        const outcome = importLifecycleRow(lifecycleRow({ pid: 'C9300-48P-E', end_of_support: '2024-01-31' }))
+        expect(outcome).toEqual({ state: 'error', comment: expect.stringContaining('end of sale after end of support') })
+        expect(readModelLifecycle(MODEL)).toEqual({ endOfSale: '2025-06-30', endOfSupport: '2030-06-30' })
+    })
+
+    it('keeps the milestones a row leaves blank and saves those it gives in order with them', () => {
+        writeModelLifecycle(MODEL, { endOfSale: '2025-06-30' }, { source: 'csv' })
+        expect(importLifecycleRow(lifecycleRow({ pid: 'C9300-48P-E', end_of_support: '2030-06-30' }))).toEqual({
+            state: 'inserted',
+            comment: 'Lifecycle for C9300-48P-E',
+        })
+        expect(readModelLifecycle(MODEL)).toEqual({ endOfSale: '2025-06-30', endOfSupport: '2030-06-30' })
+    })
+
+    it('marks a row with no date at all ignored, whatever its PID', () => {
+        expect(importLifecycleRow(lifecycleRow({ pid: 'UNKNOWN-PID' }))).toMatchObject({ state: 'ignored' })
+        expect(importLifecycleRow(lifecycleRow({ pid: '', manufacturer: '' }))).toMatchObject({ state: 'ignored' })
+        expect(platform.tables.cmdb_model_lifecycle ?? []).toEqual([])
+    })
+
+    it('still refuses a row with a date and no PID, or a PID no Model has', () => {
+        expect(importLifecycleRow(lifecycleRow({ pid: ' ', end_of_sale: '2025-06-30' }))).toEqual({ state: 'error', comment: 'PID is required' })
+        expect(importLifecycleRow(lifecycleRow({ pid: 'UNKNOWN-PID', end_of_sale: '2025-06-30' }))).toEqual({
+            state: 'error',
+            comment: 'PID UNKNOWN-PID does not map to a model',
+        })
     })
 })

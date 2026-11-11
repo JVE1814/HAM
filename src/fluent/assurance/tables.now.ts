@@ -8,6 +8,7 @@ import {
     EXCEPTION_TYPE_CHOICES,
 } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION, NAAS_STOCKROOM_CONDITION } from '../../server/domain/fleet'
+import { EXCEPTION_DETAIL_MAX_LENGTH } from '../../server/domain/reconciliation'
 
 /* Audits, attestations and reconciliation exceptions (P2.7, Q63). */
 
@@ -105,7 +106,7 @@ export const x_daas_ham_recon_exception = Table({
         asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', referenceQual: FLEET_CONDITION }),
         ci: ReferenceColumn({ label: 'Configuration item', referenceTable: 'cmdb_ci' }),
         customer: ReferenceColumn({ label: 'Customer', referenceTable: 'core_company' }),
-        detail: StringColumn({ label: 'Detail', maxLength: 255 }),
+        detail: StringColumn({ label: 'Detail', maxLength: EXCEPTION_DETAIL_MAX_LENGTH }),
         status: ChoiceColumn({
             label: 'Status',
             choices: EXCEPTION_STATUS_CHOICES,

@@ -1,5 +1,6 @@
 import type { GlideRecord } from '@servicenow/glide'
-import { finishImportRow, importCoverageRow } from '../platform/imports.ts'
+import { importCoverageRow } from '../platform/coverage.ts'
+import { finishImportRow } from '../platform/records.ts'
 
 export function processCoverageRow(current: GlideRecord): void {
     finishImportRow(current, importCoverageRow(current))

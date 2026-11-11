@@ -1,5 +1,6 @@
 import { GlideRecord } from '@servicenow/glide'
-import { fleetCondition, SITE_CONDITION } from '../domain/fleet.ts'
+import { FLEET_CONDITION, SITE_CONDITION } from '../domain/fleet.ts'
+import { MODEL_TABLE } from '../domain/normalization.ts'
 import {
     DEFAULT_RACK_FACE,
     DEFAULT_RACK_UNITS,
@@ -7,11 +8,12 @@ import {
     PLACEMENT_FIELDS,
     placementProblem,
     powerBudget,
+    RACK_EXCEPTION_TYPES,
     RACK_FACES,
+    reconcileRack,
     type Placement,
     type RackSpec,
 } from '../domain/rack.ts'
-import { RACK_EXCEPTION_TYPES, reconcileRack } from '../domain/reconciliation.ts'
 import type { RackDevice, RackElevation, RackListing, Site } from '../domain/rest-contracts.ts'
 import { visibilityFilter, type TableScoping } from '../domain/visibility.ts'
 import type { RackFace } from '../domain/vocabulary.ts'
@@ -60,7 +62,7 @@ const NO_MODEL: RackModel = { name: '', rackUnits: 0, powerW: 0 }
 
 /** Name, rack units and typical power (the platform's cmdb_model.power_consumption, in watts) of each Model, read with one query. */
 function rackModels(modelIds: readonly string[]): Map<string, RackModel> {
-    return recordsById('cmdb_model', modelIds, (model) => ({
+    return recordsById(MODEL_TABLE, modelIds, (model) => ({
         name: str(model, 'display_name'),
         rackUnits: num(model, 'rack_units'),
         powerW: num(model, 'power_consumption'),
@@ -85,7 +87,7 @@ function rackSpec(rack: GlideRecord): RackSpec {
 function placedIn(rackId: string): GlideRecord {
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery(PLACEMENT_FIELDS.rack, rackId)
-    asset.addEncodedQuery(fleetCondition())
+    asset.addEncodedQuery(FLEET_CONDITION)
     asset.addNotNullQuery(PLACEMENT_FIELDS.ruStart)
     return asset
 }
@@ -147,7 +149,7 @@ function placementsIn(rackId: string): Placement[] {
 
 /**
  * Open the rack's overlap and power exceptions that a fresh read of the rack and every device placed in it finds
- * (domain/reconciliation `reconcileRack`), and resolve the others. A rack no longer there holds nothing, so its
+ * (domain/rack `reconcileRack`), and resolve the others. A rack no longer there holds nothing, so its
  * exceptions resolve.
  */
 function recheckRack(rackId: string): void {
@@ -156,7 +158,12 @@ function recheckRack(rackId: string): void {
     settleExceptions({ ciId: rackId }, rack ? str(rack, 'company') : '', RACK_EXCEPTION_TYPES, found)
 }
 
-/** Re-check the rack a saved Asset is placed in, and the one the save took it out of (`recheckRack`), each once. */
+/**
+ * After rule on alm_hardware: re-check the rack the Asset is placed in, and the one it left (`recheckRack`), each once,
+ * now the save is written. The before rule checks against the placements saved before, so two saves into the same
+ * units (or the last of a rack's power) at the same moment can both pass it. Each after rule runs once its own save is
+ * written, so the later of the two reads both and raises the exception; a later save that clears it resolves it.
+ */
 export function recheckRacksOf(current: ForeignRecord, previous: ForeignRecord | null): void {
     const left = previous ? str(previous, PLACEMENT_FIELDS.rack) : ''
     for (const rackId of new Set([str(current, PLACEMENT_FIELDS.rack), left])) if (rackId) recheckRack(rackId)
@@ -217,14 +224,23 @@ export function visibleSites(): Site[] {
     return sites
 }
 
+/** The Asset left its Site: free its Rack units (the caller saves). */
+export function clearRackPlacement(asset: GlideRecord): void {
+    for (const field of Object.values(PLACEMENT_FIELDS)) asset.setValue(field, '')
+}
+
+/** Where a rack stands: in a Room of its Site, or at the Site itself. The listing and the elevation both read it. */
+const RACK_SITE_LOCATIONS = ['location', 'location.parent'] as const
+
 /** The racks at a Site and in its rooms, by name; null when `siteId` names no Site the user may see. */
 export function racksAtSite(siteId: string): RackListing[] | null {
     // The Site is read first so the visibility check and the rack query below use the same sys_id.
     const site = findById('cmn_location', siteId)
     if (!site || !seesSite([site.getUniqueValue()])) return null
     const rack = new GlideRecord('cmdb_ci_rack')
-    const atSite = rack.addQuery('location', site.getUniqueValue())
-    atSite.addOrCondition('location.parent', site.getUniqueValue())
+    const [standsAt, ...under] = RACK_SITE_LOCATIONS
+    const atSite = rack.addQuery(standsAt, site.getUniqueValue())
+    for (const location of under) atSite.addOrCondition(location, site.getUniqueValue())
     rack.orderBy('name')
     rack.query()
     const racks: RackListing[] = []
@@ -238,8 +254,7 @@ export function racksAtSite(siteId: string): RackListing[] | null {
  */
 export function rackElevation(rackId: string): RackElevation | null {
     const rack = new GlideRecord('cmdb_ci_rack')
-    // A rack stands in a Room of the Site (or at the Site itself), as `racksAtSite` lists it.
-    if (!rack.get(rackId) || !seesSite([str(rack, 'location'), str(rack, 'location.parent')])) return null
+    if (!rack.get(rackId) || !seesSite(RACK_SITE_LOCATIONS.map((location) => str(rack, location)))) return null
     const asset = placedIn(rack.getUniqueValue())
     asset.query()
     const found: Array<{ slot: Slot; companyId: string; device: Omit<RackDevice, 'customer' | 'model' | 'ruStart' | 'height' | 'face'> }> = []

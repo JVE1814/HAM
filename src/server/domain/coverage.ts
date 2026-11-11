@@ -1,5 +1,5 @@
 import { appendTo, firstBest } from './collections.ts'
-import { FLEET_CONDITION, fleetCondition, INSTALLED_CONDITION, OEM_SOURCE_FIELD } from './fleet.ts'
+import { FLEET_CONDITION, INSTALLED_CONDITION, OEM_SOURCE_FIELD } from './fleet.ts'
 import { notRetiredCondition } from './lifecycle.ts'
 import type { CoverageFact, CoverageFetched } from './oem/types.ts'
 import { normalizeSerial } from './serials.ts'
@@ -165,7 +165,7 @@ export const COVERAGE_END_FIELD = 'x_daas_ham_coverage_end'
  */
 export function staleCoverageQuery(vendor: OemVendor, staleBefore: string): string {
     const stale = `${COVERAGE_CHECKED_FIELD}ISEMPTY^OR${COVERAGE_CHECKED_FIELD}<${staleBefore}`
-    return `${fleetCondition()}^model.${OEM_SOURCE_FIELD}=${vendor}^${notRetiredCondition()}^serial_numberISNOTEMPTY^${stale}`
+    return `${FLEET_CONDITION}^model.${OEM_SOURCE_FIELD}=${vendor}^${notRetiredCondition()}^serial_numberISNOTEMPTY^${stale}`
 }
 
 export function withoutCoverage(coverageEnd: string, today: string): boolean {

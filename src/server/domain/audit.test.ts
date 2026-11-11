@@ -6,9 +6,9 @@ import { assetIn, type SampleRecord } from '../test-support/stored-asset'
 
 describe('compareAudit', () => {
     const expected = [
-        { assetId: 'a1', serial: 'FOC111', providerTag: 'NAAS-1', customerTag: '' },
-        { assetId: 'a2', serial: 'FOC222', providerTag: 'NAAS-2', customerTag: 'ACME-9' },
-        { assetId: 'a3', serial: 'FOC333', providerTag: '', customerTag: '' },
+        { assetId: 'a1', serial_number: 'FOC111', asset_tag: 'NAAS-1', x_daas_ham_customer_tag: '' },
+        { assetId: 'a2', serial_number: 'FOC222', asset_tag: 'NAAS-2', x_daas_ham_customer_tag: 'ACME-9' },
+        { assetId: 'a3', serial_number: 'FOC333', asset_tag: '', x_daas_ham_customer_tag: '' },
     ]
 
     it('matches scans by serial, provider tag or customer tag, case-insensitively', () => {
@@ -24,8 +24,8 @@ describe('compareAudit', () => {
 
     it('matches a scan by serial before another unit\'s Provider or Customer tag', () => {
         const units = [
-            { assetId: 'a1', serial: 'FOC111', providerTag: 'NAAS-1', customerTag: '' },
-            { assetId: 'a2', serial: 'FOC222', providerTag: 'NAAS-2', customerTag: 'FOC111' },
+            { assetId: 'a1', serial_number: 'FOC111', asset_tag: 'NAAS-1', x_daas_ham_customer_tag: '' },
+            { assetId: 'a2', serial_number: 'FOC222', asset_tag: 'NAAS-2', x_daas_ham_customer_tag: 'FOC111' },
         ]
         const result = compareAudit(units, ['FOC111', 'FOC222'])
         expect(result.matched).toEqual(['a1', 'a2'])
@@ -35,16 +35,16 @@ describe('compareAudit', () => {
 
     it('falls back to the Customer tag only when no serial or Provider tag carries the code', () => {
         const units = [
-            { assetId: 'a1', serial: 'FOC111', providerTag: 'NAAS-1', customerTag: 'SW-01' },
-            { assetId: 'a2', serial: 'FOC222', providerTag: 'SW-01', customerTag: '' },
+            { assetId: 'a1', serial_number: 'FOC111', asset_tag: 'NAAS-1', x_daas_ham_customer_tag: 'SW-01' },
+            { assetId: 'a2', serial_number: 'FOC222', asset_tag: 'SW-01', x_daas_ham_customer_tag: '' },
         ]
         expect(compareAudit(units, ['sw-01']).matched).toEqual(['a2'])
     })
 
     it('leaves a code two units carry in the same field unresolved, as unexpected', () => {
         const units = [
-            { assetId: 'a1', serial: 'FOC111', providerTag: 'NAAS-1', customerTag: 'SW-01' },
-            { assetId: 'a2', serial: 'FOC222', providerTag: 'NAAS-2', customerTag: 'SW-01' },
+            { assetId: 'a1', serial_number: 'FOC111', asset_tag: 'NAAS-1', x_daas_ham_customer_tag: 'SW-01' },
+            { assetId: 'a2', serial_number: 'FOC222', asset_tag: 'NAAS-2', x_daas_ham_customer_tag: 'SW-01' },
         ]
         const result = compareAudit(units, ['SW-01', 'FOC222'])
         expect(result.matched).toEqual(['a2'])

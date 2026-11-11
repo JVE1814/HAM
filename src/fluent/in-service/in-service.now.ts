@@ -91,15 +91,6 @@ Property({
     roles: { read: [admin], write: [admin] },
 })
 
-Property({
-    $id: Now.ID['prop_unseen_days'],
-    name: PROPERTY.unseenDays.name,
-    type: 'integer',
-    value: PROPERTY.unseenDays.default,
-    description: 'Days without a Seen signal before a deployed asset is reported as unseen.',
-    roles: { read: [admin], write: [admin] },
-})
-
 Acl({
     $id: Now.ID['acl_device_event_read'],
     type: 'record',

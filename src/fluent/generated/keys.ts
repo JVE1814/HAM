@@ -3603,6 +3603,7 @@ declare global {
                     src_server_entry_imports_ts: {
                         table: 'sys_module'
                         id: '343b74934a804be5833c19f80461877f'
+                        deleted: true
                     }
                     'src_server_entry_in-service_ts': {
                         table: 'sys_module'
@@ -3688,6 +3689,10 @@ declare global {
                         table: 'sys_module'
                         id: 'd468b0b5ac1a4e869f1728ab7ac91030'
                     }
+                    'src_server_platform_asset-identifiers_ts': {
+                        table: 'sys_module'
+                        id: 'f2b01a16dc0a4b549aef4b80a83e99ea'
+                    }
                     src_server_platform_assets_ts: {
                         table: 'sys_module'
                         id: '64007da49c55498eac75188cbad4c7bc'
@@ -3771,6 +3776,7 @@ declare global {
                     src_server_platform_imports_ts: {
                         table: 'sys_module'
                         id: 'ed7d531c06184cbd8ffad0f43ac8a482'
+                        deleted: true
                     }
                     'src_server_platform_in-service_ts': {
                         table: 'sys_module'

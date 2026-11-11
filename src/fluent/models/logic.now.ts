@@ -1,9 +1,10 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, Record, ScheduledScript, ScriptAction } from '@servicenow/sdk/core'
 import { onAgreementTermsChanged, refreshAgreementAssets } from '../../server/entry/agreements'
-import { normalizeRawModels, onModelLifecycleChanged, onNormalizationResolved, refreshModelAssets, rollLifecyclePhases } from '../../server/entry/models'
+import { onModelLifecycleChanged, onNormalizationResolved, processLifecycleRow, refreshModelAssets, rollLifecyclePhases } from '../../server/entry/models'
+import { normalizeNaasRawModels } from '../../server/platform/normalization'
+import { MILESTONE_ROW_CHANGED, MODEL_LIFECYCLE } from '../../server/domain/model-lifecycle'
 import { NORM_EXCEPTION_STATUS } from '../../server/domain/vocabulary'
-import { processLifecycleRow } from '../../server/entry/imports'
 import { EVENT } from '../../server/domain/events'
 
 /* Rules, events and jobs for model data, agreements' refresh terms and lifecycle import rows. */
@@ -18,12 +19,11 @@ import { EVENT } from '../../server/domain/events'
 BusinessRule({
     $id: Now.ID['br_model_lifecycle_changed'],
     name: 'NaaS - model lifecycle changed',
-    table: 'cmdb_model_lifecycle',
+    table: MODEL_LIFECYCLE.table,
     when: 'after',
     action: ['insert', 'update', 'delete'],
     order: 200,
-    condition:
-        "current.operation() != 'update' || current.start_date.changes() || current.active.changes() || current.lifecycle_phase.changes() || current.lifecycle_type.changes() || current.model.changes() || current.source.changes()",
+    condition: MILESTONE_ROW_CHANGED,
     script: onModelLifecycleChanged,
 })
 
@@ -109,7 +109,7 @@ ScheduledScript({
     executionInterval: { hours: 1 },
     executionStart: '2026-01-01 00:20:00',
     timeZone: 'UTC',
-    script: normalizeRawModels,
+    script: normalizeNaasRawModels,
 })
 
 ScheduledScript({

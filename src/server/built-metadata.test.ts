@@ -37,20 +37,16 @@ import {
     type RmaState,
     type ShipmentStatus,
 } from './domain/vocabulary'
-import {
-    clearVoidedWipeEvidence,
-    explainLifecycleRefusal,
-    onAllocatedAssetStageChange,
-    onAssetServiceChange,
-    onTransferReleased,
-    refusesLifecycleChange,
-} from './entry/assets'
+import { clearVoidedWipeEvidence, explainLifecycleRefusal, refusesLifecycleChange } from './entry/assets'
+import { onAssetServiceChange } from './entry/billing'
 import { explainWorkWindowRefusal, refusesWorkWindow } from './entry/delivery'
 import { completeInstallOfWork } from './platform/delivery'
 import { onDisposalApprovalDecision } from './entry/disposal'
 import { onModelLifecycleChanged } from './entry/models'
-import { onOrderApprovalDecision } from './entry/orders'
-import { explainRackRefusal, recheckRackPlacement, refusesKeptPlacement, refusesRackPlacement } from './entry/racks'
+import { onAllocatedAssetStageChange, onOrderApprovalDecision } from './entry/orders'
+import { explainRackRefusal, refusesKeptPlacement, refusesRackPlacement } from './entry/racks'
+import { recheckRacksOf } from './platform/racks'
+import { takeBackStageAfterTransfer } from './platform/transfers'
 import { scopeRecords } from './entry/visibility'
 import { EVENT } from './domain/events'
 import { takeFailedAssetTerms } from './platform/breakfix'
@@ -343,23 +339,19 @@ describe('ATF server-side scripts', () => {
  * record; an entry point that takes a GlideRecord does not compile here.
  */
 const ON_FOREIGN_TABLES = {
-    'entry/assets.ts': {
-        clearVoidedWipeEvidence,
-        explainLifecycleRefusal,
-        onAllocatedAssetStageChange,
-        onAssetServiceChange,
-        onTransferReleased,
-        refusesLifecycleChange,
-    },
+    'entry/assets.ts': { clearVoidedWipeEvidence, explainLifecycleRefusal, refusesLifecycleChange },
+    'entry/billing.ts': { onAssetServiceChange },
     'entry/delivery.ts': { explainWorkWindowRefusal, refusesWorkWindow },
     'entry/disposal.ts': { onDisposalApprovalDecision },
     'entry/models.ts': { onModelLifecycleChanged },
-    'entry/orders.ts': { onOrderApprovalDecision },
-    'entry/racks.ts': { explainRackRefusal, recheckRackPlacement, refusesKeptPlacement, refusesRackPlacement },
+    'entry/orders.ts': { onAllocatedAssetStageChange, onOrderApprovalDecision },
+    'entry/racks.ts': { explainRackRefusal, refusesKeptPlacement, refusesRackPlacement },
     'entry/visibility.ts': { scopeRecords },
     'platform/breakfix.ts': { takeFailedAssetTerms },
     'platform/delivery.ts': { completeInstallOfWork },
     'platform/leases.ts': { giveToLessor },
+    'platform/racks.ts': { recheckRacksOf },
+    'platform/transfers.ts': { takeBackStageAfterTransfer },
 } satisfies Record<string, Record<string, (current: ForeignRecord, previous: ForeignRecord) => unknown>>
 
 describe('business rule conditions', () => {

@@ -1,9 +1,10 @@
 import '@servicenow/sdk/global'
-import { ScheduledScript, UiAction } from '@servicenow/sdk/core'
-import { raiseAttestations, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudit } from '../../server/entry/assurance'
-import { CURRENT_IS_NAAS_STOCKROOM, SITE_FIELD } from '../../server/domain/fleet'
-import { reconcileInstalledBaseAndRacks } from '../../server/entry/racks'
-import { assetManager, fieldTech, scanners, stockroomWorkers } from '../shared/roles.now'
+import { Property, ScheduledScript, UiAction } from '@servicenow/sdk/core'
+import { reconcileInstalledBaseAndRacks, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudit } from '../../server/entry/assurance'
+import { raiseDueAttestations } from '../../server/platform/attestations'
+import { CURRENT_IS_NAAS_STOCKROOM, CURRENT_IS_SITE } from '../../server/domain/fleet'
+import { PROPERTY } from '../../server/domain/properties'
+import { admin, assetManager, fieldTech, scanners, stockroomWorkers } from '../shared/roles.now'
 
 /* Audits, attestations and reconciliation (P2.7): actions and jobs. */
 
@@ -26,7 +27,7 @@ UiAction({
     name: 'Start site audit',
     table: 'cmn_location',
     actionName: 'x_daas_ham_start_site_audit',
-    condition: `current.${SITE_FIELD} == true`,
+    condition: CURRENT_IS_SITE,
     roles: [assetManager, fieldTech],
     form: { showButton: true },
     showUpdate: true,
@@ -56,6 +57,15 @@ ScheduledScript({
     script: reconcileInstalledBaseAndRacks,
 })
 
+Property({
+    $id: Now.ID['prop_unseen_days'],
+    name: PROPERTY.unseenDays.name,
+    type: 'integer',
+    value: PROPERTY.unseenDays.default,
+    description: 'Days without a Seen signal before a deployed asset is reported as unseen.',
+    roles: { read: [admin], write: [admin] },
+})
+
 ScheduledScript({
     $id: Now.ID['job_raise_attestations'],
     name: 'NaaS - raise attestations',
@@ -63,5 +73,5 @@ ScheduledScript({
     frequency: 'daily',
     executionTime: { hours: 6, minutes: 10, seconds: 0 },
     timeZone: 'UTC',
-    script: raiseAttestations,
+    script: raiseDueAttestations,
 })

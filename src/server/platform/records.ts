@@ -202,3 +202,20 @@ export function bool(gr: ForeignRecord, field: string): boolean {
     const value = valueOf(gr, field)
     return value === '1' || value === 'true' || value === (true as unknown)
 }
+
+/** How an import-set row processed on insert (ASN, lifecycle CSV, coverage CSV) ends: the state and comment it is saved with. */
+export interface RowOutcome {
+    state: 'inserted' | 'updated' | 'error' | 'ignored'
+    comment: string
+}
+
+export function rowError(comment: string): RowOutcome {
+    return { state: 'error', comment }
+}
+
+export function finishImportRow(row: GlideRecord, outcome: RowOutcome): void {
+    row.setValue('sys_import_state', outcome.state)
+    row.setValue('sys_import_state_comment', outcome.comment)
+    // The row was handled all the same; unsaved, it still shows as not imported.
+    if (!row.update()) warnRefused(row, `Import row ${row.getUniqueValue()} of ${row.getTableName()}: outcome "${outcome.state}" not saved`)
+}

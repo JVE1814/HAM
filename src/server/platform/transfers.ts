@@ -98,23 +98,24 @@ export function onTransferOrderLine(asset: ForeignRecord): boolean {
 }
 
 /**
- * In the save by which Inventory lets `asset` go from its transfer order line (`before`: the Asset as stored), give it
- * back the stage it left; the save under way carries it. Inventory clears its flag and saves the Asset In stock:
+ * Before-update rule on alm_hardware once Inventory's *Active transfer order* flag changes (br_asset_transfer_released):
+ * in the save by which Inventory lets the Asset go from its transfer order line (`previous`: as stored), give it back
+ * the stage it left; the save under way carries it, so the lifecycle rule checks that move and the after rules see it. Inventory clears its flag and saves the Asset In stock:
  * Available (Reserved for a line requested for a user) in the transfer order's to-stockroom once received, Available
  * where it was when the line is cancelled or deleted (external-contracts N38, N39). The Asset takes back the stage it
  * left instead (domain/lifecycle `stageAfterTransfer`); the stockroom Inventory set is kept. Any other save is left as
  * it is: one putting the Asset onto a line, or one leaving it in transfer with the flag cleared (its line received
  * after its last task was closed skipped), for its stage to be set by hand. A stage the lifecycle refuses is logged.
  */
-export function takeBackStageAfterTransfer(asset: ForeignRecord, before: ForeignRecord): void {
-    const now = readStage(asset)
-    const released = readStage(before) === 'in_transfer' && now !== 'in_transfer' && !onTransferOrderLine(asset)
+export function takeBackStageAfterTransfer(current: ForeignRecord, previous: ForeignRecord): void {
+    const now = readStage(current)
+    const released = readStage(previous) === 'in_transfer' && now !== 'in_transfer' && !onTransferOrderLine(current)
     if (!released) return
-    const stage = stageAfterTransfer(transferContext(asset))
+    const stage = stageAfterTransfer(transferContext(current))
     // From the stock Inventory made it: each stage it can take back is a move the matrix allows from there.
-    const verdict = moveAsset(asset, stage)
+    const verdict = moveAsset(current, stage)
     if (verdict.allowed) return
-    log.warn(`${str(asset, 'serial_number')} left its transfer as ${now}, not ${stage}: ${verdict.reason}`)
+    log.warn(`${str(current, 'serial_number')} left its transfer as ${now}, not ${stage}: ${verdict.reason}`)
 }
 
 /**

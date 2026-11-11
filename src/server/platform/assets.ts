@@ -1,10 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
-import { ambiguousIdentifier, fieldMatch, IDENTIFIER_FIELDS, IDENTIFIER_READ_LIMIT } from '../domain/asset-identifier.ts'
-import { normalizeSerial } from '../domain/serials.ts'
 import {
     adoptionProblem,
     FLEET_FIELD,
-    fleetCondition,
     OEM_PID_FIELD,
     STOCKROOM_TYPE_FIELD,
     type FleetCandidate,
@@ -18,12 +15,11 @@ import {
     type TransitionVerdict,
     voidsWipeEvidence,
 } from '../domain/lifecycle.ts'
-import { PLACEMENT_FIELDS } from '../domain/rack.ts'
+import { MODEL_TABLE } from '../domain/normalization.ts'
 import { LEGAL_OWNER, type LegalOwner } from '../domain/vocabulary.ts'
-import { beyondVisibility } from './beyond-visibility.ts'
 import { stringProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
-import { bool, refusal, str, warnRefused, type ForeignRecord, type ReadOptions } from './records.ts'
+import { bool, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
 import { log } from './log.ts'
 
 /** Reading and moving Assets (alm_hardware) through their Lifecycle stage (ADR 0002). */
@@ -91,11 +87,6 @@ export function moveAndSave(asset: GlideRecord, to: Stage, context: string): boo
     return false
 }
 
-/** The Asset left its Site: free its Rack units (the caller saves). */
-export function clearRackPlacement(asset: GlideRecord): void {
-    for (const field of Object.values(PLACEMENT_FIELDS)) asset.setValue(field, '')
-}
-
 /**
  * A new, unsaved hardware Asset of `modelId` in `stage`: a fleet asset (ADR 0016) the Provider owns until a lease or a
  * Customer says otherwise, as the columns stamp no default on the rows the Provider's IT creates, and the Provider's
@@ -111,7 +102,7 @@ export function newAsset(modelId: string, stage: Stage): GlideRecord {
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('model', modelId)
     asset.setValue('quantity', 1)
-    const model = new GlideRecord('cmdb_model')
+    const model = new GlideRecord(MODEL_TABLE)
     if (model.get(modelId)) asset.setValue('model_category', str(model, 'cmdb_model_category').split(',')[0])
     writeStage(asset, stage)
     return asset
@@ -154,97 +145,4 @@ export function fleetCandidate(asset: GlideRecord): FleetCandidate {
         hasSite,
         hasAgreement,
     }
-}
-
-/** What an identifier names (`identifyAsset`): the one Asset, none, or more than one (refused, saying why). */
-export type AssetIdentified = { asset: GlideRecord } | { ambiguous: string } | null
-
-interface IdentifierLookup {
-    fleetOnly: boolean
-    beyondVisibility: boolean
-}
-
-const ARRIVING: IdentifierLookup = { fleetOnly: false, beyondVisibility: true }
-
-/**
- * The fleet asset (ADR 0016) this identifier names: by serial number, else Provider tag, else Customer tag (domain/
- * asset-identifier); `{ ambiguous }`, saying why, when two Assets carry it in the first of those fields that any does,
- * as two Customers may give their switches one Customer tag; null when none carries it. `beyondVisibility` reads past
- * the app's before-query visibility rules (ADR 0005, platform/beyond-visibility): the device-events API must find any
- * fleet asset (it reports another identifier unknown). Its later saves run every rule.
- */
-export function identifyAsset(identifier: string, options: ReadOptions = {}): AssetIdentified {
-    return identify(identifier, { fleetOnly: true, beyondVisibility: !!options.beyondVisibility })
-}
-
-/**
- * The fleet asset this identifier names (`identifyAsset`), or null when none does or it is ambiguous (logged), for a
- * caller that reports both as an unknown identifier.
- */
-export function findAssetByIdentifier(identifier: string, options: ReadOptions = {}): GlideRecord | null {
-    const identified = identifyAsset(identifier, options)
-    if (identified && 'ambiguous' in identified) {
-        log.warn(`Identifier ${identifier.trim()} refused: ${identified.ambiguous}`)
-        return null
-    }
-    return identified?.asset ?? null
-}
-
-/**
- * Any Asset a scanned `code` names as `identifyAsset` reads it, the Provider IT's too (ADR 0016), a fleet asset chosen
- * over one of the Provider IT's that carries the same code, read past the app's visibility rules (ADR 0005): an
- * arriving unit belongs to no stockroom yet. What a receipt looks a scanned unit up by, and checks again under the
- * serial's lock just as it was looked up before it, so a serial never has two Assets and a serial IT holds is refused
- * rather than given a second Asset.
- */
-export function identifyAnyAsset(code: string): AssetIdentified {
-    return identify(code, ARRIVING)
-}
-
-/**
- * Any Asset with the serial number `serial`, the Provider IT's too, a fleet asset first, read past the app's visibility
- * rules: what an ASN row's serial column duplicates (an Asset whose tag happens to read the same is another unit), and
- * what the row's holder of the serial's lock checks before it creates the Asset.
- */
-export function findAnyAssetBySerial(serial: string): GlideRecord | null {
-    const code = serial.trim()
-    if (!code) return null
-    return assetsCarrying('serial_number', normalizeSerial(code), ARRIVING)[0]?.record() ?? null
-}
-
-function identify(identifier: string, lookup: IdentifierLookup): AssetIdentified {
-    const code = identifier.trim()
-    if (!code) return null
-    for (const field of IDENTIFIER_FIELDS) {
-        const value = field.field === 'serial_number' ? normalizeSerial(code) : code
-        const found = assetsCarrying(field.field, value, lookup)
-        const match = fieldMatch(found.map((asset) => asset.fleet))
-        if (match.kind === 'ambiguous') return { ambiguous: ambiguousIdentifier(code, field) }
-        if (match.kind === 'none') continue
-        const asset = found[match.index]?.record()
-        return asset ? { asset } : null
-    }
-    return null
-}
-
-interface Carrier {
-    fleet: boolean
-    record: () => GlideRecord | null
-}
-
-function assetsCarrying(field: string, value: string, lookup: IdentifierLookup): Carrier[] {
-    const read = (record: GlideRecord, run: () => boolean | void) => (lookup.beyondVisibility ? beyondVisibility(record, run) : run())
-    const asset = new GlideRecord('alm_hardware')
-    asset.addQuery(field, value)
-    if (lookup.fleetOnly) asset.addEncodedQuery(fleetCondition())
-    else asset.orderByDesc(FLEET_FIELD)
-    asset.setLimit(IDENTIFIER_READ_LIMIT)
-    read(asset, () => asset.query())
-    if (!asset.next()) return []
-    const first = { fleet: isFleetAsset(asset), id: asset.getUniqueValue() }
-    if (!asset.hasNext()) return [{ fleet: first.fleet, record: () => asset }]
-    asset.next()
-    const again = new GlideRecord('alm_hardware')
-    const reread = () => (read(again, () => again.get(first.id)) ? again : null)
-    return [{ fleet: first.fleet, record: reread }, { fleet: isFleetAsset(asset), record: () => asset }]
 }

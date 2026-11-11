@@ -1,29 +1,22 @@
 import { GlideRecord } from '@servicenow/glide'
+import { validateAsnRows, type AsnRowCheck } from '../domain/asn.ts'
 import { normalizeSerial } from '../domain/serials.ts'
 import { naasStockroomType, OEM_PID_FIELD, providerStockroomCondition, receiptProblem, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import type { AssetSummary } from '../domain/rest-contracts.ts'
 import { allocationProblem, awaitsReceipt, putAwayProblem, receivingProblem, type ReceivingLine } from '../domain/warehouse.ts'
-import { LINE_STAGE, type StockroomType } from '../domain/vocabulary.ts'
-import {
-    fleetCandidate,
-    identifyAnyAsset,
-    identifyAsset,
-    isFleetAsset,
-    joinFleet,
-    moveAsset,
-    newAsset,
-    readStage,
-    type AssetIdentified,
-} from './assets.ts'
+import { DEFAULT_STAGING_SOURCE } from '../domain/staging.ts'
+import { LINE_STAGE, type StagingSource, type StockroomType } from '../domain/vocabulary.ts'
+import { findAnyAssetBySerial, identifyAnyAsset, identifyAsset, type AssetIdentified } from './asset-identifiers.ts'
+import { fleetCandidate, isFleetAsset, joinFleet, moveAsset, newAsset, readStage } from './assets.ts'
 import { unitsOnLine } from './fulfilment.ts'
-import { withLock } from './locks.ts'
-import { loadNormalizationData, resolveModel } from './normalization.ts'
+import { attemptLock, whyNotRun, withLock } from './locks.ts'
+import { loadNormalizationData, recordNormalizationException, resolveModel } from './normalization.ts'
 import { lineAwaitingRma, markReplacementReceived } from './oem-rma.ts'
 import { takeUnitOffOrder, withOrderLineLock } from './order-lines.ts'
 import { purchaseOrderId } from './procurement.ts'
-import { findById, num, refusal, str, warnRefused } from './records.ts'
+import { choice, findById, num, refusal, rowError, str, warnRefused, type RowOutcome } from './records.ts'
 import { receiveReturnedAsset } from './returns.ts'
 import { queueSourcing } from './sourcing-requests.ts'
 import { startStaging } from './staging-tasks.ts'
@@ -80,7 +73,7 @@ const NOT_YOUR_STOCKROOM: ScanRefusal = { reason: 'invalid', why: 'Choose one of
 const NOT_NAAS_STOCKROOM = 'Choose a NaaS stockroom: this one has no stockroom type'
 
 /**
- * The fleet asset a scanned code names (platform/assets `identifyAsset`: serial, else Provider tag, else Customer tag),
+ * The fleet asset a scanned code names (platform/asset-identifiers `identifyAsset`: serial, else Provider tag, else Customer tag),
  * not the Provider IT's, or why it is not used: none carries it (`unknown`), or two do, as two Customers may share a
  * Customer tag (`conflict`).
  */
@@ -200,7 +193,7 @@ function saveReceipt(lock: HeldLock, asset: GlideRecord): ScanRefusal | null {
 
 /**
  * The Asset of an unknown serial scanned with its PID. The check that no Asset has the serial and the insert are made
- * under a lock on the serial, which an ASN row for the serial takes too (platform/imports), checking again there, so two
+ * under a lock on the serial, which an ASN row for the serial takes too (`importAsnRow`), checking again there, so two
  * first scans of one unit, or a scan and its ASN row, create it once; a scan that finds the lock held is told to scan
  * again, and the rescan finds the Asset by serial.
  */
@@ -387,4 +380,73 @@ export function receivingStockrooms(): Array<{ id: string; name: string }> {
     const stockrooms: Array<{ id: string; name: string }> = []
     while (stockroom.next()) stockrooms.push({ id: stockroom.getUniqueValue(), name: str(stockroom, 'name') })
     return stockrooms
+}
+
+/**
+ * Import an ASN row: create its in-transit Asset (ASN = scan-to-confirm receiving).
+ *
+ * A first scan of the serial without an ASN (platform/receiving) could create its Asset between this row's check and its
+ * insert, and both would stand. So the check and the insert are made under the serial's lock, which that scan takes
+ * too, checking again there. A row that finds the lock held through every try (a holder keeps it for one check and one
+ * insert), or whose lock cannot be taken, is marked error with why, to load again; loaded again once the scan has
+ * created the Asset, it is refused as a serial that already exists.
+ */
+export function importAsnRow(row: GlideRecord): RowOutcome {
+    const serial = normalizeSerial(str(row, 'serial'))
+    // Most refused rows (a missing field, a serial known long since) are refused here, without the lock.
+    const check = checkAsnRow(row, serial)
+    if (!check.ok) return rowError(check.reason)
+
+    const raw = { manufacturer: str(row, 'manufacturer'), model: str(row, 'pid') }
+    const resolution = resolveModel(raw, loadNormalizationData())
+    const modelId = resolution.modelId
+    if (!modelId) {
+        const raised = recordNormalizationException(raw, 'reason' in resolution ? resolution.reason : '', {
+            table: 'x_daas_ham_asn_import',
+            id: row.getUniqueValue(),
+        })
+        const see = raised ? 'see normalization exceptions' : 'no normalization exception was raised (see the system log)'
+        return rowError(`PID ${raw.model} does not map to a model; ${see}`)
+    }
+
+    const attempt = attemptLock(LOCK.receiveSerial(serial), (lock) => insertHolding(lock, row, serial, modelId))
+    if (attempt.ran) return attempt.value
+    return loadAgain(serial, whyNotRun(attempt, 'a scan or another row is receiving it'))
+}
+
+/** A row the serial's lock kept from importing, marked error with why: loading it again imports or refuses it. */
+function loadAgain(serial: string, why: string): RowOutcome {
+    return rowError(`serial ${serial} not imported: ${why}; load this row again`)
+}
+
+/**
+ * The row checked (domain/asn `validateAsnRows`): its mandatory fields, and that no Asset has its serial yet. Any
+ * Asset counts, the Provider IT's too (ADR 0016), read past the importer's before-query rules (ADR 0005): an inventory
+ * tech sees only their stockrooms' Assets, and an Asset in transit or on order is in none yet.
+ */
+function checkAsnRow(row: GlideRecord, serial: string): AsnRowCheck {
+    const fields = { serial, pid: str(row, 'pid'), poNumber: str(row, 'po_number') }
+    return validateAsnRows([fields], findAnyAssetBySerial(serial) ? new Set([serial]) : new Set())[0]
+}
+
+/**
+ * Check the row again and insert its Asset, holding the serial's `lock`. A holder that outlasted the lock (ADR 0013)
+ * may overlap the scan or row that took it over: it inserts only while it holds it, and one that lost it during the
+ * insert is logged. Made by `newAsset`, the Asset is a fleet asset (ADR 0016) the Provider owns.
+ */
+function insertHolding(lock: HeldLock, row: GlideRecord, serial: string, modelId: string): RowOutcome {
+    const check = checkAsnRow(row, serial)
+    if (!check.ok) return rowError(check.reason)
+    const asset = newAsset(modelId, 'in_transit')
+    asset.setValue('serial_number', serial)
+    asset.setValue('po_number', str(row, 'po_number'))
+    asset.setValue('x_daas_ham_customer_tag', str(row, 'customer_tag'))
+    asset.setValue('x_daas_ham_mac_address', str(row, 'mac_address'))
+    asset.setValue('x_daas_ham_claim_code', str(row, 'claim_code'))
+    const stagingSource: StagingSource = choice<StagingSource>(row, 'staging_source') === 'distributor' ? 'distributor' : DEFAULT_STAGING_SOURCE
+    asset.setValue('x_daas_ham_staging_source', stagingSource)
+    const saved = lock.save(`Asset ${serial} created`, () => asset.insert(), { check: 'check it exists once' })
+    if (saved === 'lock lost') return loadAgain(serial, 'its lock was lost while checking it')
+    if (saved === 'refused') return rowError(`Asset insert failed: ${refusal(asset)}`)
+    return { state: 'inserted', comment: `Asset ${serial} in transit` }
 }
