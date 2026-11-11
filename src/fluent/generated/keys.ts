@@ -3901,6 +3901,10 @@ declare global {
                         table: 'sys_module'
                         id: '901d844c27ad469a80cd544e9e926b35'
                     }
+                    src_server_platform_visibility_ts: {
+                        table: 'sys_module'
+                        id: 'd3305fe8c73a48dd9acc87a37cbb5f27'
+                    }
                     ua_agreement_renew: {
                         table: 'sys_ui_action'
                         id: '2671d1ec92b847fea0bc80656327a746'
