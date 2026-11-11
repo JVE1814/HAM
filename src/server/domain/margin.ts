@@ -156,7 +156,7 @@ export interface CostEntry extends Amount {
     type: CostType
 }
 
-export interface MarginRow {
+interface MarginRow {
     customerId: string
     siteId: string
     currency: string

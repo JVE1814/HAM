@@ -616,7 +616,7 @@ function exportState(period: GlideRecord): ExportState {
     return { state: exists('sys_attachment', exportQuery(period, fileName)) ? 'attached' : 'missing', fileName }
 }
 
-export type ExportRequest = { queued: true } | { queued: false; why: 'not_closed' } | { queued: false; why: 'attached'; fileName: string }
+type ExportRequest = { queued: true } | { queued: false; why: 'not_closed' } | { queued: false; why: 'attached'; fileName: string }
 
 /** Re-export CSV: queue the export of a closed period whose file is missing (never saves the period). */
 export function requestExport(period: GlideRecord): ExportRequest {

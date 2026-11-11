@@ -94,7 +94,7 @@ export function billsFromIntervals(line: Pick<SubscriptionLineTerms, 'lineType'>
 }
 
 /** A range of days, end inclusive; no end means still open. */
-export interface DayRange {
+interface DayRange {
     start: string
     end?: string
 }
@@ -187,7 +187,7 @@ function unitsBySite(line: SubscriptionLineTerms, bounds: MonthBounds, sources: 
 /** How long a generating Billing period must show no activity before an admin may reset it (Reset generation). */
 export const RESET_AFTER_IDLE_MINUTES = 30
 
-export type GenerationReset = { reset: true; idleMinutes: number } | { reset: false; why: string }
+type GenerationReset = { reset: true; idleMinutes: number } | { reset: false; why: string }
 
 /**
  * Whether a Billing period stuck in Generating may be reset by hand to Ready for review: only once its generation has
