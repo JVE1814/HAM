@@ -2,11 +2,11 @@ import '@servicenow/sdk/global'
 import { BusinessRule, Property, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
 import { onAllocatedAssetStageChange, onOrderApprovalDecision, sourceOrder, uiCancelOrder, uiRecheckApprovals, uiSubmitOrder } from '../../server/entry/orders'
 import { takeBackStageAfterTransfer } from '../../server/platform/transfers'
-import { topUpSparePools } from '../../server/entry/spare-pool'
 import { CURRENT_FLEET_STAGE_CHANGED, CURRENT_IS_FLEET } from '../../server/domain/fleet'
 import { ORDER_STAGE } from '../../server/domain/vocabulary'
 import { APPROVAL } from '../../server/domain/approvals'
 import { raiseRefreshOrders } from '../../server/platform/refresh'
+import { runSparePoolTopUp } from '../../server/platform/spare-pools'
 import { EVENT } from '../../server/domain/events'
 import { PROPERTY } from '../../server/domain/properties'
 import { accountManager, admin, assetManager, commercialEditors, orderRaisers } from '../shared/roles.now'
@@ -140,7 +140,7 @@ ScheduledScript({
     frequency: 'daily',
     executionTime: { hours: 2, minutes: 40, seconds: 0 },
     timeZone: 'UTC',
-    script: topUpSparePools,
+    script: runSparePoolTopUp,
 })
 
 Property({

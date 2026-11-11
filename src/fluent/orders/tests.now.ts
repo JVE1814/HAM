@@ -738,7 +738,7 @@ export const sparePoolTopUpTest = Test(
         atf.server.runServerSideScript({
             $id: Now.ID['atf_spt_run_job'],
             script: `(function (outputs, steps, params, stepResult, assertEqual) {
-    var sparePool = require('x_daas_ham/naas-ham/0.1.0/src/server/entry/spare-pool.ts');
+    var sparePools = require('x_daas_ham/naas-ham/0.1.0/src/server/platform/spare-pools.ts');
     function pooled() {
         var spare = new GlideRecord('alm_hardware');
         spare.addQuery('serial_number', 'STARTSWITH', 'ATF-SPT-STOCK');
@@ -748,7 +748,7 @@ export const sparePoolTopUpTest = Test(
     }
     try {
         for (var run = 1; run <= 3; run++) {
-            sparePool.topUpSparePools();
+            sparePools.runSparePoolTopUp();
             if (pooled()) {
                 stepResult.setOutputMessage('The top-up filled the pool of ATF Spare Pool Customer on run ' + run);
                 return true;
