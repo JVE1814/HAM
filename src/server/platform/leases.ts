@@ -18,14 +18,14 @@ import { isFree } from '../domain/stock.ts'
 import { type DisposalMethod, LEASE_END_ACTION, type LeaseEndAction, LEGAL_OWNER, TASK_STATE } from '../domain/vocabulary.ts'
 import { assetManagerIds } from './users.ts'
 import { moveAsset, readStage } from './assets.ts'
-import { runEventTableJob } from './chunked.ts'
+import { runEventTableJob, visitInKeyOrder } from './chunked.ts'
 import { todayIso } from './clock.ts'
 import { fire, queueJob, type JobEvent } from './events.ts'
 import { EVENT } from '../domain/events.ts'
 import { queueRefresh } from './lifecycle-dates.ts'
 import { stringProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
-import { bool, count, exists, findById, num, pluck, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
+import { bool, count, exists, findById, num, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
 import { changeStock, releaseToProviderStock, stockUnit } from './stock.ts'
 import { log } from './log.ts'
 
@@ -179,10 +179,11 @@ export function applyLeaseDecision(decisionRecord: GlideRecord): DecisionOutcome
     lease.setValue('end_action', decided.endAction)
     if (decided.mismatch !== undefined) lease.setValue('mismatch', decided.mismatch)
     const leaseId = lease.getUniqueValue()
-    const terms = buyoutTerms(decision, { fixedAssets: num(lease, 'buyout_assets'), price: num(lease, 'buyout_price') }, () =>
-        // Every covered Asset's sys_id (as many as are counted, not pluck's default limit), so none is left out of the split.
-        pluck('alm_hardware', stillCovered(`x_daas_ham_lease=${leaseId}`), 'sys_id', Math.max(countAssets(leaseId), 1)),
-    )
+    const terms = buyoutTerms(decision, { fixedAssets: num(lease, 'buyout_assets'), price: num(lease, 'buyout_price') }, () => {
+        const covered: string[] = []
+        visitInKeyOrder('alm_hardware', stillCovered(`x_daas_ham_lease=${leaseId}`), (asset) => void covered.push(asset.getUniqueValue()))
+        return covered
+    })
     if (terms) {
         lease.setValue('buyout_assets', terms.assets)
         lease.setValue('buyout_share', terms.share)
