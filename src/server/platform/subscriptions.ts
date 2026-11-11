@@ -1,9 +1,9 @@
 import { GlideRecord } from '@servicenow/glide'
+import { sitePackageHoldersQuery } from '../domain/billing.ts'
 import { toIsoDate } from '../domain/calendar.ts'
 import { chooseSubscriptionLine, type SubscriptionLineView } from '../domain/in-service.ts'
 import { TRY_AGAIN, type HeldLock, type TryAgain } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { sitePackageHoldersQuery } from '../domain/returns.ts'
 import { SUBSCRIPTION_LINE_STATUS, SUBSCRIPTION_LINE_TYPE } from '../domain/vocabulary.ts'
 import { todayIso } from './clock.ts'
 import { withLockTries } from './locks.ts'
@@ -85,7 +85,7 @@ function startHolding(lock: HeldLock, lineId: string, inServiceAt: number): stri
 }
 
 /**
- * An active site package ends on the day nothing is left at its Site under its Agreement (domain/returns
+ * An active site package ends on the day nothing is left at its Site under its Agreement (domain/billing
  * `sitePackageHoldersQuery`). It is found by the Site and Agreement the unit leaves, not the line it carries, so a
  * swap's new unit that leaves before monitoring attached it still ends it. The Assets left are counted past the
  * before-query visibility rules (ADR 0005): the receiving tech sees only Assets in their stockrooms, so the units

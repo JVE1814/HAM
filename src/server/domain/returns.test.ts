@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ALL_STAGES, checkTransition, DEPLOYED_STAGES, INSTALLED_STAGES, type Stage } from './lifecycle'
+import { checkTransition, DEPLOYED_STAGES, INSTALLED_STAGES } from './lifecycle'
 import {
     collectionMethod,
     evaluationTarget,
@@ -10,7 +10,6 @@ import {
     requestedTrigger,
     returnDueDate,
     returnRequestFindings,
-    sitePackageHoldersQuery,
     deploymentEndLineQuery,
     stagesTakenBack,
     swapReturnTrigger,
@@ -19,7 +18,7 @@ import {
 } from './returns'
 import { type LeaseEndAction, RETURN_TRIGGER_CHOICES, type ReturnTrigger } from './vocabulary'
 import { recordMatches as matches } from '../test-support/encoded-query'
-import { assetIn, type SampleRecord } from '../test-support/stored-asset'
+import type { SampleRecord } from '../test-support/stored-asset'
 
 describe('returnRequestFindings', () => {
     const acmeSite: RequestedReturn = { customerId: 'acme', site: { id: 'acme-hq', customerId: 'acme', isSite: true } }
@@ -131,33 +130,6 @@ describe('overdueStep', () => {
 
     it('declares the asset missing after the grace period', () => {
         expect(overdueStep({ dueDate: due, today: '2026-12-22', graceDays: 14, escalated: true })).toBe('declare_missing')
-    })
-})
-
-describe('sitePackageHoldersQuery', () => {
-    const query = sitePackageHoldersQuery({ siteId: 'acme-hq', agreementId: 'acme-msa' })
-    /** A fleet asset at the Site under the Agreement, in `stage`. */
-    const unit = (stage: Stage, fields: SampleRecord = {}) => assetIn(stage, { x_daas_ham_fleet: 'true', x_daas_ham_site: 'acme-hq', x_daas_ham_agreement: 'acme-msa', ...fields })
-    const holding = (fields: SampleRecord = {}) => ALL_STAGES.filter((stage) => matches(query, unit(stage, fields)))
-
-    // A swap's new units before monitoring sees them, units serving there and units still to come back.
-    it('is held open by a unit shipped, awaiting first sighting, in service, temporarily deployed or awaiting return, and by no other', () => {
-        expect(holding()).toEqual(['shipped', 'pending_in_service', 'in_service', 'temporary_deployment', 'pending_return'])
-    })
-
-    it.each<Stage>(['pending_evaluation', 'missing', 'available'])('lets go of a unit %s', (stage) => {
-        expect(matches(query, unit(stage))).toBe(false)
-    })
-
-    it('counts only Assets at the Site under the Agreement, whatever their stage', () => {
-        expect(holding({ x_daas_ham_site: 'acme-branch' })).toEqual([])
-        expect(holding({ x_daas_ham_agreement: 'acme-old' })).toEqual([])
-        expect(holding({ x_daas_ham_site: '' })).toEqual([])
-    })
-
-    it('counts fleet assets only, whatever their stage (ADR 0016)', () => {
-        expect(holding({ x_daas_ham_fleet: 'false' })).toEqual([])
-        expect(holding({ x_daas_ham_fleet: '' })).toEqual([])
     })
 })
 

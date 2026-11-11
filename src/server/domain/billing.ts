@@ -1,6 +1,7 @@
 import { addDays, addMonths } from './calendar.ts'
 import { activeDays, currencyCode, currencyKey, divideRounded, fromCents, isMonth, previousMonth, toCents, type MonthBounds } from './money.ts'
-import { FLEET_CONDITION } from './fleet.ts'
+import { FLEET_CONDITION, fleetStagesQuery } from './fleet.ts'
+import { DEPLOYED_STAGES } from './lifecycle.ts'
 import { STAGE_FIELDS, SUBSCRIPTION_LINE_STATUS, SUBSCRIPTION_LINE_TYPE } from './vocabulary.ts'
 
 /** Billing periods: daily proration of Subscription lines and Fee events (plan §13 Billing export, Q52, Q66). */
@@ -130,6 +131,16 @@ export const ON_ENDED_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION
  * imports it, and Fluent metadata reads no function call (domain/billing.test.ts holds it to the function's result).
  */
 export const IN_SERVICE_ON_ENDED_LINE = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${ON_ENDED_LINE}^${FLEET_CONDITION}^NQinstall_status=${STAGE_FIELDS.temporary_deployment.installStatus}^substatus=${STAGE_FIELDS.temporary_deployment.substatus}^${ON_ENDED_LINE}^${FLEET_CONDITION}`
+
+/**
+ * The Assets that keep a site package open, as an encoded alm_hardware query: the fleet assets (ADR 0016) at its Site
+ * under its Agreement on their way there, serving there or on their way back. A unit received at the depot or declared
+ * missing no longer counts. A swap's new units do, before monitoring first sees them and attaches them to the package,
+ * so a swap-back that reaches the depot first does not end it (Q60).
+ */
+export function sitePackageHoldersQuery(line: { siteId: string; agreementId: string }): string {
+    return fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_site=${line.siteId}^x_daas_ham_agreement=${line.agreementId}`)
+}
 
 /** What one Subscription line bills at one Site for the month: the content of its Billing line. */
 export interface Charge {
