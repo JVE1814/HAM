@@ -1,24 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import type { HttpRequest } from './http'
 import {
-    addressProblem,
     applyTracking,
     buyLabel,
-    countryCode,
-    labelRequestBody,
     labelVoidable,
     newTrackingEvents,
     newestEventAt,
-    nextShipmentStatus,
     OPEN_SHIPMENTS,
-    packageCount,
     parseTrackingRetry,
     parseTrackingWebhook,
     returnLabelRefusal,
     statusOvertaken,
     tokenMatches,
     trackingEventKey,
-    TRACKING_RETRY_CHARS,
     trackingRetryParams,
     voidedLabelOrderNote,
     WEBHOOK_TOKEN_HEADER,
@@ -29,15 +23,50 @@ import {
     type TrackingUpdate,
 } from './shipping'
 import { SHIPMENT_STATUS_CHOICES, type ShipmentStatus } from './vocabulary'
+import { recordMatches as matches } from '../test-support/encoded-query'
 
 const depot: Address = { name: 'NaaS Depot', company: 'Demo NaaS Provider', phone: '+31 30 000', line1: '1 Depot Way', city: 'Utrecht', postalCode: '3511AA', country: 'nl' }
 const site: Address = { name: 'Acme HQ reception', phone: '+31 20 000', line1: '5 Main St', city: 'Amsterdam', postalCode: '1011AB', country: 'The Netherlands' }
 const input: LabelInput = { carrierId: 'se-28529731', serviceCode: 'ups_standard', from: depot, to: site, packages: 2, weightKg: 4.5, reference: 'NORD0001234' }
 
-describe('labelRequestBody', () => {
-    it('builds a ShipEngine POST /v1/labels body with the carrier account, one package per box and the order reference', () => {
-        const body = JSON.parse(labelRequestBody(input))
-        expect(body).toEqual({
+/** A ShipEngine `create_label_response_body` as in the API reference (only the parts the app reads, plus the required ones). */
+const LABEL_RESPONSE = {
+    label_id: 'se-28529731',
+    status: 'completed',
+    shipment_id: 'se-28529731',
+    tracking_number: '1Z63R096YW00000000',
+    carrier_id: 'se-28529731',
+    carrier_code: 'ups',
+    service_code: 'ups_standard',
+    shipment_cost: { currency: 'usd', amount: 21.4 },
+    label_download: {
+        href: 'https://api.shipengine.com/v1/downloads/10/F91Hn4rNBEOKgWsR5ez3Ww/label-28529731.pdf',
+        pdf: 'https://api.shipengine.com/v1/downloads/10/F91Hn4rNBEOKgWsR5ez3Ww/label-28529731.pdf',
+        png: 'https://api.shipengine.com/v1/downloads/10/F91Hn4rNBEOKgWsR5ez3Ww/label-28529731.png',
+        zpl: 'https://api.shipengine.com/v1/downloads/10/F91Hn4rNBEOKgWsR5ez3Ww/label-28529731.zpl',
+    },
+}
+
+/** The body of the label request buyLabel sends the aggregator for `label`. */
+function requestBody(label: LabelInput) {
+    const calls: HttpRequest[] = []
+    buyLabel((request) => {
+        calls.push(request)
+        return { status: 200, body: JSON.stringify(LABEL_RESPONSE) }
+    }, label)
+    expect(calls).toHaveLength(1)
+    return JSON.parse(calls[0].body ?? '')
+}
+
+/** Why buyLabel refuses `address` as the sender (`from`) or recipient (`to`), or null when it asks for the label. */
+function addressRefusal(side: 'from' | 'to', address: Address): string | null {
+    const result = buyLabel(() => ({ status: 200, body: JSON.stringify(LABEL_RESPONSE) }), { ...input, [side]: address })
+    return result.ok ? null : result.error
+}
+
+describe('the label request', () => {
+    it('is a ShipEngine POST /v1/labels body with the carrier account, one package per box and the order reference', () => {
+        expect(requestBody(input)).toEqual({
             shipment: {
                 carrier_id: 'se-28529731',
                 service_code: 'ups_standard',
@@ -68,96 +97,66 @@ describe('labelRequestBody', () => {
     })
 
     it('leaves out empty address parts instead of sending empty strings', () => {
-        const body = JSON.parse(labelRequestBody({ ...input, to: { ...site, company: '', phone: '', line2: '', state: '' } }))
+        const body = requestBody({ ...input, to: { ...site, company: '', phone: '', line2: '', state: '' } })
         expect(Object.values(body.shipment.ship_to)).not.toContain('')
         expect(Object.keys(body.shipment.ship_to)).toEqual(['name', 'address_line1', 'city_locality', 'postal_code', 'country_code'])
-        const full = JSON.parse(labelRequestBody({ ...input, to: { ...site, company: 'Acme', line2: 'Floor 3', state: 'NH' } }))
+        const full = requestBody({ ...input, to: { ...site, company: 'Acme', line2: 'Floor 3', state: 'NH' } })
         expect(full.shipment.ship_to).toMatchObject({ company_name: 'Acme', address_line2: 'Floor 3', state_province: 'NH' })
     })
 
     it('sends at least one box', () => {
-        expect(JSON.parse(labelRequestBody({ ...input, packages: 0 })).shipment.packages).toHaveLength(1)
+        expect(requestBody({ ...input, packages: 0 }).shipment.packages).toHaveLength(1)
+    })
+
+    it('sends the country as its ISO code, read from the code or a common name', () => {
+        const sent = (country: string) => requestBody({ ...input, to: { ...site, country } }).shipment.ship_to.country_code
+        expect(sent('de')).toBe('DE')
+        expect(sent('Germany')).toBe('DE')
+        expect(sent(' United  Kingdom ')).toBe('GB')
+        expect(sent('Switzerland')).toBe('CH')
     })
 })
 
-describe('packageCount', () => {
-    it('is a whole number of at least 1', () => {
-        expect(packageCount(3)).toBe(3)
-        expect(packageCount(2.7)).toBe(2)
-        expect(packageCount(0)).toBe(1)
-        expect(packageCount(-4)).toBe(1)
-        expect(packageCount(Number.NaN)).toBe(1)
-    })
-})
-
-describe('addressProblem', () => {
+describe('the addresses a label is refused for', () => {
     it('names the missing parts', () => {
-        expect(addressProblem({ ...site, line1: '', postalCode: '' }, 'to')).toBe('missing line1, postalCode')
-        expect(addressProblem(site, 'to')).toBeNull()
+        expect(addressRefusal('to', { ...site, line1: '', postalCode: '' })).toBe('to address missing line1, postalCode')
+        expect(addressRefusal('to', site)).toBeNull()
     })
 
     it('needs the phone on the sender (ship_from) side only', () => {
         const noPhone: Address = { ...depot, phone: undefined }
-        expect(addressProblem(noPhone, 'from')).toBe('missing phone')
-        expect(addressProblem({ ...noPhone, city: '' }, 'from')).toBe('missing phone, city')
-        expect(addressProblem(noPhone, 'to')).toBeNull()
-        expect(addressProblem(depot, 'from')).toBeNull()
+        expect(addressRefusal('from', noPhone)).toBe('from address missing phone')
+        expect(addressRefusal('from', { ...noPhone, city: '' })).toBe('from address missing phone, city')
+        expect(addressRefusal('to', noPhone)).toBeNull()
+        expect(addressRefusal('from', depot)).toBeNull()
     })
 
     it('needs a state in the U.S. and Canada', () => {
         const austin: Address = { name: 'Acme Austin', phone: '+1 512 000 0000', line1: '1 Congress Ave', city: 'Austin', postalCode: '78701', country: 'US' }
-        expect(addressProblem(austin, 'to')).toBe('missing state')
-        expect(addressProblem({ ...austin, country: 'Canada' }, 'from')).toBe('missing state')
-        expect(addressProblem({ ...austin, state: 'TX' }, 'to')).toBeNull()
-        expect(addressProblem(site, 'to')).toBeNull()
+        expect(addressRefusal('to', austin)).toBe('to address missing state')
+        expect(addressRefusal('from', { ...austin, country: 'Canada' })).toBe('from address missing state')
+        expect(addressRefusal('to', { ...austin, state: 'TX' })).toBeNull()
+        expect(addressRefusal('to', site)).toBeNull()
     })
 
     it('needs a country it can turn into an ISO code', () => {
-        expect(addressProblem({ ...site, country: 'Atlantis' }, 'to')).toBe('unknown country "Atlantis" (use the ISO code)')
+        expect(addressRefusal('to', { ...site, country: 'Atlantis' })).toBe('to address unknown country "Atlantis" (use the ISO code)')
     })
 })
 
-describe('addressProblem for U.S. and Canadian states', () => {
+describe('the addresses a label is refused for, by U.S. and Canadian states', () => {
     const us: Address = { name: 'Depot', phone: '+1 555 0100', line1: '1 Main St', city: 'Austin', state: 'TX', postalCode: '78701', country: 'US' }
 
     it('needs the two-letter state or province code', () => {
-        expect(addressProblem(us, 'from')).toBeNull()
-        expect(addressProblem({ ...us, state: 'Texas' }, 'from')).toBe('state "Texas" must be the two-letter code')
-        expect(addressProblem({ ...us, state: '' }, 'from')).toBe('missing state')
+        expect(addressRefusal('from', us)).toBeNull()
+        expect(addressRefusal('from', { ...us, state: 'Texas' })).toBe('from address state "Texas" must be the two-letter code')
+        expect(addressRefusal('from', { ...us, state: '' })).toBe('from address missing state')
     })
 
     it('does not ask for a state elsewhere', () => {
-        expect(addressProblem({ ...us, state: '', country: 'NL' }, 'from')).toBeNull()
+        expect(addressRefusal('from', { ...us, state: '', country: 'NL' })).toBeNull()
     })
 })
-
-describe('countryCode', () => {
-    it('reads ISO codes and common country names', () => {
-        expect(countryCode('de')).toBe('DE')
-        expect(countryCode('Germany')).toBe('DE')
-        expect(countryCode(' United  Kingdom ')).toBe('GB')
-        expect(countryCode('Switzerland')).toBe('CH')
-        expect(countryCode('Narnia')).toBe('')
-    })
-})
-
-/** A ShipEngine `create_label_response_body` as in the API reference (only the parts the app reads, plus the required ones). */
-const LABEL_RESPONSE = {
-    label_id: 'se-28529731',
-    status: 'completed',
-    shipment_id: 'se-28529731',
-    tracking_number: '1Z63R096YW00000000',
-    carrier_id: 'se-28529731',
-    carrier_code: 'ups',
-    service_code: 'ups_standard',
-    shipment_cost: { currency: 'usd', amount: 21.4 },
-    label_download: {
-        href: 'https://api.shipengine.com/v1/downloads/10/F91Hn4rNBEOKgWsR5ez3Ww/label-28529731.pdf',
-        pdf: 'https://api.shipengine.com/v1/downloads/10/F91Hn4rNBEOKgWsR5ez3Ww/label-28529731.pdf',
-        png: 'https://api.shipengine.com/v1/downloads/10/F91Hn4rNBEOKgWsR5ez3Ww/label-28529731.png',
-        zpl: 'https://api.shipengine.com/v1/downloads/10/F91Hn4rNBEOKgWsR5ez3Ww/label-28529731.zpl',
-    },
-}
 
 describe('buyLabel', () => {
     it('posts the label request and reads the tracking number and label', () => {
@@ -223,6 +222,35 @@ describe('buyLabel', () => {
         expect(calls).toHaveLength(0)
         expect(buyLabel(http, { ...input, packages: 20 })).toMatchObject({ ok: true })
         expect(JSON.parse(calls[0].body ?? '').shipment.packages).toHaveLength(20)
+    })
+})
+
+/*
+ * A label is recorded on a Shipment and put on the Order only with its tracking number, so a 2xx that carries none
+ * (missing, blank, or a body that is not JSON) is a failure, never a label.
+ */
+describe('buyLabel without a tracking number', () => {
+    const { tracking_number: _, ...untracked } = LABEL_RESPONSE
+    const label = (fields: Record<string, unknown>) => ({ status: 200, body: JSON.stringify({ ...untracked, ...fields }) })
+    const noTrackingNumber = { ok: false, error: 'the aggregator returned no tracking number' }
+
+    it('fails a label answer that carries no tracking number', () => {
+        expect(buyLabel(() => label({}), input)).toEqual(noTrackingNumber)
+    })
+
+    it('fails a blank or null tracking number', () => {
+        expect(buyLabel(() => label({ tracking_number: '   ' }), input)).toEqual(noTrackingNumber)
+        expect(buyLabel(() => label({ tracking_number: null }), input)).toEqual(noTrackingNumber)
+        expect(buyLabel(() => label({ tracking_number: { value: '1Z999' } }), input)).toEqual(noTrackingNumber)
+    })
+
+    it('fails a 2xx whose body is not JSON, or is empty', () => {
+        expect(buyLabel(() => ({ status: 200, body: '<html>OK</html>' }), input)).toEqual(noTrackingNumber)
+        expect(buyLabel(() => ({ status: 201, body: '' }), input)).toEqual(noTrackingNumber)
+    })
+
+    it('trims the tracking number it keeps', () => {
+        expect(buyLabel(() => label({ tracking_number: ' 1Z999 ' }), input)).toMatchObject({ ok: true, trackingNumber: '1Z999' })
     })
 })
 
@@ -348,8 +376,9 @@ describe('OPEN_SHIPMENTS', () => {
     it('leaves out the final statuses, whose label is no longer in use', () => {
         // The statuses a later tracking update no longer moves on.
         const statuses = Object.keys(SHIPMENT_STATUS_CHOICES) as ShipmentStatus[]
-        const final = statuses.filter((status) => status !== 'label_created' && nextShipmentStatus(status, 'label_created') === status)
-        expect(OPEN_SHIPMENTS).toBe(`statusNOT IN${final.join(',')}`)
+        const final = statuses.filter((status) => status !== 'label_created' && statusAfter(status, 'label_created') === status)
+        expect(final.length).toBeGreaterThan(0)
+        for (const status of statuses) expect(matches(OPEN_SHIPMENTS, { status }), status).toBe(!final.includes(status))
     })
 })
 
@@ -368,7 +397,7 @@ describe('labelVoidable', () => {
         const tracker = { object: 'Tracker', tracking_code: 'EZ200', status: 'cancelled', tracking_details: [] }
         const cancelled = parseTrackingWebhook(easyPostEvent('tracker.updated', tracker))
         expect(cancelled).toMatchObject({ status: 'exception' })
-        expect(labelVoidable(nextShipmentStatus('label_created', 'exception'))).toBe(true)
+        expect(labelVoidable(statusAfter('label_created', 'exception'))).toBe(true)
     })
 })
 
@@ -423,32 +452,36 @@ describe('voidedLabelOrderNote', () => {
     })
 })
 
-describe('nextShipmentStatus', () => {
+describe('the status a tracking update leaves', () => {
     it('follows the carrier until the shipment is delivered or returned', () => {
-        expect(nextShipmentStatus('label_created', 'in_transit')).toBe('in_transit')
-        expect(nextShipmentStatus('exception', 'in_transit')).toBe('in_transit')
-        expect(nextShipmentStatus('in_transit', 'delivered')).toBe('delivered')
+        expect(statusAfter('label_created', 'in_transit')).toBe('in_transit')
+        expect(statusAfter('exception', 'in_transit')).toBe('in_transit')
+        expect(statusAfter('in_transit', 'delivered')).toBe('delivered')
     })
 
     it('ignores late or unknown updates', () => {
-        expect(nextShipmentStatus('delivered', 'in_transit')).toBe('delivered')
-        expect(nextShipmentStatus('returned', 'out_for_delivery')).toBe('returned')
-        expect(nextShipmentStatus('in_transit', 'unknown')).toBe('in_transit')
+        expect(statusAfter('delivered', 'in_transit')).toBe('delivered')
+        expect(statusAfter('returned', 'out_for_delivery')).toBe('returned')
+        expect(statusAfter('in_transit', 'unknown')).toBe('in_transit')
     })
 
     it('lets a return to sender override a delivery', () => {
-        expect(nextShipmentStatus('delivered', 'returned')).toBe('returned')
+        expect(statusAfter('delivered', 'returned')).toBe('returned')
     })
 
     it('keeps a voided label voided whatever the carrier sends', () => {
         for (const status of ['label_created', 'in_transit', 'delivered', 'exception', 'returned'] as const) {
-            expect(nextShipmentStatus('voided', status)).toBe('voided')
+            expect(statusAfter('voided', status)).toBe('voided')
         }
     })
 })
 
 function trackingUpdate(status: ShipmentStatus, description = 'Carrier says so'): TrackingUpdate {
     return { trackingNumber: '1Z999', status, description, events: [] }
+}
+
+function statusAfter(current: ShipmentStatus, incoming: ShipmentStatus): ShipmentStatus {
+    return applyTracking(current, trackingUpdate(incoming)).status
 }
 
 describe('applyTracking', () => {
@@ -555,7 +588,7 @@ describe('trackingRetryParams and parseTrackingRetry', () => {
         const params = trackingRetryParams({ ...update, events }, new Set())!
         expect(params.length).toBeGreaterThan(1)
         const parsed = params.map((param) => parseTrackingRetry(param)!)
-        for (const param of params) expect(param.length).toBeLessThanOrEqual(TRACKING_RETRY_CHARS)
+        for (const param of params) expect(param.length, 'fits the 4000 characters of a sysevent parm1').toBeLessThanOrEqual(4000)
         for (const part of parsed) expect({ ...part.update, events: [] }).toEqual({ ...update, events: [] })
         for (const part of parsed) expect(part.newestAt).toBe('2026-11-06T08:59:00Z')
         expect(parsed.flatMap((part) => part.update.events)).toEqual(events)
