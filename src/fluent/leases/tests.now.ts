@@ -4,7 +4,7 @@ import { INSTALL_STATUS, STAGE_FIELDS } from '../../server/domain/vocabulary'
 import { assetManager } from '../shared/roles.now'
 
 /*
- * ATF: lessor ownership and lease extension (D65; suite "NaaS - P3"). The lease rules act on fleet assets only
+ * ATF: lessor ownership and lease extension (Q65; suite "NaaS - P3"). The lease rules act on fleet assets only
  * (ADR 0016), so the Assets here are fleet assets. Fixtures setting the Fleet flag insert without security enforcement:
  * the flag is read-only on forms, and the app's intake paths set it server-side.
  */

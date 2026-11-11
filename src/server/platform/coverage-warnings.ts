@@ -10,7 +10,7 @@ import { intProperty, PROPERTY } from './properties.ts'
 import { findById, str, warnRefused } from './records.ts'
 
 /**
- * The warning ahead of expiring OEM coverage (P3.24). It goes once per contract, which the contract's `expiry_notified`
+ * The warning ahead of expiring OEM coverage (plan §13 Renewals). It goes once per contract, which the contract's `expiry_notified`
  * mark records: platform/coverage sets it for this module (`markExpiryWarned`) and clears it when the contract's end
  * date moves.
  */

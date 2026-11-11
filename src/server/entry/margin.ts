@@ -5,7 +5,7 @@ import { EVENT, jobEvent } from '../platform/events.ts'
 import { computeMarginChunk, queueMarginCompute } from '../platform/margin.ts'
 import { str } from '../platform/records.ts'
 
-/** Cost facts and Margin per Customer and Site, computed when a Billing period closes (P3.28): platform/margin. */
+/** Cost facts and Margin per Customer and Site, computed when a Billing period closes (plan §13 Margin / TCO): platform/margin. */
 
 export function uiRecomputeMargin(current: GlideRecord): void {
     queueMarginCompute(current)

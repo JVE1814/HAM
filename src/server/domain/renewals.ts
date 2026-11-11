@@ -1,6 +1,6 @@
 import { addMonths, endOfMonth, isMonthEnd } from './calendar.ts'
 
-/** Agreement renewals (P3.24): the end a renewal moves an Agreement to, and what a moved end means for its recovery. */
+/** Agreement renewals (plan §13 Renewals): the end a renewal moves an Agreement to, and what a moved end means for its recovery. */
 
 /**
  * The Agreement's end after renewing it for `termMonths`. A term ending on a month end renews to a month end

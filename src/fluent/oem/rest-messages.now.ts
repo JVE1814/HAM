@@ -154,7 +154,7 @@ RestMessage({
 })
 
 /*
- * Claim and provisioning (P3.27). GreenLake and FortiZTP authenticate with an OAuth 2.0 profile
+ * Claim and provisioning (plan §13 OEM claim adapters). GreenLake and FortiZTP authenticate with an OAuth 2.0 profile
  * attached on the instance:
  * - GreenLake: Client Credentials grant, token URL
  *   https://global.api.greenlake.hpe.com/authorization/v2/oauth2/<workspaceId>/token; the API client's

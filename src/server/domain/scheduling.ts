@@ -1,4 +1,4 @@
-/** On-site work must fall inside its change window and the Site's Maintenance window (D57). */
+/** On-site work must fall inside its change window and the Site's Maintenance window (Q57). */
 
 export interface JobWindowFacts {
     jobStart: number

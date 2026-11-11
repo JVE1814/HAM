@@ -3,7 +3,7 @@ import type { VisibilityScope } from './visibility.ts'
 import type { InstallMode, OrderStage } from './vocabulary.ts'
 
 /**
- * Who may record an Order as installed (P1 fulfilment, D49). An install by an FSM engineer, a subcontractor or
+ * Who may record an Order as installed (P1 fulfilment, Q49). An install by an FSM engineer, a subcontractor or
  * remote hands completes when its work order is closed; a self-install waits for the Customer to confirm it.
  */
 

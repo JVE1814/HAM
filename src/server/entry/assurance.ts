@@ -5,7 +5,7 @@ import { closeAudit, findOpenVisibleAudit, recordScan, startSiteAudit, startStoc
 import { str } from '../platform/records.ts'
 import { pathParam, reply, requireScanner, textBodyOf } from '../platform/rest-api.ts'
 
-/** Audits and attestations (P2.7, D63). */
+/** Audits and attestations (P2.7, Q63). */
 
 function tellLeftOff(started: { number: string; leftOff: number }): void {
     if (started.leftOff > 0) gs.addErrorMessage(`${started.leftOff} asset(s) left off ${started.number} and not counted (see the system log)`)

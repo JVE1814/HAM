@@ -4,7 +4,7 @@ import { DEVICE_CLASS, INSTALL_STATUS, LEGAL_OWNER, STAGE_FIELDS, STOCKROOM_TYPE
 import { customerAdmin, inventoryTech, siteContact } from '../shared/roles.now'
 
 /*
- * ATF: depot evaluation routing (D60), on fleet assets: the app moves those only (ADR 0016; suite "NaaS - P2").
+ * ATF: depot evaluation routing (Q60), on fleet assets: the app moves those only (ADR 0016; suite "NaaS - P2").
  * Fixtures setting the Fleet flag insert without security enforcement: the flag is read-only on forms, and the app's
  * intake paths set it server-side.
  */
@@ -108,7 +108,7 @@ export const returnEvaluationTest = Test(
 
 /*
  * ATF: the customer return requests of POST /api/x_daas_ham/naas/customer/returns (entry/customer
- * `requestCustomerReturn`, D49; suite "NaaS - P2"). ATF's inbound REST step signs in through a basic auth profile, which
+ * `requestCustomerReturn`, Q49; suite "NaaS - P2"). ATF's inbound REST step signs in through a basic auth profile, which
  * this scope may not create, so the server-side scripts call the route's handler in the impersonated user's session,
  * with the request and response objects it reads (body.data, setStatus, setBody), as the platform does: the handler's
  * role checks and the visibility rules (ADR 0005) apply as for that user. A script cannot read an earlier step's

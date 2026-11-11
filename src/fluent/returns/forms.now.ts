@@ -104,7 +104,7 @@ List({ table: 'x_daas_ham_return_order_line', view: default_view, columns: ['ret
 List({ table: 'x_daas_ham_fee_event', view: default_view, columns: ['occurred_on', 'fee_type', 'customer', 'asset', 'amount', 'agreement.currency', 'status'] })
 
 /*
- * "Return or decommission equipment": customer admins and the service desk raise returns (D60). The Site choices follow
+ * "Return or decommission equipment": customer admins and the service desk raise returns (Q60). The Site choices follow
  * the chosen Customer and the device choices the chosen Site; submitting checks the same again, and that the requester
  * may raise it (domain/returns returnRequestFindings).
  */

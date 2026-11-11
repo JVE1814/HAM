@@ -87,7 +87,7 @@ ScheduledScript({
     script: syncOemRmaStatus,
 })
 
-/* OEM claim and provisioning of staging steps (P3.27, D70). Every vendor is off until enabled. */
+/* OEM claim and provisioning of staging steps (plan §13 OEM claim adapters, Q70). Every vendor is off until enabled. */
 
 ScheduledScript({
     $id: Now.ID['job_oem_claims'],

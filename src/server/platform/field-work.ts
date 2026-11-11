@@ -6,7 +6,7 @@ import { glideToMs } from './clock.ts'
 import { findById, str, warnRefused, type ForeignRecord } from './records.ts'
 
 /**
- * On-site work: an FSM work order (wm_order) and the change request it runs under (D57), and whether the work as
+ * On-site work: an FSM work order (wm_order) and the change request it runs under (Q57), and whether the work as
  * planned fits its windows. Routine jobs use a standard change; the change type is decided by the caller.
  */
 

@@ -20,7 +20,7 @@ import { isFleetAsset, moveRefusal, readStage, transitionFacts } from './assets.
 import { choice, findById, refusal, str, warnRefused } from './records.ts'
 
 /**
- * Disposal orders: approve, then retire each wiped Asset by its method (P2.5, D61). None of it tells the user anything:
+ * Disposal orders: approve, then retire each wiped Asset by its method (P2.5, Q61). None of it tells the user anything:
  * each gives what came of it, for the form button or rule that asked.
  */
 

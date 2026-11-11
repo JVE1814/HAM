@@ -9,7 +9,7 @@ import { queueRefresh, runRefreshPass } from '../platform/lifecycle-dates.ts'
 import type { ForeignRecord } from '../platform/records.ts'
 import { rearmForNewEnd, renewAgreement, warnAgreementRenewals } from '../platform/renewals.ts'
 
-/** Leases, end-of-lease decisions and renewals (P3.23–P3.24): platform/leases, platform/renewals. */
+/** Leases, end-of-lease decisions and renewals (plan §13 Leases, Renewals): platform/leases, platform/renewals. */
 
 /**
  * Before rule on alm_hardware (br_asset_lease): a fleet asset on a lease schedule is owned by that schedule's Lessor,

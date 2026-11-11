@@ -14,7 +14,7 @@ import { EVENT } from '../../server/platform/events'
 import { PROPERTY } from '../../server/platform/properties'
 import { admin, leaseEditors } from '../shared/roles.now'
 
-/* Leases and end-of-lease decisions (P3.23). */
+/* Leases and end-of-lease decisions (plan §13 Leases). */
 
 // Fleet assets only (ADR 0016): the condition tests the Fleet flag right after its change test, as the header of
 // fleet/logic.now.ts has it. A unit of the Provider IT's that joins the fleet with its Lease schedule already set (Add

@@ -6,7 +6,7 @@ import { EVENT } from '../../server/platform/events'
 import { PROPERTY } from '../../server/platform/properties'
 import { admin } from '../shared/roles.now'
 
-/* Returns (D60): rules, jobs and notifications. */
+/* Returns (Q60): rules, jobs and notifications. */
 
 BusinessRule({
     $id: Now.ID['br_return_evaluated'],

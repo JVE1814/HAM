@@ -30,7 +30,7 @@ export interface ShipFacts {
 /** What the on-site work an Order opens is for: installing its units, or swapping them for those they replace. */
 const ORDER_WORK_PURPOSES = ['install', 'swap'] as const satisfies readonly FieldPurpose[]
 
-/** The change request and FSM work order to open at the Site (D57). */
+/** The change request and FSM work order to open at the Site (Q57). */
 export interface OnSiteWork {
     changeType: 'standard' | 'normal'
     purpose: (typeof ORDER_WORK_PURPOSES)[number]
@@ -62,7 +62,7 @@ export function planShipment(facts: ShipFacts): ShipPlan {
     return {
         ok: true,
         errors: refusals,
-        // The shipping aggregator replaces manual tracking numbers (P3.26): one package per staged Asset, and a
+        // The shipping aggregator replaces manual tracking numbers (plan §13 Shipping aggregator): one package per staged Asset, and a
         // new label for Assets staged after an earlier Ship. Hot spares are already at the Site, so never packaged.
         labelPackages: needsCarrier ? facts.staged : null,
         onSiteWork: facts.installMode === 'self_install' || facts.hasWorkOrder ? null : onSiteWork(facts),

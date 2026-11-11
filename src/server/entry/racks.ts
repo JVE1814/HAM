@@ -7,7 +7,7 @@ import type { ForeignRecord } from '../platform/records.ts'
 import { pathParam, queryParam, reply } from '../platform/rest-api.ts'
 import { currentSession } from '../platform/session.ts'
 
-/** Rack placement and the rack elevation view (P2.8, D67). */
+/** Rack placement and the rack elevation view (P2.8, Q67). */
 
 /**
  * Condition of the before rule on alm_hardware (br_rack_placement): whether the save must be refused. The rule refuses

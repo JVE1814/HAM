@@ -69,7 +69,7 @@ export function resolveVisibility(hasRole: (role: string) => boolean): Visibilit
 }
 
 /**
- * Whether the user takes the Customer admin's part on the customer page (D49: request returns, answer attestations):
+ * Whether the user takes the Customer admin's part on the customer page (Q49: request returns, answer attestations):
  * a Customer admin who sees only their own Customer. Staff who see every Customer do not, even holding the role (as a
  * platform admin holds every role) or previewing the page: an attestation is the Customer's own word, and staff raise
  * returns through the record producer.

@@ -32,7 +32,7 @@ import { restMessagePort } from './rest-messages.ts'
 import { REST_MESSAGE } from '../domain/rest-message-names.ts'
 
 /**
- * Shipments bought from the shipping aggregator (P3.26, D73): labels for Orders and ship-back returns, marking one
+ * Shipments bought from the shipping aggregator (plan §13 Shipping aggregator, Q73): labels for Orders and ship-back returns, marking one
  * voided, and the tracking updates the aggregator sends. None of it tells the user or answers the aggregator: each
  * gives what came of it, for the form button, webhook or queued retry that asked.
  */

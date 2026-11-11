@@ -22,7 +22,7 @@ import { choice, exists, findById, num, recordsById, str, type ForeignRecord } f
 import { currentSession } from './session.ts'
 
 /**
- * Racks: where fleet assets are placed, whether a placement fits (P2.8), the rack exceptions (D67) and the reads of
+ * Racks: where fleet assets are placed, whether a placement fits (P2.8), the rack exceptions (Q67) and the reads of
  * the rack elevation view. None of it tells the user anything: each gives what it found, for the trigger that asked.
  */
 

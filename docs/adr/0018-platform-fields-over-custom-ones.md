@@ -62,7 +62,7 @@ Order's *Requested by* contact (`x_daas_ham_order.requested_by_contact`; the tas
 - **OEM coverage**: one row per serial number, which a contract is not.
 - **Cost facts**: `fm_expense_line` has no Customer, Site or period.
 - **Imports through rules**, not transform maps: one row makes several records.
-- **The billing pull API**: asked for as such (D66).
+- **The billing pull API**: asked for as such (Q66).
 - **ASN import columns no code reads** (distributor, ship date, carrier, tracking number): they are the layout of
   the distributor's file, and the import row is where an operator reads them.
 - **An Order line's allocated quantity and latest purchase order**: written only, but shown on the line's form and

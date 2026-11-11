@@ -50,7 +50,7 @@ export const x_daas_ham_coverage_import = Table({
     },
 })
 
-/** A Customer's account in a manufacturer cloud that claimed devices go to (P3.27). */
+/** A Customer's account in a manufacturer cloud that claimed devices go to (plan §13 OEM claim adapters). */
 export const x_daas_ham_cloud_account = Table({
     name: 'x_daas_ham_cloud_account',
     label: 'OEM cloud account',

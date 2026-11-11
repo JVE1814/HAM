@@ -31,7 +31,7 @@ import { completeInstall, installState } from '../platform/delivery.ts'
 import { bodyOf, pathParam, reply, requireRole } from '../platform/rest-api.ts'
 
 /*
- * Customer self-service API (P2.9, D49). Every query runs as the signed-in customer contact, so the
+ * Customer self-service API (P2.9, Q49). Every query runs as the signed-in customer contact, so the
  * before-query visibility rules (ADR 0005) limit it to their Customer (site contacts: their Sites).
  * Asset managers may open the page as a preview, which shows every Customer (platform/customer-page);
  * the Customer-admin actions stay with Customer admins.

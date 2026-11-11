@@ -30,7 +30,7 @@ import { naasMenu } from '../shared/menu.now'
 const REPLACEMENT_COMPLETE = `x_daas_ham_replacement_order.stage=${ORDER_STAGE.complete}`
 const CASE_CLOSED_UNREPLACED = `active=false^x_daas_ham_replacement_order.stage!=${ORDER_STAGE.complete}`
 
-/* Break-fix (P2.3, D58): OEM RMAs, the replacement of a failed Asset and its SLAs. */
+/* Break-fix (P2.3, Q58): OEM RMAs, the replacement of a failed Asset and its SLAs. */
 
 /** A return authorisation opened with the manufacturer for a defective Asset. */
 export const x_daas_ham_oem_rma = Table({

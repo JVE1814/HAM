@@ -9,7 +9,7 @@ import { todayIso } from './clock.ts'
 import { attemptLock, whyNotRun } from './locks.ts'
 import { exists, str, warnRefused, type ForeignRecord } from './records.ts'
 
-/** Service intervals: the days each Asset delivered a Subscription line (P3.25). */
+/** Service intervals: the days each Asset delivered a Subscription line (plan §13 Billing export). */
 
 /**
  * Start billing an Asset on a Subscription line from `startIso`, unless an interval is already open for

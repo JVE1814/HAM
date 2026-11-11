@@ -14,7 +14,7 @@ import { SHIPMENT_DIRECTION_CHOICES, SHIPMENT_STATUS_CHOICES } from '../../serve
 import { NAAS_STOCKROOM_CONDITION } from '../../server/domain/fleet'
 import { TRACKING_DESCRIPTION_LENGTH, TRACKING_LOCATION_LENGTH } from '../../server/domain/shipping'
 
-/* Shipments bought through the shipping aggregator and their tracking events (P3.26, D73). */
+/* Shipments bought through the shipping aggregator and their tracking events (plan §13 Shipping aggregator, Q73). */
 
 export const x_daas_ham_shipment = Table({
     name: 'x_daas_ham_shipment',

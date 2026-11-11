@@ -11,7 +11,7 @@ import { installedAssetIds } from './installed-assets.ts'
 import { IN_USE_STAGES } from '../domain/lifecycle.ts'
 
 /**
- * Attestations: a Customer admin confirms the equipment installed at a Site (P2.7, D63). The daily job raises them,
+ * Attestations: a Customer admin confirms the equipment installed at a Site (P2.7, Q63). The daily job raises them,
  * the customer page answers and submits them. None of it tells the user anything: each gives what came of it.
  */
 

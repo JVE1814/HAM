@@ -914,8 +914,7 @@ scoping).
 ## 20. Decision log
 
 The design interview asked 76 questions. Superseded answers are marked ~~struck~~ and point to the
-question that replaced them. Elsewhere in the docs and the code, decision D*n* is the answer to Q*n*
-below.
+question that replaced them. The docs and the code cite a decision by its Q number.
 
 | Q | Topic | Decision |
 |---|---|---|

@@ -1,6 +1,6 @@
-# Leases and renewals (P3.23–P3.24)
+# Leases and renewals (plan §13 Leases, Renewals)
 
-## Lease schedules (D65)
+## Lease schedules (Q65)
 
 - A **Lease schedule** extends `ast_contract`: Lessor (the contract's *Vendor*), the number the
   Lessor gives the schedule (its *Contract number*, which a reference to the lease shows), monthly
@@ -47,7 +47,7 @@ applied again, even from a form opened before it closed.
 
 - Each **Agreement** bills in one currency: its *Currency*, a three-letter ISO 4217 code (e.g. EUR),
   mandatory and with no default. An Agreement saved before the field existed has none: set it before
-  the next Billing period is generated, or that Agreement's lines and fees fail to bill (P3.25).
+  the next Billing period is generated, or that Agreement's lines and fees fail to bill (plan §13 Billing export).
 - The Agreement's Billing lines (its Subscription lines' and its Fee events') and its Cost facts are
   kept in that currency. A Subscription line's own *Currency* field is read-only and not used (it keeps
   the values saved before); nor is a Fee event's.

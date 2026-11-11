@@ -4,7 +4,7 @@ import { DEVICE_CLASS, INSTALL_MODE, INSTALL_STATUS, ORDER_TYPE } from '../../se
 import { assetManager } from '../shared/roles.now'
 
 /*
- * ATF: break-fix entitlement neutrality (D46), on fleet assets: the app counts those only (ADR 0016; suite
+ * ATF: break-fix entitlement neutrality (Q46), on fleet assets: the app counts those only (ADR 0016; suite
  * "NaaS - P2"). Fixtures setting the Fleet flag insert without security enforcement: the flag is read-only on forms,
  * and the app's intake paths set it server-side.
  */

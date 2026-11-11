@@ -36,7 +36,7 @@ import { findJobCursor, retirePass } from './job-cursor.ts'
 import { deleteWhere, exists, findById, noneLeft, num, refusal, str, throwRefused } from './records.ts'
 import { BILLING_PERIOD_STATUS, type BillingLineKind, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
 
-/** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
+/** Billing periods: generate, review, close (lock) and export (plan §13 Billing export, Q66). */
 
 const PERIOD = 'x_daas_ham_billing_period'
 const LINE = 'x_daas_ham_billing_line'

@@ -17,7 +17,7 @@ BusinessRule({
     script: guardAgreementCurrency,
 })
 
-/* Agreement renewals (P3.24). */
+/* Agreement renewals (plan §13 Renewals). */
 
 BusinessRule({
     $id: Now.ID['br_agreement_end_changed'],

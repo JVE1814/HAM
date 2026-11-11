@@ -6,7 +6,7 @@ import { createOrder, submitOrder } from './orders.ts'
 import { bool, findById, refusal, str, warnRefused } from './records.ts'
 
 /**
- * Break-fix replacements (P2.3, D58): the device-replace Order a CSM case raises for its failed Asset. It tells the
+ * Break-fix replacements (P2.3, Q58): the device-replace Order a CSM case raises for its failed Asset. It tells the
  * user nothing: it gives what came of it, for the form button that asked to report (entry/breakfix).
  */
 

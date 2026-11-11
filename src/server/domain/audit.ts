@@ -4,7 +4,7 @@ import type { Stage } from './lifecycle.ts'
 import { normalizeSerial } from './serials.ts'
 import { INSTALL_STATUS, TASK_STATE, type AuditLineResult } from './vocabulary.ts'
 
-/** Audits (blind counts, site audits) and Attestations (P2.7, D63). */
+/** Audits (blind counts, site audits) and Attestations (P2.7, Q63). */
 
 /** The task states an audit takes: in progress from the moment it is started, closed once its scans are compared. */
 export const AUDIT_STATE = { inProgress: TASK_STATE.workInProgress, closed: TASK_STATE.closedComplete } as const

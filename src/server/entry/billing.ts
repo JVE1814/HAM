@@ -27,7 +27,7 @@ import { str } from '../platform/records.ts'
 import { pathParam, queryInt, reply, requireRole } from '../platform/rest-api.ts'
 import { abortWith } from '../platform/rule-api.ts'
 
-/** Billing periods: generate, review, close (lock) and export (P3.25, D66): platform/billing. */
+/** Billing periods: generate, review, close (lock) and export (plan §13 Billing export, Q66): platform/billing. */
 
 export function openMonthlyBillingPeriod(): void {
     openBillingPeriod(previousMonth(todayIso()))

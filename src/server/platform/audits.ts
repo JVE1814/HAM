@@ -12,7 +12,7 @@ import { installedAssetIds } from './installed-assets.ts'
 import { currentSession } from './session.ts'
 
 /**
- * Audits: a stockroom's blind count and a Site's audit (P2.7, D63). An audit is started with the list of Assets it
+ * Audits: a stockroom's blind count and a Site's audit (P2.7, Q63). An audit is started with the list of Assets it
  * expects, scans are recorded against it while it is open, and closing it compares the two. None of it tells the user
  * anything: each gives what came of it, for the trigger that asked to report.
  */

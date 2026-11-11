@@ -7,7 +7,7 @@ import { str } from '../platform/records.ts'
 import { queryParam, reply } from '../platform/rest-api.ts'
 import { labelReturn, retryTracking, trackShipment, voidLabel } from '../platform/shipping.ts'
 
-/** Shipping aggregator: labels for ship-back returns, voided labels and tracking webhooks (P3.26, D73): platform/shipping. */
+/** Shipping aggregator: labels for ship-back returns, voided labels and tracking webhooks (plan §13 Shipping aggregator, Q73): platform/shipping. */
 
 export function uiCreateReturnLabel(current: GlideRecord): void {
     const label = labelReturn(current)

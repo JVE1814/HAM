@@ -4,7 +4,7 @@ import { inFleet } from './fleet.ts'
 import { notRetiredCondition, type Stage } from './lifecycle.ts'
 import type { LeaseEndAction } from './vocabulary.ts'
 
-/** Lease schedules and end-of-lease decisions (P3.23). */
+/** Lease schedules and end-of-lease decisions (plan §13 Leases). */
 
 /**
  * `leaseCondition` (an encoded query on the Asset's lease) narrowed to the fleet assets (ADR 0016) the lease still

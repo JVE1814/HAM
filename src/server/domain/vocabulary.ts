@@ -439,7 +439,7 @@ export const LINE_STAGE = {
 
 /* Staging and OEM claims */
 
-/** Checklist steps the manufacturer's cloud can do (P3.27): a step's `automation` (blank = by hand), an OEM cloud account's `purpose`. */
+/** Checklist steps the manufacturer's cloud can do (plan §13 OEM claim adapters): a step's `automation` (blank = by hand), an OEM cloud account's `purpose`. */
 export const CLAIM_ACTION_CHOICES = {
     oem_claim: { label: 'Claim / register in the OEM cloud', sequence: 0 },
     oem_licence: { label: 'Assign the OEM subscription', sequence: 1 },

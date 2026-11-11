@@ -12,7 +12,7 @@ import { returnLabels } from './shipping.ts'
 import { OPEN_ORDERS_QUERY } from '../domain/fulfilment.ts'
 
 /*
- * What the customer self-service page shows and takes (P2.9, D49). Every query runs as the signed-in customer contact,
+ * What the customer self-service page shows and takes (P2.9, Q49). Every query runs as the signed-in customer contact,
  * so the before-query visibility rules (ADR 0005) limit it to their Customer (site contacts: their Sites). Asset
  * managers may open the page as a preview, which shows every Customer. A server read is not checked by the read ACLs,
  * so a query with `^NQ` clauses carries the reader's filter in each one itself (customerEquipmentQuery). Only fleet

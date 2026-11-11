@@ -3,7 +3,7 @@ import { Test } from '@servicenow/sdk/core'
 import { DEVICE_CLASS, INSTALL_STATUS } from '../../server/domain/vocabulary'
 
 /*
- * ATF: rack power budget (P3.29; suite "NaaS - P3"). The rack rules act on fleet assets only (ADR 0016), so the Assets
+ * ATF: rack power budget (plan §13 Rack power budget; suite "NaaS - P3"). The rack rules act on fleet assets only (ADR 0016), so the Assets
  * here are fleet assets. Fixtures setting the Fleet flag insert without security enforcement: the flag is read-only on
  * forms, and the app's intake paths set it server-side.
  */

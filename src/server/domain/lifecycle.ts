@@ -40,7 +40,7 @@ const RETIRED: ReadonlySet<Stage> = new Set([
     'returned_to_lessor',
 ])
 
-/** In use at a Site: an Asset in one of these delivers its Subscription line and is billed (D52), and monitoring should see it. */
+/** In use at a Site: an Asset in one of these delivers its Subscription line and is billed (Q52), and monitoring should see it. */
 export const IN_USE_STAGES: readonly Stage[] = ['in_service', 'temporary_deployment']
 
 /** Installed at a Site: in use, or awaiting first sighting (temporary ends, audits, attestations). */
@@ -167,7 +167,7 @@ export function legalOwnerOf(stored: LegalOwner | ''): LegalOwner {
 }
 
 /**
- * How an Asset may leave the Provider (P2.5, D61): each Disposal method, whose Assets it retires and the stage it
+ * How an Asset may leave the Provider (P2.5, Q61): each Disposal method, whose Assets it retires and the stage it
  * leaves them in. The one way out that is no Disposal method is an OEM RMA (`checkRetirement`).
  */
 const EXIT: Record<DisposalMethod, { owner: LegalOwner; stage: Stage }> = {
@@ -288,7 +288,7 @@ export type BillingChange = { start: string } | { stop: string }
 /**
  * Whether a stage change starts or stops an Asset's billing, and on which day: it starts from the
  * in-service date on first go-live (from pending in service), else today (e.g. found after being
- * missing), and stops today, whatever moved it (D52, ADR 0009).
+ * missing), and stops today, whatever moved it (Q52, ADR 0009).
  */
 export function billingChange(before: Stage | null, after: Stage | null, dates: BillingDates): BillingChange | null {
     if (isBillable(before) === isBillable(after)) return null

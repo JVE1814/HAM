@@ -2,7 +2,7 @@ import type { Approver } from './approvals.ts'
 import { disposalMethodsFor, legalOwnerOf, type Stage } from './lifecycle.ts'
 import type { DisposalMethod, LegalOwner } from './vocabulary.ts'
 
-/** Disposal orders (P2.5, D61). */
+/** Disposal orders (P2.5, Q61). */
 
 /** A line's Asset as Complete disposal finds it; `customerId` is its company: the Customer it belongs to (ADR 0006). */
 export interface DisposalLine {

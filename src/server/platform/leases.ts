@@ -28,7 +28,7 @@ import { bool, count, exists, findById, num, pluck, refusal, str, warnRefused, t
 import { changeStock, releaseToProviderStock, stockUnit } from './stock.ts'
 
 /**
- * Lease schedules and their end-of-lease decisions (P3.23), over fleet assets only (ADR 0016): the daily review, a
+ * Lease schedules and their end-of-lease decisions (plan §13 Leases), over fleet assets only (ADR 0016): the daily review, a
  * decision applied, and the background jobs a buy out and a return start. None of it tells the user anything: each
  * gives what came of it, for the trigger that asked.
  */

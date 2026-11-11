@@ -10,7 +10,7 @@ import {
 import { str, type ForeignRecord } from '../platform/records.ts'
 import { abortWith } from '../platform/rule-api.ts'
 
-/** Disposal orders: approve, then retire each wiped Asset by its method (P2.5, D61): platform/disposal. */
+/** Disposal orders: approve, then retire each wiped Asset by its method (P2.5, Q61): platform/disposal. */
 
 export function uiSubmitDisposal(current: GlideRecord): void {
     // A refused form save (the platform says why) asks nobody: the order is not what the approvers would decide.

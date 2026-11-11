@@ -10,7 +10,7 @@ import { exists, findById, num, refusal, str, warnRefused } from './records.ts'
 
 /**
  * Fee events (x_daas_ham_fee_event): charged and waived by the returns process (P2.4), then put on a Billing period,
- * taken off it again when waived, and marked billed as it closes (P3.25). Every write of a Fee event is made here.
+ * taken off it again when waived, and marked billed as it closes (plan §13 Billing export). Every write of a Fee event is made here.
  */
 
 const FEE = 'x_daas_ham_fee_event'

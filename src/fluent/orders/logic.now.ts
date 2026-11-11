@@ -108,7 +108,7 @@ UiAction({
     script: uiCancelOrder,
 })
 
-/* Hardware refresh (D48). */
+/* Hardware refresh (Q48). */
 
 ScheduledScript({
     $id: Now.ID['job_raise_refresh_orders'],

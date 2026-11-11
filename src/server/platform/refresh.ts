@@ -23,7 +23,7 @@ import { intProperty, PROPERTY } from './properties.ts'
 import { pluck, str, warnRefused } from './records.ts'
 import { OPEN_ORDERS_QUERY } from '../domain/fulfilment.ts'
 
-/** Refresh Orders for in-service Assets due within the horizon (P2.2, D48: fully automatic). */
+/** Refresh Orders for in-service Assets due within the horizon (P2.2, Q48: fully automatic). */
 
 /** Candidates a run raises at most, and the Assets due it reads per query. */
 const CANDIDATES_PER_RUN = 2000

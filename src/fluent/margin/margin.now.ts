@@ -20,7 +20,7 @@ import { computeMargin, uiRecomputeMargin } from '../../server/entry/margin'
 import { PROPERTY } from '../../server/platform/properties'
 import { admin, finance, moneyReaders } from '../shared/roles.now'
 
-/* Cost facts and Margin per Customer, Site and currency (P3.28, D72). */
+/* Cost facts and Margin per Customer, Site and currency (plan §13 Margin / TCO, Q72). */
 
 /** A cost attributed to a Customer and Site, in one currency, for one Billing period. */
 export const x_daas_ham_cost_fact = Table({

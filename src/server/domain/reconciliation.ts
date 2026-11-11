@@ -3,7 +3,7 @@ import { overlaps, powerBudget, type Placement, type RackSpec } from './rack.ts'
 import { normalizeSerial } from './serials.ts'
 import { EXCEPTION_STATUS, type ExceptionType } from './vocabulary.ts'
 
-/** Reconciliation exceptions between installed Assets and monitoring (P2.7), and in racks (D67). */
+/** Reconciliation exceptions between installed Assets and monitoring (P2.7), and in racks (Q67). */
 
 /** The types the daily comparison of an installed Asset with monitoring raises and resolves (`reconcileAsset`). */
 export const MONITORING_EXCEPTION_TYPES = ['unseen', 'serial_mismatch', 'location_mismatch'] as const satisfies readonly ExceptionType[]

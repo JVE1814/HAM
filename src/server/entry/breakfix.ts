@@ -4,7 +4,7 @@ import { raiseReplacement } from '../platform/breakfix.ts'
 import { returnDefectiveToOem } from '../platform/oem-rma.ts'
 import { findById, str, type ForeignRecord } from '../platform/records.ts'
 
-/** Break-fix: a CSM case about a failed Asset drives a device-replace Order (P2.3, D58). */
+/** Break-fix: a CSM case about a failed Asset drives a device-replace Order (P2.3, Q58). */
 
 /**
  * Before insert/update rule on cases naming a failed Asset: take the customer and service level from it. A failed

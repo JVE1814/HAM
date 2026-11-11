@@ -9,7 +9,7 @@ import {
 } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION, NAAS_STOCKROOM_CONDITION } from '../../server/domain/fleet'
 
-/* Audits, attestations and reconciliation exceptions (P2.7, D63). */
+/* Audits, attestations and reconciliation exceptions (P2.7, Q63). */
 
 /** A check of what is physically present: a stockroom blind count or a site audit. */
 export const x_daas_ham_audit = Table({

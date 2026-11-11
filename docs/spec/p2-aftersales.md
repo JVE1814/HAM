@@ -3,7 +3,7 @@
 All of these act on fleet assets only (ADR 0016). The Provider IT's equipment shares the asset table and
 is never replaced, returned, refreshed, declared missing, charged for or disposed of here.
 
-## Break-fix (D46, D58)
+## Break-fix (Q46, Q58)
 
 - A CSM case names the **failed asset**, a fleet asset (the field offers fleet assets only). The case
   takes the Agreement's replacement service level and the Asset's Customer. A failed asset outside the
@@ -65,7 +65,7 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   When the unit is retired but the RMA's save is refused, the user is told the serial and why, and
   presses the action again once that is fixed: only the RMA is marked then.
 
-## Returns (D60)
+## Returns (Q60)
 
 | Trigger | Raised by |
 |---|---|
@@ -175,7 +175,7 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   it is still not recorded. Two scans of one unit, and overlapping overdue runs, already take turns
   under the unit's receive lock. A fee the platform refuses is logged.
 
-## Refresh (D48)
+## Refresh (Q48)
 
 - Daily, fully automatic. It covers in-service fleet assets of an Agreement with a refresh due date
   within `x_daas_ham.refresh.horizon_days` that are not already on an open replacing line, grouped
@@ -198,7 +198,7 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   logs an error naming that Order, to check its Assets are on no other open Order.
 - Shipping opens a **normal** change for the Customer's approval inside the maintenance window.
 
-## Disposal (D61)
+## Disposal (Q61)
 
 - A **Disposal order** has a method, lines and optional per-line method overrides.
   - **Submit for approval** asks the provider-side approvers (asset managers), plus the order's

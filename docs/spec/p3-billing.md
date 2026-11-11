@@ -1,4 +1,4 @@
-# Billing periods and export (P3.25, D52, D66)
+# Billing periods and export (plan §13 Billing export, Q52, Q66)
 
 ## What is billed
 
@@ -107,7 +107,7 @@
     "amount": 1234.56 }`, counted and summed from the period's lines (there is no single total: two
     currencies are never added).
 
-# Margin and TCO (P3.28, D72)
+# Margin and TCO (plan §13 Margin / TCO, Q72)
 
 Closing a period (or **Recompute margin** on a closed one) rebuilds its **Cost facts** and
 **Margin**, one row per Customer, Site and currency (Site blank for customer-level amounts such as

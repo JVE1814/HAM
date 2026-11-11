@@ -1,7 +1,7 @@
 import { fleetStagesQuery } from './fleet.ts'
 import { DEPLOYED_STAGES } from './lifecycle.ts'
 
-/** What the customer self-service page lists (P2.9, D49). */
+/** What the customer self-service page lists (P2.9, Q49). */
 
 /**
  * The equipment the customer page lists, as an encoded alm_hardware query: the fleet assets (ADR 0016) shipped to a

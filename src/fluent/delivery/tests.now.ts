@@ -4,7 +4,7 @@ import { SHIPMENT_DIRECTION, SHIPMENT_STATUS } from '../../server/domain/vocabul
 
 /*
  * ATF: the shipping aggregator's tracking webhook, POST /api/x_daas_ham/naas/shipping/tracking (entry/shipping
- * `postTrackingUpdate`, P3.26, ADR 0012; suite "NaaS - P3"). The route runs unauthenticated, so ATF's inbound REST step
+ * `postTrackingUpdate`, plan §13 Shipping aggregator, ADR 0012; suite "NaaS - P3"). The route runs unauthenticated, so ATF's inbound REST step
  * sends it without signing in, as the aggregator does: without the X-NaaS-Webhook-Token header it is refused. The
  * delivery is then sent to the route's handler in-process with the token (a REST step cannot carry the secret): a
  * configured token is read and used as it is; with none configured (webhooks refused) the script sets a random one for

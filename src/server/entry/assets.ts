@@ -70,7 +70,7 @@ export function onAllocatedAssetStageChange(current: ForeignRecord, previous: Fo
 
 /**
  * After-update rule on alm_hardware stage changes: billing (the Service interval) starts when an Asset
- * enters service and stops when it leaves, on the day billingChange gives (D52, ADR 0009).
+ * enters service and stops when it leaves, on the day billingChange gives (Q52, ADR 0009).
  */
 export function onAssetServiceChange(current: ForeignRecord, previous: ForeignRecord): void {
     const change = billingChange(readStage(previous), readStage(current), {

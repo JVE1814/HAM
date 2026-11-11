@@ -4,7 +4,7 @@ import { grantsCustomerRecord } from '../../server/entry/visibility'
 import { admin, customerRoles, providerStaff, stockroomWorkers } from '../shared/roles.now'
 
 /*
- * Access controls for shipping (P3.26). Customer admins see their own Customer's shipments, site contacts those of
+ * Access controls for shipping (plan §13 Shipping aggregator). Customer admins see their own Customer's shipments, site contacts those of
  * their Sites (entry/visibility `grantsCustomerRecord`, the check of every customer ACL).
  */
 
