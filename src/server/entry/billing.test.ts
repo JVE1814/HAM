@@ -90,6 +90,31 @@ describe('a period whose month is changed after it was generated', () => {
     })
 })
 
+describe('two months generating at once', () => {
+    it('bill each open fee on one of them only', () => {
+        platform.tables[FEE]?.push({ ...fee('fee1'), sys_id: 'fee2', asset: 'a2' })
+        let overlapped = false
+        platform.onSave = (table, row, operation) => {
+            if (overlapped || table !== LINE || operation !== 'insert' || row.kind !== 'fee') return
+            overlapped = true
+            // October generates while September is adding its first fee line.
+            generate('2026-10')
+        }
+        generate('2026-09')
+
+        const feeLines = rows(LINE).filter((line) => line.kind === 'fee')
+        expect(feeLines.map((line) => line.fee_event).sort()).toEqual(['fee1', 'fee2'])
+        for (const billed of feeLines) expect(fee(billed.fee_event ?? '')?.billing_period).toBe(billed.billing_period)
+        expect(fee('fee1')?.billing_period).toBe(periodRow('2026-09')?.sys_id)
+        expect(periodRow('2026-10')).toMatchObject({ failed_lines: '1', last_error: 'fee1: another run held its lock through every try' })
+
+        expect(regeneratePeriod(period('2026-10'))).toEqual({ done: true })
+        drainGeneration()
+        expect(linesOf('2026-10').map((line) => line.fee_event ?? '')).toEqual(['', 'fee2'])
+        expect(closePeriod(period('2026-10'))).toEqual({ done: true })
+    })
+})
+
 describe('a fee whose date is moved past its period during review', () => {
     it('leaves the period at its Regenerate, open for the month it now falls in', () => {
         generate('2026-09')

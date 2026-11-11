@@ -34,6 +34,9 @@
 - Open **Fee events** up to the month end (lost, damaged, late return) are added once, each as its
   own line. A fee a *Regenerate* no longer bills (its date moved past the month end, or it fails
   to bill) leaves the period, so *Close period* does not mark it billed and a later month bills it.
+  A fee is billed under its job lock (ADR 0013), only while it is open and on no other period, so
+  two periods generating at once never both bill it. One whose lock another run holds through 5
+  tries fails to bill, unless another period has it by then.
 - Amounts are rounded to the cent per billing line, half away from zero, in whole numbers: a monthly
   rate is taken to four decimals, so a charge of exactly half a cent (0.29 a month for 14 of 28 days)
   is 0.15, not the 0.14 binary fractions would give.

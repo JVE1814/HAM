@@ -25,7 +25,8 @@ const AGREEMENT_FEE: Record<FeeType, string> = { lost: 'lost_asset_fee', damaged
  * scans of one unit already take turns under its receive lock, platform/receiving). A unique index on the fee's
  * identity would also refuse a fee charged after a waived one, so the check and the insert are made under a lock on the
  * fee, re-checking there (as platform/exceptions `openException`). A run that finds the lock held through every try (a
- * holder keeps it for one check and one insert) leaves the fee to the holder, which is charging it. A fee that is
+ * holder keeps it for one check and one insert, or a generation billing the fee for a read, an insert and a save)
+ * leaves the fee to the holder, which is charging it unless it is billing one charged already. A fee that is
  * refused, that the holder has still not charged when this run gives up, or whose lock cannot be taken is logged, not
  * thrown.
  */
@@ -98,8 +99,38 @@ export function billableFees(periodId: string, lastDay: string): GlideRecord {
     return fee
 }
 
+/** What became of a fee a Billing period's generation found billable: billed on it, left to another period, or failed. */
+export type FeeBilling = 'billed' | 'left' | { failed: string }
+
+/**
+ * Bill a fee `billableFees` found on the period `periodId`: `addLine` adds its billing line (what it throws escapes),
+ * and the fee is put on the period. Two generations at once (one month generating as another is regenerated) both find
+ * an unlinked fee billable, so the fee is read afresh and billed under its lock, as it is charged: only while it is
+ * still open and on no other period, else it is left. A fee whose lock is held through every try (a holder keeps it
+ * for one read, one insert and one save) is left when another period has it by then, else it fails.
+ */
+export function billOnPeriod(fee: GlideRecord, periodId: string, addLine: (fee: GlideRecord) => void): FeeBilling {
+    const identity: FeeIdentity = { type: str(fee, 'fee_type') as FeeType, assetId: str(fee, 'asset'), returnOrderId: str(fee, 'return_order') }
+    const attempt = attemptLock(LOCK.fee(identity), (): FeeBilling => {
+        const current = findById(FEE, fee.getUniqueValue())
+        if (!current || !billableOn(current, periodId)) return 'left'
+        addLine(current)
+        const unlinked = putOnPeriod(current, periodId)
+        return unlinked ? { failed: `fee not linked to the period: ${unlinked}` } : 'billed'
+    })
+    if (attempt.ran) return attempt.value
+    const now = findById(FEE, fee.getUniqueValue())
+    if (!now || !billableOn(now, periodId)) return 'left'
+    return { failed: whyNotRun(attempt, 'another run held its lock through every try') }
+}
+
+function billableOn(fee: GlideRecord, periodId: string): boolean {
+    const on = str(fee, 'billing_period')
+    return str(fee, 'status') === FEE_STATUS.open && (!on || on === periodId)
+}
+
 /** Put a fee on the Billing period that bills it; why the platform refused ('' once saved). */
-export function putOnPeriod(fee: GlideRecord, periodId: string): string {
+function putOnPeriod(fee: GlideRecord, periodId: string): string {
     fee.setValue('billing_period', periodId)
     return fee.update() ? '' : refusal(fee)
 }

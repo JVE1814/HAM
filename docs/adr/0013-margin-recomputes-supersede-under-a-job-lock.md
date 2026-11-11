@@ -155,6 +155,12 @@ again, and one whose devices all await a return already raises nothing either. S
 raises one Return order, with one de-install work order and change. Under it, the Return order is
 raised and each unit put on it under its `return_asset_` lock, so `return_request` comes just before
 `return_asset`. Neither is taken under `reserve_asset`, nor takes it, so both come after it.
+A fee is charged under `fee_<type>_<Asset sys_id>_<Return order sys_id>`, and a billing generation
+bills it under the same lock: it reads the fee afresh there and adds its line and links it only
+while it is open and on no other period, so a month generating beside a *Regenerate* of another
+never bills one fee on both. The generation holds no other lock when it takes it, tries 5 times
+back to back, and counts a fee held through them as failed unless another period has it by then.
+Nothing is taken under it.
 
 An audit's scans and *Close audit* take turns under `audit_<audit sys_id>`, each holding no other
 lock when it takes it, so a scan lands wholly before the close reads the lines, or finds the audit

@@ -31,7 +31,7 @@ import { agreementCurrencyOf, customerCurrencies } from './agreements.ts'
 import { inCurrentPass, queuePass, runEventTableJob, type EventJobResult } from './chunked.ts'
 import { glideToMs, nowGlide, nowMs } from './clock.ts'
 import { EVENT, queueJob, type JobEvent } from './events.ts'
-import { billableFees, markBilled, putOnPeriod, takeOffPeriod, visitOpenFees, visitWaivedFees } from './fees.ts'
+import { billableFees, billOnPeriod, markBilled, takeOffPeriod, visitOpenFees, visitWaivedFees, type FeeBilling } from './fees.ts'
 import { findJobCursor, retirePass } from './job-cursor.ts'
 import { deleteWhere, exists, findById, noneLeft, num, refusal, str, throwRefused } from './records.ts'
 import { BILLING_PERIOD_STATUS, type BillingLineKind, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
@@ -287,34 +287,33 @@ function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
     let lastError = ''
     const currencies = memoized(customerCurrencies)
     while (fee.next()) {
+        let billing: FeeBilling
         try {
-            const customer = str(fee, 'customer')
-            // Its Agreement's currency (the fee's own Currency field is not used): a fee without one fails to bill.
-            const currency = currencyOrThrow(chooseCurrency(agreementCurrencyOf(fee, 'agreement'), () => currencies(customer)))
-            insertLine(period, {
-                kind: LINE_KIND.fee,
-                customer,
-                agreement: str(fee, 'agreement'),
-                fee_event: fee.getUniqueValue(),
-                description: feeLabel(fee),
-                units: 1,
-                amount: num(fee, 'amount'),
-                currency,
+            billing = billOnPeriod(fee, period.getUniqueValue(), (claimed) => {
+                const customer = str(claimed, 'customer')
+                // Its Agreement's currency (the fee's own Currency field is not used): a fee without one fails to bill.
+                const currency = currencyOrThrow(chooseCurrency(agreementCurrencyOf(claimed, 'agreement'), () => currencies(customer)))
+                insertLine(period, {
+                    kind: LINE_KIND.fee,
+                    customer,
+                    agreement: str(claimed, 'agreement'),
+                    fee_event: claimed.getUniqueValue(),
+                    description: feeLabel(claimed),
+                    units: 1,
+                    amount: num(claimed, 'amount'),
+                    currency,
+                })
             })
         } catch (error) {
             // The fee stays open without a period, so a regeneration bills it.
-            failed++
-            lastError = `${fee.getUniqueValue()}: ${messageOf(error)}`
-            continue
+            billing = { failed: messageOf(error) }
         }
-        const unlinked = putOnPeriod(fee, period.getUniqueValue())
-        if (!unlinked) {
-            billed.add(fee.getUniqueValue())
-            continue
-        }
-        // Unlinked, Close would not mark it billed and a later month would bill it again: Regenerate links it.
+        if (billing === 'billed') billed.add(fee.getUniqueValue())
+        if (typeof billing === 'string') continue
+        // Counted, so Close refuses: one unlinked after its line was added would not be marked billed, and a later
+        // month would bill it again. Regenerate bills and links it.
         failed++
-        lastError = `${fee.getUniqueValue()}: fee not linked to the period: ${unlinked}`
+        lastError = `${fee.getUniqueValue()}: ${billing.failed}`
     }
     // A fee an earlier pass linked that this one did not bill (its date moved past the month, it failed): Close would
     // mark it billed with no line, and no later month bills a fee linked here.

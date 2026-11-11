@@ -62,7 +62,7 @@ export const LOCK = {
     returnRequest: (customerId: string) => named(`return_request_${customerId}`),
     /** An Asset is put on a Return order under it: the check that it awaits no other return, and the insert of its line. */
     returnAsset: (assetId: string) => named(`return_asset_${assetId}`),
-    /** A fee is checked and charged under it: one per fee identity. */
+    /** A fee is checked and charged, and billed on a period, under it: one per fee identity. */
     fee: (fee: FeeIdentity) => named(`fee_${fee.type}_${fee.assetId}_${fee.returnOrderId}`),
     /**
      * An audit's scans and its close take turns under it, so a scan lands wholly before the close reads the lines, or
