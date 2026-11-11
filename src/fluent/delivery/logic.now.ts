@@ -4,7 +4,7 @@ import { explainWorkWindowRefusal, uiConfirmInstalled, uiShipOrder } from '../..
 import { completeInstallOfWork } from '../../server/platform/delivery'
 import { INSTALL_MODE, ORDER_STAGE, RETURN_METHOD, SHIPMENT_DIRECTION, SHIPMENT_STATUS, STAGE_FIELDS, TASK_STATE } from '../../server/domain/vocabulary'
 import { PLATFORM_ROLE } from '../../server/domain/roles'
-import { REST_MESSAGE } from '../../server/domain/rest-message-names'
+import { SHIPPING_MESSAGE } from '../../server/domain/shipping'
 import { retryTrackingUpdate, uiCreateReturnLabel, uiMarkLabelVoided } from '../../server/entry/shipping'
 import { PROPERTY } from '../../server/domain/properties'
 import { EVENT } from '../../server/domain/events'
@@ -94,7 +94,7 @@ BusinessRule({
 
 RestMessage({
     $id: Now.ID['rm_shipping'],
-    name: REST_MESSAGE.shipping.name,
+    name: SHIPPING_MESSAGE.name,
     endpoint: 'https://api.shipengine.com/v1',
     description: 'Buys carrier labels (one call: shipment + label + tracking number).',
     headers: [
@@ -103,7 +103,7 @@ RestMessage({
     ],
     functions: [
         {
-            name: REST_MESSAGE.shipping.fn.createLabel,
+            name: SHIPPING_MESSAGE.fn.createLabel,
             httpMethod: 'POST',
             endpoint: 'https://api.shipengine.com/v1/labels',
             headers: [{ $id: Now.ID['rm_shipping_key_header'], name: 'API-Key', value: '${api_key}' }],

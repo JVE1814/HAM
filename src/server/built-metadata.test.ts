@@ -17,7 +17,7 @@ import { LOCK_NAME_LENGTH } from './domain/lock-names'
 import { claimRoutes, CLAIM_VENDORS, OEM_ADAPTERS } from './domain/oem/adapters'
 import { REST_MESSAGE } from './domain/rest-message-names'
 import { RMA_AT_OEM } from './domain/oem-rma'
-import { buyLabel, labelVoidable } from './domain/shipping'
+import { buyLabel, labelVoidable, SHIPPING_MESSAGE } from './domain/shipping'
 import { SCOPED_TABLES, type TableScoping } from './domain/visibility'
 import {
     BROAD_STAFF,
@@ -1164,8 +1164,9 @@ describe('system properties', () => {
 })
 
 /*
- * domain/rest-message-names REST_MESSAGE is the one list of the app's REST messages and their functions. An adapter
- * that calls a function its message does not have gets no answer from RESTMessageV2, on the instance only.
+ * domain/rest-message-names REST_MESSAGE and domain/shipping SHIPPING_MESSAGE list the app's REST messages and their
+ * functions. An adapter that calls a function its message does not have gets no answer from RESTMessageV2, on the
+ * instance only.
  */
 describe('REST messages', () => {
     it('are built with the names and the functions the adapters call them by', () => {
@@ -1177,7 +1178,7 @@ describe('REST messages', () => {
                 .map((fn) => fn.function_name ?? '')
                 .sort(),
         }))
-        const named = Object.values(REST_MESSAGE)
+        const named = [...Object.values(REST_MESSAGE), SHIPPING_MESSAGE]
             .map((message) => ({ name: message.name as string, functions: (Object.values(message.fn) as string[]).sort() }))
             .sort((a, b) => a.name.localeCompare(b.name))
         expect(built).toEqual(named)
@@ -1232,7 +1233,7 @@ describe('REST messages', () => {
             for (const route of Object.values(claimRoutes(vendor))) route.run([target], restMessagePort(route.message), 10)
         }
         const address = { name: 'Depot', phone: '+31 20 000 0000', line1: 'Street 1', city: 'Amsterdam', postalCode: '1000 AA', country: 'NL' }
-        buyLabel(restMessagePort(REST_MESSAGE.shipping.name), { carrierId: 'se-1', serviceCode: 'standard', from: address, to: address, packages: 1, weightKg: 1, reference: 'R' })
+        buyLabel(restMessagePort(SHIPPING_MESSAGE.name), { carrierId: 'se-1', serviceCode: 'standard', from: address, to: address, packages: 1, weightKg: 1, reference: 'R' })
         return [...sentToRest.calls]
     }
 

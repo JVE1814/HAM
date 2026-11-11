@@ -1,8 +1,8 @@
 /**
- * The REST messages of the app and the functions each has, by name: the one list of them. The Fluent RestMessage
- * records take their name and their functions' names from here, the adapters call a function by its entry
- * (domain/oem, domain/shipping) and the transport picks the message by its (platform/oem-http, platform/rest-messages),
- * so a function an adapter calls is one its message has.
+ * The OEM REST messages and the functions each has, by name: the one list of them. The Fluent RestMessage records take
+ * their name and their functions' names from here, the adapters (domain/oem) call a function by its entry and the
+ * transport picks the message by its (platform/oem-http, platform/rest-messages), so a function an adapter calls is
+ * one its message has.
  */
 export const REST_MESSAGE = {
     ciscoSupport: {
@@ -33,10 +33,6 @@ export const REST_MESSAGE = {
         name: 'NaaS Check Point Zero Touch',
         fn: { login: 'login', claimGateway: 'claim_gateway', logout: 'logout' },
     },
-    shipping: {
-        name: 'NaaS Shipping aggregator',
-        fn: { createLabel: 'create_label' },
-    },
 } as const
 
-export type RestMessageName = (typeof REST_MESSAGE)[keyof typeof REST_MESSAGE]['name']
+export type OemMessageName = (typeof REST_MESSAGE)[keyof typeof REST_MESSAGE]['name']

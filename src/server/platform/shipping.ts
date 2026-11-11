@@ -12,6 +12,7 @@ import {
     OPEN_SHIPMENTS,
     parseTrackingRetry,
     returnLabelRefusal,
+    SHIPPING_MESSAGE,
     statusOvertaken,
     trackingEventKey,
     trackingRetryParams,
@@ -32,7 +33,6 @@ import { stagingStockroom } from './staging-tasks.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { count, findById, refusal, str, warnRefused } from './records.ts'
 import { restMessagePort } from './rest-messages.ts'
-import { REST_MESSAGE } from '../domain/rest-message-names.ts'
 import { log } from './log.ts'
 
 /**
@@ -48,7 +48,7 @@ export function shippingEnabled(): boolean {
 }
 
 function aggregator() {
-    return restMessagePort(REST_MESSAGE.shipping.name)
+    return restMessagePort(SHIPPING_MESSAGE.name)
 }
 
 /** A cmn_location as a carrier address for `contact` (a name and phone; the location's phone first). */
