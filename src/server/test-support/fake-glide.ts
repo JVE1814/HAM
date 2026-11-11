@@ -409,13 +409,16 @@ class GlideAggregate extends Conditions {
     }
     query(): void {
         const found = new Map<string, { key: Row; rows: Row[] }>()
-        // Without a group-by the platform gives one row, also for no match.
-        if (this.groups.length === 0) found.set('', { key: {}, rows: [] })
-        for (const row of this.matching()) {
-            const key = Object.fromEntries(this.groups.map((field) => [field, walk(this.table, row, field)]))
+        const groupOf = (key: Row): Row[] => {
             const id = JSON.stringify(key)
-            if (!found.has(id)) found.set(id, { key, rows: [] })
-            found.get(id)?.rows.push(row)
+            let group = found.get(id)
+            if (!group) found.set(id, (group = { key, rows: [] }))
+            return group.rows
+        }
+        // Without a group-by the platform gives one row, also for no match.
+        if (this.groups.length === 0) groupOf({})
+        for (const row of this.matching()) {
+            groupOf(Object.fromEntries(this.groups.map((field) => [field, walk(this.table, row, field)]))).push(row)
         }
         this.found = [...found.values()]
         this.at = -1
