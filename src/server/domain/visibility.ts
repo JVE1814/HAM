@@ -277,9 +277,9 @@ export interface ScopedRow {
     /** The value of a field its table's scoping names, or tells its NaaS records by ('' for blank). */
     valueOf(field: string): string
     /**
-     * Whether the record that holds the fields could not be read (an Asset's hardware record, entry/visibility
-     * `hardwareOf`): every field is then blank, and it is not taken for a record outside NaaS. Omitted when the fields
-     * are the row's own.
+     * Whether a record that holds the fields could not be read (an Asset's hardware record, entry/visibility
+     * `hardwareOf`; a Stockroom a transfer order names, `transferOrderRow`): its fields are then blank, and the row is
+     * not taken for a record outside NaaS. Omitted when the fields are the row's own.
      */
     missing?(): boolean
 }

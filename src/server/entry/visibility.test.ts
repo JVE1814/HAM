@@ -169,6 +169,18 @@ describe('readsRecord', () => {
         expect(readsRecord(unsavedWithId)).toBe(true)
     })
 
+    it("reads a transfer order's Stockrooms past the rules, and refuses one whose Stockroom is not found", () => {
+        signIn('tech')
+        const order = (from: string, to: string) => record('alm_transfer_order', { from_stockroom: from, to_stockroom: to })
+        platform.tables.alm_stockroom.push({ sys_id: 'it1', x_daas_ham_stockroom_type: '' }, { sys_id: 'it2', x_daas_ham_stockroom_type: '' })
+        expect(readsRecord(order('it1', 'it2'))).toBe(true)
+        expect(readsRecord(order('it1', ''))).toBe(true)
+        expect(readsRecord(order('sr9', 'it1'))).toBe(false)
+        // Stockrooms the reader's own rule would hide from a dot-walk, which then reads a blank type.
+        expect(readsRecord(order('sr8', 'sr7'))).toBe(false)
+        expect(readsRecord(order('sr8', 'sr1'))).toBe(true)
+    })
+
     it('checks hardware on alm_asset, where its ACL sits: on the alm_hardware record, which an alm_asset row does not carry', () => {
         platform.tables.alm_hardware = [
             { sys_id: 'mine', sys_class_name: 'alm_hardware', x_daas_ham_fleet: '1', stockroom: 'sr1' },

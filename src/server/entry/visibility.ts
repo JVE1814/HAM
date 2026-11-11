@@ -27,6 +27,7 @@ import { currentSession } from '../platform/session.ts'
 
 const ASSET_TABLE = 'alm_asset'
 const HARDWARE = SCOPED_TABLES.alm_hardware
+const TRANSFER_ORDER = SCOPED_TABLES.alm_transfer_order
 
 /**
  * `table`, then each table it extends, nearest first (the scoped GlideTableHierarchy#getTables, documented to give an
@@ -133,6 +134,30 @@ function hardwareRow(current: GlideRecord): ScopedRow {
 }
 
 /**
+ * A transfer order, with its Stockrooms read past the app's visibility rules, as hardwareOf reads hardware: a dot-walk
+ * to a Stockroom the reader's rule hides reads a blank type, which would take the order for one outside NaaS. A
+ * Stockroom it names that is not found leaves the order missing, so it is not taken for one.
+ */
+function transferOrderRow(current: GlideRecord): ScopedRow {
+    const own = scopedRow(current)
+    const stockroomOf = memoized((column: string): GlideRecord | null => {
+        const stockroom = new GlideRecord('alm_stockroom')
+        return beyondVisibility(stockroom, () => stockroom.get(str(current, column))) ? stockroom : null
+    })
+    const named = TRANSFER_ORDER.stockroom.filter((column) => str(current, column) !== '')
+    return {
+        saved: own.saved,
+        valueOf: (field) => {
+            const [column = '', ...rest] = field.split('.')
+            if (rest.length === 0) return own.valueOf(field)
+            const stockroom = stockroomOf(column)
+            return stockroom ? str(stockroom, rest.join('.')) : ''
+        },
+        missing: () => named.some((column) => stockroomOf(column) === null),
+    }
+}
+
+/**
  * The Deny-Unless read ACLs' script (shared/visibility.now.ts, ADR 0005), on the tables the rules narrow to an
  * inventory tech's Stockrooms: a record is read only when the table's before-query rule would have kept it. A rule
  * can only append conditions, which an `^NQ` in the query binds to its last clause, so a list or a direct link can
@@ -150,7 +175,8 @@ export function readsRecord(current: GlideRecord): boolean {
     const { scoping, asset } = placementOf(table)
     if (asset) return otherAssetClass(current) || rowVisible(session.scope, HARDWARE, hardwareRow(current), session)
     if (!scoping) warnUnplaced(table)
-    return rowVisible(session.scope, scoping, scopedRow(current), session)
+    const row = scoping === TRANSFER_ORDER ? transferOrderRow(current) : scopedRow(current)
+    return rowVisible(session.scope, scoping, row, session)
 }
 
 /**
