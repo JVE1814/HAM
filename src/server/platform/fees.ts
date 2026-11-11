@@ -112,7 +112,12 @@ export function visitWaivedFees(periodId: string, visit: (fee: GlideRecord) => v
     visitInKeyOrder(FEE, `billing_period=${periodId}^status=${FEE_STATUS.waived}`, visit)
 }
 
-/** Take a waived fee off its Billing period; why the platform refused ('' once saved). */
+/** Visit each open fee on a Billing period, in sys_id order; a fee `takeOffPeriod` takes off is still visited once. */
+export function visitOpenFees(periodId: string, visit: (fee: GlideRecord) => void): void {
+    visitInKeyOrder(FEE, `billing_period=${periodId}^status=${FEE_STATUS.open}`, visit)
+}
+
+/** Take a fee off its Billing period; why the platform refused ('' once saved). */
 export function takeOffPeriod(fee: GlideRecord): string {
     // Per record: updateMultiple does not reliably clear a reference to empty.
     fee.setValue('billing_period', '')

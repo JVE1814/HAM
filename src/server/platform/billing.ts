@@ -31,7 +31,7 @@ import { agreementCurrencyOf, customerCurrencies } from './agreements.ts'
 import { inCurrentPass, queuePass, runEventTableJob, type EventJobResult } from './chunked.ts'
 import { glideToMs, nowGlide, nowMs } from './clock.ts'
 import { EVENT, queueJob, type JobEvent } from './events.ts'
-import { billableFees, markBilled, putOnPeriod, takeOffPeriod, visitWaivedFees } from './fees.ts'
+import { billableFees, markBilled, putOnPeriod, takeOffPeriod, visitOpenFees, visitWaivedFees } from './fees.ts'
 import { findJobCursor, retirePass } from './job-cursor.ts'
 import { deleteWhere, exists, findById, noneLeft, num, refusal, str, throwRefused } from './records.ts'
 import { BILLING_PERIOD_STATUS, type BillingLineKind, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
@@ -282,6 +282,7 @@ function addFailedLines(period: GlideRecord, failed: number, lastError: string):
 
 function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
     const fee = billableFees(period.getUniqueValue(), bounds.last)
+    const billed = new Set<string>()
     let failed = 0
     let lastError = ''
     const currencies = memoized(customerCurrencies)
@@ -307,11 +308,23 @@ function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
             continue
         }
         const unlinked = putOnPeriod(fee, period.getUniqueValue())
-        if (!unlinked) continue
+        if (!unlinked) {
+            billed.add(fee.getUniqueValue())
+            continue
+        }
         // Unlinked, Close would not mark it billed and a later month would bill it again: Regenerate links it.
         failed++
         lastError = `${fee.getUniqueValue()}: fee not linked to the period: ${unlinked}`
     }
+    // A fee an earlier pass linked that this one did not bill (its date moved past the month, it failed): Close would
+    // mark it billed with no line, and no later month bills a fee linked here.
+    visitOpenFees(period.getUniqueValue(), (linked) => {
+        if (billed.has(linked.getUniqueValue())) return
+        const kept = takeOffPeriod(linked)
+        if (!kept) return
+        failed++
+        lastError = `${linked.getUniqueValue()}: fee not taken off the period it is no longer billed on: ${kept}`
+    })
     if (failed > 0) addFailedLines(period, failed, lastError)
     period.setValue('generated_at', nowGlide())
     // Refused, it stays generating, which Close and Regenerate refuse: say why.
@@ -371,7 +384,7 @@ export function regeneratePeriod(period: GlideRecord): PeriodOutcome {
             `${name} not regenerated: some of its old lines could not be removed, and it could not be held for review (${why}). It stays Generating with nothing queued: an admin can Reset generation once it has shown no activity for ${RESET_AFTER_IDLE_MINUTES} minutes, then Regenerate`,
         )
     }
-    // The period's open fees stay linked to it: the generation bills them again (finishGeneration).
+    // The period's open fees stay linked to it: the generation bills them again, or takes off those it no longer bills (finishGeneration).
     const unstarted = startGeneration(period)
     if (!unstarted) return DONE
     stopGeneration(period, `generation not started: ${unstarted}`)

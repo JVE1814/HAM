@@ -86,5 +86,27 @@ describe('a period whose month is changed after it was generated', () => {
         drainGeneration()
         expect(linesOf('2026-08').map((line) => [line.kind, line.amount])).toEqual([['subscription', '154.84']])
         expect(closePeriod(period('2026-08'))).toEqual({ done: true })
+        expect(fee('fee1')).toMatchObject({ status: 'open', billing_period: '' })
+    })
+})
+
+describe('a fee whose date is moved past its period during review', () => {
+    it('leaves the period at its Regenerate, open for the month it now falls in', () => {
+        generate('2026-09')
+        const moved = recordOf<GlideRecord>(FEE, fee('fee1') ?? {})
+        moved.setValue('occurred_on', '2026-10-02')
+        moved.update()
+
+        expect(regeneratePeriod(period('2026-09'))).toEqual({ done: true })
+        drainGeneration()
+        expect(linesOf('2026-09').map((line) => line.kind)).toEqual(['subscription'])
+        expect(closePeriod(period('2026-09'))).toEqual({ done: true })
+        expect(fee('fee1')).toMatchObject({ status: 'open', billing_period: '' })
+
+        generate('2026-10')
+        expect(linesOf('2026-10').map((line) => [line.kind, line.amount])).toEqual([
+            ['subscription', '300'],
+            ['fee', '50'],
+        ])
     })
 })
