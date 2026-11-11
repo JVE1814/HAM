@@ -7,7 +7,7 @@ import { IN_SERVICE_ON_ENDED_LINE, IN_SERVICE_UNBILLED } from '../../server/doma
 import { INSTALLED_PAST_SUPPORT } from '../../server/domain/model-lifecycle'
 import { INSTALLED_WITHOUT_COVERAGE } from '../../server/domain/coverage'
 import { OPEN_EXCEPTIONS_QUERY } from '../../server/domain/reconciliation'
-import { ROLE } from '../../server/domain/visibility'
+import { ROLE } from '../../server/domain/roles'
 import { SUBSCRIPTION_LINE_STATUS } from '../../server/domain/vocabulary'
 
 /*

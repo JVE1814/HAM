@@ -1,5 +1,5 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { ROLE } from '../domain/visibility.ts'
+import { ROLE } from '../domain/roles.ts'
 import {
     completeDisposal,
     lineChangeRefusal,

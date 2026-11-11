@@ -18,7 +18,14 @@ import { CLAIM_ROUTES } from './domain/oem/claims'
 import { REST_MESSAGE } from './domain/rest-message-names'
 import { RMA_AT_OEM } from './domain/oem-rma'
 import { buyLabel, labelVoidable } from './domain/shipping'
-import { BROAD_STAFF, PLATFORM_ROLE, PROVIDER_STAFF as PROVIDER_STAFF_IN_ORDER, ROLE, SCOPED_TABLES, type TableScoping } from './domain/visibility'
+import { SCOPED_TABLES, type TableScoping } from './domain/visibility'
+import {
+    BROAD_STAFF,
+    MONEY_READERS as MONEY_READERS_IN_ORDER,
+    PLATFORM_ROLE,
+    PROVIDER_STAFF as PROVIDER_STAFF_IN_ORDER,
+    ROLE,
+} from './domain/roles'
 import {
     ORDER_STAGE_CHOICES,
     REPLACEMENT_TIER_CHOICES,
@@ -752,13 +759,13 @@ const recordAcls = (): BuiltAcl[] => builtAcls().filter((acl) => !acl.field)
 
 const isCustomerRole = (role: string) => role === ROLE.customerAdmin || role === ROLE.siteContact
 /**
- * Every provider-staff role, sorted: domain/visibility PROVIDER_STAFF, the one list shared/roles.now.ts
+ * Every provider-staff role, sorted: domain/roles PROVIDER_STAFF, the one list shared/roles.now.ts
  * `providerStaff` and the rack page (which links a device to its Asset form for these roles only) both are. The checks
  * below hold the built ACLs, audience and dashboard to it, so a role the metadata admits is one the page links for.
  */
 const PROVIDER_STAFF = [...PROVIDER_STAFF_IN_ORDER].sort()
-/** The roles that read the money tables (shared/roles.now.ts `moneyReaders`), sorted. */
-const MONEY_READERS = [ROLE.finance, ROLE.accountManager, ROLE.assetManager].sort()
+/** The roles that read the money tables (domain/roles MONEY_READERS), sorted. */
+const MONEY_READERS = [...MONEY_READERS_IN_ORDER].sort()
 
 describe('the rules and ACLs that scope what a reader sees', () => {
     const SCOPINGS: Readonly<Record<string, TableScoping>> = SCOPED_TABLES

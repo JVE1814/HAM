@@ -1,7 +1,7 @@
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { parseDeviceEvents } from '../domain/device-events.ts'
 import { PROPERTY } from '../domain/properties.ts'
-import { ROLE } from '../domain/visibility.ts'
+import { ROLE } from '../domain/roles.ts'
 import { findAssetByIdentifier } from '../platform/assets.ts'
 import { nowMs } from '../platform/clock.ts'
 import { applyDeviceEvent, detectPendingInService, purgeDeviceEventsOlderThan } from '../platform/in-service.ts'

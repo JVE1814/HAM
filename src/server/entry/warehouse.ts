@@ -1,6 +1,6 @@
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import type { StockroomList } from '../domain/rest-contracts.ts'
-import { ROLE } from '../domain/visibility.ts'
+import { ROLE } from '../domain/roles.ts'
 import { assetSummary, lookUp, pick, putAway, receive, receivingStockrooms, type Scan, type ScanRefusal } from '../platform/receiving.ts'
 import { pathParam, reply, requireRole, requireScanner, textBodyOf } from '../platform/rest-api.ts'
 

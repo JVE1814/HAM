@@ -3495,6 +3495,10 @@ declare global {
                         table: 'sys_module'
                         id: '67756814d0ef4e529e29a655dfcb2bdf'
                     }
+                    src_server_domain_roles_ts: {
+                        table: 'sys_module'
+                        id: '5d76f4509472448da10bd8339fb1f474'
+                    }
                     src_server_domain_scheduling_ts: {
                         table: 'sys_module'
                         id: '70901aff85264a03b64caaaaf627143d'
@@ -14749,6 +14753,7 @@ declare global {
                     {
                         table: 'sys_security_acl_role'
                         id: '2da9c8e695ea4d5bb1612b1cb65e6bcd'
+                        deleted: false
                         key: {
                             sys_security_acl: '814550fe3b9a4c99b2b78b41917be24d'
                             sys_user_role: {
@@ -30735,6 +30740,7 @@ declare global {
                     {
                         table: 'sys_security_acl_role'
                         id: '765c9c85dfab4eff8c1487a03e94ead8'
+                        deleted: false
                         key: {
                             sys_security_acl: '814550fe3b9a4c99b2b78b41917be24d'
                             sys_user_role: {
@@ -36804,6 +36810,7 @@ declare global {
                     {
                         table: 'sys_security_acl_role'
                         id: '92b68e623e9b44ec9b033aa8bce7c1dd'
+                        deleted: false
                         key: {
                             sys_security_acl: '814550fe3b9a4c99b2b78b41917be24d'
                             sys_user_role: {
@@ -36891,6 +36898,7 @@ declare global {
                     {
                         table: 'sys_security_acl_role'
                         id: '9335508a85fc40b0b20f5b6986a2f923'
+                        deleted: false
                         key: {
                             sys_security_acl: '814550fe3b9a4c99b2b78b41917be24d'
                             sys_user_role: {
@@ -37592,6 +37600,7 @@ declare global {
                     {
                         table: 'sys_security_acl_role'
                         id: '95c3060b4ece4d6b996723f700bbffc6'
+                        deleted: false
                         key: {
                             sys_security_acl: '814550fe3b9a4c99b2b78b41917be24d'
                             sys_user_role: {
@@ -48908,6 +48917,7 @@ declare global {
                     {
                         table: 'sys_security_acl_role'
                         id: 'ca793fa9faa94e448d9dc21e2b1e4847'
+                        deleted: false
                         key: {
                             sys_security_acl: '814550fe3b9a4c99b2b78b41917be24d'
                             sys_user_role: {
@@ -54006,6 +54016,7 @@ declare global {
                     {
                         table: 'sys_security_acl_role'
                         id: 'e435d14df885412d94d5a073d1ace7bf'
+                        deleted: false
                         key: {
                             sys_security_acl: '814550fe3b9a4c99b2b78b41917be24d'
                             sys_user_role: {
@@ -57723,6 +57734,7 @@ declare global {
                     {
                         table: 'sys_security_acl_role'
                         id: 'f8ba82bbe261418d8eb23855be18f6bc'
+                        deleted: false
                         key: {
                             sys_security_acl: '814550fe3b9a4c99b2b78b41917be24d'
                             sys_user_role: {

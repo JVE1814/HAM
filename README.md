@@ -341,8 +341,9 @@ Conventions that the build or tests enforce:
   holds to it; a UI action condition that restates a server rule is run as built against every value
   (`built-metadata.test.ts`).
 - The names the metadata and the server code must agree on each have one list, which both import:
-  role names and the platform roles the app needs (`domain/visibility.ts` `ROLE`, `PLATFORM_ROLE`;
-  the role groups are in `fluent/shared/roles.now.ts`), events (`domain/events.ts` `EVENT`),
+  role names, the platform roles the app needs and the role groups the server code or a page also
+  names (`domain/roles.ts`; `fluent/shared/roles.now.ts` names every group the metadata uses),
+  events (`domain/events.ts` `EVENT`),
   system properties with their shipped values (`domain/properties.ts` `PROPERTY`: a reader takes
   the entry and falls back to that value) and REST messages with their functions
   (`domain/rest-message-names.ts` `REST_MESSAGE`). `built-metadata.test.ts` holds what was built to

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { recordMatches as matches } from '../test-support/encoded-query'
 import { naasStockroomCondition, outsideNaasStockroomCondition } from './fleet'
+import { EQUIPMENT_HANDLERS, ROLE } from './roles'
 import {
     actsAsCustomerAdmin,
-    ASSET_EDITOR_ROLES,
     contactScope,
     deletesFleetAsset,
     grantsContactRecord,
@@ -13,7 +13,6 @@ import {
     outsideNaasConditions,
     readsFleetProviderField,
     resolveVisibility,
-    ROLE,
     rowVisible,
     SCOPED_TABLES,
     scopingOf,
@@ -451,7 +450,7 @@ describe('changes to hardware by hand', () => {
     })
 
     it('let an asset editor save a fleet asset their scope keeps: an inventory tech only in their stockrooms', () => {
-        expect(ASSET_EDITOR_ROLES).toEqual([ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech])
+        expect(EQUIPMENT_HANDLERS).toEqual([ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech])
         expect(writesFleetAsset('everything', holding(ROLE.fieldTech), fleet({ stockroom: 'sr9' }), ids)).toBe(true)
         expect(writesFleetAsset('assigned_stockrooms', holding(ROLE.inventoryTech), fleet({ stockroom: 'sr1' }), ids)).toBe(true)
         expect(writesFleetAsset('assigned_stockrooms', holding(ROLE.inventoryTech), fleet({ stockroom: 'sr9' }), ids)).toBe(false)

@@ -1,10 +1,10 @@
 import '@servicenow/sdk/global'
 import { Role } from '@servicenow/sdk/core'
-import { BROAD_STAFF, PLATFORM_ROLE, PROVIDER_STAFF, ROLE } from '../../server/domain/visibility'
+import { BROAD_STAFF, EQUIPMENT_HANDLERS, MONEY_READERS, PLATFORM_ROLE, PROVIDER_STAFF, ROLE } from '../../server/domain/roles'
 
 /*
  * The base-platform roles contained below must exist on the instance, as must the service desk's, which the ACLs grant
- * directly (`serviceDesk`): domain/visibility PLATFORM_ROLE; see README "Required plugins".
+ * directly (`serviceDesk`): domain/roles PLATFORM_ROLE; see README "Required plugins".
  */
 
 export const inventoryTech = Role({
@@ -106,7 +106,7 @@ export const orderWorkers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, R
 export const stockroomWorkers = [ROLE.inventoryTech, ROLE.assetManager]
 
 /** Who scans equipment: the warehouse page, and Audits with their lines. */
-export const scanners = [ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech]
+export const scanners = EQUIPMENT_HANDLERS
 
 /** Who sends equipment back: opens OEM RMAs and Return lines, buys and voids labels. */
 export const returnWorkers = [ROLE.assetManager, ROLE.inventoryTech, ROLE.noc]
@@ -115,7 +115,7 @@ export const returnWorkers = [ROLE.assetManager, ROLE.inventoryTech, ROLE.noc]
 export const leaseEditors = [ROLE.assetManager, ROLE.finance]
 
 /** Roles that read the money tables (service intervals, billing, cost facts and margin), the NaaS dashboard's Margin tab among them. */
-export const moneyReaders = [ROLE.finance, ROLE.accountManager, ROLE.assetManager]
+export const moneyReaders = MONEY_READERS
 
 /** Every person the app serves, provider staff and Customer contacts: the rack elevations are open to them all. */
 export const staffAndCustomers = [

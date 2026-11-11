@@ -1,6 +1,6 @@
 import { gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { ROLE } from '../domain/visibility.ts'
+import { EQUIPMENT_HANDLERS } from '../domain/roles.ts'
 
 /** Helpers for the Scripted REST resources in entry/. */
 
@@ -19,9 +19,9 @@ export function requireRole(response: RESTAPIResponse, roles: readonly string[],
     return false
 }
 
-/** The guard of the resources a scan reads or records against (look a unit up, scan into an audit): inventory techs and field techs. */
+/** The guard of the resources a scan reads or records against (look a unit up, scan into an audit). */
 export function requireScanner(response: RESTAPIResponse): boolean {
-    return requireRole(response, [ROLE.inventoryTech, ROLE.fieldTech], 'Requires the inventory tech or field tech role')
+    return requireRole(response, EQUIPMENT_HANDLERS, 'Requires the inventory tech or field tech role')
 }
 
 /** The JSON object a request was sent with ({} when it carries none), its values as the client sent them. */

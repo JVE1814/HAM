@@ -1,4 +1,4 @@
-import { PLATFORM_ROLE } from './visibility.ts'
+import { PLATFORM_ROLE } from './roles.ts'
 
 /** Install prerequisites that Fluent cannot declare as plugin dependencies (README "Required plugins"). */
 

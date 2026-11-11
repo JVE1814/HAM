@@ -1,5 +1,6 @@
 import { gs } from '@servicenow/glide'
 import { billingChange, stageChangeRefusal, voidsWipeEvidence } from '../domain/lifecycle.ts'
+import { ROLE } from '../domain/roles.ts'
 import { clearWipeEvidence, readStage, transitionFacts } from '../platform/assets.ts'
 import { glideToIsoDate, todayIso } from '../platform/clock.ts'
 import { onLineAssetMoved } from '../platform/fulfilment.ts'
@@ -7,7 +8,6 @@ import { str, type ForeignRecord } from '../platform/records.ts'
 import { closeServiceIntervals, openServiceInterval } from '../platform/service-intervals.ts'
 import { putBackUntransferred } from '../platform/sourcing.ts'
 import { fellShortOfStagingCentre, onTransferOrderLine, takeBackStageAfterTransfer } from '../platform/transfers.ts'
-import { ROLE } from '../domain/visibility.ts'
 
 /**
  * Why a save that changes the stage breaks the lifecycle (domain/lifecycle `stageChangeRefusal`), or null when it may

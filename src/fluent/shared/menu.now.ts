@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { ApplicationMenu, Record } from '@servicenow/sdk/core'
-import { ROLE } from '../../server/domain/visibility'
+import { ROLE } from '../../server/domain/roles'
 import { broadStaff, providerStaff, stockroomWorkers } from './roles.now'
 import { WORKSPACE_HOME } from '../workspace/workspace.now'
 

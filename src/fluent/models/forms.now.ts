@@ -2,7 +2,7 @@ import '@servicenow/sdk/global'
 import { default_view, Form, List, Record } from '@servicenow/sdk/core'
 import { NAAS_MODEL_MILESTONES } from '../../server/domain/fleet'
 import { OPEN_NORM_EXCEPTIONS_QUERY } from '../../server/domain/normalization'
-import { ROLE } from '../../server/domain/visibility'
+import { ROLE } from '../../server/domain/roles'
 import { broadStaff } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 

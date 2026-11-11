@@ -98,7 +98,7 @@ hold, passes its write and delete ACLs on `alm_asset` for every Asset (and `snc_
 tech could change a fleet asset's company, Agreement, subscription line, lease or cost, or delete it, from a form, a
 list (an `alm_asset` list too) or the Table API. Deny-Unless ACLs on `alm_asset` (`fleet/access.now.ts`),
 applying to hardware and beside the platform's Allow-If ACLs of the same name, keep a fleet asset's saves to the asset
-editors (`assetEditors`, `domain/visibility` `ASSET_EDITOR_ROLES`) whose scope keeps it, its deletion to app
+editors (`domain/roles` `EQUIPMENT_HANDLERS`) whose scope keeps it, its deletion to app
 administrators (a fleet asset leaves by disposal, ADR 0016), and its company and cost to asset managers; every other
 Asset passes, left to the platform. The app's own columns on hardware have Allow-If field ACLs of their own: the
 Agreement, subscription line, lease and Legal owner are changed by hand by asset managers, the Fleet flag by

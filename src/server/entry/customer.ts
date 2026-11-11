@@ -8,7 +8,8 @@ import type {
     InstallConfirmation,
     ReturnRequestReceipt,
 } from '../domain/rest-contracts.ts'
-import { actsAsCustomerAdmin, ROLE } from '../domain/visibility.ts'
+import { actsAsCustomerAdmin } from '../domain/visibility.ts'
+import { CUSTOMER_PAGE_USERS } from '../domain/roles.ts'
 import {
     completeAttestation,
     findUnclosedAttestation,
@@ -43,7 +44,7 @@ function isCustomerAdmin(): boolean {
 }
 
 function allowed(response: RESTAPIResponse): boolean {
-    return requireRole(response, [ROLE.customerAdmin, ROLE.siteContact, ROLE.assetManager], 'Requires a customer admin or site contact role')
+    return requireRole(response, CUSTOMER_PAGE_USERS, 'Requires a customer admin or site contact role')
 }
 
 export function customerOverview(request: RESTAPIRequest, response: RESTAPIResponse): void {

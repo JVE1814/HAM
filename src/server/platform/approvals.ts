@@ -8,7 +8,7 @@ import {
     type ApprovalState,
 } from '../domain/approvals.ts'
 import type { Approver } from '../domain/approvals.ts'
-import { ROLE } from '../domain/visibility.ts'
+import { ROLE } from '../domain/roles.ts'
 import { exists, pluck, str, warnRefused } from './records.ts'
 
 /**
