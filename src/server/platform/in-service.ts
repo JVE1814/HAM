@@ -5,7 +5,7 @@ import { decideInService, seenSourceOf } from '../domain/in-service.ts'
 import { LONG_HOLD_LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import type { OrderType, SeenSource } from '../domain/vocabulary.ts'
-import { moveAndSave, readStage } from './assets.ts'
+import { findAssetByIdentifier, moveAndSave, readStage } from './assets.ts'
 import { runTableJob } from './chunked.ts'
 import { daysAgoGlide, glideToMs, msToGlide } from './clock.ts'
 import { applyLifecycleDates, lifecycleReaders, type LifecycleReaders } from './lifecycle-dates.ts'
@@ -85,13 +85,30 @@ function underSeenLock(assetId: string, see: (lock: HeldLock, asset: GlideRecord
  * stored, so one refused would be lost once acknowledged; a refused event sent again has its sighting applied again,
  * which changes nothing.
  */
-export function applyDeviceEvent(assetId: string, event: DeviceEvent, readers: LifecycleReaders): boolean {
+function applyDeviceEvent(assetId: string, event: DeviceEvent, readers: LifecycleReaders): boolean {
     return underSeenLock(assetId, (lock, asset) => {
         const stored = !isStateChange(event.event, () => lastEventKind(assetId)) || storeEvent(assetId, event)
         if (event.event === 'down') return stored
         recordSeen(asset, event.observedAt, event.source)
         return goLiveIfSeen(lock, asset, readers) && stored
     })
+}
+
+/**
+ * Apply a batch of NMS events, each to the fleet asset its identifier names (platform/assets `findAssetByIdentifier`,
+ * ADR 0016). The identifiers no fleet asset carries, the Provider IT's included, are `unknown` and stored as no event;
+ * those `busy` were not wholly applied (`applyDeviceEvent`), for the NMS to send again.
+ */
+export function applyDeviceEvents(events: readonly DeviceEvent[]): { unknown: string[]; busy: string[] } {
+    const readers = lifecycleReaders()
+    const unknown: string[] = []
+    const busy: string[] = []
+    for (const event of events) {
+        const asset = findAssetByIdentifier(event.identifier, { beyondVisibility: true })
+        if (!asset) unknown.push(event.identifier)
+        else if (!applyDeviceEvent(asset.getUniqueValue(), event, readers)) busy.push(event.identifier)
+    }
+    return { unknown, busy }
 }
 
 /**

@@ -15,9 +15,11 @@ import {
 } from '@servicenow/sdk/core'
 import { DEVICE_EVENT_KIND_CHOICES, DEVICE_EVENT_SOURCE_CHOICES } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION } from '../../server/domain/fleet'
-import { evaluatePendingInService, purgeDeviceEvents } from '../../server/entry/in-service'
+import { purgeDeviceEvents } from '../../server/entry/in-service'
+import { detectPendingInService } from '../../server/platform/in-service'
 import { PROPERTY } from '../../server/domain/properties'
-import { admin, assetManager, broadStaff, integration } from '../shared/roles.now'
+import { DEFAULT_DEVICE_EVENT_SOURCE, DEVICE_EVENT_SENDERS } from '../../server/domain/device-events'
+import { admin, broadStaff } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
 /* In service: the Seen signals monitoring posts, the job that reads them and their settings. */
@@ -39,7 +41,7 @@ export const x_daas_ham_device_event = Table({
             label: 'Source',
             choices: DEVICE_EVENT_SOURCE_CHOICES,
             mandatory: true,
-            default: 'nms',
+            default: DEFAULT_DEVICE_EVENT_SOURCE,
             dropdown: 'dropdown_without_none',
         }),
         observed_at: DateTimeColumn({ label: 'Observed at', mandatory: true }),
@@ -58,7 +60,7 @@ ScheduledScript({
     executionInterval: { minutes: 15 },
     executionStart: '2026-01-01 00:00:00',
     timeZone: 'UTC',
-    script: evaluatePendingInService,
+    script: detectPendingInService,
 })
 
 ScheduledScript({
@@ -111,7 +113,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_device_event',
     operation: 'create',
-    roles: [integration, assetManager],
+    roles: DEVICE_EVENT_SENDERS,
 })
 
 Acl({

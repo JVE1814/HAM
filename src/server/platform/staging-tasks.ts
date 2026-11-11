@@ -35,7 +35,7 @@ export function stagingStockroom(): string {
     return stringProperty(PROPERTY.stagingStockroom)
 }
 
-function templates(): StagingTemplateView[] {
+function activeTemplates(): StagingTemplateView[] {
     const gr = new GlideRecord('x_daas_ham_staging_template')
     gr.addQuery('active', true)
     gr.query()
@@ -48,7 +48,6 @@ function templates(): StagingTemplateView[] {
             manufacturerId: str(gr, 'manufacturer'),
             deviceClass: str(gr, 'device_class'),
             source: str(gr, 'staging_source') as StagingTemplateView['source'],
-            active: true,
         })
     }
     return list
@@ -60,7 +59,7 @@ function templates(): StagingTemplateView[] {
  */
 export function openStagingTask(asset: GlideRecord, orderLineId: string): string | null {
     const source = (str(asset, 'x_daas_ham_staging_source') || DEFAULT_STAGING_SOURCE) as StagingTemplateView['source']
-    const templateId = selectStagingTemplate(templates(), {
+    const templateId = selectStagingTemplate(activeTemplates(), {
         customerId: str(asset, 'company'),
         manufacturerId: str(asset, 'model.manufacturer'),
         deviceClass: str(asset, 'model.x_daas_ham_device_class'),
@@ -93,14 +92,20 @@ export function openStagingTask(asset: GlideRecord, orderLineId: string): string
 /**
  * Start staging the Asset for its Order line: open its Staging task and move it into staging. Without its task
  * (`no_task`) the Asset stays reserved for the line rather than staging with no task to finish; so does one whose move
- * the lifecycle or the platform refuses (`not_moved`, logged with `context`), its task left open: the caller skips the
- * task (sourcing). A receipt does the same two steps under its line's lock, checking the lock between them, and leaves
- * the task of a unit not moved for its close to move the unit into staging first (platform/receiving `stageReserved`;
- * `completeStaging`).
+ * the lifecycle or the platform refuses (`not_moved`, logged with `context`), its task left open for the caller to skip
+ * (sourcing) or for the task's close to move the unit first (a receipt; `completeStaging`). A caller holding a lock
+ * passes `lostAfter`, asked after each write: once it says the lock was lost, nothing more is written (`not_moved`).
  */
-export function startStaging(asset: GlideRecord, orderLineId: string, context: string): 'staging' | 'no_task' | 'not_moved' {
+export function startStaging(
+    asset: GlideRecord,
+    orderLineId: string,
+    context: string,
+    lostAfter: (written: string) => boolean = () => false,
+): 'staging' | 'no_task' | 'not_moved' {
     if (!openStagingTask(asset, orderLineId)) return 'no_task'
-    return moveAndSave(asset, 'staging', context) ? 'staging' : 'not_moved'
+    if (lostAfter('given a Staging task') || !moveAndSave(asset, 'staging', context)) return 'not_moved'
+    lostAfter('moved into staging')
+    return 'staging'
 }
 
 /**
@@ -259,7 +264,7 @@ function copyTemplateSteps(templateId: string, taskId: string, vendor: string): 
     return null
 }
 
-export function stagingSteps(taskId: string): Array<{ mandatory: boolean; done: boolean }> {
+function stagingSteps(taskId: string): Array<{ mandatory: boolean; done: boolean }> {
     const step = new GlideRecord('x_daas_ham_staging_step')
     step.addQuery('staging_task', taskId)
     step.query()

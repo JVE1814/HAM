@@ -1,17 +1,10 @@
 import { GlideRecord } from '@servicenow/glide'
 import { normalizeSerial } from '../domain/serials.ts'
-import { naasStockroomType, OEM_PID_FIELD, receiptProblem, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
+import { naasStockroomType, OEM_PID_FIELD, providerStockroomCondition, receiptProblem, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import type { AssetSummary } from '../domain/rest-contracts.ts'
-import {
-    allocationProblem,
-    awaitsReceipt,
-    putAwayProblem,
-    RECEIVING_STOCKROOM_TYPES,
-    receivingProblem,
-    type ReceivingLine,
-} from '../domain/warehouse.ts'
+import { allocationProblem, awaitsReceipt, putAwayProblem, receivingProblem, type ReceivingLine } from '../domain/warehouse.ts'
 import { LINE_STAGE, type StockroomType } from '../domain/vocabulary.ts'
 import {
     fleetCandidate,
@@ -19,7 +12,6 @@ import {
     identifyAsset,
     isFleetAsset,
     joinFleet,
-    moveAndSave,
     moveAsset,
     newAsset,
     readStage,
@@ -34,7 +26,7 @@ import { purchaseOrderId } from './procurement.ts'
 import { findById, num, refusal, str, warnRefused } from './records.ts'
 import { receiveReturnedAsset } from './returns.ts'
 import { withOrderLineLock } from './sourcing.ts'
-import { openStagingTask } from './staging-tasks.ts'
+import { startStaging } from './staging-tasks.ts'
 import { changeStock, reserveAsset } from './stock.ts'
 import { nextProviderTag } from './tags.ts'
 import { log } from './log.ts'
@@ -87,21 +79,12 @@ const NOT_YOUR_STOCKROOM: ScanRefusal = { reason: 'invalid', why: 'Choose one of
 /** A visible stockroom with no stockroom type is the Provider IT's: no NaaS unit is received or put away there. */
 const NOT_NAAS_STOCKROOM = 'Choose a NaaS stockroom: this one has no stockroom type'
 
-/** The stockroom, if the user may see it (the stockroom visibility rule applies to this lookup). */
-function visibleStockroom(stockroomId: string): GlideRecord | null {
-    return findById('alm_stockroom', stockroomId)
-}
-
-/** The stockroom's NaaS type, or null outside NaaS: a stockroom with no type is the Provider IT's (ADR 0016). */
-function stockroomType(stockroom: GlideRecord): StockroomType | null {
-    return naasStockroomType(str(stockroom, STOCKROOM_TYPE_FIELD))
-}
-
 /**
  * The fleet asset a scanned code names (platform/assets `identifyAsset`: serial, else Provider tag, else Customer tag),
- * or why it is not used: none carries it (`unknown`), or two do, as two Customers may share a Customer tag (`conflict`).
+ * not the Provider IT's, or why it is not used: none carries it (`unknown`), or two do, as two Customers may share a
+ * Customer tag (`conflict`).
  */
-function scannedAsset(code: string): Scan {
+export function lookUp(code: string): Scan {
     return scanned(identifyAsset(code)) ?? NOT_FOUND
 }
 
@@ -111,16 +94,10 @@ function scanned(identified: AssetIdentified): Scan | null {
     return identified
 }
 
-/** The fleet asset a scanned code names (its serial, Provider tag or Customer tag), not the Provider IT's. */
-export function lookUp(code: string): Scan {
-    return scannedAsset(code)
-}
-
-/** A unit scanned for receipt: its code, and the PID (and manufacturer) scanned with it when no ASN announced it. */
+/** A unit scanned for receipt: its code, and the PID scanned with it when no ASN announced it. */
 export interface ScannedUnit {
     code: string
     pid?: string
-    manufacturer?: string
 }
 
 /**
@@ -141,10 +118,10 @@ export interface ScannedUnit {
  * row (platform/locks); that error escapes.
  */
 export function receive(unit: ScannedUnit, stockroomId: string): Scan {
-    const stockroom = visibleStockroom(stockroomId)
+    const stockroom = findById('alm_stockroom', stockroomId)
     if (!stockroom) return NOT_YOUR_STOCKROOM
     // A visible stockroom may be a customer site (asset managers see them all); units arrive only at the Provider's own.
-    const type = stockroomType(stockroom)
+    const type = naasStockroomType(str(stockroom, STOCKROOM_TYPE_FIELD))
     const wrongStockroom = type ? receivingProblem(type) : NOT_NAAS_STOCKROOM
     if (wrongStockroom) return { reason: 'invalid', why: wrongStockroom }
 
@@ -154,7 +131,7 @@ export function receive(unit: ScannedUnit, stockroomId: string): Scan {
     let found = scanned(identifyAnyAsset(unit.code))
     if (!found) {
         if (!unit.pid) return { reason: 'unknown', why: 'Unknown serial: scan the PID too to receive without an ASN' }
-        found = createReceivedAsset(unit.code, unit.pid, unit.manufacturer ?? '')
+        found = createReceivedAsset(unit.code, unit.pid)
     }
     if ('reason' in found) return found
     const assetId = found.asset.getUniqueValue()
@@ -227,8 +204,8 @@ function saveReceipt(lock: HeldLock, asset: GlideRecord): ScanRefusal | null {
  * first scans of one unit, or a scan and its ASN row, create it once; a scan that finds the lock held is told to scan
  * again, and the rescan finds the Asset by serial.
  */
-function createReceivedAsset(code: string, pid: string, manufacturer: string): Scan {
-    const resolution = resolveModel({ manufacturer, model: pid }, loadNormalizationData())
+function createReceivedAsset(code: string, pid: string): Scan {
+    const resolution = resolveModel({ manufacturer: '', model: pid }, loadNormalizationData())
     const modelId = resolution.modelId
     if (!modelId) return { reason: 'refused', why: `PID ${pid} does not map to a model` }
     const serial = normalizeSerial(code)
@@ -347,11 +324,9 @@ function stageReserved(lineLock: HeldLock, reserved: GlideRecord, line: GlideRec
     // it stages no further.
     const lost = (what: string): boolean =>
         lineLock.lostAfter(`${str(line, 'number')}: ${str(reserved, 'serial_number')} ${what}`, { check: 'check it is still on the line' })
-    // Without its Staging task the Asset stays reserved for the line, not staging with no task to finish. A refused
-    // move (logged) leaves it reserved too, with the unsaved move on the record, so it is read again for the caller.
-    if (lost('reserved') || !openStagingTask(reserved, line.getUniqueValue()) || lost('given a Staging task')) return reserved
-    if (moveAndSave(reserved, 'staging', 'receiving')) lost('moved into staging')
-    else reserved.get(reserved.getUniqueValue())
+    if (lost('reserved')) return reserved
+    // A refused move leaves its unsaved values on the record.
+    if (startStaging(reserved, line.getUniqueValue(), 'receiving', lost) === 'not_moved') reserved.get(reserved.getUniqueValue())
     return reserved
 }
 
@@ -362,12 +337,11 @@ function stageReserved(lineLock: HeldLock, reserved: GlideRecord, line: GlideRec
  * take it is told to scan again and saves nothing.
  */
 export function putAway(code: string, stockroomId: string): Scan {
-    const stockroom = visibleStockroom(stockroomId)
+    const stockroom = findById('alm_stockroom', stockroomId)
     if (!stockroom) return NOT_YOUR_STOCKROOM
-    const type = stockroomType(stockroom)
+    const type = naasStockroomType(str(stockroom, STOCKROOM_TYPE_FIELD))
     if (!type) return { reason: 'invalid', why: NOT_NAAS_STOCKROOM }
-    // A fleet asset only: the Provider IT's are not found.
-    const found = scannedAsset(code)
+    const found = lookUp(code)
     if ('reason' in found) return found
     const change = changeStock(found.asset.getUniqueValue(), 'put away', (asset, lock) =>
         asset ? putAwayHolding(lock, asset, stockroom, type) : NOT_FOUND,
@@ -392,11 +366,11 @@ function putAwayHolding(lock: HeldLock, asset: GlideRecord, stockroom: GlideReco
 
 /** Confirm a scanned fleet asset is a staged asset of the Order numbered `orderNumber`. */
 export function pick(code: string, orderNumber: string): Scan {
-    const found = scannedAsset(code)
+    const found = lookUp(code)
     if ('reason' in found) return found
     const asset = found.asset
     const ownOrder = str(asset, 'x_daas_ham_order_line.order.number')
-    if (ownOrder !== orderNumber) {
+    if (!ownOrder || ownOrder !== orderNumber) {
         return { reason: 'conflict', why: ownOrder ? `Belongs to ${ownOrder}` : 'Not allocated to an order' }
     }
     if (readStage(asset) !== 'staged') return { reason: 'conflict', why: `Not ready to ship (${readStage(asset)})` }
@@ -406,7 +380,7 @@ export function pick(code: string, orderNumber: string): Scan {
 /** The stockrooms the user may receive into (visibility rules apply), by name. */
 export function receivingStockrooms(): Array<{ id: string; name: string }> {
     const stockroom = new GlideRecord('alm_stockroom')
-    stockroom.addQuery(STOCKROOM_TYPE_FIELD, 'IN', RECEIVING_STOCKROOM_TYPES.join(','))
+    stockroom.addEncodedQuery(providerStockroomCondition())
     stockroom.orderBy('name')
     stockroom.setLimit(500)
     stockroom.query()

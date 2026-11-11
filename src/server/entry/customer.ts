@@ -1,5 +1,4 @@
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { awaitsSelfInstallConfirmation } from '../domain/install-confirmation.ts'
 import type {
     AttestationAnswers,
     AttestationReceipt,
@@ -30,7 +29,7 @@ import {
 import { currentSession } from '../platform/session.ts'
 import { findById, str } from '../platform/records.ts'
 import { requestReturn } from '../platform/returns.ts'
-import { completeInstall, installState } from '../platform/delivery.ts'
+import { confirmInstall } from '../platform/delivery.ts'
 import { bodyOf, pathParam, reply, requireRole } from '../platform/rest-api.ts'
 
 /** The customer self-service page's routes (P2.9, Q49): what they show and take is platform/customer-page's. */
@@ -64,12 +63,12 @@ export function reportFault(request: RESTAPIRequest, response: RESTAPIResponse):
 export function confirmInstalled(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const order = findById('x_daas_ham_order', pathParam(request, 'id'))
-    if (!order || !awaitsSelfInstallConfirmation(installState(order))) {
+    const outcome = order ? confirmInstall(order, 'customer') : null
+    if (!order || !outcome?.confirmed) {
         return reply(response, 409, { error: 'This order is not waiting for a self-install confirmation' })
     }
-    const refused = completeInstall(order)
-    if (refused > 0) {
-        return reply(response, 422, { error: `${refused} device(s) not confirmed: the platform refused them` })
+    if (outcome.refused > 0) {
+        return reply(response, 422, { error: `${outcome.refused} device(s) not confirmed: the platform refused them` })
     }
     reply(response, 200, { order: str(order, 'number') } satisfies InstallConfirmation)
 }

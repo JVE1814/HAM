@@ -42,11 +42,20 @@ export function awaitsSelfInstallConfirmation(order: InstallState): boolean {
 }
 
 /**
- * Whether a user with visibility `scope` may record the Order as installed. Staff who see every Customer may do so
- * for any Order being installed (for instance when its work order was closed elsewhere); everyone else, such as
- * Customer contacts, only confirms a self-install.
+ * Who records an Order as installed. Staff record any Order being installed (for instance when its work order was
+ * closed elsewhere); a Customer contact only confirms a self-install, and so does anyone on the customer page.
  */
-export function mayConfirmInstall(scope: VisibilityScope, order: InstallState): boolean {
-    if (scope === 'everything') return beingInstalled(order)
-    return awaitsSelfInstallConfirmation(order)
+export type InstallConfirmer = 'staff' | 'customer'
+
+/** Staff are the users who see every Customer; everyone else confirms as a Customer contact does. */
+export function confirmerFor(scope: VisibilityScope): InstallConfirmer {
+    return scope === 'everything' ? 'staff' : 'customer'
+}
+
+/** Why a confirmation is refused: no shipped unit waits at the Site, or the install is not the Customer's own. */
+export type InstallRefusal = 'nothing_waiting' | 'not_self_install'
+
+export function installRefusal(confirmer: InstallConfirmer, order: InstallState): InstallRefusal | null {
+    if (confirmer === 'staff' ? beingInstalled(order) : awaitsSelfInstallConfirmation(order)) return null
+    return beingInstalled(order) ? 'not_self_install' : 'nothing_waiting'
 }
