@@ -1,6 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { stageOf } from '../domain/lifecycle.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { importAsnRow, receive } from './receiving.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
@@ -44,7 +45,7 @@ describe('a first scan of an unknown serial with its PID', () => {
     })
 
     it('creates nothing while another receipt holds the serial, and is told to scan again', () => {
-        platform.tables[LOCKS] = [{ sys_id: 'lock1', name: 'receive_serial_FOC222', sys_created_on: '2025-11-09 12:00:00' }]
+        platform.tables[LOCKS] = [{ sys_id: 'lock1', name: LOCK.receiveSerial('FOC222'), sys_created_on: '2025-11-09 12:00:00' }]
         expect(receive({ code: 'FOC222', pid: 'C9300-24T' }, 'depot1')).toEqual({ reason: 'busy', why: 'Another scan is receiving this unit: scan again' })
         expect(assets()).toHaveLength(1)
     })
@@ -72,7 +73,7 @@ describe('an ASN row', () => {
     })
 
     it('creates nothing while a scan holds the serial, and is marked to load again', () => {
-        platform.tables[LOCKS] = [{ sys_id: 'lock1', name: 'receive_serial_FOC333', sys_created_on: '2025-11-09 12:00:00' }]
+        platform.tables[LOCKS] = [{ sys_id: 'lock1', name: LOCK.receiveSerial('FOC333'), sys_created_on: '2025-11-09 12:00:00' }]
         expect(importAsnRow(asnRow({ serial: 'FOC333' }))).toEqual({
             state: 'error',
             comment: 'serial FOC333 not imported: a scan or another row is receiving it; load this row again',
