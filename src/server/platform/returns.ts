@@ -253,7 +253,7 @@ function notRaised(reason: NotRaised, why: string): RequestOutcome {
  * `returnRequestFindings`): the producer does not apply that rule and its Customer and Site are only qualified in the
  * browser, and locations have no visibility rule (ADR 0005), so any location's sys_id is found. All of that is checked
  * before the Site's devices are read. A site decommission returns everything installed or shipped at the Site
- * (domain/returns `SITE_RECOVERY_STAGES`); a device removal the listed fleet assets (ADR 0016) that are at the Site,
+ * (domain/returns `SITE_RECOVERY_STAGES`); a device removal the listed fleet assets (ADR 0016) deployed at the Site,
  * as a list qualified in the browser, or sent to the API, may name any Asset. The Return runs under the Agreement of
  * its first Asset unless the produced Return order names one.
  *
@@ -334,11 +334,14 @@ function returnRequester(produced: GlideRecord | undefined): ReturnRequester {
     return { mayRequest: permitted, scope, customerId }
 }
 
-/** Those of `listed` that are fleet assets at the Site (visibility rules apply). */
+/**
+ * Those of `listed` that are fleet assets deployed at the Site (visibility rules apply). One declared missing keeps its
+ * Site: put on this Return too, it would be declared missing again and charged a second lost fee.
+ */
 function fleetAssetsAt(siteId: string, listed: readonly string[]): string[] {
     return listed.filter((id) => {
         const asset = findById('alm_hardware', id)
-        return !!asset && isFleetAsset(asset) && str(asset, 'x_daas_ham_site') === siteId
+        return !!asset && isFleetAsset(asset) && str(asset, 'x_daas_ham_site') === siteId && isDeployed(readStage(asset))
     })
 }
 

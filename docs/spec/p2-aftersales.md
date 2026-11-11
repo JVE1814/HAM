@@ -112,7 +112,9 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   service), whatever devices the request lists. From the record producer and the customer page it
   also returns units still shipped to the Site (`domain/returns.ts` `SITE_RECOVERY_STAGES`), so none
   is left holding the site package open.
-- Devices chosen for a device removal must be fleet assets at the chosen Site; others are ignored.
+- Devices chosen for a device removal must be fleet assets deployed at the chosen Site (shipped,
+  pending in service, in service, temporary or pending return); others are ignored, so a unit
+  declared missing, which keeps its Site, is never charged a second lost-asset fee.
 - Field de-install opens a normal change and a de-install work order. Ship-back relies on the Site
   contact.
 - **Receipt** at the depot (warehouse app, Receive), for units pending return (or missing), only into a

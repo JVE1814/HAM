@@ -1,20 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fieldsOf } from '../domain/lifecycle.ts'
-import { raiseReturn } from './returns.ts'
+import { fieldsOf, type Stage } from '../domain/lifecycle.ts'
+import { chaseOverdue, raiseReturn, requestReturn } from './returns.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
 /*
- * A Return raised for a unit whose return lock another Return holds through every try, run against the in-memory
- * stand-in for the platform, job locks included.
+ * Returns raised against the in-memory stand-in for the platform, job locks included: for a unit whose return lock
+ * another Return holds through every try, and as a Customer admin's device removal.
  */
 
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const RETURNS = 'x_daas_ham_return_order'
 const RETURN_LINES = 'x_daas_ham_return_order_line'
+const FEES = 'x_daas_ham_fee_event'
 const LOCKS = 'x_daas_ham_job_lock'
 
 const rows = (table: string): Row[] => platform.tables[table] ?? []
+
+function unit(stage: Stage): Row {
+    const { installStatus, substatus } = fieldsOf(stage)
+    return { sys_id: 'a1', serial_number: 'FOC111', x_daas_ham_fleet: 'true', x_daas_ham_site: 'site1', x_daas_ham_agreement: 'ag1', install_status: installStatus, substatus: substatus ?? '' }
+}
 
 /** Raise a Return for the unit, as a device removal the Site ships back. */
 function raise() {
@@ -33,13 +39,15 @@ beforeEach(() => {
     platform.reset()
     platform.uniqueKeys = { [LOCKS]: 'name' }
     platform.defaults = { [RETURNS]: () => ({ number: 'RET0002' }) }
-    const { installStatus, substatus } = fieldsOf('in_service')
-    platform.tables.alm_hardware = [{ sys_id: 'a1', serial_number: 'FOC111', x_daas_ham_fleet: 'true', install_status: installStatus, substatus: substatus ?? '' }]
-    // Another Return holds the unit's return lock, taken just now.
-    platform.tables[LOCKS] = [{ sys_id: 'lock1', name: 'return_asset_a1', sys_created_on: '2025-11-09 12:00:00' }]
+    platform.tables.alm_hardware = [unit('in_service')]
 })
 
 describe('a unit whose return lock is held through every try', () => {
+    beforeEach(() => {
+        // Another Return holds the unit's return lock, taken just now.
+        platform.tables[LOCKS] = [{ sys_id: 'lock1', name: 'return_asset_a1', sys_created_on: '2025-11-09 12:00:00' }]
+    })
+
     it('is left to the Return that took it, when it awaits that one by now', () => {
         platform.tables[RETURN_LINES] = [{ sys_id: 'line1', return_order: 'ret1', asset: 'a1', status: 'awaiting' }]
         expect(raise()).toEqual({ number: 'RET0002', lines: 0 })
@@ -55,5 +63,42 @@ describe('a unit whose return lock is held through every try', () => {
             'warn [x_daas_ham] Asset a1 left off return RET0002: its return lock was held through every try, yet it awaits no return: put it on one by hand if it is due back',
         ])
         expect(rows(RETURNS)[0]?.work_notes).toBe('No unit could be added (see the system log).')
+    })
+})
+
+describe("a Customer admin's device removal", () => {
+    beforeEach(() => {
+        platform.user = { id: 'u1', name: 'Ada', company: 'acme', roles: ['x_daas_ham.customer_admin'], interactive: true }
+        platform.creatable = () => true
+        platform.defaults[RETURN_LINES] = () => ({ status: 'awaiting' })
+        platform.defaults[FEES] = () => ({ status: 'open' })
+        platform.references = { [`${RETURN_LINES}.return_order`]: RETURNS, [`${RETURNS}.agreement`]: 'x_daas_ham_agreement' }
+        platform.clock = Date.parse('2026-11-11T06:00:00Z')
+        platform.tables.cmn_location = [{ sys_id: 'site1', name: 'HQ', company: 'acme', x_daas_ham_is_site: 'true' }]
+        platform.tables.x_daas_ham_agreement = [{ sys_id: 'ag1', lost_asset_fee: '500', overdue_return_days: '10' }]
+    })
+
+    const removeA1 = () => requestReturn({ customerId: 'acme', siteId: 'site1', decommission: false, listedAssetIds: ['a1'], method: 'ship_back', describe: (site) => `Return from ${site}` })
+
+    it('takes a unit still shipped to the Site', () => {
+        platform.tables.alm_hardware = [unit('shipped')]
+        expect(removeA1()).toEqual({ raised: true, number: 'RET0002', lines: 1 })
+    })
+
+    it('names a unit pending return as already on a return', () => {
+        platform.tables.alm_hardware = [unit('pending_return')]
+        platform.tables[RETURN_LINES] = [{ sys_id: 'lineA', return_order: 'retA', asset: 'a1', status: 'awaiting' }]
+        expect(removeA1()).toMatchObject({ raised: false, reason: 'awaited' })
+    })
+
+    it('ignores a unit already declared missing, so its lost fee is charged once', () => {
+        platform.tables.alm_hardware = [unit('missing')]
+        platform.tables[RETURNS] = [{ sys_id: 'retA', number: 'RET0001', state: '3', due_back: '2026-09-01' }]
+        platform.tables[RETURN_LINES] = [{ sys_id: 'lineA', return_order: 'retA', asset: 'a1', status: 'missing' }]
+        platform.tables[FEES] = [{ sys_id: 'fee1', fee_type: 'lost', asset: 'a1', return_order: 'retA', status: 'open', amount: '500' }]
+        expect(removeA1()).toMatchObject({ raised: false, reason: 'nothing' })
+        platform.clock = Date.parse('2026-12-31T06:00:00Z')
+        chaseOverdue()
+        expect(rows(FEES).filter((fee) => fee.fee_type === 'lost' && fee.asset === 'a1')).toHaveLength(1)
     })
 })
