@@ -109,7 +109,7 @@ const REFRESH_PASS = {
     lease: { event: EVENT.leaseAssets, assets: (leaseId: string) => stagesQuery(SERVING_STAGES, `x_daas_ham_lease=${leaseId}`) },
 } as const
 
-export type RefreshPass = keyof typeof REFRESH_PASS
+type RefreshPass = keyof typeof REFRESH_PASS
 
 /** Queue the `pass` of `subject` (an Agreement or a Lease schedule): its Assets are recomputed in the background. */
 export function queueRefresh(pass: Exclude<RefreshPass, 'model'>, subject: GlideRecord): void {

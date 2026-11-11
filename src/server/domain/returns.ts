@@ -40,7 +40,7 @@ const REQUESTING_RETURNS: ActWording = { act: 'request returns', actForOwn: 'req
  * `actorRefusal`, as for an Order): only those the Return create rule lets in ask for returns, a customer admin only
  * for their own Customer.
  */
-export function returnRequesterRefusal(customerId: string, requester: ReturnRequester): string | null {
+function returnRequesterRefusal(customerId: string, requester: ReturnRequester): string | null {
     return actorRefusal(customerId, { ...requester, permitted: requester.mayRequest }, REQUESTING_RETURNS)
 }
 

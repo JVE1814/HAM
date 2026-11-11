@@ -71,7 +71,7 @@ export interface ReturnRequest {
 }
 
 /** A Return order raised: its number, and how many of its Assets got a line. */
-export interface RaisedReturn {
+interface RaisedReturn {
     number: string
     lines: number
 }
@@ -362,7 +362,7 @@ function latestReturnLine(assetId: string, statuses: readonly ReturnLineStatus[]
  * What came of receiving a unit at the depot as a return: it is not coming back from a Site (it is received as stock
  * instead), it is received, or the lifecycle or the platform refused the receipt and why.
  */
-export type ReturnReceipt = 'not_returning' | 'received' | { refused: string }
+type ReturnReceipt = 'not_returning' | 'received' | { refused: string }
 
 /**
  * A returned Asset arrived at the depot: it awaits evaluation, its subscription line no longer includes it, its earlier
