@@ -288,6 +288,11 @@ export const CLAIM_ROUTES: Partial<Record<OemVendor, Partial<Record<ClaimAction,
     checkpoint: { oem_ztp: { message: REST_MESSAGE.checkPoint.name, run: checkPointZeroTouch, perCall: 1 } },
 }
 
+/** Whether a run can send `vendor` an `action` step: a template's step it cannot is copied as one done by hand. */
+export function claimRouted(vendor: string, action: string): boolean {
+    return Boolean(CLAIM_ROUTES[vendor as OemVendor]?.[action as ClaimAction])
+}
+
 /** Vendors with at least one automated step (Cisco has none). */
 export const CLAIM_VENDORS: readonly OemVendor[] = Object.keys(CLAIM_ROUTES) as OemVendor[]
 

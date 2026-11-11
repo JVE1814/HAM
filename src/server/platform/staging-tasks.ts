@@ -1,5 +1,5 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { initialAutomationStatus } from '../domain/oem/claims.ts'
+import { claimRouted, initialAutomationStatus } from '../domain/oem/claims.ts'
 import { lineStillOpen } from '../domain/sourcing.ts'
 import {
     closureMoveProblem,
@@ -71,7 +71,7 @@ export function openStagingTask(asset: GlideRecord, orderLineId: string): string
         warnRefused(task, `No Staging task for ${str(asset, 'serial_number')}`)
         return null
     }
-    const stepRefused = templateId ? copyTemplateSteps(templateId, taskId) : null
+    const stepRefused = templateId ? copyTemplateSteps(templateId, taskId, str(asset, 'model.x_daas_ham_oem_source')) : null
     if (stepRefused === null) return taskId
     deleteWhere('x_daas_ham_staging_step', `staging_task=${taskId}`)
     const removed = task.deleteRecord()
@@ -219,16 +219,21 @@ export function skipOpenStagingTasks(assetId: string, why: string): boolean {
 }
 
 /**
- * Copies the template's steps onto the task, each automated one in its initialAutomationStatus. Stops at the first
- * step the platform refuses and says why; null when every step was saved.
+ * Copies the template's steps onto the task, each automated one in its initialAutomationStatus. A step's automation
+ * is kept only when a run can send it to `vendor` (claimRouted): one it cannot would never be sent, failed or listed to
+ * do by hand, and a step waiting for it would wait for ever. Stops at the first step the platform refuses and says
+ * why; null when every step was saved.
  */
-function copyTemplateSteps(templateId: string, taskId: string): string | null {
+function copyTemplateSteps(templateId: string, taskId: string, vendor: string): string | null {
     const item = new GlideRecord('x_daas_ham_staging_tmpl_item')
     item.addQuery('template', templateId)
     item.orderBy('order')
     item.query()
     const items: Array<{ label: string; order: number; mandatory: boolean; automation: string }> = []
-    while (item.next()) items.push({ label: str(item, 'label'), order: num(item, 'order'), mandatory: bool(item, 'mandatory'), automation: str(item, 'automation') })
+    while (item.next()) {
+        const automation = str(item, 'automation')
+        items.push({ label: str(item, 'label'), order: num(item, 'order'), mandatory: bool(item, 'mandatory'), automation: claimRouted(vendor, automation) ? automation : '' })
+    }
     const taskActions = items.map((i) => i.automation)
     for (const { label, order, mandatory, automation } of items) {
         const step = new GlideRecord('x_daas_ham_staging_step')

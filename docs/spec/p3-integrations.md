@@ -108,7 +108,9 @@
 
 - A staging template step can be **done by the OEM cloud**; its staging steps then start *pending*
   and are ticked automatically when the manufacturer confirms. Steps without automation stay manual,
-  as does everything Cisco (PnP has no public API).
+  as does everything Cisco (PnP has no public API). A template step whose automation the Asset's
+  vendor does not offer below (a claim step on a Check Point unit, any step on a Cisco one) is
+  copied as a manual step, so no step waits for one that is never sent.
 
 | Vendor (model *OEM data source*) | Claim / register | Subscription | Zero-touch |
 |---|---|---|---|

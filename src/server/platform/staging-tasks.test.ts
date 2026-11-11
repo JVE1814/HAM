@@ -2,7 +2,7 @@ import type { GlideRecord } from '@servicenow/glide'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fieldsOf, stageOf, type Stage } from '../domain/lifecycle.ts'
 import type { ClosedStagingTask } from '../domain/staging.ts'
-import { completeStaging, stagingClosureProblem } from './staging-tasks.ts'
+import { completeStaging, openStagingTask, stagingClosureProblem } from './staging-tasks.ts'
 import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 
 /*
@@ -115,5 +115,46 @@ describe('a Staging task closed complete', () => {
         )
 
         expect(stageOfUnit()).toBe('available')
+    })
+})
+
+describe('opening a Staging task', () => {
+    const TEMPLATES = 'x_daas_ham_staging_template'
+    const ITEMS = 'x_daas_ham_staging_tmpl_item'
+
+    function templateFor(vendor: string): GlideRecord {
+        platform.references = { ...platform.references, [`${ASSETS}.model`]: 'cmdb_model' }
+        platform.tables.cmdb_model = [{ sys_id: 'model1', x_daas_ham_oem_source: vendor }]
+        platform.tables[TEMPLATES] = [{ sys_id: 'tmpl1', name: 'Firewall', active: 'true', customer: '', manufacturer: '', device_class: '', staging_source: 'in_house' }]
+        platform.tables[ITEMS] = [
+            { sys_id: 'item1', template: 'tmpl1', label: 'Claim into the cloud', order: '100', mandatory: 'true', automation: 'oem_claim' },
+            { sys_id: 'item2', template: 'tmpl1', label: 'Zero-touch', order: '200', mandatory: 'true', automation: 'oem_ztp' },
+        ]
+        platform.tables[STEPS] = []
+        unit().model = 'model1'
+        return recordOf<GlideRecord>(ASSETS, unit())
+    }
+
+    const steps = () => rows(STEPS).map(({ label, automation, automation_status }) => ({ label, automation: automation ?? '', status: automation_status ?? '' }))
+
+    it("keeps a step's automation only for an action its vendor can do, so no step waits on one never sent", () => {
+        expect(openStagingTask(templateFor('checkpoint'), 'line1')).not.toBeNull()
+
+        expect(steps()).toEqual([
+            { label: 'Claim into the cloud', automation: '', status: '' },
+            { label: 'Zero-touch', automation: 'oem_ztp', status: 'pending' },
+        ])
+    })
+
+    it('leaves every step of a Cisco unit to do by hand', () => {
+        expect(openStagingTask(templateFor('cisco'), 'line1')).not.toBeNull()
+
+        expect(steps().map(({ automation }) => automation)).toEqual(['', ''])
+    })
+
+    it('copies both automations for a vendor that can do both, the zero-touch step waiting for the claim', () => {
+        expect(openStagingTask(templateFor('fortinet'), 'line1')).not.toBeNull()
+
+        expect(steps().map(({ automation, status }) => `${automation} ${status}`)).toEqual(['oem_claim pending', 'oem_ztp waiting'])
     })
 })
