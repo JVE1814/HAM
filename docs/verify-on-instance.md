@@ -27,13 +27,17 @@ impersonating a user who holds that role and no other NaaS role.
 *System Applications > Application install history* (`sys_upgrade_history_log`) lists one *Skipped
 Error* row per global table the app adds columns to (`sys_documentation_<table>__en`, seven of
 them): SDK 4.14 writes a table label for each augmented table, and the platform keeps the table's
-own. Any other *Skipped Error* row is a defect. The development instance's install of 2026-11-09,
-of the earlier version, which also added columns to `change_request`, logged eight and no other.
+own. The development instance's install of 2026-11-09, of the earlier version, which also added
+columns to `change_request`, logged eight and no other.
 
-The app no longer adds a column to `change_request` (ADR 0018), so the build now carries a delete
-for the label it used to write there (`sys_documentation_change_request__en`, under the app's own
-sys_id, which the platform never stored): after the install, check that the *Change Request* table
-still has its label (*System Definition > Tables*). This was not run on an instance.
+The app no longer adds a column to `change_request` (ADR 0018), so the build now carries two
+deletes for records it used to write there, under the app's own sys_ids: the table label
+(`sys_documentation_change_request__en`) and its licensing row
+(`ua_table_licensing_config_369e4a1bcfc54fb38605149dc901ed02`). On an instance that never had them,
+each is a *Skipped Error* row too, so a fresh install logs nine and no other. Any other *Skipped
+Error* row is a defect. After the install, check that the *Change Request* table still has its
+label (*System Definition > Tables*) and its licensing row. A fresh install on a Brazil PDI on
+2026-11-11 logged those nine, and *Change Request* kept both.
 
 ### Preflight check
 

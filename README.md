@@ -97,7 +97,7 @@ npx now-sdk install --auth <alias> --no-demoData   # production: demo data loads
 npx now-sdk install --auth <alias>                  # dev/test: demo data included
 ```
 
-The install log lists seven expected *Skipped Error* rows; any other is a defect
+A fresh install's log lists nine expected *Skipped Error* rows; any other is a defect
 ([install log](docs/verify-on-instance.md#install-log)).
 
 Then configure (System Properties, `x_daas_ham.*`):
