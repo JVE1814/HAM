@@ -1,7 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { LONG_HOLD_LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { LINE_STAGE, type LineStage } from '../domain/vocabulary.ts'
+import type { LineStage } from '../domain/vocabulary.ts'
 import { withLockTries, type LockRun } from './locks.ts'
 import { num, refusal, str } from './records.ts'
 
@@ -69,12 +69,7 @@ export function addOrderLines(order: GlideRecord, lines: readonly NewLine[]): Re
     return refused
 }
 
-/** Cancel the line; false when the platform refuses the save. */
-export function cancelLine(line: GlideRecord): boolean {
-    return saveLineStage(line, LINE_STAGE.cancelled)
-}
-
-/** Save the line at the `stage` derived from its Assets (platform/fulfilment); false when the platform refuses. */
+/** Save the line at `stage`, cancelled or derived from its Assets (platform/fulfilment); false when the platform refuses. */
 export function saveLineStage(line: GlideRecord, stage: LineStage): boolean {
     line.setValue('line_stage', stage)
     return !!line.update()

@@ -18,7 +18,7 @@ import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { fire } from './events.ts'
 import { log } from './log.ts'
-import { cancelLine, saveLineStage } from './order-lines.ts'
+import { saveLineStage } from './order-lines.ts'
 import { exists, findById, num, str, warnRefused, type ForeignRecord } from './records.ts'
 import { takeOffOrderLine } from './stock.ts'
 
@@ -167,7 +167,7 @@ function deriveLine(line: GlideRecord, refill: boolean): LineStage | null {
             return null
         }
         if (next !== LINE_STAGE.cancelled && closedNow(line)) {
-            if (!cancelLine(line)) warnRefused(line, `${str(line, 'number')} moved to ${next} beside its Order's cancel, not cancelled again`)
+            if (!saveLineStage(line, LINE_STAGE.cancelled)) warnRefused(line, `${str(line, 'number')} moved to ${next} beside its Order's cancel, not cancelled again`)
             return LINE_STAGE.cancelled
         }
     }

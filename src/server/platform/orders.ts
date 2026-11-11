@@ -32,7 +32,7 @@ import { requeueCounted } from './events.ts'
 import { EVENT } from '../domain/events.ts'
 import { orderShipment, queueSourcing } from './fulfilment.ts'
 import { withLock, withLockTries } from './locks.ts'
-import { addOrderLines, cancelLine, withOrderLineLocks, type NewLine, type RefusedLine } from './order-lines.ts'
+import { addOrderLines, saveLineStage, withOrderLineLocks, type NewLine, type RefusedLine } from './order-lines.ts'
 import { bool, findById, num, refusal, str, warnRefused } from './records.ts'
 import { creatorOf } from './session.ts'
 import { skipOpenStagingTasks } from './staging-tasks.ts'
@@ -509,7 +509,7 @@ function releaseAndCancel(line: GlideRecord): boolean {
     asset.query()
     while (asset.next()) done = releaseAsset(asset) && done
     if (str(line, 'line_stage') === LINE_STAGE.cancelled) return done
-    if (cancelLine(line)) return done
+    if (saveLineStage(line, LINE_STAGE.cancelled)) return done
     // Left open, it is still given the units received on its purchase orders, unless its Order's stage is read too.
     warnRefused(line, `order cancelled: ${str(line, 'number')} left open, cancel it`)
     return false
