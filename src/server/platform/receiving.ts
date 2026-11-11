@@ -2,7 +2,8 @@ import { GlideRecord } from '@servicenow/glide'
 import { validateAsnRows, type AsnRowCheck } from '../domain/asn.ts'
 import { normalizeSerial } from '../domain/serials.ts'
 import { naasStockroomType, OEM_PID_FIELD, providerStockroomCondition, receiptProblem, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
-import type { HeldLock } from '../domain/job-lock.ts'
+import { LOCK_TRIES, type HeldLock, type LockAttempt } from '../domain/job-lock.ts'
+import type { Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import type { AssetSummary } from '../domain/rest-contracts.ts'
 import { allocationProblem, awaitsReceipt, putAwayProblem, receivingProblem, type ReceivingLine } from '../domain/warehouse.ts'
@@ -124,7 +125,7 @@ export function receive(unit: ScannedUnit, stockroomId: string): Scan {
     let found = scanned(identifyAnyAsset(unit.code))
     if (!found) {
         if (!unit.pid) return { reason: 'unknown', why: 'Unknown serial: scan the PID too to receive without an ASN' }
-        found = createReceivedAsset(unit.code, unit.pid)
+        found = firstScanAsset(unit.code, unit.pid)
     }
     if ('reason' in found) return found
     const assetId = found.asset.getUniqueValue()
@@ -191,35 +192,56 @@ function saveReceipt(lock: HeldLock, asset: GlideRecord): ScanRefusal | null {
     return saved === 'refused' ? { reason: 'refused', why: `Not received: ${refusal(asset)}` } : null
 }
 
+/** What came of creating the Asset of a serial: created, `existing`'s answer when it has one already, or not inserted. */
+type SerialAsset<E> = { created: GlideRecord } | { existing: E } | { refused: string } | 'lock lost'
+
 /**
- * The Asset of an unknown serial scanned with its PID. The check that no Asset has the serial and the insert are made
- * under a lock on the serial, which an ASN row for the serial takes too (`importAsnRow`), checking again there, so two
- * first scans of one unit, or a scan and its ASN row, create it once; a scan that finds the lock held is told to scan
- * again, and the rescan finds the Asset by serial.
+ * Create the Asset of a received `serial` in `stage` with `values`, unless `existing` answers that it has one. Every
+ * receipt that creates an Asset from a serial (a first scan without an ASN, an ASN row) does it here: under the
+ * serial's lock, checking `existing` again holding it, so two of them create it once. A holder that outlasted the lock
+ * (ADR 0013) inserts nothing ('lock lost'), and one that lost it during the insert is logged. Made by `newAsset`, the
+ * Asset is a fleet asset the Provider owns. A lock held through every one of `tries`, or not taken, is `attemptLock`'s.
  */
-function createReceivedAsset(code: string, pid: string): Scan {
-    const resolution = resolveModel({ manufacturer: '', model: pid }, loadNormalizationData())
-    const modelId = resolution.modelId
-    if (!modelId) return { reason: 'refused', why: `PID ${pid} does not map to a model` }
-    const serial = normalizeSerial(code)
-    const created = withLock(LOCK.receiveSerial(serial), (lock) => {
-        // Any Asset the scanned code names, the Provider IT's too: the receipt refuses it rather than create a second one.
-        return scanned(identifyAnyAsset(code)) ?? insertReceivedAsset(lock, modelId, serial)
-    })
-    return created.ran ? created.value : SCAN_AGAIN
+function createReceivedAsset<E>(
+    serial: string,
+    modelId: string,
+    stage: Stage,
+    values: Readonly<Record<string, string>>,
+    existing: () => E | null,
+    tries: number,
+): LockAttempt<SerialAsset<E>> {
+    return attemptLock(
+        LOCK.receiveSerial(serial),
+        (lock): SerialAsset<E> => {
+            const found = existing()
+            if (found !== null) return { existing: found }
+            const asset = newAsset(modelId, stage)
+            asset.setValue('serial_number', serial)
+            for (const [field, value] of Object.entries(values)) asset.setValue(field, value)
+            const saved = lock.save(`Asset ${serial} created`, () => asset.insert(), { check: 'check it exists once' })
+            if (saved === 'lock lost') return 'lock lost'
+            return saved === 'refused' ? { refused: refusal(asset) } : { created: asset }
+        },
+        tries,
+    )
 }
 
 /**
- * Insert the Asset holding the serial's `lock`: a holder that outlasted it (ADR 0013) leaves it to the next scan. Made
- * by `newAsset`, it is a fleet asset the Provider owns.
+ * The Asset of an unknown serial scanned with its PID (`createReceivedAsset`). A scan that finds the serial's lock held
+ * is told to scan again, and the rescan finds the Asset by serial.
  */
-function insertReceivedAsset(lock: HeldLock, modelId: string, serial: string): Scan {
-    const asset = newAsset(modelId, 'on_order')
-    asset.setValue('serial_number', serial)
-    const saved = lock.save(`Asset ${serial} created`, () => asset.insert(), { check: 'check it exists once' })
-    if (saved === 'lock lost') return SCAN_AGAIN
-    if (saved === 'refused') return { reason: 'refused', why: `Not received: ${refusal(asset)}` }
-    return { asset }
+function firstScanAsset(code: string, pid: string): Scan {
+    const resolution = resolveModel({ manufacturer: '', model: pid }, loadNormalizationData())
+    const modelId = resolution.modelId
+    if (!modelId) return { reason: 'refused', why: `PID ${pid} does not map to a model` }
+    // Any Asset the scanned code names, the Provider IT's too: the receipt refuses it rather than create a second one.
+    const attempt = createReceivedAsset(normalizeSerial(code), modelId, 'on_order', {}, () => scanned(identifyAnyAsset(code)), 1)
+    if (!attempt.ran && !attempt.held) throw attempt.error
+    if (!attempt.ran || attempt.value === 'lock lost') return SCAN_AGAIN
+    const made = attempt.value
+    if ('existing' in made) return made.existing
+    if ('refused' in made) return { reason: 'refused', why: `Not received: ${made.refused}` }
+    return { asset: made.created }
 }
 
 /** An Order line waiting for a received unit, with the OEM RMA the unit replaces under ('' for a purchase). */
@@ -383,12 +405,9 @@ export function receivingStockrooms(): Array<{ id: string; name: string }> {
 }
 
 /**
- * Import an ASN row: create its in-transit Asset (ASN = scan-to-confirm receiving).
- *
- * A first scan of the serial without an ASN (platform/receiving) could create its Asset between this row's check and its
- * insert, and both would stand. So the check and the insert are made under the serial's lock, which that scan takes
- * too, checking again there. A row that finds the lock held through every try (a holder keeps it for one check and one
- * insert), or whose lock cannot be taken, is marked error with why, to load again; loaded again once the scan has
+ * Import an ASN row: create its in-transit Asset (ASN = scan-to-confirm receiving; `createReceivedAsset`), with what
+ * the row says of it. A row that finds the serial's lock held through every try (a holder keeps it for one check and
+ * one insert), or whose lock cannot be taken, is marked error with why, to load again; loaded again once a scan has
  * created the Asset, it is refused as a serial that already exists.
  */
 export function importAsnRow(row: GlideRecord): RowOutcome {
@@ -409,9 +428,25 @@ export function importAsnRow(row: GlideRecord): RowOutcome {
         return rowError(`PID ${raw.model} does not map to a model; ${see}`)
     }
 
-    const attempt = attemptLock(LOCK.receiveSerial(serial), (lock) => insertHolding(lock, row, serial, modelId))
-    if (attempt.ran) return attempt.value
-    return loadAgain(serial, whyNotRun(attempt, 'a scan or another row is receiving it'))
+    const stagingSource: StagingSource = choice<StagingSource>(row, 'staging_source') === 'distributor' ? 'distributor' : DEFAULT_STAGING_SOURCE
+    const values = {
+        po_number: str(row, 'po_number'),
+        x_daas_ham_customer_tag: str(row, 'customer_tag'),
+        x_daas_ham_mac_address: str(row, 'mac_address'),
+        x_daas_ham_claim_code: str(row, 'claim_code'),
+        x_daas_ham_staging_source: stagingSource,
+    }
+    const existing = () => {
+        const again = checkAsnRow(row, serial)
+        return again.ok ? null : rowError(again.reason)
+    }
+    const attempt = createReceivedAsset(serial, modelId, 'in_transit', values, existing, LOCK_TRIES)
+    if (!attempt.ran) return loadAgain(serial, whyNotRun(attempt, 'a scan or another row is receiving it'))
+    const made = attempt.value
+    if (made === 'lock lost') return loadAgain(serial, 'its lock was lost while checking it')
+    if ('existing' in made) return made.existing
+    if ('refused' in made) return rowError(`Asset insert failed: ${made.refused}`)
+    return { state: 'inserted', comment: `Asset ${serial} in transit` }
 }
 
 /** A row the serial's lock kept from importing, marked error with why: loading it again imports or refuses it. */
@@ -429,24 +464,3 @@ function checkAsnRow(row: GlideRecord, serial: string): AsnRowCheck {
     return validateAsnRows([fields], findAnyAssetBySerial(serial) ? new Set([serial]) : new Set())[0]
 }
 
-/**
- * Check the row again and insert its Asset, holding the serial's `lock`. A holder that outlasted the lock (ADR 0013)
- * may overlap the scan or row that took it over: it inserts only while it holds it, and one that lost it during the
- * insert is logged. Made by `newAsset`, the Asset is a fleet asset (ADR 0016) the Provider owns.
- */
-function insertHolding(lock: HeldLock, row: GlideRecord, serial: string, modelId: string): RowOutcome {
-    const check = checkAsnRow(row, serial)
-    if (!check.ok) return rowError(check.reason)
-    const asset = newAsset(modelId, 'in_transit')
-    asset.setValue('serial_number', serial)
-    asset.setValue('po_number', str(row, 'po_number'))
-    asset.setValue('x_daas_ham_customer_tag', str(row, 'customer_tag'))
-    asset.setValue('x_daas_ham_mac_address', str(row, 'mac_address'))
-    asset.setValue('x_daas_ham_claim_code', str(row, 'claim_code'))
-    const stagingSource: StagingSource = choice<StagingSource>(row, 'staging_source') === 'distributor' ? 'distributor' : DEFAULT_STAGING_SOURCE
-    asset.setValue('x_daas_ham_staging_source', stagingSource)
-    const saved = lock.save(`Asset ${serial} created`, () => asset.insert(), { check: 'check it exists once' })
-    if (saved === 'lock lost') return loadAgain(serial, 'its lock was lost while checking it')
-    if (saved === 'refused') return rowError(`Asset insert failed: ${refusal(asset)}`)
-    return { state: 'inserted', comment: `Asset ${serial} in transit` }
-}
