@@ -83,7 +83,7 @@ export function AppShell({ title, layout, nav, actions }: { title: string; layou
             </header>
             {items.length > 1 && (
                 <Tabs value={current?.to ?? null} className="print:hidden">
-                    <TabsList className="max-w-full overflow-x-auto">
+                    <TabsList className="max-w-full overflow-x-auto [scrollbar-width:none]">
                         {items.map((item) => (
                             <TabsTrigger key={item.to} value={item.to} nativeButton={false} render={<Link to={item.to} />}>
                                 {item.label}
