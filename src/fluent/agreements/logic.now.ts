@@ -1,7 +1,14 @@
 import '@servicenow/sdk/global'
-import { BusinessRule, EmailNotification, Record, ScheduledScript, UiAction } from '@servicenow/sdk/core'
+import { BusinessRule, EmailNotification, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
 import { EVENT } from '../../server/domain/events'
-import { guardAgreementCurrency, onAgreementEndChanged, uiRenewAgreement, warnRenewals } from '../../server/entry/agreements'
+import {
+    guardAgreementCurrency,
+    onAgreementEndChanged,
+    onAgreementTermsChanged,
+    refreshAgreementAssets,
+    uiRenewAgreement,
+    warnRenewals,
+} from '../../server/entry/agreements'
 import { commercialEditors } from '../shared/roles.now'
 
 // A mistyped currency is refused as it is entered, not at the next generation (owner decision: one currency per Agreement).
@@ -25,6 +32,38 @@ BusinessRule({
     order: 100,
     condition: "current.ends.changes() && current.ends != ''",
     script: onAgreementEndChanged,
+})
+
+BusinessRule({
+    $id: Now.ID['br_agreement_terms_changed'],
+    name: 'NaaS - agreement refresh terms changed',
+    table: 'x_daas_ham_agreement',
+    when: 'after',
+    action: ['update'],
+    order: 200,
+    condition: 'current.refresh_cycle_months.changes() || current.refresh_basis.changes()',
+    script: onAgreementTermsChanged,
+})
+
+Record({
+    $id: Now.ID['event_agreement_terms'],
+    table: 'sysevent_register',
+    data: {
+        suffix: 'agreement.terms',
+        event_name: EVENT.agreementTermsChanged,
+        table: 'x_daas_ham_agreement',
+        description: "An agreement's refresh terms changed; parm1 = agreement, parm2 = cursor.",
+        priority: 200,
+    },
+})
+
+ScriptAction({
+    $id: Now.ID['sa_agreement_terms'],
+    name: 'NaaS - refresh due of agreement assets',
+    eventName: EVENT.agreementTermsChanged,
+    active: true,
+    script: refreshAgreementAssets,
+    description: "Recomputes refresh due dates for an agreement's deployed assets in time-boxed chunks.",
 })
 
 UiAction({
