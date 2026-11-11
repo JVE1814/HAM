@@ -5,7 +5,7 @@ import { INSTALL_MODE, ORDER_STAGE, STAGE_FIELDS } from '../../server/domain/voc
 import { APPROVAL_REQUESTED } from '../../server/domain/approvals'
 import { uiConfirmInstalled, uiShipOrder } from '../../server/entry/delivery'
 import { PLATFORM_ROLE } from '../../server/domain/roles'
-import { raiseRefreshOrders } from '../../server/entry/refresh'
+import { raiseRefreshOrders } from '../../server/platform/refresh'
 import { EVENT } from '../../server/domain/events'
 import { PROPERTY } from '../../server/domain/properties'
 import {
