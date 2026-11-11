@@ -1,4 +1,4 @@
-import type { Approver } from './approvals.ts'
+import { APPROVER, type Approver } from './approvals.ts'
 import {
     actorRefusal,
     agreementFinding,
@@ -165,9 +165,9 @@ export function ownershipFindings(order: OrderParties, orderer: Orderer): string
 export function approversFor(verdict: EntitlementVerdict | ''): Approver[] {
     switch (verdict) {
         case 'over_quota':
-            return ['customer_admin', 'account_manager']
+            return [APPROVER.customerAdmin, APPROVER.provider]
         case 'off_catalog':
-            return ['customer_admin']
+            return [APPROVER.customerAdmin]
         default:
             return []
     }

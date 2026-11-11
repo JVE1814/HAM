@@ -1,5 +1,5 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { approvalAwaited, type Approver } from '../domain/approvals.ts'
+import { approvalAwaited, APPROVER, type Approver } from '../domain/approvals.ts'
 import { messageOf } from '../domain/errors.ts'
 import { readStage } from '../platform/assets.ts'
 import { onLineAssetMoved } from '../platform/fulfilment.ts'
@@ -84,8 +84,8 @@ export function onOrderApprovalDecision(current: ForeignRecord): void {
 
 /** An Order's approver groups as Re-check approvals names them: its provider side asks the account manager first. */
 const ORDER_APPROVER_NAMES: Readonly<Record<Approver, string>> = {
-    customer_admin: 'a Customer admin',
-    account_manager: 'the account manager (or the asset managers)',
+    [APPROVER.customerAdmin]: 'a Customer admin',
+    [APPROVER.provider]: 'the account manager (or the asset managers)',
 }
 
 /**
