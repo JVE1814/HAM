@@ -64,7 +64,6 @@ function Score({ widget }: { widget: Extract<Widget, { chart: 'score' }> }) {
     )
 }
 
-/** The `top` largest groups, and the rest as one "Others" when the widget asks for it. */
 function topGroups(tally: Tally, top: number, others: boolean): Tally {
     const rest = tally.slice(top)
     const shown = tally.slice(0, top)
@@ -131,7 +130,7 @@ function money(amount: number, currency: string): string {
 
 const AMOUNT: ChartConfig = { amount: { label: 'Amount', color: 'var(--chart-2)' } }
 
-/** One bar per currency, labelled with its amount. No value axis: amounts of two currencies share no unit. */
+/** No value axis: amounts of two currencies share no unit. */
 function CurrencyBar({ widget }: { widget: Extract<Widget, { chart: 'currencyBar' }> }) {
     return (
         <Loaded result={useQuery(sumQuery(widget.source, widget.sum))} height="h-48">
@@ -160,7 +159,6 @@ function CurrencyBar({ widget }: { widget: Extract<Widget, { chart: 'currencyBar
 const TINT = ['bg-chart-1/10', 'bg-chart-1/20', 'bg-chart-1/35', 'bg-chart-1/50', 'bg-chart-1/70']
 const NEGATIVE_TINT = ['bg-destructive/10', 'bg-destructive/20', 'bg-destructive/35', 'bg-destructive/50', 'bg-destructive/70']
 
-/** A cell's shade, measured against the largest amount of its own currency only. */
 function tint(amount: number, largest: number): string {
     if (!largest || !amount) return ''
     const step = Math.min(TINT.length - 1, Math.floor((Math.abs(amount) / largest) * TINT.length))

@@ -2,7 +2,7 @@ import '@servicenow/sdk/global'
 import { ApplicationMenu, Record } from '@servicenow/sdk/core'
 import { ROLE } from '../../server/domain/visibility'
 import { broadStaff, providerStaff, stockroomWorkers } from './roles.now'
-import { WORKSPACE_HOME } from '../workspace/workspace.now'
+import { WORKSPACE_PAGE } from '../workspace/workspace.now'
 
 /*
  * Navigator menu "NaaS Asset Management".
@@ -27,7 +27,7 @@ Record({
         title: 'NaaS Asset Workspace',
         application: naasMenu,
         link_type: 'DIRECT',
-        query: WORKSPACE_HOME,
+        query: `${WORKSPACE_PAGE}.do`,
         roles: providerStaff,
         active: true,
         order: 100,

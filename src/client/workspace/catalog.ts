@@ -16,17 +16,14 @@ import type { Session } from '../lib/session'
 import type { Source } from '../lib/sn'
 
 /*
- * The workspace's lists, grouped by the job they serve: each written once, here. The sidebar, the list route and the
- * tests derive from it.
- *
  * The platform tables are shared with the Provider's IT (ADR 0016): a list on alm_hardware shows fleet assets only (its
  * condition holds the fleet condition in each ^NQ clause) and one on cmdb_model NaaS Models only, which catalog.test.ts
- * checks for any search and sort a user picks. The conditions are the domain's constants, the same the dashboard counts.
+ * checks for any search and sort a user picks.
  */
 
 /**
- * Who a list or a dashboard tab is offered to: the domain's role groups by reference. It decides what the sidebar and
- * the tabs offer, never what a list shows: the ACLs and the before-query rules (ADR 0005) do that.
+ * Who a list or a dashboard tab is offered to. It decides what the sidebar and the tabs offer, never what a list shows:
+ * the ACLs and the before-query rules (ADR 0005) do that.
  */
 export const AUDIENCE = {
     /** Every provider-staff role, for the tables inventory techs also read, and the platform's cmdb_model. */
@@ -50,13 +47,11 @@ interface ListSource {
     audience: Audience
 }
 
-/** What every list of Orders shows. */
 const ORDER_COLUMNS = 'number,customer,site,order_type,stage,entitlement_verdict,install_mode,requested_date'
 
-/** What every list of installed Assets starts with. */
 const INSTALLED_ASSET_COLUMNS = 'asset_tag,serial_number,model,company,x_daas_ham_site,install_status,substatus,x_daas_ham_last_seen'
 
-/** Category title, then list id (the old workspace list's key without `ws_`), then list; position is order. */
+/** Category title, then list id, then list; key order is the sidebar's order. */
 const CATALOG = {
     Orders: {
         orders_open: {
@@ -154,7 +149,6 @@ const CATALOG = {
             columns: `${INSTALLED_ASSET_COLUMNS},x_daas_ham_install_completed`,
             audience: 'staff',
         },
-        // The days the refresh job plans ahead by default: a list's condition cannot read the property itself.
         assets_refresh_due: {
             title: `Refresh due within ${REFRESH_HORIZON_DAYS} days`,
             table: 'alm_hardware',
@@ -455,7 +449,6 @@ const CATALOG = {
 type Lists = typeof CATALOG
 export type ListId = { [C in keyof Lists]: keyof Lists[C] & string }[keyof Lists]
 
-/** A list as the page reads it: its query split into conditions and order, its columns an array. */
 export interface WorkspaceList extends Source {
     id: ListId
     title: string

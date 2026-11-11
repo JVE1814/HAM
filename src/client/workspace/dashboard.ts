@@ -10,11 +10,9 @@ import type { Money, Source } from '../lib/sn'
 import { AUDIENCE, type Audience, type ListId } from './catalog'
 
 /*
- * The workspace's landing dashboard: operations, billing integrity (P1), lifecycle risk (P2) and margin (P3).
- *
  * alm_hardware also holds the Provider IT's equipment (ADR 0016), so every source on it counts fleet assets only: its
  * filter holds the fleet condition in each ^NQ clause (a condition after ^NQ binds to the last clause only), which
- * catalog.test.ts checks. The queries are the domain's constants, the same the workspace lists show.
+ * catalog.test.ts checks.
  */
 
 interface WidgetBase {
@@ -48,7 +46,6 @@ export interface DashboardTab {
     widgets: readonly Widget[]
 }
 
-/** A record of the Billing period that started last month. */
 const LAST_MONTH = 'billing_period.period_startONLast month@javascript:gs.beginningOfLastMonth()@javascript:gs.endOfLastMonth()'
 
 export const DASHBOARD: readonly DashboardTab[] = [
@@ -125,8 +122,6 @@ export const DASHBOARD: readonly DashboardTab[] = [
                 span: 3,
                 source: { table: 'alm_hardware', filter: IN_SERVICE_UNBILLED },
             },
-            // Not billed past the line's end date (domain/billing IN_SERVICE_ON_ENDED_LINE, in the fleet): flagged,
-            // never moved.
             {
                 id: 'ended_line_in_service',
                 chart: 'score',
@@ -166,7 +161,6 @@ export const DASHBOARD: readonly DashboardTab[] = [
                 source: { table: 'alm_hardware', filter: INSTALLED_PAST_SUPPORT },
                 drill: 'risk_past_support',
             },
-            // No current coverage: none recorded, or it ended before today (an end date of today still covers).
             {
                 id: 'no_coverage',
                 chart: 'score',
@@ -214,10 +208,6 @@ export const DASHBOARD: readonly DashboardTab[] = [
             },
         ],
     },
-    /*
-     * Amounts of two currencies are never added (owner decision (b)): every widget groups by currency, as its own
-     * bar or its own cell, and none stacks, totals or slices them into one whole.
-     */
     {
         id: 'margin',
         title: 'Margin',
@@ -269,7 +259,6 @@ export const DASHBOARD: readonly DashboardTab[] = [
     },
 ]
 
-/** The tabs `session` is offered. */
 export function tabsFor(session: Session): readonly DashboardTab[] {
     return DASHBOARD.filter((tab) => session.holdsAny(AUDIENCE[tab.audience]))
 }

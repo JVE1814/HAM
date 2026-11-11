@@ -26,7 +26,7 @@ const HOSTILE_VIEWS: ListView[] = [
     { ...VIEW, page: 1e9, size: 1e9 },
 ]
 
-/** The gs date helpers the conditions already used; the Table and Stats APIs run them for the reader. */
+/** The Table and Stats APIs run a condition's javascript: for the reader, so only these gs date helpers may appear. */
 const DATE_HELPERS = ['gs.beginningOfToday()', 'gs.beginningOfLastMonth()', 'gs.endOfLastMonth()', 'gs.beginningOfLast12Months()']
 
 describe('the workspace catalog', () => {

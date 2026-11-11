@@ -26,7 +26,7 @@ an OEM PID ([ADR 0016](docs/adr/0016-fleet-assets.md)).
 | In service | Seen signals from Discovery / connectors (CI last discovered) and the provider NMS (REST) put installed assets in service and start their subscription line |
 | Models | Normalization of discovered models (PID, aliases, match rules, exceptions that teach rules); lifecycle (EoX) dates via CSV, kept in the platform's Model lifecycle table ([ADR 0017](docs/adr/0017-model-lifecycle-in-the-platform-table.md)); lifecycle phase and refresh due date per asset |
 | Visibility | Customer admins see only their customer, site contacts their sites, inventory techs their stockrooms (of fleet assets and NaaS stockrooms; the Provider IT's equipment is left to the platform's access rules) |
-| UI | NaaS Asset Workspace (`/x/daas/naas-assets/home`) with dashboard; navigator menu; warehouse page (`x_daas_ham_warehouse.do`) |
+| UI | NaaS Asset Workspace page (`x_daas_ham_workspace.do`): its lists and its dashboard; navigator menu; warehouse page (`x_daas_ham_warehouse.do`) |
 
 | Area | Phase 2 |
 |---|---|
@@ -382,8 +382,8 @@ the demo data loader).
   root), the visibility rules and row checks with their ATF tests (ADR 0005: one concern over every
   scoped table), the customer page (it reads several features) and the ATF suites (one per delivery
   phase, each listing tests of several features).
-- `workspace/` holds the workspace, its list menu and its dashboard: each is one structure over
-  every table.
+- `workspace/` holds the workspace's UI page and its ACL. Its lists and its dashboard are data in
+  `src/client/workspace/` (`catalog.ts`, `dashboard.ts`), each one structure over every table.
 - A record's sys_id is keyed by its `$id` name in `generated/keys.ts`, not by its file: moving a
   record to another file changes nothing in the build.
 
