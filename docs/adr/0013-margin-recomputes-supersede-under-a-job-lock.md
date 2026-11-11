@@ -53,7 +53,12 @@ Order rejected and cancels its lines; one that finds a line's lock held changes 
 Order stays awaiting approval, to re-check. A line's stage derived from its Assets takes no lock, so
 a derive that read the line before a cancel is not saved once the line is cancelled or its Order has
 ended, and a line whose Order ended while its derived stage was saved is cancelled again
-(`platform/fulfilment.ts` `deriveLine`): a derive never reopens a cancelled line. The daily
+(`platform/fulfilment.ts` `deriveLine`): a derive never reopens a cancelled line. An Order's stage
+derived from its lines takes no lock either: a derive that read the Order before a cancel and saved
+its stage after leaves the cancel's Closed Skipped state beside it, as a save writes only the fields
+it changed, so an Order read so just after the save is saved cancelled again (`recomputeOrder`).
+A submission holds `source_order_` from its fresh read of the Order through its save out of draft
+(below), so a cancel never lands between them. The daily
 refresh run holds `refresh_orders`, a lock of the same kind, and, like *Cancel order*, does not
 retry: a run that finds its lock held raises nothing and leaves it to the run holding it. Short
 critical sections, such as an Order line, an Agreement's submissions, an ASN row's serial, the
@@ -85,8 +90,8 @@ under `subscription_line_<line sys_id>` and releases it before the go-live save 
 `service_interval_<sys_id>`. Nothing takes `subscription_line_` except that go-live, and nothing is
 taken under it. `refresh_orders` is held by the daily refresh run for the whole run, and the run
 holds no other lock when it takes it. The Orders it raises are inserted and submitted under it. Each
-of their lines replaces an Asset, so their submit reads no usage and takes no lock (below), and
-sourcing runs from the queued event: nothing is taken under it. It comes first all the same, ahead
+of their lines replaces an Asset, so their submit reads no usage and takes only the Order's
+`source_order_` (below), and sourcing runs from the queued event. It comes first all the same, ahead
 of `agreement_usage`, which a submit of an Order with a line that adds a unit takes.
 Submitting an Order assesses it against its Agreement's usage (deployed units plus the quantities of
 its other Orders in flight, `domain/entitlement.ts`) and then saves it out of draft, from which save
@@ -99,14 +104,17 @@ a second submission of the same Order finds it gone ahead and says so. *Submit*,
 producer, *Raise replacement* and a submission queued again take it holding no lock. An Order whose
 lines all replace Assets (break-fix, refresh) is assessed the same whatever is in flight, and its
 lines going into flight beside a holder's read of usage read as if it had come first or last, so its
-submit takes no lock. A submission that finds the lock held through 10 back-to-back tries leaves the
+submit takes no usage lock. Under the usage lock, or holding nothing for such an Order, a submission
+takes the Order's `source_order_`, 10 tries back to back, so a *Cancel order* saved after its read
+of the draft is not overwritten by its save; one that finds it held submits nothing and says the
+Order is being cancelled. A submission that finds the lock held through 10 back-to-back tries leaves the
 Order a draft, noted, and queues it to be submitted again a minute later (the sourcing event with
 parm1 `submit`), at most 15 times, then logs it for staff to submit; the producer's raiser, who may
 have no *Submit*, is told it is submitted within minutes and not to raise it again. Under the lock a
 submit only reads, requests approvals (and cancels them when it cannot go ahead, which runs the
 approval rollup rule: it finds the Order a draft and takes nothing), saves the Order (no rule of the
 app is on it) and queues its sourcing, which takes `source_order_` in its own transaction holding
-nothing. A submit that outlasts the lock logs *<Order> submitted after its lock
+nothing, once the submission has let it go. A submit that outlasts the lock logs *<Order> submitted after its lock
 `agreement_usage_<sys_id>` was lost*.
 The lock orders submissions only: usage that changes without one (a line added to an Order already
 submitted, its Agreement changed, Assets adopted into the Agreement) is not assessed.

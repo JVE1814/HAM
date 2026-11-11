@@ -36,7 +36,8 @@ export const LOCK = {
     receiveAsset: (assetId: string) => named(`receive_asset_${assetId}`),
     /**
      * An Order's sourcing passes take turns under it, so two never count the same shortfall, and Cancel order holds it,
-     * so a pass never reserves or buys for lines being cancelled.
+     * so a pass never reserves or buys for lines being cancelled. A submission holds it too, so it never saves out of
+     * draft an Order cancelled since it read it.
      */
     sourceOrder: (orderId: string) => named(`source_order_${orderId}`),
     /** A Ship of the Order, Cancel order and a void of one of its outbound labels take turns under it. */

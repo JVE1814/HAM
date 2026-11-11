@@ -4,7 +4,7 @@ import { REQUEUE } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { ROLE } from '../domain/visibility.ts'
 import { EVENT } from './events.ts'
-import { submitOrder, submitProducedOrder, submitQueuedOrder, SUBMIT_AGAIN } from './orders.ts'
+import { cancelOrder, submitOrder, submitProducedOrder, submitQueuedOrder, SUBMIT_AGAIN } from './orders.ts'
 import { findById } from './records.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
@@ -63,7 +63,7 @@ beforeEach(() => {
 })
 
 describe('submitting an Order that adds a unit', () => {
-    it("assesses it and saves it out of draft holding its Agreement's usage lock, then lets the lock go", () => {
+    it("assesses it and saves it out of draft holding its Agreement's usage lock and its own sourcing lock, then lets them go", () => {
         let heldAtSave: string[] = []
         platform.onSave = (table, row) => {
             if (table === ORDERS && row.stage !== 'draft') heldAtSave = rows(LOCKS).map((lock) => lock.name)
@@ -71,7 +71,7 @@ describe('submitting an Order that adds a unit', () => {
 
         expect(submitOrder(order())).toEqual({ submitted: true })
 
-        expect(heldAtSave).toEqual([LOCK.agreementUsage('agr1')])
+        expect(heldAtSave).toEqual([LOCK.agreementUsage('agr1'), LOCK.sourceOrder('order1')])
         expect(storedOrder()).toMatchObject({ stage: 'sourcing', approval: 'approved', entitlement_verdict: 'within_agreement' })
         expect(platform.events).toEqual([{ name: EVENT.sourceOrder, record: 'order1', parm1: '', parm2: '', delayed: false }])
         expect(rows(LOCKS)).toEqual([])
@@ -144,6 +144,21 @@ describe('submitting an Order that adds a unit', () => {
         expect(platform.events).toEqual([])
     })
 
+    it('keeps Cancel order out until it is saved out of draft, so the cancel changes nothing and asks to try again', () => {
+        let cancel: unknown
+        platform.onSave = (table, row) => {
+            if (cancel || table !== ORDERS || row.stage !== 'sourcing') return
+            cancel = cancelOrder(order())
+        }
+
+        expect(submitOrder(order())).toEqual({ submitted: true })
+
+        expect(cancel).toEqual({ cancelled: false, reason: 'it is being submitted or sourced. Try again in a minute' })
+        expect(storedOrder()).toMatchObject({ stage: 'sourcing', approval: 'approved' })
+        expect(line().line_stage).toBe('new')
+        expect(rows(LOCKS)).toEqual([])
+    })
+
     it('is not submitted once the Order was cancelled meanwhile, and a submission queued again does nothing', () => {
         const stale = order()
         storedOrder().stage = 'cancelled'
@@ -161,7 +176,7 @@ describe('submitting an Order that only replaces Assets', () => {
         line().replaces_asset = 'old1'
     })
 
-    it("reads no usage, so it takes no lock: it goes ahead while another submission holds its Agreement's", () => {
+    it("reads no usage, so it takes no usage lock: it goes ahead while another submission holds its Agreement's", () => {
         const theirs = holdUsageLock()
 
         expect(submitOrder(order())).toEqual({ submitted: true })

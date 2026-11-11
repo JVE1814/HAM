@@ -5,13 +5,14 @@ import {
     followsLines,
     leftInTransit,
     lineStageFor,
+    ORDER_TASK_STATE,
     orderStageFor,
     refillsLine,
     type OrderShipment,
 } from '../domain/fulfilment.ts'
 import type { Stage } from '../domain/lifecycle.ts'
 import { deploymentEndLineQuery } from '../domain/returns.ts'
-import { LINE_STAGE, ORDER_STAGE, type LineStage } from '../domain/vocabulary.ts'
+import { LINE_STAGE, ORDER_STAGE, type LineStage, type OrderStage } from '../domain/vocabulary.ts'
 import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { EVENT, fire } from './events.ts'
@@ -189,8 +190,22 @@ export function recomputeOrder(orderId: string): void {
     const closed = closedStateFor(next)
     if (closed !== undefined) order.setValue('state', closed)
     if (!order.update()) return notMoved(order, next)
+    if (cancelledWhileMoved(orderId, next)) return
     // Its case is saved by the event's script action (platform/breakfix `noteReplacementComplete`), not in this save.
     if (next === ORDER_STAGE.complete && str(order, 'case')) fire(EVENT.replacementComplete, order)
+}
+
+/**
+ * Cancel order saves the Order cancelled under locks a derive does not take, so a derive that read the Order before the
+ * cancel and saved its stage after leaves the cancel's Closed Skipped state beside a live stage (a save writes only the
+ * fields it changed). That Order is saved cancelled again, read afresh: true when it was found so.
+ */
+function cancelledWhileMoved(orderId: string, next: OrderStage): boolean {
+    const fresh = findById('x_daas_ham_order', orderId)
+    if (!fresh || num(fresh, 'state') !== ORDER_TASK_STATE.cancelled || str(fresh, 'stage') === ORDER_STAGE.cancelled) return false
+    fresh.setValue('stage', ORDER_STAGE.cancelled)
+    if (!fresh.update()) warnRefused(fresh, `${str(fresh, 'number')} moved to ${next} beside its cancel, not cancelled again`)
+    return true
 }
 
 /**

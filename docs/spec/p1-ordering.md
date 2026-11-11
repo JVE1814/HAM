@@ -49,6 +49,10 @@
   draft: one that finds the Order already submitted says *Order <number> was already submitted* and
   counts as gone ahead (a second *Raise replacement* says it is raised); one whose Customer or
   Agreement changed meanwhile, or that gained a line adding a unit, stays a draft, to submit again.
+- Every submission, with or without that lock, holds the Order's sourcing lock
+  (`source_order_<sys_id>`, as **Cancel** below) from its read of the draft through its save out of
+  draft, so a cancel never lands between them. One that finds it held through 10 tries stays a draft
+  and says *Order not submitted: it is being cancelled. Try again shortly*.
 - A submission that finds the lock held through 10 tries leaves the Order a draft, its work notes
   saying why, and it is submitted again automatically a minute later, at most 15 times, then left
   for staff to submit (logged). *Submit* says *Order not submitted yet: another Order of its
@@ -189,9 +193,9 @@
   shipped or later (a hot spare handed over at Ship included), also on a line not delivered whole.
   The user is told to use a Return order instead. A unit taken off its line in transit no longer
   counts. Cancel does nothing when the form's save is refused (the platform says why). It runs
-  under the Order's sourcing lock (`source_order_<sys_id>`), taking turns with sourcing passes:
-  pressed while a pass holds it, it changes nothing and says *Order not cancelled: sourcing is
-  running on it. Try again in a minute*. Under it, it also takes the Order's Ship lock
+  under the Order's sourcing lock (`source_order_<sys_id>`), taking turns with sourcing passes and
+  submissions: pressed while one holds it, it changes nothing and says *Order not cancelled: it is
+  being submitted or sourced. Try again in a minute*. Under it, it also takes the Order's Ship lock
   (`ship_order_<sys_id>`), so no Ship sends units between its shipped check and its release of the
   lines: pressed while a Ship (or *Mark label voided* on one of the Order's outbound labels) holds
   it, it changes nothing and says *Order not cancelled: a Ship of the Order is running. Try again
@@ -214,7 +218,8 @@
 
   A line, unit or staging task the platform refuses to cancel or release is logged and the user is
   told. A rejected Order's lines are cancelled the same way. A cancelled, rejected or complete Order
-  keeps its stage.
+  keeps its stage: an Order stage derived from its lines and saved just after a cancel is saved
+  cancelled again.
 
   Sourcing reads each line and its Order again under the line's lock, before it picks stock and again
   before it buys and saves. It leaves a line that is no longer open, or whose Order is cancelled or

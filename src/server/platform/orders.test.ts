@@ -212,3 +212,26 @@ describe("a line's stage derived from its Assets", () => {
         expect(line2().line_stage).toBe('cancelled')
     })
 })
+
+describe("an Order's stage derived from its lines", () => {
+    beforeEach(() => {
+        // Nothing has shipped, so Cancel order goes ahead; the unit of line2 is being staged, so the Order derives to preparing.
+        rows(LINES).pop()
+        Object.assign(storedOrder(), { state: '2' })
+        Object.assign(unit(), inStage('staging'))
+    })
+
+    it('leaves the Order cancelled when Cancel order lands between its read and its save', () => {
+        let cancel: unknown
+        platform.onSave = (table, row, operation) => {
+            if (cancel || table !== ORDERS || operation !== 'update' || row.stage !== 'preparing') return
+            cancel = cancelOrder(order())
+        }
+
+        recomputeLine('line2')
+
+        expect(cancel).toEqual({ cancelled: true, complete: true })
+        expect(storedOrder()).toMatchObject({ stage: 'cancelled', state: '7' })
+        expect(lineStages()).toEqual({ line1: 'cancelled', line2: 'cancelled' })
+    })
+})

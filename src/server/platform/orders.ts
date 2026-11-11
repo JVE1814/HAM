@@ -222,10 +222,21 @@ function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Order
 function submitAccepted(order: GlideRecord, source: SubmissionSource): Submission {
     const lines = requestedLines(order.getUniqueValue())
     if (lines.length === 0) return notSubmitted('Add at least one order line before submitting')
-    if (!readsUsage(lines)) return submitHolding(null, order)
+    if (!readsUsage(lines)) return submitUnderOrderLock(null, order)
     const usageLock = LOCK.agreementUsage(str(order, 'agreement'))
-    const underUsage = withLockTries(usageLock, (lock) => submitHolding(lock, order), LONG_HOLD_LOCK_TRIES)
+    const underUsage = withLockTries(usageLock, (lock) => submitUnderOrderLock(lock, order), LONG_HOLD_LOCK_TRIES)
     return underUsage.ran ? underUsage.value : submitLater(order, source)
+}
+
+/**
+ * The submission holding the Order's sourcing lock (domain/lock-names `sourceOrder`), which Cancel order holds
+ * (`cancelOrder`): a cancel saved between the submission's read of the Order as a draft and its save out of draft would
+ * be overwritten, its lines cancelled under an Order sourcing or awaiting approval. One that finds the lock held
+ * through every try submits nothing.
+ */
+function submitUnderOrderLock(usageLock: HeldLock | null, order: GlideRecord): Submission {
+    const underOrder = withLockTries(LOCK.sourceOrder(order.getUniqueValue()), () => submitHolding(usageLock, order), LONG_HOLD_LOCK_TRIES)
+    return underOrder.ran ? underOrder.value : notSubmitted('Order not submitted: it is being cancelled. Try again shortly')
 }
 
 /**
@@ -535,10 +546,11 @@ function notCancelled(reason: string): Cancellation {
  *
  * A sourcing pass running meanwhile would reserve stock for, or buy for, lines just cancelled, and its purchase orders
  * would not be listed to cancel. So the cancel holds the Order's sourcing lock (platform/sourcing `runSourcingPass`)
- * and the two take turns; a cancel that finds it held changes nothing and says so. A Ship running between the cancel's
- * shipped check and its release of the lines would send units of lines being cancelled, so the cancel holds the
- * Order's Ship lock too (platform/delivery `shipOrder`), taken under the sourcing lock as in ADR 0013's order (Ship
- * never takes the sourcing lock); one that finds it held changes nothing and says a Ship is running. A receipt
+ * and the two take turns, as it does with a submission (`submitUnderOrderLock`); a cancel that finds it held changes
+ * nothing and says so. A Ship running between the cancel's shipped check and its release of the lines would send units
+ * of lines being cancelled, so the cancel holds the Order's Ship lock too (platform/delivery `shipOrder`), taken under
+ * the sourcing lock as in ADR 0013's order (Ship never takes the sourcing lock); one that finds it held changes nothing
+ * and says a Ship is running. A receipt
  * allocating its unit to a line between the cancel's read of the line's units and the line's cancel would leave the
  * unit on a cancelled line, so under the Ship lock the cancel holds each open line's lock too (`withOrderLineLocks`),
  * which a receipt takes to allocate and stage its unit (platform/receiving `receive`); one that finds a line's lock
@@ -553,7 +565,7 @@ export function cancelOrder(order: GlideRecord): Cancellation {
             return withOrderLineLocks(lineIds, (lines) => cancelHolding({ sourcing, ship, lines }, order, lineIds))
         })
     })
-    if (!underSourcing.ran) return notCancelled('sourcing is running on it. Try again in a minute')
+    if (!underSourcing.ran) return notCancelled('it is being submitted or sourced. Try again in a minute')
     const underShip = underSourcing.value
     if (!underShip.ran) return notCancelled('a Ship of the Order is running. Try again once it is done')
     const underLines = underShip.value

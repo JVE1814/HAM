@@ -574,7 +574,9 @@ under `order_line_<line sys_id>`, which a receipt for a waiting line takes too.
   unit whose reservation fails queues `x_daas_ham.order.source` for its Order: one *not reserved
   for <line>* warning is followed by a sourcing pass, not by a stalled line.
 - *Cancel order* takes `source_order_<Order sys_id>` too: with a row of that name in *Job lock*, it
-  says *Order not cancelled: sourcing is running on it. Try again in a minute* and changes nothing.
+  says *Order not cancelled: it is being submitted or sourced. Try again in a minute* and changes
+  nothing. *Submit* takes it as well: with that row in place, it says *Order not submitted: it is
+  being cancelled. Try again shortly* and the Order stays a draft.
   Under it, it also takes `ship_order_<Order sys_id>`: with a row of that name in place (and none
   for `source_order_`), it says *Order not cancelled: a Ship of the Order is running. Try again once
   it is done* and changes nothing.
