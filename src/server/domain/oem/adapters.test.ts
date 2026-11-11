@@ -419,8 +419,8 @@ describe('parseCoverageRow', () => {
 })
 
 /*
- * The adapters' tolerant-reader promise (adapters.ts header): a 2xx whose body is not JSON, and a record missing the
- * field a fact is keyed by, degrade to "unknown" (no fact, an error where the answer said nothing) and never throw.
+ * The adapters' tolerant-reader promise (sync-adapters.ts header): a 2xx whose body is not JSON, and a record missing
+ * the field a fact is keyed by, degrade to "unknown" (no fact, an error where the answer said nothing) and never throw.
  */
 
 const answer = (response: HttpResponse): OemContext => ({ http: () => response, orgIds: ['org1'] })

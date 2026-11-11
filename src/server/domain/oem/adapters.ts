@@ -91,8 +91,8 @@ export const OEM_ADAPTERS: Record<OemVendor, VendorIntegration> = {
 }
 
 /**
- * The order the sync jobs take the vendors in. It is an order, not the list of vendors, which is `OemVendor`: the type
- * below fails when a vendor is missing from it.
+ * The order the sync jobs take the vendors in, and the vendors a coverage CSV row may name (`parseCoverageRow`). The
+ * type below fails when a vendor of `OemVendor` is missing from it.
  */
 const SYNC_ORDER = ['cisco', 'meraki', 'fortinet', 'mist', 'aruba', 'checkpoint'] as const satisfies readonly OemVendor[]
 
