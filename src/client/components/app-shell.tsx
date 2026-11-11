@@ -76,16 +76,16 @@ export function AppShell({ title, layout, nav, actions }: { title: string; layou
     const items = nav.flatMap((group) => group.items)
     const current = items.find((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))
     return (
-        <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
-            <header className="flex flex-wrap items-center gap-3">
+        <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4 print:max-w-none print:p-0">
+            <header className="flex flex-wrap items-center gap-3 print:hidden">
                 <h1 className="mr-auto font-heading text-xl font-semibold">{title}</h1>
                 {actions}
             </header>
             {items.length > 1 && (
-                <Tabs value={current?.to ?? null}>
+                <Tabs value={current?.to ?? null} className="print:hidden">
                     <TabsList className="max-w-full overflow-x-auto">
                         {items.map((item) => (
-                            <TabsTrigger key={item.to} value={item.to} render={<Link to={item.to} />}>
+                            <TabsTrigger key={item.to} value={item.to} nativeButton={false} render={<Link to={item.to} />}>
                                 {item.label}
                                 {item.badge ? <Badge>{item.badge}</Badge> : null}
                             </TabsTrigger>

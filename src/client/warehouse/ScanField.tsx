@@ -1,4 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react'
+import { Button } from '@/components/ui/button'
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 
 const TEXT_INPUTS = new Set(['text', 'search', 'email', 'number', 'password', 'tel', 'url'])
 
@@ -27,7 +30,7 @@ export default function ScanField({
     label: string
     onScan: (code: string) => void
     pending: number
-    inputRef: React.RefObject<HTMLInputElement | null>
+    inputRef: RefObject<HTMLInputElement | null>
 }) {
     const [value, setValue] = useState('')
     const [cameraOn, setCameraOn] = useState(false)
@@ -111,7 +114,7 @@ export default function ScanField({
         return stop
     }, [cameraOn, inputRef])
 
-    const submit = (event: React.FormEvent) => {
+    const submit = (event: FormEvent) => {
         event.preventDefault()
         const code = value.trim()
         if (!code) return
@@ -127,36 +130,37 @@ export default function ScanField({
     }
 
     return (
-        <form className="scan" onSubmit={submit}>
-            <label className="field" htmlFor="scan-input">
-                {label}
-            </label>
-            <div className="scan-row">
-                <input
-                    id="scan-input"
-                    ref={inputRef}
-                    value={value}
-                    onChange={(e) => setValue(e.target.value)}
-                    autoComplete="off"
-                    autoCapitalize="characters"
-                    placeholder="Scan or type serial / tag"
-                />
-                <button type="submit" disabled={!value.trim()}>
-                    Go
-                </button>
-                {cameraSupported && (
-                    <button type="button" onClick={toggleCamera}>
-                        {cameraOn ? 'Stop camera' : 'Camera'}
-                    </button>
+        <form onSubmit={submit} className="print:hidden">
+            <Field>
+                <FieldLabel htmlFor="scan-input">{label}</FieldLabel>
+                <div className="flex gap-2">
+                    <Input
+                        id="scan-input"
+                        ref={inputRef}
+                        className="h-11 flex-1 text-lg md:text-lg"
+                        value={value}
+                        onChange={(e) => setValue(e.target.value)}
+                        autoComplete="off"
+                        autoCapitalize="characters"
+                        placeholder="Scan or type serial / tag"
+                    />
+                    <Button type="submit" className="h-11 px-4" disabled={!value.trim()}>
+                        Go
+                    </Button>
+                    {cameraSupported && (
+                        <Button type="button" variant="outline" className="h-11 px-4" onClick={toggleCamera}>
+                            {cameraOn ? 'Stop camera' : 'Camera'}
+                        </Button>
+                    )}
+                </div>
+                {pending > 0 && (
+                    <FieldDescription role="status">
+                        Sending {pending} {pending === 1 ? 'scan' : 'scans'}…
+                    </FieldDescription>
                 )}
-            </div>
-            {pending > 0 && (
-                <p className="scan-pending" role="status">
-                    Sending {pending} {pending === 1 ? 'scan' : 'scans'}…
-                </p>
-            )}
-            {cameraError && <p className="scan-error">Camera unavailable: {cameraError}</p>}
-            {cameraOn && <video ref={videoRef} className="camera" muted playsInline />}
+                {cameraError && <FieldError>Camera unavailable: {cameraError}</FieldError>}
+                {cameraOn && <video ref={videoRef} className="w-full rounded-lg" muted playsInline />}
+            </Field>
         </form>
     )
 }
