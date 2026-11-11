@@ -224,14 +224,18 @@ export function visibleSites(): Site[] {
     return sites
 }
 
+/** Where a rack stands: in a Room of its Site, or at the Site itself. The listing and the elevation both read it. */
+const RACK_SITE_LOCATIONS = ['location', 'location.parent'] as const
+
 /** The racks at a Site and in its rooms, by name; null when `siteId` names no Site the user may see. */
 export function racksAtSite(siteId: string): RackListing[] | null {
     // The Site is read first so the visibility check and the rack query below use the same sys_id.
     const site = findById('cmn_location', siteId)
     if (!site || !seesSite([site.getUniqueValue()])) return null
     const rack = new GlideRecord('cmdb_ci_rack')
-    const atSite = rack.addQuery('location', site.getUniqueValue())
-    atSite.addOrCondition('location.parent', site.getUniqueValue())
+    const [standsAt, ...under] = RACK_SITE_LOCATIONS
+    const atSite = rack.addQuery(standsAt, site.getUniqueValue())
+    for (const location of under) atSite.addOrCondition(location, site.getUniqueValue())
     rack.orderBy('name')
     rack.query()
     const racks: RackListing[] = []
@@ -245,8 +249,7 @@ export function racksAtSite(siteId: string): RackListing[] | null {
  */
 export function rackElevation(rackId: string): RackElevation | null {
     const rack = new GlideRecord('cmdb_ci_rack')
-    // A rack stands in a Room of the Site (or at the Site itself), as `racksAtSite` lists it.
-    if (!rack.get(rackId) || !seesSite([str(rack, 'location'), str(rack, 'location.parent')])) return null
+    if (!rack.get(rackId) || !seesSite(RACK_SITE_LOCATIONS.map((location) => str(rack, location)))) return null
     const asset = placedIn(rack.getUniqueValue())
     asset.query()
     const found: Array<{ slot: Slot; companyId: string; device: Omit<RackDevice, 'customer' | 'model' | 'ruStart' | 'height' | 'face'> }> = []

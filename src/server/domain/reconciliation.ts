@@ -28,13 +28,19 @@ export interface InstalledAssetView {
 const CI_HARDWARE = 'asset.ref_alm_hardware.'
 
 /**
+ * Where a CI may stand at a customer Site: its location, or the location one or two levels up (room, building, Site).
+ * Both checks of a CI's Site read it: the location mismatch and *seen without asset*.
+ */
+export const CI_SITE_LOCATIONS = ['location', 'location.parent', 'location.parent.parent'] as const
+
+/**
  * Encoded query on network-gear CIs for *seen without asset*: at a customer Site (the CI's location, or the location
  * one or two levels up, as for a location mismatch) and pointing at no fleet asset (ADR 0016): at none, or at one of
  * the Provider IT's, which an asset manager adds to the fleet. The Provider IT's own network gear elsewhere is not
  * NaaS's to report. The caller adds how recently it was discovered.
  */
 export function seenWithoutFleetAssetQuery(): string {
-    const atSite = ['location.', 'location.parent.', 'location.parent.parent.'].map((via) => `${via}${SITE_CONDITION}`)
+    const atSite = CI_SITE_LOCATIONS.map((location) => `${location}.${SITE_CONDITION}`)
     return `assetISEMPTY^OR${outsideFleetCondition(CI_HARDWARE)}^${atSite.join('^OR')}`
 }
 

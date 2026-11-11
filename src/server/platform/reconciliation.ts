@@ -1,6 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import {
+    CI_SITE_LOCATIONS,
     MONITORING_EXCEPTION_TYPES,
     outOfUseExceptionsQuery,
     outsideFleetExceptionsQuery,
@@ -40,7 +41,7 @@ export function reconcileInstalledBase(): void {
                 ci: str(asset, 'ci')
                     ? {
                           serial: str(asset, 'ci.serial_number'),
-                          locationIds: [str(asset, 'ci.location'), str(asset, 'ci.location.parent'), str(asset, 'ci.location.parent.parent')],
+                          locationIds: CI_SITE_LOCATIONS.map((location) => str(asset, `ci.${location}`)),
                       }
                     : undefined,
             },
