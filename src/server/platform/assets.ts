@@ -216,8 +216,7 @@ function identify(identifier: string, lookup: IdentifierLookup): AssetIdentified
     const code = identifier.trim()
     if (!code) return null
     for (const field of IDENTIFIER_FIELDS) {
-        const value = field.field === 'serial_number' ? normalizeSerial(code) : code
-        const found = assetsCarrying(field.field, value, lookup)
+        const found = assetsCarrying(field.field, normalizeSerial(code), lookup)
         const match = fieldMatch(found.map((asset) => asset.fleet))
         if (match.kind === 'ambiguous') return { ambiguous: ambiguousIdentifier(code, field) }
         if (match.kind === 'none') continue

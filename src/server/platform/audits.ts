@@ -1,4 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
+import { IDENTIFIER_FIELDS, type IdentifierColumn } from '../domain/asset-identifier.ts'
 import { AUDIT_STATE, closedLineResult, compareAudit, onTheShelfQuery, type ExpectedAsset } from '../domain/audit.ts'
 import { messageOf } from '../domain/errors.ts'
 import { naasStockroomType, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
@@ -190,12 +191,8 @@ function closeHolding(audit: GlideRecord): AuditClose {
     while (read.next()) {
         if (str(read, 'scanned_code')) scans.push(str(read, 'scanned_code'))
         else if (str(read, 'asset')) {
-            expected.push({
-                assetId: str(read, 'asset'),
-                serial: str(read, 'asset.serial_number'),
-                providerTag: str(read, 'asset.asset_tag'),
-                customerTag: str(read, 'asset.x_daas_ham_customer_tag'),
-            })
+            const codes = Object.fromEntries(IDENTIFIER_FIELDS.map(({ field }) => [field, str(read, `asset.${field}`)]))
+            expected.push({ assetId: str(read, 'asset'), ...(codes as Record<IdentifierColumn, string>) })
         }
     }
     const comparison = compareAudit(expected, scans)
