@@ -25,19 +25,21 @@ impersonating a user who holds that role and no other NaaS role.
 ### Install log
 
 *System Applications > Application install history* (`sys_upgrade_history_log`) lists one *Skipped
-Error* row per global table the app adds columns to (`sys_documentation_<table>__en`, seven of
-them): SDK 4.14 writes a table label for each augmented table, and the platform keeps the table's
+Error* row per global table the app adds columns to (`sys_documentation_<table>__en`; the tables are
+the `Table({ augments })` records of `src/fluent/shared/platform-tables.now.ts`): SDK 4.14 writes a
+table label for each augmented table, and the platform keeps the table's
 own. The development instance's install of 2026-11-09, of the earlier version, which also added
-columns to `change_request`, logged eight and no other.
+columns to `change_request`, logged one per table it augmented and no other.
 
 The app no longer adds a column to `change_request` (ADR 0018), so the build now carries two
 deletes for records it used to write there, under the app's own sys_ids: the table label
 (`sys_documentation_change_request__en`) and its licensing row
 (`ua_table_licensing_config_369e4a1bcfc54fb38605149dc901ed02`). On an instance that never had them,
-each is a *Skipped Error* row too, so a fresh install logs nine and no other. Any other *Skipped
+each is a *Skipped Error* row too, so a fresh install logs one row per augmented table, those two,
+and no other. Any other *Skipped
 Error* row is a defect. After the install, check that the *Change Request* table still has its
 label (*System Definition > Tables*) and its licensing row. A fresh install on a Brazil PDI on
-2026-11-11 logged those nine, and *Change Request* kept both.
+2026-11-11 logged exactly those rows, and *Change Request* kept both.
 
 ### Preflight check
 
@@ -48,10 +50,14 @@ missing* and names them, each also logged as an error.
 
 ### Choices
 
-The instance accepts the app's `alm_asset.substatus` choice set (v2 format, the app's 10 values).
+The instance accepts the app's `alm_asset.substatus` choice set (v2 format, one value per `choice`
+entry of `STAGE_FIELDS` in
+`src/server/domain/vocabulary.ts`).
 That format deletes only the app's own values, so the platform's stay beside them: after the install
-of 2026-11-09, `sys_choice name=alm_asset^element=substatus^language=en` listed 55 rows on the
-development instance (Brazil), its 45 and the app's 10. Check that the out-of-box values are still
+of 2026-11-09, `sys_choice name=alm_asset^element=substatus^language=en` listed the platform's 45
+rows on the
+development instance (Brazil) and one for each of the app's values. Check that the out-of-box values
+are still
 there, e.g. `value=available` (In stock): the app's install never removes them, but a script that
 deletes this field's choices takes them along, and only a reinstall from the platform's own choice
 set brings them back. A Brazil instance already has *Pending evaluation* (`pending_evaluation`, In
@@ -363,7 +369,7 @@ producer opens the Return it raised.
 ### REST access for customer users
 
 `shared/rest-api.now.ts`, `shared/rest-acls.now.ts`. In *System Web Services > Scripted REST APIs >
-NaaS asset management*, the routes `/sites`, `/racks`, `/racks/{id}` and the five `/customer/...`
+NaaS asset management*, the routes `/sites`, `/racks`, `/racks/{id}` and the `/customer/...`
 routes have *Requires SNC Internal role* off and the ACLs *Scripted REST External Default* and
 *x_daas_ham NaaS customer routes*. The latter is an execute REST_Endpoint ACL with the roles
 `x_daas_ham.customer_admin` and `x_daas_ham.site_contact`. Every other authenticated route keeps
@@ -375,8 +381,9 @@ user, `GET /api/x_daas_ham/naas/stockrooms` and `/billing_periods` answer HTTP 4
 
 ### NaaS dashboard
 
-`workspace/dashboard.now.ts`. *NaaS Asset Overview* shows in the workspace for each of the six NaaS
-staff roles and for app administrators, and for no Customer contact. As a NOC-only or
+`workspace/dashboard.now.ts`. *NaaS Asset Overview* shows in the workspace for each NaaS
+staff role (`PROVIDER_STAFF` in `src/server/domain/roles.ts`) and for app administrators, and for no
+Customer contact. As a NOC-only or
 inventory-tech-only user, Operations, Billing integrity and Lifecycle risk show counts. The Margin
 tab's tiles show no figures, because the money ACLs refuse them (if one shows a figure, the
 dashboard's widgets do not apply the tables' read ACLs), and an inventory tech also gets no
@@ -488,7 +495,9 @@ Every lock below behaves as follows, which its own check does not repeat:
 - **Holding a lock by hand.** A row created by hand in *Job lock* with the lock's name (the sys_ids
   it names filled in) holds the lock, as another run would. Delete the row and the next run, event,
   scan or press goes ahead.
-- **Abandoned locks.** A row created over 10 minutes ago is taken as abandoned and cleared by the
+- **Abandoned locks.** A row created longer ago than `ABANDONED_AFTER_MINUTES` is taken as abandoned
+  (`src/server/domain/job-lock.ts` owns that time and the try and re-queue counts below) and cleared
+  by the
   next take, which then goes ahead; a fresh one is not cleared.
 - **Nothing left behind.** No lock row is left once the run, request or action that took it ends.
 
@@ -496,7 +505,8 @@ Every lock below behaves as follows, which its own check does not repeat:
 
 `margin_<Billing period sys_id>` ([how a job lock behaves](#how-a-job-lock-behaves)). The
 `x_daas_ham.margin.compute` event still ends as processed when its take is refused. A chunk that
-finds the lock held runs again about a minute later. A recompute whose lock was cleared while it
+finds the lock held runs again `REQUEUE.delaySeconds` seconds later. A recompute whose lock was
+cleared while it
 was writing logs a *job lock lost while writing* warning and starts a fresh pass, which recomputes
 the period from scratch. A recompute whose clearing of the period's old Cost facts or Margin rows
 leaves a row (kept by a delete rule, say) stops with *Last margin error* *stopped: old Cost facts
@@ -511,9 +521,10 @@ tags. A number whose tag an Asset already carries is skipped, so a counter set b
 that outlasted the lock) skips the tags issued since; only a tag issued but not yet saved on its
 Asset when such a write lands could be issued again (ADR 0013). With *Cursor* of the
 `provider_tag_sequence` row in *Job cursor* set to 0, the next unit received gets the first tag no
-Asset carries. A receipt that finds the lock held 5 times in a row answers HTTP 503 *Other receipts
-are taking Provider tags: scan again* and leaves the unit unreceived (up to 10 *Unique Key
-violation* errors for one 503).
+Asset carries. A receipt that finds the lock held `LOCK_TRIES` times in a row answers HTTP 503
+*Other receipts
+are taking Provider tags: scan again* and leaves the unit unreceived (two *Unique Key
+violation* errors a try for one 503).
 
 ### Serial lock
 
@@ -522,9 +533,11 @@ Warehouse Receive without an ASN, and ASN import rows
 PID, or an ASN row, creates the Asset under the job lock `receive_serial_<serial>`, checking there
 that no Asset has the serial, so two first scans, or a scan and an ASN row, create one Asset. The
 other scan answers HTTP 503 *Another scan is receiving this unit: scan again*; its rescan finds the
-Asset by serial. An ASN row tries the lock 5 times: with a row `receive_serial_<serial>` created by
+Asset by serial. An ASN row tries the lock `LOCK_TRIES` times: with a row `receive_serial_<serial>`
+created by
 hand, an ASN row loaded for that serial is marked error *serial <serial> not imported: a scan or
-another row is receiving it; load this row again*, and ten *Unique Key violation* errors are logged.
+another row is receiving it; load this row again*, and two *Unique Key violation* errors a try are
+logged.
 
 ### Receipt lock
 
@@ -543,7 +556,8 @@ lease return's withdrawal ([how a job lock behaves](#how-a-job-lock-behaves)). R
 for an Order line, linking a hot spare at the customer site to one, or moving free stock into a
 Spare pool takes the job lock `reserve_asset_<Asset sys_id>` and re-reads the Asset under it, so
 two runs that pick the same Asset never both claim it. Put-away and the withdrawal of a returned
-lease's stock take the same lock, each trying 5 times, so neither moves a unit a claim is taking.
+lease's stock take the same lock, each trying `LOCK_TRIES` times, so neither moves a unit a claim is
+taking.
 The re-read also refuses a unit whose lease is being returned to its Lessor (end action *Return to
 lessor*), so such a unit is never reserved, linked or pooled.
 
@@ -571,11 +585,14 @@ Order sourcing and receiving ([how a job lock behaves](#how-a-job-lock-behaves))
 holds the job lock `source_order_<Order sys_id>` for its whole run, and reads and saves each line
 under `order_line_<line sys_id>`, which a receipt for a waiting line takes too.
 
-- A pass that finds the Order's lock held logs *[x_daas_ham] <Order> sourced again in 60 s: another
-  pass or a cancel holds its lock* (info), and runs again a minute later. A request queued again 15
-  times logs *[x_daas_ham] <Order> not sourced again after 15 tries (...): check its lines*
+- A pass that finds the Order's lock held logs *[x_daas_ham] <Order> sourced again in <n> s: another
+  pass or a cancel holds its lock* (info), and runs again `REQUEUE.delaySeconds` seconds later. A
+  request queued again
+  `REQUEUE.times` times logs *[x_daas_ham] <Order> not sourced again after <n> tries (...): check
+  its lines*
   (warning) and is dropped.
-- A line lock is tried 10 times (up to 20 errors). Held through them all, sourcing leaves the line
+- A line lock is tried `LONG_HOLD_LOCK_TRIES` times (two errors a try). Held through them all,
+  sourcing leaves the line
   to the pass queued again (after picking stock, it logs *[x_daas_ham] <line> left to the next
   sourcing pass (...)*, naming any transfer orders the line does not list), and a receipt answers
   HTTP 503 *Its order line is being sourced, received or cancelled: scan again* and saves nothing. A received
@@ -592,16 +609,17 @@ under `order_line_<line sys_id>`, which a receipt for a waiting line takes too.
 ### Sighting lock
 
 Device events and in-service detection ([how a job lock behaves](#how-a-job-lock-behaves)). An NMS
-event or the 15-minute detection job applies a sighting under the job lock `seen_asset_<Asset
+event or the detection job applies a sighting under the job lock `seen_asset_<Asset
 sys_id>`. With a row named `seen_asset_<sys_id of a pending-in-service Asset>` in *Job lock*, POST a
 *seen* event for it. The POST answers `202` with its identifier in `busy_identifiers` and
-`accepted` 0, after 10 refused tries (20 *Unique Key violation* errors). The 15-minute detection
+`accepted` 0, after `LONG_HOLD_LOCK_TRIES` refused tries (two *Unique Key violation* errors each).
+The detection
 job leaves that Asset pending and logs nothing of its own for it: only the *Unique Key violation*
 errors of its refused tries appear. Delete the row and the next event or run puts it in service.
 
 A go-live starts a pending Subscription line under `subscription_line_<line sys_id>`. With a row of
 that name in *Job lock*, a *seen* event for an Asset going live on that line is accepted. The Asset
-stays pending in service, ten *Unique Key violation* errors are logged, and so is *[x_daas_ham]
+stays pending in service, two *Unique Key violation* errors a try are logged, and so is *[x_daas_ham]
 <serial> stays pending in service, line not started: another go-live held its lock through every
 try* (warning). Delete the row, or leave it until it is abandoned, and the next sighting starts the
 line.
@@ -612,7 +630,7 @@ line.
 `fee_<type>_<Asset sys_id>_<Return order sys_id>`, and opening or closing a Service interval takes
 `service_interval_<Asset sys_id>`. In *Job lock*, create a row named `service_interval_<sys_id of a
 pending-in-service Asset>`, then move that Asset into service: no Service interval opens, and the
-system log shows ten *Unique Key violation* errors and *[x_daas_ham] <serial> in service from
+system log shows two *Unique Key violation* errors a try and *[x_daas_ham] <serial> in service from
 <date>, no interval open: left to another save holding its lock ...* (error). Delete the row and
 the next go-live opens it. With the row in place, moving an Asset with an open interval out of
 service leaves it open and logs *[x_daas_ham] <serial> left service on <date>, its Service interval
@@ -633,8 +651,9 @@ row and the next run raises them.
 Daily spare-pool top-up ([how a job lock behaves](#how-a-job-lock-behaves)). The *NaaS - spare pool
 top-up* run counts, fills and buys for each short Spare pool under the job lock
 `spare_pool_<Customer sys_id>_<Model sys_id>`. With a row of that name in *Job lock* for a pool
-that is short, *Execute now* moves nothing into it and buys nothing for it. It tries 5 times (up to
-10 *Unique Key violation* errors), and the run logs *[x_daas_ham] Spare pool of <Customer sys_id>
+that is short, *Execute now* moves nothing into it and buys nothing for it. It tries `LOCK_TRIES`
+times (two
+*Unique Key violation* errors a try), and the run logs *[x_daas_ham] Spare pool of <Customer sys_id>
 for <Model sys_id> not topped up: another run holds the spare_pool_... lock and tops it up* (info).
 Delete the row and the next run tops it up.
 
@@ -648,7 +667,8 @@ HTTP 503 *Another return request of yours is being raised: try again in a moment
 nothing. Delete the row and the request raises the Return. Sending the same request again then
 answers HTTP 409 *Each device is already on a return* and raises nothing. With a row named
 `return_asset_<sys_id of an in-service Asset>`, a Return raised for that Asset (record producer or
-customer page) tries the lock 5 times (up to 10 *Unique Key violation* errors), leaves it off and,
+customer page) tries the lock `LOCK_TRIES` times (two *Unique Key violation* errors a try), leaves
+it off and,
 as the Asset awaits no return, warns *[x_daas_ham] Asset <sys_id> left off return <number>: its
 return lock was held through every try, yet it awaits no return: put it on one by hand if it is due
 back*. A Return left with no unit closes at once, noting *No unit could be added (see the system
@@ -679,15 +699,19 @@ run holds the oem_claim_run lock and sends them* (info). Delete the row and the 
 - The tracking webhook holds `track_shipment_<Shipment sys_id>` while it saves the status and
   inserts new events, and *Mark label voided* while it checks and saves the void. A busy lock is
   retried inside the app, not by the aggregator. With a row of that name created by hand in *Job
-  lock*, a delivery answers HTTP 202 `{"matched": true, "queued": true}` within a second, logs up to
-  10 *Unique Key violation* errors (5 tries) and *[x_daas_ham] Tracking update of Shipment <number>
+  lock*, a delivery answers HTTP 202 `{"matched": true, "queued": true}` within a second, logs two
+  *Unique Key violation* errors a try (`LOCK_TRIES` tries) and *[x_daas_ham] Tracking update of
+  Shipment <number>
   (<tracking number>) queued in 1 event(s): another update held its lock* (info), and saves nothing
-  yet. The `x_daas_ham.shipment.track` event then tries again as soon as it is processed and about
-  every minute after, each try logging up to 10 more errors and *... tried again in 60 s: another
+  yet. The `x_daas_ham.shipment.track` event then tries again as soon as it is processed and every
+  `REQUEUE.delaySeconds` seconds after, each try logging its errors again and *... tried again in
+  <n> s: another
   update held its lock*. Delete the row and the next try saves the status and events (and notes a
-  delivery on the Order once); left in place, the first try once the row is 10 minutes old clears
-  it as abandoned and saves them. A retry still held off after 15 re-queues logs *[x_daas_ham]
-  Tracking update of Shipment <number> (<tracking number>) dropped after 15 tries (...): check the
+  delivery on the Order once); left in place, the first try once the row is older than
+  `ABANDONED_AFTER_MINUTES` clears
+  it as abandoned and saves them. A retry still held off after `REQUEUE.times` re-queues logs
+  *[x_daas_ham]
+  Tracking update of Shipment <number> (<tracking number>) dropped after <n> tries (...): check the
   Shipment with the carrier* (warning).
 - With the `track_shipment_` row in place, *Mark label voided* says *Label <tracking number> not
   marked voided: a tracking update of it is being saved. Try again* and changes nothing. *Mark
@@ -695,9 +719,10 @@ run holds the oem_claim_run lock and sends them* (info). Delete the row and the 
   name in place, it says *Label <tracking number> not marked voided: a Ship of its Order, or a void
   of one of its labels, is running. Try again once it has finished* and changes nothing, and a Ship
   pressed while a void holds the lock says *Another Ship of this Order is running*.
-- The queued update travels in the event's `parm1`, at most 4000 characters (a long history is
+- The queued update travels in the event's `parm1`, at most `TRACKING_RETRY_CHARS` characters
+  (`src/server/domain/shipping.ts`; a long history is
   shared out over several events, never cut): check that `sysevent.parm1` holds that many on the
-  instance (its dictionary max length), as the 4000 comes from community answers, not ServiceNow's
+  instance (its dictionary max length), as that size comes from community answers, not ServiceNow's
   documentation. A longer value would be cut on save and the retry dropped as *parm1 is not an
   update*.
 

@@ -19,30 +19,38 @@ runner is used in two ways:
 Other scheduled jobs do not use the runner. Each bounds its work its own way, or not at all:
 
 - Refresh Orders (`platform/refresh.ts`) read due in-service fleet assets, earliest due first (then
-  by sys_id), a page of 2000 at a time after the last one read, skipping those already on an open
-  replacing line, until 2000 candidates are found, the Assets due run out, or the job time budget
+  by sys_id), a page at a time after the last one read, skipping those already on an open
+  replacing line, until a run's candidates are found (`CANDIDATES_PER_RUN`, also the page size), the
+  Assets due run out, or the job time budget
   (`x_daas_ham.job.budget_seconds`) is spent (`domain/refresh.ts` `firstCandidatesDue`). No cursor
   is kept: each run starts from the earliest due, so Assets waiting on open Orders (a draft left for
   review, a replacement not yet installed) cost reads but no longer block later-due ones.
 - OEM sync (`platform/oem-sync.ts`): the lifecycle sync reads every NaaS Model of each enabled
   vendor in one query; the coverage sync takes batches of stale Assets, oldest check first, until
   the time budget is spent, with no cursor since a checked Asset drops out of the query; the RMA
-  status sync asks at most 200 open RMAs per vendor a run, least recently synced first.
+  status sync asks a capped number of open RMAs per vendor a run (`RMAS_PER_SYNC` in
+  `platform/oem-rma.ts`), least
+  recently synced first.
 - OEM claim and provisioning (`platform/claim-steps.ts` `runClaims`) makes at most
   `x_daas_ham.oem.claim.max_calls` adapter calls per vendor a run, holding its run lock. Before them
-  it checks 200 waiting steps for stranded ones, in sys_id order from where the last run stopped
+  it checks a capped number of waiting steps (`STRANDED_LOAD`) for stranded ones, in sys_id order
+  from where the last run stopped
   (the `x_daas_ham_job_cursor` row `oem_claim_stranded`, which holds only that position), starting
   over after the last.
-- Scheduled returns (`platform/scheduled-returns.ts` `raiseDueReturns`) take at most 50 ended
-  Agreements and 50 ending temporary Orders a run; each one raised is flagged and drops out.
+- Scheduled returns (`platform/scheduled-returns.ts` `raiseDueReturns`) take a limited number of ended
+  Agreements and of ending temporary Orders a run (the limits are in that module); each one raised
+  is flagged and drops out.
 - Attestations (`platform/attestations.ts` `raiseDueAttestations`) read every in-service or
   temporarily deployed fleet asset of each active Agreement with an attestation interval, in one run
   with no time budget or cursor.
 - Lease review (`platform/leases.ts` `runLeaseReview`) reads every undecided lease that ended no
-  more than 30 days ago or ends later, in one query; the renewal warnings read every Agreement not
-  yet warned, and the coverage-expiry warnings at most 5000 contracts a run.
+  longer ago than `REVIEWED_DAYS_PAST_END` (`domain/leases.ts`) or ends later, in one query; the
+  renewal warnings read every Agreement not
+  yet warned, and the coverage-expiry warnings a limited number of contracts a run
+  (`platform/coverage-warnings.ts`).
 - The installed-base reconciliation's exception clean-up, its *seen without asset* report (at most
-  1000 CIs a run) and the rack re-check run after its chunked pass, unchunked. The device-event
+  `SEEN_WITHOUT_ASSET_PER_RUN` CIs a run, `platform/reconciliation.ts`) and the rack re-check run
+  after its chunked pass, unchunked. The device-event
   purge deletes with one query.
 
 A record whose handling throws fails, and the pass moves on past it: only the next pass handles it
@@ -75,7 +83,8 @@ One runner and one repository of the rows (`platform/chunked.ts`, `platform/job-
 all of these. The table also holds two rows that are not cursors, the Provider tag counter
 (`provider_tag_sequence`) and the preflight check's last result (`preflight`).
 
-Billing generation keeps one such row per period (`billing_generate_<period sys_id>`), with the
+Billing generation keeps one such row per period (named by `generationJob` in
+`platform/billing.ts`), with the
 current pass's token and the time the last chunk started. So a reset or replaced pass's queued
 chunks are dropped, and *Reset generation* can tell whether the generation is idle. A pass starts
 where it is triggered (the period's insert, *Regenerate*), not from its first event, and, unlike

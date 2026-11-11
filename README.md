@@ -67,11 +67,14 @@ on-demand job **NaaS - preflight check** (System Definition > Scheduled Jobs); i
 | Change Management | ITSM | `change_request` (standard changes for routine work) |
 | Discovery / Service Graph Connectors | ITOM | CI `last_discovered` as a Seen signal |
 
-Roles the app's roles contain and that must exist: `asset`, `inventory_user`, `inventory_admin`,
-`procurement_user`, `procurement_admin`, `model_manager`, `report_user`, `snc_external`, `canvas_user`.
-The app also grants Customer Service's `sn_customerservice_agent` (the service desk) directly, in
-its ACLs, the *Submit* and *Raise replacement* buttons and the request and return menu modules, so
-it must exist too. The preflight check looks for all ten.
+The table says what each plugin is used for. What the preflight check looks for is one list in the
+code: the tables in `REQUIRED_TABLES` and the roles in `REQUIRED_ROLES`
+(`src/server/domain/preflight.ts`).
+
+The roles that must exist are the platform roles in `PLATFORM_ROLE` (`src/server/domain/roles.ts`).
+The app's own roles contain most of them. The app also grants Customer Service's service desk role
+directly, in its ACLs, the *Submit* and *Raise replacement* buttons and the request and return menu
+modules, so that role must exist too. The preflight check looks for each of them.
 
 Without these plugins the install fails and rolls back with only *Unable to install third party
 application 'x_daas_ham'*: the app's tables reference theirs. On a personal developer instance,
@@ -97,30 +100,32 @@ npx now-sdk install --auth <alias> --no-demoData   # production: demo data loads
 npx now-sdk install --auth <alias>                  # dev/test: demo data included
 ```
 
-A fresh install's log lists nine expected *Skipped Error* rows; any other is a defect
-([install log](docs/verify-on-instance.md#install-log)).
+A fresh install's log lists a few expected *Skipped Error* rows; any other is a defect. The
+[install log](docs/verify-on-instance.md#install-log) check says which rows to expect and why.
 
-Then configure (System Properties, `x_daas_ham.*`):
+Then configure (System Properties, `x_daas_ham.*`). Every property, with the value it ships with, is
+an entry of `PROPERTY` in `src/server/domain/properties.ts`, and the table below says what each is
+for:
 
 | Property | Set to |
 |---|---|
 | `x_daas_ham.provider_company` | sys_id of the provider's own `core_company` (company of unassigned stock) |
 | `x_daas_ham.staging.default_stockroom` | sys_id of the staging-centre stockroom |
-| `x_daas_ham.tag.prefix` / `.digits` | provider tag format (default `NAAS-0000001`) |
-| `x_daas_ham.job.batch_size` / `.budget_seconds` | chunked-job tuning (defaults 500 / 120 s; a batch size below 1 counts as 1, and a budget of 0 or less handles one record per run); the OEM coverage sync shares the budget among the enabled vendors one batch at a time and gives each at least one batch per run, and the refresh run reads no further page of due Assets once it is spent |
-| `x_daas_ham.events.max_batch` / `.retention_days` | NMS event API limits (500 / 90 days) |
+| `x_daas_ham.tag.prefix` / `.digits` | provider tag format: the prefix, then a number of that many digits |
+| `x_daas_ham.job.batch_size` / `.budget_seconds` | chunked-job tuning (a batch size below 1 counts as 1, and a budget of 0 or less handles one record per run); the OEM coverage sync shares the budget among the enabled vendors one batch at a time and gives each at least one batch per run, and the refresh run reads no further page of due Assets once it is spent |
+| `x_daas_ham.events.max_batch` / `.retention_days` | NMS event API limits: events per request, and days an event is kept |
 | `x_daas_ham.spare_pool.auto_purchase` | `true` to raise POs for spare-pool shortfalls |
 | `x_daas_ham.oem.<vendor>.enabled`, `x_daas_ham.meraki.*`, `x_daas_ham.mist.*` | OEM API access, see [OEM spec](docs/spec/p2-oem.md) |
-| `x_daas_ham.oem.coverage_refresh_days` | days between coverage checks per asset (7) |
-| `x_daas_ham.returns.grace_days` / `.temporary_lead_days` | missing after due + grace (14); temporary returns raised ahead (7) |
-| `x_daas_ham.refresh.horizon_days` | refresh orders for assets due within (90) days |
-| `x_daas_ham.reconciliation.unseen_days` | installed but unseen threshold (7) |
-| `x_daas_ham.oem.coverage_warning_days` | warn about OEM coverage of deployed assets ending within (60) days |
+| `x_daas_ham.oem.coverage_refresh_days` | days between coverage checks per asset |
+| `x_daas_ham.returns.grace_days` / `.temporary_lead_days` | days after the due date before a unit is declared missing; days ahead a temporary return is raised |
+| `x_daas_ham.refresh.horizon_days` | refresh orders for assets due within this many days |
+| `x_daas_ham.reconciliation.unseen_days` | days without a Seen signal before an installed asset counts as unseen |
+| `x_daas_ham.oem.coverage_warning_days` | warn about OEM coverage of deployed assets ending within this many days |
 | `x_daas_ham.leases.decision_group` | group that end-of-lease decisions are assigned to |
-| `x_daas_ham.margin.amortisation_months` / `.visit_cost` | purchase write-off period (60) and standard field visit cost (250) |
+| `x_daas_ham.margin.amortisation_months` / `.visit_cost` | purchase write-off period in months, and standard field visit cost |
 | `x_daas_ham.shipping.*` | shipping aggregator: `enabled`, `api_key`, `carrier_id`, `webhook_token`, `service_code`, `package_kg`, `sender_name`, `sender_phone` |
 | `x_daas_ham.oem.claim.<vendor>.enabled`, `.max_calls`, `x_daas_ham.checkpoint.api_client_id` / `.api_key` | OEM claims, see [integrations spec](docs/spec/p3-integrations.md) |
-| `x_daas_ham.meraki.api_host`, `x_daas_ham.mist.api_host` | regional API hosts (defaults `api.meraki.com`, `api.mist.com`; set for Canada, China, India, FedRAMP or another Mist cloud) |
+| `x_daas_ham.meraki.api_host`, `x_daas_ham.mist.api_host` | regional API hosts (set for Canada, China, India, FedRAMP or another Mist cloud) |
 
 Assign roles (`x_daas_ham.asset_manager`, `.inventory_tech`, `.field_tech`, `.noc`, `.account_manager`,
 `.finance`, `.admin`; customers: `.customer_admin`, `.site_contact`) and assign inventory techs to
@@ -182,20 +187,21 @@ On an instance where an earlier version was installed:
 ### Demo data
 
 Unless installed with `--no-demoData`, the on-demand job **NaaS - load demo data** is installed. Run
-it once ("Execute Now"): it creates two customers (Acme Retail, Globex Logistics) with sites, racks
-and stockrooms, models from Cisco/Meraki, HPE Aruba, Fortinet and Check Point, site templates,
-agreements, subscription lines, catalog entries, staging checklists, demo users (`naas.inventory`,
-`naas.field`, `acme.admin`, `acme.hq.contact`) and stock, in-service switches with OEM coverage,
-service intervals and a lease that ends before the Acme agreement, and sets the two properties
-above. Every demo Asset is a fleet asset (run again, the job adds to the fleet the demo Assets an
+it once ("Execute Now"). It creates demo customers with their sites, racks and stockrooms, models of
+several vendors, agreements with what hangs off them, demo users of the staff and customer roles,
+and stock, in-service switches with OEM coverage and a lease that ends before its agreement. It
+also sets the provider company and the staging stockroom properties. `src/server/entry/demo-seed.ts`
+is the list of what it creates, by name.
+Every demo Asset is a fleet asset (run again, the job adds to the fleet the demo Assets an
 earlier version loaded), and the demo stockrooms and Models carry their stockroom type and OEM PID.
-The demo depot and staging centre are assigned to the group *NaaS demo depot team*, which ships with
-the demo data and gets `naas.inventory` as its member.
+The demo depot and staging centre are assigned to a demo group, which ships with the demo data and
+gets the demo inventory tech as its member.
 Lifecycle dates in the demo data are illustrative, not vendor bulletins.
 
 It loads nothing on an instance whose Provider (`x_daas_ham.provider_company`) names a company
-other than *Demo NaaS Provider*, as an instance in use does, and logs why as an error: on a
-dev/test instance, clear the property first. The demo Agreements bill in EUR; run again, the job
+other than the demo Provider it creates, as an instance in use does, and logs why as an error: on a
+dev/test instance, clear the property first. The demo Agreements bill in one currency; run again,
+the job
 gives that currency to any demo Agreement an earlier version loaded without one.
 
 ## Integrations
@@ -210,14 +216,17 @@ gives that currency to any demo Agreement an earlier version loaded without one.
 `identifier` is a serial number, provider tag or customer tag, matched in that order (the first
 field any fleet asset carries it in); one that two fleet assets carry in that field, such as a
 customer tag two Customers share, is refused, logged, and reported in `unknown_identifiers`. `event`
-is `seen`, `down` or `up`. `observed_at` is an ISO-8601 timestamp with a UTC offset (`Z`, `±hh:mm`
+is `seen`, `down` or `up`. `source` is optional. `src/server/domain/device-events.ts` holds the
+values each field takes and the reason a row is rejected with. `observed_at` is an ISO-8601
+timestamp with a UTC offset (`Z`, `±hh:mm`
 or `±hhmm`), to the minute, second or fraction of a second; a time without an offset, another date
 format or a time that does not exist (2026-02-31, 24:00) is a rejected row. Events are applied in
 the order they were observed, oldest first, whatever their order in the request. Responds `202` with
 accepted / unknown identifiers / busy identifiers / rejected rows. `accepted` counts only the events
 applied: unknown and busy identifiers and rejected rows are not counted in it. `busy_identifiers`
 lists the events not applied because another request was applying a sighting to the same Asset (job
-lock `seen_asset_<Asset sys_id>`) or because the platform refused the Asset's save (logged as an
+lock `LOCK.seenAsset` in `src/server/domain/lock-names.ts`) or because the platform refused the
+Asset's save (logged as an
 error): send those again. That is safe, because a repeated *seen* is not stored twice and last_seen
 only moves forward. Only state changes are stored.
 
@@ -238,8 +247,9 @@ default type, *Internal*, is an organisation's own plan for the Model, which the
 
 **Billing pull API** (role `x_daas_ham.finance` or `x_daas_ham.integration`):
 `GET /api/x_daas_ham/naas/billing_periods` and
-`GET /api/x_daas_ham/naas/billing_periods/{id}/lines?offset=0&limit=1000` (`final` once the period is
-closed, `nextOffset` null on the last page). Each line carries its `currency`, and a period its
+`GET /api/x_daas_ham/naas/billing_periods/{id}/lines?offset=<n>&limit=<n>` (`final` once the period is
+closed, `nextOffset` null on the last page; `PULL_PAGE` in `src/server/domain/billing.ts` holds the
+page sizes and their caps). Each line carries its `currency`, and a period its
 `totals`, one per currency: there is no single `total`, as two currencies are never added
 ([billing spec](docs/spec/p3-billing.md)).
 
@@ -286,9 +296,11 @@ src/fluent/      Fluent metadata (*.now.ts): a folder per feature, shared/, work
 src/server/
   domain/        pure TypeScript business rules, unit-tested (ADR 0003)
   platform/      Glide access: the operations (raise, source, ship, receive, bill) as services,
-                 with their repositories and gateways
-  entry/         one thin adapter per trigger (business rule, job, REST, UI action): reads its
-                 inputs, calls a platform service, reports the outcome
+                 with their repositories and gateways. Fluent wires one of its functions to a
+                 trigger directly when there is nothing to read from the trigger or report back
+  entry/         a thin adapter for each trigger that needs one (business rule, REST, UI action,
+                 record producer): reads its inputs, calls a platform service, reports the
+                 outcome in the trigger's terms
   test-support/  the tests' in-memory stand-in for Glide and their encoded-query evaluator
 src/client/      React UI pages (warehouse, rack elevation, customer self-service)
 ```
@@ -317,17 +329,20 @@ Conventions that the build or tests enforce:
   `npm run check` builds before it tests).
 - What a query, qualifier or condition tells NaaS records by (the Fleet flag, a NaaS stockroom type,
   an OEM PID, a customer Site) is a constant of `domain/fleet.ts`, which the Fluent metadata imports.
-- Entry-point parameters must be named after the platform globals (`current`, `previous`, `event`,
-  `producer`, `request`, `response`): the SDK wrapper passes them by name (`built-metadata.test.ts`).
+- A function wired from Fluent, in `entry/` or `platform/`, names its parameters after the platform
+  globals (`current`, `previous`, `event`, `producer`, `request`, `response`): the SDK wrapper
+  passes them by name (`built-metadata.test.ts`). An entry function that would only forward to a
+  platform function is not written, and the Fluent record names the platform function
+  ([ADR 0003](docs/adr/0003-pure-domain-core-with-glide-adapters.md)).
 - A business rule condition fits the 254-character field and loads a module by its installed path,
   `x_daas_ham/<package name>/<version>/src/...` (`fluent/shared/server-modules.now.ts` builds it from
   `package.json` and `now.config.json`), calling a function it exports (`built-metadata.test.ts`). A
   before rule on a table of another scope (`alm_hardware`, `wm_order`) refuses that way, with its
   Abort action, and its script only adds the reason: the platform ignores `current.setAbortAction`
-  and `setWorkflow` called from this scope on such a table. So an entry point wired on one takes its
+  and `setWorkflow` called from this scope on such a table. So a function wired on one takes its
   record as a `ForeignRecord` (`platform/records.ts`), a type without those two methods: neither it
   nor a helper it hands the record to compiles with such a call. `built-metadata.test.ts` holds the
-  entry points the rules on those tables call to that type, and a rule with an Abort action to
+  functions the rules on those tables call to that type, and a rule with an Abort action to
   having a condition. The platform runs a condition on every save of the table, whatever the rule's
   filter, so it starts with the change test that keeps the module unloaded on other saves
   ([external-contracts.md](docs/research/external-contracts.md#servicenow-platform)).

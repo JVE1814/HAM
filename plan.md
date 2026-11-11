@@ -310,6 +310,9 @@ Confidence tags:
 | `x_daas_ham.customer_admin` | Customer network/IT admin | `snc_external` | CSM portal: installed base, orders, faults, decommission, attestation |
 | `x_daas_ham.site_contact` | Customer site contact | `snc_external` | CSM portal: confirm delivery/install, self-install, swap simple devices, ship-back |
 
+The *Contains* column is the plan. What each role contains as built is in
+`src/fluent/shared/roles.now.ts`.
+
 ## 8. Security and visibility model
 
 - **Provider staff:**
@@ -369,6 +372,10 @@ Confidence tags:
 
 ### 9.2 Columns added to base tables (`augments`)
 
+This table is the plan. The columns as built, with their types and choices, are in
+`src/fluent/shared/platform-tables.now.ts`, and each choice list is in
+`src/server/domain/vocabulary.ts`.
+
 | Table | Column (`x_daas_ham_` + …) | Type | Phase | Notes |
 |---|---|---|---|---|
 | `alm_hardware` | `legal_owner` | choice: provider / customer / lessor | P1 | Indexed |
@@ -379,7 +386,7 @@ Confidence tags:
 | | `staging_source` | choice: in-house / distributor | P1 | |
 | | `in_service_date` | date/time | P1 | Starts billing |
 | | `last_seen` | date/time | P1 | Derived cache from CI or device events. Indexed. |
-| | `seen_source` | choice: discovery / sgc / nms | P1 | |
+| | `seen_source` | choice (`SEEN_SOURCE_CHOICES`) | P1 | |
 | | `rack`, `ru_start`, `rack_face` | ref `cmdb_ci_rack`, integer, choice | P1 (data) / P2 (view) | |
 | | `lifecycle_phase` | choice: available / end_of_sale / end_of_support / end_of_extended_support / eol | P1 | Derived from the Model's milestones in `cmdb_model_lifecycle` |
 | | `refresh_due` | date | P1 (field) / P2 (logic) | Indexed |
@@ -463,7 +470,7 @@ Confidence tags:
 
 ```text
 On order ─► In transit (ASN) ─► In stock/available ─► In stock/staging ─► In stock/staged
-   ─► In transit/pending_install ─► In use/pending_in_service ─► In use (in service)
+   ─► In transit/shipped_to_site ─► In use/pending_in_service ─► In use (in service)
    ─► In use/pending_return ─► In stock/pending_evaluation ─► In stock/available (refurbished)
                                                          └─► In stock/pending_oem_rma
                                                          └─► Retired/disposed|sold|returned
@@ -993,4 +1000,4 @@ question that replaced them. The docs and the code cite a decision by its Q numb
 | Q73 | Carriers | Shipping aggregator (P3). |
 | Q74 | Cadence | Foundation PR, then one PR per module. |
 | Q75 | Roles | admin, asset_manager, inventory_tech, field_tech, account_manager, finance, noc + CSM customer admin + site_contact. |
-| Q76 | Demo data | Yes, installed only with `--demo-data`. |
+| Q76 | Demo data | Yes, installed unless `--no-demoData`. |

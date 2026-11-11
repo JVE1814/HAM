@@ -13,6 +13,8 @@ tracking mapping is tested with fakes like the OEM adapters. A call that gets no
 back as status 0 with the transport's reason in `HttpResponse.error`, logged by the transport;
 `failureText` reads it as *no response: <reason>*.
 
-Claim and provisioning calls run in a five-minute job with a per-vendor call budget (Meraki allows 10
-claim calls per 5 minutes), so a run loads only as many staging steps as its budget can send; the
+Claim and provisioning calls run in a frequent job with a per-vendor call budget (Meraki allows 10
+claim calls per 5 minutes; the job's interval is in `oem/logic.now.ts` and the budget is the property
+`PROPERTY.claimMaxCalls` of `domain/properties.ts`, which go together), so a run loads only as many
+staging steps as its budget can send; the
 Customer's account in each vendor cloud is a configuration record, not code.
