@@ -206,7 +206,7 @@ export function DataGrid<T extends RowData>({ caption, columns, data, error, row
                                             className={cn(column?.hideBelow && HIDDEN_BELOW[column.hideBelow], column?.align === 'end' && 'text-right', !column && 'w-8')}
                                         >
                                             {header.column.getCanSort() ? (
-                                                <Button variant="ghost" size="sm" className="-ml-2.5" onClick={header.column.getToggleSortingHandler()}>
+                                                <Button variant="ghost" size="sm" className="-ml-2.5 text-sm" onClick={header.column.getToggleSortingHandler()}>
                                                     <table.FlexRender header={header} />
                                                     {sorted === 'asc' ? <ArrowUpIcon /> : sorted === 'desc' ? <ArrowDownIcon /> : <ChevronsUpDownIcon className="opacity-40" />}
                                                 </Button>
