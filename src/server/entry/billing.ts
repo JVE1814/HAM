@@ -37,7 +37,7 @@ export function generateBillingLines(event: GlideRecord, current: GlideRecord): 
 
 function report(outcome: PeriodOutcome, done: string): void {
     if (!outcome.done) {
-        if (outcome.why) gs.addErrorMessage(outcome.why)
+        if ('why' in outcome) gs.addErrorMessage(outcome.why)
         return
     }
     gs.addInfoMessage(done)

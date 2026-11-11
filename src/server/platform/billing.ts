@@ -45,17 +45,11 @@ const LINE = 'x_daas_ham_billing_line'
 const FEE = 'x_daas_ham_fee_event'
 
 /**
- * What became of an action on a period: done, or not done and why. `why` is '' when the platform has told the user
- * already: it refused the save of the form the action was used on. One done may leave something to put right by hand,
- * its `warning`.
+ * What became of an action on a period: done, or not done and why. One the platform refused to save has told the user
+ * why already (`refusedSave`): it refused the save of the form the action was used on. One done may leave something to
+ * put right by hand, its `warning`.
  */
-export type PeriodOutcome = { done: true; warning?: string } | { done: false; why: string }
-
-const DONE: PeriodOutcome = { done: true }
-
-function notDone(why: string): PeriodOutcome {
-    return { done: false, why }
-}
+export type PeriodOutcome = { done: true; warning?: string } | { done: false; why: string } | { done: false; refusedSave: true }
 
 /**
  * Open the Billing period of `month` unless it exists. Its insert rules set its days and start its generation, as for
@@ -461,17 +455,17 @@ function markBilled(periodId: string, refused: (fee: GlideRecord, why: string) =
  * try is not acted on.
  */
 function takingTurns(period: GlideRecord, undone: string, act: (stored: GlideRecord) => PeriodOutcome): PeriodOutcome {
-    const attempt = attemptLock(LOCK.billingPeriod(period.getUniqueValue()), () => {
+    const attempt = attemptLock(LOCK.billingPeriod(period.getUniqueValue()), (): PeriodOutcome => {
         const stored = findById(PERIOD, period.getUniqueValue())
-        return stored ? act(stored) : notDone(`${str(period, 'period')} ${undone}: the period is gone`)
+        return stored ? act(stored) : { done: false, why: `${str(period, 'period')} ${undone}: the period is gone` }
     })
     if (attempt.ran) return attempt.value
-    return notDone(`${str(period, 'period')} ${undone}: ${whyNotRun(attempt, 'a Close or Regenerate of it is running; try again')}`)
+    return { done: false, why: `${str(period, 'period')} ${undone}: ${whyNotRun(attempt, 'a Close or Regenerate of it is running; try again')}` }
 }
 
 export function regeneratePeriod(period: GlideRecord): PeriodOutcome {
     return takingTurns(period, 'not regenerated', (stored) => {
-        if (str(stored, 'status') !== BILLING_PERIOD_STATUS.ready) return notDone('Only a period ready for review can be regenerated')
+        if (str(stored, 'status') !== BILLING_PERIOD_STATUS.ready) return { done: false, why: 'Only a period ready for review can be regenerated' }
         return regenerateReady(period)
     })
 }
@@ -481,25 +475,26 @@ function regenerateReady(period: GlideRecord): PeriodOutcome {
     period.setValue('failed_lines', 0)
     period.setValue('last_error', '')
     // Saved first: a refused form save (the platform says why) keeps the period ready with its lines, not without them.
-    if (!period.update()) return notDone('')
+    if (!period.update()) return { done: false, refusedSave: true }
     // Lines the delete left would be billed twice by the new generation.
     if (!dropLinesForRegeneration(period)) {
         const name = str(period, 'period')
         period.setValue('status', BILLING_PERIOD_STATUS.ready)
         period.setValue('last_error', 'Regenerate could not remove all of the old lines; remove them and Regenerate again')
-        if (period.update()) return notDone(`${name} not regenerated: some of its old lines could not be removed`)
+        if (period.update()) return { done: false, why: `${name} not regenerated: some of its old lines could not be removed` }
         // Refused, it stays generating with nothing queued, which Close and Regenerate refuse: say so, and how it ends.
         const why = refusal(period)
         log.error(`Billing period ${name}: Regenerate left old lines and the period was not held for review: ${why}`)
-        return notDone(
-            `${name} not regenerated: some of its old lines could not be removed, and it could not be held for review (${why}). It stays Generating with nothing queued: an admin can Reset generation once it has shown no activity for ${RESET_AFTER_IDLE_MINUTES} minutes, then Regenerate`,
-        )
+        return {
+            done: false,
+            why: `${name} not regenerated: some of its old lines could not be removed, and it could not be held for review (${why}). It stays Generating with nothing queued: an admin can Reset generation once it has shown no activity for ${RESET_AFTER_IDLE_MINUTES} minutes, then Regenerate`,
+        }
     }
     // The period's open fees stay linked to it: the generation bills them again, or takes off those it no longer bills (finishGeneration).
     const unstarted = startGeneration(period)
-    if (!unstarted) return DONE
+    if (!unstarted) return { done: true }
     stopGeneration(period, `generation not started: ${unstarted}`)
-    return notDone(`${str(period, 'period')} not regenerated: ${unstarted}`)
+    return { done: false, why: `${str(period, 'period')} not regenerated: ${unstarted}` }
 }
 
 /**
@@ -517,20 +512,21 @@ export function resetGeneration(period: GlideRecord): PeriodOutcome {
     const lastChunk = pass ? pass.lastRun : ''
     const activity = [glideToMs(str(period, 'sys_updated_on')), glideToMs(lastChunk)]
     const decision = decideGenerationReset(str(period, 'status'), activity, nowMs())
-    if (!decision.reset) return notDone(`${name} not reset: ${decision.why}`)
+    if (!decision.reset) return { done: false, why: `${name} not reset: ${decision.why}` }
     // Without a job cursor no pass was recorded, and chunks of none are dropped: nothing is left to retire.
     if (pass) {
         const refused = retirePass(pass)
-        if (refused) return notDone(`${name} not reset: its generation could not be stopped: ${refused}`)
+        if (refused) return { done: false, why: `${name} not reset: its generation could not be stopped: ${refused}` }
         if ((findJobCursor(job) ?? pass).lastRun !== lastChunk) {
-            return notDone(
-                `${name} not reset: a chunk of its generation started as it was being reset. Its generation is stopped and the period stays Generating until that chunk is done: Reset generation again in ${RESET_AFTER_IDLE_MINUTES} minutes`,
-            )
+            return {
+                done: false,
+                why: `${name} not reset: a chunk of its generation started as it was being reset. Its generation is stopped and the period stays Generating until that chunk is done: Reset generation again in ${RESET_AFTER_IDLE_MINUTES} minutes`,
+            }
         }
     }
     period.setValue('last_error', resetGenerationError(gs.getUserDisplayName(), decision.idleMinutes))
     // Refused (the platform says why), it stays generating with its pass retired: Reset generation again.
-    return holdForReview(period) ? DONE : notDone('')
+    return holdForReview(period) ? { done: true } : { done: false, refusedSave: true }
 }
 
 /**
@@ -569,19 +565,20 @@ export function closePeriod(period: GlideRecord): PeriodOutcome {
 
 /** Close `period`, judged by how it is `stored` now: a Regenerate since `period` was read may have found lines failing. */
 function closeReady(period: GlideRecord, stored: GlideRecord): PeriodOutcome {
-    if (str(stored, 'status') !== BILLING_PERIOD_STATUS.ready) return notDone('Only a period ready for review can be closed')
+    if (str(stored, 'status') !== BILLING_PERIOD_STATUS.ready) return { done: false, why: 'Only a period ready for review can be closed' }
     const name = str(period, 'period')
     const failed = num(stored, 'failed_lines')
     const lastError = str(stored, 'last_error')
     if (failed > 0 || lastError) {
-        return notDone(
-            `${name} did not generate cleanly (${failed} line(s) failed to bill; last error: ${lastError || 'none'}); fix the cause and Regenerate before closing`,
-        )
+        return {
+            done: false,
+            why: `${name} did not generate cleanly (${failed} line(s) failed to bill; last error: ${lastError || 'none'}); fix the cause and Regenerate before closing`,
+        }
     }
     const stuck = dropWaivedFeeLines(period)
     if (stuck.length > 0) {
         const named = stuck.slice(0, 3).join('; ') + (stuck.length > 3 ? `; and ${stuck.length - 3} more` : '')
-        return notDone(`${name} not closed, as ${stuck.length} waived fee(s) could not leave it: ${named}. Fix them and Close again`)
+        return { done: false, why: `${name} not closed, as ${stuck.length} waived fee(s) could not leave it: ${named}. Fix them and Close again` }
     }
     // Always: finance may have adjusted lines during review, and the locked total must match the locked lines.
     setTotals(period)
@@ -589,9 +586,9 @@ function closeReady(period: GlideRecord, stored: GlideRecord): PeriodOutcome {
     period.setValue('closed_at', nowGlide())
     period.setValue('closed_by', gs.getUserID())
     // Closed first: a refused form save (the platform says why) leaves its fees open, so a Regenerate still bills them.
-    if (!period.update()) return notDone('')
+    if (!period.update()) return { done: false, refusedSave: true }
     const unmarked = markFeesBilled(period)
-    if (unmarked.length === 0) return DONE
+    if (unmarked.length === 0) return { done: true }
     const named = unmarked.slice(0, 3).join('; ') + (unmarked.length > 3 ? `; and ${unmarked.length - 3} more (see the system log)` : '')
     return { done: true, warning: `${unmarked.length} fee(s) billed in ${name} could not be marked billed: ${named}. Set them to Billed by hand` }
 }
