@@ -256,7 +256,7 @@ page sizes and their caps). Each line carries its `currency`, and a period its
 The NMS and billing integrations sign in as an internal user, one without the `snc_external` role
 (the Explicit Roles plugin gives such a user `snc_internal`). Their routes, like the warehouse ones,
 require `snc_internal` and the platform's *Scripted REST External Default* ACL. Only the site, rack
-and `/customer/...` routes admit customer admins and site contacts (`shared/rest-acls.now.ts`).
+and `/customer/...` routes admit customer admins and site contacts (`shared/rest-api.now.ts`).
 The tracking webhook needs no sign-in and checks its token itself.
 
 **Shipping aggregator**: labels through the *NaaS Shipping aggregator* REST message (ShipEngine label

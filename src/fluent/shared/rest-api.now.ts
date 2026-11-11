@@ -1,5 +1,5 @@
 import '@servicenow/sdk/global'
-import { RestApi } from '@servicenow/sdk/core'
+import { Acl, RestApi } from '@servicenow/sdk/core'
 import { postDeviceEvents } from '../../server/entry/in-service'
 import { listStockrooms, lookupAsset, pickAsset, putAwayAsset, receiveAsset } from '../../server/entry/warehouse'
 import { scanAudit } from '../../server/entry/assurance'
@@ -8,15 +8,35 @@ import { answerAttestation, confirmInstalled, customerOverview, reportFault, req
 import { getBillingLines, listBillingPeriods } from '../../server/entry/billing'
 import { PULL_PAGE } from '../../server/domain/billing'
 import { postTrackingUpdate } from '../../server/entry/shipping'
-import { staffOrCustomer } from './rest-acls.now'
+import { customerRoles } from './roles.now'
 
 /*
- * A route that sets nothing requires the snc_internal role and enforces
- * the platform's default ACL, which admits internal users only: the staff and integration routes. The routes built for
- * customer users too (sites, racks, customer/...) turn the snc_internal requirement off and enforce `staffOrCustomer`.
- * The shipping webhook runs unauthenticated (as guest, who holds no role) and checks its token
- * itself. Each handler checks the caller's role.
+ * A route that sets nothing requires the snc_internal role and enforces the platform's "Scripted REST External
+ * Default" ACL, which admits internal users only: the staff and integration routes. The routes built for customer
+ * users too (sites, racks, customer/..., for the customer self-service and rack pages) turn the snc_internal
+ * requirement off, which customer users, who hold snc_external, cannot pass, and enforce `staffOrCustomer`. A user
+ * passes either of its ACLs, as on the platform's own CSM case API. The shipping webhook runs unauthenticated (as
+ * guest, who holds no role) and checks its token itself. Each handler checks the caller's role, and on a customer
+ * route the caller's Customer.
  */
+
+const customerRestAcl = Acl({
+    $id: Now.ID['acl_rest_customer'],
+    type: 'rest_endpoint',
+    name: 'x_daas_ham NaaS customer routes',
+    operation: 'execute',
+    roles: customerRoles,
+    description: "Admits customer admins and site contacts to the NaaS API's customer, site and rack routes; the handlers check the role and the Customer.",
+})
+
+/**
+ * The platform's "Scripted REST External Default" ACL (global): role snc_internal and the script
+ * `answer = !gs.hasRole("snc_external")`.
+ */
+const SCRIPTED_REST_EXTERNAL_DEFAULT = 'cf9d01d3e73003009d6247e603f6a990'
+
+/** A customer route's ACLs: staff pass the platform's default one, customer admins and site contacts the app's. */
+const staffOrCustomer = [SCRIPTED_REST_EXTERNAL_DEFAULT, customerRestAcl]
 
 RestApi({
     $id: Now.ID['rest_naas'],

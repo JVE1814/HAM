@@ -368,7 +368,7 @@ producer opens the Return it raised.
 
 ### REST access for customer users
 
-`shared/rest-api.now.ts`, `shared/rest-acls.now.ts`. In *System Web Services > Scripted REST APIs >
+`shared/rest-api.now.ts`. In *System Web Services > Scripted REST APIs >
 NaaS asset management*, the routes `/sites`, `/racks`, `/racks/{id}` and the `/customer/...`
 routes have *Requires SNC Internal role* off and the ACLs *Scripted REST External Default* and
 *x_daas_ham NaaS customer routes*. The latter is an execute REST_Endpoint ACL with the roles
