@@ -1,6 +1,7 @@
 import { andEachClause } from '../encoded-query.ts'
 import { fleetCondition } from '../fleet.ts'
 import type { HttpPort, HttpRequest, HttpResponse } from '../http.ts'
+import type { RestMessageName } from '../rest-message-names.ts'
 import { CLAIM_ACTION_CHOICES, type AutomationStatus, type ClaimAction, type OemVendor } from '../vocabulary.ts'
 
 /**
@@ -50,7 +51,7 @@ export type VendorClaimRoutes = Partial<Record<ClaimAction, ClaimRoute>>
 
 export interface ClaimRoute {
     /** Name of the REST message that serves the calls. */
-    message: string
+    message: RestMessageName
     run: ClaimAdapter
     /**
      * Targets one API call can carry (below 1 where each target takes several calls); sizes how many
@@ -137,7 +138,7 @@ export function runVendorClaims(
     vendor: OemVendor,
     routes: VendorClaimRoutes,
     store: ClaimStore,
-    transport: (message: string) => HttpPort,
+    transport: (message: RestMessageName) => HttpPort,
     maxCalls: number,
     held: () => boolean,
 ): { calls: number; lockLost: boolean } {

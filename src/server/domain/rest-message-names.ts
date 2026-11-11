@@ -38,3 +38,5 @@ export const REST_MESSAGE = {
         fn: { createLabel: 'create_label' },
     },
 } as const
+
+export type RestMessageName = (typeof REST_MESSAGE)[keyof typeof REST_MESSAGE]['name']

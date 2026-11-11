@@ -1,7 +1,7 @@
 import type { ClaimAction, OemVendor } from '../vocabulary.ts'
 import type { CoverageFetched, Fetched, LifecycleFact, RmaFact } from './types.ts'
 import { PROPERTY, type PropertyOf } from '../properties.ts'
-import { REST_MESSAGE } from '../rest-message-names.ts'
+import { REST_MESSAGE, type RestMessageName } from '../rest-message-names.ts'
 import type { VendorClaimRoutes } from './claims.ts'
 import { FORTICLOUD_REGISTER, FORTIZTP_PROVISION, GREENLAKE_ADD, GREENLAKE_SUBSCRIBE, MERAKI_CLAIM, MIST_CLAIM, ZERO_TOUCH_CLAIM } from './claim-adapters.ts'
 import {
@@ -17,7 +17,7 @@ import {
 
 /** A vendor API the sync jobs read: the REST message that serves its calls, its switch, and where it is read per organization, which ones. */
 export interface SyncApi {
-    message: string
+    message: RestMessageName
     enabled: PropertyOf<boolean>
     orgIds?: PropertyOf<string>
 }

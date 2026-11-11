@@ -3852,6 +3852,7 @@ declare global {
                     'src_server_platform_rest-port_ts': {
                         table: 'sys_module'
                         id: '008ae84b1ad241d6af3a6d706d26061c'
+                        deleted: true
                     }
                     src_server_platform_returns_ts: {
                         table: 'sys_module'
