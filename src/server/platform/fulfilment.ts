@@ -10,7 +10,7 @@ import {
     type OrderShipment,
 } from '../domain/fulfilment.ts'
 import type { Stage } from '../domain/lifecycle.ts'
-import { siteRecoveryLineQuery } from '../domain/returns.ts'
+import { deploymentEndLineQuery } from '../domain/returns.ts'
 import { LINE_STAGE, ORDER_STAGE, type LineStage } from '../domain/vocabulary.ts'
 import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
@@ -117,8 +117,8 @@ export function onLineAssetMoved(asset: ForeignRecord, lineId: string, from: Sta
     const line = leftInTransit(from, to) ? findById('x_daas_ham_order_line', lineId, { beyondVisibility: true }) : null
     if (!line) return recomputeLine(lineId)
     const stage = str(line, 'line_stage') as LineStage
-    const siteRecovery = exists('x_daas_ham_return_order_line', siteRecoveryLineQuery(asset.getUniqueValue()))
-    if (!refillsLine({ stage, siteRecovery }) || !takeOffLine(asset.getUniqueValue(), line, to as Stage)) {
+    const deploymentEnds = exists('x_daas_ham_return_order_line', deploymentEndLineQuery(asset.getUniqueValue()))
+    if (!refillsLine({ stage, deploymentEnds }) || !takeOffLine(asset.getUniqueValue(), line, to as Stage)) {
         return void deriveLine(line, false)
     }
     const next = deriveLine(line, true)

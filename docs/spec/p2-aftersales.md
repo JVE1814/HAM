@@ -103,10 +103,11 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
 - Installed and shipped Assets on a return become *pending return*. The due date is the Agreement's
   return allowance. A unit still shipped that goes on a device removal, or is declared missing while
   still shipped, leaves its Order line, which is filled again (P1 fulfilment spec). On a site
-  decommission or agreement end it stays on its line, which is not sourced again.
+  decommission, agreement end or temporary end it stays on its line, which is not sourced again.
 - An Asset already awaiting another return is not added again; completing an install twice raises
   one return. A return with nothing to bring back closes at once (a temporary Order still being
-  installed waits until its equipment is installed or its end date passes).
+  installed waits until all its equipment is installed or its end date passes; once the end date
+  has passed, its units still shipped come back too).
 - A site decommission returns everything installed at the Site (in service, temporary, pending in
   service), whatever devices the request lists. From the record producer and the customer page it
   also returns units still shipped to the Site (`domain/returns.ts` `SITE_RECOVERY_STAGES`), so none

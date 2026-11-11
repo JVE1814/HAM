@@ -14,7 +14,7 @@ import {
     returnRequesterRefusal,
     SITE_RECOVERY_STAGES,
     sitePackageHoldersQuery,
-    siteRecoveryLineQuery,
+    deploymentEndLineQuery,
     stagesTakenBack,
     type RequestedReturn,
     type ReturnRequester,
@@ -192,13 +192,13 @@ describe('SITE_RECOVERY_STAGES', () => {
     })
 })
 
-describe('siteRecoveryLineQuery', () => {
-    const query = siteRecoveryLineQuery('a1')
+describe('deploymentEndLineQuery', () => {
+    const query = deploymentEndLineQuery('a1')
     const line = (fields: SampleRecord = {}) => ({ asset: 'a1', status: 'awaiting', 'return_order.trigger': 'site_decommission', ...fields })
     const triggers = Object.keys(RETURN_TRIGGER_CHOICES) as ReturnTrigger[]
 
-    it('finds the line that awaits the Asset back on a site decommission or agreement end, and on no other Return', () => {
-        expect(triggers.filter((trigger) => matches(query, line({ 'return_order.trigger': trigger })))).toEqual(['site_decommission', 'agreement_end'])
+    it('finds the line that awaits the Asset back on a site decommission, agreement end or temporary end, and on no other Return', () => {
+        expect(triggers.filter((trigger) => matches(query, line({ 'return_order.trigger': trigger })))).toEqual(['site_decommission', 'agreement_end', 'temporary_end'])
     })
 
     it("finds no other Asset's line, nor one whose unit is back, evaluated or declared missing", () => {
@@ -214,9 +214,10 @@ describe('a whole-Site recovery, by the trigger of its Return', () => {
         expect(triggers.filter(isSiteRecovery)).toEqual(['site_decommission', 'agreement_end'])
     })
 
-    it('takes the units still shipped to the Site too; any other Return the installed ones', () => {
+    it('takes the units still shipped to the Site too, as a temporary end does; any other Return the installed ones', () => {
         for (const trigger of triggers) {
-            expect(stagesTakenBack(trigger)).toBe(isSiteRecovery(trigger) ? SITE_RECOVERY_STAGES : INSTALLED_STAGES)
+            const takesShipped = isSiteRecovery(trigger) || trigger === 'temporary_end'
+            expect(stagesTakenBack(trigger)).toBe(takesShipped ? SITE_RECOVERY_STAGES : INSTALLED_STAGES)
         }
     })
 

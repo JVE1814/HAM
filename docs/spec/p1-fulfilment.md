@@ -69,8 +69,8 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
   staging centre counts as sourced: on its way, not yet sent to the Site.
 - A unit that leaves while in transit (shipped, then missing or pending return) is taken off its
   line (logged). The line goes back to awaiting stock and is sourced again, with no new approval and
-  its quantity unchanged. The exception is a whole-Site recovery (site decommission, agreement end):
-  the unit stays on the line, which is not sourced again. A unit the platform refuses to take off
+  its quantity unchanged. The exception is a Return that ends the deployment (site decommission,
+  agreement end, temporary end): the unit stays on the line, which is not sourced again. A unit the platform refuses to take off
   the line also stays on it, and that line, like one that cannot be saved back to awaiting stock, is
   not sourced again (both logged).
 - A unit that leaves after install (pending in service or later: a return, a break-fix swap of a

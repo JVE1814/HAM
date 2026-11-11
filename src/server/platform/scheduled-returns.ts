@@ -88,11 +88,14 @@ function returnTemporaryDeployments(today: string): void {
     order.setLimit(50)
     order.query()
     while (order.next()) {
-        const assetIds = installedAssetIds({ orderId: order.getUniqueValue() })
-        // Still being installed and not yet ended: wait for the equipment to arrive before raising.
-        if (assetIds.length === 0 && str(order, 'stage') === ORDER_STAGE.installing && str(order, 'end_date') >= today) continue
+        const orderId = order.getUniqueValue()
+        const assetIds = installedAssetIds({ orderId, returning: 'temporary_end' })
+        // The Return is raised once, so an Order still being installed waits until every unit is installed. Once its
+        // end date has passed, the units still shipped come back too.
+        const installing = str(order, 'stage') === ORDER_STAGE.installing && str(order, 'end_date') >= today
+        if (installing && (assetIds.length === 0 || installedAssetIds({ orderId }).length < assetIds.length)) continue
         // Raised once: a run whose mark below was refused left the units that Return could not take (logged then).
-        const raisedBefore = () => exists(RETURN, `trigger=${RETURN_TRIGGER.temporary_end}^source_order=${order.getUniqueValue()}`)
+        const raisedBefore = () => exists(RETURN, `trigger=${RETURN_TRIGGER.temporary_end}^source_order=${orderId}`)
         if (assetIds.length > 0 && !raisedBefore()) {
             const raised = raiseReturn({
                 trigger: 'temporary_end',
@@ -101,7 +104,7 @@ function returnTemporaryDeployments(today: string): void {
                 agreementId: str(order, 'agreement'),
                 method: collectionMethod(str(order, 'install_mode') as InstallMode | ''),
                 assetIds,
-                sourceOrderId: order.getUniqueValue(),
+                sourceOrderId: orderId,
                 description: `Temporary deployment ${str(order, 'number')} ends ${str(order, 'end_date')}`,
             })
             // Refused: raised on the next run.

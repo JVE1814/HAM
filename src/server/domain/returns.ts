@@ -142,9 +142,15 @@ export function requestedTrigger(decommission: boolean): ReturnTrigger {
     return decommission ? RETURN_TRIGGER.site_decommission : RETURN_TRIGGER.device_removal
 }
 
-/** Encoded query on x_daas_ham_return_order_line: the Asset is awaited back on a whole-Site recovery. */
-export function siteRecoveryLineQuery(assetId: string): string {
-    return `asset=${assetId}^status=${AWAITED}^return_order.triggerIN${SITE_RECOVERY_TRIGGERS.join(',')}`
+/**
+ * The Returns that end a deployment: a whole-Site recovery, and a temporary Order's end. Each takes back the units
+ * still shipped too, which stay on their Order lines (domain/fulfilment `refillsLine`).
+ */
+const DEPLOYMENT_END_TRIGGERS: readonly ReturnTrigger[] = [...SITE_RECOVERY_TRIGGERS, RETURN_TRIGGER.temporary_end]
+
+/** Encoded query on x_daas_ham_return_order_line: the Asset is awaited back on a Return that ends its deployment. */
+export function deploymentEndLineQuery(assetId: string): string {
+    return `asset=${assetId}^status=${AWAITED}^return_order.triggerIN${DEPLOYMENT_END_TRIGGERS.join(',')}`
 }
 
 /**
@@ -155,11 +161,12 @@ export function siteRecoveryLineQuery(assetId: string): string {
 export const SITE_RECOVERY_STAGES: readonly Stage[] = SERVING_STAGES
 
 /**
- * The stages of the units at a Site a Return with this trigger takes back: a whole-Site recovery those still shipped
- * there too, any other the installed ones.
+ * The stages of the units a Return with this trigger takes back: one that ends their deployment those still shipped
+ * too, any other the installed ones. A temporary Order's units still shipped once its end date has passed would
+ * otherwise stay deployed, and billed, with no Return raised again.
  */
 export function stagesTakenBack(trigger: ReturnTrigger): readonly Stage[] {
-    return isSiteRecovery(trigger) ? SITE_RECOVERY_STAGES : INSTALLED_STAGES
+    return DEPLOYMENT_END_TRIGGERS.includes(trigger) ? SITE_RECOVERY_STAGES : INSTALLED_STAGES
 }
 
 /** Who an evaluated Asset belongs to: its Legal owner and the end action of its lease ('' without one). */

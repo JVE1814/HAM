@@ -122,12 +122,13 @@ const REFILLABLE: readonly LineStage[] = LINE_ORDER.slice(LINE_ORDER.indexOf('aw
 
 /**
  * Whether a unit that left its line in transit (`leftInTransit`) is taken off it and the line filled again: back to
- * awaiting stock and sourced again, with no new approval and its quantity unchanged. Not on a whole-Site recovery (site
- * decommission, agreement end), which brings everything back: filled again, the line would buy and send a unit to a
- * Site being emptied. Nor on a line installed, cancelled or new, which a unit still in transit never holds.
+ * awaiting stock and sourced again, with no new approval and its quantity unchanged. Not on a Return that ends the
+ * deployment (site decommission, agreement end, temporary end), which brings everything back: filled again, the line
+ * would buy and send a unit only to bring it back. Nor on a line installed, cancelled or new, which a unit still in
+ * transit never holds.
  */
-export function refillsLine(line: { stage: LineStage; siteRecovery: boolean }): boolean {
-    return !line.siteRecovery && REFILLABLE.includes(line.stage)
+export function refillsLine(line: { stage: LineStage; deploymentEnds: boolean }): boolean {
+    return !line.deploymentEnds && REFILLABLE.includes(line.stage)
 }
 
 /** What Cancel order reads of an Order: the stages of its lines and of every Asset on them. */

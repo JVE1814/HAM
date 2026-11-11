@@ -171,15 +171,15 @@ describe('leftInTransit', () => {
 
 describe('refillsLine', () => {
     it.each(['shipped', 'ready_to_ship', 'awaiting_stock', 'sourced', 'staging'] as const)('fills a %s line again', (stage) => {
-        expect(refillsLine({ stage, siteRecovery: false })).toBe(true)
+        expect(refillsLine({ stage, deploymentEnds: false })).toBe(true)
     })
 
-    it('leaves a line on a whole-Site recovery, which brings everything back', () => {
-        expect(refillsLine({ stage: 'shipped', siteRecovery: true })).toBe(false)
+    it('leaves a line on a Return that ends the deployment, which brings everything back', () => {
+        expect(refillsLine({ stage: 'shipped', deploymentEnds: true })).toBe(false)
     })
 
     it.each(['installed', 'in_service', 'cancelled', 'new'] as const)('leaves a %s line as it is', (stage) => {
-        expect(refillsLine({ stage, siteRecovery: false })).toBe(false)
+        expect(refillsLine({ stage, deploymentEnds: false })).toBe(false)
     })
 })
 
@@ -253,7 +253,7 @@ describe('the Order stage sets', () => {
 
 describe('the Order line stages', () => {
     it('have a line filled again from awaiting stock to shipped', () => {
-        const refilled = (Object.keys(LINE_STAGE_CHOICES) as LineStage[]).filter((stage) => refillsLine({ stage, siteRecovery: false }))
+        const refilled = (Object.keys(LINE_STAGE_CHOICES) as LineStage[]).filter((stage) => refillsLine({ stage, deploymentEnds: false }))
         expect(refilled).toEqual(['awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped'])
     })
 })
