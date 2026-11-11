@@ -55,15 +55,15 @@ describe('resolveVisibility', () => {
 
 describe('actsAsCustomerAdmin', () => {
     it('lets customer admins, also when they are site contacts, take the customer-admin actions', () => {
-        expect(actsAsCustomerAdmin(roles('x_daas_ham.customer_admin'))).toBe(true)
-        expect(actsAsCustomerAdmin(roles('x_daas_ham.site_contact', 'x_daas_ham.customer_admin'))).toBe(true)
+        expect(actsAsCustomerAdmin(resolveVisibility(roles('x_daas_ham.customer_admin')))).toBe(true)
+        expect(actsAsCustomerAdmin(resolveVisibility(roles('x_daas_ham.site_contact', 'x_daas_ham.customer_admin')))).toBe(true)
     })
 
     it('leaves them out for site contacts and for staff who see every customer, even holding the role', () => {
-        expect(actsAsCustomerAdmin(roles('x_daas_ham.site_contact'))).toBe(false)
-        expect(actsAsCustomerAdmin(roles('x_daas_ham.asset_manager'))).toBe(false)
-        expect(actsAsCustomerAdmin(roles('x_daas_ham.asset_manager', 'x_daas_ham.customer_admin'))).toBe(false)
-        expect(actsAsCustomerAdmin(() => true)).toBe(false) // a platform admin holds every role
+        expect(actsAsCustomerAdmin(resolveVisibility(roles('x_daas_ham.site_contact')))).toBe(false)
+        expect(actsAsCustomerAdmin(resolveVisibility(roles('x_daas_ham.asset_manager')))).toBe(false)
+        expect(actsAsCustomerAdmin(resolveVisibility(roles('x_daas_ham.asset_manager', 'x_daas_ham.customer_admin')))).toBe(false)
+        expect(actsAsCustomerAdmin(resolveVisibility(() => true))).toBe(false) // a platform admin holds every role
     })
 })
 

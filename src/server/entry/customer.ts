@@ -1,4 +1,3 @@
-import { gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { awaitsSelfInstallConfirmation } from '../domain/install-confirmation.ts'
 import type {
@@ -31,17 +30,7 @@ import { requestReturn } from '../platform/returns.ts'
 import { completeInstall, installState } from '../platform/delivery.ts'
 import { bodyOf, pathParam, reply, requireRole } from '../platform/rest-api.ts'
 
-/*
- * Customer self-service API (P2.9, Q49). Every query runs as the signed-in customer contact, so the
- * before-query visibility rules (ADR 0005) limit it to their Customer (site contacts: their Sites).
- * Asset managers may open the page as a preview, which shows every Customer (platform/customer-page);
- * the Customer-admin actions stay with Customer admins.
- */
-
-/** A Customer admin of their own Customer only (`actsAsCustomerAdmin`); staff raise returns via the record producer. */
-function isCustomerAdmin(): boolean {
-    return actsAsCustomerAdmin((role) => gs.hasRole(role))
-}
+/** The customer self-service page's routes (P2.9, Q49): what they show and take is platform/customer-page's. */
 
 function allowed(response: RESTAPIResponse): boolean {
     return requireRole(response, CUSTOMER_PAGE_USERS, 'Requires a customer admin or site contact role')
@@ -52,7 +41,7 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
     const session = currentSession()
     reply(response, 200, {
         customer: customerName(session.customerId),
-        isCustomerAdmin: isCustomerAdmin(),
+        isCustomerAdmin: actsAsCustomerAdmin(session.scope),
         assets: customerEquipment(),
         orders: ordersUnderWay(),
         returns: openReturns(),
@@ -84,7 +73,7 @@ export function confirmInstalled(request: RESTAPIRequest, response: RESTAPIRespo
 
 export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    if (!isCustomerAdmin()) return reply(response, 403, { error: 'Only customer admins attest equipment' })
+    if (!actsAsCustomerAdmin(currentSession().scope)) return reply(response, 403, { error: 'Only customer admins attest equipment' })
     const attestation = findUnclosedAttestation(pathParam(request, 'id'))
     if (!attestation) return reply(response, 404, { error: 'No open attestation' })
     const input = bodyOf(request)
@@ -101,10 +90,11 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
 
 export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    if (!isCustomerAdmin()) return reply(response, 403, { error: 'Only customer admins can request returns' })
+    const session = currentSession()
+    if (!actsAsCustomerAdmin(session.scope)) return reply(response, 403, { error: 'Only customer admins can request returns' })
     const input = bodyOf(request)
     const outcome = requestReturn({
-        customerId: currentSession().customerId,
+        customerId: session.customerId,
         siteId: String(input.site ?? ''),
         decommission: input.decommission === true,
         listedAssetIds: (Array.isArray(input.assets) ? (input.assets as unknown[]) : []).map(String),
