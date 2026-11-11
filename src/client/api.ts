@@ -1,6 +1,6 @@
 import { restErrorMessage } from './rest-error'
 
-/** The app's scripted REST API (src/fluent/logic/rest.now.ts), which the three pages call. */
+/** The app's scripted REST API (src/fluent/shared/rest-api.now.ts), which the three pages call. */
 const BASE = '/api/x_daas_ham/naas'
 
 /** A failed call, with its HTTP status. */

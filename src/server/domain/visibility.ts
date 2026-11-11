@@ -40,13 +40,13 @@ export const PLATFORM_ROLE = {
 
 /**
  * Provider staff without inventory techs: who reads the customer, commercial and configuration tables, and sees every
- * Customer. The metadata's read lists (security/roles.now.ts `broadStaff`) are this list.
+ * Customer. The metadata's read lists (shared/roles.now.ts `broadStaff`) are this list.
  */
 export const BROAD_STAFF = [ROLE.assetManager, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance]
 
 /**
  * Every provider-staff role: who reads the installed base, and so opens an Asset's form (the rack page links a device
- * to it for them only). The metadata's `providerStaff` (security/roles.now.ts) is this list, in the order the
+ * to it for them only). The metadata's `providerStaff` (shared/roles.now.ts) is this list, in the order the
  * navigator's modules store it.
  */
 export const PROVIDER_STAFF = [ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance]
@@ -104,8 +104,8 @@ export interface TableScoping {
  * Every table the app scopes, by name (ADR 0005). The before-query rules' one script (entry/visibility `scopeRecords`)
  * and the read ACLs' row checks (`readsRecord`, `grantsCustomerRecord`, `grantsFleetAsset`) find a record's scoping
  * here by its table. So a table is scoped by its entry here and the metadata that calls those: a before-query rule
- * (security/visibility.now.ts), a Deny-Unless read ACL where an inventory tech is kept to their Stockrooms
- * (security/acls-visibility.now.ts), and the Customer contacts' read ACL.
+ * (shared/visibility.now.ts), a Deny-Unless read ACL where an inventory tech is kept to their Stockrooms
+ * (shared/visibility.now.ts), and the Customer contacts' read ACL.
  */
 export const SCOPED_TABLES = {
     alm_hardware: { stockroom: 'stockroom', customer: 'company', site: 'x_daas_ham_site', naas: 'fleet_flag' },
@@ -371,7 +371,7 @@ export function grantsReturnOfOwnCustomer(customerId: string, returnCustomer: st
 /*
  * Changes to hardware by hand (ADR 0005): the platform's `asset` role, which inventory and field techs hold, lets its
  * holders save and delete every Asset, and change its company and cost, from a form, a list or the Table API. The
- * app's Deny-Unless ACLs on alm_asset (security/acls-hardware.now.ts) keep fleet assets to the people who run them and
+ * app's Deny-Unless ACLs on alm_asset (fleet/access.now.ts) keep fleet assets to the people who run them and
  * leave every other Asset to the platform. A record that is not a saved row (a New form, a check of the whole table)
  * passes, as for reads. The app's own server logic saves through GlideRecord, which no ACL checks.
  */

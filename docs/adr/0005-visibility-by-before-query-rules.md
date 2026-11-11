@@ -81,7 +81,7 @@ hardware (*Applies To*
 A before-query rule can only append conditions, and one appended after an `^NQ` binds to the last clause only, so a
 list query with `^NQ` clauses, like a direct link or a dot-walk, can reach a record the rule would hide. So each table
 the rules narrow to an inventory tech's Stockrooms also has a Deny-Unless read ACL, a row check
-(`security/acls-visibility.now.ts`); hardware's sits on `alm_asset` with the others, so an `alm_asset` list, which the
+(`shared/visibility.now.ts`); hardware's sits on `alm_asset` with the others, so an `alm_asset` list, which the
 `alm_hardware` rule does not narrow, is checked too. Its script (`entry/visibility.ts` `readsRecord`) runs
 `domain/visibility` `rowVisible` on the same `SCOPED_TABLES` entry as the table's rule, which keeps exactly
 the records the rule's filter keeps, on every record of the table: it passes staff who see every Customer and users
@@ -96,7 +96,7 @@ only records the check passes, so it shows no "removed by security constraints" 
 Changes by hand are checked on hardware the same way. The platform's `asset` role, which inventory and field techs
 hold, passes its write and delete ACLs on `alm_asset` for every Asset (and `snc_internal` its field write ACLs), so a
 tech could change a fleet asset's company, Agreement, subscription line, lease or cost, or delete it, from a form, a
-list (an `alm_asset` list too) or the Table API. Deny-Unless ACLs on `alm_asset` (`security/acls-hardware.now.ts`),
+list (an `alm_asset` list too) or the Table API. Deny-Unless ACLs on `alm_asset` (`fleet/access.now.ts`),
 applying to hardware and beside the platform's Allow-If ACLs of the same name, keep a fleet asset's saves to the asset
 editors (`assetEditors`, `domain/visibility` `ASSET_EDITOR_ROLES`) whose scope keeps it, its deletion to app
 administrators (a fleet asset leaves by disposal, ADR 0016), and its company and cost to asset managers; every other

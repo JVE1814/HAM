@@ -47,13 +47,13 @@
 | inventory tech only | fleet assets, NaaS stockrooms, transfer orders from or to a NaaS stockroom, staging tasks and audits (with their lines) of their stockrooms; plus, across all stockrooms and Customers, the ASN imports, staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and Disposal orders; no other app table; the Provider IT's hardware, stockrooms and transfer orders, and Model lifecycle milestones, as the platform allows |
 | customer admin | their Customer's fleet assets (and no other company's hardware), Orders, lines, Return orders and lines, Shipments and events, Attestations and items, Agreements, subscription lines, catalog entries and Fee events; Site templates with their items, their Customer's and those offered to every Customer (checked by the read ACL, no before-query rule) |
 | site contact | their Customer's fleet assets (and no other company's hardware), Orders and lines, Return orders and lines, Shipments and events, and Attestations and items at the Sites listing them as contacts; no Fee events |
-| service desk (`sn_customerservice_agent`, no NaaS role) | every Customer's Agreements, Site templates with their items, Orders and lines, and Return orders and lines, to raise, submit and follow them (read ACLs of its own, `security/acls.now.ts`); no other app table; hardware as the platform's ACLs allow |
+| service desk (`sn_customerservice_agent`, no NaaS role) | every Customer's Agreements, Site templates with their items, Orders and lines, and Return orders and lines, to raise, submit and follow them (read ACLs of its own, in the features' `access.now.ts`); no other app table; hardware as the platform's ACLs allow |
 | anyone else with no NaaS role | whatever the platform's ACLs and rules allow, fleet assets included |
 
 On hardware, the app's own Provider columns (support cost, claim code and lease) are read by provider staff alone,
 whoever reads the Asset, and a Customer contact does not read a fleet asset's *Cost*, which Customer Service's
-ACLs grant its contacts, nor a Shipment's carrier cost (`security/acls-hardware.now.ts`,
-`security/acls-logistics.now.ts`).
+ACLs grant its contacts, nor a Shipment's carrier cost (`fleet/access.now.ts`,
+`delivery/access.now.ts`).
 
 An inventory tech's stockrooms are the NaaS stockrooms whose *Assignment group* (the platform's
 `alm_stockroom.assignment_group`) is a group they are a member of (ADR 0018).
@@ -92,7 +92,7 @@ without a NaaS role lost all hardware.
 **Row checks.** A rule can only append conditions, and one appended after an `^NQ` binds to the last clause only,
 so a list query with `^NQ` clauses or a direct link could reach a record the rule hides. Each table the rules
 narrow to an inventory tech's stockrooms (those whose `SCOPED_TABLES` entry names a Stockroom) therefore has a Deny-Unless read ACL
-(`security/acls-visibility.now.ts`), hardware's on `alm_asset` so an `alm_asset` list is checked too. Its script checks
+(`shared/visibility.now.ts`), hardware's on `alm_asset` so an `alm_asset` list is checked too. Its script checks
 the record with `rowVisible` on the same `SCOPED_TABLES` entry as the table's rule and keeps exactly what the rule keeps: an
 inventory tech with no broader role reads a fleet asset, NaaS stockroom, transfer order touching a NaaS stockroom,
 staging task or audit only of their stockrooms, and a Customer contact hardware and the other records only of their

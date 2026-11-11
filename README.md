@@ -238,7 +238,7 @@ closed, `nextOffset` null on the last page). Each line carries its `currency`, a
 The NMS and billing integrations sign in as an internal user, one without the `snc_external` role
 (the Explicit Roles plugin gives such a user `snc_internal`). Their routes, like the warehouse ones,
 require `snc_internal` and the platform's *Scripted REST External Default* ACL. Only the site, rack
-and `/customer/...` routes admit customer admins and site contacts (`security/rest-acls.now.ts`).
+and `/customer/...` routes admit customer admins and site contacts (`shared/rest-acls.now.ts`).
 The tracking webhook needs no sign-in and checks its token itself.
 
 **Shipping aggregator**: labels through the *NaaS Shipping aggregator* REST message (ShipEngine label
@@ -274,7 +274,7 @@ documentation in [docs/research/external-contracts.md](docs/research/external-co
 Layout:
 
 ```text
-src/fluent/      Fluent metadata (*.now.ts): data/, security/, logic/, ui/, workspace/, tests/, demo/
+src/fluent/      Fluent metadata (*.now.ts): a folder per feature, shared/, workspace/ (see below)
 src/server/
   domain/        pure TypeScript business rules, unit-tested (ADR 0003)
   platform/      Glide access: the operations (raise, source, ship, receive, bill) as services,
@@ -312,7 +312,7 @@ Conventions that the build or tests enforce:
 - Entry-point parameters must be named after the platform globals (`current`, `previous`, `event`,
   `producer`, `request`, `response`): the SDK wrapper passes them by name (`built-metadata.test.ts`).
 - A business rule condition fits the 254-character field and loads a module by its installed path,
-  `x_daas_ham/<package name>/<version>/src/...` (`fluent/logic/server-modules.now.ts` builds it from
+  `x_daas_ham/<package name>/<version>/src/...` (`fluent/shared/server-modules.now.ts` builds it from
   `package.json` and `now.config.json`), calling a function it exports (`built-metadata.test.ts`). A
   before rule on a table of another scope (`alm_hardware`, `wm_order`) refuses that way, with its
   Abort action, and its script only adds the reason: the platform ignores `current.setAbortAction`
@@ -334,7 +334,7 @@ Conventions that the build or tests enforce:
   (`built-metadata.test.ts`).
 - The names the metadata and the server code must agree on each have one list, which both import:
   role names and the platform roles the app needs (`domain/visibility.ts` `ROLE`, `PLATFORM_ROLE`;
-  the role groups are in `fluent/security/roles.now.ts`), events (`platform/events.ts` `EVENT`),
+  the role groups are in `fluent/shared/roles.now.ts`), events (`platform/events.ts` `EVENT`),
   system properties with their shipped values (`platform/properties.ts` `PROPERTY`: a reader takes
   the entry and falls back to that value) and REST messages with their functions
   (`domain/rest-message-names.ts` `REST_MESSAGE`). `built-metadata.test.ts` holds what was built to
@@ -343,10 +343,41 @@ Conventions that the build or tests enforce:
   route fits the instance's 40 characters, which cut a longer one off unseen
   (`built-metadata.test.ts`).
 - Substatus values added to `alm_asset` are the `choice` entries of `STAGE_FIELDS` in
-  `domain/vocabulary.ts`, which `fluent/data/substatus-choices.now.ts` ships one Record each
+  `domain/vocabulary.ts`, which `fluent/fleet/tables.now.ts` ships one Record each
   (`built-metadata.test.ts` compares the built choice set with them).
 - Commit `src/fluent/generated/keys.ts`. Deleting Fluent code that was installed generates delete
   records; see the SDK's `fluent-overview` before removing metadata.
+
+### Where a Fluent record goes
+
+`src/fluent` is grouped by feature, so that what changes together sits together: a feature's folder
+holds its tables, its rules, UI actions, events, jobs, properties and REST messages, its ACLs, its
+forms, lists, navigator modules, record producers and pages, and its ATF tests. The folders are
+`agreements`, `orders`, `staging`, `warehouse`, `delivery` (shipments and field work), `in-service`,
+`fleet` (what the app puts on the platform's hardware table: stage rules, substatus choices, ACLs),
+`models`, `oem`, `break-fix`, `returns`, `disposal`, `assurance`, `racks`, `leases`, `billing`,
+`margin` and `operations` (job cursors and locks, the settings every job reads, the preflight check,
+the demo data loader).
+
+- A new record goes to the feature whose table or server module it serves, whatever table it is
+  declared on: the rule on `alm_hardware` that makes the lessor own a leased Asset is in `leases/`,
+  not `fleet/`. A feature of a handful of records joins its nearest neighbour.
+- A small feature is one file, `<feature>/<feature>.now.ts`. Past about 300 lines it is cut by kind:
+  `tables.now.ts`, `logic.now.ts` (rules, UI actions, events with their script actions and
+  notifications, jobs, properties, REST messages), `access.now.ts` (ACLs) and `forms.now.ts` (forms,
+  lists, navigator modules, record producers, a page with its ACL). ATF tests are `tests.now.ts`.
+- `shared/` holds what the SDK takes as one call for everything, and what no single feature owns:
+  the roles and role groups, the cross-scope privileges, the columns added to platform tables (one
+  `Table({ augments })` per table, whichever feature a column serves), the REST API (one `RestApi`
+  with every route) and the ACL that admits customer users to it, the entry modules' installed path,
+  the menu root with its separators (a feature's navigator modules are in its folder and name the
+  root), the visibility rules and row checks with their ATF tests (ADR 0005: one concern over every
+  scoped table), the customer page (it reads several features) and the ATF suites (one per delivery
+  phase, each listing tests of several features).
+- `workspace/` holds the workspace, its list menu and its dashboard: each is one structure over
+  every table.
+- A record's sys_id is keyed by its `$id` name in `generated/keys.ts`, not by its file: moving a
+  record to another file changes nothing in the build.
 
 ## Verify on an instance
 

@@ -140,7 +140,7 @@ The page calls the app's REST API under `/api/x_daas_ham/naas`. Its routes, and 
 (`/sites`, `/racks`), do not require the `snc_internal` role, which customer users (`snc_external`)
 lack. They admit a user who passes either the platform's *Scripted REST External Default* ACL
 (internal users) or the app's REST ACL for customer admins and site contacts
-(`security/rest-acls.now.ts`), and each handler checks the role and the Customer. A call the
+(`shared/rest-acls.now.ts`), and each handler checks the role and the Customer. A call the
 platform refuses answers
 HTTP 422, so it can be sent again:
 

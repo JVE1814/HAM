@@ -56,7 +56,7 @@ those values; on an older release check that both exist.
 
 ### Cross-scope access
 
-The privileges in `security/cross-scope.now.ts` match the scopes the instance reports
+The privileges in `shared/cross-scope.now.ts` match the scopes the instance reports
 (`alm_hardware`, `change_request`, `wm_order`, `proc_po`, `sys_attachment`, ...), including delete
 on `alm_transfer_order` and its lines, which sourcing uses to remove a transfer order created only
 in part (otherwise the line's sourcing summary names it for cancelling). Procurement lets no other
@@ -163,7 +163,7 @@ a Subscription line's *Agreement* shows the Agreement's number (`NAG...`). A Lea
 such override (ADR 0018): its *Contract number* is mandatory, and an Asset's *Lease schedule* shows
 it. On the development instance on 2026-11-09, on the earlier version, whose lease still overrode
 `number`, the lease showed `NLS0001001` and an Agreement reference was blank, as
-`data/agreements.now.ts` then gave the Agreement no override. A lease's reference showing its
+`agreements/tables.now.ts` then gave the Agreement no override. A lease's reference showing its
 Contract number was not run on an instance.
 
 ### Scale
@@ -310,7 +310,7 @@ read.
 
 ### Row checks
 
-`security/acls-visibility.now.ts`. Impersonating an inventory-tech-only user assigned to one
+`shared/visibility.now.ts`. Impersonating an inventory-tech-only user assigned to one
 stockroom, the list `alm_hardware_list.do?sysparm_query=sys_id=<fleet asset of another
 stockroom>^NQsys_id=<fleet asset of theirs>` shows only their unit, with a *rows removed by
 security constraints* gap: the Deny-Unless check on `alm_asset` applies to an `alm_hardware` record
@@ -321,7 +321,7 @@ with such gaps (ADR 0005). A New form of an Audit or a Staging task opens.
 
 ### Changes to hardware by hand
 
-ADR 0005, `security/acls-hardware.now.ts`. Impersonating an inventory-tech-only user, a fleet asset
+ADR 0005, `fleet/access.now.ts`. Impersonating an inventory-tech-only user, a fleet asset
 of their stockroom saves, but its company, cost, Agreement, subscription line, lease, Legal owner
 and Fleet are read-only, the form offers no Delete, and `DELETE
 /api/now/table/alm_hardware/<id>` is refused; a list edit of cost on `alm_asset_list.do` is refused
@@ -333,7 +333,7 @@ returns no cost, support cost, claim code or lease, and a Shipment returns no co
 
 ### Customer creates
 
-`security/acls.now.ts`. As a customer admin, `POST /api/now/table/x_daas_ham_order` for another
+`orders/access.now.ts`, `returns/access.now.ts`. As a customer admin, `POST /api/now/table/x_daas_ham_order` for another
 Customer and `POST /api/now/table/x_daas_ham_order_line` are refused; a `POST` of a Return order
 for another Customer is refused (this confirms the create rule sees the posted values); the
 customer page's *Return selected* and the two record producers still work. As a service desk
@@ -343,7 +343,7 @@ producer opens the Return it raised.
 
 ### REST access for customer users
 
-`logic/rest.now.ts`, `security/rest-acls.now.ts`. In *System Web Services > Scripted REST APIs >
+`shared/rest-api.now.ts`, `shared/rest-acls.now.ts`. In *System Web Services > Scripted REST APIs >
 NaaS asset management*, the routes `/sites`, `/racks`, `/racks/{id}` and the five `/customer/...`
 routes have *Requires SNC Internal role* off and the ACLs *Scripted REST External Default* and
 *x_daas_ham NaaS customer routes*. The latter is an execute REST_Endpoint ACL with the roles

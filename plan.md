@@ -340,7 +340,8 @@ Confidence tags:
 
 **Conventions:**
 - Scoped tables are `x_daas_ham_<name>`. Columns we add to base tables are `x_daas_ham_<name>`.
-- Each table is defined in its own file under `src/fluent/tables/`.
+- Each table is defined in the folder of the feature that owns it, `src/fluent/<feature>/` (README,
+  *Where a Fluent record goes*).
 - Field lists below are indicative. Each module spec finalises them, and the Fluent table
   definitions under `src/fluent` are the tables as built: they name the Customer `customer` where
   the lists below say account.
@@ -815,11 +816,12 @@ package.json                    # scripts: build, typecheck, test, lint, check
 eslint.config.js                # lint rules, the layer rules of src/server among them
 src/
   fluent/
-    tables/ augments/ choices/ roles/ acls/ cross-scope/
-    business-rules/ flows/ catalog/ workspace/ dashboards/
-    scheduled/ rest/ import-sets/ notifications/ menus/
-    tests/                       # ATF Test / TestSuite
-    demo-data/                   # records installed only with --demo-data
+    agreements/ orders/ staging/ warehouse/ delivery/ in-service/ fleet/ models/ oem/
+    break-fix/ returns/ disposal/ assurance/ racks/ leases/ billing/ margin/ operations/
+                                 # one folder per feature: its tables, logic, ACLs, forms, ATF tests
+    shared/                      # roles, cross-scope privileges, platform-table columns, REST API,
+                                 # menu root, visibility rules, customer page, ATF suites
+    workspace/                   # workspace, list menu, dashboard
     generated/keys.ts            # committed
   server/                        # TypeScript server modules → sys_module
     domain/                      # pure rules; vocabulary.ts holds every stored choice value
@@ -841,7 +843,7 @@ README.md                        # required plugins, install, demo data, local c
 ```
 
 **Conventions**
-- One file per Fluent artefact family.
+- One folder per feature under `src/fluent`, cut into files by kind once it grows (README).
 - `.now.ts` files contain no runtime logic. Logic lives in `src/server` and is imported.
 - Every property is prefixed `x_daas_ham.`.
 - Every cross-scope access has a matching `CrossScopePrivilege`.

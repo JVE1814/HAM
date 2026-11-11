@@ -81,7 +81,7 @@ function find(job: string): GlideRecord | null {
     return record.get('job', job) ? record : null
 }
 
-/** The length of the Last error column (data/operations.now.ts). */
+/** The length of the Last error column (operations/operations.now.ts). */
 const LAST_ERROR_LENGTH = 1000
 
 function rowOf(record: GlideRecord): JobCursor {

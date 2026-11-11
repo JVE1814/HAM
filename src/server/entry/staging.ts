@@ -26,7 +26,7 @@ export function releaseWaitingSteps(current: GlideRecord): void {
 /**
  * Before-update rule on Staging tasks being closed: refused, with what to do, while closing cannot move the Asset to the
  * stage it sends it to, or would leave a unit that still needs the task without one (platform/staging-tasks
- * `stagingClosureProblem`). The rule's condition decides which closed states reach it (logic/rules.now.ts).
+ * `stagingClosureProblem`). The rule's condition decides which closed states reach it (staging/logic.now.ts).
  */
 export function guardStagingClosure(current: GlideRecord): void {
     const closing = stagingClosing(str(current, 'state'))

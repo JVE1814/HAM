@@ -768,12 +768,12 @@ const recordAcls = (): BuiltAcl[] => builtAcls().filter((acl) => !acl.field)
 
 const isCustomerRole = (role: string) => role === ROLE.customerAdmin || role === ROLE.siteContact
 /**
- * Every provider-staff role, sorted: domain/visibility PROVIDER_STAFF, the one list security/roles.now.ts
+ * Every provider-staff role, sorted: domain/visibility PROVIDER_STAFF, the one list shared/roles.now.ts
  * `providerStaff` and the rack page (which links a device to its Asset form for these roles only) both are. The checks
  * below hold the built ACLs, audience and dashboard to it, so a role the metadata admits is one the page links for.
  */
 const PROVIDER_STAFF = [...PROVIDER_STAFF_IN_ORDER].sort()
-/** The roles that read the money tables (security/roles.now.ts `moneyReaders`), sorted. */
+/** The roles that read the money tables (shared/roles.now.ts `moneyReaders`), sorted. */
 const MONEY_READERS = [ROLE.finance, ROLE.accountManager, ROLE.assetManager].sort()
 
 describe('the rules and ACLs that scope what a reader sees', () => {
@@ -1063,7 +1063,7 @@ describe('the rules and ACLs that scope what a reader sees', () => {
 })
 
 /*
- * A role group is one list of names (security/roles.now.ts). A workspace audience stores role ids, so it is built from
+ * A role group is one list of names (shared/roles.now.ts). A workspace audience stores role ids, so it is built from
  * the same roles as records: each audience must name the roles of its group.
  */
 describe('workspace audiences', () => {
@@ -1418,7 +1418,7 @@ describe('built substatus choice set', () => {
 })
 
 /*
- * The ATF tests (src/fluent/tests) run on an instance only, after an install. Read here, from the built tests, is what
+ * The ATF tests (each feature's tests.now.ts) run on an instance only, after an install. Read here, from the built tests, is what
  * goes wrong before that. A test in no suite is never run (`now-sdk cicd testsuite run` runs suites). A "Run Server
  * Side Script" step's script is text to the build: it loads server modules by the path the instance keeps them under,
  * which names the package version (logic/server-modules), and what it calls of them is checked by no compiler.

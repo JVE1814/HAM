@@ -28,12 +28,20 @@ Short file names used below:
 |---|---|
 | `adapters.ts`, `adapters.test.ts` | `src/server/domain/oem/` |
 | `claims.ts`, `claims.test.ts` | `src/server/domain/oem/` |
-| `oem-messages.now.ts`, `oem-claims.now.ts`, `shipping.now.ts`, `rest.now.ts`, `rules.now.ts` | `src/fluent/logic/` |
-| `oem.now.ts`, `staging.now.ts`, `substatus-choices.now.ts` | `src/fluent/data/` |
+| `oem-messages.now.ts`, `oem-claims.now.ts`, `shipping.now.ts`, `rest.now.ts`, `rules.now.ts` | `src/fluent/logic/` then; see below |
+| `oem.now.ts`, `staging.now.ts`, `substatus-choices.now.ts` | `src/fluent/data/` then; see below |
 | `oem-sync.ts`, `entry/oem-claims.ts`, `entry/shipping.ts`, `margin.ts`, `leases.ts`, `billing.ts`, `delivery.ts`, `in-service.ts`, `assurance.ts`, `warehouse.ts`, `spare-pool.ts`, `demo-seed.ts` | `src/server/entry/` |
 | `rest-port.ts`, `properties.ts`, `procurement.ts`, `field-work.ts`, `assets.ts`, `rest-api.ts` | `src/server/platform/` |
 | `http.ts`, `json.ts`, `domain/shipping.ts`, `shipping.test.ts`, `lifecycle.ts`, `model-lifecycle.ts`, `substatus-choices.test.ts` | `src/server/domain/` |
 | `keys.ts` | `src/fluent/generated/` |
+
+`src/fluent` has since been grouped by feature, so the `.now.ts` files named here are those of the
+research date. Their records are now in `oem/rest-messages.now.ts` (`oem-messages.now.ts`),
+`oem/logic.now.ts` (`oem-claims.now.ts`), `delivery/logic.now.ts` (`shipping.now.ts`),
+`shared/rest-api.now.ts` (`rest.now.ts`), the `logic.now.ts` of `fleet/`, `staging/`, `delivery/`
+and `orders/` (`rules.now.ts`), `oem/tables.now.ts` and `break-fix/break-fix.now.ts` (`oem.now.ts`),
+`staging/tables.now.ts` and `oem/tables.now.ts` (`staging.now.ts`), and `fleet/tables.now.ts`
+(`substatus-choices.now.ts`).
 
 
 **Status (2026-11-07):** every change under "Changes needed in the app" has been applied, except the
@@ -768,8 +776,8 @@ Sources:
 | Out-of-box transfer order line logic and the Asset | Inventory works the transfer orders sourcing raises, each unit handed over *In stock / Available* just before its line is inserted (`platform/transfers.ts` requestTransfer). Both combinations Inventory sets are one stage, *In transfer*, entered only while `active_to` is set and left only once it is cleared (`domain/lifecycle.ts`, `entry/assets.ts` refusesLifecycleChange); an Asset Inventory lets go takes back the stage it left (`entry/assets.ts` onTransferReleased) | *Push Status to Asset/Consumable* sets *In stock / Pending transfer* or *In transit / Reserved* with `active_to` set, and *In stock / Available* in the to-stockroom with it cleared at Received; *Release Asset on TOL cancel/delete* sets *In stock / Available* where the Asset is and clears it; *Validate TOL and check availibility* takes onto a line only an Asset *In stock / Available* with `active_to` clear. Each saves through `alm_asset` in the user's transaction, and the app's `alm_hardware` rules run on that save | matches | N38, N39 |
 | The platform's Model lifecycle table | A Model's manufacturer milestones are rows of `cmdb_model_lifecycle`, written as `cmdb_hardware_model_lifecycle` with lifecycle type `publisher`, source `internal`, the milestone as `lifecycle_phase` and its date as `start_date`; a write updates the active row of one Model, type, phase and source and never deletes; asset managers hold `model_manager` (`platform/model-lifecycle.ts`, ADR 0017) | Both tables are Model Management's (`com.snc.model`), with those columns and phase values; before rules refuse an insert without a start date, a second active row for one Model, type, phase and source, and a hardware lifecycle row for a Model that is not a hardware Model; this scope may read, create and update, not delete; create and write need `model_manager`, read `snc_internal` | matches (the app's use was not run on the instance) | N40 |
 | Platform fields the app uses in place of its own | An inventory tech's Stockrooms from `alm_stockroom.assignment_group` and `sys_user_grmember` (`platform/session.ts`); a Model's typical power from `cmdb_model.power_consumption` (`platform/racks.ts`); a lease's Lessor and schedule number in `ast_contract.vendor` and `vendor_contract`; on-site work linked through `wm_order.initiated_from` and `change_request.parent` (`platform/field-work.ts`, the rules on `wm_order`); ADR 0018 | The columns exist with those types; `sys_user_group` lets other scopes read only, `sys_user_grmember` read, create and update; no platform rule reads a contract's vendor fields, a work order's *Initiated from* or (beyond running the parent's workflows) a task's *Parent* | matches (the app's use was not run on the instance) | N41 |
-| ATF *Record Validation* on a date field | The ATF tests check a date with the `ON` form, `endsON2028-01-31@javascript:gs.dateGenerate('2028-01-31','start')@javascript:gs.dateGenerate('2028-01-31','end')` (`src/fluent/tests/contracts.now.ts`) | The step matches the record loaded in memory against the condition, not the database, and there a date `=` a literal day is shifted by the session time zone; `ON` matches the day in every time zone | matches | N42 |
-| A row inserted into an import-set table outside an import set | The app processes its import rows by business rule and ships no transform map (ADR 0018); an ATF test that inserts such a row does not fail on server errors and checks the outcome (`src/fluent/tests/models.now.ts`) | The platform transforms the row at once and, where the table has no transform map, logs the error *Transform map record not provided, transform stopped*; the insert is written and the app's rule runs | matches | N43 |
+| ATF *Record Validation* on a date field | The ATF tests check a date with the `ON` form, `endsON2028-01-31@javascript:gs.dateGenerate('2028-01-31','start')@javascript:gs.dateGenerate('2028-01-31','end')` (`src/fluent/leases/tests.now.ts`) | The step matches the record loaded in memory against the condition, not the database, and there a date `=` a literal day is shifted by the session time zone; `ON` matches the day in every time zone | matches | N42 |
+| A row inserted into an import-set table outside an import set | The app processes its import rows by business rule and ships no transform map (ADR 0018); an ATF test that inserts such a row does not fail on server errors and checks the outcome (`src/fluent/models/tests.now.ts`) | The platform transforms the row at once and, where the table has no transform map, logs the error *Transform map record not provided, transform stopped*; the insert is written and the app's rule runs | matches | N43 |
 
 Notes:
 

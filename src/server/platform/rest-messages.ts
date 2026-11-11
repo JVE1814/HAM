@@ -4,7 +4,7 @@ import { restPort, type MessageVariables } from './rest-port.ts'
 import { REST_MESSAGE } from '../domain/rest-message-names.ts'
 
 /**
- * What each REST message of the app (fluent/logic/oem-messages.now.ts and the shipping aggregator's) takes at call
+ * What each REST message of the app (fluent/oem/rest-messages.now.ts and the shipping aggregator's) takes at call
  * time besides a request's own parameters: its secrets and its settings.
  */
 

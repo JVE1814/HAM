@@ -85,7 +85,7 @@ function submitReplacement(order: GlideRecord): Replacement {
 
 /**
  * A replacement Order completed: its case is saved with a work note. The replacement SLAs on the case stop once the Order
- * it links is complete (logic/aftersales.now.ts), but the SLA engine weighs a case's SLAs only when the case is saved,
+ * it links is complete (break-fix/break-fix.now.ts), but the SLA engine weighs a case's SLAs only when the case is saved,
  * and completing the Order does not save it. Only an open case that still links this Order, now complete, is saved. A
  * case not found, or a refused save, leaves the SLA running, to breach: that is logged, to save the case by hand.
  *

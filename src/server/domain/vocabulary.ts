@@ -48,7 +48,7 @@ export const INSTALL_STATUS = {
 /**
  * The install_status + substatus pair each Lifecycle stage is stored as (ADR 0002; domain/lifecycle reads it).
  *
- * A stage with a `choice` uses a substatus this app adds to alm_asset.substatus: data/substatus-choices.now.ts ships
+ * A stage with a `choice` uses a substatus this app adds to alm_asset.substatus: fleet/tables.now.ts ships
  * one sys_choice per `choice`, taking its value, install status, label and sequence from here. The others use
  * out-of-box values: Brazil ships pending_evaluation under In stock and lease_return under Retired.
  */

@@ -70,7 +70,7 @@ const warnUnplaced = memoized((table: string) => {
 })
 
 /**
- * The before-query business rules' script (security/visibility.now.ts): restricts a list or look-up to what the user
+ * The before-query business rules' script (shared/visibility.now.ts): restricts a list or look-up to what the user
  * may see (ADR 0005), by the scoping of the table queried. A rule on a table also runs for the queries of the tables
  * that extend it, which take its scoping. A query the app's own logic runs past the rules (platform/beyond-visibility)
  * is left as it is. On a table the app shares with the Provider's IT (ADR 0016) an inventory tech's NaaS records only
@@ -136,7 +136,7 @@ function hardwareRow(current: GlideRecord): ScopedRow {
 }
 
 /**
- * The Deny-Unless read ACLs' script (security/acls-visibility.now.ts, ADR 0005), on the tables the rules narrow to an
+ * The Deny-Unless read ACLs' script (shared/visibility.now.ts, ADR 0005), on the tables the rules narrow to an
  * inventory tech's Stockrooms: a record is read only when the table's before-query rule would have kept it. A rule
  * can only append conditions, which an `^NQ` in the query binds to its last clause, so a list or a direct link can
  * reach a record the rule would hide; the ACL denies it. It decides on the same scoping as the rule (domain/visibility
@@ -167,7 +167,7 @@ export function grantsFleetAsset(current: GlideRecord): boolean {
 }
 
 /*
- * Changes to hardware by hand (security/acls-hardware.now.ts, ADR 0005): Deny-Unless ACLs on alm_asset, beside the
+ * Changes to hardware by hand (fleet/access.now.ts, ADR 0005): Deny-Unless ACLs on alm_asset, beside the
  * platform's Allow-If ones there, which the platform's `asset` role (inventory and field techs hold it) passes for every
  * Asset. On a fleet asset they keep saving to the asset editors whose scope keeps it, deleting to app administrators,
  * and the company and cost to asset managers (domain/visibility); any other Asset passes, left to the platform.
@@ -201,7 +201,7 @@ export function readsAssetCost(current: GlideRecord): boolean {
 }
 
 /**
- * Grant of the Customer contacts' Allow-If read ACLs on the app's own tables (security/acls.now.ts,
+ * Grant of the Customer contacts' Allow-If read ACLs on the app's own tables (each feature's access.now.ts,
  * acls-logistics.now.ts): a record of the reader's Customer and, for a site contact who is no Customer admin, of a
  * Site that lists them, on the fields the table's before-query rule filters on (domain/visibility
  * `grantsContactRecord`). So a direct link, a dot-walk from a visible record or a table with no rule (return lines,
@@ -221,7 +221,7 @@ export function grantsCustomerRecord(current: GlideRecord): boolean {
 }
 
 /**
- * Grant of the customer admins' create ACL on Returns (security/acls.now.ts): a Return of their own Customer, or one
+ * Grant of the customer admins' create ACL on Returns (returns/access.now.ts): a Return of their own Customer, or one
  * that names none yet (domain/visibility `grantsReturnOfOwnCustomer`).
  */
 export function createsCustomerReturn(current: GlideRecord): boolean {

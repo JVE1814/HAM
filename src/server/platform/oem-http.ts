@@ -3,7 +3,7 @@ import type { OemVendor } from '../domain/vocabulary.ts'
 import { boolProperty, PROPERTY, stringProperty, type PropertyOf } from './properties.ts'
 import { restMessagePort } from './rest-messages.ts'
 
-/** RESTMessageV2 transport for the OEM adapters (REST messages in fluent/logic/oem-messages.now.ts). */
+/** RESTMessageV2 transport for the OEM adapters (REST messages in fluent/oem/rest-messages.now.ts). */
 
 /**
  * The switch of each vendor whose API the sync jobs read, and the organizations of those read per organization. Every

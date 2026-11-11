@@ -3,7 +3,7 @@ import type { PowerBudget } from './rack.ts'
 import type { AttestationResponse, LifecyclePhase, RackFace, ReturnMethod } from './vocabulary.ts'
 
 /**
- * What the REST resources of the three pages take and answer (src/fluent/logic/rest.now.ts): each shape is declared
+ * What the REST resources of the three pages take and answer (src/fluent/shared/rest-api.now.ts): each shape is declared
  * here once, for the page that sends or reads it and the entry function that reads or builds it. Types only, so the
  * module adds no code to either. A request body is what a page sends; the server still checks what it receives.
  */

@@ -9,7 +9,7 @@ import { REST_MESSAGE, type RestFunction } from '../rest-message-names.ts'
 /*
  * Vendor adapters (ADR 0008). Response shapes follow the vendors' public API documentation; mappers
  * read tolerantly so optional or renamed fields degrade to "unknown" rather than failing.
- * Request functions name the REST message functions declared in fluent/logic/oem-messages.now.ts.
+ * Request functions name the REST message functions declared in fluent/oem/rest-messages.now.ts.
  */
 
 export interface OemContext {
