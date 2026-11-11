@@ -1,6 +1,6 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { todayIso } from '../platform/clock.ts'
-import { queueRefresh, runRefreshPass } from '../platform/lifecycle-dates.ts'
+import { runRefreshPass } from '../platform/lifecycle-dates.ts'
 import { queueModelRefresh, queueModelsReachingMilestone, writingModelLifecycle } from '../platform/model-lifecycle.ts'
 import { normalizeNaasRawModels, resolveNormalizationException } from '../platform/normalization.ts'
 import { str, type ForeignRecord } from '../platform/records.ts'
@@ -41,12 +41,4 @@ export function refreshModelAssets(event: GlideRecord, current: GlideRecord): vo
 /** Daily job: models crossing a milestone today change phase without any record changing. */
 export function rollLifecyclePhases(): void {
     queueModelsReachingMilestone(todayIso())
-}
-
-export function onAgreementTermsChanged(current: GlideRecord): void {
-    queueRefresh('agreement', current)
-}
-
-export function refreshAgreementAssets(event: GlideRecord, current: GlideRecord): void {
-    runRefreshPass('agreement', event, current)
 }

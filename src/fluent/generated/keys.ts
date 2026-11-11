@@ -3547,6 +3547,10 @@ declare global {
                         table: 'sys_module'
                         id: 'f8efb37c93ba4672a7b3da6bf81a6621'
                     }
+                    src_server_entry_agreements_ts: {
+                        table: 'sys_module'
+                        id: 'a94bd081be664dff95eba15e470c784c'
+                    }
                     src_server_entry_assets_ts: {
                         table: 'sys_module'
                         id: '95edc36f9b974249b1dff9dfe2d79015'

@@ -2,7 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { agreementCurrencyProblem, billingMonthProblem, currencyCode, monthBounds, monthChangedError, previousMonth } from '../domain/billing.ts'
+import { billingMonthProblem, monthBounds, monthChangedError, previousMonth } from '../domain/billing.ts'
 import { EVENT } from '../domain/events.ts'
 import { ROLE } from '../domain/roles.ts'
 import {
@@ -82,19 +82,6 @@ export function exportBillingPeriod(event: GlideRecord): void {
 
 export function guardClosedBillingLine(current: GlideRecord, previous: GlideRecord): void {
     abortWith(current, closedLineRefusal(current, previous))
-}
-
-/**
- * Before insert/update rule on Agreements (when the currency changes): a currency that is no three-letter code is
- * refused as it is entered (domain/billing `agreementCurrencyProblem`), rather than failing every line of the Agreement
- * at the next generation; one entered in lower case is saved upper-cased, as billing reads it.
- */
-export function guardAgreementCurrency(current: GlideRecord): void {
-    const entered = str(current, 'currency')
-    const problem = agreementCurrencyProblem(entered)
-    if (problem) return abortWith(current, problem)
-    const code = currencyCode(entered)
-    if (code && code !== entered) current.setValue('currency', code)
 }
 
 export function guardBillingPeriodMonth(current: GlideRecord): void {
