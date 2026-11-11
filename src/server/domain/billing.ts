@@ -23,7 +23,7 @@ const RATE_SCALE = 10000
  * A monthly rate charged for `units` (whole) days, or device-days, of a month, to the cent: worked out in whole numbers,
  * so a charge of exactly half a cent rounds up (0.29 a month for 14 of 28 days is 0.15).
  */
-export function prorate(monthlyRate: number, units: number, daysInMonth: number): number {
+function prorate(monthlyRate: number, units: number, daysInMonth: number): number {
     if (daysInMonth <= 0) return 0
     const rate = Math.round(monthlyRate * RATE_SCALE)
     return fromCents(divideRounded(rate * Math.round(units), daysInMonth * (RATE_SCALE / 100)))
@@ -102,14 +102,14 @@ interface DayRange {
  * flags it, IN_SERVICE_ON_ENDED_LINE; it is never moved to another line). Null when they do not overlap, and for a
  * line without a start date, which has not started (a site package without one bills nothing either).
  */
-export function withinLine(interval: DayRange, line: Partial<DayRange>): DayRange | null {
+function withinLine(interval: DayRange, line: Partial<DayRange>): DayRange | null {
     if (!line.start || !interval.start) return null
     const start = interval.start > line.start ? interval.start : line.start
     const end = !line.end || (interval.end && interval.end < line.end) ? interval.end : line.end
     return end !== undefined && end < start ? null : { start, end }
 }
 
-export const NO_LINE = 'x_daas_ham_subscription_lineISEMPTY'
+const NO_LINE = 'x_daas_ham_subscription_lineISEMPTY'
 
 /**
  * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets in service on no Subscription line,
@@ -117,7 +117,7 @@ export const NO_LINE = 'x_daas_ham_subscription_lineISEMPTY'
  */
 export const IN_SERVICE_UNBILLED = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${NO_LINE}^${FLEET_CONDITION}`
 
-export const ON_ENDED_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION_LINE_STATUS.ended}^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()`
+const ON_ENDED_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION_LINE_STATUS.ended}^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()`
 
 /**
  * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets (ADR 0016) billed from a Service
