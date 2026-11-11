@@ -31,11 +31,10 @@ import { moveAndSave, readStage } from './assets.ts'
 import { requeueCounted } from './events.ts'
 import { EVENT } from '../domain/events.ts'
 import { orderShipment, queueSourcing } from './fulfilment.ts'
-import { withLock, withLockTries, type LockRun } from './locks.ts'
-import { addOrderLines, cancelLine, type NewLine, type RefusedLine } from './order-lines.ts'
+import { withLock, withLockTries } from './locks.ts'
+import { addOrderLines, cancelLine, withOrderLineLocks, type NewLine, type RefusedLine } from './order-lines.ts'
 import { bool, findById, num, refusal, str, warnRefused } from './records.ts'
 import { creatorOf } from './session.ts'
-import { withOrderLineLock } from './sourcing.ts'
 import { skipOpenStagingTasks } from './staging-tasks.ts'
 import { releaseToProviderStock, takeOffOrderLine } from './stock.ts'
 import { SITE_FIELD } from '../domain/fleet.ts'
@@ -402,21 +401,6 @@ function rejectOrder(order: GlideRecord): string {
     if (underLines.ran) return underLines.value
     log.warn(`${number} not rejected: a line's lock stayed held through every try; re-check its approvals`)
     return 'one of its lines is being received or cancelled: re-check its approvals shortly'
-}
-
-/**
- * Run `work` holding the lock of every line in `lineIds` (platform/sourcing `withOrderLineLock` each), taken one under
- * another in sys_id order (ADR 0013), and give what it returned, or `ran: false`, with nothing run, when one stayed
- * held through its tries.
- */
-function withOrderLineLocks<T>(lineIds: readonly string[], work: (locks: HeldLock[]) => T): LockRun<T> {
-    const ids = [...lineIds].sort()
-    const holdFrom = (next: number, held: HeldLock[]): LockRun<T> => {
-        if (next === ids.length) return { ran: true, value: work(held) }
-        const under = withOrderLineLock(ids[next], (lock) => holdFrom(next + 1, [...held, lock]))
-        return under.ran ? under.value : { ran: false }
-    }
-    return holdFrom(0, [])
 }
 
 /** A cancel or rejection that outlasted a line's lock (ADR 0013) may have overlapped a receipt that took it over: logged once. */

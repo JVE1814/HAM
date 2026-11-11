@@ -1,6 +1,6 @@
 import { GlideRecord } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
-import { LONG_HOLD_LOCK_TRIES, REQUEUE, type HeldLock } from '../domain/job-lock.ts'
+import { REQUEUE, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { advanceReplacementRma } from '../domain/oem-rma.ts'
 import {
@@ -24,8 +24,8 @@ import { todayIso } from './clock.ts'
 import { requeueCounted } from './events.ts'
 import { EVENT } from '../domain/events.ts'
 import { lineLostUnit, recomputeLine, recomputeOrder, unitsOnLine } from './fulfilment.ts'
-import { withLock, withLockTries, type LockRun } from './locks.ts'
-import { saveLineSourcing } from './order-lines.ts'
+import { withLock } from './locks.ts'
+import { saveLineSourcing, withOrderLineLock } from './order-lines.ts'
 import { openOemRma, openRmaCount, openRmasFor, reuseOemRma } from './oem-rma.ts'
 import { requestPurchase } from './procurement.ts'
 import { findById, num, str, warnRefused, type ForeignRecord } from './records.ts'
@@ -89,18 +89,6 @@ function queuePassAgain(order: GlideRecord, tries: number, why: string): void {
         return void log.warn(`${number} not sourced again after ${tries} tries (${why}): check its lines`)
     }
     log.info(`${number} sourced again in ${REQUEUE.delaySeconds} s: ${why}`)
-}
-
-/**
- * Run `work` holding the Order line's lock and give what it returned, or `ran: false` when other holders kept it through
- * every try: a holder keeps it for a receipt (the Asset, the line, the reservation and the move into staging saved),
- * for sourcing's read of the line or its purchase and save, or for a cancel or rejection of its Order (platform/orders
- * `withOrderLineLocks`). Taking the lock throws only when an insert is refused with no lock row
- * (platform/locks `withLockTries` tries again, and that error escapes only when every try threw), as does an error
- * from `work`.
- */
-export function withOrderLineLock<T>(lineId: string, work: (lock: HeldLock) => T): LockRun<T> {
-    return withLockTries(LOCK.orderLine(lineId), work, LONG_HOLD_LOCK_TRIES)
 }
 
 /** What sourcing found and did for a line outside its lock: what `settleHolding` routes, buys and saves. */
