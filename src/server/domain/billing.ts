@@ -124,7 +124,7 @@ const ON_ENDED_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION_LINE_S
  * interval whose Subscription line has ended (set ended, or past its end date; the end date itself is billed). Their
  * days after the line's end are not billed (withinLine), so they are flagged; nothing moves them to another line.
  * It is `fleetStagesQuery(IN_USE_STAGES, ON_ENDED_LINE)` written out, one clause per stage in use: the dashboard tile
- * imports it, and Fluent metadata reads no function call (domain/billing.test.ts holds it to the function's result).
+ * imports it, and Fluent metadata reads no function call (domain/billing.test.ts checks which Assets it flags).
  */
 export const IN_SERVICE_ON_ENDED_LINE = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${ON_ENDED_LINE}^${FLEET_CONDITION}^NQinstall_status=${STAGE_FIELDS.temporary_deployment.installStatus}^substatus=${STAGE_FIELDS.temporary_deployment.substatus}^${ON_ENDED_LINE}^${FLEET_CONDITION}`
 

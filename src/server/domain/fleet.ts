@@ -64,7 +64,7 @@ export function fleetStagesQuery(stages: readonly Stage[], base = '', via = ''):
 
 /**
  * Fleet assets in one stage, as `fleetStagesQuery([stage])` gives them: the constants Fluent metadata imports for its
- * lists, modules and dashboard tiles (domain/fleet.test.ts holds each to the function's result).
+ * lists, modules and dashboard tiles (domain/fleet.test.ts checks which Assets each finds).
  */
 export const FLEET_IN_STAGE = {
     in_service: `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${FLEET_CONDITION}`,
