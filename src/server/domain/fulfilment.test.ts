@@ -13,6 +13,7 @@ import {
     UNFULFILLED_ORDER_STAGES,
 } from './fulfilment'
 import { LINE_STAGE_CHOICES, ORDER_STAGE_CHOICES, type LineStage, type OrderStage } from './vocabulary'
+import { recordMatches as matches } from '../test-support/encoded-query'
 
 describe('lineStageFor', () => {
     it('waits for stock while fewer assets than ordered are allocated', () => {
@@ -241,8 +242,8 @@ describe('the Order stage sets', () => {
         expect(UNFULFILLED_ORDER_STAGES).not.toContain('complete')
     })
 
-    it('select the open Orders with the query the metadata imports', () => {
-        expect(OPEN_ORDERS_QUERY).toBe(`stageNOT IN${ENDED_ORDER_STAGES.join(',')}`)
+    it('select the open Orders, every one that has not ended, with the query the metadata imports', () => {
+        expect(stages.filter((stage) => matches(OPEN_ORDERS_QUERY, { stage }))).toEqual(stages.filter((stage) => !ENDED_ORDER_STAGES.includes(stage)))
     })
 
     it('offer Cancel order until Ship: on no Order that ended, is being installed or is complete', () => {
