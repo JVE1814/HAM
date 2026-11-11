@@ -16,7 +16,7 @@ import {
 import { memoized } from '../domain/memo.ts'
 import { SHIPMENT_STATUS, type LegalOwner } from '../domain/vocabulary.ts'
 import { agreementCurrencyOf, customerCurrencies } from './agreements.ts'
-import { recordMarginOutcome } from './billing.ts'
+import { recordMarginOutcome } from './closed-period.ts'
 import { runEventTableJob } from './chunked.ts'
 import { queueJob, type JobEvent } from './events.ts'
 import { EVENT } from '../domain/events.ts'

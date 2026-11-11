@@ -3700,6 +3700,10 @@ declare global {
                         table: 'sys_module'
                         id: '401af081928d430898e921643f5942ce'
                     }
+                    'src_server_platform_closed-period_ts': {
+                        table: 'sys_module'
+                        id: '5cabd174deb142e1ac202c79090b2c01'
+                    }
                     src_server_platform_coverage_ts: {
                         table: 'sys_module'
                         id: '222af00d39bf43329fb67f8b8ed52f9c'

@@ -8,8 +8,6 @@ import { EVENT } from '../domain/events.ts'
 import { ROLE } from '../domain/roles.ts'
 import {
     attachExport,
-    closedLineRefusal,
-    closedPeriodRefusal,
     closePeriod,
     generateChunk,
     generateNewPeriod,
@@ -23,6 +21,7 @@ import {
     type PeriodOutcome,
 } from '../platform/billing.ts'
 import { todayIso } from '../platform/clock.ts'
+import { closedLineRefusal, closedPeriodRefusal } from '../platform/closed-period.ts'
 import { jobEvent, subjectOf } from '../platform/events.ts'
 import { queueMarginCompute } from '../platform/margin.ts'
 import { str } from '../platform/records.ts'
