@@ -60,5 +60,23 @@ export const EQUIPMENT_HANDLERS = [ROLE.assetManager, ROLE.inventoryTech, ROLE.f
  */
 export const CUSTOMER_PAGE_USERS = [ROLE.customerAdmin, ROLE.siteContact, ROLE.assetManager]
 
+/** The Customer contacts' roles: their reads are kept to their own Customer, and a site contact's to their Sites. */
+export const CUSTOMER_CONTACTS = [ROLE.customerAdmin, ROLE.siteContact]
+
+/**
+ * Who opens the rack page and calls its routes: every person the app serves, PROVIDER_STAFF and CUSTOMER_CONTACTS.
+ * Written out, as the metadata cannot evaluate a spread.
+ */
+export const RACK_PAGE_USERS = [
+    ROLE.assetManager,
+    ROLE.inventoryTech,
+    ROLE.fieldTech,
+    ROLE.noc,
+    ROLE.accountManager,
+    ROLE.finance,
+    ROLE.customerAdmin,
+    ROLE.siteContact,
+]
+
 /** The roles that read the money tables: service intervals, billing, cost facts and margin. */
 export const MONEY_READERS = [ROLE.finance, ROLE.accountManager, ROLE.assetManager]

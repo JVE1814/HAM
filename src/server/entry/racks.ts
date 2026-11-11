@@ -1,11 +1,11 @@
 import { gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import type { RackList, SiteList } from '../domain/rest-contracts.ts'
+import { RACK_PAGE_USERS } from '../domain/roles.ts'
 import { keepsPlacement, placementRefusal, rackElevation, racksAtSite, recheckFlaggedRacks, recheckRacksOf, visibleSites } from '../platform/racks.ts'
 import { reconcileInstalledBase } from '../platform/reconciliation.ts'
 import type { ForeignRecord } from '../platform/records.ts'
-import { pathParam, queryParam, reply } from '../platform/rest-api.ts'
-import { currentSession } from '../platform/session.ts'
+import { pathParam, queryParam, reply, requireRole } from '../platform/rest-api.ts'
 
 /** Rack placement and the rack elevation view (P2.8, Q67). */
 
@@ -57,27 +57,25 @@ export function reconcileInstalledBaseAndRacks(): void {
     }
 }
 
-function forbidden(response: RESTAPIResponse): boolean {
-    if (currentSession().scope !== 'unscoped') return false
-    reply(response, 403, { error: 'Requires a NaaS role' })
-    return true
+function allowed(response: RESTAPIResponse): boolean {
+    return requireRole(response, RACK_PAGE_USERS, 'Requires a NaaS role')
 }
 
 export function listRacks(request: RESTAPIRequest, response: RESTAPIResponse): void {
-    if (forbidden(response)) return
+    if (!allowed(response)) return
     const racks = racksAtSite(queryParam(request, 'site'))
     if (!racks) return reply(response, 404, { error: 'No such site' })
     reply(response, 200, { racks } satisfies RackList)
 }
 
 export function getRack(request: RESTAPIRequest, response: RESTAPIResponse): void {
-    if (forbidden(response)) return
+    if (!allowed(response)) return
     const elevation = rackElevation(pathParam(request, 'id'))
     if (!elevation) return reply(response, 404, { error: 'No such rack' })
     reply(response, 200, elevation)
 }
 
 export function listSites(request: RESTAPIRequest, response: RESTAPIResponse): void {
-    if (forbidden(response)) return
+    if (!allowed(response)) return
     reply(response, 200, { sites: visibleSites() } satisfies SiteList)
 }

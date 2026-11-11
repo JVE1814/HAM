@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Role } from '@servicenow/sdk/core'
-import { BROAD_STAFF, EQUIPMENT_HANDLERS, MONEY_READERS, PLATFORM_ROLE, PROVIDER_STAFF, ROLE } from '../../server/domain/roles'
+import { BROAD_STAFF, CUSTOMER_CONTACTS, EQUIPMENT_HANDLERS, MONEY_READERS, PLATFORM_ROLE, PROVIDER_STAFF, RACK_PAGE_USERS, ROLE } from '../../server/domain/roles'
 
 /*
  * The base-platform roles contained below must exist on the instance, as must the service desk's, which the ACLs grant
@@ -86,7 +86,7 @@ export const broadStaff = BROAD_STAFF
 export const serviceDesk = [PLATFORM_ROLE.serviceDeskAgent]
 
 /** External customer roles; their reads are filtered to their own customer. */
-export const customerRoles = [ROLE.customerAdmin, ROLE.siteContact]
+export const customerRoles = CUSTOMER_CONTACTS
 
 /** Who writes Agreements, Catalog entries and the other commercial records. */
 export const commercialEditors = [ROLE.accountManager, ROLE.assetManager]
@@ -118,16 +118,7 @@ export const leaseEditors = [ROLE.assetManager, ROLE.finance]
 export const moneyReaders = MONEY_READERS
 
 /** Every person the app serves, provider staff and Customer contacts: the rack elevations are open to them all. */
-export const staffAndCustomers = [
-    ROLE.assetManager,
-    ROLE.inventoryTech,
-    ROLE.fieldTech,
-    ROLE.noc,
-    ROLE.accountManager,
-    ROLE.finance,
-    ROLE.customerAdmin,
-    ROLE.siteContact,
-]
+export const staffAndCustomers = RACK_PAGE_USERS
 
 /*
  * Three of the groups again as role records, for the workspace's audiences: an Applicability stores role ids, which a
