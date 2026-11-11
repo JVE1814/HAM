@@ -4,8 +4,8 @@ import { explainWorkWindowRefusal, onWorkOrderClosed } from '../../server/entry/
 import { RETURN_METHOD, SHIPMENT_DIRECTION, SHIPMENT_STATUS, TASK_STATE } from '../../server/domain/vocabulary'
 import { REST_MESSAGE } from '../../server/domain/rest-message-names'
 import { retryTrackingUpdate, uiCreateReturnLabel, uiMarkLabelVoided } from '../../server/entry/shipping'
-import { PROPERTY } from '../../server/platform/properties'
-import { EVENT } from '../../server/platform/events'
+import { PROPERTY } from '../../server/domain/properties'
+import { EVENT } from '../../server/domain/events'
 import { ENTRY_MODULES } from '../shared/server-modules.now'
 import { admin, returnWorkers } from '../shared/roles.now'
 

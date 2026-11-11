@@ -4,7 +4,7 @@ import { fieldsOf, stageOf, type Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { recomputeLine } from './fulfilment.ts'
 import { cancelOrder, rollUpOrderApprovals } from './orders.ts'
-import { PROPERTY } from './properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { findById } from './records.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 

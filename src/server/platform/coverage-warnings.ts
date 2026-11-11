@@ -5,8 +5,10 @@ import { fleetStagesQuery } from '../domain/fleet.ts'
 import { SERVING_STAGES } from '../domain/lifecycle.ts'
 import { assetManagerIds } from './approvals.ts'
 import { markExpiryWarned } from './coverage.ts'
-import { EVENT, fire } from './events.ts'
-import { intProperty, PROPERTY } from './properties.ts'
+import { fire } from './events.ts'
+import { EVENT } from '../domain/events.ts'
+import { intProperty } from './properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { findById, str, warnRefused } from './records.ts'
 
 /**

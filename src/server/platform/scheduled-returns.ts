@@ -1,10 +1,11 @@
 import { GlideRecord } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { collectionMethod, TEMPORARY_RETURN_STAGES } from '../domain/returns.ts'
 import { type InstallMode, ORDER_STAGE, type OrderType, RETURN_TRIGGER } from '../domain/vocabulary.ts'
 import { todayIso } from './clock.ts'
 import { installedAssetIds, installedAssetIdsBySite } from './installed-assets.ts'
-import { intProperty, PROPERTY } from './properties.ts'
+import { intProperty } from './properties.ts'
 import { exists, findById, str, warnRefused } from './records.ts'
 import { raiseReturn } from './returns.ts'
 

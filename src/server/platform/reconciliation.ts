@@ -11,7 +11,8 @@ import {
 import { runTableJob } from './chunked.ts'
 import { daysAgoGlide, glideToMs, nowMs } from './clock.ts'
 import { cisWithOpenException, openException, resolveExceptions, resolveExceptionsWhere, settleExceptions } from './exceptions.ts'
-import { intProperty, PROPERTY } from './properties.ts'
+import { intProperty } from './properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { pluck, str } from './records.ts'
 import { IN_USE_STAGES } from '../domain/lifecycle.ts'
 

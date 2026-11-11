@@ -19,8 +19,10 @@ import { SHIPMENT_STATUS, type LegalOwner } from '../domain/vocabulary.ts'
 import { agreementCurrencyOf, customerCurrencies } from './agreements.ts'
 import { recordMarginOutcome } from './billing.ts'
 import { runEventTableJob } from './chunked.ts'
-import { EVENT, queueJob, type JobEvent } from './events.ts'
-import { intProperty, PROPERTY } from './properties.ts'
+import { queueJob, type JobEvent } from './events.ts'
+import { EVENT } from '../domain/events.ts'
+import { intProperty } from './properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { count, deleteWhere, findById, num, recordsById, str, throwRefused } from './records.ts'
 
 /**

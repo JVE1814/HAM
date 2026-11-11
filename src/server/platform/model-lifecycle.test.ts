@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { EVENT } from './events.ts'
+import { EVENT } from '../domain/events.ts'
 import {
     queueModelRefresh,
     queueModelsReachingMilestone,

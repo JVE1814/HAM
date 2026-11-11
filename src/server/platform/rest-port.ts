@@ -2,7 +2,8 @@ import { gs } from '@servicenow/glide'
 import { RESTMessageV2 } from '@servicenow/glide/sn_ws'
 import { messageOf } from '../domain/errors.ts'
 import type { HttpPort, HttpResponse } from '../domain/http.ts'
-import { secretProperty, stringProperty, type PropertyOf } from './properties.ts'
+import { type PropertyOf } from '../domain/properties.ts'
+import { secretProperty, stringProperty } from './properties.ts'
 
 /**
  * RESTMessageV2 transport behind the HttpPort seam (ADR 0008). It knows no REST message of its own: what each of the

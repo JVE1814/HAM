@@ -1,5 +1,6 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { claimRouted, initialAutomationStatus } from '../domain/oem/claims.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { lineStillOpen } from '../domain/sourcing.ts'
 import {
     closureMoveProblem,
@@ -18,6 +19,7 @@ import {
 import { moveAndSave, readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { lineLostUnit } from './fulfilment.ts'
+import { stringProperty } from './properties.ts'
 import { bool, deleteWhere, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { takeOffOrderLine } from './stock.ts'
 
@@ -26,6 +28,11 @@ import { takeOffOrderLine } from './stock.ts'
  * A task's steps are created (and removed with a task that could not be opened) here; what an automated step goes
  * through afterwards is platform/claim-steps'.
  */
+
+/** The staging centre's stockroom: where purchased units ship to, Assets are staged and shipments leave from ('' while none is set). */
+export function stagingStockroom(): string {
+    return stringProperty(PROPERTY.stagingStockroom)
+}
 
 function templates(): StagingTemplateView[] {
     const gr = new GlideRecord('x_daas_ham_staging_template')

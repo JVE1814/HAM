@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { guardBillingPeriodMonth } from './billing.ts'
 import { closePeriod, generateChunk, generateNewPeriod, regeneratePeriod } from '../platform/billing.ts'
-import { EVENT } from '../platform/events.ts'
+import { EVENT } from '../domain/events.ts'
 import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 import type { GlideRecord } from '@servicenow/glide'
 

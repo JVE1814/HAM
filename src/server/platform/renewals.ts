@@ -1,9 +1,10 @@
 import { GlideRecord } from '@servicenow/glide'
 import { withinLead } from '../domain/calendar.ts'
+import { EVENT } from '../domain/events.ts'
 import { recoversAgainAt, renewedEnd } from '../domain/renewals.ts'
 import { providerApproverIds } from './approvals.ts'
 import { todayIso } from './clock.ts'
-import { EVENT, fire } from './events.ts'
+import { fire } from './events.ts'
 import { num, str, warnRefused } from './records.ts'
 import { recoverAgainAtEnd } from './scheduled-returns.ts'
 

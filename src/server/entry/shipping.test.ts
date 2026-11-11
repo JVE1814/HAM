@@ -1,6 +1,6 @@
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { PROPERTY } from '../platform/properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { postTrackingUpdate } from './shipping.ts'
 import { platform } from '../test-support/fake-glide.ts'
 

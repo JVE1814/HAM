@@ -14,7 +14,7 @@ import {
 } from '@servicenow/sdk/core'
 import { LOCK_NAME_LENGTH } from '../../server/domain/lock-names'
 import { runPreflight } from '../../server/entry/preflight'
-import { PROPERTY } from '../../server/platform/properties'
+import { PROPERTY } from '../../server/domain/properties'
 import { DEMO_DEPOT_GROUP, loadDemoData } from '../../server/entry/demo-seed'
 import { ROLE } from '../../server/domain/visibility'
 import { admin } from '../shared/roles.now'

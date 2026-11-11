@@ -6,7 +6,8 @@ import type { Stage } from '../domain/lifecycle.ts'
 import type { CatalogEntryType, DeviceClass } from '../domain/vocabulary.ts'
 import { fleetCondition, OEM_PID_FIELD, SITE_FIELD, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import { ROLE } from '../domain/visibility.ts'
-import { PROPERTY, stringProperty } from '../platform/properties.ts'
+import { stringProperty } from '../platform/properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 
 /**
  * Demo data for dev/test instances: two Customers with Sites, racks and stockrooms, models from the

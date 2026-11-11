@@ -13,7 +13,7 @@ import {
     uiRegenerateBillingPeriod,
     uiResetBillingGeneration,
 } from '../../server/entry/billing'
-import { EVENT } from '../../server/platform/events'
+import { EVENT } from '../../server/domain/events'
 import { BILLING_PERIOD_STATUS } from '../../server/domain/vocabulary'
 import { RESET_AFTER_IDLE_MINUTES } from '../../server/domain/billing'
 import { admin, finance } from '../shared/roles.now'

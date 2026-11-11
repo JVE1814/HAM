@@ -2,7 +2,7 @@ import '@servicenow/sdk/global'
 import { BusinessRule, Property } from '@servicenow/sdk/core'
 import { guardStagingClosure, onStagingClosed, releaseWaitingSteps, stampStagingStep } from '../../server/entry/staging'
 import { STAGING_TASK_STATE } from '../../server/domain/staging'
-import { PROPERTY } from '../../server/platform/properties'
+import { PROPERTY } from '../../server/domain/properties'
 import { admin } from '../shared/roles.now'
 
 /* Record-change rules of staging (ADR 0004) and the staging centre's stockroom setting. */

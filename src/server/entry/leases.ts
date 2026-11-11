@@ -1,9 +1,10 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { gs, type GlideRecord } from '@servicenow/glide'
+import { EVENT } from '../domain/events.ts'
 import { todayIso } from '../platform/clock.ts'
 import { warnExpiringCoverage } from '../platform/coverage-warnings.ts'
-import { EVENT, jobEvent } from '../platform/events.ts'
+import { jobEvent } from '../platform/events.ts'
 import { applyLeaseDecision, giveToLessor, runLeaseReview, transferToProvider } from '../platform/leases.ts'
 import { queueRefresh, runRefreshPass } from '../platform/lifecycle-dates.ts'
 import type { ForeignRecord } from '../platform/records.ts'

@@ -1,11 +1,12 @@
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { parseDeviceEvents } from '../domain/device-events.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { ROLE } from '../domain/visibility.ts'
 import { findAssetByIdentifier } from '../platform/assets.ts'
 import { nowMs } from '../platform/clock.ts'
 import { applyDeviceEvent, detectPendingInService, purgeDeviceEventsOlderThan } from '../platform/in-service.ts'
 import { lifecycleReaders } from '../platform/lifecycle-dates.ts'
-import { intProperty, PROPERTY } from '../platform/properties.ts'
+import { intProperty } from '../platform/properties.ts'
 import { reply, requireRole } from '../platform/rest-api.ts'
 
 /** In-service detection: Seen signals in, billing start out (P1.8). */

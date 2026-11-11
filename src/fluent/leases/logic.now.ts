@@ -10,8 +10,8 @@ import {
 } from '../../server/entry/leases'
 import { CURRENT_IS_FLEET, FLEET_FIELD } from '../../server/domain/fleet'
 import { LEASE_END_ACTION } from '../../server/domain/vocabulary'
-import { EVENT } from '../../server/platform/events'
-import { PROPERTY } from '../../server/platform/properties'
+import { EVENT } from '../../server/domain/events'
+import { PROPERTY } from '../../server/domain/properties'
 import { admin, leaseEditors } from '../shared/roles.now'
 
 /* Leases and end-of-lease decisions (plan §13 Leases). */

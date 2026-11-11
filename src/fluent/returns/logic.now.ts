@@ -2,8 +2,8 @@ import '@servicenow/sdk/global'
 import { BusinessRule, EmailNotification, Property, Record, ScheduledScript } from '@servicenow/sdk/core'
 import { chaseOverdueReturns, onReturnEvaluated, raiseScheduledReturns } from '../../server/entry/returns'
 import { RETURN_LINE_STATUS } from '../../server/domain/vocabulary'
-import { EVENT } from '../../server/platform/events'
-import { PROPERTY } from '../../server/platform/properties'
+import { EVENT } from '../../server/domain/events'
+import { PROPERTY } from '../../server/domain/properties'
 import { admin } from '../shared/roles.now'
 
 /* Returns (Q60): rules, jobs and notifications. */

@@ -1,11 +1,12 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { stageAfterTransfer, transferFellThrough, type TransferContext } from '../domain/lifecycle.ts'
 import { createMarks } from '../domain/marks.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import type { TransferResult } from '../domain/sourcing.ts'
 import { moveAsset, moveRefusal, readStage } from './assets.ts'
-import { PROPERTY, stagingStockroom, stringProperty } from './properties.ts'
+import { stringProperty } from './properties.ts'
 import { bool, deleteWhere, refusal, str, type ForeignRecord } from './records.ts'
-import { hasOpenStagingTask } from './staging-tasks.ts'
+import { hasOpenStagingTask, stagingStockroom } from './staging-tasks.ts'
 
 /**
  * Transfer orders (alm_transfer_order) moving stock between the Provider's stockrooms, one line per Asset. While a

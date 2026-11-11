@@ -1,4 +1,5 @@
 import { GlideRecord, gs } from '@servicenow/glide'
+import { EVENT } from '../domain/events.ts'
 import {
     closedStateFor,
     endedUnfulfilled,
@@ -15,7 +16,7 @@ import { deploymentEndLineQuery } from '../domain/returns.ts'
 import { LINE_STAGE, ORDER_STAGE, type LineStage, type OrderStage } from '../domain/vocabulary.ts'
 import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
-import { EVENT, fire } from './events.ts'
+import { fire } from './events.ts'
 import { cancelLine, saveLineStage } from './order-lines.ts'
 import { exists, findById, num, str, warnRefused, type ForeignRecord } from './records.ts'
 import { takeOffOrderLine } from './stock.ts'

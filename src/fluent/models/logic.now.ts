@@ -11,7 +11,7 @@ import {
 } from '../../server/entry/models'
 import { NORM_EXCEPTION_STATUS } from '../../server/domain/vocabulary'
 import { processLifecycleRow } from '../../server/entry/imports'
-import { EVENT } from '../../server/platform/events'
+import { EVENT } from '../../server/domain/events'
 
 /* Rules, events and jobs for model data, agreements' refresh terms and lifecycle import rows. */
 

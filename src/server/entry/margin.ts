@@ -1,7 +1,8 @@
 // Entry points: parameter names must be the platform globals (current, previous, event, request,
 // response) because the SDK's generated wrapper passes them by name.
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { EVENT, jobEvent } from '../platform/events.ts'
+import { EVENT } from '../domain/events.ts'
+import { jobEvent } from '../platform/events.ts'
 import { computeMarginChunk, queueMarginCompute } from '../platform/margin.ts'
 import { str } from '../platform/records.ts'
 

@@ -15,9 +15,9 @@ import {
     UiAction,
 } from '@servicenow/sdk/core'
 import { BILLING_PERIOD_STATUS, COST_TYPE_CHOICES } from '../../server/domain/vocabulary'
-import { EVENT } from '../../server/platform/events'
+import { EVENT } from '../../server/domain/events'
 import { computeMargin, uiRecomputeMargin } from '../../server/entry/margin'
-import { PROPERTY } from '../../server/platform/properties'
+import { PROPERTY } from '../../server/domain/properties'
 import { admin, finance, moneyReaders } from '../shared/roles.now'
 
 /* Cost facts and Margin per Customer, Site and currency (plan §13 Margin / TCO, Q72). */

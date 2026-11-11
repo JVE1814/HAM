@@ -13,7 +13,8 @@ import {
 } from '../domain/sourcing.ts'
 import { moveAsset, readStage } from './assets.ts'
 import { attemptLock, type LockRun } from './locks.ts'
-import { PROPERTY, stringProperty } from './properties.ts'
+import { stringProperty } from './properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { refusal, str } from './records.ts'
 import { STOCK_STAGES } from '../domain/lifecycle.ts'
 

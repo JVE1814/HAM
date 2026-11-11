@@ -28,7 +28,8 @@ import {
     type ApprovalRollup,
 } from './approvals.ts'
 import { moveAndSave, readStage } from './assets.ts'
-import { EVENT, requeueCounted } from './events.ts'
+import { requeueCounted } from './events.ts'
+import { EVENT } from '../domain/events.ts'
 import { orderShipment, queueSourcing } from './fulfilment.ts'
 import { withLock, withLockTries, type LockRun } from './locks.ts'
 import { addOrderLines, cancelLine, type NewLine, type RefusedLine } from './order-lines.ts'
@@ -301,7 +302,7 @@ function warnIfUsageLockLost(usageLock: HeldLock | null, order: GlideRecord): vo
 }
 
 /**
- * parm1 of the sourcing event (platform/events `EVENT.sourceOrder`) when it carries a submission queued again
+ * parm1 of the sourcing event (domain/events `EVENT.sourceOrder`) when it carries a submission queued again
  * (`submitLater`), which its script action runs instead of a sourcing pass (`submitQueuedOrder`).
  */
 export const SUBMIT_AGAIN = 'submit'

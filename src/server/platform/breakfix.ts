@@ -89,7 +89,7 @@ function submitReplacement(order: GlideRecord): Replacement {
  * and completing the Order does not save it. Only an open case that still links this Order, now complete, is saved. A
  * case not found, or a refused save, leaves the SLA running, to breach: that is logged, to save the case by hand.
  *
- * Run from the event queue (platform/events `EVENT.replacementComplete`, fired by platform/fulfilment
+ * Run from the event queue (domain/events `EVENT.replacementComplete`, fired by platform/fulfilment
  * `recomputeOrder`), never in the save that completes the Order: that save is often made in a user's interactive session
  * (an asset manager moving the unit to in service on the form, a customer contact confirming the install), where
  * Customer Service's before-query rule 'Case query rules' narrows every read of a case to the CSM query rules of a user

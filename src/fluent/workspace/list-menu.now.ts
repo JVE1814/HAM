@@ -21,7 +21,7 @@ import {
     SHIPMENT_STATUS,
     SUBSCRIPTION_LINE_STATUS,
 } from '../../server/domain/vocabulary'
-import { PROPERTY } from '../../server/platform/properties'
+import { PROPERTY } from '../../server/domain/properties'
 
 /*
  * Lists of the NaaS asset workspace, grouped by the job they serve.

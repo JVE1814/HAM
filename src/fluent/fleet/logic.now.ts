@@ -10,7 +10,7 @@ import {
 } from '../../server/entry/assets'
 import { uiAddToFleet } from '../../server/entry/fleet'
 import { topUpSparePools } from '../../server/entry/spare-pool'
-import { PROPERTY } from '../../server/platform/properties'
+import { PROPERTY } from '../../server/domain/properties'
 import { ENTRY_MODULES } from '../shared/server-modules.now'
 import { admin, assetManager } from '../shared/roles.now'
 

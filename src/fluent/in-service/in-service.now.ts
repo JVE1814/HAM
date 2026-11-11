@@ -16,7 +16,7 @@ import {
 import { DEVICE_EVENT_KIND_CHOICES, DEVICE_EVENT_SOURCE_CHOICES } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION } from '../../server/domain/fleet'
 import { evaluatePendingInService, purgeDeviceEvents } from '../../server/entry/in-service'
-import { PROPERTY } from '../../server/platform/properties'
+import { PROPERTY } from '../../server/domain/properties'
 import { admin, assetManager, broadStaff, integration } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 

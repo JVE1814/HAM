@@ -1,6 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import type { PurchaseResult } from '../domain/sourcing.ts'
-import { PROPERTY, stagingStockroom } from './properties.ts'
+import { stagingStockroom } from './staging-tasks.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { findById, refusal, str } from './records.ts'
 
 /**

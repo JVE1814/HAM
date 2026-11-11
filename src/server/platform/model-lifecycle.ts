@@ -1,9 +1,10 @@
 import { GlideRecord } from '@servicenow/glide'
+import { EVENT } from '../domain/events.ts'
 import { isNaasModel, naasModelCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
 import { createMarks } from '../domain/marks.ts'
 import { mergeLifecycle, MILESTONES, type LifecycleDates } from '../domain/model-lifecycle.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
-import { EVENT, queueJob } from './events.ts'
+import { queueJob } from './events.ts'
 import { findById, refusal, str } from './records.ts'
 
 /**

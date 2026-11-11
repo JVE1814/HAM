@@ -1,6 +1,7 @@
 import { isSyncVendor, SYNC_MESSAGE, type OemContext, type SyncVendor } from '../domain/oem/adapters.ts'
+import { PROPERTY, type PropertyOf } from '../domain/properties.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
-import { boolProperty, PROPERTY, stringProperty, type PropertyOf } from './properties.ts'
+import { boolProperty, stringProperty } from './properties.ts'
 import { restMessagePort } from './rest-messages.ts'
 
 /** RESTMessageV2 transport for the OEM adapters (REST messages in fluent/oem/rest-messages.now.ts). */

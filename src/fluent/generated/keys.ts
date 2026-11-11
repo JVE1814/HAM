@@ -3362,6 +3362,10 @@ declare global {
                         table: 'sys_module'
                         id: 'f33b2acd720947b6a2d6c27ec9812534'
                     }
+                    src_server_domain_events_ts: {
+                        table: 'sys_module'
+                        id: '855782e315a34097a9156628875a0d63'
+                    }
                     src_server_domain_exhaustive_ts: {
                         table: 'sys_module'
                         id: '3856fa292b1e4d828135c86590ba068b'
@@ -3454,6 +3458,10 @@ declare global {
                     src_server_domain_preflight_ts: {
                         table: 'sys_module'
                         id: 'e09a575f75f4414892295f6c99476267'
+                    }
+                    src_server_domain_properties_ts: {
+                        table: 'sys_module'
+                        id: 'fed47c32fa994025ac269ac4453bd3bb'
                     }
                     'src_server_domain_provider-tag_ts': {
                         table: 'sys_module'

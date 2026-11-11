@@ -46,9 +46,9 @@ import { onModelLifecycleChanged } from './entry/models'
 import { onOrderApprovalDecision } from './entry/orders'
 import { explainRackRefusal, recheckRackPlacement, refusesKeptPlacement, refusesRackPlacement } from './entry/racks'
 import { scopeRecords } from './entry/visibility'
-import { EVENT } from './platform/events'
+import { EVENT } from './domain/events'
 import { oemContext } from './platform/oem-http'
-import { PROPERTY, type PropertyOf } from './platform/properties'
+import { PROPERTY, type PropertyOf } from './domain/properties'
 import type { ForeignRecord } from './platform/records'
 import { restMessagePort } from './platform/rest-messages'
 
@@ -1097,7 +1097,7 @@ describe('the NaaS dashboard', () => {
 })
 
 /*
- * platform/events EVENT is the one list of the app's events. An event the metadata does not register is dropped by the
+ * domain/events EVENT is the one list of the app's events. An event the metadata does not register is dropped by the
  * platform when it is queued, and one nothing answers does nothing: both pass the build.
  */
 describe('events', () => {
@@ -1116,7 +1116,7 @@ describe('events', () => {
 })
 
 /*
- * platform/properties PROPERTY is the one list of the app's system properties. A property the server code reads but
+ * domain/properties PROPERTY is the one list of the app's system properties. A property the server code reads but
  * the metadata does not declare exists on no instance, and one declared with another value than the reader falls back
  * to behaves differently once an administrator clears it.
  */

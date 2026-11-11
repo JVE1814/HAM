@@ -16,11 +16,12 @@ import { andEachClause } from '../domain/encoded-query.ts'
 import { messageOf } from '../domain/errors.ts'
 import { REQUEUE, writeHoldingLock, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { nowMs } from './clock.ts'
 import { queueJobAt, type JobEvent } from './events.ts'
 import { completePass, isCurrentPass, JOB_STATUS, openJobCursor, startPass, type JobCursor } from './job-cursor.ts'
 import { isLocked, withLock, type LockRun } from './locks.ts'
-import { intProperty, PROPERTY } from './properties.ts'
+import { intProperty } from './properties.ts'
 
 /**
  * The chunked-job runner over a table's records (ADR 0007), for a scheduled job (`runTableJob`, its cursor kept in

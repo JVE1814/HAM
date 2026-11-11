@@ -1,11 +1,12 @@
 import { GlideRecord } from '@servicenow/glide'
 import { TRY_AGAIN, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { formatProviderTag, nextFreeSequence } from '../domain/provider-tag.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { openJobCursor } from './job-cursor.ts'
 import { withLockTries } from './locks.ts'
-import { intProperty, PROPERTY, stringProperty } from './properties.ts'
+import { intProperty, stringProperty } from './properties.ts'
 
 /** The counter's row among the job cursors (platform/job-cursor), which holds the last number issued. */
 const SEQUENCE_JOB = 'provider_tag_sequence'

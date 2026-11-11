@@ -1,5 +1,5 @@
 import type { HttpPort } from '../domain/http.ts'
-import { PROPERTY } from './properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { restPort, type MessageVariables } from './rest-port.ts'
 import { REST_MESSAGE } from '../domain/rest-message-names.ts'
 

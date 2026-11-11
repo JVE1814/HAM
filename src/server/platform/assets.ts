@@ -21,7 +21,8 @@ import {
 import { PLACEMENT_FIELDS } from '../domain/rack.ts'
 import { LEGAL_OWNER, type LegalOwner } from '../domain/vocabulary.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
-import { PROPERTY, stringProperty } from './properties.ts'
+import { stringProperty } from './properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { bool, refusal, str, warnRefused, type ForeignRecord, type ReadOptions } from './records.ts'
 
 /** Reading and moving Assets (alm_hardware) through their Lifecycle stage (ADR 0002). */
