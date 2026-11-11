@@ -3821,6 +3821,7 @@ declare global {
                     'src_server_platform_oem-http_ts': {
                         table: 'sys_module'
                         id: '7a3a9a6e2ab7498a88300f31f4ce5f58'
+                        deleted: true
                     }
                     'src_server_platform_oem-rma_ts': {
                         table: 'sys_module'
