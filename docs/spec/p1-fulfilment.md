@@ -281,7 +281,10 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
   gives a temporary deployment instead.
 - At that moment:
   - the in-service date is set;
-  - the Asset joins its Site's package line, or else the Agreement's line for its device class;
+  - the Asset joins its Site's package line, or else the Agreement's line for its device class
+    (one for its Site before one with no Site). A line whose end date is before the in-service date
+    is passed over, even when it is not set ended, and one already started is chosen before one that
+    starts later;
   - a pending line becomes active with its start date under a job lock on the line
     (`subscription_line_<sys_id>`), only while it is still pending when read again there. A line
     another go-live started is joined with its start date kept. One ended meanwhile, or whose lock

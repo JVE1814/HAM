@@ -27,6 +27,7 @@ describe('decideInService', () => {
 })
 
 describe('chooseSubscriptionLine', () => {
+    const liveOn = '2026-08-10'
     const lines = [
         { id: 'ended-pkg', lineType: 'site_package' as const, siteId: 'site-a', deviceClass: '', status: 'ended' as const },
         { id: 'pkg-a', lineType: 'site_package' as const, siteId: 'site-a', deviceClass: '', status: 'active' as const },
@@ -34,15 +35,15 @@ describe('chooseSubscriptionLine', () => {
     ]
 
     it('prefers the site package for the asset site', () => {
-        expect(chooseSubscriptionLine(lines, { siteId: 'site-a', deviceClass: 'switch' })).toBe('pkg-a')
+        expect(chooseSubscriptionLine(lines, { siteId: 'site-a', deviceClass: 'switch', liveOn })).toBe('pkg-a')
     })
 
     it('falls back to the device-class line', () => {
-        expect(chooseSubscriptionLine(lines, { siteId: 'site-b', deviceClass: 'switch' })).toBe('switches')
+        expect(chooseSubscriptionLine(lines, { siteId: 'site-b', deviceClass: 'switch', liveOn })).toBe('switches')
     })
 
     it('finds nothing when no open line fits', () => {
-        expect(chooseSubscriptionLine(lines, { siteId: 'site-b', deviceClass: 'ap' })).toBeNull()
+        expect(chooseSubscriptionLine(lines, { siteId: 'site-b', deviceClass: 'ap', liveOn })).toBeNull()
     })
 
     describe('with a site-less and a Site-specific line for the device class', () => {
@@ -50,24 +51,50 @@ describe('chooseSubscriptionLine', () => {
         const siteA = { id: 'switches-a', lineType: 'device_class' as const, siteId: 'site-a', deviceClass: 'switch', status: 'active' as const }
 
         it('chooses the line for the asset site when it is read after the site-less one', () => {
-            expect(chooseSubscriptionLine([siteLess, siteA], { siteId: 'site-a', deviceClass: 'switch' })).toBe('switches-a')
+            expect(chooseSubscriptionLine([siteLess, siteA], { siteId: 'site-a', deviceClass: 'switch', liveOn })).toBe('switches-a')
         })
 
         it('chooses the line for the asset site when it is read before the site-less one', () => {
-            expect(chooseSubscriptionLine([siteA, siteLess], { siteId: 'site-a', deviceClass: 'switch' })).toBe('switches-a')
+            expect(chooseSubscriptionLine([siteA, siteLess], { siteId: 'site-a', deviceClass: 'switch', liveOn })).toBe('switches-a')
         })
 
         it('chooses the site-less line for an asset at another site, in either order', () => {
-            expect(chooseSubscriptionLine([siteA, siteLess], { siteId: 'site-b', deviceClass: 'switch' })).toBe('switches')
-            expect(chooseSubscriptionLine([siteLess, siteA], { siteId: 'site-b', deviceClass: 'switch' })).toBe('switches')
+            expect(chooseSubscriptionLine([siteA, siteLess], { siteId: 'site-b', deviceClass: 'switch', liveOn })).toBe('switches')
+            expect(chooseSubscriptionLine([siteLess, siteA], { siteId: 'site-b', deviceClass: 'switch', liveOn })).toBe('switches')
         })
 
         it('passes over an ended line for the asset site', () => {
-            expect(chooseSubscriptionLine([{ ...siteA, status: 'ended' }, siteLess], { siteId: 'site-a', deviceClass: 'switch' })).toBe('switches')
+            expect(chooseSubscriptionLine([{ ...siteA, status: 'ended' }, siteLess], { siteId: 'site-a', deviceClass: 'switch', liveOn })).toBe('switches')
         })
 
         it('never gives a Site-specific line to an asset without a site', () => {
-            expect(chooseSubscriptionLine([siteA], { siteId: '', deviceClass: 'switch' })).toBeNull()
+            expect(chooseSubscriptionLine([siteA], { siteId: '', deviceClass: 'switch', liveOn })).toBeNull()
+        })
+    })
+
+    describe('with lines of the device class that ended or start after the go-live', () => {
+        const live = { siteId: 'site-a', deviceClass: 'switch', liveOn: '2026-08-10' }
+        const line = { lineType: 'device_class' as const, siteId: '', deviceClass: 'switch', status: 'active' as const }
+        const ended = { ...line, id: 'h1', start: '2026-01-01', end: '2026-06-30' }
+        const current = { ...line, id: 'h2', start: '2026-07-01' }
+        const later = { ...line, id: 'next-year', start: '2027-01-01' }
+
+        it('passes over a line whose end date is before the go-live, though not set ended', () => {
+            expect(chooseSubscriptionLine([ended, current], live)).toBe('h2')
+            expect(chooseSubscriptionLine([current, ended], live)).toBe('h2')
+        })
+
+        it('still chooses a line that ends on the go-live day', () => {
+            expect(chooseSubscriptionLine([{ ...ended, end: '2026-08-10' }], live)).toBe('h1')
+        })
+
+        it('prefers a started line to one that starts later, and takes the later one when it is all there is', () => {
+            expect(chooseSubscriptionLine([later, current], live)).toBe('h2')
+            expect(chooseSubscriptionLine([later], live)).toBe('next-year')
+        })
+
+        it('keeps a line for the asset site before a site-less one that has started', () => {
+            expect(chooseSubscriptionLine([current, { ...later, id: 'site-a-later', siteId: 'site-a' }], live)).toBe('site-a-later')
         })
     })
 })

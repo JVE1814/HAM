@@ -30,11 +30,14 @@ export function attachToSubscription(asset: GlideRecord, inServiceAt: number): b
             siteId: str(gr, 'site'),
             deviceClass: str(gr, 'device_class'),
             status: str(gr, 'status') as SubscriptionLineView['status'],
+            start: str(gr, 'start_date') || undefined,
+            end: str(gr, 'end_date') || undefined,
         })
     }
     const lineId = chooseSubscriptionLine(lines, {
         siteId: str(asset, 'x_daas_ham_site'),
         deviceClass: str(asset, 'model.x_daas_ham_device_class'),
+        liveOn: toIsoDate(inServiceAt),
     })
     if (!lineId) return true
     if (lines.find((l) => l.id === lineId)?.status === 'pending') {
