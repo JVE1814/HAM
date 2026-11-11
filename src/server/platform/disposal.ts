@@ -25,9 +25,6 @@ import { choice, findById, refusal, str, warnRefused } from './records.ts'
  * each gives what came of it, for the form button or rule that asked.
  */
 
-/** The task states a Disposal order closes with: Closed Complete once every line is retired, Closed Incomplete when rejected. */
-const DISPOSAL_TASK_STATE = { complete: TASK_STATE.closedComplete, rejected: TASK_STATE.closedIncomplete } as const
-
 /** Line fields that say what is retired and how; the rest (status, blockers, amounts) stays writable after submit. */
 const LINE_SCOPE = ['disposal_order', 'asset', 'method']
 
@@ -91,7 +88,7 @@ const DISPOSAL_APPROVAL: ApprovalFlow = {
     decide: (order, outcome) => {
         order.setValue('approval', outcome)
         order.setValue('stage', outcome === 'approved' ? DISPOSAL_STAGE.approved : DISPOSAL_STAGE.rejected)
-        if (outcome === 'rejected') order.setValue('state', DISPOSAL_TASK_STATE.rejected)
+        if (outcome === 'rejected') order.setValue('state', TASK_STATE.closedIncomplete)
         // Refused: it still awaits approval with its requests open, so the next decision on them rolls it up again.
         return order.update() ? '' : warnRefused(order, `Disposal ${str(order, 'number')} not saved as ${outcome}`)
     },
@@ -138,7 +135,7 @@ export function completeDisposal(order: GlideRecord): DisposalCompletion {
     }
     if (blocked > 0 || unsaved > 0) return { completed: false, blocked, unsaved }
     order.setValue('stage', DISPOSAL_STAGE.completed)
-    order.setValue('state', DISPOSAL_TASK_STATE.complete)
+    order.setValue('state', TASK_STATE.closedComplete)
     if (order.update()) return { completed: true, blocked, unsaved }
     // Refused, it stays open with every line done: completing it again retires nothing twice and closes it.
     return { completed: false, blocked, unsaved, refused: refusal(order) }

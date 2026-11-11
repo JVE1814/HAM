@@ -37,9 +37,6 @@ import { log } from './log.ts'
 
 const LEASE = 'x_daas_ham_lease_schedule'
 
-/** The task state an applied decision is closed with. */
-const DECISION_CLOSED = TASK_STATE.closedComplete
-
 /**
  * Before rule on alm_hardware (br_asset_lease), wired here: a fleet asset on a lease schedule is owned by that
  * schedule's Lessor (the lease's Vendor), whether its lease is set or it joins the fleet with one already set (adoption
@@ -173,7 +170,7 @@ export function applyLeaseDecision(decisionRecord: GlideRecord): DecisionOutcome
     })
     if (problem || !decision) return notApplied(problem ?? undefined)
     const openState = str(decisionRecord, 'state')
-    decisionRecord.setValue('state', DECISION_CLOSED)
+    decisionRecord.setValue('state', TASK_STATE.closedComplete)
     // Closed first: a refused form save (the platform says why) leaves the lease as it was and the decision open.
     if (!decisionRecord.update()) return notApplied()
 

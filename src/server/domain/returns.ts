@@ -16,7 +16,6 @@ import {
     RETURN_LINE_STATUS,
     RETURN_TRIGGER,
     type ReturnTrigger,
-    TASK_STATE,
 } from './vocabulary.ts'
 
 /** Returns, depot evaluation and Fee events (P2.4). */
@@ -60,12 +59,6 @@ export function returnRequestFindings(request: RequestedReturn, requester: Retur
     const misplaced = request.customerId ? siteFinding(request.customerId, request.site) : CHOOSE_CUSTOMER
     return misplaced ? [{ about: 'site', message: misplaced }] : []
 }
-
-/**
- * The platform's task states a Return order takes: Work in Progress while units are awaited or evaluated, Closed
- * Complete once every line is settled (or it has none).
- */
-export const RETURN_TASK_STATE = { inProgress: TASK_STATE.workInProgress, closed: TASK_STATE.closedComplete } as const
 
 /** The stages of a temporary deployment whose end date is watched: its equipment is being installed or is installed. */
 export const TEMPORARY_RETURN_STAGES: readonly OrderStage[] = [ORDER_STAGE.installing, ORDER_STAGE.complete]

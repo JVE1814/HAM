@@ -12,7 +12,6 @@ import {
     overdueStep,
     receivedLate,
     requestedTrigger,
-    RETURN_TASK_STATE,
     returnDueDate,
     returnRequestFindings,
     SETTLED_BY_RECEIPT,
@@ -29,6 +28,7 @@ import {
     type ReturnLineStatus,
     type ReturnMethod,
     type ReturnTrigger,
+    TASK_STATE,
 } from '../domain/vocabulary.ts'
 import { customerAdminIds } from './approvals.ts'
 import { clearRackPlacement, clearWipeEvidence, isFleetAsset, moveAndSave, moveRefusal, readStage, transitionFacts } from './assets.ts'
@@ -107,7 +107,7 @@ function fillReturn(order: GlideRecord, request: ReturnRequest): RaisedReturn {
     const agreement = findById('x_daas_ham_agreement', request.agreementId)
     order.setValue('agreement', request.agreementId)
     order.setValue('due_back', returnDueDate(todayIso(), agreement ? num(agreement, 'overdue_return_days') : 0))
-    order.setValue('state', RETURN_TASK_STATE.inProgress)
+    order.setValue('state', TASK_STATE.workInProgress)
 
     let lines = 0
     let refused = 0
@@ -119,7 +119,7 @@ function fillReturn(order: GlideRecord, request: ReturnRequest): RaisedReturn {
 
     if (lines === 0) {
         // Nothing installed, everything already on another Return order, or every unit refused: close straight away.
-        order.setValue('state', RETURN_TASK_STATE.closed)
+        order.setValue('state', TASK_STATE.closedComplete)
         const note = refused > 0 ? 'No unit could be added (see the system log).' : 'No equipment to bring back.'
         order.setValue('work_notes', note)
     } else if (opensDeinstallWork(request.trigger, request.method)) {
@@ -401,7 +401,7 @@ function settleReceivedLine(line: GlideRecord, asset: GlideRecord): void {
     if (turnedUp) {
         // Declared missing, then found: it is late, not lost, and its line needs evaluating again.
         waiveOpenFees('lost', asset.getUniqueValue(), returnOrder.getUniqueValue())
-        returnOrder.setValue('state', RETURN_TASK_STATE.inProgress)
+        returnOrder.setValue('state', TASK_STATE.workInProgress)
         if (!returnOrder.update()) warnRefused(returnOrder, `${str(returnOrder, 'number')} not reopened for ${serial}`)
     }
     if (receivedLate(str(returnOrder, 'due_back'), todayIso())) recordFee('late_return', asset, returnOrder.getUniqueValue())
@@ -546,8 +546,8 @@ function mayGoMissing(asset: GlideRecord, stage: Stage | null): boolean {
 function closeReturnIfDone(returnOrderId: string): void {
     if (exists(RETURN_LINE, `return_order=${returnOrderId}^statusIN${KEEPS_RETURN_OPEN.join(',')}`)) return
     const order = findById(RETURN, returnOrderId)
-    if (!order || str(order, 'state') === String(RETURN_TASK_STATE.closed)) return
-    order.setValue('state', RETURN_TASK_STATE.closed)
+    if (!order || str(order, 'state') === String(TASK_STATE.closedComplete)) return
+    order.setValue('state', TASK_STATE.closedComplete)
     // No later line calls this again, and an open Return still asks the Customer for its equipment.
     if (!order.update()) warnRefused(order, `Return ${str(order, 'number')} not closed, close it`)
 }
