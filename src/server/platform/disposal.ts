@@ -7,7 +7,7 @@ import {
     type DisposalAsset,
 } from '../domain/disposal.ts'
 import { disposalStage } from '../domain/lifecycle.ts'
-import { DISPOSAL_STAGE, type DisposalLineStatus, type DisposalMethod, type LegalOwner, TASK_STATE } from '../domain/vocabulary.ts'
+import { DISPOSAL_LINE_STATUS, DISPOSAL_STAGE, type DisposalLineStatus, type DisposalMethod, type LegalOwner, TASK_STATE } from '../domain/vocabulary.ts'
 import {
     customerAdminIds,
     assetManagerIds,
@@ -127,10 +127,10 @@ export function completeDisposal(order: GlideRecord): DisposalCompletion {
     let unsaved = 0
     const line = lines(order.getUniqueValue())
     while (line.next()) {
-        if (choice<DisposalLineStatus>(line, 'status') === 'done') continue
+        if (choice<DisposalLineStatus>(line, 'status') === DISPOSAL_LINE_STATUS.done) continue
         const blockers = retire(line, order)
         if (blockers) blocked++
-        const status: DisposalLineStatus = blockers ? 'blocked' : 'done'
+        const status = blockers ? DISPOSAL_LINE_STATUS.blocked : DISPOSAL_LINE_STATUS.done
         line.setValue('status', status)
         line.setValue('blockers', blockers)
         if (line.update()) continue

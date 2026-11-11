@@ -54,7 +54,7 @@ export const x_daas_ham_oem_rma = Table({
         state: ChoiceColumn({
             label: 'State',
             choices: RMA_STATE_CHOICES,
-            default: 'to_open',
+            default: RMA_STATE.to_open,
             dropdown: 'dropdown_without_none',
         }),
         ship_back_due: DateColumn({ label: 'Return defective by' }),

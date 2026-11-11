@@ -13,6 +13,7 @@ import {
     type OrderStage,
     type ReturnLineStatus,
     type ReturnMethod,
+    RETURN_LINE_STATUS,
     RETURN_TRIGGER,
     type ReturnTrigger,
     TASK_STATE,
@@ -73,7 +74,7 @@ export const TEMPORARY_RETURN_STAGES: readonly OrderStage[] = [ORDER_STAGE.insta
 export const OPEN_FEES_QUERY = `status=${FEE_STATUS.open}`
 
 /** The status of a Return line whose unit is still expected back: not at the depot yet, nor declared missing. */
-export const AWAITED: ReturnLineStatus = 'awaiting'
+export const AWAITED: ReturnLineStatus = RETURN_LINE_STATUS.awaiting
 
 /** The lines an arriving unit settles: awaited, or declared missing and now turning up late. */
 export const SETTLED_BY_RECEIPT: readonly ReturnLineStatus[] = ['awaiting', 'missing']

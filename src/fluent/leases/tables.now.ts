@@ -10,7 +10,7 @@ import {
     StringColumn,
     Table,
 } from '@servicenow/sdk/core'
-import { LEASE_END_ACTION_CHOICES } from '../../server/domain/vocabulary'
+import { LEASE_END_ACTION, LEASE_END_ACTION_CHOICES } from '../../server/domain/vocabulary'
 
 /* Lease schedules and end-of-lease decisions (plan §13 Leases, Q65). */
 
@@ -35,7 +35,7 @@ export const x_daas_ham_lease_schedule = Table({
         end_action: ChoiceColumn({
             label: 'End-of-lease action',
             choices: LEASE_END_ACTION_CHOICES,
-            default: 'undecided',
+            default: LEASE_END_ACTION.undecided,
             readOnly: true,
             dropdown: 'dropdown_without_none',
         }),

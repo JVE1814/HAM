@@ -2,10 +2,13 @@ import '@servicenow/sdk/global'
 import { BooleanColumn, ChoiceColumn, DateColumn, DateTimeColumn, DecimalColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 import {
     EVALUATION_OUTCOME_CHOICES,
+    FEE_STATUS,
     FEE_STATUS_CHOICES,
     FEE_TYPE_CHOICES,
     RETURN_CONDITION_CHOICES,
+    RETURN_LINE_STATUS,
     RETURN_LINE_STATUS_CHOICES,
+    RETURN_METHOD,
     RETURN_METHOD_CHOICES,
     RETURN_TRIGGER_CHOICES,
 } from '../../server/domain/vocabulary'
@@ -31,7 +34,7 @@ export const x_daas_ham_return_order = Table({
             label: 'Collection',
             choices: RETURN_METHOD_CHOICES,
             mandatory: true,
-            default: 'ship_back',
+            default: RETURN_METHOD.ship_back,
             dropdown: 'dropdown_without_none',
         }),
         // Not due_date: Return orders extend task, whose due_date is a date-time; this is a date.
@@ -64,7 +67,7 @@ export const x_daas_ham_return_order_line = Table({
         status: ChoiceColumn({
             label: 'Status',
             choices: RETURN_LINE_STATUS_CHOICES,
-            default: 'awaiting',
+            default: RETURN_LINE_STATUS.awaiting,
             readOnly: true,
             dropdown: 'dropdown_without_none',
         }),
@@ -107,7 +110,7 @@ export const x_daas_ham_fee_event = Table({
         status: ChoiceColumn({
             label: 'Status',
             choices: FEE_STATUS_CHOICES,
-            default: 'open',
+            default: FEE_STATUS.open,
             dropdown: 'dropdown_without_none',
         }),
         billing_period: ReferenceColumn({ label: 'Billed in', referenceTable: 'x_daas_ham_billing_period', readOnly: true }),

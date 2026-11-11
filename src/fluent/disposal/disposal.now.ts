@@ -14,7 +14,7 @@ import {
     Table,
     UiAction,
 } from '@servicenow/sdk/core'
-import { DISPOSAL_LINE_STATUS_CHOICES, DISPOSAL_METHOD_CHOICES, DISPOSAL_STAGE, DISPOSAL_STAGE_CHOICES } from '../../server/domain/vocabulary'
+import { DISPOSAL_LINE_STATUS, DISPOSAL_LINE_STATUS_CHOICES, DISPOSAL_METHOD_CHOICES, DISPOSAL_STAGE, DISPOSAL_STAGE_CHOICES } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION } from '../../server/domain/fleet'
 import { guardDisposalLine, guardDisposalOrder, onDisposalApprovalDecision, uiCompleteDisposal, uiSubmitDisposal } from '../../server/entry/disposal'
 import { admin, providerStaff, stockroomWorkers } from '../shared/roles.now'
@@ -35,7 +35,7 @@ export const x_daas_ham_disposal_order = Table({
         stage: ChoiceColumn({
             label: 'Stage',
             choices: DISPOSAL_STAGE_CHOICES,
-            default: 'draft',
+            default: DISPOSAL_STAGE.draft,
             readOnly: true,
             dropdown: 'dropdown_without_none',
         }),
@@ -62,7 +62,7 @@ export const x_daas_ham_disposal_line = Table({
         status: ChoiceColumn({
             label: 'Status',
             choices: DISPOSAL_LINE_STATUS_CHOICES,
-            default: 'pending',
+            default: DISPOSAL_LINE_STATUS.pending,
             readOnly: true,
             dropdown: 'dropdown_without_none',
         }),

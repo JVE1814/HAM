@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fieldsOf, type Stage } from '../domain/lifecycle.ts'
+import { FEE_STATUS, RETURN_LINE_STATUS } from '../domain/vocabulary.ts'
 import { chaseOverdue, raiseReturn, requestReturn } from './returns.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
@@ -70,8 +71,8 @@ describe("a Customer admin's device removal", () => {
     beforeEach(() => {
         platform.user = { id: 'u1', name: 'Ada', company: 'acme', roles: ['x_daas_ham.customer_admin'], interactive: true }
         platform.creatable = () => true
-        platform.defaults[RETURN_LINES] = () => ({ status: 'awaiting' })
-        platform.defaults[FEES] = () => ({ status: 'open' })
+        platform.defaults[RETURN_LINES] = () => ({ status: RETURN_LINE_STATUS.awaiting })
+        platform.defaults[FEES] = () => ({ status: FEE_STATUS.open })
         platform.references = { [`${RETURN_LINES}.return_order`]: RETURNS, [`${RETURNS}.agreement`]: 'x_daas_ham_agreement' }
         platform.clock = Date.parse('2026-11-11T06:00:00Z')
         platform.tables.cmn_location = [{ sys_id: 'site1', name: 'HQ', company: 'acme', x_daas_ham_is_site: 'true' }]
