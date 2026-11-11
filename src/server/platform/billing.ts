@@ -467,6 +467,7 @@ function regenerateReady(period: GlideRecord): PeriodOutcome {
     period.setValue('status', BILLING_PERIOD_STATUS.generating)
     period.setValue('failed_lines', 0)
     period.setValue('last_error', '')
+    // Saved first: a refused form save (the platform says why) keeps the period ready with its lines, not without them.
     if (!period.update()) return { done: false, refusedSave: true }
     // Lines the delete left would be billed twice by the new generation.
     if (!dropLinesForRegeneration(period)) {
@@ -576,6 +577,7 @@ function closeReady(period: GlideRecord, stored: GlideRecord): PeriodOutcome {
     period.setValue('status', BILLING_PERIOD_STATUS.closed)
     period.setValue('closed_at', nowGlide())
     period.setValue('closed_by', gs.getUserID())
+    // Closed first: a refused form save (the platform says why) leaves its fees open, so a Regenerate still bills them.
     if (!period.update()) return { done: false, refusedSave: true }
     const unmarked = markFeesBilled(period)
     if (unmarked.length === 0) return { done: true }
