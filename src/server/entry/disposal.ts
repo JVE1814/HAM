@@ -1,5 +1,4 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { ROLE } from '../domain/roles.ts'
 import {
     completeDisposal,
     lineChangeRefusal,
@@ -32,14 +31,8 @@ export function uiCompleteDisposal(current: GlideRecord): void {
     if (refused) gs.addErrorMessage(`Every line is done, but ${str(current, 'number')} was not saved as completed: ${refused}; complete it again`)
 }
 
-/**
- * Before insert/update/delete rule on disposal lines: once the order leaves draft, what it retires is fixed
- * (platform/disposal `lineChangeRefusal`). Removing a line retires nothing, so administrators (the only role the ACLs
- * let delete) still may: otherwise a line whose Asset can never be retired keeps its order approved for good, and
- * deleting an order could not take its lines with it.
- */
+/** Before insert/update/delete rule on disposal lines: once the order leaves draft, what it retires is fixed. */
 export function guardDisposalLine(current: GlideRecord, previous: GlideRecord): void {
-    if (current.operation() === 'delete' && gs.hasRole(ROLE.admin)) return
     abortWith(current, lineChangeRefusal(current, previous))
 }
 

@@ -1,4 +1,4 @@
-import { GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 import {
     disposalApprovers,
     disposalCustomerFindings,
@@ -7,6 +7,7 @@ import {
     type DisposalAsset,
 } from '../domain/disposal.ts'
 import { disposalStage } from '../domain/lifecycle.ts'
+import { ROLE } from '../domain/roles.ts'
 import { DISPOSAL_LINE_STATUS, DISPOSAL_STAGE, type DisposalLineStatus, type DisposalMethod, type LegalOwner, TASK_STATE } from '../domain/vocabulary.ts'
 import {
     customerAdminIds,
@@ -179,10 +180,13 @@ function retire(line: GlideRecord, order: GlideRecord): string {
 /**
  * Why this insert, update or delete of a Disposal line is refused ('' when it is not): once the order leaves draft no
  * line is added, removed or pointed at another order, Asset or method, so what is retired is what was approved. An
- * update moving a line checks the order it leaves too.
+ * update moving a line checks the order it leaves too. Removing a line retires nothing, so administrators (the only
+ * role the ACLs let delete) still may: otherwise a line whose Asset can never be retired keeps its order approved for
+ * good, and deleting an order could not take its lines with it.
  */
 export function lineChangeRefusal(current: GlideRecord, previous: GlideRecord): string {
     const operation = current.operation()
+    if (operation === 'delete' && gs.hasRole(ROLE.admin)) return ''
     if (operation === 'update' && LINE_SCOPE.every((field) => str(current, field) === str(previous, field))) return ''
     const stages = [str(current, 'disposal_order.stage')]
     if (operation === 'update') stages.push(str(previous, 'disposal_order.stage'))
