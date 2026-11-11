@@ -20,6 +20,7 @@ import { fire } from './events.ts'
 import { log } from './log.ts'
 import { saveLineStage } from './order-lines.ts'
 import { exists, findById, num, str, warnRefused, type ForeignRecord } from './records.ts'
+import { queueSourcing } from './sourcing-requests.ts'
 import { takeOffOrderLine } from './stock.ts'
 
 /**
@@ -78,38 +79,23 @@ export function recomputeLine(lineId: string): void {
 }
 
 /**
- * Queue the Order's sourcing (the event's script action sources its lines that are new or awaiting stock): for a line
- * that lost a unit, or a unit received for a line and not reserved for it. Queued, not run: sourcing takes the Order's
- * sourcing lock and saves other Assets, and the saves that ask for it hold locks of their own (ADR 0013).
- */
-export function sourceOrderAgain(orderId: string): void {
-    const order = findById('x_daas_ham_order', orderId)
-    if (order) queueSourcing(order)
-}
-
-/** Queue the sourcing of `order`, as its approval does first. */
-export function queueSourcing(order: GlideRecord): void {
-    fire(EVENT.sourceOrder, order)
-}
-
-/**
  * A unit left the Order line, already taken off it (a failed staging, a transfer to the staging centre fallen
  * through): the line's stage is derived again, back to awaiting stock while it is short, and its Order is sourced
- * again, queued (`sourceOrderAgain`). The one sequence for a unit that leaves its line; one lost in transit differs
+ * again, queued (platform/sourcing-requests `queueSourcing`). The one sequence for a unit that leaves its line; one lost in transit differs
  * only in how the line is derived (`onLineAssetMoved`).
  */
 export function lineLostUnit(lineId: string): void {
     const line = findById('x_daas_ham_order_line', lineId)
     if (!line) return
     deriveLine(line, false)
-    sourceOrderAgain(str(line, 'order'))
+    queueSourcing(str(line, 'order'))
 }
 
 /**
  * An Asset on `lineId` moved `from` -> `to` (the after-update rule on alm_hardware): the line's stage is derived again.
  * A unit that left it in transit while still owed to it (domain/fulfilment `leftInTransit`, `refillsLine`) is first
  * taken off it, and the line is derived as filled again, back to awaiting stock: its Order is then sourced again,
- * queued (`sourceOrderAgain`).
+ * queued (platform/sourcing-requests `queueSourcing`).
  *
  * No lock is taken. The unit comes off the line before the line is saved as awaiting stock, so a sourcing pass or a
  * receipt counting the reopened line never counts it (each counts only a line awaiting stock). The sourcing is queued,
@@ -127,7 +113,7 @@ export function onLineAssetMoved(asset: ForeignRecord, lineId: string, from: Sta
     const next = deriveLine(line, true)
     // Left at its stage, the line is not sourced again, and a later change no longer fills it again.
     if (next === null) log.warn(`${str(line, 'number')} lost a unit in transit but is not sourced again`)
-    if (next === 'awaiting_stock') sourceOrderAgain(str(line, 'order'))
+    if (next === 'awaiting_stock') queueSourcing(str(line, 'order'))
 }
 
 /** Take a unit that left `line` in transit off it (logged); false when the platform refuses (logged): it stays on. */

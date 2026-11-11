@@ -4,7 +4,8 @@ import { REQUEUE } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { ROLE } from '../domain/roles.ts'
 import { EVENT } from '../domain/events.ts'
-import { cancelOrder, submitOrder, submitProducedOrder, submitQueuedOrder, SUBMIT_AGAIN } from './orders.ts'
+import { cancelOrder, submitOrder, submitProducedOrder, submitQueuedOrder } from './orders.ts'
+import { sourcingRequestOf } from './sourcing-requests.ts'
 import { findById } from './records.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
@@ -62,6 +63,16 @@ beforeEach(() => {
     platform.tables[LINES] = [{ sys_id: 'line1', number: 'ORL0001', order: 'order1', model: 'model1', quantity: '1', line_stage: 'new' }]
 })
 
+/** Every event queued, read as the sourcing event's script action reads its request. */
+function queuedRequests() {
+    return platform.events.map((queued) => ({
+        name: queued.name,
+        record: queued.record,
+        delayed: queued.delayed,
+        ...sourcingRequestOf({ getValue: (field: string) => queued[field as 'parm1' | 'parm2'] } as unknown as GlideRecord),
+    }))
+}
+
 describe('submitting an Order that adds a unit', () => {
     it("assesses it and saves it out of draft holding its Agreement's usage lock and its own sourcing lock, then lets them go", () => {
         let heldAtSave: string[] = []
@@ -84,7 +95,7 @@ describe('submitting an Order that adds a unit', () => {
 
         expect(storedOrder()).toMatchObject({ stage: 'draft', work_notes: `Not submitted yet: ${BUSY}` })
         expect(storedOrder().entitlement_verdict ?? '').toBe('')
-        expect(platform.events).toEqual([{ name: EVENT.sourceOrder, record: 'order1', parm1: SUBMIT_AGAIN, parm2: '1', delayed: true }])
+        expect(queuedRequests()).toEqual([{ name: EVENT.sourceOrder, record: 'order1', delayed: true, request: 'submission', tries: 1 }])
         expect(rows(LOCKS)).toEqual([theirs])
     })
 
@@ -101,7 +112,7 @@ describe('submitting an Order that adds a unit', () => {
         })
 
         expect(storedOrder().stage).toBe('draft')
-        expect(platform.events).toEqual([{ name: EVENT.sourceOrder, record: 'order1', parm1: SUBMIT_AGAIN, parm2: '1', delayed: true }])
+        expect(queuedRequests()).toEqual([{ name: EVENT.sourceOrder, record: 'order1', delayed: true, request: 'submission', tries: 1 }])
     })
 
     it('goes ahead when the submission queued again finds the lock free', () => {
@@ -116,7 +127,7 @@ describe('submitting an Order that adds a unit', () => {
 
         submitQueuedOrder('order1', 3)
 
-        expect(platform.events).toEqual([{ name: EVENT.sourceOrder, record: 'order1', parm1: SUBMIT_AGAIN, parm2: '4', delayed: true }])
+        expect(queuedRequests()).toEqual([{ name: EVENT.sourceOrder, record: 'order1', delayed: true, request: 'submission', tries: 4 }])
         expect(storedOrder().work_notes ?? '').toBe('')
 
         platform.events.length = 0

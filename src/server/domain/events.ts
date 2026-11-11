@@ -6,7 +6,7 @@
 export const EVENT = {
     /**
      * An approved Order needs its lines sourced. Record: the Order; parm2: how often it was queued again. With parm1
-     * `submit` (platform/orders `SUBMIT_AGAIN`) it carries a submission of the Order queued again instead.
+     * `submit` it carries a submission of the Order queued again instead (platform/sourcing-requests).
      */
     sourceOrder: 'x_daas_ham.order.source',
     /** A Model's lifecycle milestones changed or one was crossed (event job). Record and parm1: the Model; parm2: cursor. */

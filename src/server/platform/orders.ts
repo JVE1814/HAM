@@ -28,13 +28,12 @@ import {
     type ApprovalRollup,
 } from './approvals.ts'
 import { readStage } from './assets.ts'
-import { requeueCounted } from './events.ts'
-import { EVENT } from '../domain/events.ts'
-import { orderShipment, queueSourcing } from './fulfilment.ts'
+import { orderShipment } from './fulfilment.ts'
 import { withLock, withLockTries } from './locks.ts'
 import { addOrderLines, saveLineStage, withOrderLineLocks, type NewLine, type RefusedLine } from './order-lines.ts'
 import { bool, findById, num, refusal, str, warnRefused } from './records.ts'
 import { creatorOf } from './session.ts'
+import { queueSourcing, queueSubmissionAgain } from './sourcing-requests.ts'
 import { skipOpenStagingTasks } from './staging-tasks.ts'
 import { leaveOrderLine } from './stock.ts'
 import { SITE_FIELD } from '../domain/fleet.ts'
@@ -299,12 +298,6 @@ function warnIfUsageLockLost(usageLock: HeldLock | null, order: GlideRecord): vo
 }
 
 /**
- * parm1 of the sourcing event (domain/events `EVENT.sourceOrder`) when it carries a submission queued again
- * (`submitLater`), which its script action runs instead of a sourcing pass (`submitQueuedOrder`).
- */
-export const SUBMIT_AGAIN = 'submit'
-
-/**
  * A submission that found its Agreement's usage lock held through every try. Unless another submission of this same
  * Order took it ahead (then it went ahead), the Order stays a draft for now, noted, and is submitted again a minute
  * later from the event queue, as often as a sourcing request is queued again (domain/job-lock `REQUEUE`), then left
@@ -317,7 +310,7 @@ function submitLater(order: GlideRecord, source: SubmissionSource): Submission {
     if (str(fresh, 'stage') !== ORDER_STAGE.draft) return alreadySubmitted(fresh)
     const number = str(order, 'number')
     const lockName = LOCK.agreementUsage(str(order, 'agreement'))
-    if (!requeueCounted(EVENT.sourceOrder, order, SUBMIT_AGAIN, source.tries)) {
+    if (!queueSubmissionAgain(order, source.tries)) {
         log.warn(`${number} left a draft: ${lockName} stayed held through ${source.tries} submissions queued again; submit it`)
         const kept = 'other Orders of its Agreement kept being submitted at the same time. Submit it'
         noteDraft(order, `Not submitted: ${kept}`)
@@ -372,7 +365,7 @@ function startSourcing(order: GlideRecord): string {
     order.setValue('stage', ORDER_STAGE.sourcing)
     order.setValue('state', ORDER_TASK_STATE.inProgress)
     if (!order.update()) return warnRefused(order, `${str(order, 'number')} not saved as approved, not sourced`)
-    queueSourcing(order)
+    queueSourcing(order.getUniqueValue())
     return ''
 }
 

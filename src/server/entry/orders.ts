@@ -5,15 +5,14 @@ import type { NewLine } from '../platform/order-lines.ts'
 import {
     cancelOrder,
     rollUpOrderApprovals,
-    SUBMIT_AGAIN,
     submitOrder,
     submitProducedOrder,
     submitQueuedOrder,
     type Submission,
 } from '../platform/orders.ts'
-import { timesRequeued } from '../platform/events.ts'
 import { str, type ForeignRecord } from '../platform/records.ts'
 import { runSourcingPass } from '../platform/sourcing.ts'
+import { sourcingRequestOf } from '../platform/sourcing-requests.ts'
 
 /*
  * Order orchestration (ADR 0004):
@@ -101,8 +100,9 @@ export function uiRecheckApprovals(current: GlideRecord): void {
 }
 
 export function sourceOrder(event: GlideRecord, current: GlideRecord): void {
-    if (str(event, 'parm1') === SUBMIT_AGAIN) return submitQueuedOrder(current.getUniqueValue(), timesRequeued(event))
-    runSourcingPass(current, timesRequeued(event))
+    const { request, tries } = sourcingRequestOf(event)
+    if (request === 'submission') return submitQueuedOrder(current.getUniqueValue(), tries)
+    runSourcingPass(current, tries)
 }
 
 export function uiCancelOrder(current: GlideRecord): void {

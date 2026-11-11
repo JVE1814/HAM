@@ -25,7 +25,7 @@ import {
     readStage,
     type AssetIdentified,
 } from './assets.ts'
-import { sourceOrderAgain, unitsOnLine } from './fulfilment.ts'
+import { unitsOnLine } from './fulfilment.ts'
 import { withLock } from './locks.ts'
 import { loadNormalizationData, resolveModel } from './normalization.ts'
 import { lineAwaitingRma, markReplacementReceived } from './oem-rma.ts'
@@ -33,6 +33,7 @@ import { takeUnitOffOrder, withOrderLineLock } from './order-lines.ts'
 import { purchaseOrderId } from './procurement.ts'
 import { findById, num, refusal, str, warnRefused } from './records.ts'
 import { receiveReturnedAsset } from './returns.ts'
+import { queueSourcing } from './sourcing-requests.ts'
 import { openStagingTask } from './staging-tasks.ts'
 import { changeStock, reserveAsset } from './stock.ts'
 import { nextProviderTag } from './tags.ts'
@@ -205,7 +206,7 @@ function receiveHolding(lock: HeldLock, assetId: string, stockroomId: string): S
         // line is a unit short, so its Order is sourced again: a sourcing run's stock pick, made outside the line's
         // lock, may have taken the unit between its save and its reservation. Read again for the caller: a run that
         // claimed the unit first has put it on its own line.
-        sourceOrderAgain(str(waiting.line, 'order'))
+        queueSourcing(str(waiting.line, 'order'))
         return { asset: findById('alm_hardware', assetId) ?? asset }
     }
     return { asset: received.reserved }

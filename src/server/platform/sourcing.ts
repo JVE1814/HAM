@@ -20,8 +20,6 @@ import {
 import { putBackUnit, type Source } from '../domain/stock.ts'
 import type { OrderType } from '../domain/vocabulary.ts'
 import { todayIso } from './clock.ts'
-import { requeueCounted } from './events.ts'
-import { EVENT } from '../domain/events.ts'
 import { lineLostUnit, recomputeLine, recomputeOrder, unitsOnLine } from './fulfilment.ts'
 import { withLock } from './locks.ts'
 import { saveLineSourcing, withOrderLineLock } from './order-lines.ts'
@@ -30,6 +28,7 @@ import { requestPurchase } from './procurement.ts'
 import { findById, num, str, warnRefused, type ForeignRecord } from './records.ts'
 import { openStagingTask, skipOpenStagingTasks, stagingStockroom, startStaging } from './staging-tasks.ts'
 import { leaveOrderLine, linkHotSpare, reserveAsset, stockCandidates } from './stock.ts'
+import { queuePassAgain } from './sourcing-requests.ts'
 import { requestTransfer } from './transfers.ts'
 import { log } from './log.ts'
 
@@ -76,15 +75,15 @@ export function runSourcingPass(order: GlideRecord, queuedAgain: number): void {
     const again = pass.ran ? pass.value : null
     if (!pass.ran || again) {
         const why = again ? AGAIN_BECAUSE[again] : 'another pass or a cancel holds its lock'
-        queuePassAgain(order, queuedAgain, why)
+        runAgainLater(order, queuedAgain, why)
     }
     if (pass.ran) recomputeOrder(orderId)
 }
 
 /** Queue the request to source `order` again a minute later, unless it was already queued again `tries` times. */
-function queuePassAgain(order: GlideRecord, tries: number, why: string): void {
+function runAgainLater(order: GlideRecord, tries: number, why: string): void {
     const number = str(order, 'number')
-    if (!requeueCounted(EVENT.sourceOrder, order, '', tries)) {
+    if (!queuePassAgain(order, tries)) {
         return void log.warn(`${number} not sourced again after ${tries} tries (${why}): check its lines`)
     }
     log.info(`${number} sourced again in ${REQUEUE.delaySeconds} s: ${why}`)

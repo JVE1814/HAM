@@ -3885,6 +3885,10 @@ declare global {
                         table: 'sys_module'
                         id: 'dbce578cb8cf42fcad843970b9cc2d54'
                     }
+                    'src_server_platform_sourcing-requests_ts': {
+                        table: 'sys_module'
+                        id: 'd8b0dc4e13df40648bc45b4a379e5e72'
+                    }
                     'src_server_platform_spare-pools_ts': {
                         table: 'sys_module'
                         id: '77cc7cb69a664f46a22b3a6fe2432731'
