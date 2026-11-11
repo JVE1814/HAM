@@ -1,7 +1,6 @@
 import { GlideRecord } from '@servicenow/glide'
 import { claimRouted } from '../domain/oem/adapters.ts'
 import { initialAutomationStatus } from '../domain/oem/claims.ts'
-import { PROPERTY } from '../domain/properties.ts'
 import { lineStillOpen } from '../domain/sourcing.ts'
 import {
     closureMoveProblem,
@@ -21,14 +20,8 @@ import { moveAndSave, readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { lineLostUnit } from './fulfilment.ts'
 import { log } from './log.ts'
-import { stringProperty } from './properties.ts'
 import { bool, deleteWhere, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { leaveOrderLine } from './stock.ts'
-
-/** The staging centre's stockroom: where purchased units ship to, Assets are staged and shipments leave from ('' while none is set). */
-export function stagingStockroom(): string {
-    return stringProperty(PROPERTY.stagingStockroom)
-}
 
 function activeTemplates(): StagingTemplateView[] {
     const gr = new GlideRecord('x_daas_ham_staging_template')

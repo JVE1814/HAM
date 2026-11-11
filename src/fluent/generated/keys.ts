@@ -3663,6 +3663,7 @@ declare global {
                     'src_server_entry_spare-pool_ts': {
                         table: 'sys_module'
                         id: 'e4a09635dab141b8a31ac273e98cfe97'
+                        deleted: true
                     }
                     src_server_entry_staging_ts: {
                         table: 'sys_module'

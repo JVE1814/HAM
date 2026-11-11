@@ -131,8 +131,6 @@ export function planSourcing(request: SourcingRequest, stock: readonly StockCand
 
 export type PurchaseResult = { ok: true; poId: string } | { ok: false; reason: string }
 
-export type TransferResult = { ok: true; transferId: string } | { ok: false; reason: string }
-
 /** Picked stock left where it was, and no longer reserved, because no transfer order to the staging centre came of it. */
 export interface UnmovedStock {
     units: number

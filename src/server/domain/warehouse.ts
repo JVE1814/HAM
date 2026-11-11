@@ -61,3 +61,15 @@ export function putAwayProblem(stage: Stage | null, into: StockroomType): string
     if (stage === 'staging') return into === 'staging_centre' ? null : 'A unit being staged is put away in a staging centre'
     return `Cannot be put away (${stage ?? 'unknown stage'})`
 }
+
+/**
+ * Why a scanned unit cannot be picked for this Order, or null when it can: it must be on one of that Order's lines and
+ * staged, so a picker never ships another Order's unit or one still being prepared. `ownOrder` is the number of the
+ * Order its line belongs to ('' while it is on none).
+ */
+export function pickProblem(ownOrder: string, orderNumber: string, stage: Stage | null): string | null {
+    if (!ownOrder) return 'Not allocated to an order'
+    if (ownOrder !== orderNumber) return `Belongs to ${ownOrder}`
+    if (stage !== 'staged') return `Not ready to ship (${stage})`
+    return null
+}
