@@ -10,7 +10,6 @@ import { writeHoldingLock, type LockedWrite } from './job-lock.ts'
  */
 export interface ChunkedJobPorts<T> {
     loadCursor(): string
-    /** Up to `size` records with key > `after`, in ascending key order. */
     fetchBatch(after: string, size: number): T[]
     keyOf(record: T): string
     handle(record: T): void
@@ -136,13 +135,12 @@ export interface LockedChunkPorts {
     held(): boolean
     flush(): void
     queueNext(): void
-    /** Complete the pass (after its last chunk only). */
     complete(): void
 }
 
 /**
- * Write a chunk of a pass: flush, then queue the next chunk or, after the last one, complete the pass. A chunk whose
- * pass is no longer the current one writes nothing, and one that lost its job's lock during a write writes nothing more.
+ * A chunk whose pass is no longer the current one writes nothing, and one that lost its job's lock during a write
+ * writes nothing more.
  */
 export function writeChunkUnderLock(ports: LockedChunkPorts, last: boolean): ChunkWrite {
     if (!ports.isCurrent()) return { outcome: 'superseded' }

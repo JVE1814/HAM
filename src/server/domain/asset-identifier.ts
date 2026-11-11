@@ -7,7 +7,6 @@
  * field an identifier is compared as a serial is (domain/serials `normalizeSerial`).
  */
 
-/** The fields an identifier is looked for in, in the order they take precedence. */
 export const IDENTIFIER_FIELDS = [
     { field: 'serial_number', label: 'serial number' },
     { field: 'asset_tag', label: 'Provider tag' },
@@ -35,7 +34,6 @@ export function fieldMatch(fleet: readonly boolean[]): FieldMatch {
     return fleet[0] && !fleet[1] ? { kind: 'one', index: 0 } : { kind: 'ambiguous' }
 }
 
-/** Why an ambiguous identifier is refused, for the person who scanned it or the integration that sent it. */
 export function ambiguousIdentifier(identifier: string, field: IdentifierField): string {
     const others = IDENTIFIER_FIELDS.filter((other) => other.field !== field.field).map((other) => other.label)
     return `More than one asset has ${field.label} ${identifier}: use its ${others.join(' or ')} instead`

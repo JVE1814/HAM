@@ -5,7 +5,6 @@ import type { CoverageFact, CoverageFetched } from './oem/types.ts'
 import { normalizeSerial } from './serials.ts'
 import type { OemVendor } from './vocabulary.ts'
 
-/** One coverage contract, as an Asset's coverage is summarised from it. */
 export interface CoverageView {
     covered: boolean
     endDate?: string
@@ -42,13 +41,11 @@ export function coverageSummary(contracts: readonly CoverageView[], today: strin
     return { coveredToday: latest.end >= today, coverageEnd: latest.end, serviceLevel: latest.serviceLevel }
 }
 
-/** What the Provider pays per year for the contracts covering an Asset today (open-ended ones included, as coverageSummary counts them). */
 export function annualSupportCost(contracts: readonly CoverageView[], today: string): number {
     const coversToday = (contract: CoverageView) => (coveredUntil(contract) ?? '') >= today
     return contracts.filter(coversToday).reduce((sum, contract) => sum + (contract.annualCost ?? 0), 0)
 }
 
-/** What the coverage sync does with one asked serial once its vendor has been called. */
 export type CoverageDisposition =
     /** Answered: write these contracts (none: not covered) and re-summarise the Asset onto it. */
     | { kind: 'apply'; facts: CoverageFact[] }
@@ -77,13 +74,11 @@ export interface CoverageDates {
     endDate?: string
 }
 
-/** The values to write to a coverage contract on a fresh answer. */
 export interface CoverageWrite extends CoverageDates {
     /** The end date changed: a renewed contract can expire again, so its expiry warning is to be sent afresh. */
     resetExpiryNotified: boolean
 }
 
-/** Combine a stored coverage contract (empty when new) with a fresh answer from the OEM API or a CSV import. */
 export function mergeCoverage(stored: CoverageDates, incoming: CoverageDates): CoverageWrite {
     return {
         // A response without a start date (SN2INFO v2) keeps the one stored earlier.
@@ -93,7 +88,6 @@ export function mergeCoverage(stored: CoverageDates, incoming: CoverageDates): C
     }
 }
 
-/** One answered contract to write onto the coverage record of its serial and contract number. */
 export interface CoverageAnswer {
     /** The Asset the record points at: of duplicate Assets sharing the serial, the last answered. */
     assetId: string
@@ -118,7 +112,6 @@ export interface SerialCoverage extends CoverageView {
     serial: string
 }
 
-/** The coverage an Asset is given: the summary of its serial's contracts and what the Provider pays for them per year. */
 export interface AssetCoverage extends CoverageSummary {
     supportCost: number
 }

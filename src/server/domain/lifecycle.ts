@@ -71,7 +71,7 @@ const ALLOWED_MOVES: Record<Stage, readonly Stage[]> = {
     staged: ['shipped', 'available', 'spare_pool'],
     in_transfer: TRANSFERABLE,
     shipped: ['pending_in_service', 'pending_return', 'missing'],
-    // Missing: an installed unit never seen, on a return that is overdue (platform/returns `chaseOverdue`), like one in service.
+    // Missing: an installed unit never seen, on a return that is overdue, like one in service.
     pending_in_service: ['in_service', 'temporary_deployment', 'pending_return', 'missing'],
     in_service: ['pending_return', 'missing'],
     temporary_deployment: ['pending_return', 'missing'],
@@ -303,14 +303,12 @@ export function isBillable(stage: Stage | null): boolean {
     return stage !== null && IN_USE_STAGES.includes(stage)
 }
 
-/** The dates a stage change can start or stop an Asset's billing on (YYYY-MM-DD). */
 export interface BillingDates {
     /** The day the Asset went into service, once it has. */
     inServiceDate?: string
     today: string
 }
 
-/** Billing (the Asset's Service interval) starts or stops on this day (YYYY-MM-DD). */
 export type BillingChange = { start: string } | { stop: string }
 
 /**

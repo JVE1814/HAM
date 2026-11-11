@@ -161,7 +161,6 @@ describe('totalsText and singleCurrencyTotal', () => {
 
 const SITE_NAMES: { [siteId: string]: string } = { hq: 'Head office', store: 'Store 12' }
 
-/** Sources with these Service intervals and the Site names above, counting the Site name reads. */
 function sources(intervals: readonly ServiceInterval[] = []): ChargeSources & { siteReads: number } {
     return {
         intervals,
@@ -383,7 +382,6 @@ describe('IN_SERVICE_ON_ENDED_LINE', () => {
     /** Today is 2026-11-09: the day the tile's query compares a line's end date with. */
     const flagged = (asset: SampleRecord) => matches(IN_SERVICE_ON_ENDED_LINE, asset, () => '2026-11-09')
     const LINE = 'x_daas_ham_subscription_line'
-    /** A fleet asset in service on a line with this status and end date. */
     const billed = (status: string, endDate: string) => assetIn('in_service', { x_daas_ham_fleet: 'true', [`${LINE}.status`]: status, [`${LINE}.end_date`]: endDate })
 
     it('flags billed fleet assets whose line was set ended or is past its end date', () => {
@@ -541,7 +539,6 @@ describe('pullPageSize', () => {
 
 describe('sitePackageHoldersQuery', () => {
     const query = sitePackageHoldersQuery({ siteId: 'acme-hq', agreementId: 'acme-msa' })
-    /** A fleet asset at the Site under the Agreement, in `stage`. */
     const unit = (stage: Stage, fields: SampleRecord = {}) => assetIn(stage, { x_daas_ham_fleet: 'true', x_daas_ham_site: 'acme-hq', x_daas_ham_agreement: 'acme-msa', ...fields })
     const holding = (fields: SampleRecord = {}) => ALL_STAGES.filter((stage) => matches(query, unit(stage, fields)))
 

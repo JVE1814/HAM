@@ -10,7 +10,7 @@ export interface AsnRow {
 
 export type AsnRowCheck = { row: number; ok: true } | { row: number; ok: false; reason: string }
 
-/** Check each row; `knownSerials` holds normalized serials that already exist as Assets. */
+/** `knownSerials` holds normalized serials that already exist as Assets. */
 export function validateAsnRows(rows: readonly AsnRow[], knownSerials: ReadonlySet<string>): AsnRowCheck[] {
     const seen = new Set<string>()
     return rows.map((row, index) => {

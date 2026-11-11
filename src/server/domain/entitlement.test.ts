@@ -239,7 +239,6 @@ describe('usage queries', () => {
     const OPEN_STAGES = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship'] as const
     const SENT_STAGES = ['shipped', 'installed', 'in_service', 'cancelled'] as const
     const LINE_STAGE = 'x_daas_ham_order_line.line_stage'
-    /** A fleet asset of Agreement a1 on no Order line, in `stage`. */
     const deployed = (stage: Stage, fields: SampleRecord = {}) => assetIn(stage, { x_daas_ham_fleet: 'true', x_daas_ham_agreement: 'a1', x_daas_ham_order_line: '', ...fields })
     const countedIn = (fields: SampleRecord = {}) => ALL_STAGES.filter((stage) => matches(deployedUsageQuery('a1'), deployed(stage, fields)))
 

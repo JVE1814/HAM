@@ -18,10 +18,6 @@ export interface ApprovalDecision {
     state: ApprovalState
 }
 
-/**
- * Overall approval of an Order: any rejection rejects it; it is approved once each required group
- * (any Customer admin; the Provider) has at least one approval.
- */
 export function rollupApprovals(required: readonly Approver[], decisions: readonly ApprovalDecision[]): ApprovalOutcome {
     if (decisions.some((d) => d.state === APPROVAL.rejected)) return APPROVAL.rejected
     const approvedGroups = new Set(decisions.filter((d) => d.state === APPROVAL.approved).map((d) => d.group))
