@@ -3443,6 +3443,10 @@ declare global {
                         table: 'sys_module'
                         id: '3e742f506a82462580d00cec26db4db6'
                     }
+                    'src_server_domain_oem_claim-adapters_ts': {
+                        table: 'sys_module'
+                        id: 'ec31974267114ff4a63aecbb6fb92563'
+                    }
                     src_server_domain_oem_claims_ts: {
                         table: 'sys_module'
                         id: '56f7a0a317d2447bbb3e28c63281cd56'
@@ -3455,6 +3459,10 @@ declare global {
                         table: 'sys_module'
                         id: 'f19ec875c0b445ccb4062a3fa36da90b'
                         deleted: true
+                    }
+                    'src_server_domain_oem_sync-adapters_ts': {
+                        table: 'sys_module'
+                        id: 'cb48e29b847541708f1a5b7fe0d6ea83'
                     }
                     src_server_domain_oem_types_ts: {
                         table: 'sys_module'
@@ -3603,6 +3611,7 @@ declare global {
                     'src_server_entry_oem-claims_ts': {
                         table: 'sys_module'
                         id: 'd93ffacd56a849a190cb8f4bf30e6794'
+                        deleted: true
                     }
                     'src_server_entry_oem-sync_ts': {
                         table: 'sys_module'
@@ -3852,6 +3861,7 @@ declare global {
                     'src_server_platform_rest-port_ts': {
                         table: 'sys_module'
                         id: '008ae84b1ad241d6af3a6d706d26061c'
+                        deleted: true
                     }
                     src_server_platform_returns_ts: {
                         table: 'sys_module'

@@ -16,22 +16,25 @@ vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-gli
 const asked: Array<{ vendor: OemVendor; serials: string[] }> = []
 let routeVendors: OemVendor[] = []
 
-vi.mock('../domain/oem/adapters.ts', async (importOriginal) => ({
-    ...(await importOriginal<typeof import('../domain/oem/adapters.ts')>()),
-    enabledRoutes: () =>
-        routeVendors.map((vendor) => {
-            const route: CoverageRoute = {
-                via: 'cisco',
-                run: (serials) => {
-                    asked.push({ vendor, serials: [...serials] })
-                    return { facts: [], errors: serials.map((serial) => `${serial}: HTTP 500`), failed: [...serials], rejected: [] }
-                },
-            }
-            return { vendor, route }
-        }),
-}))
+vi.mock('../domain/oem/adapters.ts', async (importOriginal) => {
+    const adapters = await importOriginal<typeof import('../domain/oem/adapters.ts')>()
+    return {
+        ...adapters,
+        enabledRoutes: () =>
+            routeVendors.map((vendor) => {
+                const route: CoverageRoute = {
+                    api: adapters.OEM_ADAPTERS.cisco.api!,
+                    run: (serials) => {
+                        asked.push({ vendor, serials: [...serials] })
+                        return { facts: [], errors: serials.map((serial) => `${serial}: HTTP 500`), failed: [...serials], rejected: [] }
+                    },
+                }
+                return { vendor, route }
+            }),
+    }
+})
 
-vi.mock('./oem-http.ts', () => ({ oemEnabled: () => true, oemContext: () => ({ http: () => ({ status: 0, body: '' }), orgIds: [] }) }))
+vi.mock('./oem-http.ts', () => ({ apiEnabled: () => true, oemContext: () => ({ http: () => ({ status: 0, body: '' }), orgIds: [] }) }))
 
 const LOCKS = 'x_daas_ham_job_lock'
 

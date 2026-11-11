@@ -1,6 +1,6 @@
 # OEM lifecycle, coverage and RMA data (P2.1, ADR 0008)
 
-## Adapters (`domain/oem/adapters.ts`)
+## Adapters (`domain/oem/sync-adapters.ts`, routed per vendor in `domain/oem/adapters.ts`)
 
 | Vendor (model `OEM data source`) | Lifecycle (EoX) | Coverage by serial | RMA status |
 |---|---|---|---|

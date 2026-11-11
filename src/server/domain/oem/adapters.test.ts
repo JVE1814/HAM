@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { enabledRoute, enabledRoutes, OEM_ADAPTERS, SYNC_ORDER, type OemContext } from './adapters'
+import { enabledRoute, enabledRoutes, OEM_ADAPTERS, SYNC_ORDER, type SyncApi } from './adapters'
+import type { OemContext } from './sync-adapters'
 import type { HttpRequest, HttpResponse } from '../http'
 import type { OemVendor } from '../vocabulary'
 
@@ -342,7 +343,7 @@ describe('rate limits', () => {
 })
 
 describe('enabledRoute', () => {
-    const only = (...vendors: OemVendor[]) => (vendor: OemVendor) => vendors.includes(vendor)
+    const only = (...vendors: OemVendor[]) => (api: SyncApi) => vendors.some((vendor) => OEM_ADAPTERS[vendor].api === api)
 
     it('runs Meraki coverage, which Cisco SN2INFO serves, only when Meraki and Cisco are both enabled', () => {
         expect(enabledRoute('meraki', 'coverage', only('cisco'))).toBeUndefined()
@@ -368,7 +369,7 @@ describe('enabledRoutes', () => {
         const all = () => true
         expect(enabledRoutes('coverage', all).map((turn) => turn.vendor)).toEqual(['cisco', 'meraki', 'fortinet', 'mist'])
         expect(enabledRoutes('rmaStatus', all)).toEqual([{ vendor: 'cisco', route: OEM_ADAPTERS.cisco.rmaStatus }])
-        expect(enabledRoutes('lifecycle', (vendor) => vendor === 'mist').map((turn) => turn.vendor)).toEqual(['mist'])
+        expect(enabledRoutes('lifecycle', (api) => api === OEM_ADAPTERS.mist.api).map((turn) => turn.vendor)).toEqual(['mist'])
         expect(enabledRoutes('coverage', () => false)).toEqual([])
     })
 

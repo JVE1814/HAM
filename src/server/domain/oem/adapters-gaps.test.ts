@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { OEM_ADAPTERS, type OemContext } from './adapters'
+import { OEM_ADAPTERS } from './adapters'
+import type { OemContext } from './sync-adapters'
 import type { HttpResponse } from '../http'
 
 /*

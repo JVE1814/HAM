@@ -120,6 +120,9 @@ export function providerStockroomCondition(via = ''): string {
 
 export const OEM_PID_FIELD = 'x_daas_ham_oem_pid'
 
+/** The Model's OEM vendor (vocabulary `OEM_VENDOR_CHOICES`): whose API or CSV import its data comes from. */
+export const OEM_SOURCE_FIELD = 'x_daas_ham_oem_source'
+
 /** Encoded condition matching NaaS Models, on cmdb_model itself. */
 export const NAAS_MODEL_CONDITION = `${OEM_PID_FIELD}ISNOTEMPTY`
 

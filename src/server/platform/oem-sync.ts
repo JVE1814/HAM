@@ -1,10 +1,11 @@
 import { GlideRecord } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
 import { coverageDisposition, type CoverageAnswer } from '../domain/coverage.ts'
-import { naasModelCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
+import { naasModelCondition, OEM_PID_FIELD, OEM_SOURCE_FIELD } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { enabledRoutes, pidKey, type CoverageRoute } from '../domain/oem/adapters.ts'
+import { enabledRoutes, type CoverageRoute } from '../domain/oem/adapters.ts'
+import { pidKey } from '../domain/oem/sync-adapters.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
 import { daysAgoGlide, nowMs } from './clock.ts'
@@ -12,7 +13,7 @@ import { applyCoverage, staleAssets } from './coverage.ts'
 import { withLock } from './locks.ts'
 import { log } from './log.ts'
 import { writeModelLifecycle } from './model-lifecycle.ts'
-import { oemContext, oemEnabled } from './oem-http.ts'
+import { apiEnabled, oemContext } from './oem-http.ts'
 import { recordRmaStatuses, rmasToAskAbout } from './oem-rma.ts'
 import { intProperty } from './properties.ts'
 import { str } from './records.ts'
@@ -44,14 +45,14 @@ function ofVendor(vendor: OemVendor, errors: readonly string[]): string[] {
 }
 
 /**
- * `vendor`'s NaaS Models (those with an OEM PID), by PID as an OEM's answer is matched to them (domain/oem/adapters
+ * `vendor`'s NaaS Models (those with an OEM PID), by PID as an OEM's answer is matched to them (domain/oem/sync-adapters
  * `pidKey`): the PID to ask for each key, as the first of its Models stores it (trimmed), and the Models with it.
  */
 function naasModelsByPid(vendor: OemVendor): { asked: Map<string, string>; models: Map<string, string[]> } {
     const asked = new Map<string, string>()
     const models = new Map<string, string[]>()
     const model = new GlideRecord('cmdb_model')
-    model.addQuery('x_daas_ham_oem_source', vendor)
+    model.addQuery(OEM_SOURCE_FIELD, vendor)
     model.addEncodedQuery(naasModelCondition())
     model.query()
     while (model.next()) {
@@ -70,10 +71,10 @@ function naasModelsByPid(vendor: OemVendor): { asked: Map<string, string>; model
  */
 export function syncLifecycle(): void {
     const runErrors: string[] = []
-    for (const { vendor, route } of enabledRoutes('lifecycle', oemEnabled)) {
+    for (const { vendor, route } of enabledRoutes('lifecycle', apiEnabled)) {
         const { asked, models } = naasModelsByPid(vendor)
         if (asked.size === 0) continue
-        const result = route.run([...asked.values()], oemContext(route.via))
+        const result = route.run([...asked.values()], oemContext(route.api))
         const errors = [...result.errors]
         // New dates win; dates the vendor does not give (e.g. a CSV end of life) are kept.
         for (const fact of result.facts) {
@@ -112,7 +113,7 @@ function syncCoverageHolding(lock: HeldLock): void {
     const budgetMs = intProperty(PROPERTY.jobBudgetSeconds) * 1000
     const staleBefore = daysAgoGlide(intProperty(PROPERTY.coverageRefreshDays))
     const errors: string[] = []
-    let due = enabledRoutes('coverage', oemEnabled)
+    let due = enabledRoutes('coverage', apiEnabled)
     try {
         for (let round = 0; due.length > 0; round++) {
             const behind: typeof due = []
@@ -136,7 +137,7 @@ function syncCoverageHolding(lock: HeldLock): void {
 function syncCoverageBatch(vendor: OemVendor, route: CoverageRoute, staleBefore: string, errors: string[]): boolean {
     const assets = staleAssets(vendor, staleBefore, route.maxKeysPerRun ?? COVERAGE_BATCH)
     if (assets.size === 0) return false
-    const result = route.run([...assets.keys()], oemContext(route.via))
+    const result = route.run([...assets.keys()], oemContext(route.api))
     errors.push(...ofVendor(vendor, result.errors))
     const dispositionOf = coverageDisposition(result)
     const answered = new Map<string, string>()
@@ -165,10 +166,10 @@ function syncCoverageBatch(vendor: OemVendor, route: CoverageRoute, staleBefore:
  */
 export function syncRmaStatus(): void {
     const errors: string[] = []
-    for (const { vendor, route } of enabledRoutes('rmaStatus', oemEnabled)) {
+    for (const { vendor, route } of enabledRoutes('rmaStatus', apiEnabled)) {
         const asked = rmasToAskAbout(vendor)
         if (asked.ids.length === 0) continue
-        const result = route.run(asked.rmaNumbers, oemContext(route.via))
+        const result = route.run(asked.rmaNumbers, oemContext(route.api))
         const statusOf = new Map(result.facts.map((fact) => [fact.rmaNumber, fact.status]))
         errors.push(...ofVendor(vendor, [...result.errors, ...recordRmaStatuses(asked.ids, statusOf)]))
     }

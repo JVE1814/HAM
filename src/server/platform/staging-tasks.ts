@@ -1,5 +1,6 @@
 import { GlideRecord } from '@servicenow/glide'
-import { claimRouted, initialAutomationStatus } from '../domain/oem/claims.ts'
+import { claimRouted } from '../domain/oem/adapters.ts'
+import { initialAutomationStatus } from '../domain/oem/claims.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { lineStillOpen } from '../domain/sourcing.ts'
 import {

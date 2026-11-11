@@ -39,7 +39,4 @@ export const REST_MESSAGE = {
     },
 } as const
 
-type Messages = typeof REST_MESSAGE
-
-/** The name of a function of one of the app's REST messages: what a request through the HTTP seam may call (domain/http). */
-export type RestFunction = { [M in keyof Messages]: Messages[M]['fn'][keyof Messages[M]['fn']] }[keyof Messages]
+export type RestMessageName = (typeof REST_MESSAGE)[keyof typeof REST_MESSAGE]['name']

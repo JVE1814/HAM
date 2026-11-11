@@ -56,10 +56,10 @@ export function parseDeviceEvents(body: unknown, maxBatch: number, now: number):
         const observedAt = typeof item?.observed_at === 'string' ? parseTimestamp(item.observed_at) : NaN
         const source = (item?.source ?? DEFAULT_DEVICE_EVENT_SOURCE) as DeviceEventSource
         if (!identifier) return void rejected.push({ index, reason: 'identifier is required' })
-        if (!KINDS.includes(event)) return void rejected.push({ index, reason: 'event must be one of seen, down, up' })
+        if (!KINDS.includes(event)) return void rejected.push({ index, reason: `event must be one of ${KINDS.join(', ')}` })
         if (Number.isNaN(observedAt)) return void rejected.push({ index, reason: OBSERVED_AT_FORMAT })
         if (observedAt > now + MAX_CLOCK_SKEW_MS) return void rejected.push({ index, reason: 'observed_at is in the future' })
-        if (!SOURCES.includes(source)) return void rejected.push({ index, reason: 'source must be one of discovery, connector, nms' })
+        if (!SOURCES.includes(source)) return void rejected.push({ index, reason: `source must be one of ${SOURCES.join(', ')}` })
         accepted.push({ event: { identifier, event, observedAt, source }, index })
     })
     // The index breaks ties, so the order does not rest on the engine's sort being stable.

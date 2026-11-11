@@ -1,13 +1,13 @@
 import { GlideRecord } from '@servicenow/glide'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
+import { CLAIM_VENDORS, OEM_ADAPTERS } from '../domain/oem/adapters.ts'
 import {
     CLAIM_PREREQUISITE,
-    CLAIM_VENDORS,
     dependentActions,
     dueStepsQuery,
+    OPEN_STEP,
     runVendorClaims,
-    settledStatus,
     STEP_STATUS,
     type ClaimOutcome,
     type ClaimStore,
@@ -16,7 +16,7 @@ import {
 import { openJobCursor, type JobCursor } from './job-cursor.ts'
 import { withLock } from './locks.ts'
 import { boolProperty, intProperty } from './properties.ts'
-import { PROPERTY, type PropertyOf } from '../domain/properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { restMessagePort } from './rest-messages.ts'
 import { bool, num, pluck, recordsById, str, warnRefused } from './records.ts'
 import { messageOf } from '../domain/errors.ts'
@@ -27,7 +27,7 @@ import { log } from './log.ts'
 /**
  * The automated steps of a Staging task (x_daas_ham_staging_step rows with an `automation`) and the OEM claims they
  * stand for. Of a step's state (domain/oem/claims `STEP_STATUS`), this module owns what follows its creation: a step
- * waiting on another is released once that one is ticked (`releaseStepsWaitingOn`: waiting to due), or by the next
+ * waiting on another is released once that one is ticked (`releaseStepsWaitingOn`: waiting to pending), or by the next
  * claim run when that release was refused (`releaseStranded`), and the claim run settles each step it sent (`settle`:
  * done and ticked, or failed with one more attempt and the vendor's message).
  * The rest is platform/staging-tasks': it creates a task's steps, each automated one in its
@@ -45,8 +45,6 @@ interface ClaimAsset {
 }
 
 const NO_ASSET: ClaimAsset = { customerId: '', serial: '', mac: '', claimCode: '' }
-
-const CLAIM_ENABLED: Partial<Record<OemVendor, PropertyOf<boolean>>> = PROPERTY.claimEnabled
 
 /**
  * For each enabled vendor, send its due automated staging steps (pending, and failed ones due a retry) through the
@@ -68,24 +66,14 @@ export function runClaims(): void {
 function runHolding(lock: HeldLock): void {
     const maxCalls = intProperty(PROPERTY.claimMaxCalls)
     releaseStranded()
-    const store = whileHeld(lock, glideClaimStore())
+    const store = glideClaimStore()
     for (const vendor of CLAIM_VENDORS) {
-        const enabled = CLAIM_ENABLED[vendor]
-        if (enabled && boolProperty(enabled)) runVendorClaims(vendor, store, restMessagePort, maxCalls, () => lock.held())
-    }
-}
-
-function whileHeld(lock: HeldLock, store: ClaimStore): ClaimStore {
-    let lost = false
-    return {
-        due: (vendor, action, limit) => {
-            if (!lost && !lock.held()) {
-                lost = true
-                log.warn(`OEM claim run stopped: job lock lost while sending, to the run that took it over`)
-            }
-            return lost ? [] : store.due(vendor, action, limit)
-        },
-        settle: store.settle,
+        const claims = OEM_ADAPTERS[vendor].claims
+        if (!claims || !boolProperty(claims.enabled)) continue
+        if (runVendorClaims(vendor, claims.routes, store, restMessagePort, maxCalls, () => lock.held()).lockLost) {
+            log.warn(`OEM claim run stopped: job lock lost while sending, to the run that took it over`)
+            return
+        }
     }
 }
 
@@ -172,7 +160,7 @@ function releaseStranded(): void {
 
 function waitingSteps(after: string): Array<{ stepId: string; taskId: string; prerequisite: string }> {
     const waiting = new GlideRecord(STEP)
-    waiting.addEncodedQuery(`automation_status=${STEP_STATUS.waiting}^done=false^staging_task.active=true`)
+    waiting.addEncodedQuery(`automation_status=${STEP_STATUS.waiting}^${OPEN_STEP}`)
     if (after) waiting.addQuery('sys_id', '>', after)
     waiting.orderBy('sys_id')
     waiting.setLimit(STRANDED_LOAD)
@@ -206,7 +194,7 @@ function saveStrandedCursor(cursor: JobCursor, next: string): void {
  * react only to done changing.
  */
 function release(step: GlideRecord): void {
-    step.setValue('automation_status', STEP_STATUS.due)
+    step.setValue('automation_status', STEP_STATUS.pending)
     if (!step.update()) warnRefused(step, `OEM step "${str(step, 'label')}" of ${step.getDisplayValue('staging_task')} still waiting, not released`)
 }
 
@@ -230,7 +218,7 @@ function settle(outcomes: readonly ClaimOutcome[]): void {
     while (step.next()) {
         const outcome = byStep.get(step.getUniqueValue())
         if (!outcome || (!outcome.ok && bool(step, 'done'))) continue
-        const status = settledStatus(outcome)
+        const status = outcome.ok ? STEP_STATUS.done : STEP_STATUS.failed
         step.setValue('automation_message', outcome.message)
         step.setValue('automation_status', status)
         if (outcome.ok) step.setValue('done', true)
