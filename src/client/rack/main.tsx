@@ -1,5 +1,4 @@
-import { mount } from '../mount'
-import App from './App'
-import './rack.css'
+import { startApp } from '@/lib/app'
+import { routeTree } from './routes'
 
-mount(App)
+startApp(routeTree)
