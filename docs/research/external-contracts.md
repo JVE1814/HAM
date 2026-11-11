@@ -1342,8 +1342,8 @@ recommended hardening are described in the notes of their area.
   into staging voids is cleared by a rule of its own, `entry/assets.ts` clearVoidedWipeEvidence) and
   `NaaS - work inside the change window` (`wm_order`, `entry/delivery.ts` refusesWorkWindow). No
   other rule refuses a save on another scope's table: the before rule on `sn_customerservice_case`
-  (`entry/breakfix.ts` onCaseFailedAsset) and the lease rule and transfer release rule on
-  `alm_hardware` (`entry/leases.ts` onAssetLeaseChanged, `entry/assets.ts` onTransferReleased) only
+  (`platform/breakfix.ts` takeFailedAssetTerms) and the lease rule and transfer release rule on
+  `alm_hardware` (`platform/leases.ts` giveToLessor, `entry/assets.ts` onTransferReleased) only
   set fields, and the rest that refuse run on `x_daas_ham_*` tables, where `setAbortAction` works
   (`built-metadata.test.ts` keeps it that way). With the lifecycle rule's refusal holding, it also
   checks the Asset saves Inventory's transfer order logic makes for an inventory tech working a line
