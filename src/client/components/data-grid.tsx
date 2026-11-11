@@ -31,11 +31,6 @@ import { Failure } from '@/lib/app'
 import type { ListView } from '@/lib/sn'
 import { cn } from '@/lib/utils'
 
-/*
- * The app's one data grid: a shadcn Table driven by TanStack Table. No caller sees a TanStack type: a column is a
- * GridColumn, and the shape of `data` decides who processes the rows.
- */
-
 export interface GridColumn<T> {
     /** Unique among the columns; for server rows, the field the server sorts by. */
     id: string
@@ -283,7 +278,6 @@ export function DataGrid<T extends RowData>({ caption, columns, data, error, row
     )
 }
 
-/** The search field: it reports what was typed once typing pauses. */
 function SearchBox({ value, onChange }: { value: string; onChange: (text: string) => void }) {
     const [text, setText] = useState(value)
     useEffect(() => setText(value), [value])

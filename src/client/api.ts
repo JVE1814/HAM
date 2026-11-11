@@ -1,8 +1,6 @@
 import { restErrorMessage } from './rest-error'
 
-/** The app's scripted REST API (src/fluent/shared/rest-api.now.ts). */
 const NAAS = '/api/x_daas_ham/naas'
-/** The platform's REST APIs (Table, Stats, UI meta), which the workspace reads any table through. */
 const NOW = '/api/now'
 
 export class ApiError extends Error {

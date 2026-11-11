@@ -22,7 +22,6 @@ declare module '@tanstack/react-query' {
     }
 }
 
-/** The context every route's loader and beforeLoad receive. */
 export interface AppContext {
     queryClient: QueryClient
 }

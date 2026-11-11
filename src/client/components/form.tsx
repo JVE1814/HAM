@@ -8,11 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 
-/*
- * TanStack Form bound to shadcn fields: a page writes `form.AppField name=... {(field) => <field.TextField label=.../>}`
- * and gets the label, the input, the description and the errors laid out the same way everywhere.
- */
-
 const { fieldContext, formContext, useFieldContext, useFormContext } = createFormHookContexts()
 
 export interface Option {
@@ -117,7 +112,6 @@ function RadioField({ label, description, options }: FieldProps & { options: rea
     )
 }
 
-/** The form's submit button: disabled while the form cannot submit, with a spinner while it submits. */
 function SubmitButton({ children, disabled, ...button }: Omit<ComponentProps<typeof Button>, 'type'>) {
     const form = useFormContext()
     return (
@@ -139,7 +133,6 @@ export const { useAppForm } = createFormHook({
     formComponents: { SubmitButton },
 })
 
-/** A validator of a field that must not be blank. */
 export const required =
     (message: string) =>
     ({ value }: { value: string }) =>

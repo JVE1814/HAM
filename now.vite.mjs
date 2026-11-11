@@ -2,7 +2,6 @@ import tailwindcss from '@tailwindcss/vite'
 import { uiPageSourceManifest } from '@servicenow/isomorphic-rollup'
 import { servicenowVitePlugins } from '@servicenow/isomorphic-rollup/vite'
 
-/** The Vite config of the UI pages (src/client/*.html), shared by the build (now.prebuild.mjs) and the dev server (now.dev.mjs). */
 export async function clientConfig({ rootDir, config, path, registerExplicitId }) {
     const clientDir = path.join(rootDir, config.clientDir)
     return {

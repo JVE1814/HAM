@@ -28,9 +28,7 @@ import type { Source } from '../lib/sn'
 export const AUDIENCE = {
     /** Every provider-staff role, for the tables inventory techs also read, and the platform's cmdb_model. */
     staff: PROVIDER_STAFF,
-    /** Provider staff without inventory techs, for the customer, commercial and configuration tables. */
     broadStaff: BROAD_STAFF,
-    /** The roles that read billing and margin data (the money tables' read ACLs). */
     money: MONEY_READERS,
     admin: [ROLE.admin],
 } as const satisfies Record<string, readonly AppRole[]>

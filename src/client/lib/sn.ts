@@ -72,7 +72,6 @@ function kindOf(column: MetaColumn): FieldKind {
     return NUMBER_TYPES.has(type) ? 'number' : 'text'
 }
 
-/** Every column of a table, inherited ones included: one call per table for the session. */
 const metaQuery = (table: string) =>
     queryOptions({
         queryKey: ['sn', 'meta', table],
@@ -134,7 +133,6 @@ type Cell = { value?: unknown; display_value?: unknown } | string | undefined
 
 const text = (value: unknown) => (value === null || value === undefined ? '' : String(value))
 
-/** One page of a list: key holds every part of the request, so two lists never share a page. */
 export const listPageQuery = (source: Source, order: readonly Ordering[], view: ListView, fields: readonly Field[]) => {
     const query = listQuery(source, order, view, fields)
     const names = fields.map((field) => field.name)

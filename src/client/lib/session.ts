@@ -3,7 +3,6 @@ import type { SessionRoles } from '../../server/domain/rest-contracts'
 import type { AppRole } from '../../server/domain/visibility'
 import { ApiError, get } from '../api'
 
-/** The signed-in user as a page needs them: whether they hold any of a group of the app's roles. */
 export interface Session {
     holdsAny(roles: readonly AppRole[]): boolean
 }
