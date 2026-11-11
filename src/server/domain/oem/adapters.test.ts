@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { enabledRoute, enabledRoutes, OEM_ADAPTERS, SYNC_ORDER, type OemContext } from './adapters'
+import { enabledRoute, enabledRoutes, OEM_ADAPTERS, parseCoverageRow, SYNC_ORDER, type OemContext } from './adapters'
 import type { HttpRequest, HttpResponse } from '../http'
 import type { OemVendor } from '../vocabulary'
 
@@ -374,5 +374,34 @@ describe('enabledRoutes', () => {
 
     it('takes every vendor that has adapters, once', () => {
         expect([...SYNC_ORDER].sort()).toEqual(Object.keys(OEM_ADAPTERS).sort())
+    })
+})
+
+describe('parseCoverageRow', () => {
+    const row = {
+        vendor: 'aruba',
+        serial: ' cn12ab ',
+        contractNumber: 'C-1',
+        serviceLevel: 'NBD',
+        startDate: '2026-01-01',
+        endDate: '',
+        annualCost: ' 120.50 ',
+    }
+
+    it('reads a contract covering the normalized serial from the dates given, with the cost as a number', () => {
+        expect(parseCoverageRow(row)).toEqual({
+            ok: true,
+            vendor: 'aruba',
+            fact: { serial: 'CN12AB', covered: true, contractNumber: 'C-1', serviceLevel: 'NBD', startDate: '2026-01-01', endDate: undefined },
+            annualCost: 120.5,
+        })
+        expect(parseCoverageRow({ ...row, annualCost: '' })).toMatchObject({ ok: true, annualCost: undefined })
+    })
+
+    it('refuses a vendor the app does not integrate with, a blank serial, a date that is no calendar day and a cost that is no number', () => {
+        expect(parseCoverageRow({ ...row, vendor: 'Aruba' })).toMatchObject({ ok: false, reason: expect.stringMatching(/^vendor must be one of /) })
+        expect(parseCoverageRow({ ...row, serial: '  ' })).toEqual({ ok: false, reason: 'serial number is required' })
+        expect(parseCoverageRow({ ...row, endDate: '2026-02-30' })).toEqual({ ok: false, reason: 'dates must be real calendar dates (YYYY-MM-DD)' })
+        expect(parseCoverageRow({ ...row, annualCost: '12O' })).toEqual({ ok: false, reason: 'annual cost must be a number' })
     })
 })

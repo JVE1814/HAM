@@ -11,10 +11,8 @@ import {
     type CoverageAnswer,
     type SerialCoverage,
 } from '../domain/coverage.ts'
-import { isIsoDate } from '../domain/calendar.ts'
 import { fleetCondition } from '../domain/fleet.ts'
-import { SYNC_ORDER } from '../domain/oem/adapters.ts'
-import type { CoverageFact } from '../domain/oem/types.ts'
+import { parseCoverageRow } from '../domain/oem/adapters.ts'
 import { normalizeSerial } from '../domain/serials.ts'
 import type { CoverageSource, OemVendor } from '../domain/vocabulary.ts'
 import { nowGlide, todayIso } from './clock.ts'
@@ -164,28 +162,22 @@ function refreshAssetCoverage(answered: ReadonlyMap<string, string>, coverageOf:
  * the platform refuses is marked error with why, to load again once the cause is fixed.
  */
 export function importCoverageRow(row: GlideRecord): RowOutcome {
-    const vendor = str(row, 'vendor') as OemVendor
-    const serial = normalizeSerial(str(row, 'serial_number'))
-    const start = str(row, 'start_date')
-    const end = str(row, 'end_date')
-    const cost = str(row, 'annual_cost').trim()
-    if (!SYNC_ORDER.includes(vendor)) return rowError(`vendor must be one of ${SYNC_ORDER.join(', ')}`)
-    if (!serial) return rowError('serial number is required')
-    if ((start && !isIsoDate(start)) || (end && !isIsoDate(end))) return rowError('dates must be real calendar dates (YYYY-MM-DD)')
-    if (cost && !Number.isFinite(Number(cost))) return rowError('annual cost must be a number')
+    const parsed = parseCoverageRow({
+        vendor: str(row, 'vendor'),
+        serial: str(row, 'serial_number'),
+        contractNumber: str(row, 'contract_number'),
+        serviceLevel: str(row, 'service_level'),
+        startDate: str(row, 'start_date'),
+        endDate: str(row, 'end_date'),
+        annualCost: str(row, 'annual_cost'),
+    })
+    if (!parsed.ok) return rowError(parsed.reason)
+    const { serial } = parsed.fact
     const asset = fleetAssetWithSerial(serial)
     if (!asset) return rowError(`no fleet asset with serial ${serial}`)
     const assetId = asset.getUniqueValue()
-    const fact: CoverageFact = {
-        serial,
-        covered: true,
-        contractNumber: str(row, 'contract_number'),
-        serviceLevel: str(row, 'service_level'),
-        startDate: start || undefined,
-        endDate: end || undefined,
-    }
-    const answer: CoverageAnswer = { assetId, fact, annualCost: cost ? Number(cost) : undefined }
-    const refused = applyCoverage(vendor, 'csv', new Map([[assetId, serial]]), [answer], [])
+    const answer: CoverageAnswer = { assetId, fact: parsed.fact, annualCost: parsed.annualCost }
+    const refused = applyCoverage(parsed.vendor, 'csv', new Map([[assetId, serial]]), [answer], [])
     if (refused.length > 0) return rowError(refused.join('; '))
     return { state: 'inserted', comment: `Coverage for ${serial}` }
 }

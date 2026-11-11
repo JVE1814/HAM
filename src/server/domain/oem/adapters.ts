@@ -1,6 +1,9 @@
+import { isIsoDate } from '../calendar.ts'
 import { chunks } from '../collections.ts'
+import { oneOf } from '../exhaustive.ts'
 import { failureText, isSuccess, type HttpPort } from '../http.ts'
 import { asArray, field, isoDate, parseJson, text } from '../json.ts'
+import { normalizeSerial } from '../serials.ts'
 import type { OemVendor } from '../vocabulary.ts'
 import type { CoverageFact, CoverageFetched, Fetched, LifecycleFact, RmaFact } from './types.ts'
 import { fortiCloudError } from './forticloud.ts'
@@ -387,6 +390,42 @@ export function enabledRoute<K extends keyof VendorRoutes>(
 export interface SyncTurn<K extends keyof VendorRoutes> {
     vendor: OemVendor
     route: NonNullable<VendorRoutes[K]>
+}
+
+/** A coverage CSV row as loaded (vendors without an API), each column as text. */
+export interface CoverageRow {
+    vendor: string
+    serial: string
+    contractNumber: string
+    serviceLevel: string
+    startDate: string
+    endDate: string
+    annualCost: string
+}
+
+export type ParsedCoverageRow = { ok: true; vendor: OemVendor; fact: CoverageFact; annualCost?: number } | { ok: false; reason: string }
+
+/** A coverage row's contract, which covers its serial over the dates it gives, or why the row is refused. */
+export function parseCoverageRow(row: CoverageRow): ParsedCoverageRow {
+    const vendor = oneOf(row.vendor, SYNC_ORDER)
+    const serial = normalizeSerial(row.serial)
+    const cost = row.annualCost.trim()
+    const { startDate, endDate } = row
+    if (!vendor) return { ok: false, reason: `vendor must be one of ${SYNC_ORDER.join(', ')}` }
+    if (!serial) return { ok: false, reason: 'serial number is required' }
+    if ((startDate && !isIsoDate(startDate)) || (endDate && !isIsoDate(endDate))) {
+        return { ok: false, reason: 'dates must be real calendar dates (YYYY-MM-DD)' }
+    }
+    if (cost && !Number.isFinite(Number(cost))) return { ok: false, reason: 'annual cost must be a number' }
+    const fact: CoverageFact = {
+        serial,
+        covered: true,
+        contractNumber: row.contractNumber,
+        serviceLevel: row.serviceLevel,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+    }
+    return { ok: true, vendor, fact, annualCost: cost ? Number(cost) : undefined }
 }
 
 /** The vendors a sync job of `capability` calls, in SYNC_ORDER: those whose route may run (enabledRoute). */
