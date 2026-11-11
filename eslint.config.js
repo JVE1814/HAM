@@ -7,6 +7,8 @@ const EXTENSIONLESS = {
     message: 'Name the .ts file: the instance resolves a server module import by its exact path.',
 }
 
+const SERVER_FILES = 'src/server/**/*.{ts,tsx,mts,cts,js,mjs,cjs}'
+
 export default tseslint.config(
     {
         ignores: [
@@ -48,6 +50,27 @@ export default tseslint.config(
         files: ['src/server/**/*.ts'],
         ignores: ['**/*.test.ts', 'src/server/test-support/**'],
         rules: { 'no-restricted-imports': ['error', { patterns: [EXTENSIONLESS] }] },
+    },
+    // ADR 0003: the layer rules below see only static imports, and only of modules in a layer's folder.
+    {
+        files: [SERVER_FILES],
+        ignores: ['**/*.test.ts', 'src/server/test-support/**'],
+        rules: {
+            'no-restricted-syntax': [
+                'error',
+                { selector: 'ImportExpression', message: 'A server module imports statically, so the layer rules see it (ADR 0003).' },
+            ],
+        },
+    },
+    {
+        files: [SERVER_FILES],
+        ignores: ['**/*.test.ts', 'src/server/{domain,platform,entry,test-support}/**'],
+        rules: {
+            'no-restricted-syntax': [
+                'error',
+                { selector: 'Program', message: 'A server module sits in domain/, platform/ or entry/ (ADR 0003); test code in test-support/.' },
+            ],
+        },
     },
     // ADR 0003: the domain core never reaches Glide or the layers above it, and platform never reaches entry.
     {
