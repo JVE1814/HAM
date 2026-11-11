@@ -6,7 +6,7 @@ import { LOCK } from '../domain/lock-names.ts'
 import { SCOPED_TABLES, visibilityFilter } from '../domain/visibility.ts'
 import type { AuditLineResult, AuditType } from '../domain/vocabulary.ts'
 import { nowGlide } from './clock.ts'
-import { hasOpenException, openException } from './exceptions.ts'
+import { openException } from './exceptions.ts'
 import { openFieldWork } from './field-work.ts'
 import { withLockTries } from './locks.ts'
 import { refusal, str, warnRefused } from './records.ts'
@@ -225,19 +225,17 @@ function closeHolding(audit: GlideRecord): AuditClose {
 
 /**
  * Raise the *missing in audit* exception of the line's Asset (platform/exceptions `openException`); false, logged, when
- * none is open afterwards, as the closed audit does not raise it again. openException returns nothing: an insert the
- * platform refuses is logged there and returns normally, as does a raise whose lock another holds through every try,
- * and one whose lock cannot be taken throws. So whether the exception stands is read back.
+ * none is open afterwards, as the closed audit does not raise it again. A raise whose lock cannot be taken throws, and
+ * is logged as one that left none open, so the other lines are still closed.
  */
 function raiseMissing(line: GlideRecord, number: string): boolean {
     const assetId = str(line, 'asset')
     let why = 'none is open (see the system log)'
     try {
-        openException('audit_missing', { assetId }, { customerId: str(line, 'asset.company'), detail: `Not found in ${number}` })
+        if (openException('audit_missing', { assetId }, { customerId: str(line, 'asset.company'), detail: `Not found in ${number}` }) === 'open') return true
     } catch (error) {
         why = messageOf(error)
     }
-    if (hasOpenException('audit_missing', { assetId })) return true
     log.warn(`Audit ${number}: no missing in audit exception for ${line.getDisplayValue('asset')}: ${why}; raise it by hand`)
     return false
 }
