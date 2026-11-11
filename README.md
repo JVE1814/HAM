@@ -171,6 +171,10 @@ On an instance where an earlier version was installed:
     ([platform fields](docs/verify-on-instance.md#platform-fields)).
   - Load the Models' lifecycle milestones again through the lifecycle import, or enter them by hand
     ([model lifecycle](docs/verify-on-instance.md#model-lifecycle)).
+- Before upgrading, decide or cancel every Order and Disposal order awaiting approval. Approvals
+  are now counted by *Customer admins asked*, which the app saves when it asks for approval. On a
+  task asked before that, the field is empty and reads as "no Customer admin asked", so a provider
+  approval would stand in for the Customer admins.
 - Work through the checks marked **After an upgrade** in
   [docs/verify-on-instance.md](docs/verify-on-instance.md): adopting the fleet and clearing the
   earlier version's column defaults, and clean-ups of returns, fees and spare-pool purchases.
