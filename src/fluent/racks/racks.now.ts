@@ -3,7 +3,7 @@ import { Acl, BusinessRule, Record, UiPage } from '@servicenow/sdk/core'
 import { PLACEMENT_FIELDS } from '../../server/domain/rack'
 import { explainRackRefusal } from '../../server/entry/racks'
 import { recheckRacksOf } from '../../server/platform/racks'
-import { CURRENT_IS_FLEET, FLEET_FIELD } from '../../server/domain/fleet'
+import { CURRENT_IS_FLEET, CURRENT_IS_FLEET_UNSPACED, FLEET_FIELD } from '../../server/domain/fleet'
 import rackPage from '../../client/rack.html'
 import { ENTRY_MODULES } from '../shared/server-modules.now'
 import { providerStaff, staffAndCustomers } from '../shared/roles.now'
@@ -31,7 +31,7 @@ BusinessRule({
     action: ['insert', 'update'],
     order: 150,
     condition:
-        `(${PLACEMENT_SET})&&current.${FLEET_FIELD}==true&&require('${ENTRY_MODULES}/racks.ts').refusesRackPlacement(current,previous)`,
+        `(${PLACEMENT_SET})&&${CURRENT_IS_FLEET_UNSPACED}&&require('${ENTRY_MODULES}/racks.ts').refusesRackPlacement(current,previous)`,
     abortAction: true,
     script: explainRackRefusal,
 })
@@ -64,7 +64,7 @@ BusinessRule({
     action: ['insert', 'update'],
     order: 150,
     condition:
-        `(${PLACEMENT_SET}||((current.model.changes()||current.${FLEET_FIELD}.changes())&&current.${PLACEMENT_FIELDS.rack}!=''))&&current.${FLEET_FIELD}==true`,
+        `(${PLACEMENT_SET}||((current.model.changes()||current.${FLEET_FIELD}.changes())&&current.${PLACEMENT_FIELDS.rack}!=''))&&${CURRENT_IS_FLEET_UNSPACED}`,
     script: recheckRacksOf,
 })
 

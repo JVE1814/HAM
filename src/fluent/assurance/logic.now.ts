@@ -2,7 +2,7 @@ import '@servicenow/sdk/global'
 import { Property, ScheduledScript, UiAction } from '@servicenow/sdk/core'
 import { reconcileInstalledBaseAndRacks, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudit } from '../../server/entry/assurance'
 import { raiseDueAttestations } from '../../server/platform/attestations'
-import { CURRENT_IS_NAAS_STOCKROOM, SITE_FIELD } from '../../server/domain/fleet'
+import { CURRENT_IS_NAAS_STOCKROOM, CURRENT_IS_SITE } from '../../server/domain/fleet'
 import { PROPERTY } from '../../server/domain/properties'
 import { admin, assetManager, fieldTech, scanners, stockroomWorkers } from '../shared/roles.now'
 
@@ -27,7 +27,7 @@ UiAction({
     name: 'Start site audit',
     table: 'cmn_location',
     actionName: 'x_daas_ham_start_site_audit',
-    condition: `current.${SITE_FIELD} == true`,
+    condition: CURRENT_IS_SITE,
     roles: [assetManager, fieldTech],
     form: { showButton: true },
     showUpdate: true,

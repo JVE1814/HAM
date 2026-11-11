@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, UiAction } from '@servicenow/sdk/core'
-import { CURRENT_FLEET_STAGE_CHANGED, FLEET_FIELD } from '../../server/domain/fleet'
+import { CURRENT_FLEET_STAGE_CHANGED, CURRENT_NOT_FLEET } from '../../server/domain/fleet'
 import { clearVoidedWipeEvidence, explainLifecycleRefusal } from '../../server/entry/assets'
 import { uiAddToFleet } from '../../server/entry/fleet'
 import { ENTRY_MODULES } from '../shared/server-modules.now'
@@ -56,7 +56,7 @@ UiAction({
     table: 'alm_hardware',
     actionName: 'x_daas_ham_add_to_fleet',
     hint: 'Make this asset part of the NaaS fleet, so NaaS asset management sources, stages, tracks and bills it.',
-    condition: `current.${FLEET_FIELD} != true`,
+    condition: CURRENT_NOT_FLEET,
     roles: [assetManager, admin],
     form: { showButton: true },
     list: { showListChoice: true },
