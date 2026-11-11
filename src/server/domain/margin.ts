@@ -110,11 +110,6 @@ function marginKey(customerId: string, siteId: string, currency: string): string
     return `${customerId}|${siteId}|${currency}`
 }
 
-function splitMarginKey(key: string): { customerId: string; siteId: string; currency: string } {
-    const [customerId, siteId = '', currency = ''] = key.split('|')
-    return { customerId, siteId, currency }
-}
-
 /** Which Cost fact an amount belongs to: one per Customer, Site, cost type and currency in a period. */
 export function costFactKey(customerId: string, siteId: string, type: string, currency: string): string {
     return `${marginKey(customerId, siteId, currency)}|${type}`
@@ -175,11 +170,11 @@ interface MarginRow {
 export function marginRows(revenue: Iterable<Amount>, cost: Iterable<Amount>): MarginRow[] {
     const revenues = sumByKey(revenue)
     const costs = sumByKey(cost)
-    const keys = [...new Set([...revenues.keys(), ...costs.keys()])].map((key) => ({ key, ...splitMarginKey(key) }))
+    const keys = [...new Map([...costs, ...revenues])].map(([key, { customerId, siteId, currency }]) => ({ key, customerId, siteId, currency }))
     keys.sort((a, b) => compare(a.customerId, b.customerId) || compare(a.siteId, b.siteId) || compare(a.currency, b.currency))
     return keys.map(({ key, ...where }) => {
-        const r = toCents(revenues.get(key) ?? 0)
-        const c = toCents(costs.get(key) ?? 0)
+        const r = toCents(revenues.get(key)?.amount ?? 0)
+        const c = toCents(costs.get(key)?.amount ?? 0)
         return {
             ...where,
             revenue: fromCents(r),
@@ -194,11 +189,13 @@ function compare(a: string, b: string): number {
     return a < b ? -1 : a > b ? 1 : 0
 }
 
-function sumByKey(amounts: Iterable<Amount>): Map<string, number> {
-    const sums = new Map<string, number>()
+function sumByKey(amounts: Iterable<Amount>): Map<string, Amount> {
+    const sums = new Map<string, Amount>()
     for (const { customerId, siteId, currency, amount } of amounts) {
         const key = marginKey(customerId, siteId, currency)
-        sums.set(key, (sums.get(key) ?? 0) + amount)
+        const sum = sums.get(key)
+        if (sum) sum.amount += amount
+        else sums.set(key, { customerId, siteId, currency, amount })
     }
     return sums
 }
