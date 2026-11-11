@@ -125,9 +125,8 @@ export function moveAlongPath(
  * (its company, ADR 0006), under no Agreement and on no Order line. Sets the fields only: its caller moves and saves it.
  */
 function releaseToProviderStock(asset: GlideRecord): void {
-    asset.setValue('x_daas_ham_order_line', '')
-    asset.setValue('company', stringProperty(PROPERTY.providerCompany))
-    asset.setValue('x_daas_ham_agreement', '')
+    const released = reservationValues({ orderLineId: '', customerId: stringProperty(PROPERTY.providerCompany), agreementId: '' })
+    for (const [field, value] of Object.entries(released)) asset.setValue(field, value)
 }
 
 interface Claim {
