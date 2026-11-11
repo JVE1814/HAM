@@ -24,9 +24,15 @@ export function requireScanner(response: RESTAPIResponse): boolean {
     return requireRole(response, EQUIPMENT_HANDLERS, 'Requires the inventory tech or field tech role')
 }
 
+/**
+ * A request body of contract `Body` (domain/rest-contracts) as it arrives: each field may be absent or of another type,
+ * so a handler reads its fields by the contract's names and checks their values itself.
+ */
+export type Sent<Body extends object> = { readonly [Field in keyof Body]?: unknown }
+
 /** The JSON object a request was sent with ({} when it carries none), its values as the client sent them. */
-export function bodyOf(request: RESTAPIRequest): Record<string, unknown> {
-    return (request.body.data as Record<string, unknown> | null) ?? {}
+export function bodyOf<Body extends object = Record<string, unknown>>(request: RESTAPIRequest): Sent<Body> {
+    return (request.body.data as Sent<Body> | null) ?? {}
 }
 
 /** `bodyOf` a request whose values are plain text (a scan): each one trimmed; a value the body does not name is absent here too. */

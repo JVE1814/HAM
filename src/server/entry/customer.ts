@@ -1,10 +1,13 @@
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { awaitsSelfInstallConfirmation } from '../domain/install-confirmation.ts'
 import type {
+    AttestationAnswers,
     AttestationReceipt,
     CustomerOverview,
     FaultReport,
+    FaultRequest,
     InstallConfirmation,
+    ReturnRequestBody,
     ReturnRequestReceipt,
 } from '../domain/rest-contracts.ts'
 import { actsAsCustomerAdmin } from '../domain/visibility.ts'
@@ -51,7 +54,7 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
 
 export function reportFault(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    const input = bodyOf(request)
+    const input = bodyOf<FaultRequest>(request)
     const fault = openFaultCase(String(input.asset ?? ''), String(input.description ?? ''))
     if (fault.opened) return reply(response, 201, { case: fault.number } satisfies FaultReport)
     if (fault.reason === 'unknown') return reply(response, 404, { error: 'Unknown device' })
@@ -76,7 +79,7 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
     if (!actsAsCustomerAdmin(currentSession().scope)) return reply(response, 403, { error: 'Only customer admins attest equipment' })
     const attestation = findUnclosedAttestation(pathParam(request, 'id'))
     if (!attestation) return reply(response, 404, { error: 'No open attestation' })
-    const input = bodyOf(request)
+    const input = bodyOf<AttestationAnswers>(request)
     const refused = saveAttestationAnswers(attestation, Array.isArray(input.items) ? (input.items as AttestationAnswer[]) : [])
     if (refused > 0) return reply(response, 422, { error: `${refused} answer(s) not saved: the platform refused them` })
     if (input.submit === true) {
@@ -92,7 +95,7 @@ export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPI
     if (!allowed(response)) return
     const session = currentSession()
     if (!actsAsCustomerAdmin(session.scope)) return reply(response, 403, { error: 'Only customer admins can request returns' })
-    const input = bodyOf(request)
+    const input = bodyOf<ReturnRequestBody>(request)
     const outcome = requestReturn({
         customerId: session.customerId,
         siteId: String(input.site ?? ''),
