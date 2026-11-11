@@ -1,19 +1,13 @@
 import { anyOf } from './encoded-query.ts'
 import { fleetStagesQuery, outsideFleetCondition, SITE_CONDITION } from './fleet.ts'
 import { ALL_STAGES, IN_USE_STAGES } from './lifecycle.ts'
-import { overlaps, powerBudget, type Placement, type RackSpec } from './rack.ts'
 import { normalizeSerial } from './serials.ts'
 import { EXCEPTION_STATUS, type ExceptionType } from './vocabulary.ts'
 
-/** Reconciliation exceptions between installed Assets and monitoring (P2.7), and in racks (Q67). */
+/** Reconciliation exceptions between installed Assets and monitoring (P2.7); a rack's own are domain/rack's. */
 
 /** The types the daily comparison of an installed Asset with monitoring raises and resolves (`reconcileAsset`). */
 export const MONITORING_EXCEPTION_TYPES = ['unseen', 'serial_mismatch', 'location_mismatch'] as const satisfies readonly ExceptionType[]
-
-/** The types a rack check raises and resolves: each is the rack's, open once per rack. */
-export const RACK_EXCEPTION_TYPES = ['rack_overlap', 'rack_over_power'] as const satisfies readonly ExceptionType[]
-
-export type RackExceptionType = (typeof RACK_EXCEPTION_TYPES)[number]
 
 export interface InstalledAssetView {
     serial: string
@@ -92,29 +86,4 @@ export function reconcileAsset(asset: InstalledAssetView, now: number, unseenDay
         if (located.length > 0 && asset.siteId && !located.includes(asset.siteId)) exceptions.push('location_mismatch')
     }
     return exceptions
-}
-
-export interface RackException {
-    type: RackExceptionType
-    detail: string
-}
-
-/**
- * What a fresh read of every device placed in a rack finds wrong with it: devices sharing units on one face, and
- * typical power over the rack's capacity (none recorded: no budget). The before rule refuses a save that would cause
- * either, but two saves at the same moment can both pass it. A type not found here no longer applies: its open one
- * resolves.
- */
-export function reconcileRack(rack: RackSpec, placements: readonly Placement[]): RackException[] {
-    const found: RackException[] = []
-    const shared = overlaps(placements)
-    if (shared.length > 0) {
-        const detail = shared.map(({ labels: [a, b], face, unit }) => `${a} and ${b} share rack unit ${unit} (${face})`).join('; ')
-        found.push({ type: 'rack_overlap', detail })
-    }
-    const budget = powerBudget(rack.powerCapacityW, placements)
-    if (budget.capacityW > 0 && budget.usedW > budget.capacityW) {
-        found.push({ type: 'rack_over_power', detail: `Typical power ${budget.usedW} W is over the rack's ${budget.capacityW} W` })
-    }
-    return found
 }

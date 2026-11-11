@@ -8,11 +8,12 @@ import {
     PLACEMENT_FIELDS,
     placementProblem,
     powerBudget,
+    RACK_EXCEPTION_TYPES,
     RACK_FACES,
+    reconcileRack,
     type Placement,
     type RackSpec,
 } from '../domain/rack.ts'
-import { RACK_EXCEPTION_TYPES, reconcileRack } from '../domain/reconciliation.ts'
 import type { RackDevice, RackElevation, RackListing, Site } from '../domain/rest-contracts.ts'
 import { visibilityFilter, type TableScoping } from '../domain/visibility.ts'
 import type { RackFace } from '../domain/vocabulary.ts'
@@ -148,7 +149,7 @@ function placementsIn(rackId: string): Placement[] {
 
 /**
  * Open the rack's overlap and power exceptions that a fresh read of the rack and every device placed in it finds
- * (domain/reconciliation `reconcileRack`), and resolve the others. A rack no longer there holds nothing, so its
+ * (domain/rack `reconcileRack`), and resolve the others. A rack no longer there holds nothing, so its
  * exceptions resolve.
  */
 function recheckRack(rackId: string): void {

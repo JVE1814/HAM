@@ -1,4 +1,4 @@
-import { RACK_FACE_CHOICES, type RackFace } from './vocabulary.ts'
+import { RACK_FACE_CHOICES, type ExceptionType, type RackFace } from './vocabulary.ts'
 
 /**
  * Rack placement (P2.8) and power budget (plan §13 Rack power budget): units are numbered from 1 at the bottom; a device
@@ -171,4 +171,34 @@ export function rackElevation(rackUnits: number, placements: readonly Placement[
         }
     }
     return rows
+}
+
+/** The types a rack check raises and resolves: each is the rack's, open once per rack. */
+export const RACK_EXCEPTION_TYPES = ['rack_overlap', 'rack_over_power'] as const satisfies readonly ExceptionType[]
+
+export type RackExceptionType = (typeof RACK_EXCEPTION_TYPES)[number]
+
+export interface RackException {
+    type: RackExceptionType
+    detail: string
+}
+
+/**
+ * What a fresh read of every device placed in a rack finds wrong with it: devices sharing units on one face, and
+ * typical power over the rack's capacity (none recorded: no budget). The before rule refuses a save that would cause
+ * either, but two saves at the same moment can both pass it. A type not found here no longer applies: its open one
+ * resolves.
+ */
+export function reconcileRack(rack: RackSpec, placements: readonly Placement[]): RackException[] {
+    const found: RackException[] = []
+    const shared = overlaps(placements)
+    if (shared.length > 0) {
+        const detail = shared.map(({ labels: [a, b], face, unit }) => `${a} and ${b} share rack unit ${unit} (${face})`).join('; ')
+        found.push({ type: 'rack_overlap', detail })
+    }
+    const budget = powerBudget(rack.powerCapacityW, placements)
+    if (budget.capacityW > 0 && budget.usedW > budget.capacityW) {
+        found.push({ type: 'rack_over_power', detail: `Typical power ${budget.usedW} W is over the rack's ${budget.capacityW} W` })
+    }
+    return found
 }
