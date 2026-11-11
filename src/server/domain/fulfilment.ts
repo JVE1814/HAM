@@ -41,9 +41,6 @@ const SHIPPED_AT = LINE_ORDER.indexOf('shipped')
 
 type LiveLineStage = (typeof LINE_ORDER)[number]
 
-/** Every line stage, to read x_daas_ham_order_line.line_stage with (platform/records `choice`). */
-export const LINE_STAGES: readonly LineStage[] = [...LINE_ORDER, 'cancelled']
-
 function rank(stage: LineStage): number {
     return (LINE_ORDER as readonly LineStage[]).indexOf(stage)
 }
