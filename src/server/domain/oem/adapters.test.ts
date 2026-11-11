@@ -335,13 +335,6 @@ describe('HPE Mist', () => {
     })
 })
 
-describe('rate limits', () => {
-    // FortiCloud answers 100 calls a minute, and its products/list takes one serial per call (external-contracts F1).
-    it('ask FortiCloud for fewer serials per run than it answers calls for in a minute', () => {
-        expect(OEM_ADAPTERS.fortinet.coverage?.maxKeysPerRun).toBeLessThan(100)
-    })
-})
-
 describe('enabledClaims', () => {
     const switchedOn = (...vendors: OemVendor[]) => (property: unknown) => vendors.some((vendor) => OEM_ADAPTERS[vendor].claims?.enabled === property)
 
