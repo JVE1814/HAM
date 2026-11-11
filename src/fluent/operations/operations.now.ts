@@ -12,6 +12,7 @@ import {
     StringColumn,
     Table,
 } from '@servicenow/sdk/core'
+import { JOB_ERROR_LENGTH, JOB_STATUS_LENGTH } from '../../server/domain/chunked-job'
 import { LOCK_NAME_LENGTH } from '../../server/domain/lock-names'
 import { runPreflight } from '../../server/entry/preflight'
 import { PROPERTY } from '../../server/domain/properties'
@@ -35,10 +36,10 @@ export const x_daas_ham_job_cursor = Table({
         job: StringColumn({ label: 'Job', maxLength: 100, mandatory: true }),
         cursor: StringColumn({ label: 'Cursor', maxLength: 100 }),
         last_run: DateTimeColumn({ label: 'Last run' }),
-        last_status: StringColumn({ label: 'Last status', maxLength: 255 }),
+        last_status: StringColumn({ label: 'Last status', maxLength: JOB_STATUS_LENGTH }),
         processed_total: IntegerColumn({ label: 'Processed (last run)', default: 0 }),
         failed_total: IntegerColumn({ label: 'Failed (this pass)', default: 0 }),
-        last_error: StringColumn({ label: 'Last error', maxLength: 1000 }),
+        last_error: StringColumn({ label: 'Last error', maxLength: JOB_ERROR_LENGTH }),
     },
     index: [{ name: 'x_daas_ham_jc_job', unique: true, element: 'job' }],
 })

@@ -15,7 +15,7 @@ export function runPreflight(): void {
     for (const item of report.missing) log.error(`preflight: missing ${item}`)
     log.info(`preflight: ${report.summary}`)
 
-    const result = `${report.summary}${report.missing.length ? `: ${report.missing.join('; ')}` : ''}`.slice(0, 255)
+    const result = `${report.summary}${report.missing.length ? `: ${report.missing.join('; ')}` : ''}`
     const refused = recordResult(result)
     if (refused) log.error(`preflight: result not recorded on job cursor preflight: ${refused}`)
 }

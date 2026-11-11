@@ -1,6 +1,12 @@
 import { messageOf } from './errors.ts'
 import { writeHoldingLock, type LockedWrite } from './job-lock.ts'
 
+/** The length of a Job cursor's Last status, which `save` cuts a status to. */
+export const JOB_STATUS_LENGTH = 255
+
+/** The length of a Job cursor's Last error, which `save` cuts an error to. */
+export const JOB_ERROR_LENGTH = 1000
+
 /**
  * Bulk work in bounded chunks with a persistent cursor (ADR 0007).
  *
