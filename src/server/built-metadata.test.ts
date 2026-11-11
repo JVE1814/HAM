@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join, matchesGlob, relative } from 'node:path'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import {
     CURRENT_IS_FLEET,
@@ -109,9 +109,10 @@ function filesUnder(dir: string): string[] {
 
 function sources(): string[] {
     const fluent = filesUnder(join(ROOT, 'src/fluent')).filter((path) => !path.includes('/generated/'))
-    const server = filesUnder(join(ROOT, 'src/server')).filter(
-        (path) => path.endsWith('.ts') && !path.endsWith('.test.ts') && !path.includes('/test-support/'),
-    )
+    const testCode = (JSON.parse(readFileSync(join(ROOT, 'now.config.json'), 'utf8')) as { serverModulesExcludePatterns: string[] })
+        .serverModulesExcludePatterns
+    const isTestCode = (path: string) => testCode.some((pattern) => matchesGlob(relative(join(ROOT, 'src/server'), path), pattern))
+    const server = filesUnder(join(ROOT, 'src/server')).filter((path) => path.endsWith('.ts') && !isTestCode(path))
     return [...fluent, ...server, join(ROOT, 'package.json'), join(ROOT, 'now.config.json')]
 }
 

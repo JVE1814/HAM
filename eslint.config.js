@@ -1,6 +1,7 @@
 import js from '@eslint/js'
 import tseslint from 'typescript-eslint'
 import globals from 'globals'
+import nowConfig from './now.config.json' with { type: 'json' }
 
 const EXTENSIONLESS = {
     regex: '^\\.{1,2}/.*(?<!\\.ts|\\.json)$',
@@ -8,6 +9,9 @@ const EXTENSIONLESS = {
 }
 
 const SERVER_FILES = 'src/server/**/*.{ts,tsx,mts,cts,js,mjs,cjs}'
+
+/** Test code: what the build leaves out of the server modules, so the layer rules do not apply to it. */
+const TEST_CODE = nowConfig.serverModulesExcludePatterns.map((pattern) => `src/server/${pattern}`)
 
 export default tseslint.config(
     {
@@ -45,16 +49,15 @@ export default tseslint.config(
     // The instance stores each server module as a sys_module whose path ends in ".ts" and resolves an import by that
     // exact path, so a relative import without the extension builds and passes every unit test, then fails on the
     // instance the first time its module loads.
-    // src/server/test-support/ is test code like *.test.ts: the build leaves it out (src/server/tsconfig.json).
     {
         files: ['src/server/**/*.ts'],
-        ignores: ['**/*.test.ts', 'src/server/test-support/**'],
+        ignores: TEST_CODE,
         rules: { 'no-restricted-imports': ['error', { patterns: [EXTENSIONLESS] }] },
     },
     // ADR 0003: the layer rules below see only static imports, and only of modules in a layer's folder.
     {
         files: [SERVER_FILES],
-        ignores: ['**/*.test.ts', 'src/server/test-support/**'],
+        ignores: TEST_CODE,
         rules: {
             'no-restricted-syntax': [
                 'error',
@@ -64,7 +67,7 @@ export default tseslint.config(
     },
     {
         files: [SERVER_FILES],
-        ignores: ['**/*.test.ts', 'src/server/{domain,platform,entry,test-support}/**'],
+        ignores: [...TEST_CODE, 'src/server/{domain,platform,entry}/**'],
         rules: {
             'no-restricted-syntax': [
                 'error',
@@ -75,7 +78,7 @@ export default tseslint.config(
     // ADR 0003: the domain core never reaches Glide or the layers above it, and platform never reaches entry.
     {
         files: ['src/server/domain/**/*.ts'],
-        ignores: ['**/*.test.ts'],
+        ignores: TEST_CODE,
         rules: {
             'no-restricted-imports': [
                 'error',
@@ -101,7 +104,7 @@ export default tseslint.config(
     // ADR 0003: an entry module wires triggers to services and is no other entry module's library.
     {
         files: ['src/server/entry/**/*.ts'],
-        ignores: ['**/*.test.ts'],
+        ignores: TEST_CODE,
         rules: {
             'no-restricted-imports': [
                 'error',
