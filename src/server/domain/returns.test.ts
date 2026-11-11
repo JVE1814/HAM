@@ -130,18 +130,17 @@ describe('receivedLate', () => {
 
 describe('overdueStep', () => {
     const due = '2026-12-07'
-    it('does nothing before the due date or once received', () => {
-        expect(overdueStep({ dueDate: due, today: '2026-12-07', graceDays: 14, received: false, escalated: false })).toBe('none')
-        expect(overdueStep({ dueDate: due, today: '2027-02-01', graceDays: 14, received: true, escalated: false })).toBe('none')
+    it('does nothing up to the due date', () => {
+        expect(overdueStep({ dueDate: due, today: '2026-12-07', graceDays: 14, escalated: false })).toBe('none')
     })
 
     it('escalates once when the due date has passed', () => {
-        expect(overdueStep({ dueDate: due, today: '2026-12-08', graceDays: 14, received: false, escalated: false })).toBe('escalate')
-        expect(overdueStep({ dueDate: due, today: '2026-12-08', graceDays: 14, received: false, escalated: true })).toBe('none')
+        expect(overdueStep({ dueDate: due, today: '2026-12-08', graceDays: 14, escalated: false })).toBe('escalate')
+        expect(overdueStep({ dueDate: due, today: '2026-12-08', graceDays: 14, escalated: true })).toBe('none')
     })
 
     it('declares the asset missing after the grace period', () => {
-        expect(overdueStep({ dueDate: due, today: '2026-12-22', graceDays: 14, received: false, escalated: true })).toBe('declare_missing')
+        expect(overdueStep({ dueDate: due, today: '2026-12-22', graceDays: 14, escalated: true })).toBe('declare_missing')
     })
 })
 

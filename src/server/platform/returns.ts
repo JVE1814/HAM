@@ -459,7 +459,7 @@ export function chaseOverdue(): void {
             const returnOrder = findById(RETURN, line.returnOrderId)
             if (!returnOrder) return
             const number = str(returnOrder, 'number')
-            const step = overdueStep({ dueDate: line.dueDate, today, graceDays: grace, received: false, escalated: bool(returnOrder, 'escalated') })
+            const step = overdueStep({ dueDate: line.dueDate, today, graceDays: grace, escalated: bool(returnOrder, 'escalated') })
             if (step === 'escalate') {
                 returnOrder.setValue('escalated', true)
                 returnOrder.setValue('work_notes', `Return overdue since ${line.dueDate}; customer and account manager notified.`)

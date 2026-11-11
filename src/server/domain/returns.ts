@@ -111,8 +111,8 @@ export function returnDueDate(raisedOn: string, allowanceDays: number): string {
 export type OverdueStep = 'none' | 'escalate' | 'declare_missing'
 
 /** What to do about an unreturned Asset today: escalate once after the due date, declare it missing after the grace period. */
-export function overdueStep(input: { dueDate: string; today: string; graceDays: number; received: boolean; escalated: boolean }): OverdueStep {
-    if (input.received || input.today <= input.dueDate) return 'none'
+export function overdueStep(input: { dueDate: string; today: string; graceDays: number; escalated: boolean }): OverdueStep {
+    if (input.today <= input.dueDate) return 'none'
     if (input.today > addDays(input.dueDate, input.graceDays)) return 'declare_missing'
     return input.escalated ? 'none' : 'escalate'
 }
