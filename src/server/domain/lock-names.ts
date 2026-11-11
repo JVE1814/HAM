@@ -64,6 +64,11 @@ export const LOCK = {
     returnAsset: (assetId: string) => named(`return_asset_${assetId}`),
     /** A fee is checked and charged under it: one per fee identity. */
     fee: (fee: FeeIdentity) => named(`fee_${fee.type}_${fee.assetId}_${fee.returnOrderId}`),
+    /**
+     * An audit's scans and its close take turns under it, so a scan lands wholly before the close reads the lines, or
+     * finds the audit closed.
+     */
+    audit: (auditId: string) => named(`audit_${auditId}`),
     /** An exception of one type on one subject (an Asset, or a CI such as a rack) is checked and opened under it. */
     reconException: (type: ExceptionType, subjectId: string) => named(`recon_exception_${type}_${subjectId}`),
     /** A pending Subscription line is started under it: nothing is taken under it. */

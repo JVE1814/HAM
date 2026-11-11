@@ -41,7 +41,10 @@ export function scanAudit(request: RESTAPIRequest, response: RESTAPIResponse): v
     const code = textBodyOf(request).code ?? ''
     if (!audit) return reply(response, 404, { error: 'No open audit with that number' })
     if (!code) return reply(response, 400, { error: 'code is required' })
-    if (recordScan(audit, code)) return reply(response, 422, { error: 'Scan not recorded: the platform refused it; scan it again' })
+    const scan = recordScan(audit, code)
+    if (scan === 'not_open') return reply(response, 404, { error: 'No open audit with that number' })
+    if (scan === 'busy') return reply(response, 503, { error: 'Scan not recorded: the audit is being closed or scanned; scan it again' })
+    if (scan === 'refused') return reply(response, 422, { error: 'Scan not recorded: the platform refused it; scan it again' })
     reply(response, 200, { audit: str(audit, 'number'), scanned: code })
 }
 
@@ -49,6 +52,7 @@ export function uiCloseAudit(current: GlideRecord): void {
     const number = str(current, 'number')
     const close = closeAudit(current)
     if (close.outcome === 'not_open') return void gs.addErrorMessage('Only an open audit of one of your stockrooms can be closed')
+    if (close.outcome === 'busy') return void gs.addErrorMessage(`Audit ${number} not closed: a scan is being recorded; close it again`)
     if (close.outcome === 'not_saved') return void gs.addErrorMessage(`Audit ${number} not closed: ${close.reason}`)
     if (close.unsaved > 0) gs.addErrorMessage(`Audit ${number} closed, but ${close.unsaved} line result(s) or exception(s) were not saved (see the system log)`)
 }

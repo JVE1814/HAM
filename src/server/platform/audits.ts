@@ -2,11 +2,13 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import { AUDIT_STATE, closedLineResult, compareAudit, onTheShelfQuery, type ExpectedAsset } from '../domain/audit.ts'
 import { messageOf } from '../domain/errors.ts'
 import { naasStockroomType, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { SCOPED_TABLES, visibilityFilter } from '../domain/visibility.ts'
 import type { AuditLineResult, AuditType } from '../domain/vocabulary.ts'
 import { nowGlide } from './clock.ts'
 import { hasOpenException, openException } from './exceptions.ts'
 import { openFieldWork } from './field-work.ts'
+import { withLockTries } from './locks.ts'
 import { refusal, str, warnRefused } from './records.ts'
 import { installedAssetIds } from './installed-assets.ts'
 import { currentSession } from './session.ts'
@@ -125,33 +127,57 @@ export function findOpenVisibleAudit(key: string): GlideRecord | null {
     return audit.next() ? audit : null
 }
 
-/** Record one scan against an open audit; why the platform refused it (logged), '' once recorded. */
-export function recordScan(audit: GlideRecord, code: string): string {
-    const line = new GlideRecord(LINE)
-    line.initialize()
-    line.setValue('audit', audit.getUniqueValue())
-    line.setValue('scanned_code', code)
-    const found: AuditLineResult = 'found'
-    line.setValue('result', found)
-    line.setValue('scanned_at', nowGlide())
-    return line.insert() ? '' : warnRefused(line, `Scan of ${code} on audit ${str(audit, 'number')} not recorded`)
+/**
+ * What came of a scan: `recorded`; `not_open` when the audit closed since it was found; `busy` when its close (or
+ * another scan) held its lock through every try; `refused` by the platform (logged).
+ */
+export type ScanRecord = 'recorded' | 'not_open' | 'busy' | 'refused'
+
+/** Record one scan against an open audit, under the audit's lock, which its close takes too. */
+export function recordScan(audit: GlideRecord, code: string): ScanRecord {
+    const auditId = audit.getUniqueValue()
+    const run = withLockTries(LOCK.audit(auditId), (): ScanRecord => {
+        if (!findOpenVisibleAudit(auditId)) return 'not_open'
+        const line = new GlideRecord(LINE)
+        line.initialize()
+        line.setValue('audit', auditId)
+        line.setValue('scanned_code', code)
+        const found: AuditLineResult = 'found'
+        line.setValue('result', found)
+        line.setValue('scanned_at', nowGlide())
+        if (line.insert()) return 'recorded'
+        warnRefused(line, `Scan of ${code} on audit ${str(audit, 'number')} not recorded`)
+        return 'refused'
+    })
+    return run.ran ? run.value : 'busy'
 }
 
 /**
- * How closing an audit ended: `not_open` when it is no open audit the user may work on, and nothing was changed;
- * `not_saved` when the platform refused to close it, and why; else `closed`, with how many line results and exceptions
- * the platform refused (`unsaved`, each logged), to fix by hand.
+ * How closing an audit ended: `not_open` when it is no open audit the user may work on, and `busy` when a scan held
+ * its lock through every try, nothing changed either way; `not_saved` when the platform refused to close it, and why;
+ * else `closed`, with how many line results and exceptions the platform refused (`unsaved`, each logged), to fix by
+ * hand.
  */
-export type AuditClose = { outcome: 'not_open' } | { outcome: 'not_saved'; reason: string } | { outcome: 'closed'; unsaved: number }
+export type AuditClose =
+    | { outcome: 'not_open' }
+    | { outcome: 'busy' }
+    | { outcome: 'not_saved'; reason: string }
+    | { outcome: 'closed'; unsaved: number }
 
 /**
  * Close an audit: compare its scans with its expected list (domain/audit `compareAudit`), save the counts on the audit,
  * give each line its result and raise an exception for each Asset missing. The lines are read once to compare and once
  * to write. The audit is closed first: one the platform refuses to close stays open, to scan and close again, with no
  * line marked and no exception raised for a unit that may still be scanned. A line result or exception then refused is
- * logged and counted, to fix by hand: closing does not run again.
+ * logged and counted, to fix by hand: closing does not run again. It all runs under the audit's lock, so no scan is
+ * recorded between the read of the lines and the close.
  */
 export function closeAudit(audit: GlideRecord): AuditClose {
+    const run = withLockTries(LOCK.audit(audit.getUniqueValue()), () => closeHolding(audit))
+    return run.ran ? run.value : { outcome: 'busy' }
+}
+
+function closeHolding(audit: GlideRecord): AuditClose {
     const auditId = audit.getUniqueValue()
     if (!findOpenVisibleAudit(auditId)) return { outcome: 'not_open' }
     const number = str(audit, 'number')

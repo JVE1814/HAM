@@ -19,7 +19,9 @@
   audit is logged and the user told; the audit stands.
 - Technicians scan in the warehouse app's **Audit** mode. Scans are blind: no unit details are
   shown. A scan the platform refuses to record answers HTTP 422 with a generic message (why is
-  logged), to scan again.
+  logged), to scan again. A scan and **Close audit** of one audit take turns (ADR 0013): a scan sent
+  while the audit closes answers HTTP 503, to scan again, or *No open audit with that number* once
+  it has closed; a close sent while a scan is recorded asks the user to close it again.
 - An inventory tech sees, scans and closes only the blind counts of their Stockrooms; site audits
   are for field techs. Field techs and asset managers scan and close any open audit; other staff
   (NOC, account managers, finance) only read audits. An audit the user may not see answers *No open

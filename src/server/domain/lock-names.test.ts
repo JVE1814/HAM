@@ -24,6 +24,7 @@ function oneOfEach(id: string): string[] {
         LOCK.returnRequest(id),
         LOCK.returnAsset(id),
         LOCK.fee({ ...fee, assetId: id }),
+        LOCK.audit(id),
         LOCK.reconException('rack_overlap', id),
         LOCK.subscriptionLine(id),
         LOCK.serviceInterval(id),
@@ -52,6 +53,7 @@ describe('LOCK', () => {
         expect(LOCK.returnRequest(a)).toBe(`return_request_${a}`)
         expect(LOCK.returnAsset(a)).toBe(`return_asset_${a}`)
         expect(LOCK.fee(fee)).toBe(`fee_late_return_${sysId('a')}_${sysId('r')}`)
+        expect(LOCK.audit(a)).toBe(`audit_${a}`)
         expect(LOCK.reconException('audit_missing', a)).toBe(`recon_exception_audit_missing_${a}`)
         expect(LOCK.reconException('rack_overlap', '')).toBe('recon_exception_rack_overlap_')
         expect(LOCK.subscriptionLine(a)).toBe(`subscription_line_${a}`)

@@ -16,13 +16,13 @@ const visit = vi.hoisted(() => ({ installed: [] as string[], workOrder: 'wo1' as
 
 vi.mock('./session.ts', () => ({ currentSession: () => ({ scope: 'everything', customerId: '', stockroomIds: () => [], siteIds: () => [] }) }))
 vi.mock('./clock.ts', () => ({ nowGlide: () => '2026-11-09 10:00:00' }))
-vi.mock('./locks.ts', () => ({ withLockTries: (_name: string, work: () => void) => work() }))
 vi.mock('./installed-assets.ts', () => ({ installedAssetIds: () => visit.installed }))
 vi.mock('./field-work.ts', () => ({ openFieldWork: () => (visit.workOrder ? { workOrderId: visit.workOrder } : null) }))
 
 const AUDITS = 'x_daas_ham_audit'
 const LINES = 'x_daas_ham_audit_line'
 const EXCEPTIONS = 'x_daas_ham_recon_exception'
+const LOCKS = 'x_daas_ham_job_lock'
 
 const rows = (table: string): Row[] => platform.tables[table] ?? []
 
@@ -51,6 +51,7 @@ const resultOf = (lineId: string) => rows(LINES).find((line) => line.sys_id === 
 
 beforeEach(() => {
     platform.reset()
+    platform.uniqueKeys = { [LOCKS]: 'name' }
     platform.references = { [`${LINES}.asset`]: 'alm_hardware' }
     // What the platform fills in on insert: an audit's number and active flag, an exception's default status.
     platform.defaults = {
@@ -156,11 +157,33 @@ describe('starting an audit', () => {
 describe('recordScan', () => {
     it('records the scan as found, or says why the platform refused it', () => {
         const audit = countedAudit()
-        expect(recordScan(audit, 'FOC222')).toBe('')
+        expect(recordScan(audit, 'FOC222')).toBe('recorded')
         expect(rows(LINES).at(-1)).toMatchObject({ audit: 'audit1', scanned_code: 'FOC222', result: 'found', scanned_at: '2026-11-09 10:00:00' })
-        platform.refuses = () => 'full'
-        expect(recordScan(audit, 'FOC222')).toBe('full')
+        platform.refuses = (table) => (table === LINES ? 'full' : '')
+        expect(recordScan(audit, 'FOC222')).toBe('refused')
         // Logged, naming the code and the audit: the client is not sent why.
         expect(platform.warnings).toEqual([expect.stringMatching(/\bFOC222\b.*\bAUD1\b.*: full$/)])
+    })
+
+    it('records nothing on an audit closed since it was found', () => {
+        const found = countedAudit()
+        expect(closeAudit(record(AUDITS, 'audit1'))).toEqual({ outcome: 'closed', unsaved: 0 })
+        // What the task rule does once a task's state is a closed one.
+        rows(AUDITS)[0].active = 'false'
+        const lines = rows(LINES).length
+        expect(recordScan(found, 'FOC222')).toBe('not_open')
+        expect(rows(LINES)).toHaveLength(lines)
+    })
+})
+
+describe('a scan and a close of one audit', () => {
+    it('take turns under its lock: neither records nor closes anything while the other holds it', () => {
+        const audit = countedAudit()
+        platform.tables[LOCKS] = [{ sys_id: 'lock1', name: 'audit_audit1', sys_created_on: '2025-11-09 12:00:00' }]
+        const lines = rows(LINES).length
+        expect(recordScan(audit, 'FOC222')).toBe('busy')
+        expect(closeAudit(audit)).toEqual({ outcome: 'busy' })
+        expect(rows(LINES)).toHaveLength(lines)
+        expect(rows(AUDITS)[0]).toMatchObject({ active: 'true', state: '2' })
     })
 })

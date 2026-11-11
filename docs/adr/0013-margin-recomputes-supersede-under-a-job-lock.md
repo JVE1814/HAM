@@ -81,8 +81,8 @@ the order under it, and two cancels of one Order exclude each other through `sou
 `refresh_orders` < `agreement_usage` < `oem_claim_run` < `seen_asset` < `receive_serial` <
 `receive_asset` < `source_order` < `ship_order` < `track_shipment` < `return_label` < `order_line` <
 `provider_tag_sequence` < `spare_pool` < `reserve_asset` < `return_request` < `return_asset` <
-`fee` < `recon_exception` < `subscription_line` < `service_interval` < job locks (the margin
-recompute's).
+`fee` < `audit` < `recon_exception` < `subscription_line` < `service_interval` < job locks (the
+margin recompute's).
 
 Only the device-events REST handler and the in-service detection job take `seen_asset_<sys_id>`, and
 they hold no other lock when they do. The go-live under it starts its pending Subscription line
@@ -155,5 +155,12 @@ again, and one whose devices all await a return already raises nothing either. S
 raises one Return order, with one de-install work order and change. Under it, the Return order is
 raised and each unit put on it under its `return_asset_` lock, so `return_request` comes just before
 `return_asset`. Neither is taken under `reserve_asset`, nor takes it, so both come after it.
+
+An audit's scans and *Close audit* take turns under `audit_<audit sys_id>`, each holding no other
+lock when it takes it, so a scan lands wholly before the close reads the lines, or finds the audit
+closed when it reads it again under the lock and records nothing. Both try 5 times back to back: a
+scan held through them answers HTTP 503, to scan again, and a close changes nothing and asks the user
+to close again. Under it, the close raises each *missing in audit* exception under its
+`recon_exception_` lock, so `audit` comes just before `recon_exception`.
 
 Whether the instance behaves as expected is on the first-install checklist.
