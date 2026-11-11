@@ -4,8 +4,6 @@ import { FLEET_CONDITION, fleetStagesQuery } from './fleet.ts'
 import { DEPLOYED_STAGES } from './lifecycle.ts'
 import { STAGE_FIELDS, SUBSCRIPTION_LINE_STATUS, SUBSCRIPTION_LINE_TYPE } from './vocabulary.ts'
 
-/** Billing periods: daily proration of Subscription lines and Fee events (plan §13 Billing export, Q52, Q66). */
-
 /**
  * Why a Billing period cannot be saved for `month` on `today`, or null. The month must be YYYY-MM and over: a new
  * period is generated at once, so one for a month still running would bill part of it, and the monthly job would
@@ -55,7 +53,6 @@ export function intervalEnd(start: string, closedOn: string): string {
     return closedOn < start ? start : closedOn
 }
 
-/** Where an Asset delivers (or delivered) a Subscription line. */
 interface IntervalPlace {
     lineId: string
     siteId: string
@@ -75,7 +72,6 @@ export function restartInterval<Closed extends IntervalPlace & { end: string }>(
     return latest.lineId === place.lineId && latest.siteId === place.siteId ? { reopen: latest } : { start: addDays(latest.end, 1) }
 }
 
-/** What a Subscription line is billed by, as stored on it. */
 export interface SubscriptionLineTerms {
     /** As stored. 'site_package' bills its own dates, 'device_class' its Service intervals; any other value bills nothing. */
     lineType: string
@@ -151,7 +147,6 @@ export interface Charge {
     units: number
     /** To the cent, in `currency`. */
     amount: number
-    /** The line's (its Agreement's) currency. */
     currency: string
 }
 
@@ -195,7 +190,6 @@ function unitsBySite(line: SubscriptionLineTerms, bounds: MonthBounds, sources: 
     return bySite
 }
 
-/** How long a generating Billing period must show no activity before an admin may reset it (Reset generation). */
 export const RESET_AFTER_IDLE_MINUTES = 30
 
 type GenerationReset = { reset: true; idleMinutes: number } | { reset: false; why: string }
@@ -241,7 +235,6 @@ export function monthChangedError(month: string): string {
     return `Month changed to ${month}; its lines are still the old month's: Regenerate before closing`
 }
 
-/** A column of a Billing line, as its exports give it. */
 interface BillingLineColumn<Field extends string = string> {
     field: Field
     /** A reference reads as its display value in the CSV. */
@@ -256,8 +249,7 @@ interface BillingLineColumn<Field extends string = string> {
 
 /**
  * What a Billing line holds besides its period, in the order every export gives it: the CSV attached to a closed
- * period and the pull API's lines are both read off this list (`billingCsvRow`, `billingLineJson`), and a generated
- * line sets these fields (`BillingLineValues`).
+ * period and the pull API's lines are both read off this list.
  */
 const BILLING_LINE_COLUMNS = [
     { field: 'kind', type: 'text', csv: true, json: 'kind' },
@@ -278,7 +270,6 @@ export type BillingLineField = (typeof BILLING_LINE_COLUMNS)[number]['field']
 /** The fields a generated Billing line is given; one left out keeps the column's default. */
 export type BillingLineValues = { readonly [field in BillingLineField]?: string | number }
 
-/** A stored Billing line as an export reads it. */
 export interface StoredBillingLine {
     /** The field's stored value ('' when empty). */
     value(field: BillingLineField): string
@@ -299,12 +290,10 @@ export function billingCsvHeader(): string[] {
     return ['period', ...CSV_COLUMNS.map((column) => column.field)]
 }
 
-/** A Billing line's row in the CSV export of `period` (its YYYY-MM month). */
 export function billingCsvRow(period: string, line: StoredBillingLine): Array<string | number> {
     return [period, ...CSV_COLUMNS.map((column) => (column.type === 'reference' ? line.display(column.field) : storedValue(line, column)))]
 }
 
-/** A Billing line as the pull API gives it. */
 export function billingLineJson(id: string, line: StoredBillingLine): { [key: string]: string | number } {
     const json: { [key: string]: string | number } = { id }
     for (const column of COLUMNS) {
@@ -314,23 +303,19 @@ export function billingLineJson(id: string, line: StoredBillingLine): { [key: st
     return json
 }
 
-/** The pages of the billing pull API: how many periods or lines one gives unless asked for fewer or more, and at most. */
 export const PULL_PAGE = {
     periods: { size: 24, most: 120 },
     lines: { size: 1000, most: 5000 },
 } as const
 
-/** The page size a pull request asks for, from 1 to the page's most. */
 export function pullPageSize(requested: number, page: { most: number }): number {
     return Math.min(Math.max(requested, 1), page.most)
 }
 
-/** A Billing period's lines and their amount in one currency. */
 export interface CurrencyTotal {
     /** As stored on the lines (currencyCode); '' for lines without one. */
     currency: string
     lines: number
-    /** To the cent. */
     amount: number
 }
 

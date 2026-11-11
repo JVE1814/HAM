@@ -1,15 +1,9 @@
 import { INSTALLED_STAGES, type Stage } from './lifecycle.ts'
 import type { FieldPurpose, InstallMode, OrderType } from './vocabulary.ts'
 
-/**
- * Shipping an Order to its Site: when "Ship" is refused, what label it buys and what on-site work it opens, and when
- * install completion takes a replaced Asset out of service (P1.7).
- */
-
 export interface ShipFacts {
     orderType: OrderType
     installMode: InstallMode
-    /** The Order has a carrier and tracking number. */
     hasTrackingNumber: boolean
     /** That tracking number is a label an earlier Ship bought: it covers only the Assets that Ship packed. */
     trackingNumberBought: boolean
@@ -23,11 +17,9 @@ export interface ShipFacts {
     refusedReason: string
     /** The Order's Assets in 'spare_pool' that the lifecycle lets ship: hot spares already at the Site, handed over. */
     hotSpares: number
-    /** The shipping aggregator is on. */
     shippingEnabled: boolean
 }
 
-/** What the on-site work an Order opens is for: installing its units, or swapping them for those they replace. */
 const ORDER_WORK_PURPOSES = ['install', 'swap'] as const satisfies readonly FieldPurpose[]
 
 /** The change request and FSM work order to open at the Site (Q57). */
@@ -48,7 +40,6 @@ export function installsOrder(purpose: string): boolean {
  */
 export type ShipPlan = { errors: string[] } & ({ ok: false } | { ok: true; labelPackages: number | null; onSiteWork: OnSiteWork | null })
 
-/** What "Ship" does for an Order: refuse, buy a label for N packages, open on-site work. Total, no I/O. */
 export function planShipment(facts: ShipFacts): ShipPlan {
     const refusals = facts.refused > 0 ? [`${facts.refused} asset(s) cannot ship: ${facts.refusedReason}`] : []
     if (facts.staged + facts.hotSpares === 0) {
@@ -69,7 +60,6 @@ export function planShipment(facts: ShipFacts): ShipPlan {
     }
 }
 
-/** A device replace is a routine (standard) change; device replace and refresh swap Assets, the rest install them. */
 function onSiteWork({ orderType, installMode }: ShipFacts): OnSiteWork {
     return {
         changeType: orderType === 'device_replace' ? 'standard' : 'normal',
@@ -78,7 +68,6 @@ function onSiteWork({ orderType, installMode }: ShipFacts): OnSiteWork {
     }
 }
 
-/** A line that replaces an Asset (break-fix, refresh): its quantity and the stages of the units allocated to it. */
 export interface ReplacementLine {
     quantity: number
     assetStages: ReadonlyArray<Stage | null>

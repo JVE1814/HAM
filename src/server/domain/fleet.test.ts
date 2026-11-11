@@ -79,7 +79,6 @@ const typesFound = (condition: string, via = '') => STOCKROOM_TYPES.filter((type
  * function the server code uses: the two forms must say the same.
  */
 describe('the conditions the metadata imports', () => {
-    /** Whether a script condition holds for `current`, a record with these field values. */
     const holds = (condition: string, current: Record<string, unknown>) => new Function('current', `return ${condition}`)(current) as boolean
 
     it('find the NaaS stockrooms: those of a NaaS type, and none with another type or without one', () => {

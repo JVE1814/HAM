@@ -4,8 +4,6 @@ import { inFleet } from './fleet.ts'
 import { notRetiredCondition } from './lifecycle.ts'
 import type { LeaseEndAction } from './vocabulary.ts'
 
-/** Lease schedules and end-of-lease decisions (plan §13 Leases). */
-
 /**
  * `leaseCondition` (an encoded query on the Asset's lease) narrowed to the fleet assets (ADR 0016) the lease still
  * covers. A retired unit (returned to the Lessor or the OEM, disposed of) keeps its lease as history, but is no longer
@@ -28,7 +26,6 @@ export function leaseMismatch(leaseEnd: string, serviceEnds: readonly string[]):
 /** How long after its end an undecided lease is still reviewed: its mismatch flagged, a decision raised for it. */
 const REVIEWED_DAYS_PAST_END = 30
 
-/** The earliest end date of the undecided leases the daily review on `today` still looks at. */
 export function earliestReviewedEnd(today: string): string {
     return addDays(today, -REVIEWED_DAYS_PAST_END)
 }
@@ -100,7 +97,6 @@ export function evenShare(amount: number, count: number): number {
     return count > 0 ? amount / count : 0
 }
 
-/** An amount split to the cent over a number of Assets: each gets `share`, and the first `extra` of them one cent more. */
 export interface EvenSplit {
     share: number
     extra: number

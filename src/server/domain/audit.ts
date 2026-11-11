@@ -5,12 +5,8 @@ import type { Stage } from './lifecycle.ts'
 import { normalizeSerial } from './serials.ts'
 import { INSTALL_STATUS, TASK_STATE, type AuditLineResult } from './vocabulary.ts'
 
-/** Audits (blind counts, site audits) and Attestations (P2.7, Q63). */
-
-/** The task states an audit takes: in progress from the moment it is started, closed once its scans are compared. */
 export const AUDIT_STATE = { inProgress: TASK_STATE.workInProgress, closed: TASK_STATE.closedComplete } as const
 
-/** The task states an attestation takes: pending while its Assets are listed, open to answer, closed once attested. */
 export const ATTESTATION_STATE = { pending: TASK_STATE.pending, open: TASK_STATE.open, closed: TASK_STATE.closedComplete } as const
 
 /**
@@ -33,12 +29,10 @@ const ON_THE_SHELF: readonly Stage[] = [
     'in_transfer',
 ]
 
-/** Encoded alm_hardware query: the fleet assets on the shelves of the stockroom, In stock by install status, in one of the ON_THE_SHELF stages. */
 export function onTheShelfQuery(stockroomId: string): string {
     return fleetStagesQuery(ON_THE_SHELF, `stockroom=${stockroomId}^install_status=${INSTALL_STATUS.inStock}`)
 }
 
-/** An expected Asset and what it carries in each field a scan may name it by (domain/asset-identifier). */
 export type ExpectedAsset = { assetId: string } & Readonly<Record<IdentifierColumn, string>>
 
 export interface AuditComparison {

@@ -1,6 +1,6 @@
 /**
  * Job locks (ADR 0013), the part that needs no platform: how a take is tried again, what a holder does with the lock it
- * holds, and the numbers the retries share. platform/locks.ts supplies the lock rows; domain/lock-names.ts names them.
+ * holds, and the numbers the retries share.
  */
 
 /**
@@ -23,7 +23,6 @@ export const LONG_HOLD_LOCK_TRIES = 10
  */
 export const REQUEUE = { delaySeconds: 60, times: 15 } as const
 
-/** What `work` returns to give its try at a lock up (see `attemptUnderLock`). */
 export const TRY_AGAIN = { tryAgain: true } as const
 
 export type TryAgain = typeof TRY_AGAIN
@@ -34,7 +33,6 @@ export interface LateSave {
     level?: 'warn' | 'error'
 }
 
-/** What became of a write made through a held lock: not made, the lock lost before it, or made, perhaps while losing it. */
 export type HeldWrite<T> = { written: false } | { written: true; value: T; lockLost: boolean }
 
 export type LockedSave = 'saved' | 'refused' | 'lock lost'
@@ -63,10 +61,8 @@ export interface HeldLock {
     lostAfter(done: string, late?: LateSave): boolean
 }
 
-/** What became of a try at running work under a lock: it ran, other holders kept the lock, or the lock could not be taken. */
 export type LockAttempt<T> = { ran: true; value: T } | { ran: false; held: true } | { ran: false; held: false; error: unknown }
 
-/** The lock rows, and the log a late save is written to. */
 export interface LockPorts {
     /** Take the lock `name`: its id, or null while another holder has it. Throws when it cannot be taken for another reason. */
     take(name: string): string | null
@@ -142,7 +138,6 @@ function heldLock(ports: LockPorts, name: string, lockId: string): HeldLock {
     }
 }
 
-/** A write made under a lock: whether the lock was held throughout, and what the write returned or, the lock lost, threw. */
 export type LockedWrite<T> =
     | { lock: 'held'; value: T }
     | { lock: 'lost'; threw: false; value: T }

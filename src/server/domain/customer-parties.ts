@@ -15,7 +15,6 @@ export interface NamedRecord {
     customerId: string | null
 }
 
-/** A location a request names as its Site, and whether it is a Site at all. */
 export type NamedSite = NamedRecord & { isSite: boolean }
 
 /**
@@ -53,12 +52,10 @@ function notOwn(noun: 'agreement' | 'site', customerId: string, record: NamedRec
     return genuine && record.customerId === customerId ? null : `The ${noun} is not one of the customer's ${noun}s`
 }
 
-/** Why the Agreement a request names is not one of the Customer's, or null when it is. */
 export function agreementFinding(customerId: string, agreement: NamedRecord | undefined): string | null {
     return notOwn('agreement', customerId, agreement, true)
 }
 
-/** Why the location a request names is not one of the Customer's Sites, or null when it is. */
 export function siteFinding(customerId: string, site: NamedSite | undefined): string | null {
     return notOwn('site', customerId, site, !!site?.isSite)
 }

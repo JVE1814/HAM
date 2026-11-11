@@ -75,7 +75,6 @@ export interface EntitlementAssessment {
     findings: string[]
 }
 
-/** Whether the Customer's catalog offers the entry on `today`: it is active and inside its validity dates. */
 export function isCurrent(entry: CatalogEntryView, today: string): boolean {
     if (!entry.active) return false
     if (entry.validFrom && entry.validFrom > today) return false
@@ -134,23 +133,19 @@ export interface Orderer {
 const RAISING_ORDERS: ActWording = { act: 'raise orders', actForOwn: 'order' }
 
 /**
- * Why this person may not raise an Order for the Customer, or null when they may (domain/customer-parties
- * `actorRefusal`): only Order raisers raise Orders, a customer admin only for their own Customer.
+ * Why this person may not raise an Order for the Customer, or null when they may: only Order raisers raise Orders, a
+ * customer admin only for their own Customer.
  */
 export function raiserRefusal(customerId: string, orderer: Orderer): string | null {
     return actorRefusal(customerId, { ...orderer, permitted: orderer.mayRaise }, RAISING_ORDERS)
 }
 
-/** Whether the Order names no Site template, or one offered to its Customer or to every Customer. */
 export function siteTemplateOffered(order: OrderParties): boolean {
     const offeredTo = order.siteTemplate?.customerId
     return !order.siteTemplate || offeredTo === '' || offeredTo === order.customerId
 }
 
-/**
- * Why an Order cannot go ahead as raised; empty when it can. The person must be allowed to raise it for its Customer
- * (`raiserRefusal`), its Agreement and Site must be the Customer's own, and its Site template one offered to it.
- */
+/** Why an Order cannot go ahead as raised; empty when it can. */
 export function ownershipFindings(order: OrderParties, orderer: Orderer): string[] {
     const refusal = raiserRefusal(order.customerId, orderer)
     if (refusal) return [refusal]
@@ -195,7 +190,6 @@ export function readsUsage(lines: readonly RequestedLine[]): boolean {
 /** Order stages whose lines use nothing of an Agreement: a draft is not asked for yet, and one that ended unfulfilled never will be. */
 const NOT_YET_LIVE_OR_UNFULFILLED: readonly OrderStage[] = [ORDER_STAGE.draft, ...UNFULFILLED_ORDER_STAGES]
 
-/** Encoded query on x_daas_ham_order_line: the Agreement's open lines on live Orders other than `excludeOrderId`. */
 export function inFlightLinesQuery(agreementId: string, excludeOrderId: string): string {
     return `order.agreement=${agreementId}^order!=${excludeOrderId}^order.stageNOT IN${NOT_YET_LIVE_OR_UNFULFILLED.join(',')}^line_stageIN${OPEN_LINE_STAGES.join(',')}`
 }

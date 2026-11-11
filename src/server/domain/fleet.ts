@@ -49,10 +49,7 @@ export function outsideFleetCondition(via = ''): string {
     return `${flag}=false^OR${flag}ISEMPTY`
 }
 
-/**
- * `query` kept to fleet assets: the fleet condition is ANDed into every top-level `^NQ` clause, as a condition
- * appended after `^NQ` would bind to the last clause only. An empty query becomes the fleet condition alone.
- */
+/** `query` kept to fleet assets. An empty query becomes the fleet condition alone. */
 export function inFleet(query: string, via = ''): string {
     return andEachClause(query, fleetCondition(via))
 }
@@ -96,7 +93,6 @@ export const NAAS_STOCKROOM_CONDITION = `${STOCKROOM_TYPE_FIELD}IN${STOCKROOM_TY
 /** The same as a script condition on `current`, a Stockroom (domain/fleet.test.ts holds it to the list above too). */
 export const CURRENT_IS_NAAS_STOCKROOM = `current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.central_depot}' || current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.staging_centre}' || current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.customer_site}'`
 
-/** The NaaS stockroom type `value` (a stored type) names, or null for a stockroom outside NaaS. */
 export function naasStockroomType(value: string): StockroomType | null {
     return NAAS_STOCKROOM_TYPES.find((type) => type === value) ?? null
 }
@@ -132,7 +128,6 @@ export const OEM_PID_FIELD = 'x_daas_ham_oem_pid'
 /** The Model's OEM vendor (vocabulary `OEM_VENDOR_CHOICES`): whose API or CSV import its data comes from. */
 export const OEM_SOURCE_FIELD = 'x_daas_ham_oem_source'
 
-/** Encoded condition matching NaaS Models, on cmdb_model itself. */
 export const NAAS_MODEL_CONDITION = `${OEM_PID_FIELD}ISNOTEMPTY`
 
 /**
@@ -162,10 +157,8 @@ export function naasModelCondition(via = ''): string {
  */
 export const SITE_FIELD = 'x_daas_ham_is_site'
 
-/** Encoded condition matching customer Sites, on cmn_location itself. */
 export const SITE_CONDITION = `${SITE_FIELD}=true`
 
-/** The same as a script condition on `current`, a Location. */
 export const CURRENT_IS_SITE = `current.${SITE_FIELD} == true`
 
 /** A Customer's Sites, once the Customer's sys_id is appended: what a Site picker's qualifier completes. */

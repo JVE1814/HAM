@@ -10,7 +10,6 @@ import type { InstallMode, OrderStage } from './vocabulary.ts'
 export interface InstallState {
     stage: OrderStage
     installMode: InstallMode
-    /** How many of its units are shipped (`awaitsInstall`): read only for an Order held back before installing. */
     shippedUnits(): number
 }
 
@@ -29,10 +28,6 @@ export function awaitsInstall(stage: Stage | null): boolean {
  */
 const HELD_BACK: readonly string[] = ['preparing', 'delivering']
 
-/**
- * Whether the Order has equipment at its Site to confirm installed: it is installing, or a line not shipped yet holds
- * it back while units already shipped wait there. Confirming installs only those; the line waits for its own units.
- */
 export function beingInstalled(order: InstallState): boolean {
     return order.stage === 'installing' || (HELD_BACK.includes(order.stage) && order.shippedUnits() > 0)
 }
@@ -47,12 +42,10 @@ export function awaitsSelfInstallConfirmation(order: InstallState): boolean {
  */
 export type InstallConfirmer = 'staff' | 'customer'
 
-/** Staff are the users who see every Customer; everyone else confirms as a Customer contact does. */
 export function confirmerFor(scope: VisibilityScope): InstallConfirmer {
     return scope === 'everything' ? 'staff' : 'customer'
 }
 
-/** Why a confirmation is refused: no shipped unit waits at the Site, or the install is not the Customer's own. */
 export type InstallRefusal = 'nothing_waiting' | 'not_self_install'
 
 export function installRefusal(confirmer: InstallConfirmer, order: InstallState): InstallRefusal | null {

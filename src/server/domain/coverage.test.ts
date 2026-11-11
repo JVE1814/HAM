@@ -195,7 +195,6 @@ describe('coverageBySerial', () => {
 
 describe('staleCoverageQuery', () => {
     const query = staleCoverageQuery('cisco', '2026-11-01 00:00:00')
-    /** A Cisco fleet asset in service with a serial, its coverage never checked. */
     const unchecked = assetIn('in_service', { x_daas_ham_fleet: 'true', 'model.x_daas_ham_oem_source': 'cisco', serial_number: 'FOC1', x_daas_ham_coverage_checked: '' })
 
     it("asks again for a vendor's fleet assets never checked, or last checked before the cut-off", () => {

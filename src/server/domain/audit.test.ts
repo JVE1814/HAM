@@ -81,7 +81,6 @@ describe('closedLineResult', () => {
 
 describe('onTheShelfQuery', () => {
     const query = onTheShelfQuery('sr1')
-    /** A fleet asset in stockroom sr1, in `stage`. */
     const unit = (stage: Stage, fields: SampleRecord = {}) => assetIn(stage, { x_daas_ham_fleet: 'true', stockroom: 'sr1', ...fields })
     const expected = (fields: SampleRecord = {}) => ALL_STAGES.filter((stage) => matches(query, unit(stage, fields)))
 

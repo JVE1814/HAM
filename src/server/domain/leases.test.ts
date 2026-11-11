@@ -152,7 +152,6 @@ describe('evenShare', () => {
 })
 
 describe('evenSplit', () => {
-    /** The shares an amount split by evenSplit gives, the first `extra` one cent more. */
     function shares(amount: number, count: number): number[] {
         const split = evenSplit(amount, count)
         return Array.from({ length: count }, (_, i) => (i < split.extra ? Math.round(split.share * 100 + 1) / 100 : split.share))

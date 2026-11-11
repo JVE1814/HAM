@@ -45,7 +45,6 @@ export function daysBetween(from: string, to: string): number {
     return Math.round((toEpoch(to) - toEpoch(from)) / DAY_MS)
 }
 
-/** True once `today` is within `leadDays` of `endDate` (or past it); never without an end date. */
 export function withinLead(endDate: string, today: string, leadDays: number): boolean {
     return !!endDate && today >= addDays(endDate, -Math.max(0, leadDays))
 }
