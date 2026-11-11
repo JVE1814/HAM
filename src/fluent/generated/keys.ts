@@ -1151,6 +1151,10 @@ declare global {
                         table: 'sys_atf_step'
                         id: '3c7acb099fd34fe0b26a54d1c8bace79'
                     }
+                    atf_crr_asset_manager: {
+                        table: 'sys_atf_step'
+                        id: '7b3d41e6a2584c6dae7b1639da4381a1'
+                    }
                     atf_crr_asset_unlisted: {
                         table: 'sys_atf_step'
                         id: '22310dafcc4d4ffd9930c3fab098a4f7'
@@ -1178,6 +1182,10 @@ declare global {
                     atf_crr_impersonate_contact: {
                         table: 'sys_atf_step'
                         id: '07c2c40f869241c0b980e496a66743bc'
+                    }
+                    atf_crr_impersonate_manager: {
+                        table: 'sys_atf_step'
+                        id: '795b0749963b48f08eb2219565407567'
                     }
                     atf_crr_model: {
                         table: 'sys_atf_step'
@@ -8089,6 +8097,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_variable_value'
+                        id: '0ebe7b918c914e47bf4321c970c866af'
+                        key: {
+                            document_key: '7b3d41e6a2584c6dae7b1639da4381a1'
+                            variable: 'b27b2b29ff6033008d3f5d9ad53bf164'
+                        }
+                    },
+                    {
                         table: 'sys_ui_element'
                         id: '0eda8e6d52084f00923d68fd54de20ce'
                         key: {
@@ -13109,6 +13125,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_variable_value'
+                        id: '26da1d40bd254359af5dd6fb58a82998'
+                        key: {
+                            document_key: '7b3d41e6a2584c6dae7b1639da4381a1'
+                            variable: '98c44875ffa033008d3f5d9ad53bf1fa'
+                        }
+                    },
+                    {
                         table: 'sys_element_mapping'
                         id: '26db247007814dd4ac228364a80dd2b1'
                         key: {
@@ -17890,6 +17914,14 @@ declare global {
                         key: {
                             document_key: '40c22d1f395141f9894b994ea874e6b7'
                             variable: 'dd54cf535320220002c6435723dc34fd'
+                        }
+                    },
+                    {
+                        table: 'sys_variable_value'
+                        id: '3bede0647c0d4141a7e59b844ed8f742'
+                        key: {
+                            document_key: '7b3d41e6a2584c6dae7b1639da4381a1'
+                            variable: '8c07aba5ff6033008d3f5d9ad53bf13b'
                         }
                     },
                     {
@@ -39755,6 +39787,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_variable_value'
+                        id: '9f5397e713cc41cd9ab2a203534698ce'
+                        key: {
+                            document_key: '7b3d41e6a2584c6dae7b1639da4381a1'
+                            variable: 'ff06ab840f20101091d0f00c97767e6d'
+                        }
+                    },
+                    {
                         table: 'sys_element_mapping'
                         id: '9f55c2c118fd40649e7c381f62e7ebfb'
                         key: {
@@ -42843,6 +42883,14 @@ declare global {
                     },
                     {
                         table: 'sys_variable_value'
+                        id: 'ada5de70b86d4bcfac8a811b744a10ce'
+                        key: {
+                            document_key: '7b3d41e6a2584c6dae7b1639da4381a1'
+                            variable: '1985e0ceff2433008d3f5d9ad53bf1ba'
+                        }
+                    },
+                    {
+                        table: 'sys_variable_value'
                         id: 'adabee95a0174ce7ad6daa2f532f16e7'
                         key: {
                             document_key: '81a8aeda19d745ad8600fe392d4badd7'
@@ -42913,6 +42961,14 @@ declare global {
                         key: {
                             document_key: '0a9b8c00138147429f0dd3c231d4d398'
                             variable: 'b86c0427531000109e02ddeeff7b1227'
+                        }
+                    },
+                    {
+                        table: 'sys_variable_value'
+                        id: 'ae9ce707356c4eb39e3047a9e4a182be'
+                        key: {
+                            document_key: '7b3d41e6a2584c6dae7b1639da4381a1'
+                            variable: '6f69fc4aff6433008d3f5d9ad53bf18c'
                         }
                     },
                     {
@@ -51626,6 +51682,14 @@ declare global {
                     },
                     {
                         table: 'sys_variable_value'
+                        id: 'd7fe1d6d95244445bc055928eb05e7c7'
+                        key: {
+                            document_key: '7b3d41e6a2584c6dae7b1639da4381a1'
+                            variable: '1778a7480f20101091d0f00c97767e03'
+                        }
+                    },
+                    {
+                        table: 'sys_variable_value'
                         id: 'd80f00b88e3647f3a6b49af7aa2cee36'
                         key: {
                             document_key: 'c373211e9e514301b95c0cc0172bceef'
@@ -56552,6 +56616,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_variable_value'
+                        id: 'f2c7c951cfe145c3a77806095caa854a'
+                        key: {
+                            document_key: '795b0749963b48f08eb2219565407567'
+                            variable: '586e2c4253e0220002c6435723dc3415'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'f2d711fb68e64927abbfd362701fae7b'
                         key: {
@@ -59061,6 +59133,15 @@ declare global {
                             name: 'change_request'
                             element: 'x_daas_ham_audit'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_element_mapping'
+                        id: 'ffacc9806a734326bce17a37033cc2b5'
+                        key: {
+                            id: '795b0749963b48f08eb2219565407567'
+                            table: 'var__m_atf_input_variable_071ee5b253331200040729cac2dc348d'
+                            field: 'user'
                         }
                     },
                     {

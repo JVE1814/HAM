@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { Test } from '@servicenow/sdk/core'
 import { DEVICE_CLASS, INSTALL_STATUS, LEGAL_OWNER, STAGE_FIELDS, STOCKROOM_TYPE } from '../../server/domain/vocabulary'
-import { customerAdmin, inventoryTech, siteContact } from '../shared/roles.now'
+import { assetManager, customerAdmin, inventoryTech, siteContact } from '../shared/roles.now'
 
 /*
  * ATF: depot evaluation routing (Q60), on fleet assets: the app moves those only (ADR 0016; suite "NaaS - P2").
@@ -303,6 +303,15 @@ export const customerReturnRequestTest = Test(
     }
 })(outputs, steps, params, stepResult, assertEqual);`,
         })
+        // A customer reads no Asset's stage (fleet/access.now.ts), so the provider checks the outcome.
+        const manager = atf.server.createUser({
+            $id: Now.ID['atf_crr_asset_manager'],
+            firstName: 'ATF',
+            lastName: 'Returns Asset Manager',
+            roles: [assetManager],
+            impersonate: false,
+        })
+        atf.server.impersonate({ $id: Now.ID['atf_crr_impersonate_manager'], user: manager.user })
         // decommission: true returns everything installed at the Site, whatever the request lists.
         atf.server.recordValidation({
             $id: Now.ID['atf_crr_validate_listed'],
