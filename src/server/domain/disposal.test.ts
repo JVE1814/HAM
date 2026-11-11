@@ -70,9 +70,14 @@ describe('how an Asset may leave, by its legal owner', () => {
         expect(retire(owner, method)).toEqual({ allowed: true })
     })
 
+    const REFUSAL: Record<LegalOwner, string> = {
+        provider: 'a provider-owned asset can only be broker resale or oem takeback or itad recycle',
+        customer: 'a customer-owned asset can only be return to customer',
+        lessor: 'a lessor-owned asset can only be return to lessor',
+    }
+
     it.each(pairs.filter((pair) => !pair.open))('refuses a $owner-owned asset leaving by $method: the line is blocked and the move refused', ({ owner, method }) => {
-        const allowed = OPEN_TO[owner].map((m) => m.replace(/_/g, ' ')).join(' or ')
-        expect(disposalLineBlockers(line(owner, method))).toEqual([`a ${owner}-owned asset can only be ${allowed}`])
+        expect(disposalLineBlockers(line(owner, method))).toEqual([REFUSAL[owner]])
         expect(retire(owner, method).allowed).toBe(false)
     })
 

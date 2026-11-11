@@ -10,10 +10,7 @@ import {
     decideGenerationReset,
     IN_SERVICE_ON_ENDED_LINE,
     IN_SERVICE_UNBILLED,
-    NO_LINE,
-    ON_ENDED_LINE,
     intervalEnd,
-    prorate,
     PULL_PAGE,
     pullPageSize,
     resetGenerationError,
@@ -23,14 +20,12 @@ import {
     subscriptionCharges,
     toCsv,
     totalsText,
-    withinLine,
     type BillingLineField,
     type ChargeSources,
     type ServiceInterval,
     type StoredBillingLine,
 } from './billing'
 import { monthBounds, previousMonth } from './money'
-import { fleetStagesQuery } from './fleet'
 import { ALL_STAGES, IN_USE_STAGES, type Stage } from './lifecycle'
 import { recordMatches as matches } from '../test-support/encoded-query'
 import { assetIn, type SampleRecord } from '../test-support/stored-asset'
@@ -69,27 +64,6 @@ describe('intervalEnd', () => {
 
     it('never ends one before it started', () => {
         expect(intervalEnd('2026-11-10', '2026-11-07')).toBe('2026-11-10')
-    })
-})
-
-describe('prorate', () => {
-    it('charges the share of the month, to the cent', () => {
-        expect(prorate(45, 30, 30)).toBe(45)
-        expect(prorate(45, 10, 30)).toBe(15)
-        expect(prorate(100, 1, 31)).toBe(3.23)
-    })
-
-    it('rounds a charge of exactly half a cent up, which binary floats would round down', () => {
-        // 0.29 x 14 / 28 = 0.145 and 0.7 x 3 / 28 = 0.075, yet (0.29 * 14 * 100) / 28 is 14.499999999999998 in floats.
-        expect(prorate(0.29, 14, 28)).toBe(0.15)
-        expect(prorate(0.7, 3, 28)).toBe(0.08)
-        expect(prorate(10.05, 1, 2)).toBe(5.03)
-        expect(prorate(-0.29, 14, 28)).toBe(-0.15)
-    })
-
-    it('stays exact for large rates and many device-days', () => {
-        expect(prorate(123456.78, 31 * 400, 31)).toBe(49382712)
-        expect(prorate(45, 0, 30)).toBe(0)
     })
 })
 
@@ -306,15 +280,41 @@ describe('subscriptionCharges', () => {
         ])
     })
 
-    it('bills nothing for a per-device line without a start date, as for a site package', () => {
+    it('bills nothing for a per-device line without a start date, as for a site package, nor for an interval without one', () => {
         const { start: _start, ...unstarted } = perDevice
         expect(subscriptionCharges(unstarted, nov, sources([{ siteId: 'hq', start: '2026-11-01' }]))).toEqual([])
+        expect(subscriptionCharges(perDevice, nov, sources([{ siteId: 'hq', start: '' }]))).toEqual([])
     })
 
     it('bills nothing for an unknown line type, whatever Service intervals it is given, and reads no Site name', () => {
         const read = sources([{ siteId: 'hq', start: '2026-11-01' }])
         expect(subscriptionCharges({ ...perDevice, lineType: 'per_seat', siteId: 'hq', start: '2026-11-01' }, nov, read)).toEqual([])
         expect(read.siteReads).toBe(0)
+    })
+})
+
+describe('the amount of a charge', () => {
+    const sitePackage = { lineType: 'site_package', currency: 'EUR', siteId: '', description: 'Site package' }
+    const amounts = (monthlyRate: number, month: string, start: string) =>
+        subscriptionCharges({ ...sitePackage, monthlyRate, start }, monthBounds(month), sources()).map((charge) => charge.amount)
+
+    it('is the share of the month the line ran, to the cent', () => {
+        expect(amounts(45, '2026-11', '2026-01-01')).toEqual([45])
+        expect(amounts(45, '2026-11', '2026-11-21')).toEqual([15])
+        expect(amounts(100, '2026-12', '2026-12-31')).toEqual([3.23])
+    })
+
+    it('rounds a charge of exactly half a cent up, which binary floats would round down', () => {
+        // 0.29 x 14 / 28 = 0.145 and 0.7 x 3 / 28 = 0.075, yet (0.29 * 14 * 100) / 28 is 14.499999999999998 in floats.
+        expect(amounts(0.29, '2026-02', '2026-02-15')).toEqual([0.15])
+        expect(amounts(0.7, '2026-02', '2026-02-26')).toEqual([0.08])
+        expect(amounts(-0.29, '2026-02', '2026-02-15')).toEqual([-0.15])
+    })
+
+    it('stays exact for large rates and many device-days', () => {
+        const core = { lineType: 'device_class', monthlyRate: 123456.78, currency: 'EUR', siteId: '', description: 'Core', start: '2026-01-01' }
+        const charges = subscriptionCharges(core, monthBounds('2026-12'), sources([{ siteId: 'hq', start: '2026-01-01', count: 400 }]))
+        expect(charges.map((charge) => [charge.units, charge.amount])).toEqual([[31 * 400, 49382712]])
     })
 })
 
@@ -356,25 +356,18 @@ describe('restartInterval', () => {
     })
 })
 
-describe('withinLine', () => {
-    const line = { start: '2026-11-10', end: '2026-11-20' }
+describe('IN_SERVICE_UNBILLED', () => {
+    const flagged = (asset: SampleRecord) => matches(IN_SERVICE_UNBILLED, asset)
+    const unbilled = (stage: Stage, fields: SampleRecord = {}) => assetIn(stage, { x_daas_ham_fleet: 'true', x_daas_ham_subscription_line: '', ...fields })
 
-    it('cuts a Service interval to its line start and end date, both billed', () => {
-        expect(withinLine({ start: '2026-02-01' }, line)).toEqual({ start: '2026-11-10', end: '2026-11-20' })
-        expect(withinLine({ start: '2026-11-12', end: '2026-11-14' }, line)).toEqual({ start: '2026-11-12', end: '2026-11-14' })
-        expect(withinLine({ start: '2026-11-20', end: '2026-12-31' }, line)).toEqual({ start: '2026-11-20', end: '2026-11-20' })
+    it('flags fleet assets in service on no Subscription line', () => {
+        expect(ALL_STAGES.filter((stage) => flagged(unbilled(stage)))).toEqual(['in_service'])
     })
 
-    it('leaves an interval open on a line without an end date', () => {
-        expect(withinLine({ start: '2026-11-12' }, { start: '2026-11-10' })).toEqual({ start: '2026-11-12', end: undefined })
-        expect(withinLine({ start: '2026-11-01', end: '2026-11-05' }, { start: '2026-10-01' })).toEqual({ start: '2026-11-01', end: '2026-11-05' })
-    })
-
-    it('bills nothing outside the line, or on a line not started', () => {
-        expect(withinLine({ start: '2026-11-21' }, line)).toBeNull()
-        expect(withinLine({ start: '2026-10-01', end: '2026-11-09' }, line)).toBeNull()
-        expect(withinLine({ start: '2026-11-12' }, {})).toBeNull()
-        expect(withinLine({ start: '' }, line)).toBeNull()
+    it("leaves out an asset on a line, and the Provider IT's (ADR 0016)", () => {
+        expect(flagged(unbilled('in_service', { x_daas_ham_subscription_line: 'sl1' }))).toBe(false)
+        expect(flagged(unbilled('in_service', { x_daas_ham_fleet: 'false' }))).toBe(false)
+        expect(flagged(unbilled('in_service', { x_daas_ham_fleet: '' }))).toBe(false)
     })
 })
 
@@ -397,15 +390,10 @@ describe('IN_SERVICE_ON_ENDED_LINE', () => {
         expect(flagged(billed('active', '2027-01-31'))).toBe(false)
     })
 
-    it("leaves out an asset that is not billed, and the Provider IT's (ADR 0016)", () => {
-        for (const stage of ['pending_in_service', 'pending_return', 'shipped'] as const) expect(flagged({ ...billed('ended', ''), ...assetIn(stage) }), stage).toBe(false)
+    it("leaves out an asset in no stage in use, which is not billed, and the Provider IT's (ADR 0016)", () => {
+        expect(ALL_STAGES.filter((stage) => flagged({ ...billed('ended', ''), ...assetIn(stage) }))).toEqual([...IN_USE_STAGES])
         expect(flagged({ ...billed('ended', ''), x_daas_ham_fleet: 'false' })).toBe(false)
         expect(flagged({ ...billed('active', '2026-11-08'), ...assetIn('temporary_deployment'), x_daas_ham_fleet: '' })).toBe(false)
-    })
-
-    it('is, like the unbilled tile, the query the server would build: the dashboard imports the constant', () => {
-        expect(IN_SERVICE_ON_ENDED_LINE).toBe(fleetStagesQuery(IN_USE_STAGES, ON_ENDED_LINE))
-        expect(IN_SERVICE_UNBILLED).toBe(fleetStagesQuery(['in_service'], NO_LINE))
     })
 })
 

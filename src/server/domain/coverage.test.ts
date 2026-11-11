@@ -51,8 +51,7 @@ describe('coverageSummary', () => {
             '2026-11-07',
         )
         expect(summary).toEqual({ coveredToday: true, coverageEnd: OPEN_ENDED_COVERAGE_END, serviceLevel: 'Mist support' })
-        // Read as covered where an Asset's coverage end is compared with today (break-fix routing, the rack risk view).
-        expect(summary.coverageEnd >= '2026-11-07').toBe(true)
+        expect(withoutCoverage(summary.coverageEnd, '2026-11-07')).toBe(false)
     })
 
     it('leaves a contract without an end date that does not cover out', () => {
