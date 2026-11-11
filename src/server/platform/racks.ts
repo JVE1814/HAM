@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { FLEET_CONDITION, SITE_CONDITION } from '../domain/fleet.ts'
+import { FLEET_CONDITION, SITE_CONDITION, SITE_OR_ROOM_LOCATIONS } from '../domain/fleet.ts'
 import { MODEL_TABLE } from '../domain/normalization.ts'
 import {
     DEFAULT_RACK_FACE,
@@ -216,15 +216,13 @@ export function clearRackPlacement(asset: GlideRecord): void {
     for (const field of Object.values(PLACEMENT_FIELDS)) asset.setValue(field, '')
 }
 
-const RACK_SITE_LOCATIONS = ['location', 'location.parent'] as const
-
 /** The racks at a Site and in its rooms, by name; null when `siteId` names no Site the user may see. */
 export function racksAtSite(siteId: string): RackListing[] | null {
     // The Site is read first so the visibility check and the rack query below use the same sys_id.
     const site = findById('cmn_location', siteId)
     if (!site || !seesSite([site.getUniqueValue()])) return null
     const rack = new GlideRecord('cmdb_ci_rack')
-    const [standsAt, ...under] = RACK_SITE_LOCATIONS
+    const [standsAt, ...under] = SITE_OR_ROOM_LOCATIONS
     const atSite = rack.addQuery(standsAt, site.getUniqueValue())
     for (const location of under) atSite.addOrCondition(location, site.getUniqueValue())
     rack.orderBy('name')
@@ -240,7 +238,7 @@ export function racksAtSite(siteId: string): RackListing[] | null {
  */
 export function rackElevation(rackId: string): RackElevation | null {
     const rack = new GlideRecord('cmdb_ci_rack')
-    if (!rack.get(rackId) || !seesSite(RACK_SITE_LOCATIONS.map((location) => str(rack, location)))) return null
+    if (!rack.get(rackId) || !seesSite(SITE_OR_ROOM_LOCATIONS.map((location) => str(rack, location)))) return null
     const asset = placedIn(rack.getUniqueValue())
     asset.query()
     const found: Array<{ slot: Slot; companyId: string; device: Omit<RackDevice, 'customer' | 'model' | 'ruStart' | 'height' | 'face'> }> = []
