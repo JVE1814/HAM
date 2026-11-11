@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ALL_STAGES, type Stage } from './lifecycle'
-import {
-    allocationProblem,
-    awaitsReceipt,
-    putAwayProblem,
-    RECEIVING_STOCKROOM_TYPES,
-    receivingProblem,
-} from './warehouse'
+import { allocationProblem, awaitsReceipt, putAwayProblem, receivingProblem } from './warehouse'
 import type { StockroomType } from './vocabulary'
 
 describe('awaitsReceipt', () => {
@@ -30,11 +24,6 @@ describe('receivingProblem', () => {
 
     it("refuses a customer-site stockroom, which holds that Customer's own stock, saying where units go", () => {
         expect(receivingProblem('customer_site')).toBe('Receive into a central depot or a staging centre')
-    })
-
-    it('lists exactly the types it receives into, for the stockroom picker', () => {
-        const TYPES: readonly StockroomType[] = ['central_depot', 'staging_centre', 'customer_site']
-        expect(TYPES.filter((type) => receivingProblem(type) === null)).toEqual([...RECEIVING_STOCKROOM_TYPES])
     })
 })
 

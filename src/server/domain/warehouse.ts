@@ -15,16 +15,13 @@ export function awaitsReceipt(stage: Stage | null): boolean {
 }
 
 /**
- * Stockroom types arriving units (bought or returned) are received into: the Provider's own, its central depots and
- * staging centres. A customer-site stockroom holds that Customer's own site stock: a bought unit received there would
- * be sourced only for that Customer's replacements, as a hot spare that skips staging, and a returned unit would await
- * evaluation away from the depot.
+ * Why an arriving unit (bought or returned) cannot be received into a Stockroom of this type, or null when it can: only
+ * the Provider's own take one. A customer-site stockroom holds that Customer's own site stock: a bought unit received
+ * there would be sourced only for that Customer's replacements, as a hot spare that skips staging, and a returned unit
+ * would await evaluation away from the depot.
  */
-export const RECEIVING_STOCKROOM_TYPES = PROVIDER_STOCKROOM_TYPES
-
-/** Why an arriving unit cannot be received into a Stockroom of this type, or null when it can. */
 export function receivingProblem(into: StockroomType): string | null {
-    return RECEIVING_STOCKROOM_TYPES.includes(into) ? null : 'Receive into a central depot or a staging centre'
+    return PROVIDER_STOCKROOM_TYPES.includes(into) ? null : 'Receive into a central depot or a staging centre'
 }
 
 /** An Order line as a receipt reads it again under the line's lock, to decide whether the unit still goes to it. */
