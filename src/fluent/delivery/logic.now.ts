@@ -33,8 +33,8 @@ UiAction({
     actionName: 'x_daas_ham_confirm_installed',
     hint: 'Record that the shipped equipment is installed (self-install, or when the work order is closed elsewhere).',
     // Customer contacts confirm only a self-install, staff any install: one installing, or one a line filled again
-    // holds back while units already shipped wait at the Site (uiConfirmInstalled checks domain/install-confirmation
-    // on the server). The condition column holds at most 254 characters, hence the terse script: staff are told apart
+    // holds back while units already shipped wait at the Site (platform/delivery confirmInstall checks
+    // domain/install-confirmation on the server). The condition column holds at most 254 characters, hence the terse script: staff are told apart
     // by the platform's asset role, which asset managers and field techs contain and Customer roles do not, and the
     // stage of an Order held back goes unchecked, as only one preparing, delivering or installing has units shipped.
     condition:
