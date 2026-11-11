@@ -19,7 +19,6 @@ import {
     voidsWipeEvidence,
 } from '../domain/lifecycle.ts'
 import { MODEL_TABLE } from '../domain/normalization.ts'
-import { PLACEMENT_FIELDS } from '../domain/rack.ts'
 import { LEGAL_OWNER, type LegalOwner } from '../domain/vocabulary.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { stringProperty } from './properties.ts'
@@ -90,11 +89,6 @@ export function moveAndSave(asset: GlideRecord, to: Stage, context: string): boo
     if (!reason) return true
     log.warn(`${context}: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
     return false
-}
-
-/** The Asset left its Site: free its Rack units (the caller saves). */
-export function clearRackPlacement(asset: GlideRecord): void {
-    for (const field of Object.values(PLACEMENT_FIELDS)) asset.setValue(field, '')
 }
 
 /**

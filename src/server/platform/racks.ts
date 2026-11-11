@@ -224,6 +224,11 @@ export function visibleSites(): Site[] {
     return sites
 }
 
+/** The Asset left its Site: free its Rack units (the caller saves). */
+export function clearRackPlacement(asset: GlideRecord): void {
+    for (const field of Object.values(PLACEMENT_FIELDS)) asset.setValue(field, '')
+}
+
 /** Where a rack stands: in a Room of its Site, or at the Site itself. The listing and the elevation both read it. */
 const RACK_SITE_LOCATIONS = ['location', 'location.parent'] as const
 
