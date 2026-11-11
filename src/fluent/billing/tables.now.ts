@@ -4,9 +4,6 @@ import { FLEET_CONDITION } from '../../server/domain/fleet'
 import { BILLING_LINE_KIND_CHOICES, BILLING_PERIOD_STATUS, BILLING_PERIOD_STATUS_CHOICES } from '../../server/domain/vocabulary'
 import { PERIOD_ERROR_LENGTH, TOTALS_TEXT_LENGTH } from '../../server/domain/billing'
 
-/* Service intervals, billing periods and their lines (plan §13 Billing export, Q52, Q66). */
-
-/** The days one Asset delivered a Subscription line: from the day it went in service to the day it left service. */
 export const x_daas_ham_service_interval = Table({
     name: 'x_daas_ham_service_interval',
     label: 'Service interval',
@@ -24,7 +21,6 @@ export const x_daas_ham_service_interval = Table({
     ],
 })
 
-/** A calendar month of prorated Subscription line charges and Fee events, locked once closed. */
 export const x_daas_ham_billing_period = Table({
     name: 'x_daas_ham_billing_period',
     label: 'Billing period',
@@ -43,10 +39,6 @@ export const x_daas_ham_billing_period = Table({
         generated_at: DateTimeColumn({ label: 'Generated at', readOnly: true }),
         failed_lines: IntegerColumn({ label: 'Lines that failed to bill', default: 0, readOnly: true }),
         last_error: StringColumn({ label: 'Last generation error', maxLength: PERIOD_ERROR_LENGTH, readOnly: true }),
-        /**
-         * Service intervals, work orders and shipments the latest margin computation failed to cost (its Cost facts and
-         * Margin miss them: e.g. an unknown Asset, or no currency), with the last error; both cleared as one starts.
-         */
         margin_failed: IntegerColumn({ label: 'Records that failed to cost', default: 0, readOnly: true }),
         margin_error: StringColumn({ label: 'Last margin error', maxLength: PERIOD_ERROR_LENGTH, readOnly: true }),
         line_count: IntegerColumn({ label: 'Lines', readOnly: true }),
@@ -60,7 +52,6 @@ export const x_daas_ham_billing_period = Table({
     index: [{ name: 'x_daas_ham_bp_period', unique: true, element: 'period' }],
 })
 
-/** One charge of a Billing period: a Subscription line at a Site, or a Fee event. */
 export const x_daas_ham_billing_line = Table({
     name: 'x_daas_ham_billing_line',
     label: 'Billing line',

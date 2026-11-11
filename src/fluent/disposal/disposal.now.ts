@@ -20,9 +20,6 @@ import { guardDisposalLine, guardDisposalOrder, onDisposalApprovalDecision, uiCo
 import { admin, providerStaff, stockroomWorkers } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
-/* Disposal orders (P2.5, Q61). */
-
-/** Retiring Assets for good. */
 export const x_daas_ham_disposal_order = Table({
     name: 'x_daas_ham_disposal_order',
     label: 'Disposal order',

@@ -6,10 +6,8 @@ import { CURRENT_IS_NAAS_STOCKROOM, CURRENT_IS_SITE } from '../../server/domain/
 import { PROPERTY } from '../../server/domain/properties'
 import { admin, assetManager, fieldTech, scanners, stockroomWorkers } from '../shared/roles.now'
 
-/* Audits, attestations and reconciliation (P2.7): actions and jobs. */
-
 // Offered on NaaS stockrooms only, those with a NaaS stockroom type: one with none is the Provider IT's storeroom
-// (ADR 0016), as "Start site audit" below is offered on Sites only.
+// (ADR 0016).
 UiAction({
     $id: Now.ID['ua_stockroom_blind_count'],
     name: 'Start blind count',

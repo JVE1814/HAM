@@ -22,9 +22,6 @@ import { DEFAULT_DEVICE_EVENT_SOURCE, DEVICE_EVENT_SENDERS } from '../../server/
 import { admin, broadStaff } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
-/* In service: the Seen signals monitoring posts, the job that reads them and their settings. */
-
-/** A Seen signal (state change only) from monitoring for one Asset. */
 export const x_daas_ham_device_event = Table({
     name: 'x_daas_ham_device_event',
     label: 'Device event',

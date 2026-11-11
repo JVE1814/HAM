@@ -20,7 +20,6 @@ import {
 } from '../../server/domain/vocabulary'
 import { NAAS_MODEL_CONDITION } from '../../server/domain/fleet'
 
-/** The commercial Agreement between the Provider and a Customer. */
 export const x_daas_ham_agreement = Table({
     name: 'x_daas_ham_agreement',
     label: 'Agreement',
@@ -63,7 +62,6 @@ export const x_daas_ham_agreement = Table({
     index: [{ name: 'x_daas_ham_agr_customer', unique: false, element: 'customer' }],
 })
 
-/** How many Assets of a Device class (or one Model) an Agreement allows. */
 export const x_daas_ham_agreement_quantity = Table({
     name: 'x_daas_ham_agreement_quantity',
     label: 'Contracted quantity',
@@ -81,7 +79,6 @@ export const x_daas_ham_agreement_quantity = Table({
     index: [{ name: 'x_daas_ham_aq_agreement', unique: false, element: 'agreement' }],
 })
 
-/** A billable service line of an Agreement that delivering Assets attach to. */
 export const x_daas_ham_subscription_line = Table({
     name: 'x_daas_ham_subscription_line',
     label: 'Subscription line',
@@ -116,7 +113,6 @@ export const x_daas_ham_subscription_line = Table({
     ],
 })
 
-/** A Model or Site template a Customer may order. */
 export const x_daas_ham_catalog_entry = Table({
     name: 'x_daas_ham_catalog_entry',
     label: 'Catalog entry',
@@ -139,7 +135,6 @@ export const x_daas_ham_catalog_entry = Table({
     index: [{ name: 'x_daas_ham_ce_customer', unique: false, element: 'customer' }],
 })
 
-/** A named bill of materials for a standard kind of Site. */
 export const x_daas_ham_site_template = Table({
     name: 'x_daas_ham_site_template',
     label: 'Site template',

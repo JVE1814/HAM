@@ -26,13 +26,9 @@ import { EVENT } from '../../server/domain/events'
 import { admin, assetManager, noc, providerStaff, returnWorkers, stockroomWorkers } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
-/** The replacement SLAs stop once the case's replacement Order is complete, and are cancelled when the case closes without that. */
 const REPLACEMENT_COMPLETE = `x_daas_ham_replacement_order.stage=${ORDER_STAGE.complete}`
 const CASE_CLOSED_UNREPLACED = `active=false^x_daas_ham_replacement_order.stage!=${ORDER_STAGE.complete}`
 
-/* Break-fix (P2.3, Q58): OEM RMAs, the replacement of a failed Asset and its SLAs. */
-
-/** A return authorisation opened with the manufacturer for a defective Asset. */
 export const x_daas_ham_oem_rma = Table({
     name: 'x_daas_ham_oem_rma',
     label: 'OEM RMA',
@@ -80,8 +76,8 @@ UiAction({
     table: 'sn_customerservice_case',
     actionName: 'x_daas_ham_raise_replacement',
     hint: 'Order a like-for-like replacement of the failed asset (spare at the site, spare pool, stock, OEM advance replacement or purchase).',
-    // Offered while no replacement goes ahead: none linked, or the linked one ended unfulfilled (domain/breakfix
-    // replacementStep, which built-metadata.test.ts holds the built condition to).
+    // Offered while no replacement goes ahead (domain/breakfix replacementStep, which built-metadata.test.ts holds the
+    // built condition to).
     condition:
         `current.x_daas_ham_failed_asset != '' && current.active == true && (current.x_daas_ham_replacement_order == '' || ['${ORDER_STAGE.rejected}', '${ORDER_STAGE.cancelled}'].indexOf(String(current.x_daas_ham_replacement_order.stage)) >= 0)`,
     roles: [noc, assetManager, PLATFORM_ROLE.serviceDeskAgent],

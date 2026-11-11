@@ -20,8 +20,6 @@ import { BILLING_PERIOD_STATUS } from '../../server/domain/vocabulary'
 import { RESET_AFTER_IDLE_MINUTES } from '../../server/domain/billing'
 import { admin, finance } from '../shared/roles.now'
 
-/* Billing periods (plan §13 Billing export, Q66): monthly generation, review, close and lock, CSV export. */
-
 ScheduledScript({
     $id: Now.ID['job_open_billing_period'],
     name: 'NaaS - open last month billing period',
@@ -89,7 +87,7 @@ UiAction({
     script: uiRegenerateBillingPeriod,
 })
 
-// Admin only: a generation that stopped without being held for review (e.g. its chunk died) is left Generating.
+// A generation that stopped without being held for review (e.g. its chunk died) is left Generating.
 UiAction({
     $id: Now.ID['ua_billing_reset_generation'],
     name: 'Reset generation',
@@ -160,7 +158,6 @@ BusinessRule({
     script: guardBillingPeriodMonth,
 })
 
-// Where a new period's generation starts, whether the monthly job or a person created it (Regenerate starts its own).
 BusinessRule({
     $id: Now.ID['br_billing_period_generate'],
     name: 'NaaS - generate a new billing period',

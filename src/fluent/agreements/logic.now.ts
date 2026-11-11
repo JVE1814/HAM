@@ -17,8 +17,6 @@ BusinessRule({
     script: guardAgreementCurrency,
 })
 
-/* Agreement renewals (plan §13 Renewals). */
-
 BusinessRule({
     $id: Now.ID['br_agreement_end_changed'],
     name: 'NaaS - re-arm renewal warning on new end',
