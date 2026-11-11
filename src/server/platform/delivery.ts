@@ -1,6 +1,12 @@
 import { GlideRecord } from '@servicenow/glide'
 import { installsOrder, planShipment, replacementInstalled, type OnSiteWork } from '../domain/delivery.ts'
-import { awaitsInstall, type InstallState } from '../domain/install-confirmation.ts'
+import {
+    awaitsInstall,
+    installRefusal,
+    type InstallConfirmer,
+    type InstallRefusal,
+    type InstallState,
+} from '../domain/install-confirmation.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { isDeployed, stagesQuery } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
@@ -171,15 +177,30 @@ function openOnSiteWork(order: GlideRecord, work: OnSiteWork): string | null {
     return order.update() ? null : `On-site work opened but not linked to the Order: ${refusal(order)}`
 }
 
+/** What came of a confirmation: how many units the platform refused to move, or why nothing was recorded. */
+export type InstallConfirmation = { confirmed: true; refused: number } | { confirmed: false; why: InstallRefusal | 'unsaved' }
+
 /**
- * Record an Order's shipped units as installed (Confirm installed, or its work order closed complete). How many units
- * the platform refused to move (logged): they and their line stay where they were, and so does the Asset their line
- * replaces, so confirming again retries only them and then retires it.
+ * Record `order` as installed for `confirmer`, when domain/install-confirmation `installRefusal` lets them. The units
+ * take the Order's Site as `order` holds it, so `saveForm` first saves the values a user typed on its form (`unsaved`
+ * when the platform refused that save, and said why).
+ */
+export function confirmInstall(order: GlideRecord, confirmer: InstallConfirmer, saveForm: () => boolean = () => true): InstallConfirmation {
+    const why = installRefusal(confirmer, installState(order))
+    if (why) return { confirmed: false, why }
+    if (!saveForm()) return { confirmed: false, why: 'unsaved' }
+    return { confirmed: true, refused: completeInstall(order) }
+}
+
+/**
+ * Record an Order's shipped units as installed. How many units the platform refused to move (logged): they and their
+ * line stay where they were, and so does the Asset their line replaces, so confirming again retries only them and then
+ * retires it.
  *
  * Only shipped units move (domain/install-confirmation `awaitsInstall`): on an Order held back by a line filled again
  * after a unit was lost in transit, that line's new units, a hot spare allocated to it included, wait for Ship.
  */
-export function completeInstall(order: GlideRecord): number {
+function completeInstall(order: GlideRecord): number {
     const now = nowGlide()
     const asset = orderAssets(order.getUniqueValue())
     let refused = 0
