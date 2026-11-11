@@ -49,7 +49,7 @@ export function AppShell({ title, layout, nav, actions }: { title: string; layou
                                     {group.items.map((item) => (
                                         <SidebarMenuItem key={item.to}>
                                             <SidebarMenuButton isActive={pathname === item.to} render={<Link to={item.to} />}>
-                                                {item.label}
+                                                <span title={item.label}>{item.label}</span>
                                             </SidebarMenuButton>
                                             {item.badge !== undefined && <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>}
                                         </SidebarMenuItem>
@@ -59,16 +59,16 @@ export function AppShell({ title, layout, nav, actions }: { title: string; layou
                         ))}
                     </SidebarContent>
                 </Sidebar>
-                <SidebarInset>
+                <SidebarInset className="min-w-0">
                     <header className="flex h-12 items-center gap-2 border-b px-4">
                         <SidebarTrigger className="-ml-1" />
                         <Separator orientation="vertical" className="h-4" />
                         <span className="truncate text-sm font-medium">{titleOf(nav, pathname) ?? title}</span>
                         <div className="ml-auto">{actions}</div>
                     </header>
-                    <main className="flex flex-col gap-4 p-4">
+                    <div className="flex flex-col gap-4 p-4">
                         <Outlet />
-                    </main>
+                    </div>
                 </SidebarInset>
             </SidebarProvider>
         )
