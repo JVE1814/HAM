@@ -104,6 +104,15 @@ describe('reading', () => {
         while (byOrder.next()) groups.push(`${byOrder.getValue('order.customer')} ${byOrder.getAggregate('COUNT', '')} ${byOrder.getAggregate('SUM', 'quantity')}`)
         expect(groups).toEqual(['acme 2 12', 'globex 1 1'])
 
+        const all = new GlideAggregate(LINES)
+        all.addQuery('line_stage', 'new')
+        all.addAggregate('COUNT', '')
+        all.addAggregate('SUM', 'quantity')
+        all.query()
+        expect(all.next()).toBe(true)
+        expect([all.getAggregate('COUNT', ''), all.getAggregate('SUM', 'quantity')]).toEqual(['2', '7'])
+        expect(all.next()).toBe(false)
+
         const none = new GlideAggregate(LINES)
         none.addQuery('line_stage', 'cancelled')
         none.addAggregate('COUNT', '')

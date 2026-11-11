@@ -26,7 +26,7 @@ import type { FeeIdentity } from '../domain/fees.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { memoized } from '../domain/memo.ts'
 import { agreementCurrencyOf, customerCurrencies } from './agreements.ts'
-import { inCurrentPass, queuePass, runEventTableJob, visitInKeyOrder, type EventJobResult } from './chunked.ts'
+import { inCurrentPass, queuePass, runTriggeredChunk, visitInKeyOrder, type EventJobResult } from './chunked.ts'
 import { glideToMs, nowGlide, nowMs } from './clock.ts'
 import { queueJob, type JobEvent } from './events.ts'
 import { EVENT } from '../domain/events.ts'
@@ -69,7 +69,7 @@ export function openBillingPeriod(month: string): void {
 
 /*
  * Generation. A period's generation passes replace each other on its job cursor `billing_generate_<sys_id>`
- * (ADR 0007, platform/chunked `PassJob`): the row names the current pass ('' once reset by hand), and its last run is
+ * (ADR 0007, platform/chunked `runTriggeredChunk`): the row names the current pass ('' once reset by hand), and its last run is
  * when that pass last started a chunk, its activity. No lock is taken: a pass starts where it is triggered.
  */
 
@@ -142,8 +142,8 @@ function dropChunk(period: GlideRecord): void {
 function billLines(period: GlideRecord, bounds: MonthBounds, queued: JobEvent, job: string): EventJobResult {
     const siteName = memoized(siteNameOf)
     const currencies = memoized(customerCurrencies)
-    return runEventTableJob(queued, {
-        pass: { job },
+    return runTriggeredChunk(queued, {
+        job,
         table: 'x_daas_ham_subscription_line',
         query: `status!=${SUBSCRIPTION_LINE_STATUS.pending}^${overlapsMonth(bounds)}`,
         read: (line) => ({
