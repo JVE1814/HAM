@@ -1,10 +1,12 @@
+import type { GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import type { StockroomList } from '../domain/rest-contracts.ts'
 import { ROLE } from '../domain/roles.ts'
-import { assetSummary, lookUp, pick, putAway, receive, receivingStockrooms, type Scan, type ScanRefusal } from '../platform/receiving.ts'
+import { assetSummary, importAsnRow, lookUp, pick, putAway, receive, receivingStockrooms, type Scan, type ScanRefusal } from '../platform/receiving.ts'
+import { finishImportRow } from '../platform/records.ts'
 import { pathParam, reply, requireRole, requireScanner, textBodyOf } from '../platform/rest-api.ts'
 
-/** Warehouse scanning API used by the warehouse React app (P1.5): platform/receiving. */
+/** Warehouse scanning API used by the warehouse React app (P1.5), and the ASN import rows: platform/receiving. */
 
 const REFUSAL_STATUS: Record<ScanRefusal['reason'], number> = {
     invalid: 400,
@@ -55,4 +57,8 @@ export function pickAsset(request: RESTAPIRequest, response: RESTAPIResponse): v
 export function listStockrooms(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     reply(response, 200, { stockrooms: receivingStockrooms() } satisfies StockroomList)
+}
+
+export function processAsnRow(current: GlideRecord): void {
+    finishImportRow(current, importAsnRow(current))
 }

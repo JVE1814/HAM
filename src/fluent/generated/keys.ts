@@ -3578,6 +3578,7 @@ declare global {
                     src_server_entry_imports_ts: {
                         table: 'sys_module'
                         id: '343b74934a804be5833c19f80461877f'
+                        deleted: true
                     }
                     'src_server_entry_in-service_ts': {
                         table: 'sys_module'
@@ -3739,6 +3740,7 @@ declare global {
                     src_server_platform_imports_ts: {
                         table: 'sys_module'
                         id: 'ed7d531c06184cbd8ffad0f43ac8a482'
+                        deleted: true
                     }
                     'src_server_platform_in-service_ts': {
                         table: 'sys_module'

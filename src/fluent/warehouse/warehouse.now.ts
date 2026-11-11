@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Acl, BusinessRule, Property, Record, StringColumn, Table, UiPage } from '@servicenow/sdk/core'
-import { processAsnRow } from '../../server/entry/imports'
+import { processAsnRow } from '../../server/entry/warehouse'
 import { PROPERTY } from '../../server/domain/properties'
 import warehousePage from '../../client/warehouse.html'
 import { admin, scanners, stockroomWorkers } from '../shared/roles.now'
