@@ -3,13 +3,12 @@ import { join, relative } from 'node:path'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import {
     CURRENT_IS_FLEET,
-    FLEET_CONDITION,
     FLEET_FIELD,
-    NAAS_MODEL_CONDITION,
-    NAAS_STOCKROOM_CONDITION,
     OEM_PID_FIELD,
+    SHARED_TABLE_CONDITION,
     STOCKROOM_TYPE_FIELD,
 } from './domain/fleet'
+import { holdsInEveryClause } from './domain/encoded-query'
 import { replacementStep } from './domain/breakfix'
 import { CANCELLABLE_ORDER_STAGES } from './domain/fulfilment'
 import { LOCK_NAME_LENGTH } from './domain/lock-names'
@@ -385,35 +384,6 @@ describe('business rule conditions', () => {
     })
 })
 
-/** A term that is ORed to the one before it (`^OR`), unlike an ordering (`^ORDERBY`). */
-const isOrTerm = (term: string) => term.startsWith('OR') && !term.startsWith('ORDERBY')
-
-/**
- * Whether `condition` holds in every ^NQ clause of `query`: one of the clause's AND terms, not one side of an `^OR`.
- * A condition after an ^NQ binds to the last clause only.
- */
-function holdsInEveryClause(query: string, condition: string): boolean {
-    return query.split('^NQ').every((clause) => {
-        const terms = clause.split('^')
-        return terms.some((term, i) => term === condition && !isOrTerm(terms[i + 1] ?? ''))
-    })
-}
-
-/*
- * The platform tables the app shares with the Provider's IT (ADR 0016) hold its records too. So whatever lists or
- * counts one of them (a navigator module, a workspace list, a dashboard tile) keeps to fleet assets, NaaS Models or
- * NaaS stockrooms in every ^NQ clause of its query, and a picker on one (a reference column of the app's tables, a
- * catalog variable) offers only those: a qualifier only filters what a picker offers, so a column the app itself
- * writes takes one as well.
- */
-const SHARED: Readonly<Record<string, string>> = {
-    alm_hardware: FLEET_CONDITION,
-    cmdb_model: NAAS_MODEL_CONDITION,
-    // The platform's Model lifecycle table (ADR 0017) holds the milestones of the Provider IT's Models too.
-    cmdb_model_lifecycle: `model.${NAAS_MODEL_CONDITION}`,
-    alm_stockroom: NAAS_STOCKROOM_CONDITION,
-}
-
 interface SharedQuery {
     what: string
     table: string
@@ -483,10 +453,10 @@ function references(): SharedQuery[] {
 describe('what the metadata reads of the tables shared with the Provider IT', () => {
     const outside = (found: SharedQuery[]) =>
         found
-            .filter(({ table }) => table in SHARED)
-            .filter(({ table, query }) => !holdsInEveryClause(query ?? '', SHARED[table] ?? ''))
+            .filter(({ table }) => table in SHARED_TABLE_CONDITION)
+            .filter(({ table, query }) => !holdsInEveryClause(query ?? '', SHARED_TABLE_CONDITION[table] ?? ''))
             .map(({ what, table, query }) => `${what} (${table}): ${query === undefined ? 'no query' : `'${query}'`}`)
-    const onShared = (found: SharedQuery[]) => found.filter(({ table }) => table in SHARED).map(({ what }) => what)
+    const onShared = (found: SharedQuery[]) => found.filter(({ table }) => table in SHARED_TABLE_CONDITION).map(({ what }) => what)
 
     it('lists fleet assets, NaaS Models and NaaS stockrooms only, in the navigator and the workspace', () => {
         // A module's `name` is the table it opens: one on a shared table with no filter would open it whole.
@@ -1235,7 +1205,7 @@ describe('REST messages', () => {
  */
 describe('the REST calls of the pages', () => {
     const CLIENT = join(ROOT, 'src/client')
-    const clientSources = () => filesUnder(CLIENT).filter((path) => /\/api\.ts$/.test(path))
+    const clientSources = () => filesUnder(CLIENT).filter((path) => /\/(api|session)\.ts$/.test(path))
 
     function clientCalls(): Array<{ where: string; method: string; path: string }> {
         return clientSources().flatMap((source) =>
@@ -1248,7 +1218,7 @@ describe('the REST calls of the pages', () => {
     }
 
     it('go to the base path the API is built with', () => {
-        const base = /^const BASE = '([^']*)'$/m.exec(readFileSync(join(CLIENT, 'api.ts'), 'utf8'))?.[1]
+        const base = /^const NAAS = '([^']*)'$/m.exec(readFileSync(join(CLIENT, 'api.ts'), 'utf8'))?.[1]
         expect(records('sys_ws_definition').map((api) => api.base_uri)).toEqual([base])
     })
 
