@@ -6,7 +6,7 @@ import {
     billsFromIntervals,
     currencyTotals,
     decideGenerationReset,
-    PERIOD_ERROR_LENGTH,
+    periodError,
     RESET_AFTER_IDLE_MINUTES,
     resetGenerationError,
     singleCurrencyTotal,
@@ -192,7 +192,7 @@ function billLines(period: GlideRecord, bounds: MonthBounds, queued: JobEvent, j
 
 function stopGeneration(period: GlideRecord, error: string): void {
     log.error(`Billing period ${str(period, 'period')}: generation stopped: ${error}`)
-    period.setValue('last_error', error.slice(0, PERIOD_ERROR_LENGTH))
+    period.setValue('last_error', periodError(error))
     // Refused, it stays generating with no chunk queued, which Close and Regenerate refuse: say why.
     if (!holdForReview(period)) {
         log.error(`Billing period ${str(period, 'period')} not held for review: ${refusal(period)}`)
@@ -271,7 +271,7 @@ function insertLine(period: GlideRecord, values: BillingLineValues): void {
 function addFailedLines(period: GlideRecord, failed: number, lastError: string): void {
     log.error(`Billing period ${str(period, 'period')}: ${failed} line(s) failed: ${lastError}`)
     period.setValue('failed_lines', num(period, 'failed_lines') + failed)
-    period.setValue('last_error', lastError.slice(0, PERIOD_ERROR_LENGTH))
+    period.setValue('last_error', periodError(lastError))
 }
 
 function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
