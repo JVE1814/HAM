@@ -169,6 +169,9 @@ function builtRecords(): BuiltRecord[] {
 
 const records = (table: string): BuiltRecord[] => builtRecords().filter((record) => record.$table === table)
 
+// Reads every built record from disk: a few hundred milliseconds alone, but seconds while other builds run.
+const READS_EVERY_RECORD = 30_000
+
 describe('the built metadata', () => {
     // The SDK evaluates the Fluent sources without running them. A value it cannot read (a function call, an array
     // element, an object where a text is expected) is no build error: the record is built with a placeholder in it.
@@ -180,7 +183,7 @@ describe('the built metadata', () => {
             .filter((path) => /Symbol\(|\[object Object\]|\[[A-Za-z_]\w*\]=/.test(readFileSync(path, 'utf8')))
             .map((path) => relative(BUILT, path))
         expect(placeholders).toEqual([])
-    })
+    }, READS_EVERY_RECORD)
 })
 
 /*
@@ -218,7 +221,7 @@ describe('texts of the built records', () => {
                 .map((record) => `${table}.${field} '${record[field]}' (${(record[field] ?? '').length} > ${limit})`)
         })
         expect(tooLong).toEqual([])
-    })
+    }, READS_EVERY_RECORD)
 })
 
 /** The server module and function a built script calls, from the header the SDK writes on the wrapper it generates. */
