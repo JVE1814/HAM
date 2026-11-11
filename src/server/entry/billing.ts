@@ -4,6 +4,7 @@ import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { agreementCurrencyProblem, billingMonthProblem, currencyCode, monthBounds, monthChangedError, previousMonth } from '../domain/billing.ts'
 import { EVENT } from '../domain/events.ts'
+import { billingChange } from '../domain/lifecycle.ts'
 import { ROLE } from '../domain/roles.ts'
 import {
     attachExport,
@@ -21,12 +22,14 @@ import {
     resetGeneration,
     type PeriodOutcome,
 } from '../platform/billing.ts'
-import { todayIso } from '../platform/clock.ts'
+import { readStage } from '../platform/assets.ts'
+import { glideToIsoDate, todayIso } from '../platform/clock.ts'
 import { jobEvent, subjectOf } from '../platform/events.ts'
 import { queueMarginCompute } from '../platform/margin.ts'
-import { str } from '../platform/records.ts'
+import { str, type ForeignRecord } from '../platform/records.ts'
 import { pathParam, queryInt, reply, requireRole } from '../platform/rest-api.ts'
 import { abortWith } from '../platform/rule-api.ts'
+import { closeServiceIntervals, openServiceInterval } from '../platform/service-intervals.ts'
 
 /** Billing periods: generate, review, close (lock) and export (plan §13 Billing export, Q66): platform/billing. */
 
@@ -127,4 +130,19 @@ export function getBillingLines(request: RESTAPIRequest, response: RESTAPIRespon
     const page = linesPage(pathParam(request, 'id'), offset, limit)
     if (!page) return reply(response, 404, { error: 'Unknown billing period' })
     reply(response, 200, page)
+}
+
+/**
+ * After-update rule on alm_hardware stage changes: billing (the Service interval) starts when an Asset
+ * enters service and stops when it leaves, on the day billingChange gives (Q52, ADR 0009).
+ */
+export function onAssetServiceChange(current: ForeignRecord, previous: ForeignRecord): void {
+    const change = billingChange(readStage(previous), readStage(current), {
+        inServiceDate: glideToIsoDate(str(current, 'x_daas_ham_in_service_date')),
+        today: todayIso(),
+    })
+    if (!change) return
+    const lineId = str(current, 'x_daas_ham_subscription_line')
+    if ('stop' in change) closeServiceIntervals(current.getUniqueValue(), change.stop)
+    else if (lineId) openServiceInterval(current, lineId, change.start)
 }

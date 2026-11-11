@@ -26,6 +26,9 @@ export const FLEET_CONDITION = `${FLEET_FIELD}=true`
 /** The same as a script condition on `current`, an Asset: what a business rule's or UI action's condition tests. */
 export const CURRENT_IS_FLEET = `current.${FLEET_FIELD} == true`
 
+/** A fleet asset changed its stage: the change test and the Fleet flag every stage rule on alm_hardware starts with. */
+export const CURRENT_FLEET_STAGE_CHANGED = `(current.install_status.changes() || current.substatus.changes()) && ${CURRENT_IS_FLEET}`
+
 /** Encoded condition matching fleet assets only (through `via` from another table, e.g. `asset.`). */
 export function fleetCondition(via = ''): string {
     return `${via}${FLEET_CONDITION}`

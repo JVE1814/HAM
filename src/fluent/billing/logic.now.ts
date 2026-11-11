@@ -2,6 +2,7 @@ import '@servicenow/sdk/global'
 import { BusinessRule, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
 import {
     exportBillingPeriod,
+    onAssetServiceChange,
     generateBillingLines,
     guardBillingPeriodMonth,
     guardClosedBillingLine,
@@ -14,6 +15,7 @@ import {
     uiResetBillingGeneration,
 } from '../../server/entry/billing'
 import { EVENT } from '../../server/domain/events'
+import { CURRENT_FLEET_STAGE_CHANGED } from '../../server/domain/fleet'
 import { BILLING_PERIOD_STATUS } from '../../server/domain/vocabulary'
 import { RESET_AFTER_IDLE_MINUTES } from '../../server/domain/billing'
 import { admin, finance } from '../shared/roles.now'
@@ -169,3 +171,15 @@ BusinessRule({
     condition: `current.status == '${BILLING_PERIOD_STATUS.generating}'`,
     script: startBillingPeriodGeneration,
 })
+
+BusinessRule({
+    $id: Now.ID['br_asset_left_service'],
+    name: 'NaaS - start or stop billing on service',
+    table: 'alm_hardware',
+    when: 'after',
+    action: ['update'],
+    order: 210,
+    condition: CURRENT_FLEET_STAGE_CHANGED,
+    script: onAssetServiceChange,
+})
+

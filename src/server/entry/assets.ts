@@ -1,13 +1,9 @@
 import { gs } from '@servicenow/glide'
-import { billingChange, stageChangeRefusal, voidsWipeEvidence } from '../domain/lifecycle.ts'
+import { stageChangeRefusal, voidsWipeEvidence } from '../domain/lifecycle.ts'
 import { ROLE } from '../domain/roles.ts'
 import { clearWipeEvidence, readStage, transitionFacts } from '../platform/assets.ts'
-import { glideToIsoDate, todayIso } from '../platform/clock.ts'
-import { onLineAssetMoved } from '../platform/fulfilment.ts'
-import { str, type ForeignRecord } from '../platform/records.ts'
-import { closeServiceIntervals, openServiceInterval } from '../platform/service-intervals.ts'
-import { putBackUntransferred } from '../platform/sourcing.ts'
-import { fellShortOfStagingCentre, onTransferOrderLine, takeBackStageAfterTransfer } from '../platform/transfers.ts'
+import type { ForeignRecord } from '../platform/records.ts'
+import { onTransferOrderLine, takeBackStageAfterTransfer } from '../platform/transfers.ts'
 
 /**
  * Why a save that changes the stage breaks the lifecycle (domain/lifecycle `stageChangeRefusal`), or null when it may
@@ -58,27 +54,4 @@ export function onTransferReleased(current: ForeignRecord, previous: ForeignReco
 export function clearVoidedWipeEvidence(current: ForeignRecord, previous: ForeignRecord): void {
     const to = readStage(current)
     if (to !== null && voidsWipeEvidence(readStage(previous), to)) clearWipeEvidence(current)
-}
-
-export function onAllocatedAssetStageChange(current: ForeignRecord, previous: ForeignRecord): void {
-    const lineId = str(current, 'x_daas_ham_order_line')
-    if (!lineId) return
-    const from = readStage(previous)
-    if (from === 'in_transfer' && fellShortOfStagingCentre(current)) return void putBackUntransferred(current, lineId)
-    onLineAssetMoved(current, lineId, from, readStage(current))
-}
-
-/**
- * After-update rule on alm_hardware stage changes: billing (the Service interval) starts when an Asset
- * enters service and stops when it leaves, on the day billingChange gives (Q52, ADR 0009).
- */
-export function onAssetServiceChange(current: ForeignRecord, previous: ForeignRecord): void {
-    const change = billingChange(readStage(previous), readStage(current), {
-        inServiceDate: glideToIsoDate(str(current, 'x_daas_ham_in_service_date')),
-        today: todayIso(),
-    })
-    if (!change) return
-    const lineId = str(current, 'x_daas_ham_subscription_line')
-    if ('stop' in change) closeServiceIntervals(current.getUniqueValue(), change.stop)
-    else if (lineId) openServiceInterval(current, lineId, change.start)
 }

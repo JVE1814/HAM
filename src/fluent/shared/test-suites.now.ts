@@ -6,9 +6,16 @@ import {
     inventoryTechAuditVisibilityTest,
     inventoryTechVisibilityTest,
 } from './visibility-tests.now'
-import { addToFleetTest, sparePoolTopUpTest, transferStageTest } from '../fleet/tests.now'
+import { addToFleetTest } from '../fleet/tests.now'
 import { lifecycleImportTest } from '../models/tests.now'
-import { cancelRefusedOnceShippedTest, lostInTransitResourcingTest, offCatalogOrderTest, withinAgreementOrderTest } from '../orders/tests.now'
+import {
+    cancelRefusedOnceShippedTest,
+    lostInTransitResourcingTest,
+    offCatalogOrderTest,
+    sparePoolTopUpTest,
+    transferStageTest,
+    withinAgreementOrderTest,
+} from '../orders/tests.now'
 import { warehouseScanRulesTest } from '../warehouse/tests.now'
 import { customerReturnRequestTest, returnEvaluationTest } from '../returns/tests.now'
 import { replacementWithinAgreementTest } from '../break-fix/tests.now'

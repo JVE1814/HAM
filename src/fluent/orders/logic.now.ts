@@ -1,6 +1,9 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, Property, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
-import { onOrderApprovalDecision, sourceOrder, uiCancelOrder, uiRecheckApprovals, uiSubmitOrder } from '../../server/entry/orders'
+import { onAllocatedAssetStageChange, onOrderApprovalDecision, sourceOrder, uiCancelOrder, uiRecheckApprovals, uiSubmitOrder } from '../../server/entry/orders'
+import { onTransferReleased } from '../../server/entry/assets'
+import { topUpSparePools } from '../../server/entry/spare-pool'
+import { CURRENT_FLEET_STAGE_CHANGED, CURRENT_IS_FLEET } from '../../server/domain/fleet'
 import { INSTALL_MODE, ORDER_STAGE, STAGE_FIELDS } from '../../server/domain/vocabulary'
 import { APPROVAL_REQUESTED } from '../../server/domain/approvals'
 import { uiConfirmInstalled, uiShipOrder } from '../../server/entry/delivery'
@@ -147,5 +150,53 @@ Property({
     type: 'integer',
     value: PROPERTY.refreshHorizonDays.default,
     description: 'Assets whose refresh is due within this many days get refresh orders.',
+    roles: { read: [admin], write: [admin] },
+})
+
+/*
+ * Fleet assets' stage changes that move their Order lines and transfers. Rules on alm_hardware are written as
+ * fluent/fleet/logic.now.ts says: the change test, then the Fleet flag.
+ */
+
+// Ahead of the lifecycle rule, so that it checks the stage the Asset takes back, not Inventory's In stock / Available.
+BusinessRule({
+    $id: Now.ID['br_asset_transfer_released'],
+    name: 'NaaS - asset stage back after transfer',
+    table: 'alm_hardware',
+    when: 'before',
+    action: ['update'],
+    order: 80,
+    condition: `current.active_to.changes() && ${CURRENT_IS_FLEET}`,
+    script: onTransferReleased,
+})
+
+// Also takes a unit that left its line in transit off it.
+BusinessRule({
+    $id: Now.ID['br_asset_stage_to_order_line'],
+    name: 'NaaS - asset stage advances order line',
+    table: 'alm_hardware',
+    when: 'after',
+    action: ['update'],
+    order: 200,
+    condition: `${CURRENT_FLEET_STAGE_CHANGED} && current.x_daas_ham_order_line != ''`,
+    script: onAllocatedAssetStageChange,
+})
+
+ScheduledScript({
+    $id: Now.ID['job_spare_pool_top_up'],
+    name: 'NaaS - spare pool top-up',
+    active: true,
+    frequency: 'daily',
+    executionTime: { hours: 2, minutes: 40, seconds: 0 },
+    timeZone: 'UTC',
+    script: topUpSparePools,
+})
+
+Property({
+    $id: Now.ID['prop_spare_auto_purchase'],
+    name: PROPERTY.autoPurchaseSpares.name,
+    type: 'boolean',
+    value: PROPERTY.autoPurchaseSpares.default,
+    description: 'When true, the spare-pool top-up job requests purchase orders for shortfalls central stock cannot cover.',
     roles: { read: [admin], write: [admin] },
 })

@@ -1,6 +1,8 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { approvalAwaited } from '../domain/approvals.ts'
 import { messageOf } from '../domain/errors.ts'
+import { readStage } from '../platform/assets.ts'
+import { onLineAssetMoved } from '../platform/fulfilment.ts'
 import type { NewLine } from '../platform/order-lines.ts'
 import {
     cancelOrder,
@@ -13,7 +15,8 @@ import {
 } from '../platform/orders.ts'
 import { timesRequeued } from '../platform/events.ts'
 import { str, type ForeignRecord } from '../platform/records.ts'
-import { runSourcingPass } from '../platform/sourcing.ts'
+import { putBackUntransferred, runSourcingPass } from '../platform/sourcing.ts'
+import { fellShortOfStagingCentre } from '../platform/transfers.ts'
 
 /*
  * Order orchestration (ADR 0004):
@@ -107,4 +110,12 @@ export function uiCancelOrder(current: GlideRecord): void {
     if (!cancellation.complete) {
         gs.addErrorMessage('Order cancelled; some lines, stock or staging tasks were left as they were (see the log)')
     }
+}
+
+export function onAllocatedAssetStageChange(current: ForeignRecord, previous: ForeignRecord): void {
+    const lineId = str(current, 'x_daas_ham_order_line')
+    if (!lineId) return
+    const from = readStage(previous)
+    if (from === 'in_transfer' && fellShortOfStagingCentre(current)) return void putBackUntransferred(current, lineId)
+    onLineAssetMoved(current, lineId, from, readStage(current))
 }

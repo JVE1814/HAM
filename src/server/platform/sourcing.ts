@@ -334,7 +334,7 @@ function unreserve(asset: GlideRecord, source: Source, why = 'no transfer order'
 }
 
 /**
- * A unit's transfer to the staging centre fell through (`current` as its after-update rule sees it, entry/assets
+ * A unit's transfer to the staging centre fell through (`current` as its after-update rule sees it, entry/orders
  * `onAllocatedAssetStageChange`): Inventory let it go short of the staging centre, its transfer order line cancelled
  * or deleted, and it was reserved for its line again where it was, which nothing moves it on from (domain/lifecycle
  * `transferFellThrough`). So it is put back as stock is for want of a transfer order, as free stock: the Source it was
