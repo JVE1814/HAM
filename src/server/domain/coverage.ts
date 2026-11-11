@@ -1,4 +1,4 @@
-import { appendTo } from './collections.ts'
+import { appendTo, firstBest } from './collections.ts'
 import { FLEET_CONDITION, fleetCondition, INSTALLED_CONDITION } from './fleet.ts'
 import { notRetiredCondition } from './lifecycle.ts'
 import type { CoverageFact, CoverageFetched } from './oem/types.ts'
@@ -37,7 +37,7 @@ export function coverageSummary(contracts: readonly CoverageView[], today: strin
         const end = coveredUntil(contract)
         return end === null ? [] : [{ end, serviceLevel: contract.serviceLevel }]
     })
-    const latest = covering.sort((a, b) => b.end.localeCompare(a.end))[0]
+    const latest = firstBest(covering, (a, b) => a.end.localeCompare(b.end))
     if (!latest) return { coveredToday: false, coverageEnd: '', serviceLevel: '' }
     return { coveredToday: latest.end >= today, coverageEnd: latest.end, serviceLevel: latest.serviceLevel }
 }
