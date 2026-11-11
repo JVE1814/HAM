@@ -73,8 +73,9 @@ Order's *Requested by* contact (`x_daas_ham_order.requested_by_contact`; the tas
 
 - **Upgrades**: the build carries no delete for a removed table or column, so an instance that had an earlier
   version keeps them with their values, unread. Nothing is migrated: stockroom members are entered again as group
-  members, and a Model's *Power (watts)*, a lease's *Vendor* and *Contract number* and an open work order's
-  *Initiated from* are filled in again ([Platform fields](../verify-on-instance.md#platform-fields)).
+  members, and a Model's *Power (watts)*, a lease's *Vendor* and *Contract number* and a work order's *Initiated
+  from* (one still open, or closed in a month whose Margin is still to be computed) are filled in again
+  ([Platform fields](../verify-on-instance.md#platform-fields)).
 - **`change_request` carries no column of the app any more.** For a table whose last app column goes, the build
   carries a delete of the table label SDK 4.14 wrote for it, under the app's own sys_id; the platform kept its own
   label then and should now (to confirm on the first install:

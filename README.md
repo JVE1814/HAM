@@ -163,7 +163,8 @@ On an instance where an earlier version was installed:
   - Give each NaaS stockroom an *Assignment group* holding the inventory techs who were its
     stockroom members ([stockroom assignment](docs/verify-on-instance.md#stockroom-assignment)).
   - Fill in each lease's *Vendor* (its Lessor) and *Contract number* and each racked Model's *Power
-    (watts)*, and set *Initiated from* to its NaaS Order on each work order still open
+    (watts)*, and set *Initiated from* to its NaaS Order, Return order or Audit on each work order
+    still open or closed in a month whose Margin is still to be computed
     ([platform fields](docs/verify-on-instance.md#platform-fields)).
   - Load the Models' lifecycle milestones again through the lifecycle import, or enter them by hand
     ([model lifecycle](docs/verify-on-instance.md#model-lifecycle)).

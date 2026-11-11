@@ -110,10 +110,15 @@ app no longer reads them: load them again through the lifecycle import or enter 
 unread. Fill in each lease's *Vendor* (its Lessor) and *Contract number* (until then a reference to
 the lease shows blank, and its return-to-lessor disposal order gets no vendor) and each racked
 Model's *Power (watts)* (until then it counts as 0 W in a rack's power budget). A work order opened
-by the earlier version has no *Initiated from*: set it to its NaaS Order while the work is open, or
-closing it will not confirm the install and its planned start is not checked against the change
-window (*Confirm installed* on the Order does the former). Stockroom members are entered again as
-group members ([Stockroom assignment](#stockroom-assignment)).
+by the earlier version has no *Initiated from*: set it to the Order, Return order or Audit its old
+column names (`x_daas_ham_order`, `x_daas_ham_return_order`, `x_daas_ham_audit`). Do it on every such
+work order still open, or closing one for an Order will not confirm the install and its planned
+start is not checked against the change window (*Confirm installed* on the Order does the former).
+Do it as well on every one closed in a month whose Margin is still to be computed or computed
+again: Margin takes a work order's labour in the currency of the Agreement its Order or Return
+order names, and without one it takes the currency the Customer's Agreements share, so a Customer
+whose Agreements bill in two currencies gets the labour left out with *no currency*. Stockroom
+members are entered again as group members ([Stockroom assignment](#stockroom-assignment)).
 
 ### Procurement and FSM data
 
