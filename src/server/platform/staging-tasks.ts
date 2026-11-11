@@ -35,7 +35,7 @@ export function stagingStockroom(): string {
     return stringProperty(PROPERTY.stagingStockroom)
 }
 
-function templates(): StagingTemplateView[] {
+function activeTemplates(): StagingTemplateView[] {
     const gr = new GlideRecord('x_daas_ham_staging_template')
     gr.addQuery('active', true)
     gr.query()
@@ -48,7 +48,6 @@ function templates(): StagingTemplateView[] {
             manufacturerId: str(gr, 'manufacturer'),
             deviceClass: str(gr, 'device_class'),
             source: str(gr, 'staging_source') as StagingTemplateView['source'],
-            active: true,
         })
     }
     return list
@@ -60,7 +59,7 @@ function templates(): StagingTemplateView[] {
  */
 export function openStagingTask(asset: GlideRecord, orderLineId: string): string | null {
     const source = (str(asset, 'x_daas_ham_staging_source') || DEFAULT_STAGING_SOURCE) as StagingTemplateView['source']
-    const templateId = selectStagingTemplate(templates(), {
+    const templateId = selectStagingTemplate(activeTemplates(), {
         customerId: str(asset, 'company'),
         manufacturerId: str(asset, 'model.manufacturer'),
         deviceClass: str(asset, 'model.x_daas_ham_device_class'),

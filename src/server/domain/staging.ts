@@ -11,7 +11,6 @@ export interface StagingTemplateView {
     manufacturerId: string
     deviceClass: string
     source: StagingSource
-    active: boolean
 }
 
 export interface StagingSubject {
@@ -21,14 +20,13 @@ export interface StagingSubject {
     source: StagingSource
 }
 
-/** The most specific active template whose non-blank fields all match (customer > manufacturer > device class). */
+/** The most specific template whose non-blank fields all match (customer > manufacturer > device class). */
 export function selectStagingTemplate(templates: readonly StagingTemplateView[], subject: StagingSubject): string | null {
     const fits = (field: string, value: string) => field === '' || field === value
     const score = (t: StagingTemplateView) => (t.customerId ? 4 : 0) + (t.manufacturerId ? 2 : 0) + (t.deviceClass ? 1 : 0)
     const best = templates
         .filter(
             (t) =>
-                t.active &&
                 t.source === subject.source &&
                 fits(t.customerId, subject.customerId) &&
                 fits(t.manufacturerId, subject.manufacturerId) &&
@@ -36,11 +34,6 @@ export function selectStagingTemplate(templates: readonly StagingTemplateView[],
         )
         .sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name))[0]
     return best?.id ?? null
-}
-
-export function stagingOutcome(steps: ReadonlyArray<{ mandatory: boolean; done: boolean }>): { complete: boolean; remaining: number } {
-    const remaining = steps.filter((s) => s.mandatory && !s.done).length
-    return { complete: remaining === 0, remaining }
 }
 
 /** The stage closing a Staging task complete sends its Asset to: staged, or pending evaluation when it failed. */
@@ -122,7 +115,7 @@ export function stagingClosureRefusal(
     }
     const unmoved = closureMoveProblem(task, asset)
     if (unmoved || task.failed) return unmoved
-    const { remaining } = stagingOutcome(steps)
+    const remaining = steps.filter((step) => step.mandatory && !step.done).length
     return remaining > 0 ? `${remaining} mandatory staging step(s) are still open` : null
 }
 
