@@ -1,11 +1,10 @@
 import { asArray, field, parseJson, text } from './json.ts'
-import type { RestFunction } from './rest-message-names.ts'
 
 /** The outbound HTTP seam shared by OEM and shipping integrations (ADR 0008). */
 
 /** A call to a named function of a REST message, with ${variable} substitutions, optional request headers and an optional JSON body. */
 export interface HttpRequest {
-    fn: RestFunction
+    fn: string
     /** ${variable} substitutions wherever the function uses them (endpoint, headers or body content); URL-encoded by the transport. */
     params: Record<string, string>
     /** Request headers set as they are (not encoded), for values only known at call time such as a session id. */

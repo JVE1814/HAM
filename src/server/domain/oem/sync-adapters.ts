@@ -3,7 +3,7 @@ import { failureText, isSuccess, type HttpPort } from '../http.ts'
 import { asArray, field, isoDate, parseJson, text } from '../json.ts'
 import type { CoverageFact, CoverageFetched, Fetched, LifecycleFact, RmaFact } from './types.ts'
 import { fortiCloudError } from './forticloud.ts'
-import { REST_MESSAGE, type RestFunction } from '../rest-message-names.ts'
+import { REST_MESSAGE } from '../rest-message-names.ts'
 
 /*
  * The vendor adapters the sync jobs call for lifecycle, coverage and RMA status (ADR 0008). Response shapes follow the vendors' public API documentation; mappers
@@ -19,7 +19,7 @@ export interface OemContext {
 
 export type Capability<Result> = (keys: readonly string[], context: OemContext) => Result
 
-function call(context: OemContext, fn: RestFunction, params: Record<string, string>, errors: string[]): unknown {
+function call(context: OemContext, fn: string, params: Record<string, string>, errors: string[]): unknown {
     const response = context.http({ fn, params })
     if (!isSuccess(response.status)) {
         errors.push(`${fn} ${JSON.stringify(params)}: ${failureText(response)}`)
