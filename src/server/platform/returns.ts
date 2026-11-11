@@ -54,16 +54,11 @@ import { endSitePackageIfEmpty } from './subscriptions.ts'
 import { SITE_FIELD } from '../domain/fleet.ts'
 import { log } from './log.ts'
 
-/**
- * Return orders and their lines (P2.4): raising one, by request or for a job, and what each line then goes through.
- * A line awaits its unit, which is received at the depot and evaluated, or declared missing once it is overdue; its
- * Return order closes when every line is evaluated or missing. Every write of a line's status is made here.
- */
+/** Every write of a line's status is made here. */
 
 export const RETURN = 'x_daas_ham_return_order'
 const RETURN_LINE = 'x_daas_ham_return_order_line'
 
-/** A Return to raise: why, for whom and from where, how its units come back, and the Assets to bring back. */
 export interface ReturnRequest {
     trigger: ReturnTrigger
     customerId: string
@@ -75,7 +70,6 @@ export interface ReturnRequest {
     description: string
 }
 
-/** A Return order raised: its number, and how many of its Assets got a line. */
 interface RaisedReturn {
     number: string
     lines: number
@@ -166,10 +160,8 @@ function fillReturn(order: GlideRecord, request: ReturnRequest): RaisedReturn {
     return { number: str(order, 'number'), lines }
 }
 
-/** What came of putting an Asset on a Return order: a line added, refused (logged), or none needed. */
 type LineResult = 'added' | 'refused' | 'skipped'
 
-/** Whether the Asset is on a Return order line still awaiting it. */
 function awaitsReturn(assetId: string): boolean {
     return latestReturnLine(assetId, [AWAITED]) !== null
 }
@@ -241,7 +233,6 @@ function addLineHolding(lock: HeldLock, order: GlideRecord, assetId: string): Li
     return 'added'
 }
 
-/** A request to take equipment back from a Site, as the record producer and the customer page make it. */
 export interface RequestedEquipment {
     /**
      * The Return order the record producer saved for the request, which names its Customer, Site and method; none
@@ -255,11 +246,9 @@ export interface RequestedEquipment {
     listedAssetIds: readonly string[]
     /** How the units come back; '' leaves it to the Site contact to ship them. */
     method: ReturnMethod | ''
-    /** The Return's short description, given the Site's name. */
     describe(siteName: string): string
 }
 
-/** Why a return request raised no Return (`RequestOutcome`). */
 type NotRaised = 'forbidden' | 'invalid' | 'nothing' | 'awaited' | 'busy' | 'refused'
 
 /**
@@ -303,7 +292,6 @@ export function requestReturn(request: RequestedEquipment): RequestOutcome {
     return raised.ran ? raised.value : notRaised('busy', 'Another return request of yours is being raised: try again in a moment')
 }
 
-/** Raise the requested Return, its requester and Site checked (`requestReturn`); the customer page's holding its Customer's return-request lock. */
 function raiseRequested(request: RequestedEquipment, site: GlideRecord | null): RequestOutcome {
     const { produced, customerId, siteId } = request
     const trigger = requestedTrigger(request.decommission)
@@ -349,13 +337,11 @@ export function requestProducedReturn(order: GlideRecord, listedAssetIds: readon
     return outcome
 }
 
-/** The location a request names, as domain/returns reads it: whose it is and whether it is a Site at all. */
 function requestedSite(siteId: string, site: GlideRecord | null): RequestedReturn['site'] {
     if (!siteId) return undefined
     return { id: siteId, customerId: site ? str(site, 'company') : null, isSite: !!site && bool(site, SITE_FIELD) }
 }
 
-/** The signed-in user as a Return requester: one the Return create rule lets create a Return order. */
 function returnRequester(produced: GlideRecord | undefined): ReturnRequester {
     const { permitted, scope, customerId } = creatorOf(produced ?? new GlideRecord(RETURN))
     return { mayRequest: permitted, scope, customerId }
@@ -382,10 +368,6 @@ function latestReturnLine(assetId: string, statuses: readonly ReturnLineStatus[]
     return line.next() ? line : null
 }
 
-/**
- * What came of receiving a unit at the depot as a return: it is not coming back from a Site (it is received as stock
- * instead), it is received, or the lifecycle or the platform refused the receipt and why.
- */
 type ReturnReceipt = 'not_returning' | 'received' | { refused: string }
 
 /**
@@ -411,7 +393,6 @@ export function receiveReturnedAsset(asset: GlideRecord, stockroomId: string): R
     return 'received'
 }
 
-/** Mark the line of a unit just received, and charge or waive what its arrival settles. */
 function settleReceivedLine(line: GlideRecord, asset: GlideRecord): void {
     const turnedUp = str(line, 'status') === RETURN_LINE_STATUS.missing
     line.setValue('status', RETURN_LINE_STATUS.received)
@@ -431,7 +412,6 @@ function settleReceivedLine(line: GlideRecord, asset: GlideRecord): void {
     if (receivedLate(str(returnOrder, 'due_back'), todayIso())) recordFee('late_return', asset, returnOrder.getUniqueValue())
 }
 
-/** What came of an evaluation: the Asset moved on and its line is evaluated, or why not. */
 export type Evaluation = { evaluated: true } | { evaluated: false; why: string }
 
 function notEvaluated(why: string): Evaluation {
@@ -497,7 +477,6 @@ export function chaseOverdue(): void {
     })
 }
 
-/** An overdue return line to declare missing, with its Return order's number for the log. */
 interface OverdueLine {
     lineId: string
     assetId: string
@@ -560,12 +539,10 @@ function declareHolding(lock: HeldLock, overdue: OverdueLine): boolean {
     return false
 }
 
-/** Whether the unit is at or towards its Site in a stage the lifecycle moves to missing (domain/lifecycle `checkTransition`). */
 function mayGoMissing(asset: GlideRecord, stage: Stage | null): boolean {
     return isDeployed(stage) && checkTransition(stage, 'missing', transitionFacts(asset)).allowed
 }
 
-/** Close a Return order once every line is evaluated or declared missing. */
 function closeReturnIfDone(returnOrderId: string): void {
     if (exists(RETURN_LINE, `return_order=${returnOrderId}^statusIN${KEEPS_RETURN_OPEN.join(',')}`)) return
     const order = findById(RETURN, returnOrderId)

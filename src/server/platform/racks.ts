@@ -23,14 +23,9 @@ import { cisWithOpenException, settleExceptions } from './exceptions.ts'
 import { choice, exists, findById, num, recordsById, str, type ForeignRecord } from './records.ts'
 import { currentSession } from './session.ts'
 
-/**
- * Racks: where fleet assets are placed, whether a placement fits (P2.8), the rack exceptions (Q67) and the reads of
- * the rack elevation view. None of it tells the user anything: each gives what it found, for the trigger that asked.
- */
+/** None of it tells the user anything: each gives what it found, for the trigger that asked. */
 
-/** Where an Asset sits in its rack, and its Model (whose name, size and draw are read separately). */
 interface Slot {
-    /** The Asset's sys_id: the Placement's key, read the same way for the candidate and for the rack's other devices. */
     id: string
     tag: string
     serial: string
@@ -50,7 +45,6 @@ function slotOf(asset: ForeignRecord): Slot {
     }
 }
 
-/** What the rack checks and the elevation view need of a Model. */
 interface RackModel {
     name: string
     rackUnits: number
@@ -60,7 +54,7 @@ interface RackModel {
 /** A missing or deleted Model reads as a dot-walk through a broken reference did: blank and zeros. */
 const NO_MODEL: RackModel = { name: '', rackUnits: 0, powerW: 0 }
 
-/** Name, rack units and typical power (the platform's cmdb_model.power_consumption, in watts) of each Model, read with one query. */
+/** Typical power is the platform's cmdb_model.power_consumption, in watts. */
 function rackModels(modelIds: readonly string[]): Map<string, RackModel> {
     return recordsById(MODEL_TABLE, modelIds, (model) => ({
         name: str(model, 'display_name'),
@@ -122,25 +116,20 @@ export function placementRefusal(current: ForeignRecord, previous: ForeignRecord
     if (!rack) return null
     const candidate = slotOf(current)
     const others = slotsIn(rackId, candidate.id)
-    // The Model this device already had in this rack, as a fleet asset; undefined when it is new to the rack or to
-    // the fleet.
     const previousModelId =
         previous && isFleetAsset(previous) && str(previous, PLACEMENT_FIELDS.rack) === rackId && str(previous, PLACEMENT_FIELDS.ruStart)
             ? str(previous, 'model')
             : undefined
-    // Every Model involved in one query; an unchanged Model is the candidate's own entry.
     const models = rackModels([candidate.modelId, previousModelId ?? '', ...others.map((slot) => slot.modelId)])
     const previousPowerW = previousModelId === undefined ? undefined : (models.get(previousModelId) ?? NO_MODEL).powerW
     const placements = others.map((slot) => placementOf(slot, models))
     return placementProblem(rackSpec(rack), placements, placementOf(candidate, models), previousPowerW)
 }
 
-/** Whether the save leaves the Asset where it was placed: not an insert, and its rack, lowest unit and face unchanged. */
 export function keepsPlacement(current: ForeignRecord, previous: ForeignRecord | null): boolean {
     return !!previous && Object.values(PLACEMENT_FIELDS).every((field) => str(current, field) === str(previous, field))
 }
 
-/** Every device placed in the rack, past the visibility rules, with its Model's height and draw. */
 function placementsIn(rackId: string): Placement[] {
     const slots = slotsIn(rackId)
     const models = rackModels(slots.map((slot) => slot.modelId))
@@ -207,10 +196,8 @@ function seesSite(locationIds: readonly string[]): boolean {
     return exists('cmn_location', [`sys_idIN${ids.join(',')}`, SITE_CONDITION, ...(filter ? [filter] : [])].join('^'))
 }
 
-/** The most Sites the page's picker lists. */
 const SITES_LISTED = 1000
 
-/** The customer Sites the user may see, by name (customers only their own, site contacts only theirs). */
 export function visibleSites(): Site[] {
     const site = new GlideRecord('cmn_location')
     site.addEncodedQuery(SITE_CONDITION)
@@ -229,7 +216,6 @@ export function clearRackPlacement(asset: GlideRecord): void {
     for (const field of Object.values(PLACEMENT_FIELDS)) asset.setValue(field, '')
 }
 
-/** Where a rack stands: in a Room of its Site, or at the Site itself. The listing and the elevation both read it. */
 const RACK_SITE_LOCATIONS = ['location', 'location.parent'] as const
 
 /** The racks at a Site and in its rooms, by name; null when `siteId` names no Site the user may see. */
@@ -273,7 +259,6 @@ export function rackElevation(rackId: string): RackElevation | null {
             },
         })
     }
-    // Models and Customer names each read with one query.
     const models = rackModels(found.map(({ slot }) => slot.modelId))
     const customerNames = recordsById('core_company', found.map(({ companyId }) => companyId), (company) => str(company, 'name'))
     const placements = found.map(({ slot }) => placementOf(slot, models))

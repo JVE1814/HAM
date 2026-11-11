@@ -4,12 +4,6 @@ import { LOCK } from '../domain/lock-names.ts'
 import { receive } from './receiving.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
-/*
- * A scan at the staging centre of a bought unit, run against the in-memory stand-in for the platform, job locks
- * included (ADR 0013): the unit was announced on purchase order PO0001, which Order line ORL0001 of ORD0001 raised and
- * still awaits.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const ORDERS = 'x_daas_ham_order'

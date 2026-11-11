@@ -17,8 +17,6 @@ import { PROPERTY } from '../domain/properties.ts'
 import { pluck, str } from './records.ts'
 import { IN_USE_STAGES } from '../domain/lifecycle.ts'
 
-/** Reconciliation of the installed base with what monitoring reports (P2.7). */
-
 /**
  * Compare installed fleet assets with monitoring; open new exceptions and resolve cleared ones. The Provider IT's
  * equipment in use (laptops, printers) is in service by its install status too, and is left out (ADR 0016): a
@@ -72,7 +70,6 @@ function resolveClearedSeenWithoutAsset(): void {
 /** The most CIs one run reports: each costs an exception lookup, and the run has no cursor to go on from. */
 const SEEN_WITHOUT_ASSET_PER_RUN = 1000
 
-/** Network CIs recently discovered at a customer Site that no fleet asset points at (`seenWithoutFleetAssetQuery`). */
 function reportSeenWithoutAsset(days: number): void {
     const ci = new GlideRecord('cmdb_ci_netgear')
     ci.addQuery('last_discovered', '>=', daysAgoGlide(days))

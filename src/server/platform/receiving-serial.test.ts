@@ -4,11 +4,6 @@ import { stageOf } from '../domain/lifecycle.ts'
 import { importAsnRow, receive } from './receiving.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
-/*
- * The Asset of a serial the app has none for, created by a first scan with its PID or by an ASN row, against the
- * in-memory stand-in for the platform, job locks included.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const ASSETS = 'alm_hardware'

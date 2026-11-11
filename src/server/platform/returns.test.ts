@@ -4,11 +4,6 @@ import { FEE_STATUS, RETURN_LINE_STATUS } from '../domain/vocabulary.ts'
 import { chaseOverdue, raiseReturn, requestReturn } from './returns.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
-/*
- * Returns raised against the in-memory stand-in for the platform, job locks included: for a unit whose return lock
- * another Return holds through every try, and as a Customer admin's device removal.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const RETURNS = 'x_daas_ham_return_order'
@@ -23,7 +18,6 @@ function unit(stage: Stage): Row {
     return { sys_id: 'a1', serial_number: 'FOC111', x_daas_ham_fleet: 'true', x_daas_ham_site: 'site1', x_daas_ham_agreement: 'ag1', install_status: installStatus, substatus: substatus ?? '' }
 }
 
-/** Raise a Return for the unit, as a device removal the Site ships back. */
 function raise() {
     return raiseReturn({
         trigger: 'device_removal',
