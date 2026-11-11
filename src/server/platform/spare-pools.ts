@@ -59,10 +59,6 @@ function sparePurchasesEnabled(): boolean {
     return false
 }
 
-function countByModel(query: string): Map<string, number> {
-    return countBy('alm_hardware', query, 'model')
-}
-
 /** The Customer's Agreements the top-up runs over, with their spare-pool ratios. */
 function poolAgreements(customerId: string): Map<string, number> {
     const agreement = new GlideRecord('x_daas_ham_agreement')
@@ -103,7 +99,7 @@ function topUpCustomerPools(customerId: string, agreementId: string, autoPurchas
     if (!customerId) return
     const ratios = poolAgreements(customerId)
     if (sparePoolLead([...ratios.keys()]) !== agreementId) return
-    const reserved = countByModel(reservedSparesQuery(customerId))
+    const reserved = countBy('alm_hardware', reservedSparesQuery(customerId), 'model')
     for (const pool of sparePools(deployedShares(ratios))) {
         // A pool these counts show full is left without its lock: another run's top-up meanwhile only fills it.
         if (sparePoolShortfall(pool.size, reserved.get(pool.modelId) ?? 0) === 0) continue
@@ -120,7 +116,7 @@ function topUpCustomerPools(customerId: string, agreementId: string, autoPurchas
  */
 function topUpPool(customerId: string, pool: SparePool, autoPurchase: boolean, lock: HeldLock): void {
     const { modelId } = pool
-    const reserved = countByModel(andEachClause(reservedSparesQuery(customerId), `model=${modelId}`)).get(modelId) ?? 0
+    const reserved = countBy('alm_hardware', andEachClause(reservedSparesQuery(customerId), `model=${modelId}`), 'model').get(modelId) ?? 0
     const shortfall = sparePoolShortfall(pool.size, reserved)
     if (shortfall === 0) return
     const picked = freeStock(modelId, shortfall)
