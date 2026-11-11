@@ -45,7 +45,7 @@ function setDemoProperty(name: string, recordId: string): void {
 
 const ADMIN_USER = '6816f79cc0a8016401c5a33be04be441'
 
-/** The group the demo depots are assigned to. It ships with the demo data (fluent/demo): this scope may not create a group. */
+/** The group the demo depots are assigned to. */
 export const DEMO_DEPOT_GROUP = 'NaaS demo depot team'
 
 const DEMO_PROVIDER = 'Demo NaaS Provider'

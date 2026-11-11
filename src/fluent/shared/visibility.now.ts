@@ -3,22 +3,8 @@ import { Acl, BusinessRule } from '@servicenow/sdk/core'
 import { readsRecord, scopeRecords } from '../../server/entry/visibility'
 
 /*
- * Reads are also
- * narrowed by the before-query rules below; customer ACLs re-check the customer, and for a site contact (no customer
- * admin role) that the record's Site lists them as a contact, so neither a direct link nor a dot-walk from a visible
- * record leaks data. Return lines, attestation items,
- * shipment events and Site templates with their items have no before-query rule: their ACL is the only check.
- * Inventory techs read only the tables of their stockroom work (providerStaff or a list naming inventoryTech); other
- * staff reads use broadStaff or a narrower list, and the service desk reads what the Orders and Returns it raises need.
- * On the tables narrowed to an inventory tech's stockrooms, a Deny-Unless row check (below) re-checks the stockroom.
- * Hardware's read ACLs sit on alm_asset, and with them who changes hardware by hand and who reads its Provider fields
- * (fleet/access.now.ts).
- */
-
-/*
- * Every rule runs the one
- * script, which finds the scoping of the table queried in domain/visibility SCOPED_TABLES: a table is scoped by a rule
- * here and its entry there.
+ * Every rule runs the one script, which finds the scoping of the table queried in domain/visibility SCOPED_TABLES: a
+ * table is scoped by a rule here and its entry there.
  */
 
 BusinessRule({
