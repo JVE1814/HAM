@@ -1,6 +1,7 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { isCurrentPass as namesCurrentPass } from '../domain/chunked-job.ts'
 import { nowGlide, nowMs } from './clock.ts'
+import { log } from './log.ts'
 import { num, refusal, str } from './records.ts'
 
 /**
@@ -132,7 +133,7 @@ export function isCurrentPass(job: string, token: string): boolean {
  */
 export function completePass(job: string): void {
     const refused = openJobCursor(job).save({ status: JOB_STATUS.complete, ranNow: true })
-    if (refused) gs.warn(`[x_daas_ham] ${job}: the pass completed, but its job cursor still reads running (as if stalled): ${refused}`)
+    if (refused) log.warn(`${job}: the pass completed, but its job cursor still reads running (as if stalled): ${refused}`)
 }
 
 /**

@@ -1,7 +1,8 @@
-import { gs, type GlideRecord } from '@servicenow/glide'
+import type { GlideRecord } from '@servicenow/glide'
 import { replacementProblem, replacementStep } from '../domain/breakfix.ts'
 import { ORDER_STAGE, type OrderStage } from '../domain/vocabulary.ts'
 import { isFleetAsset, readStage } from './assets.ts'
+import { log } from './log.ts'
 import { createOrder, submitOrder } from './orders.ts'
 import { bool, findById, refusal, str, warnRefused } from './records.ts'
 
@@ -102,7 +103,7 @@ export function noteReplacementComplete(orderId: string): void {
     const caseId = str(order, 'case')
     if (!caseId) return
     const kase = findById('sn_customerservice_case', caseId)
-    if (!kase) return void gs.warn(`[x_daas_ham] ${str(order, 'number')} complete, but its case ${caseId} was not found: save the case to stop its SLA`)
+    if (!kase) return void log.warn(`${str(order, 'number')} complete, but its case ${caseId} was not found: save the case to stop its SLA`)
     if (!bool(kase, 'active') || str(kase, 'x_daas_ham_replacement_order') !== order.getUniqueValue()) return
     kase.setValue('work_notes', `Replacement order ${str(order, 'number')} is complete: the replacement is installed.`)
     if (!kase.update()) warnRefused(kase, `${str(kase, 'number')}: replacement SLA not stopped, the case save was refused; save the case`)

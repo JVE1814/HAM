@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { ambiguousIdentifier, fieldMatch, IDENTIFIER_FIELDS, IDENTIFIER_READ_LIMIT } from '../domain/asset-identifier.ts'
 import { normalizeSerial } from '../domain/serials.ts'
 import {
@@ -24,6 +24,7 @@ import { beyondVisibility } from './beyond-visibility.ts'
 import { stringProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { bool, refusal, str, warnRefused, type ForeignRecord, type ReadOptions } from './records.ts'
+import { log } from './log.ts'
 
 /** Reading and moving Assets (alm_hardware) through their Lifecycle stage (ADR 0002). */
 
@@ -86,7 +87,7 @@ export function moveRefusal(asset: GlideRecord, to: Stage): string {
 export function moveAndSave(asset: GlideRecord, to: Stage, context: string): boolean {
     const reason = moveRefusal(asset, to)
     if (!reason) return true
-    gs.warn(`[x_daas_ham] ${context}: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
+    log.warn(`${context}: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
     return false
 }
 
@@ -183,7 +184,7 @@ export function identifyAsset(identifier: string, options: ReadOptions = {}): As
 export function findAssetByIdentifier(identifier: string, options: ReadOptions = {}): GlideRecord | null {
     const identified = identifyAsset(identifier, options)
     if (identified && 'ambiguous' in identified) {
-        gs.warn(`[x_daas_ham] Identifier ${identifier.trim()} refused: ${identified.ambiguous}`)
+        log.warn(`Identifier ${identifier.trim()} refused: ${identified.ambiguous}`)
         return null
     }
     return identified?.asset ?? null

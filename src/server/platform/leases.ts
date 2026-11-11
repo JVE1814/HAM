@@ -1,4 +1,4 @@
-import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
+import { GlideAggregate, GlideRecord } from '@servicenow/glide'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { withinLead } from '../domain/calendar.ts'
@@ -28,6 +28,7 @@ import { stringProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { bool, count, exists, findById, num, pluck, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
 import { changeStock, releaseToProviderStock, stockUnit } from './stock.ts'
+import { log } from './log.ts'
 
 /**
  * Lease schedules and their end-of-lease decisions (plan §13 Leases), over fleet assets only (ADR 0016): the daily review, a
@@ -283,7 +284,7 @@ function withdrawFromStock(found: GlideRecord): GlideRecord | 'taken' | 'refused
     })
     if (withdrawn.ran) return withdrawn.value
     const serial = str(found, 'serial_number')
-    gs.warn(`[x_daas_ham] Lease return: ${serial} not withdrawn: its stock lock could not be taken`)
+    log.warn(`Lease return: ${serial} not withdrawn: its stock lock could not be taken`)
     return 'refused'
 }
 
@@ -307,7 +308,7 @@ function moveOutOfStock(lock: HeldLock, asset: GlideRecord): boolean {
 }
 
 function notMoved(asset: GlideRecord, to: Stage, reason: string): false {
-    gs.warn(`[x_daas_ham] Lease return: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
+    log.warn(`Lease return: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
     return false
 }
 

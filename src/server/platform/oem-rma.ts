@@ -1,10 +1,11 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
 import { RMA_AT_OEM, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse } from '../domain/oem-rma.ts'
 import { lineStillOpen } from '../domain/sourcing.ts'
 import { LINE_STAGE, type OemVendor, RMA_STATE, type RmaState } from '../domain/vocabulary.ts'
 import { isFleetAsset, moveRefusal } from './assets.ts'
 import { nowGlide, todayIso } from './clock.ts'
+import { log } from './log.ts'
 import { count, findById, refusal, str, warnRefused } from './records.ts'
 
 /** OEM RMA records (opening the RMA with the vendor is manual, ADR 0008). */
@@ -62,7 +63,7 @@ export function reuseOemRma(reuse: RmaReuse, orderLineId: string): boolean {
     const rma = findById('x_daas_ham_oem_rma', reuse.rma.rmaId)
     const notReused = `OEM RMA ${reuse.rma.rmaNumber || reuse.rma.rmaId} not reused`
     if (!rma) {
-        gs.warn(`[x_daas_ham] ${notReused}: not found`)
+        log.warn(`${notReused}: not found`)
         return false
     }
     rma.setValue('order_line', orderLineId)

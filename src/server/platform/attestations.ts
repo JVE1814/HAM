@@ -9,6 +9,7 @@ import { openException } from './exceptions.ts'
 import { bool, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { installedAssetIds } from './installed-assets.ts'
 import { IN_USE_STAGES } from '../domain/lifecycle.ts'
+import { log } from './log.ts'
 
 /**
  * Attestations: a Customer admin confirms the equipment installed at a Site (P2.7, Q63). The daily job raises them,
@@ -80,7 +81,7 @@ function openAttestation(agreement: GlideRecord, siteId: string): void {
         why = `not opened: ${refusal(attestation)}`
     }
     const kept = attestation.deleteRecord() ? '' : `; ${str(attestation, 'number')} stays pending, cancel it`
-    gs.warn(`[x_daas_ham] No attestation for site ${siteId}: ${why}${kept}`)
+    log.warn(`No attestation for site ${siteId}: ${why}${kept}`)
 }
 
 function listAttested(attestationId: string, assetIds: readonly string[]): string {
@@ -155,6 +156,6 @@ export function completeAttestation(attestation: GlideRecord): string {
 }
 
 function notClosed(number: string, reason: string): string {
-    gs.warn(`[x_daas_ham] Attestation ${number} not closed: ${reason}`)
+    log.warn(`Attestation ${number} not closed: ${reason}`)
     return reason
 }

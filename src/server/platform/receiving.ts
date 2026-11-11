@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { normalizeSerial } from '../domain/serials.ts'
 import { naasStockroomType, OEM_PID_FIELD, receiptProblem, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
@@ -37,6 +37,7 @@ import { withOrderLineLock } from './sourcing.ts'
 import { openStagingTask } from './staging-tasks.ts'
 import { changeStock, reserveAsset } from './stock.ts'
 import { nextProviderTag } from './tags.ts'
+import { log } from './log.ts'
 
 /**
  * Depot work on a scanned unit (P1.5): receiving it, putting it away, picking it for an Order. Each gives the Asset as
@@ -296,7 +297,7 @@ function allocateHolding(lineLock: HeldLock, asset: GlideRecord, waiting: Waitin
         const unit = `${str(asset, 'serial_number')} left in stock, not given to ${str(waiting.line, 'number')}`
         // The RMA number came in the PO field (`waitingLine`).
         const rma = waiting.rmaId ? `; RMA ${str(asset, 'po_number')} left open, update it by hand` : ''
-        gs.warn(`[x_daas_ham] Received ${unit}: ${problem ?? ''}${rma}`)
+        log.warn(`Received ${unit}: ${problem ?? ''}${rma}`)
         return { leftFree: true }
     }
     if (waiting.rmaId) markReplacementReceived(waiting.rmaId, str(asset, 'serial_number'))
@@ -310,7 +311,7 @@ function allocateHolding(lineLock: HeldLock, asset: GlideRecord, waiting: Waitin
     })
     if (!reserved) {
         const why = 'another run claimed it, or the save was refused'
-        gs.warn(`[x_daas_ham] Received ${str(asset, 'serial_number')} not reserved for ${str(line, 'number')}: ${why}`)
+        log.warn(`Received ${str(asset, 'serial_number')} not reserved for ${str(line, 'number')}: ${why}`)
         return { reserved: null }
     }
     return { reserved: stageReserved(lineLock, reserved, line) }

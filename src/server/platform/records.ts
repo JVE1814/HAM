@@ -1,6 +1,7 @@
-import { GlideAggregate, type GlideElement, GlideRecord, gs } from '@servicenow/glide'
+import { GlideAggregate, type GlideElement, GlideRecord } from '@servicenow/glide'
 import { oneOf } from '../domain/exhaustive.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
+import { log } from './log.ts'
 
 /** Small Glide helpers shared by repositories and gateways. Keep this module free of business rules. */
 
@@ -135,7 +136,7 @@ export function refusal(record: GlideRecord, fallback = 'the save was refused'):
  */
 export function warnRefused(record: GlideRecord, undone: string): string {
     const reason = refusal(record)
-    gs.warn(`[x_daas_ham] ${undone}: ${reason}`)
+    log.warn(`${undone}: ${reason}`)
     return reason
 }
 
@@ -174,7 +175,7 @@ export function num(gr: ForeignRecord, field: string): number {
     if (raw === null || raw === undefined) return 0
     const value = Number(raw)
     if (Number.isFinite(value)) return value
-    gs.warn(`[x_daas_ham] ${gr.getTableName()} ${gr.getUniqueValue()}: ${field} holds '${String(raw)}', not a number; read as 0`)
+    log.warn(`${gr.getTableName()} ${gr.getUniqueValue()}: ${field} holds '${String(raw)}', not a number; read as 0`)
     return 0
 }
 

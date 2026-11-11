@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { approversToAsk } from '../domain/approvals.ts'
 import type { NamedRecord } from '../domain/customer-parties.ts'
 import {
@@ -39,6 +39,7 @@ import { withOrderLineLock } from './sourcing.ts'
 import { skipOpenStagingTasks } from './staging-tasks.ts'
 import { releaseToProviderStock, takeOffOrderLine } from './stock.ts'
 import { SITE_FIELD } from '../domain/fleet.ts'
+import { log } from './log.ts'
 
 /**
  * Orders up to sourcing (ADR 0004): raise an Order with its lines, submit it (entitlement, then approval or sourcing),
@@ -133,10 +134,10 @@ export function submitProducedOrder(order: GlideRecord, devices: readonly NewLin
     }
     const fromTemplate = parties.siteTemplate && siteTemplateOffered(parties) ? siteTemplateLines(parties.siteTemplate.id) : []
     const refused = addOrderLines(order, [...fromTemplate, ...devices])
-    for (const { line, reason } of refused) gs.warn(`[x_daas_ham] ${number}: no line for model ${line.modelId}: ${reason}`)
+    for (const { line, reason } of refused) log.warn(`${number}: no line for model ${line.modelId}: ${reason}`)
     const missing = refused.length > 0 ? [`${refused.length} order line(s) not saved (see the system log): add them`] : []
     if (devicesUnread) {
-        gs.warn(`[x_daas_ham] ${number}: the devices asked for could not be read, so it has no line for them: ${devicesUnread}`)
+        log.warn(`${number}: the devices asked for could not be read, so it has no line for them: ${devicesUnread}`)
         missing.push('The devices asked for could not be read (see the system log): add them as order lines')
     }
     return submitAsRaised(order, parties, raiser, missing, { via: 'producer', tries: 0 })
@@ -321,14 +322,14 @@ function submitLater(order: GlideRecord, source: SubmissionSource): Submission {
     const number = str(order, 'number')
     const lockName = LOCK.agreementUsage(str(order, 'agreement'))
     if (!requeueCounted(EVENT.sourceOrder, order, SUBMIT_AGAIN, source.tries)) {
-        gs.warn(`[x_daas_ham] ${number} left a draft: ${lockName} stayed held through ${source.tries} submissions queued again; submit it`)
+        log.warn(`${number} left a draft: ${lockName} stayed held through ${source.tries} submissions queued again; submit it`)
         const kept = 'other Orders of its Agreement kept being submitted at the same time. Submit it'
         noteDraft(order, `Not submitted: ${kept}`)
         return notSubmitted(`Order not submitted: ${kept}`)
     }
     const busy = 'another Order of its Agreement was being submitted at the same time. It is submitted again automatically'
     if (source.tries === 0) noteDraft(order, `Not submitted yet: ${busy}`)
-    gs.info(`[x_daas_ham] ${number} submitted again in ${REQUEUE.delaySeconds} s: another submission holds ${lockName}`)
+    log.info(`${number} submitted again in ${REQUEUE.delaySeconds} s: another submission holds ${lockName}`)
     if (source.via !== 'producer') return notSubmitted(`Order not submitted yet: ${busy} in a minute`)
     const saved = `Order ${number} is saved and is submitted within a few minutes: another order of the same agreement was being submitted at that moment`
     return { submitted: false, message: `${saved}. There is no need to raise it again`, info: true }
@@ -399,7 +400,7 @@ function rejectOrder(order: GlideRecord): string {
         return ''
     })
     if (underLines.ran) return underLines.value
-    gs.warn(`[x_daas_ham] ${number} not rejected: a line's lock stayed held through every try; re-check its approvals`)
+    log.warn(`${number} not rejected: a line's lock stayed held through every try; re-check its approvals`)
     return 'one of its lines is being received or cancelled: re-check its approvals shortly'
 }
 

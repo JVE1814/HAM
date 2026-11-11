@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { fleetCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
 import {
     aliasedManufacturer,
@@ -21,6 +21,7 @@ import {
 import { runTableJob } from './chunked.ts'
 import { bool, countBy, num, pluck, str, warnRefused } from './records.ts'
 import { NORM_EXCEPTION_STATUS } from '../domain/vocabulary.ts'
+import { log } from './log.ts'
 
 /** Resolving raw manufacturer/model strings to canonical Models (domain/normalization). */
 
@@ -126,7 +127,7 @@ export function normalizeNaasRawModels(): void {
     // No raw model is NaaS's: nothing to map.
     if (!query) return
     const data = loadNormalizationData()
-    for (const rule of unusableRules(data.rules)) gs.warn(`[x_daas_ham] Model match rule skipped: its pattern ${rule.pattern} is not a regular expression`)
+    for (const rule of unusableRules(data.rules)) log.warn(`Model match rule skipped: its pattern ${rule.pattern} is not a regular expression`)
     runTableJob({
         job: 'normalize_raw_models',
         table: RAW_MODEL_TABLE,

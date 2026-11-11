@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { toIsoDate } from '../domain/calendar.ts'
 import { chooseSubscriptionLine, type SubscriptionLineView } from '../domain/in-service.ts'
 import { TRY_AGAIN, type HeldLock, type TryAgain } from '../domain/job-lock.ts'
@@ -7,6 +7,7 @@ import { sitePackageHoldersQuery } from '../domain/returns.ts'
 import { SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
 import { todayIso } from './clock.ts'
 import { withLockTries } from './locks.ts'
+import { log } from './log.ts'
 import { exists, findById, refusal, str, warnRefused } from './records.ts'
 
 /** Subscription lines (x_daas_ham_subscription_line): a pending one starts with its first Asset into service, a site package ends as the last unit leaves its Site. */
@@ -44,7 +45,7 @@ export function attachToSubscription(asset: GlideRecord, inServiceAt: number): b
         const unstarted = startLine(lineId, inServiceAt)
         if (unstarted) {
             const serial = str(asset, 'serial_number')
-            gs.warn(`[x_daas_ham] ${serial} stays pending in service, line not started: ${unstarted}`)
+            log.warn(`${serial} stays pending in service, line not started: ${unstarted}`)
             return false
         }
     }

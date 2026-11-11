@@ -33,6 +33,7 @@ import { PROPERTY } from '../domain/properties.ts'
 import { count, findById, refusal, str, warnRefused } from './records.ts'
 import { restMessagePort } from './rest-messages.ts'
 import { REST_MESSAGE } from '../domain/rest-message-names.ts'
+import { log } from './log.ts'
 
 /**
  * Shipments bought from the shipping aggregator (plan §13 Shipping aggregator, Q73): labels for Orders and ship-back returns, marking one
@@ -403,7 +404,7 @@ export function trackShipment(update: TrackingUpdate): WebhookTracking {
 export function retryTracking(shipment: GlideRecord, param: string, tries: number): void {
     const queued = parseTrackingRetry(param)
     if (!queued) {
-        return void gs.warn(`[x_daas_ham] Tracking retry of ${shipmentName(shipment)} dropped: parm1 is not an update`)
+        return void log.warn(`Tracking retry of ${shipmentName(shipment)} dropped: parm1 is not an update`)
     }
     let tracked: Tracked
     try {
@@ -485,12 +486,12 @@ function noteDelivery(saved: Saved, trackingNumber: string): void {
 function trackLater(shipment: GlideRecord, update: TrackingUpdate): boolean {
     const params = trackingRetryParams(update, storedEvents(shipment.getUniqueValue()).keys)
     if (!params) {
-        gs.warn(`[x_daas_ham] Tracking update of ${shipmentName(shipment)} not queued: an event is too long to queue`)
+        log.warn(`Tracking update of ${shipmentName(shipment)} not queued: an event is too long to queue`)
         return false
     }
     for (const param of params) fire(EVENT.trackShipment, shipment, param, '0')
     const name = shipmentName(shipment)
-    gs.info(`[x_daas_ham] Tracking update of ${name} queued in ${params.length} event(s): another update held its lock`)
+    log.info(`Tracking update of ${name} queued in ${params.length} event(s): another update held its lock`)
     return true
 }
 
@@ -499,9 +500,9 @@ function trackAgain(shipment: GlideRecord, param: string, tries: number, why: st
     const name = shipmentName(shipment)
     if (!requeueCounted(EVENT.trackShipment, shipment, param, tries)) {
         const check = 'check the Shipment with the carrier'
-        return void gs.warn(`[x_daas_ham] Tracking update of ${name} dropped after ${tries} tries (${why}): ${check}`)
+        return void log.warn(`Tracking update of ${name} dropped after ${tries} tries (${why}): ${check}`)
     }
-    gs.info(`[x_daas_ham] Tracking update of ${name} tried again in ${REQUEUE.delaySeconds} s: ${why}`)
+    log.info(`Tracking update of ${name} tried again in ${REQUEUE.delaySeconds} s: ${why}`)
 }
 
 /**

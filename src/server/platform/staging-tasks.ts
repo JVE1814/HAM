@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { claimRouted, initialAutomationStatus } from '../domain/oem/claims.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { lineStillOpen } from '../domain/sourcing.ts'
@@ -19,6 +19,7 @@ import {
 import { moveAndSave, readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { lineLostUnit } from './fulfilment.ts'
+import { log } from './log.ts'
 import { stringProperty } from './properties.ts'
 import { bool, deleteWhere, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { takeOffOrderLine } from './stock.ts'
@@ -82,8 +83,8 @@ export function openStagingTask(asset: GlideRecord, orderLineId: string): string
     if (stepRefused === null) return taskId
     deleteWhere('x_daas_ham_staging_step', `staging_task=${taskId}`)
     const removed = task.deleteRecord()
-    gs.warn(
-        `[x_daas_ham] No Staging task for ${str(asset, 'serial_number')}: ${stepRefused}` +
+    log.warn(
+        `No Staging task for ${str(asset, 'serial_number')}: ${stepRefused}` +
             (removed ? '' : `; ${str(task, 'number')} keeps an incomplete checklist, cancel it`),
     )
     return null

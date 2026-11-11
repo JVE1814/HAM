@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { isStateChange, type DeviceEvent } from '../domain/device-events.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import { decideInService, seenSourceOf } from '../domain/in-service.ts'
@@ -10,6 +10,7 @@ import { runTableJob } from './chunked.ts'
 import { daysAgoGlide, glideToMs, msToGlide } from './clock.ts'
 import { applyLifecycleDates, lifecycleReaders, type LifecycleReaders } from './lifecycle-dates.ts'
 import { withLockTries } from './locks.ts'
+import { log } from './log.ts'
 import { choice, deleteWhere, findById, refusal, str } from './records.ts'
 import { attachToSubscription } from './subscriptions.ts'
 
@@ -41,7 +42,7 @@ function goLiveIfSeen(lock: HeldLock, asset: GlideRecord, readers: LifecycleRead
     // An Asset whose Subscription line could not be started stays pending, so a later sighting or run attaches it.
     if (!decision.goesLive || !attachToSubscription(asset, decision.at)) {
         if (asset.update()) return true
-        gs.error(`[x_daas_ham] in-service detection: sighting of ${str(asset, 'serial_number')} not saved: ${refusal(asset)}`)
+        log.error(`in-service detection: sighting of ${str(asset, 'serial_number')} not saved: ${refusal(asset)}`)
         return false
     }
     asset.setValue('x_daas_ham_in_service_date', msToGlide(decision.at))
@@ -49,7 +50,7 @@ function goLiveIfSeen(lock: HeldLock, asset: GlideRecord, readers: LifecycleRead
     if (moveAndSave(asset, decision.stage, 'in-service detection')) return true
     // A line started above stays active: the sighting applied again finds it active and joins it, its start date kept.
     const pending = `${str(asset, 'serial_number')} stays pending in service, its Subscription line possibly active`
-    gs.error(`[x_daas_ham] in-service detection: ${pending}: left to the next sighting or run`)
+    log.error(`in-service detection: ${pending}: left to the next sighting or run`)
     return false
 }
 
@@ -141,7 +142,7 @@ function storeEvent(assetId: string, event: DeviceEvent): boolean {
     gr.setValue('source', event.source)
     gr.setValue('observed_at', msToGlide(event.observedAt))
     if (gr.insert()) return true
-    gs.error(`[x_daas_ham] in-service detection: ${event.event} event of ${event.identifier} not stored: ${refusal(gr)}`)
+    log.error(`in-service detection: ${event.event} event of ${event.identifier} not stored: ${refusal(gr)}`)
     return false
 }
 

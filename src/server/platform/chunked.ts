@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import {
     cursorReport,
     lockLostIn,
@@ -21,6 +21,7 @@ import { nowMs } from './clock.ts'
 import { queueJobAt, type JobEvent } from './events.ts'
 import { completePass, isCurrentPass, JOB_STATUS, openJobCursor, startPass, type JobCursor } from './job-cursor.ts'
 import { isLocked, withLock, type LockRun } from './locks.ts'
+import { log } from './log.ts'
 import { intProperty } from './properties.ts'
 
 /**
@@ -66,7 +67,7 @@ type TableJob<T, R = T> = TableSourceFields<T, R> & Prepare<T, R> & { job: strin
 
 function logFailures(where: string, failures: Failures): void {
     if (failures.failed === 0) return
-    gs.error(`[x_daas_ham] ${where}: ${failures.failed} record(s) failed, the last: ${failures.lastError}`)
+    log.error(`${where}: ${failures.failed} record(s) failed, the last: ${failures.lastError}`)
 }
 
 function chunkOf(queued: JobEvent): string {
@@ -81,7 +82,7 @@ export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
     } catch (error) {
         // Without a cursor no progress is kept, and every run would handle the same records again from the start.
         const reason = messageOf(error)
-        gs.error(`[x_daas_ham] ${spec.job}: not run: ${reason}`)
+        log.error(`${spec.job}: not run: ${reason}`)
         return { processed: 0, failed: 0, done: false, cursor: '', lastError: reason }
     }
     const resumed = row.cursor !== ''
@@ -91,7 +92,7 @@ export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
             logFailures(`${spec.job}: in this run`, failures)
             const report = cursorReport({ failed: row.failed, lastError: row.lastError }, { ...failures, resumed, done })
             const refused = row.save({ cursor, processed, status: report.status, failed: report.failed, lastError: report.lastError, ranNow: true })
-            if (refused) gs.warn(`[x_daas_ham] ${spec.job}: cursor not saved, so the next run repeats this one: ${refused}`)
+            if (refused) log.warn(`${spec.job}: cursor not saved, so the next run repeats this one: ${refused}`)
         },
     })
 }
@@ -245,12 +246,12 @@ function recordStop(job: string, locked: NonNullable<PassJob['underLock']>, toke
             if (isCurrentPass(job, token)) locked.stopped?.(error)
         })
     } catch (unrecorded) {
-        gs.warn(`[x_daas_ham] ${job}: why the pass stopped was not recorded: ${messageOf(unrecorded)}`)
+        log.warn(`${job}: why the pass stopped was not recorded: ${messageOf(unrecorded)}`)
     }
 }
 
 function retryLater(queued: JobEvent, parm2: string): EventJobResult {
-    gs.warn(`[x_daas_ham] ${queued.name} ${queued.subject}: job locked, running again in ${REQUEUE.delaySeconds} s`)
+    log.warn(`${queued.name} ${queued.subject}: job locked, running again in ${REQUEUE.delaySeconds} s`)
     queueJobAt(queued, parm2, 'later')
     return { processed: 0, failed: 0, done: false, cursor: parm2, lastError: 'job locked: retried later', superseded: false }
 }
@@ -261,7 +262,7 @@ function retryLater(queued: JobEvent, parm2: string): EventJobResult {
  */
 function restartPass(queued: JobEvent, error: string): EventJobResult {
     const threw = error ? ` (the write then threw: ${error})` : ''
-    gs.warn(`[x_daas_ham] ${queued.name} ${queued.subject}: job lock lost while writing${threw}, starting a fresh pass`)
+    log.warn(`${queued.name} ${queued.subject}: job lock lost while writing${threw}, starting a fresh pass`)
     queueJobAt(queued, '')
     return { processed: 0, failed: 0, done: false, cursor: '', lastError: 'job lock lost: pass restarted', superseded: false }
 }

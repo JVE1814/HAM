@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
@@ -23,6 +23,7 @@ import { intProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { pluck, str, warnRefused } from './records.ts'
 import { OPEN_ORDERS_QUERY } from '../domain/fulfilment.ts'
+import { log } from './log.ts'
 
 /** Refresh Orders for in-service Assets due within the horizon (P2.2, Q48: fully automatic). */
 
@@ -39,7 +40,7 @@ export function raiseDueRefreshOrders(lock: HeldLock): void {
         const number = raiseWave(wave)
         if (lock.held()) continue
         const check = number ? `; check ${number}'s Assets are on no other open Order` : ''
-        gs.error(`[x_daas_ham] Refresh run stopped, its lock lost: the run that took it over raises the rest${check}`)
+        log.error(`Refresh run stopped, its lock lost: the run that took it over raises the rest${check}`)
         return
     }
 }
@@ -118,18 +119,18 @@ function raiseWave({ customerId, siteId, agreementId, assets }: RefreshWave): st
         lines,
     )
     if (!raised.created && raised.step === 'order') {
-        gs.warn(`[x_daas_ham] No refresh Order for site ${siteId}: ${raised.reason}`)
+        log.warn(`No refresh Order for site ${siteId}: ${raised.reason}`)
         return ''
     }
     const number = raised.created ? str(raised.order, 'number') : raised.number
     for (const { line, reason } of raised.refused) {
-        gs.warn(`[x_daas_ham] Asset ${line.replacesAssetId} left off ${number}: ${reason}`)
+        log.warn(`Asset ${line.replacesAssetId} left off ${number}: ${reason}`)
         unmatched.delete(line)
     }
     if (!raised.created) {
         const empty = `Refresh Order ${number} for site ${siteId}`
-        if (!raised.kept) gs.warn(`[x_daas_ham] ${empty} removed: none of its lines was saved`)
-        else gs.warn(`[x_daas_ham] ${empty} has no lines and was not removed (${raised.kept}): cancel it`)
+        if (!raised.kept) log.warn(`${empty} removed: none of its lines was saved`)
+        else log.warn(`${empty} has no lines and was not removed (${raised.kept}): cancel it`)
         return ''
     }
     const order = raised.order
@@ -141,6 +142,6 @@ function raiseWave({ customerId, siteId, agreementId, assets }: RefreshWave): st
     }
     const submission = submitOrder(order)
     // Nobody is there to be told: the Order stays a draft for the account manager, with why in the log.
-    if (!submission.submitted) gs.warn(`[x_daas_ham] Refresh Order ${number} left a draft: ${submission.message}`)
+    if (!submission.submitted) log.warn(`Refresh Order ${number} left a draft: ${submission.message}`)
     return number
 }

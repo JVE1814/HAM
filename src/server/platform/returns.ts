@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { messageOf } from '../domain/errors.ts'
 import { TRY_AGAIN, type HeldLock } from '../domain/job-lock.ts'
 import { checkTransition, isDeployed, type Stage } from '../domain/lifecycle.ts'
@@ -47,6 +47,7 @@ import { creatorOf } from './session.ts'
 import { releaseToProviderStock } from './stock.ts'
 import { endSitePackageIfEmpty } from './subscriptions.ts'
 import { SITE_FIELD } from '../domain/fleet.ts'
+import { log } from './log.ts'
 
 /**
  * Return orders and their lines (P2.4): raising one, by request or for a job, and what each line then goes through.
@@ -167,15 +168,15 @@ function addUnderLock(order: GlideRecord, assetId: string): LineResult {
     if (attempt.ran) return attempt.value
     const left = `Asset ${assetId} left off return ${str(order, 'number')}`
     if (!attempt.held) {
-        gs.warn(`[x_daas_ham] ${left}: ${messageOf(attempt.error)}`)
+        log.warn(`${left}: ${messageOf(attempt.error)}`)
         return 'refused'
     }
     // The holder has normally put it on its Return by now; one that has not leaves the unit on none (as recordFee).
     if (awaitsReturn(assetId)) {
-        gs.info(`[x_daas_ham] ${left}: another return held its lock and took it`)
+        log.info(`${left}: another return held its lock and took it`)
         return 'skipped'
     }
-    gs.warn(`[x_daas_ham] ${left}: its return lock was held through every try, yet it awaits no return: put it on one by hand if it is due back`)
+    log.warn(`${left}: its return lock was held through every try, yet it awaits no return: put it on one by hand if it is due back`)
     return 'refused'
 }
 
@@ -189,7 +190,7 @@ function addLineHolding(lock: HeldLock, order: GlideRecord, assetId: string): Li
     if (!asset || awaitsReturn(assetId)) return 'skipped'
     const number = str(order, 'number')
     if (!isFleetAsset(asset)) {
-        gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left off return ${number}: it is not a fleet asset`)
+        log.warn(`${str(asset, 'serial_number')} left off return ${number}: it is not a fleet asset`)
         return 'refused'
     }
     // The line first: an Asset whose line is refused stays as it is, off this Return order.
@@ -211,7 +212,7 @@ function addLineHolding(lock: HeldLock, order: GlideRecord, assetId: string): Li
     if (moving && !moveAndSave(asset, 'pending_return', `return ${number}`)) {
         if (line.deleteRecord()) return 'refused'
         const kept = `${str(asset, 'serial_number')} not pending return but kept on return ${number}`
-        gs.warn(`[x_daas_ham] ${kept}: ${refusal(line, 'delete refused')}; remove its line`)
+        log.warn(`${kept}: ${refusal(line, 'delete refused')}; remove its line`)
     }
     return 'added'
 }
@@ -507,13 +508,13 @@ function declareHolding(lock: HeldLock, overdue: OverdueLine): boolean {
     const asset = findById('alm_hardware', overdue.assetId)
     if (asset && !isFleetAsset(asset)) {
         const unit = `Line of ${str(asset, 'serial_number')} on ${overdue.number}`
-        gs.warn(`[x_daas_ham] ${unit} not declared missing: it is not a fleet asset; settle the line by hand`)
+        log.warn(`${unit} not declared missing: it is not a fleet asset; settle the line by hand`)
         return false
     }
     const stage = asset ? readStage(asset) : null
     if (asset && stage !== 'missing' && !mayGoMissing(asset, stage)) {
         const unit = `Line of ${str(asset, 'serial_number')} on ${overdue.number}`
-        gs.warn(`[x_daas_ham] ${unit} not declared missing: the unit is ${stage ?? 'unknown'}; settle the line by hand`)
+        log.warn(`${unit} not declared missing: the unit is ${stage ?? 'unknown'}; settle the line by hand`)
         return false
     }
     // A holder that outlasted the lock (ADR 0013) may overlap the next receipt: it saves only while it holds it.

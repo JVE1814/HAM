@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { EVENT } from '../domain/events.ts'
 import {
     closedStateFor,
@@ -17,6 +17,7 @@ import { LINE_STAGE, ORDER_STAGE, type LineStage, type OrderStage } from '../dom
 import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { fire } from './events.ts'
+import { log } from './log.ts'
 import { cancelLine, saveLineStage } from './order-lines.ts'
 import { exists, findById, num, str, warnRefused, type ForeignRecord } from './records.ts'
 import { takeOffOrderLine } from './stock.ts'
@@ -125,7 +126,7 @@ export function onLineAssetMoved(asset: ForeignRecord, lineId: string, from: Sta
     }
     const next = deriveLine(line, true)
     // Left at its stage, the line is not sourced again, and a later change no longer fills it again.
-    if (next === null) gs.warn(`[x_daas_ham] ${str(line, 'number')} lost a unit in transit but is not sourced again`)
+    if (next === null) log.warn(`${str(line, 'number')} lost a unit in transit but is not sourced again`)
     if (next === 'awaiting_stock') sourceOrderAgain(str(line, 'order'))
 }
 
@@ -137,7 +138,7 @@ function takeOffLine(assetId: string, line: GlideRecord, to: Stage): boolean {
     takeOffOrderLine(asset)
     const what = `${str(asset, 'serial_number')} left ${str(line, 'number')} in transit (${to})`
     if (asset.update()) {
-        gs.info(`[x_daas_ham] ${what}: taken off the line, which is filled again`)
+        log.info(`${what}: taken off the line, which is filled again`)
         return true
     }
     warnRefused(asset, `${what} but stays on it, which is not sourced again`)

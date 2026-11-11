@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import {
@@ -22,6 +22,7 @@ import { bool, num, pluck, recordsById, str, warnRefused } from './records.ts'
 import { messageOf } from '../domain/errors.ts'
 import { memoized } from '../domain/memo.ts'
 import type { ClaimAction, OemVendor } from '../domain/vocabulary.ts'
+import { log } from './log.ts'
 
 /**
  * The automated steps of a Staging task (x_daas_ham_staging_step rows with an `automation`) and the OEM claims they
@@ -61,7 +62,7 @@ const CLAIM_ENABLED: Partial<Record<OemVendor, PropertyOf<boolean>>> = PROPERTY.
 export function runClaims(): void {
     const lockName = LOCK.oemClaimRun()
     if (withLock(lockName, runHolding).ran) return
-    gs.info(`[x_daas_ham] OEM claims not sent: another run holds the ${lockName} lock and sends them`)
+    log.info(`OEM claims not sent: another run holds the ${lockName} lock and sends them`)
 }
 
 function runHolding(lock: HeldLock): void {
@@ -80,7 +81,7 @@ function whileHeld(lock: HeldLock, store: ClaimStore): ClaimStore {
         due: (vendor, action, limit) => {
             if (!lost && !lock.held()) {
                 lost = true
-                gs.warn(`[x_daas_ham] OEM claim run stopped: job lock lost while sending, to the run that took it over`)
+                log.warn(`OEM claim run stopped: job lock lost while sending, to the run that took it over`)
             }
             return lost ? [] : store.due(vendor, action, limit)
         },
@@ -188,7 +189,7 @@ function strandedCursor(): JobCursor | null {
     try {
         return openJobCursor(STRANDED_CURSOR)
     } catch (error) {
-        gs.warn(`[x_daas_ham] Job cursor ${STRANDED_CURSOR} not created, so each claim run checks the same waiting steps: ${messageOf(error)}`)
+        log.warn(`Job cursor ${STRANDED_CURSOR} not created, so each claim run checks the same waiting steps: ${messageOf(error)}`)
         return null
     }
 }
@@ -196,7 +197,7 @@ function strandedCursor(): JobCursor | null {
 function saveStrandedCursor(cursor: JobCursor, next: string): void {
     if (cursor.cursor === next) return
     const refused = cursor.save({ cursor: next })
-    if (refused) gs.warn(`[x_daas_ham] Job cursor ${STRANDED_CURSOR} not saved, so the next claim run checks the same waiting steps: ${refused}`)
+    if (refused) log.warn(`Job cursor ${STRANDED_CURSOR} not saved, so the next claim run checks the same waiting steps: ${refused}`)
 }
 
 /**

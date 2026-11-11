@@ -1,9 +1,10 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { stageAfterTransfer, transferFellThrough, type TransferContext } from '../domain/lifecycle.ts'
 import { createMarks } from '../domain/marks.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import type { TransferResult } from '../domain/sourcing.ts'
 import { moveAsset, moveRefusal, readStage } from './assets.ts'
+import { log } from './log.ts'
 import { stringProperty } from './properties.ts'
 import { bool, deleteWhere, refusal, str, type ForeignRecord } from './records.ts'
 import { hasOpenStagingTask, stagingStockroom } from './staging-tasks.ts'
@@ -69,7 +70,7 @@ function addLine(transferId: string, modelId: string, asset: GlideRecord): strin
 }
 
 function noTransfer(fromStockroomId: string, reason: string): TransferResult {
-    gs.warn(`[x_daas_ham] No transfer order from stockroom ${fromStockroomId} (${reason})`)
+    log.warn(`No transfer order from stockroom ${fromStockroomId} (${reason})`)
     return { ok: false, reason }
 }
 
@@ -113,7 +114,7 @@ export function takeBackStageAfterTransfer(asset: ForeignRecord, before: Foreign
     // From the stock Inventory made it: each stage it can take back is a move the matrix allows from there.
     const verdict = moveAsset(asset, stage)
     if (verdict.allowed) return
-    gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left its transfer as ${now}, not ${stage}: ${verdict.reason}`)
+    log.warn(`${str(asset, 'serial_number')} left its transfer as ${now}, not ${stage}: ${verdict.reason}`)
 }
 
 /**

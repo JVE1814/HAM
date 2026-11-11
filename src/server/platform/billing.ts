@@ -38,6 +38,7 @@ import { findJobCursor, retirePass } from './job-cursor.ts'
 import { attemptLock, whyNotRun } from './locks.ts'
 import { deleteWhere, exists, findById, noneLeft, num, refusal, str, throwRefused } from './records.ts'
 import { BILLING_PERIOD_STATUS, type BillingLineKind, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
+import { log } from './log.ts'
 
 /** Billing periods: generate, review, close (lock) and export (plan §13 Billing export, Q66). */
 
@@ -72,7 +73,7 @@ export function openBillingPeriod(month: string): void {
     period.setValue('status', BILLING_PERIOD_STATUS.generating)
     if (period.insert()) return
     // No later run opens this month, so a refused one would go unbilled unseen.
-    gs.error(`[x_daas_ham] Billing period ${month} not opened: ${refusal(period)}; create it by hand`)
+    log.error(`Billing period ${month} not opened: ${refusal(period)}; create it by hand`)
 }
 
 /*
@@ -114,7 +115,7 @@ export function generateNewPeriod(inserted: GlideRecord): void {
 export function generateChunk(queued: JobEvent): void {
     const period = findById(PERIOD, queued.subject)
     if (!period) {
-        return void gs.warn(`[x_daas_ham] ${queued.name}: dropped a generation chunk, as there is no billing period '${queued.subject}'`)
+        return void log.warn(`${queued.name}: dropped a generation chunk, as there is no billing period '${queued.subject}'`)
     }
     if (str(period, 'status') !== BILLING_PERIOD_STATUS.generating) return
     const job = generationJob(queued.subject)
@@ -142,8 +143,8 @@ function recordActivity(job: string): void {
 }
 
 function dropChunk(period: GlideRecord): void {
-    gs.warn(
-        `[x_daas_ham] Billing period ${str(period, 'period')}: dropped a generation chunk of a pass reset or replaced; if the period stays Generating, Reset generation and Regenerate it`,
+    log.warn(
+        `Billing period ${str(period, 'period')}: dropped a generation chunk of a pass reset or replaced; if the period stays Generating, Reset generation and Regenerate it`,
     )
 }
 
@@ -200,11 +201,11 @@ function billLines(period: GlideRecord, bounds: MonthBounds, queued: JobEvent, j
 }
 
 function stopGeneration(period: GlideRecord, error: string): void {
-    gs.error(`[x_daas_ham] Billing period ${str(period, 'period')}: generation stopped: ${error}`)
+    log.error(`Billing period ${str(period, 'period')}: generation stopped: ${error}`)
     period.setValue('last_error', error.slice(0, 255))
     // Refused, it stays generating with no chunk queued, which Close and Regenerate refuse: say why.
     if (!holdForReview(period)) {
-        gs.error(`[x_daas_ham] Billing period ${str(period, 'period')} not held for review: ${refusal(period)}`)
+        log.error(`Billing period ${str(period, 'period')} not held for review: ${refusal(period)}`)
     }
 }
 
@@ -278,7 +279,7 @@ function insertLine(period: GlideRecord, values: BillingLineValues): void {
 }
 
 function addFailedLines(period: GlideRecord, failed: number, lastError: string): void {
-    gs.error(`[x_daas_ham] Billing period ${str(period, 'period')}: ${failed} line(s) failed: ${lastError}`)
+    log.error(`Billing period ${str(period, 'period')}: ${failed} line(s) failed: ${lastError}`)
     period.setValue('failed_lines', num(period, 'failed_lines') + failed)
     period.setValue('last_error', lastError.slice(0, 255))
 }
@@ -331,7 +332,7 @@ function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
     period.setValue('generated_at', nowGlide())
     // Refused, it stays generating, which Close and Regenerate refuse: say why.
     if (!holdForReview(period)) {
-        gs.error(`[x_daas_ham] Billing period ${str(period, 'period')} not saved as ready: ${refusal(period)}`)
+        log.error(`Billing period ${str(period, 'period')} not saved as ready: ${refusal(period)}`)
     }
 }
 
@@ -402,7 +403,7 @@ function regenerateReady(period: GlideRecord): PeriodOutcome {
         if (period.update()) return notDone(`${name} not regenerated: some of its old lines could not be removed`)
         // Refused, it stays generating with nothing queued, which Close and Regenerate refuse: say so, and how it ends.
         const why = refusal(period)
-        gs.error(`[x_daas_ham] Billing period ${name}: Regenerate left old lines and the period was not held for review: ${why}`)
+        log.error(`Billing period ${name}: Regenerate left old lines and the period was not held for review: ${why}`)
         return notDone(
             `${name} not regenerated: some of its old lines could not be removed, and it could not be held for review (${why}). It stays Generating with nothing queued: an admin can Reset generation once it has shown no activity for ${RESET_AFTER_IDLE_MINUTES} minutes, then Regenerate`,
         )
@@ -513,7 +514,7 @@ function markFeesBilled(period: GlideRecord): string[] {
     markBilled(period.getUniqueValue(), (fee, why) => refused.push(`${feeLabel(fee)}: ${why}`))
     if (refused.length > 0) {
         const unmarked = `${refused.length} fee(s) not marked billed; set them to Billed by hand`
-        gs.error(`[x_daas_ham] Billing period ${str(period, 'period')} closed, but ${unmarked}: ${refused.join('; ')}`)
+        log.error(`Billing period ${str(period, 'period')} closed, but ${unmarked}: ${refused.join('; ')}`)
     }
     return refused
 }
@@ -561,7 +562,7 @@ export function attachExport(periodId: string): void {
         new GlideSysAttachment().write(period, fileName, 'text/csv', toCsv(rows))
         keepOldestExport(period, fileName)
     } catch (error) {
-        gs.error(`[x_daas_ham] CSV export of billing period ${str(period, 'period')} failed: ${messageOf(error)}`)
+        log.error(`CSV export of billing period ${str(period, 'period')} failed: ${messageOf(error)}`)
     }
 }
 

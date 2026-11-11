@@ -1,4 +1,4 @@
-import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
+import { GlideAggregate, GlideRecord } from '@servicenow/glide'
 import { andEachClause } from '../domain/encoded-query.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
@@ -23,6 +23,7 @@ import { stagingStockroom } from './staging-tasks.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { countBy, num, str } from './records.ts'
 import { moveToSparePool, stockCandidates } from './stock.ts'
+import { log } from './log.ts'
 
 /**
  * Keeping each Customer's Spare pool of each Model at the size their Agreements' spare-pool ratios give (P1.4,
@@ -56,7 +57,7 @@ export function runSparePoolTopUp(): void {
 function sparePurchasesEnabled(): boolean {
     if (!boolProperty(PROPERTY.autoPurchaseSpares)) return false
     if (stagingStockroom()) return true
-    gs.warn(`[x_daas_ham] Spare-pool top-up buys no spares: set ${PROPERTY.stagingStockroom.name}`)
+    log.warn(`Spare-pool top-up buys no spares: set ${PROPERTY.stagingStockroom.name}`)
     return false
 }
 
@@ -110,7 +111,7 @@ function topUpCustomerPools(customerId: string, agreementId: string, autoPurchas
         if (sparePoolShortfall(pool.size, reserved.get(pool.modelId) ?? 0) === 0) continue
         const lockName = LOCK.sparePool(customerId, pool.modelId)
         if (withLockTries(lockName, (lock) => topUpPool(customerId, pool, autoPurchase, lock)).ran) continue
-        gs.info(`[x_daas_ham] Spare pool of ${customerId} for ${pool.modelId} not topped up: another run holds the ${lockName} lock and tops it up`)
+        log.info(`Spare pool of ${customerId} for ${pool.modelId} not topped up: another run holds the ${lockName} lock and tops it up`)
     }
 }
 
@@ -129,7 +130,7 @@ function topUpPool(customerId: string, pool: SparePool, autoPurchase: boolean, l
     const moved = picked.filter((assetId) => moveToSparePool(assetId, customerId, pool.agreementId)).length
     if (!autoPurchase) return
     if (!lock.held()) {
-        gs.warn(`[x_daas_ham] Spare pool of ${customerId} for ${modelId}: nothing bought, its lock was lost to the run that took it over`)
+        log.warn(`Spare pool of ${customerId} for ${modelId}: nothing bought, its lock was lost to the run that took it over`)
         return
     }
     const missing = shortfall - moved - openSparePurchaseQuantity(customerId, modelId)

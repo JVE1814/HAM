@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
 import { coverageDisposition, type CoverageAnswer } from '../domain/coverage.ts'
 import { naasModelCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
@@ -10,6 +10,7 @@ import type { OemVendor } from '../domain/vocabulary.ts'
 import { daysAgoGlide, nowMs } from './clock.ts'
 import { applyCoverage, staleAssets } from './coverage.ts'
 import { withLock } from './locks.ts'
+import { log } from './log.ts'
 import { writeModelLifecycle } from './model-lifecycle.ts'
 import { oemContext, oemEnabled } from './oem-http.ts'
 import { recordRmaStatuses, rmasToAskAbout } from './oem-rma.ts'
@@ -33,9 +34,9 @@ const ERRORS_LOGGED = 20
 
 /** Log a job's errors of one run, each naming its vendor: the first ERRORS_LOGGED, and a line counting the rest. */
 function report(job: string, errors: readonly string[]): void {
-    for (const error of errors.slice(0, ERRORS_LOGGED)) gs.warn(`[x_daas_ham] ${job}: ${error}`)
+    for (const error of errors.slice(0, ERRORS_LOGGED)) log.warn(`${job}: ${error}`)
     const more = errors.length - ERRORS_LOGGED
-    if (more > 0) gs.warn(`[x_daas_ham] ${job}: and ${more} more error(s) not logged`)
+    if (more > 0) log.warn(`${job}: and ${more} more error(s) not logged`)
 }
 
 function ofVendor(vendor: OemVendor, errors: readonly string[]): string[] {
@@ -103,7 +104,7 @@ export function syncLifecycle(): void {
 export function syncCoverage(): void {
     const lockName = LOCK.oemCoverageRun()
     if (withLock(lockName, syncCoverageHolding).ran) return
-    gs.info(`[x_daas_ham] OEM coverage not checked: another run holds the ${lockName} lock and checks it`)
+    log.info(`OEM coverage not checked: another run holds the ${lockName} lock and checks it`)
 }
 
 function syncCoverageHolding(lock: HeldLock): void {

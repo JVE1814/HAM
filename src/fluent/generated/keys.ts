@@ -3764,6 +3764,10 @@ declare global {
                         table: 'sys_module'
                         id: 'd959aeddfa4042d3bf17fda638d0cf0f'
                     }
+                    src_server_platform_log_ts: {
+                        table: 'sys_module'
+                        id: '5756ff68a6f24ee19c8f3f3865a6acdd'
+                    }
                     src_server_platform_margin_ts: {
                         table: 'sys_module'
                         id: '9678e0f1b7744ad5bffba89d94f9d7b3'

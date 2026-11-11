@@ -1,4 +1,4 @@
-import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
+import { GlideAggregate, GlideRecord } from '@servicenow/glide'
 import { chooseCurrency, currencyCode, currencyKey, currencyOrThrow, monthBounds, overlapsMonth, type AgreementCurrency, type MonthBounds } from '../domain/billing.ts'
 import { messageOf } from '../domain/errors.ts'
 import { stillCovered } from '../domain/leases.ts'
@@ -24,6 +24,7 @@ import { EVENT } from '../domain/events.ts'
 import { intProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { count, deleteWhere, findById, num, recordsById, str, throwRefused } from './records.ts'
+import { log } from './log.ts'
 
 /**
  * Cost facts and Margin per Customer, Site and currency, computed when a Billing period closes (plan §13 Margin / TCO). A cost is kept
@@ -45,7 +46,7 @@ export function computeMarginChunk(queued: JobEvent): void {
     try {
         costServiceIntervals(period, queued)
     } catch (error) {
-        gs.error(`[x_daas_ham] Margin of ${str(period, 'period')} stopped: ${messageOf(error)}`)
+        log.error(`Margin of ${str(period, 'period')} stopped: ${messageOf(error)}`)
     }
 }
 
@@ -117,7 +118,7 @@ function costServiceIntervals(period: GlideRecord, queued: JobEvent): void {
 function addMarginFailures(periodId: string, failed: number, lastError: string): void {
     const period = findById('x_daas_ham_billing_period', periodId)
     if (!period) return
-    gs.error(`[x_daas_ham] Margin of ${str(period, 'period')}: ${failed} record(s) failed to cost: ${lastError}`)
+    log.error(`Margin of ${str(period, 'period')}: ${failed} record(s) failed to cost: ${lastError}`)
     recordMarginOutcome(period, num(period, 'margin_failed') + failed, lastError)
 }
 

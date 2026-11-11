@@ -1,4 +1,4 @@
-import { gs, GlideRecord } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
 import { LONG_HOLD_LOCK_TRIES, REQUEUE, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
@@ -32,6 +32,7 @@ import { findById, num, str, warnRefused, type ForeignRecord } from './records.t
 import { openStagingTask, skipOpenStagingTasks, stagingStockroom, startStaging } from './staging-tasks.ts'
 import { linkHotSpare, releaseToProviderStock, reserveAsset, stockCandidates, takeOffOrderLine } from './stock.ts'
 import { requestTransfer } from './transfers.ts'
+import { log } from './log.ts'
 
 /**
  * Sourcing an Order's lines (ADR 0004): allocate stock, request transfers and purchases, and put back what could not
@@ -85,9 +86,9 @@ export function runSourcingPass(order: GlideRecord, queuedAgain: number): void {
 function queuePassAgain(order: GlideRecord, tries: number, why: string): void {
     const number = str(order, 'number')
     if (!requeueCounted(EVENT.sourceOrder, order, '', tries)) {
-        return void gs.warn(`[x_daas_ham] ${number} not sourced again after ${tries} tries (${why}): check its lines`)
+        return void log.warn(`${number} not sourced again after ${tries} tries (${why}): check its lines`)
     }
-    gs.info(`[x_daas_ham] ${number} sourced again in ${REQUEUE.delaySeconds} s: ${why}`)
+    log.info(`${number} sourced again in ${REQUEUE.delaySeconds} s: ${why}`)
 }
 
 /**
@@ -296,7 +297,7 @@ function putUnderRma(order: GlideRecord, line: GlideRecord, replaced: GlideRecor
         return reuse.askAgain ? ` (${which}: its replacement was received, ask the vendor for another)` : ` (${which})`
     }
     if (openOemRma({ defectiveAsset: replaced, orderLineId: lineId, caseId: str(order, 'case') })) return ''
-    gs.warn(`[x_daas_ham] ${str(line, 'number')}: no OEM RMA saved for ${serial}`)
+    log.warn(`${str(line, 'number')}: no OEM RMA saved for ${serial}`)
     return ' (none saved: open it by hand)'
 }
 
@@ -308,13 +309,13 @@ function leftClosed(line: GlideRecord, transfers: readonly string[]): void {
     const units = unitsOnLine(line.getUniqueValue())
     const release = units > 0 ? `; release the ${units} unit(s) still on it` : ''
     const cancel = transfers.length > 0 ? `; cancel ${transfers.join(', ')}` : ''
-    gs.warn(`[x_daas_ham] ${str(line, 'number')} closed while it was sourced: nothing bought for it${release}${cancel}`)
+    log.warn(`${str(line, 'number')} closed while it was sourced: nothing bought for it${release}${cancel}`)
 }
 
 /** Log a line left to the pass queued again, naming the transfer orders it does not list. */
 function leftUnsaved(line: GlideRecord, why: keyof typeof AGAIN_BECAUSE, transfers: readonly string[]): LineSourcing {
     const listThem = transfers.length > 0 ? `; it does not list ${transfers.join(', ')}, add them by hand` : ''
-    gs.warn(`[x_daas_ham] ${str(line, 'number')} left to the next sourcing pass (${AGAIN_BECAUSE[why]})${listThem}`)
+    log.warn(`${str(line, 'number')} left to the next sourcing pass (${AGAIN_BECAUSE[why]})${listThem}`)
     return why
 }
 
@@ -352,5 +353,5 @@ export function putBackUntransferred(current: ForeignRecord, lineId: string): vo
     if (!unreserve(asset, 'central_stock', `${what}, so it is put back`)) return
     skipOpenStagingTasks(asset.getUniqueValue(), 'Transfer to the staging centre fell through')
     lineLostUnit(lineId)
-    gs.warn(`[x_daas_ham] ${what}: put back as free stock, its line sourced again`)
+    log.warn(`${what}: put back as free stock, its line sourced again`)
 }

@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { AUDIT_STATE, closedLineResult, compareAudit, onTheShelfQuery, type ExpectedAsset } from '../domain/audit.ts'
 import { messageOf } from '../domain/errors.ts'
 import { naasStockroomType, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
@@ -12,6 +12,7 @@ import { withLockTries } from './locks.ts'
 import { refusal, str, warnRefused } from './records.ts'
 import { installedAssetIds } from './installed-assets.ts'
 import { currentSession } from './session.ts'
+import { log } from './log.ts'
 
 /**
  * Audits: a stockroom's blind count and a Site's audit (P2.7, Q63). An audit is started with the list of Assets it
@@ -237,6 +238,6 @@ function raiseMissing(line: GlideRecord, number: string): boolean {
         why = messageOf(error)
     }
     if (hasOpenException('audit_missing', { assetId })) return true
-    gs.warn(`[x_daas_ham] Audit ${number}: no missing in audit exception for ${line.getDisplayValue('asset')}: ${why}; raise it by hand`)
+    log.warn(`Audit ${number}: no missing in audit exception for ${line.getDisplayValue('asset')}: ${why}; raise it by hand`)
     return false
 }

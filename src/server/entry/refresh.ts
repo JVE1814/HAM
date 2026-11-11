@@ -1,6 +1,6 @@
-import { gs } from '@servicenow/glide'
 import { LOCK } from '../domain/lock-names.ts'
 import { withLock } from '../platform/locks.ts'
+import { log } from '../platform/log.ts'
 import { raiseDueRefreshOrders } from '../platform/refresh.ts'
 
 /**
@@ -13,5 +13,5 @@ import { raiseDueRefreshOrders } from '../platform/refresh.ts'
 export function raiseRefreshOrders(): void {
     const lockName = LOCK.refreshOrders()
     if (withLock(lockName, raiseDueRefreshOrders).ran) return
-    gs.info(`[x_daas_ham] Refresh Orders not raised: another run holds the ${lockName} lock and raises them`)
+    log.info(`Refresh Orders not raised: another run holds the ${lockName} lock and raises them`)
 }

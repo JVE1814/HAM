@@ -1,8 +1,8 @@
-import { gs } from '@servicenow/glide'
 import { RESTMessageV2 } from '@servicenow/glide/sn_ws'
 import { messageOf } from '../domain/errors.ts'
 import type { HttpPort, HttpResponse } from '../domain/http.ts'
 import { type PropertyOf } from '../domain/properties.ts'
+import { log } from './log.ts'
 import { secretProperty, stringProperty } from './properties.ts'
 
 /**
@@ -69,6 +69,6 @@ export function restPort(message: string, variables: MessageVariables): HttpPort
 
 /** A call of `message`.`fn` that got no answer, logged with its reason. */
 function noAnswer(message: string, fn: string, error: string): HttpResponse {
-    gs.warn(`[x_daas_ham] ${message}.${fn} failed: ${error}`)
+    log.warn(`${message}.${fn} failed: ${error}`)
     return { status: 0, body: '', error }
 }

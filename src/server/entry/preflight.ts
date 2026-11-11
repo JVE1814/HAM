@@ -1,7 +1,8 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { messageOf } from '../domain/errors.ts'
 import { preflightReport } from '../domain/preflight.ts'
 import { openJobCursor } from '../platform/job-cursor.ts'
+import { log } from '../platform/log.ts'
 
 export function runPreflight(): void {
     const report = preflightReport({
@@ -11,12 +12,12 @@ export function runPreflight(): void {
             return gr.get('name', role)
         },
     })
-    for (const item of report.missing) gs.error(`[x_daas_ham] preflight: missing ${item}`)
-    gs.info(`[x_daas_ham] preflight: ${report.summary}`)
+    for (const item of report.missing) log.error(`preflight: missing ${item}`)
+    log.info(`preflight: ${report.summary}`)
 
     const result = `${report.summary}${report.missing.length ? `: ${report.missing.join('; ')}` : ''}`.slice(0, 255)
     const refused = recordResult(result)
-    if (refused) gs.error(`[x_daas_ham] preflight: result not recorded on job cursor preflight: ${refused}`)
+    if (refused) log.error(`preflight: result not recorded on job cursor preflight: ${refused}`)
 }
 
 function recordResult(result: string): string | null {

@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { intervalEnd, restartInterval } from '../domain/billing.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { isBillable } from '../domain/lifecycle.ts'
@@ -7,6 +7,7 @@ import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { todayIso } from './clock.ts'
 import { attemptLock, whyNotRun } from './locks.ts'
+import { log } from './log.ts'
 import { exists, str, warnRefused, type ForeignRecord } from './records.ts'
 
 /** Service intervals: the days each Asset delivered a Subscription line (plan §13 Billing export). */
@@ -31,7 +32,7 @@ export function openServiceInterval(asset: ForeignRecord, lineId: string, startI
     // The holder has normally opened it by now; one that has not may be slow, or have died holding the lock.
     if (why === null || hasOpenInterval(assetId)) return
     const unopened = `${str(asset, 'serial_number')} in service from ${startIso}, no interval open`
-    gs.error(`[x_daas_ham] ${unopened}: ${why}; open it by hand if it is still not open`)
+    log.error(`${unopened}: ${why}; open it by hand if it is still not open`)
 }
 
 /**
@@ -131,7 +132,7 @@ export function closeServiceIntervals(assetId: string, endIso: string): void {
     if (!open.next() || inServiceNow(assetId)) return
     // A holder that is an open closes it too once it sees the Asset out of service, so this may clear itself.
     const unclosed = `${str(open, 'asset.serial_number')} left service on ${endIso}, its Service interval still open`
-    gs.error(`[x_daas_ham] ${unclosed}: ${why}; close it by hand if it is still open`)
+    log.error(`${unclosed}: ${why}; close it by hand if it is still open`)
 }
 
 /**

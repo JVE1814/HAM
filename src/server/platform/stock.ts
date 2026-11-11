@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { messageOf } from '../domain/errors.ts'
 import { LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import type { Stage } from '../domain/lifecycle.ts'
@@ -17,6 +17,7 @@ import { stringProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { refusal, str } from './records.ts'
 import { STOCK_STAGES } from '../domain/lifecycle.ts'
+import { log } from './log.ts'
 
 /** Stock that can serve an Order line, claiming it for one, giving it back, and changing it where a claim could race. */
 
@@ -149,7 +150,7 @@ function underStockLock<T>(assetId: string, tries: number, what: string, work: S
         },
         tries,
     )
-    if (!attempt.ran && !attempt.held) gs.warn(`[x_daas_ham] Asset ${assetId} not ${what}: ${messageOf(attempt.error)}`)
+    if (!attempt.ran && !attempt.held) log.warn(`Asset ${assetId} not ${what}: ${messageOf(attempt.error)}`)
     return attempt
 }
 
@@ -167,7 +168,7 @@ function claimHolding(lock: HeldLock, asset: GlideRecord, wanted: Claim): GlideR
     const saved = lock.write(() => asset.update())
     if (!saved.written) return lockLost(assetId)
     if (!saved.value) {
-        gs.warn(`[x_daas_ham] Asset ${str(asset, 'serial_number') || assetId} not claimed as ${wanted.to}: ${refusal(asset)}`)
+        log.warn(`Asset ${str(asset, 'serial_number') || assetId} not claimed as ${wanted.to}: ${refusal(asset)}`)
         return null
     }
     if (!saved.lockLost) return asset
@@ -189,6 +190,6 @@ function shows(asset: GlideRecord, wanted: Claim): boolean {
 }
 
 function lockLost(assetId: string): null {
-    gs.warn(`[x_daas_ham] Asset ${assetId} not claimed: its lock was lost while claiming it`)
+    log.warn(`Asset ${assetId} not claimed: its lock was lost while claiming it`)
     return null
 }
