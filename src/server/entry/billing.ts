@@ -2,7 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { agreementCurrencyProblem, billingMonthProblem, currencyCode, monthBounds, previousMonth } from '../domain/billing.ts'
+import { agreementCurrencyProblem, billingMonthProblem, currencyCode, monthBounds, monthChangedError, previousMonth } from '../domain/billing.ts'
 import { ROLE } from '../domain/visibility.ts'
 import {
     attachExport,
@@ -103,6 +103,7 @@ export function guardBillingPeriodMonth(current: GlideRecord): void {
     const bounds = monthBounds(month)
     current.setValue('period_start', bounds.first)
     current.setValue('period_end', bounds.last)
+    if (!current.isNewRecord()) current.setValue('last_error', monthChangedError(month))
 }
 
 export function guardClosedBillingPeriod(current: GlideRecord, previous: GlideRecord): void {

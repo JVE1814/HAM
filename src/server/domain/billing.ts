@@ -352,6 +352,14 @@ export function resetGenerationError(byUser: string, idleMinutes: number): strin
     return note.slice(0, PERIOD_ERROR_LENGTH)
 }
 
+/**
+ * The generation error a period records when its month is changed after it was inserted: its lines and fees are still
+ * the old month's (or both months', changed mid-generation), so Close period refuses until a Regenerate bills the new one.
+ */
+export function monthChangedError(month: string): string {
+    return `Month changed to ${month}; its lines are still the old month's: Regenerate before closing`
+}
+
 /** A column of a Billing line, as its exports give it. */
 interface BillingLineColumn<Field extends string = string> {
     field: Field

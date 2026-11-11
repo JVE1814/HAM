@@ -59,6 +59,9 @@
 - A period's month is entered as YYYY-MM (e.g. 2026-10); a business rule refuses a period saved
   with any other month, or with a month that has not ended. The period's first and last day are set
   from its month whenever the month is saved.
+- A period whose month is changed after it was created still holds the old month's lines and fees
+  (both months', if changed while generating). The change is recorded as its *Last generation
+  error*, so *Close period* refuses until *Regenerate* bills the new month.
 - A period whose month is changed past the rule bills nothing: its generation stops with the error
   recorded, and *Close period* refuses until the month is corrected and *Regenerate* run. A period
   inserted without business rules does not start generating: delete it and create it again, or, 30
