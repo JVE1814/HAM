@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { fleetCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
+import { FLEET_CONDITION, OEM_PID_FIELD } from '../domain/fleet.ts'
 import {
     aliasedManufacturer,
     fleetOnRawModelQuery,
@@ -163,7 +163,7 @@ function repointModel(rawModelId: string, canonicalModelId: string): void {
     let refused = 0
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery('model', rawModelId)
-    asset.addEncodedQuery(fleetCondition())
+    asset.addEncodedQuery(FLEET_CONDITION)
     asset.query()
     while (asset.next()) {
         asset.setValue('model', canonicalModelId)

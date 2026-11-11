@@ -3,8 +3,8 @@ import { ambiguousIdentifier, fieldMatch, IDENTIFIER_FIELDS, IDENTIFIER_READ_LIM
 import { normalizeSerial } from '../domain/serials.ts'
 import {
     adoptionProblem,
+    FLEET_CONDITION,
     FLEET_FIELD,
-    fleetCondition,
     OEM_PID_FIELD,
     STOCKROOM_TYPE_FIELD,
     type FleetCandidate,
@@ -235,7 +235,7 @@ function assetsCarrying(field: string, value: string, lookup: IdentifierLookup):
     const read = (record: GlideRecord, run: () => boolean | void) => (lookup.beyondVisibility ? beyondVisibility(record, run) : run())
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery(field, value)
-    if (lookup.fleetOnly) asset.addEncodedQuery(fleetCondition())
+    if (lookup.fleetOnly) asset.addEncodedQuery(FLEET_CONDITION)
     else asset.orderByDesc(FLEET_FIELD)
     asset.setLimit(IDENTIFIER_READ_LIMIT)
     read(asset, () => asset.query())

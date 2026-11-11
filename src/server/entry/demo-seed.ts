@@ -4,7 +4,7 @@ import { writeModelLifecycle } from '../platform/model-lifecycle.ts'
 import { findById, refusal, str } from '../platform/records.ts'
 import type { Stage } from '../domain/lifecycle.ts'
 import type { CatalogEntryType, DeviceClass } from '../domain/vocabulary.ts'
-import { fleetCondition, OEM_PID_FIELD, SITE_FIELD, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
+import { FLEET_CONDITION, OEM_PID_FIELD, SITE_FIELD, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import { ROLE } from '../domain/roles.ts'
 import { stringProperty } from '../platform/properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
@@ -313,7 +313,7 @@ export function loadDemoData(): void {
     const eachLive = (what: string, change: (asset: GlideRecord) => void) => {
         const live = new GlideRecord('alm_hardware')
         live.addQuery('serial_number', 'STARTSWITH', 'DEMOLIVE')
-        live.addEncodedQuery(fleetCondition())
+        live.addEncodedQuery(FLEET_CONDITION)
         live.orderBy('serial_number')
         live.query()
         while (live.next()) {

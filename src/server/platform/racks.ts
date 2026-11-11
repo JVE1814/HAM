@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { fleetCondition, SITE_CONDITION } from '../domain/fleet.ts'
+import { FLEET_CONDITION, SITE_CONDITION } from '../domain/fleet.ts'
 import {
     DEFAULT_RACK_FACE,
     DEFAULT_RACK_UNITS,
@@ -85,7 +85,7 @@ function rackSpec(rack: GlideRecord): RackSpec {
 function placedIn(rackId: string): GlideRecord {
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery(PLACEMENT_FIELDS.rack, rackId)
-    asset.addEncodedQuery(fleetCondition())
+    asset.addEncodedQuery(FLEET_CONDITION)
     asset.addNotNullQuery(PLACEMENT_FIELDS.ruStart)
     return asset
 }

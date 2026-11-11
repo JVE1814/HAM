@@ -11,7 +11,7 @@ import {
     type CoverageAnswer,
     type SerialCoverage,
 } from '../domain/coverage.ts'
-import { fleetCondition } from '../domain/fleet.ts'
+import { FLEET_CONDITION } from '../domain/fleet.ts'
 import { parseCoverageRow } from '../domain/oem/adapters.ts'
 import { normalizeSerial } from '../domain/serials.ts'
 import type { CoverageSource, OemVendor } from '../domain/vocabulary.ts'
@@ -186,7 +186,7 @@ export function importCoverageRow(row: GlideRecord): RowOutcome {
 function fleetAssetWithSerial(serial: string): GlideRecord | null {
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery('serial_number', serial)
-    asset.addEncodedQuery(fleetCondition())
+    asset.addEncodedQuery(FLEET_CONDITION)
     asset.setLimit(1)
     asset.query()
     return asset.next() ? asset : null
