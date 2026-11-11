@@ -2,8 +2,8 @@ import { GlideRecord } from '@servicenow/glide'
 import { FLEET_CONDITION, OEM_PID_FIELD } from '../domain/fleet.ts'
 import {
     aliasedManufacturer,
+    DEFAULT_RULE_ORDER,
     fleetOnRawModelQuery,
-    LEARNED_RULE,
     MODEL_TABLE,
     NORMALIZED_TO,
     normalizeModel,
@@ -19,7 +19,7 @@ import {
     unusableRules,
 } from '../domain/normalization.ts'
 import { runTableJob } from './chunked.ts'
-import { bool, countBy, num, pluck, str, warnRefused } from './records.ts'
+import { countBy, num, pluck, str, warnRefused } from './records.ts'
 import { NORM_EXCEPTION_STATUS } from '../domain/vocabulary.ts'
 import { log } from './log.ts'
 
@@ -53,7 +53,6 @@ export function loadNormalizationData(): NormalizationData {
             matchType: str(rule, 'match_type') as ModelMatchRule['matchType'],
             pattern: str(rule, 'pattern'),
             modelId: str(rule, 'model'),
-            active: bool(rule, 'active'),
         })
     }
     return { aliases, rules }
@@ -123,8 +122,8 @@ export function recordNormalizationException(
  */
 export function normalizeNaasRawModels(): void {
     const naas = [
-        ...distinctValues('alm_hardware', fleetOnRawModelQuery(), 'model'),
-        ...distinctValues('cmdb_ci_netgear', siteCiOnRawModelQuery(), 'model_id'),
+        ...countBy('alm_hardware', fleetOnRawModelQuery(), 'model').keys(),
+        ...countBy('cmdb_ci_netgear', siteCiOnRawModelQuery(), 'model_id').keys(),
     ]
     closeNonNaasExceptions(naas)
     const query = rawModelsToNormalizeQuery(naas)
@@ -149,11 +148,6 @@ export function normalizeNaasRawModels(): void {
             repointModel(rawModelId, resolution.modelId)
         },
     })
-}
-
-/** The distinct values of `field` among the rows of `table` that `query` matches, read with one aggregate query. */
-function distinctValues(table: string, query: string, field: string): string[] {
-    return [...countBy(table, query, field).keys()]
 }
 
 /**
@@ -223,11 +217,13 @@ function learnFromResolution(exception: GlideRecord, data: NormalizationData): b
         alias.setValue('manufacturer', manufacturerId)
         if (!learned(alias, 'alias', rawPair)) return false
     }
+    // An exact match at the order a rule gets when none is entered, so a rule given a lower order still wins.
+    const exact: ModelMatchRule['matchType'] = 'exact'
     const rule = new GlideRecord(RULE_TABLE)
     rule.initialize()
-    rule.setValue('order', LEARNED_RULE.order)
+    rule.setValue('order', DEFAULT_RULE_ORDER)
     rule.setValue('manufacturer', aliasedManufacturer(rawManufacturer, data.aliases) ?? manufacturerId)
-    rule.setValue('match_type', LEARNED_RULE.matchType)
+    rule.setValue('match_type', exact)
     rule.setValue('pattern', str(exception, 'raw_model'))
     rule.setValue('model', modelId)
     return learned(rule, 'match rule', rawPair)

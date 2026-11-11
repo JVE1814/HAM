@@ -20,7 +20,6 @@ export interface ModelMatchRule {
     matchType: MatchType
     pattern: string
     modelId: string
-    active: boolean
 }
 
 export type NormalizationResult =
@@ -97,7 +96,7 @@ export function normalizeModel(
     if (!manufacturerId) return { matched: false, reason: 'unknown_manufacturer' }
 
     const rule = rules
-        .filter((r) => r.active && r.manufacturerId === manufacturerId)
+        .filter((r) => r.manufacturerId === manufacturerId)
         .sort((a, b) => a.order - b.order)
         .find((r) => ruleMatches(r, raw.model))
     if (!rule) return { matched: false, manufacturerId, reason: 'no_matching_rule' }
@@ -118,12 +117,6 @@ export const NORMALIZED_TO = 'x_daas_ham_normalized_to'
 
 /** The order a model match rule gets when none is entered: the default of its `order` column. */
 export const DEFAULT_RULE_ORDER = 100
-
-/**
- * The rule learned from a resolved exception: an exact match on its raw model, at the order a rule gets when none is
- * entered, so a rule given a lower order still wins.
- */
-export const LEARNED_RULE = { order: DEFAULT_RULE_ORDER, matchType: 'exact' } as const satisfies Pick<ModelMatchRule, 'order' | 'matchType'>
 
 /** Encoded condition: the Model in `field` has no OEM PID (it is a raw model, ADR 0016) and is not yet normalized. */
 function onUnmappedRawModel(field: string): string {
