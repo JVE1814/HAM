@@ -1443,6 +1443,8 @@ describe('ATF tests', () => {
     it('load in their scripts server modules by the path the build installs them under, and call what those export', () => {
         const modules = new Map(records('sys_module').map((module) => [module.path ?? '', module.content ?? '']))
         for (const { step, script } of stepScripts()) {
+            // A script that calls a REST route over HTTP reaches the app through the route, not a module.
+            if (!/\bsn_ws\.RESTMessageV2\b/.test(script)) expect(loaded(script).length, step).toBeGreaterThan(0)
             expect([...script.matchAll(/\brequire\(/g)].length, `${step}: every require is read`).toBe(loaded(script).length)
             const code = script.replace(/'[^'\n]*'/g, "''")
             for (const { binding, path } of loaded(script)) {
