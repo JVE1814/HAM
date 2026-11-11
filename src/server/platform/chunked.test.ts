@@ -243,6 +243,15 @@ describe('an event job', () => {
         expect(run.flushed).toEqual([{ failed: 1 }])
         expect(platform.logs).toEqual([`error [x_daas_ham] ${EVENT_NAME} ${SUBJECT}: in this chunk: 1 record(s) failed, the last: b: boom b`])
     })
+
+    it('runs nothing for an event that names no subject', () => {
+        items('a')
+        const run = job()
+        expect(runEventTableJob({ ...queued(''), subject: '' }, run.spec)).toMatchObject({ processed: 0, done: false })
+        expect(run.handled).toEqual([])
+        expect(run.flushed).toEqual([])
+        expect(platform.events).toEqual([])
+    })
 })
 
 describe('an event job whose passes are started where they are triggered', () => {

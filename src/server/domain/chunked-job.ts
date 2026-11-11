@@ -129,10 +129,10 @@ export interface LockLost {
 
 export type ChunkWrite = { outcome: 'written' | 'superseded' } | LockLost
 
-/** What a chunk of a pass does as it writes, under its job's lock where the job has one (ADR 0013). */
+/** What a chunk of a pass does as it writes, under its job's lock (ADR 0013). */
 export interface LockedChunkPorts {
     isCurrent(): boolean
-    /** Whether the chunk still holds the job's lock: a taker that judged it abandoned may have cleared it. Always true for a job without a lock. */
+    /** Whether the chunk still holds the job's lock: a taker that judged it abandoned may have cleared it. */
     held(): boolean
     flush(): void
     queueNext(): void

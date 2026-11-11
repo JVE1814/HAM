@@ -125,8 +125,6 @@ export function queueRefresh(pass: Exclude<RefreshPass, 'model'>, subject: Glide
  */
 export function runRefreshPass(pass: RefreshPass, event: GlideRecord, current: GlideRecord): void {
     const queued = jobEvent(REFRESH_PASS[pass].event, event, current)
-    // Never run for a blank model, agreement or lease: the query would match every Asset without one.
-    if (!queued.subject) return
     const readers = lifecycleReaders()
     runEventTableJob(queued, {
         query: inFleet(REFRESH_PASS[pass].assets(queued.subject)),
