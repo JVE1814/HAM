@@ -33,7 +33,7 @@ export function isSuccess(status: number): boolean {
  * detail, and the OAuth-style {error, error_description} used by FortiCloud and FortiZTP. Status 0 is
  * "no response" (failureText adds the transport's reason).
  */
-export function errorText(status: number, body: string): string {
+function errorText(status: number, body: string): string {
     const json = parseJson(body)
     const first = asArray(field(json, 'errors'))[0]
     const detail =
