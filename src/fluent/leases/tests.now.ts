@@ -4,7 +4,7 @@ import { INSTALL_STATUS, LEASE_END_ACTION, STAGE_FIELDS, TASK_STATE } from '../.
 import { assetManager } from '../shared/roles.now'
 
 /*
- * ATF: lessor ownership and lease extension (Q65; suite "NaaS - P3"). The lease rules act on fleet assets only
+ * The lease rules act on fleet assets only
  * (ADR 0016), so the Assets here are fleet assets. Fixtures setting the Fleet flag insert without security enforcement:
  * the flag is read-only on forms, and the app's intake paths set it server-side.
  */

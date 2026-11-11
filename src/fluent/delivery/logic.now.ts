@@ -11,8 +11,6 @@ import { EVENT } from '../../server/domain/events'
 import { ENTRY_MODULES } from '../shared/server-modules.now'
 import { admin, assetManager, customerAdmin, fieldTech, returnWorkers, siteContact, stockroomWorkers } from '../shared/roles.now'
 
-/* The Order form's Ship and Confirm installed buttons. */
-
 UiAction({
     $id: Now.ID['ua_order_ship'],
     name: 'Ship',
@@ -84,7 +82,7 @@ BusinessRule({
 })
 
 /*
- * Shipping aggregator (plan §13 Shipping aggregator, Q73). The message targets ShipEngine's label API; point the endpoint at
+ * The message targets ShipEngine's label API; point the endpoint at
  * another aggregator with the same request shape if needed. Tracking webhooks are registered at
  * /api/x_daas_ham/naas/shipping/tracking with the custom header
  * X-NaaS-Webhook-Token: <x_daas_ham.shipping.webhook_token> (ShipEngine `headers: [{ key, value }]`,

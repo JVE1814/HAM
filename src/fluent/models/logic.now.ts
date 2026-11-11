@@ -7,8 +7,6 @@ import { MILESTONE_ROW_CHANGED, MODEL_LIFECYCLE } from '../../server/domain/mode
 import { NORM_EXCEPTION_STATUS } from '../../server/domain/vocabulary'
 import { EVENT } from '../../server/domain/events'
 
-/* Rules, events and jobs for model data, agreements' refresh terms and lifecycle import rows. */
-
 /*
  * cmdb_model_lifecycle is the platform's table (ADR 0017), which holds the milestones of the Provider IT's Models too
  * (ADR 0016), and a rule on it runs for its child classes as well. The platform runs a condition on every save of the

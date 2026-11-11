@@ -12,9 +12,6 @@ import {
 } from '@servicenow/sdk/core'
 import { LEASE_END_ACTION, LEASE_END_ACTION_CHOICES } from '../../server/domain/vocabulary'
 
-/* Lease schedules and end-of-lease decisions (plan §13 Leases, Q65). */
-
-/** A financing contract with a Lessor covering a set of Assets until an end date. */
 export const x_daas_ham_lease_schedule = Table({
     name: 'x_daas_ham_lease_schedule',
     label: 'Lease schedule',
@@ -28,7 +25,6 @@ export const x_daas_ham_lease_schedule = Table({
         monthly_payment: DecimalColumn({ label: 'Monthly payment (all assets)' }),
         buyout_price: DecimalColumn({ label: 'Buyout price' }),
         buyout_share: DecimalColumn({ label: 'Buyout cost per asset', readOnly: true, scale: 6 }),
-        // The buyout's left-over cents go one each to the Assets up to this sys_id (domain/leases buyoutSplit).
         buyout_extra_through: StringColumn({ label: 'Buyout: one cent more up to asset', maxLength: 32, readOnly: true }),
         buyout_assets: IntegerColumn({ label: 'Assets covered at buyout', readOnly: true }),
         decision_lead_days: IntegerColumn({ label: 'Decide this many days before the end', default: 120, min: 0 }),
@@ -44,7 +40,6 @@ export const x_daas_ham_lease_schedule = Table({
     autoNumber: { prefix: 'NLS', number: 1000, numberOfDigits: 7 },
 })
 
-/** The buy-out / extend / return decision raised ahead of a lease end. */
 export const x_daas_ham_lease_decision = Table({
     name: 'x_daas_ham_lease_decision',
     label: 'End-of-lease decision',

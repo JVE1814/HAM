@@ -3,8 +3,7 @@ import { Test } from '@servicenow/sdk/core'
 import { SHIPMENT_DIRECTION, SHIPMENT_STATUS } from '../../server/domain/vocabulary'
 
 /*
- * ATF: the shipping aggregator's tracking webhook, POST /api/x_daas_ham/naas/shipping/tracking (entry/shipping
- * `postTrackingUpdate`, plan §13 Shipping aggregator, ADR 0012; suite "NaaS - P3"). The route runs unauthenticated, so ATF's inbound REST step
+ * The route runs unauthenticated, so ATF's inbound REST step
  * sends it without signing in, as the aggregator does: without the X-NaaS-Webhook-Token header it is refused. The
  * delivery is then posted from a script, again without signing in, with the token in the header (a REST step cannot
  * carry the secret). The route answers as guest, so the delivery being applied shows guest reads the password2 token
@@ -25,7 +24,6 @@ export const trackingWebhookTest = Test(
         description:
             'Posts a ShipEngine "DE" update to the tracking webhook without the X-NaaS-Webhook-Token header (HTTP 401, the Shipment unchanged), then posts it twice, still unauthenticated, with the token: each answers HTTP 200 delivered, the Shipment is delivered with its delivery time, and it holds one tracking event.',
         active: true,
-        // The handler logs what it refuses; the assertions below check the outcome.
         failOnServerError: false,
     },
     (atf) => {

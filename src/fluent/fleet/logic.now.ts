@@ -6,8 +6,6 @@ import { uiAddToFleet } from '../../server/entry/fleet'
 import { ENTRY_MODULES } from '../shared/server-modules.now'
 import { admin, assetManager } from '../shared/roles.now'
 
-/* The lifecycle rules on fleet assets' stage changes, and adoption into the fleet. */
-
 /*
  * alm_hardware is a global table: the platform refuses current.setAbortAction from this scope on its records and saves
  * anyway. So a before rule there refuses with its Abort action when its condition (the module's check) holds, and its

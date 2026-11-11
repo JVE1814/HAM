@@ -4,7 +4,6 @@ import { MODEL_LIFECYCLE } from '../../server/domain/model-lifecycle'
 import { DEVICE_CLASS } from '../../server/domain/vocabulary'
 
 /*
- * ATF: a Model's manufacturer milestones are kept in the platform's Model lifecycle table (ADR 0017; suite "NaaS - P1").
  * The recomputation of the Model's fleet assets is not tested here: it runs from the event queue, after the test.
  */
 

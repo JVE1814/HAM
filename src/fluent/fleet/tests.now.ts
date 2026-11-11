@@ -4,7 +4,6 @@ import { DEVICE_CLASS, INSTALL_STATUS, STAGE_FIELDS, STOCKROOM_TYPE } from '../.
 import { assetManager } from '../shared/roles.now'
 
 /*
- * ATF: adopting the Provider's existing equipment into the fleet with "Add to fleet" (ADR 0016; suite "NaaS - P1").
  * Fixtures setting the Fleet flag insert without security enforcement: the flag is read-only on forms.
  */
 
@@ -22,7 +21,6 @@ export const addToFleetTest = Test(
         description:
             'Add to fleet leaves an available asset in a NaaS stockroom outside the fleet when its model has no OEM PID, and adopts the same asset of a model with one.',
         active: true,
-        // The refusal is the expected path, and shows an error message; the validations below check the outcome.
         failOnServerError: false,
     },
     (atf) => {

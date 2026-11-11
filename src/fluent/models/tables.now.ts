@@ -46,7 +46,6 @@ export const x_daas_ham_manufacturer_alias = Table({
     index: [{ name: 'x_daas_ham_ma_alias', unique: true, element: 'alias' }],
 })
 
-/** An ordered rule mapping a raw model string to a canonical Model. */
 export const x_daas_ham_model_match_rule = Table({
     name: 'x_daas_ham_model_match_rule',
     label: 'Model match rule',
@@ -67,7 +66,6 @@ export const x_daas_ham_model_match_rule = Table({
     index: [{ name: 'x_daas_ham_mmr_mfr', unique: false, element: 'manufacturer' }],
 })
 
-/** A raw manufacturer/model pair no Model match rule could map. */
 export const x_daas_ham_norm_exception = Table({
     name: 'x_daas_ham_norm_exception',
     label: 'Normalization exception',
