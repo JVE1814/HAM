@@ -92,8 +92,7 @@ function writeOffShare(
 }
 
 /**
- * Each Asset's share of a lease's monthly payment: split evenly over the Assets it covers. While a
- * buyout transfer runs, Assets leave the schedule one by one, so the payment keeps being split over
+ * While a buyout transfer runs, Assets leave the schedule one by one, so the payment keeps being split over
  * the Assets it covered when the buyout was decided.
  */
 export function leaseShare(lease: Pick<LeaseTerms, 'monthlyPayment' | 'coveredAssets' | 'buyoutAssets'>): number {
@@ -110,7 +109,6 @@ function marginKey(customerId: string, siteId: string, currency: string): string
     return `${customerId}|${siteId}|${currency}`
 }
 
-/** Which Cost fact an amount belongs to: one per Customer, Site, cost type and currency in a period. */
 export function costFactKey(customerId: string, siteId: string, type: string, currency: string): string {
     return `${marginKey(customerId, siteId, currency)}|${type}`
 }

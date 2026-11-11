@@ -1,8 +1,6 @@
 import { firstBest } from './collections.ts'
 import { RMA_STATE, type RmaState } from './vocabulary.ts'
 
-/** OEM RMAs: the states an RMA is open in, and which open RMA a break-fix line's advance replacement goes under (P2.3). */
-
 /** RMAs whose replacement is still to come: their line counts each as a unit on its way. */
 export const RMA_AWAITED: readonly RmaState[] = [RMA_STATE.to_open, RMA_STATE.open]
 

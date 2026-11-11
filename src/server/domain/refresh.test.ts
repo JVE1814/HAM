@@ -91,7 +91,6 @@ describe('firstCandidatesDue', () => {
         deviceClass: 'switch',
     })
 
-    /** A keyset read over `assets`, as the query dueAfter builds; counts the pages read. */
     function reader(assets: ReturnType<typeof assetsDue>) {
         const pages: number[] = []
         const readPage = (after: DueKey | null, size: number): DueRow[] => {

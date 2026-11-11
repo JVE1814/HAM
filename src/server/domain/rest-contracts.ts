@@ -31,19 +31,19 @@ export interface ReceiveRequest {
     pid?: string
 }
 
-/** POST /putaway: the scanned code and the Stockroom the unit now sits in. */
+/** POST /putaway */
 export interface PutAwayRequest {
     code: string
     stockroom: string
 }
 
-/** POST /pick: the scanned code and the number of the Order it is picked for. */
+/** POST /pick */
 export interface PickRequest {
     code: string
     order: string
 }
 
-/** POST /audits/{id}/scan: the scanned code. */
+/** POST /audits/{id}/scan */
 export interface AuditScanRequest {
     code: string
 }
@@ -164,12 +164,12 @@ export interface FaultRequest {
     description: string
 }
 
-/** POST /customer/faults: the number of the case opened. */
+/** POST /customer/faults */
 export interface FaultReport {
     case: string
 }
 
-/** POST /customer/orders/{id}/installed: the Order's number. */
+/** POST /customer/orders/{id}/installed */
 export interface InstallConfirmation {
     order: string
 }
@@ -180,7 +180,7 @@ export interface AttestationAnswers {
     submit: boolean
 }
 
-/** POST /customer/attestations/{id}: the Attestation's number. */
+/** POST /customer/attestations/{id} */
 export interface AttestationReceipt {
     attestation: string
 }
@@ -193,7 +193,7 @@ export interface ReturnRequestBody {
     method: ReturnMethod
 }
 
-/** POST /customer/returns: the number of the Return order raised. */
+/** POST /customer/returns */
 export interface ReturnRequestReceipt {
     returnOrder: string
 }

@@ -82,7 +82,6 @@ export function outOfUseExceptionsQuery(types: readonly ExceptionType[]): string
     return fleetStagesQuery(outOfUse, `${OPEN_EXCEPTIONS_QUERY}^exception_typeIN${types.join(',')}`, 'asset.')
 }
 
-/** Disagreements between an installed Asset and what monitoring reports. */
 export function reconcileAsset(asset: InstalledAssetView, now: number, unseenDays: number): ExceptionType[] {
     const exceptions: ExceptionType[] = []
     if (asset.lastSeenAt === undefined || now - asset.lastSeenAt > unseenDays * 86_400_000) exceptions.push('unseen')

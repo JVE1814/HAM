@@ -1,7 +1,5 @@
 import { addMonths, daysBetween, endOfMonth } from './calendar.ts'
 
-/** Amounts, currencies and billing months, as every money workflow (billing, Margin, leases, shipping) counts them. */
-
 export interface MonthBounds {
     /** YYYY-MM */
     month: string
@@ -30,7 +28,6 @@ export function overlapsMonth(bounds: MonthBounds): string {
     return `start_date<=${bounds.last}^end_dateISEMPTY^ORend_date>=${bounds.first}`
 }
 
-/** An encoded query for records whose date-time `field` falls on a day of the month. */
 export function timeInMonth(field: string, bounds: MonthBounds): string {
     return `${field}>=${bounds.first} 00:00:00^${field}<=${bounds.last} 23:59:59`
 }

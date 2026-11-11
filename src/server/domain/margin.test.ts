@@ -29,7 +29,6 @@ function purchaseOf(amount: number) {
     return [{ type: 'purchase', amount: expect.closeTo(amount, 10) }]
 }
 
-/** The purchase cost of an Asset in service from its purchase date on, summed until a year after its write-off ends. */
 function lifetimePurchaseCost(purchaseDate: string, amortisationMonths: number): number {
     const asset = { ...provider, purchaseDate }
     let total = 0

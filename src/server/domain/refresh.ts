@@ -97,7 +97,6 @@ export function replacementModel(
     }
     if (catalog.some((c) => c.modelId === current.modelId) && sellable(current.modelId)) return current.modelId
     const endOfSupport = (modelId: string) => lifecycle.get(modelId)?.endOfSupport ?? ''
-    // Latest end of support; '' (unknown) ranks below every date, and ties keep catalog order.
     const options = catalog.filter((c) => c.deviceClass === current.deviceClass && sellable(c.modelId))
     return firstBest(options, (a, b) => endOfSupport(a.modelId).localeCompare(endOfSupport(b.modelId)))?.modelId ?? null
 }
