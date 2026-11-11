@@ -3,12 +3,12 @@ import { BusinessRule, EmailNotification, Record, ScheduledScript, ScriptAction,
 import { EVENT } from '../../server/domain/events'
 import {
     guardAgreementCurrency,
-    onAgreementEndChanged,
     onAgreementTermsChanged,
     refreshAgreementAssets,
     uiRenewAgreement,
     warnRenewals,
 } from '../../server/entry/agreements'
+import { rearmForNewEnd } from '../../server/platform/renewals'
 import { commercialEditors } from '../shared/roles.now'
 
 // A mistyped currency is refused as it is entered, not at the next generation (owner decision: one currency per Agreement).
@@ -31,7 +31,7 @@ BusinessRule({
     action: ['update'],
     order: 100,
     condition: "current.ends.changes() && current.ends != ''",
-    script: onAgreementEndChanged,
+    script: rearmForNewEnd,
 })
 
 BusinessRule({

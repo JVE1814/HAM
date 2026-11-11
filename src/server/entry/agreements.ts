@@ -5,7 +5,7 @@ import { todayIso } from '../platform/clock.ts'
 import { warnExpiringCoverage } from '../platform/coverage-warnings.ts'
 import { queueRefresh, runRefreshPass } from '../platform/lifecycle-dates.ts'
 import { str } from '../platform/records.ts'
-import { rearmForNewEnd, renewAgreement, warnAgreementRenewals } from '../platform/renewals.ts'
+import { renewAgreement, warnAgreementRenewals } from '../platform/renewals.ts'
 import { abortWith } from '../platform/rule-api.ts'
 
 /**
@@ -27,10 +27,6 @@ export function onAgreementTermsChanged(current: GlideRecord): void {
 
 export function refreshAgreementAssets(event: GlideRecord, current: GlideRecord): void {
     runRefreshPass('agreement', event, current)
-}
-
-export function onAgreementEndChanged(current: GlideRecord): void {
-    rearmForNewEnd(current)
 }
 
 export function uiRenewAgreement(current: GlideRecord): void {
