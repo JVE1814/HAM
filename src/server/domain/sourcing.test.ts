@@ -29,7 +29,6 @@ const stock: StockCandidate[] = [
     { assetId: 'staging-1', stockroomId: 'lab', source: 'central_stock' },
 ]
 
-/** A request for Acme at its HQ Site. */
 const acme = (request: Pick<SourcingRequest, 'modelId' | 'quantity' | 'purpose'>): SourcingRequest => ({
     ...request,
     customerId: 'acme',
@@ -82,7 +81,6 @@ describe('planSourcing', () => {
 
 const STOCKROOM_TYPE = 'stockroom.x_daas_ham_stockroom_type'
 const LEASE_END = 'x_daas_ham_lease.end_action'
-/** A fleet asset of Model m1 on no Order line, in a central depot unless `fields` say otherwise. */
 const unit = (stage: Stage, fields: SampleRecord = {}) =>
     assetIn(stage, { x_daas_ham_fleet: 'true', model: 'm1', x_daas_ham_order_line: '', [STOCKROOM_TYPE]: 'central_depot', ...fields })
 const IN_TRANSIT_RESERVED = { install_status: '9', substatus: 'reserved' }
@@ -92,12 +90,10 @@ describe('stockQueries', () => {
     const replacement: SourcingScope = { ...forAcme, purpose: 'replace' }
     const free = unit('available')
     const acmeSpare = unit('spare_pool', { company: 'acme', [STOCKROOM_TYPE]: 'staging_centre' })
-    /** A hot spare in Acme's site stockroom at the location given. */
     const siteSpare = (location: SampleRecord) =>
         unit('spare_pool', { company: 'acme', [STOCKROOM_TYPE]: 'customer_site', 'stockroom.x_daas_ham_customer': 'acme', ...location })
     const atHq = siteSpare({ 'stockroom.location': 'hq' })
     const sources = (scope: SourcingScope) => stockQueries(scope).map(({ source }) => source)
-    /** The Sources whose query finds `asset`. */
     const sourcesOf = (scope: SourcingScope, asset: SampleRecord) =>
         stockQueries(scope)
             .filter(({ query }) => matches(query, asset))

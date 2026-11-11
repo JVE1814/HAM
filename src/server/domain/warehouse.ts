@@ -3,8 +3,6 @@ import { endedUnfulfilled } from './fulfilment.ts'
 import type { Stage } from './lifecycle.ts'
 import type { LineStage, StockroomType } from './vocabulary.ts'
 
-/** What the warehouse scanning app (P1.5) may do with a scanned Asset, by its Lifecycle stage. */
-
 /**
  * Receiving confirms bought units as available stock: in transit (an ASN row) or on order (created on receipt without
  * one). Any other Asset is already in stock, allocated or deployed, and receiving it would pull it out of its Stockroom
