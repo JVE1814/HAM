@@ -5,7 +5,7 @@ import type { CoverageAnswer } from '../domain/coverage.ts'
 import { fleetCondition } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { parseLifecycleRow } from '../domain/model-lifecycle.ts'
+import { backwardsMilestones, mergeLifecycle, parseLifecycleRow } from '../domain/model-lifecycle.ts'
 import { SYNC_ORDER } from '../domain/oem/adapters.ts'
 import type { CoverageFact } from '../domain/oem/types.ts'
 import { normalizeSerial } from '../domain/serials.ts'
@@ -14,7 +14,7 @@ import type { OemVendor, StagingSource } from '../domain/vocabulary.ts'
 import { findAnyAssetBySerial, newAsset } from './assets.ts'
 import { applyCoverage } from './coverage.ts'
 import { attemptLock, whyNotRun } from './locks.ts'
-import { writeModelLifecycle } from './model-lifecycle.ts'
+import { readModelLifecycle, writeModelLifecycle } from './model-lifecycle.ts'
 import { loadNormalizationData, recordNormalizationException, resolveModel } from './normalization.ts'
 import { choice, refusal, str, warnRefused } from './records.ts'
 
@@ -152,8 +152,9 @@ function fleetAssetWithSerial(serial: string): GlideRecord | null {
 
 /**
  * Import a lifecycle row: store its milestones on its Model (platform/model-lifecycle, source CSV). A milestone the
- * row leaves blank keeps what is stored. A row with a milestone the platform refuses is marked error with why, to load
- * again once the cause is fixed: the milestones saved meanwhile are then found as given.
+ * row leaves blank keeps what is stored, so a row whose milestones go backwards counted with those is refused whole. A
+ * row with a milestone the platform refuses is marked error with why, to load again once the cause is fixed: the
+ * milestones saved meanwhile are then found as given.
  */
 export function importLifecycleRow(row: GlideRecord): RowOutcome {
     const parsed = parseLifecycleRow({
@@ -167,6 +168,8 @@ export function importLifecycleRow(row: GlideRecord): RowOutcome {
 
     const resolution = resolveModel({ manufacturer: str(row, 'manufacturer'), model: parsed.pid }, loadNormalizationData())
     if (!resolution.modelId) return failed(`PID ${parsed.pid} does not map to a model`)
+    const backwards = backwardsMilestones(mergeLifecycle(readModelLifecycle(resolution.modelId), parsed.dates))
+    if (backwards) return failed(`${backwards}, counting the milestones stored for ${parsed.pid}`)
 
     const written = writeModelLifecycle(resolution.modelId, parsed.dates, { source: 'csv', reference: str(row, 'source_reference') })
     if (written.refused.length > 0) return failed(`Lifecycle for ${parsed.pid} not saved: ${written.refused.join('; ')}`)

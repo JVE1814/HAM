@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
     assetLifecycleStamp,
     INSTALLED_PAST_SUPPORT,
+    backwardsMilestones,
     mergeLifecycle,
     parseLifecycleRow,
     PAST_SUPPORT_PHASES,
@@ -111,11 +112,21 @@ describe('parseLifecycleRow', () => {
         expect(parseLifecycleRow({ pid: 'X', endOfSupport: '2026-02-31' })).toEqual({ ok: false, reason: 'endOfSupport must be YYYY-MM-DD' })
     })
 
-    it('rejects milestones out of order', () => {
-        expect(parseLifecycleRow({ pid: 'X', endOfSale: '2030-01-01', endOfSupport: '2029-01-01' })).toEqual({
-            ok: false,
-            reason: 'Milestones must not go backwards (end of sale after end of support)',
-        })
+})
+
+describe('backwardsMilestones', () => {
+    it('says which milestone comes after the next one given, skipping those not given', () => {
+        expect(backwardsMilestones({ endOfSale: '2030-01-01', endOfSupport: '2029-01-01' })).toBe(
+            'Milestones must not go backwards (end of sale after end of support)',
+        )
+        expect(backwardsMilestones({ endOfSupport: '2030-01-01', endOfLife: '2029-01-01' })).toBe(
+            'Milestones must not go backwards (end of support after end of life)',
+        )
+    })
+
+    it('passes milestones in order, on the same day or with gaps', () => {
+        expect(backwardsMilestones({ endOfSale: '2025-06-30', endOfSupport: '2030-06-30', endOfLife: '2030-06-30' })).toBe('')
+        expect(backwardsMilestones({})).toBe('')
     })
 })
 

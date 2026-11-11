@@ -28,7 +28,8 @@
   active Publisher row of the Model, so a milestone the Provider's IT keeps by hand or ServiceNow's content service
   supplies counts too; where two rows give the same milestone, the *Internal* one wins.
 - The CSV import accepts ISO dates of real calendar days (it refuses 2026-02-31) and refuses milestones that go
-  backwards. A milestone a row leaves blank keeps the date stored; a row with no date at all is marked *ignored*.
+  backwards, counted with the dates stored. A milestone a row leaves blank keeps the date stored; a row with no date
+  at all is marked *ignored*.
   No row is ever removed by the app: a milestone stored by mistake is deactivated or deleted in the list by hand.
 - **Lifecycle phase** on a day is the latest milestone reached: end of sale → end of support → end of
   extended support → end of life.

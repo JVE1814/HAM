@@ -104,15 +104,21 @@ export function parseLifecycleRow(row: LifecycleRow): ParsedLifecycleRow {
         if (!isIsoDate(value)) return { ok: false, reason: `${field} must be YYYY-MM-DD` }
         dates[field] = value
     }
+    return { ok: true, pid, dates }
+}
+
+/**
+ * Why `dates` go backwards (a milestone dated before one the manufacturer reaches earlier), or '' when they are in
+ * order. A row is checked merged with the milestones stored (`mergeLifecycle`), since a blank one keeps its date.
+ */
+export function backwardsMilestones(dates: LifecycleDates): string {
     const present = MILESTONES.filter(({ field }) => dates[field])
     for (let i = 1; i < present.length; i++) {
         const earlier = present[i - 1]
         const later = present[i]
-        if (dates[earlier.field]! > dates[later.field]!) {
-            return { ok: false, reason: `Milestones must not go backwards (${earlier.label} after ${later.label})` }
-        }
+        if (dates[earlier.field]! > dates[later.field]!) return `Milestones must not go backwards (${earlier.label} after ${later.label})`
     }
-    return { ok: true, pid, dates }
+    return ''
 }
 
 /** Combine stored milestones with a newer source: present values win, missing ones keep what was there. */
