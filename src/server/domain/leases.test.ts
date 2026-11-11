@@ -5,7 +5,6 @@ import {
     buyoutTerms,
     decidedLease,
     earliestReviewedEnd,
-    evenShare,
     leaseDecisionProblem,
     leaseMismatch,
     stillCovered,
@@ -134,18 +133,6 @@ describe('buyoutPurchase', () => {
 
     it('records no purchase without a buyout price, so the Asset keeps its cost and purchase date', () => {
         expect(buyoutPurchase(0, '2026-11-07')).toBeUndefined()
-    })
-})
-
-describe('evenShare', () => {
-    it("splits an amount evenly, unrounded, e.g. a lease payment's share for Margin", () => {
-        expect(evenShare(9000, 3)).toBe(3000)
-        expect(evenShare(0, 3)).toBe(0)
-        expect(evenShare(10000, 3) * 3).toBeCloseTo(10000, 9)
-    })
-
-    it('gives no share when there is none to split it over', () => {
-        expect(evenShare(9000, 0)).toBe(0)
     })
 })
 

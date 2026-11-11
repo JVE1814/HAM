@@ -106,6 +106,11 @@ describe('serviceIntervalCosts', () => {
         expect(costs({ ...lessor, lease: { ...lease, coveredAssets: 4, buyoutAssets: 3 } })).toEqual([{ type: 'lease', amount: 45 }])
     })
 
+    it('leaves a share of the payment unrounded, as costs are rounded only once summed', () => {
+        const shares = costs({ ...lessor, lease: { ...lease, monthlyPayment: 100, coveredAssets: 3 } })
+        expect(shares).toEqual([{ type: 'lease', amount: expect.closeTo(100 / 3, 10) }])
+    })
+
     it('charges no lease without covered Assets, a Lease schedule, or the Lessor as owner', () => {
         expect(costs({ ...lessor, lease: { ...lease, coveredAssets: 0 } })).toEqual([])
         expect(costs({ ...lessor, lease: null })).toEqual([])
