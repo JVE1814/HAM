@@ -1,6 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
 import { FLEET_CONDITION, SITE_CONDITION, SITE_OR_ROOM_LOCATIONS } from '../domain/fleet.ts'
-import { MODEL_TABLE } from '../domain/normalization.ts'
 import {
     DEFAULT_RACK_FACE,
     DEFAULT_RACK_UNITS,
@@ -56,7 +55,7 @@ const NO_MODEL: RackModel = { name: '', rackUnits: 0, powerW: 0 }
 
 /** Typical power is the platform's cmdb_model.power_consumption, in watts. */
 function rackModels(modelIds: readonly string[]): Map<string, RackModel> {
-    return recordsById(MODEL_TABLE, modelIds, (model) => ({
+    return recordsById('cmdb_model', modelIds, (model) => ({
         name: str(model, 'display_name'),
         rackUnits: num(model, 'rack_units'),
         powerW: num(model, 'power_consumption'),
