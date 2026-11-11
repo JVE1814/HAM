@@ -7,12 +7,12 @@ import {
     guardClosedBillingLine,
     guardClosedBillingPeriod,
     openMonthlyBillingPeriod,
-    startBillingPeriodGeneration,
     uiCloseBillingPeriod,
     uiExportBillingPeriod,
     uiRegenerateBillingPeriod,
     uiResetBillingGeneration,
 } from '../../server/entry/billing'
+import { generateNewPeriod } from '../../server/platform/billing'
 import { EVENT } from '../../server/domain/events'
 import { BILLING_PERIOD_STATUS } from '../../server/domain/vocabulary'
 import { RESET_AFTER_IDLE_MINUTES } from '../../server/domain/billing'
@@ -167,5 +167,5 @@ BusinessRule({
     action: ['insert'],
     order: 200,
     condition: `current.status == '${BILLING_PERIOD_STATUS.generating}'`,
-    script: startBillingPeriodGeneration,
+    script: generateNewPeriod,
 })

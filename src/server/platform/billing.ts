@@ -94,13 +94,13 @@ function startGeneration(period: GlideRecord): string | null {
 }
 
 /**
- * Generate a period just inserted still generating (the monthly job's or one made by hand). A pass that cannot be
- * started is held for review with why, as a generation that stops is.
+ * Generate a period just inserted still generating (the monthly job's or one made by hand), from its after insert rule
+ * (`current`). A pass that cannot be started is held for review with why, as a generation that stops is.
  */
-export function generateNewPeriod(inserted: GlideRecord): void {
-    const unstarted = startGeneration(inserted)
+export function generateNewPeriod(current: GlideRecord): void {
+    const unstarted = startGeneration(current)
     if (!unstarted) return
-    const period = findById(PERIOD, inserted.getUniqueValue())
+    const period = findById(PERIOD, current.getUniqueValue())
     if (period) stopGeneration(period, `generation not started: ${unstarted}`)
 }
 

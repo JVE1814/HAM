@@ -10,7 +10,6 @@ import {
     attachExport,
     closePeriod,
     generateChunk,
-    generateNewPeriod,
     linesPage,
     openBillingPeriod,
     recentPeriods,
@@ -30,10 +29,6 @@ import { abortWith } from '../platform/rule-api.ts'
 
 export function openMonthlyBillingPeriod(): void {
     openBillingPeriod(previousMonth(todayIso()))
-}
-
-export function startBillingPeriodGeneration(current: GlideRecord): void {
-    generateNewPeriod(current)
 }
 
 export function generateBillingLines(event: GlideRecord, current: GlideRecord): void {
