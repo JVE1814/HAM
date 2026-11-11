@@ -166,6 +166,9 @@ On an instance where an earlier version was installed:
     (watts)*, and set *Initiated from* to its NaaS Order, Return order or Audit on each work order
     still open or closed in a month whose Margin is still to be computed
     ([platform fields](docs/verify-on-instance.md#platform-fields)).
+  - Clear the earlier version's *Lessor* on every Asset (`alm_hardware.x_daas_ham_lessor`), or delete
+    the column: no ACL of the app keeps it to provider staff, so Customer contacts can read it
+    ([platform fields](docs/verify-on-instance.md#platform-fields)).
   - Load the Models' lifecycle milestones again through the lifecycle import, or enter them by hand
     ([model lifecycle](docs/verify-on-instance.md#model-lifecycle)).
 - Work through the checks marked **After an upgrade** in

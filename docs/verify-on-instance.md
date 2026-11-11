@@ -120,6 +120,12 @@ order names, and without one it takes the currency the Customer's Agreements sha
 whose Agreements bill in two currencies gets the labour left out with *no currency*. Stockroom
 members are entered again as group members ([Stockroom assignment](#stockroom-assignment)).
 
+An Asset's old *Lessor* column (`alm_hardware.x_daas_ham_lessor`) keeps its values, and no ACL of
+the app keeps it to provider staff, so a Customer contact who reads an Asset can
+read its Lessor (the Table API with `sysparm_fields=x_daas_ham_lessor`, for one). Clear it on every
+Asset (list `alm_hardware` with `x_daas_ham_lessorISNOTEMPTY` and blank it), or delete the column,
+then check that the list is empty.
+
 ### Procurement and FSM data
 
 The stored `proc_po` / `proc_po_item` status values and column names, `wm_order` state 3 = Closed
