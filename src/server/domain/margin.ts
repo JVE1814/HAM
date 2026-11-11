@@ -95,7 +95,7 @@ function writeOffShare(
  * While a buyout transfer runs, Assets leave the schedule one by one, so the payment keeps being split over
  * the Assets it covered when the buyout was decided.
  */
-export function leaseShare(lease: Pick<LeaseTerms, 'monthlyPayment' | 'coveredAssets' | 'buyoutAssets'>): number {
+function leaseShare(lease: Pick<LeaseTerms, 'monthlyPayment' | 'coveredAssets' | 'buyoutAssets'>): number {
     return evenShare(lease.monthlyPayment, Math.max(lease.coveredAssets, lease.buyoutAssets))
 }
 

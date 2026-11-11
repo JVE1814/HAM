@@ -5,7 +5,6 @@ import {
     CostLedger,
     costFactKey,
     labourCost,
-    leaseShare,
     marginRows,
     serviceIntervalCosts,
     type AssetCostFacts,
@@ -20,8 +19,9 @@ const provider: AssetCostFacts = { legalOwner: 'provider', purchaseCost: 6000, p
 const lease: LeaseTerms = { starts: '2024-02-01 00:00:00', ends: '2027-01-31 23:59:59', monthlyPayment: 180, coveredAssets: 2, buyoutAssets: 0 }
 const lessor: AssetCostFacts = { ...provider, legalOwner: 'lessor', lease }
 
+/** The costs charged, leaving out amounts of 0, which add nothing to a Cost fact. */
 function costs(asset: AssetCostFacts, interval: { start: string; end?: string } = wholeMonth, amortisationMonths = 60) {
-    return serviceIntervalCosts(interval, asset, november, amortisationMonths)
+    return serviceIntervalCosts(interval, asset, november, amortisationMonths).filter((cost) => cost.amount !== 0)
 }
 
 /** A purchase write-off of about `amount` (fractions of a month's days do not divide exactly). */
@@ -59,7 +59,7 @@ describe('serviceIntervalCosts', () => {
         expect(costs({ ...provider, purchaseDate: '2021-11-02' })).toEqual(purchaseOf(100 / 30))
         expect(costs({ ...provider, purchaseDate: '2021-11-16' })).toEqual(purchaseOf(50))
         expect(costs({ ...provider, purchaseDate: '2021-11-16' }, { start: '2026-11-10', end: '2026-11-20' })).toEqual(purchaseOf(20))
-        expect(costs({ ...provider, purchaseDate: '2021-11-16' }, { start: '2026-11-16' })).toEqual(purchaseOf(0))
+        expect(costs({ ...provider, purchaseDate: '2021-11-16' }, { start: '2026-11-16' })).toEqual([])
     })
 
     it('writes off exactly the cost over the life of an Asset in service throughout', () => {
@@ -80,7 +80,7 @@ describe('serviceIntervalCosts', () => {
 
     it('starts the write-off no earlier than the purchase, e.g. a lease buyout', () => {
         expect(costs({ ...provider, purchaseDate: '2026-11-16' })).toEqual([{ type: 'purchase', amount: 50 }])
-        expect(costs({ ...provider, purchaseDate: '2026-12-01' })).toEqual([{ type: 'purchase', amount: 0 }])
+        expect(costs({ ...provider, purchaseDate: '2026-12-01' })).toEqual([])
         expect(costs({ ...provider, purchaseDate: '2026-11-16' }, { start: '2026-11-21', end: '2026-11-25' })).toEqual([{ type: 'purchase', amount: 100 * (5 / 30) }])
     })
 
@@ -103,6 +103,7 @@ describe('serviceIntervalCosts', () => {
 
     it('keeps splitting the payment over the Assets covered at buyout while the transfer runs', () => {
         expect(costs({ ...lessor, lease: { ...lease, coveredAssets: 1, buyoutAssets: 3 } })).toEqual([{ type: 'lease', amount: 60 }])
+        expect(costs({ ...lessor, lease: { ...lease, coveredAssets: 4, buyoutAssets: 3 } })).toEqual([{ type: 'lease', amount: 45 }])
     })
 
     it('charges no lease without covered Assets, a Lease schedule, or the Lessor as owner', () => {
@@ -126,42 +127,9 @@ describe('serviceIntervalCosts', () => {
         ])
     })
 
-    it('gives zero amounts for an interval outside the month', () => {
-        expect(costs({ ...provider, supportAnnual: 360 }, { start: '2026-12-01' })).toEqual([
-            { type: 'purchase', amount: 0 },
-            { type: 'oem_support', amount: 0 },
-        ])
-        expect(costs(lessor, { start: '2026-09-01', end: '2026-10-31' })).toEqual([{ type: 'lease', amount: 0 }])
-    })
-})
-
-describe('leaseShare', () => {
-    it('splits the monthly payment over the covered assets', () => {
-        expect(leaseShare({ monthlyPayment: 180, coveredAssets: 2, buyoutAssets: 0 })).toBe(90)
-        expect(leaseShare({ monthlyPayment: 180, coveredAssets: 0, buyoutAssets: 0 })).toBe(0)
-    })
-
-    it('splits over the Assets covered at buyout while fewer are left on the lease', () => {
-        expect(leaseShare({ monthlyPayment: 180, coveredAssets: 1, buyoutAssets: 3 })).toBe(60)
-        expect(leaseShare({ monthlyPayment: 180, coveredAssets: 0, buyoutAssets: 3 })).toBe(60)
-    })
-
-    it('splits over the Assets on the lease when there are more than at buyout', () => {
-        expect(leaseShare({ monthlyPayment: 180, coveredAssets: 4, buyoutAssets: 3 })).toBe(45)
-    })
-})
-
-describe('costFactKey', () => {
-    it('tells Cost facts apart by customer, site, type and currency', () => {
-        const keys = [
-            costFactKey('acme', 'hq', 'lease', 'EUR'),
-            costFactKey('acme', 'hq', 'purchase', 'EUR'),
-            costFactKey('acme', '', 'lease', 'EUR'),
-            costFactKey('globex', 'hq', 'lease', 'EUR'),
-            costFactKey('acme', 'hq', 'lease', 'USD'),
-        ]
-        expect(new Set(keys).size).toBe(5)
-        expect(costFactKey('acme', 'hq', 'lease', 'EUR')).toBe(costFactKey('acme', 'hq', 'lease', 'EUR'))
+    it('charges nothing for an interval outside the month', () => {
+        expect(costs({ ...provider, supportAnnual: 360 }, { start: '2026-12-01' })).toEqual([])
+        expect(costs(lessor, { start: '2026-09-01', end: '2026-10-31' })).toEqual([])
     })
 })
 
@@ -174,7 +142,8 @@ describe('CostLedger', () => {
         ledger.add(cost('acme', 'hq', 'purchase', 5))
         ledger.add(cost('acme', 'hq', 'purchase', 8, 'USD'))
         ledger.add(cost('acme', 'hq', 'lease', 7))
-        ledger.add(cost('acme', '', 'field_labour', 250))
+        ledger.add(cost('acme', '', 'purchase', 250))
+        ledger.add(cost('globex', 'hq', 'purchase', 3))
         ledger.add(cost('', 'hq', 'purchase', 99))
         ledger.add(cost('acme', 'hq', 'shipping', 0, ''))
         expect(ledger.drain()).toEqual(
@@ -182,7 +151,8 @@ describe('CostLedger', () => {
                 [costFactKey('acme', 'hq', 'purchase', 'EUR'), cost('acme', 'hq', 'purchase', 15)],
                 [costFactKey('acme', 'hq', 'purchase', 'USD'), cost('acme', 'hq', 'purchase', 8, 'USD')],
                 [costFactKey('acme', 'hq', 'lease', 'EUR'), cost('acme', 'hq', 'lease', 7)],
-                [costFactKey('acme', '', 'field_labour', 'EUR'), cost('acme', '', 'field_labour', 250)],
+                [costFactKey('acme', '', 'purchase', 'EUR'), cost('acme', '', 'purchase', 250)],
+                [costFactKey('globex', 'hq', 'purchase', 'EUR'), cost('globex', 'hq', 'purchase', 3)],
             ]),
         )
         expect(ledger.drain().size).toBe(0)

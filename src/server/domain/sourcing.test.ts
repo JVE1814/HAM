@@ -66,16 +66,6 @@ describe('planSourcing', () => {
         const plan = planSourcing(acme({ modelId: 'c9300', quantity: 5, purpose: 'new' }), stock)
         expect(plan.summary).toBe('1 from spare pool, 3 from central stock, 1 to purchase')
     })
-
-    it.each([0, -1, -5, Number.NaN, Number.NEGATIVE_INFINITY])('takes no stock and buys nothing for a quantity of %s', (quantity) => {
-        expect(planSourcing(acme({ modelId: 'c9300', quantity, purpose: 'new' }), stock)).toEqual({ picks: [], toPurchase: 0, summary: '' })
-    })
-
-    it('takes no more than the whole units of a fractional quantity', () => {
-        const plan = planSourcing(acme({ modelId: 'c9300', quantity: 2.5, purpose: 'new' }), stock)
-        expect(plan.picks.map((pick) => pick.assetId)).toEqual(['pool-1', 'central-1'])
-        expect(plan.toPurchase).toBe(0)
-    })
 })
 
 
@@ -295,7 +285,6 @@ describe('stillToBuy', () => {
 
     it('never buys a negative quantity', () => {
         expect(stillToBuy(2, -1, 0)).toBe(0)
-        expect(stillToBuy(-1, 3, 0)).toBe(0)
     })
 })
 

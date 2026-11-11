@@ -33,7 +33,7 @@ const PUNCTUATION = /[!-/:-@[-`{-~\u00a9\u00ae\u2010-\u2015\u2018-\u201f\u2122]/
  * Lower-case, treat punctuation as a word break and collapse whitespace, so "Cisco Systems, Inc." matches "cisco systems inc"
  * and "Hewlett-Packard" matches "Hewlett Packard".
  */
-export function manufacturerKey(raw: string): string {
+function manufacturerKey(raw: string): string {
     return raw.toLowerCase().replace(PUNCTUATION, ' ').replace(/\s+/g, ' ').trim()
 }
 

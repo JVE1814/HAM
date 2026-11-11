@@ -176,9 +176,8 @@ describe('a whole-Site recovery, by the trigger of its Return', () => {
     })
 
     it('takes the units still shipped to the Site too, as a temporary end does; any other Return the installed ones', () => {
+        expect(triggers.filter((trigger) => stagesTakenBack(trigger).includes('shipped'))).toEqual(['site_decommission', 'agreement_end', 'temporary_end'])
         for (const trigger of triggers) {
-            const takesShipped = isSiteRecovery(trigger) || trigger === 'temporary_end'
-            expect(stagesTakenBack(trigger).includes('shipped'), trigger).toBe(takesShipped)
             for (const stage of INSTALLED_STAGES) expect(stagesTakenBack(trigger), trigger).toContain(stage)
         }
     })

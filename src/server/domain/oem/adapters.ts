@@ -94,7 +94,7 @@ export const OEM_ADAPTERS: Record<OemVendor, VendorIntegration> = {
  * The order the sync jobs take the vendors in. It is an order, not the list of vendors, which is `OemVendor`: the type
  * below fails when a vendor is missing from it.
  */
-export const SYNC_ORDER = ['cisco', 'meraki', 'fortinet', 'mist', 'aruba', 'checkpoint'] as const satisfies readonly OemVendor[]
+const SYNC_ORDER = ['cisco', 'meraki', 'fortinet', 'mist', 'aruba', 'checkpoint'] as const satisfies readonly OemVendor[]
 
 type Holds<T extends true> = T
 type _EveryVendorHasItsTurn = Holds<[OemVendor] extends [(typeof SYNC_ORDER)[number]] ? true : false>
@@ -103,7 +103,7 @@ type _EveryVendorHasItsTurn = Holds<[OemVendor] extends [(typeof SYNC_ORDER)[num
  * `vendor`'s route for `capability` when it may run: `vendor`'s own API is enabled and so is the API that serves the
  * call. Meraki coverage therefore needs Cisco enabled too, and with Meraki off no Meraki serial goes to Cisco SN2INFO.
  */
-export function enabledRoute<K extends keyof VendorRoutes>(vendor: OemVendor, capability: K, enabled: (api: SyncApi) => boolean): VendorRoutes[K] | undefined {
+function enabledRoute<K extends keyof VendorRoutes>(vendor: OemVendor, capability: K, enabled: (api: SyncApi) => boolean): VendorRoutes[K] | undefined {
     const integration: VendorIntegration = OEM_ADAPTERS[vendor]
     const route = integration[capability]
     return route && integration.api && enabled(integration.api) && enabled(route.api) ? route : undefined

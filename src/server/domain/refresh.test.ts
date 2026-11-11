@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { dueAfter, firstCandidatesDue, refreshWaves, replacementModel, type DueKey, type DueRow, type RefreshCandidate } from './refresh'
+import { recordMatches as matches } from '../test-support/encoded-query'
 
 describe('refreshWaves', () => {
     it('groups due assets by agreement and site', () => {
@@ -63,13 +64,23 @@ describe('dueAfter', () => {
     })
 
     it('narrows every clause to a later due date, or the same one and a later sys_id', () => {
-        const query = 'install_status=1^x_daas_ham_fleet=true^NQinstall_status=2^x_daas_ham_fleet=true'
-        expect(dueAfter(query, { due: '2026-12-01', id: 'abc' }).split('^NQ')).toEqual([
-            'install_status=1^x_daas_ham_fleet=true^x_daas_ham_refresh_due>2026-12-01',
-            'install_status=2^x_daas_ham_fleet=true^x_daas_ham_refresh_due>2026-12-01',
-            'install_status=1^x_daas_ham_fleet=true^x_daas_ham_refresh_due=2026-12-01^sys_id>abc',
-            'install_status=2^x_daas_ham_fleet=true^x_daas_ham_refresh_due=2026-12-01^sys_id>abc',
-        ])
+        const query = dueAfter('install_status=1^x_daas_ham_fleet=true^NQinstall_status=2^x_daas_ham_fleet=true', { due: '2026-12-01', id: 'abc' })
+        const asset = (install_status: string, x_daas_ham_refresh_due: string, sys_id: string, x_daas_ham_fleet = 'true') => ({
+            install_status,
+            x_daas_ham_fleet,
+            x_daas_ham_refresh_due,
+            sys_id,
+        })
+        for (const status of ['1', '2']) {
+            expect(matches(query, asset(status, '2026-12-02', 'aaa')), `${status} due later`).toBe(true)
+            expect(matches(query, asset(status, '2026-12-01', 'abd')), `${status} same day, later sys_id`).toBe(true)
+            expect(matches(query, asset(status, '2026-12-01', 'abc')), `${status} the key itself`).toBe(false)
+            expect(matches(query, asset(status, '2026-12-01', 'abb')), `${status} same day, earlier sys_id`).toBe(false)
+            expect(matches(query, asset(status, '2026-11-30', 'zzz')), `${status} due earlier`).toBe(false)
+            expect(matches(query, asset(status, '2026-12-02', 'aaa', 'false')), `${status} outside the fleet`).toBe(false)
+            expect(matches(query, asset(status, '2026-12-01', 'abd', 'false')), `${status} same day, outside the fleet`).toBe(false)
+        }
+        expect(matches(query, asset('3', '2026-12-02', 'aaa'))).toBe(false)
     })
 })
 

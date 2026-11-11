@@ -118,7 +118,7 @@ export interface Overlap {
  * would overlap, but two saves into the same units at the same moment both pass it, so the whole rack is re-checked
  * once they are written. Pairs are by position in the list, so two devices with the same name are still compared.
  */
-export function overlaps(placements: readonly Placement[]): Overlap[] {
+function overlaps(placements: readonly Placement[]): Overlap[] {
     const found: Overlap[] = []
     placements.forEach((a, i) => {
         for (const b of placements.slice(i + 1)) {

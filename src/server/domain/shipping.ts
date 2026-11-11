@@ -57,7 +57,7 @@ const COUNTRY_CODES: Record<string, string> = {
 }
 
 /** A location's country as an ISO alpha-2 code, or '' when it cannot be told. */
-export function countryCode(country: string): string {
+function countryCode(country: string): string {
     const value = country.trim()
     if (/^[A-Za-z]{2}$/.test(value)) return value.toUpperCase()
     return COUNTRY_CODES[value.toLowerCase().replace(/\s+/g, ' ')] ?? ''
@@ -76,7 +76,7 @@ function partRequired(part: (typeof ADDRESS_PARTS)[number], side: 'from' | 'to',
 }
 
 /** What is missing from the sender (`from`) or recipient (`to`) address before a carrier will accept it, or null. */
-export function addressProblem(address: Address, side: 'from' | 'to'): string | null {
+function addressProblem(address: Address, side: 'from' | 'to'): string | null {
     const country = countryCode(address.country)
     const missing = ADDRESS_PARTS.filter((part) => !address[part] && partRequired(part, side, country))
     if (missing.length > 0) return `missing ${missing.join(', ')}`
@@ -105,12 +105,12 @@ function toAggregatorAddress(address: Address): Record<string, string> {
 const MAX_LABEL_PACKAGES = 20
 
 /** How many boxes a label covers: a whole number, at least 1 (buyLabel refuses more than MAX_LABEL_PACKAGES first). */
-export function packageCount(n: number): number {
+function packageCount(n: number): number {
     if (Number.isNaN(n)) return 1
     return Math.max(1, Math.floor(n))
 }
 
-export function labelRequestBody(input: LabelInput): string {
+function labelRequestBody(input: LabelInput): string {
     const count = packageCount(input.packages)
     const weight = Math.max(0.1, input.weightKg)
     return JSON.stringify({
@@ -289,7 +289,7 @@ export const OPEN_SHIPMENTS = `statusNOT IN${SHIPMENT_STATUS.delivered},${SHIPME
  * delivered, returned or voided shipment keeps that status (only a return to sender overrides a
  * delivery), and an `unknown` update never replaces a known status.
  */
-export function nextShipmentStatus(current: ShipmentStatus, incoming: ShipmentStatus): ShipmentStatus {
+function nextShipmentStatus(current: ShipmentStatus, incoming: ShipmentStatus): ShipmentStatus {
     if (incoming === 'unknown') return current
     if (current === 'delivered' && incoming === 'returned') return 'returned'
     if (FINAL.has(current)) return current
@@ -403,7 +403,7 @@ function written(value: unknown): string {
 }
 
 /** The most characters one queued tracking retry carries: its event's parm1, a 4000-character string on sysevent. */
-export const TRACKING_RETRY_CHARS = 4000
+const TRACKING_RETRY_CHARS = 4000
 
 /** A tracking update queued to be applied in the background, and when its newest event happened ('' if undated). */
 export interface QueuedTracking {

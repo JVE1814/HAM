@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { advanceReplacementRma, OPEN_RMAS_QUERY, type OpenRma, RMA_AT_OEM, RMA_AWAITED, RMA_OPEN } from './oem-rma'
+import { advanceReplacementRma, OPEN_RMAS_QUERY, type OpenRma, RMA_AT_OEM, RMA_OPEN } from './oem-rma'
+import { RMA_STATE } from './vocabulary'
+import { recordMatches as matches } from '../test-support/encoded-query'
 
 describe('advanceReplacementRma', () => {
     const rma = (rma: Partial<OpenRma> & Pick<OpenRma, 'rmaId'>): OpenRma => ({
@@ -56,9 +58,8 @@ describe('advanceReplacementRma', () => {
 })
 
 describe('the open RMAs', () => {
-    it('are the awaited ones and those whose replacement came, as the query the metadata imports selects them', () => {
-        for (const state of RMA_AWAITED) expect(RMA_OPEN).toContain(state)
-        expect(OPEN_RMAS_QUERY).toBe(`stateIN${RMA_OPEN.join(',')}`)
+    it('are the ones the query the metadata imports selects', () => {
+        for (const state of Object.values(RMA_STATE)) expect(matches(OPEN_RMAS_QUERY, { state }), state).toBe(RMA_OPEN.includes(state))
     })
 
     it('are with the OEM once opened there: all but those still to open', () => {
