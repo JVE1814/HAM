@@ -26,11 +26,6 @@ import { nextProviderTag } from './tags.ts'
 import { log } from './log.ts'
 
 /**
- * Depot work on a scanned unit (P1.5): receiving it, putting it away, picking it for an Order. Each gives the Asset as
- * it now stands, or why the scan did nothing, for the trigger that scanned (the warehouse app's REST API) to answer.
- */
-
-/**
  * Why a scan did nothing. `reason` is the kind of refusal: the stockroom chosen is not one to use (`invalid`), no
  * Asset answers to the code (`unknown`), two Assets do or the Asset or its Order line is not in a state for it
  * (`conflict`), the
@@ -42,10 +37,8 @@ export interface ScanRefusal {
     why: string
 }
 
-/** What a scan came to: the Asset as it now stands, or why the scan did nothing. */
 export type Scan = { asset: GlideRecord } | ScanRefusal
 
-/** The unit a scan found or changed, as the warehouse API answers with it (domain/rest-contracts `AssetSummary`). */
 export function assetSummary(asset: GlideRecord): AssetSummary {
     return {
         id: asset.getUniqueValue(),
@@ -82,7 +75,6 @@ export function lookUp(code: string): Scan {
     return scanned(identifyAsset(code)) ?? NOT_FOUND
 }
 
-/** An identifier lookup as a scan reads it: the Asset, an ambiguous code refused, or null when none carries it. */
 function scanned(identified: AssetIdentified): Scan | null {
     if (identified && 'ambiguous' in identified) return { reason: 'conflict', why: identified.ambiguous }
     return identified
@@ -134,7 +126,6 @@ export function receive(unit: ScannedUnit, stockroomId: string): Scan {
     return receipt.ran ? receipt.value : SCAN_AGAIN
 }
 
-/** The receipt, made holding the Asset's `lock`: the stage is read again here, so only one scan receives the unit. */
 function receiveHolding(lock: HeldLock, assetId: string, stockroomId: string): Scan {
     // Read again past the stockroom rule, as the scan's lookup was (see `receive`); the receipt's saves run the
     // lifecycle, billing and asset-CI rules.
@@ -170,7 +161,6 @@ function receiveHolding(lock: HeldLock, assetId: string, stockroomId: string): S
     const underLine = withOrderLineLock(lineId, (lineLock) => saveReceipt(lock, asset) ?? allocateHolding(lineLock, asset, waiting))
     const received = underLine.ran ? underLine.value : LINE_BUSY
     if ('reason' in received) return received
-    // Received as free stock: the line it was found for no longer waits for it (logged).
     if ('leftFree' in received) return { asset }
     if (!received.reserved) {
         // The receipt is saved; the reservation is not, so no Staging task opens. Off order and not allocated, the
@@ -183,7 +173,6 @@ function receiveHolding(lock: HeldLock, assetId: string, stockroomId: string): S
     return { asset: received.reserved }
 }
 
-/** Save the receipt holding the Asset's `lock`: null once saved, or why not. */
 function saveReceipt(lock: HeldLock, asset: GlideRecord): ScanRefusal | null {
     // A holder that outlasted the lock (ADR 0013) may overlap the next scan's receipt: it saves only while it holds it.
     const saved = lock.save(`${str(asset, 'serial_number')} received`, () => asset.update())
@@ -192,7 +181,6 @@ function saveReceipt(lock: HeldLock, asset: GlideRecord): ScanRefusal | null {
     return saved === 'refused' ? { reason: 'refused', why: `Not received: ${refusal(asset)}` } : null
 }
 
-/** What came of creating the Asset of a serial: created, `existing`'s answer when it has one already, or not inserted. */
 type SerialAsset<E> = { created: GlideRecord } | { existing: E } | { refused: string } | 'lock lost'
 
 /**
@@ -244,7 +232,6 @@ function firstScanAsset(code: string, pid: string): Scan {
     return { asset: made.created }
 }
 
-/** An Order line waiting for a received unit, with the OEM RMA the unit replaces under ('' for a purchase). */
 interface WaitingLine {
     line: GlideRecord
     rmaId: string
@@ -271,7 +258,6 @@ function waitingLine(asset: GlideRecord): WaitingLine | null {
     return line.next() ? { line, rmaId: '' } : null
 }
 
-/** What a saved receipt came to on its line: reserved for it (null when that was not saved), or left free stock. */
 type Allocation = { reserved: GlideRecord | null } | { leftFree: true }
 
 /**
@@ -287,7 +273,6 @@ function allocateHolding(lineLock: HeldLock, asset: GlideRecord, waiting: Waitin
     const problem = line ? allocationProblem(receivingLine(line)) : 'it no longer exists'
     if (!line || problem) {
         const unit = `${str(asset, 'serial_number')} left in stock, not given to ${str(waiting.line, 'number')}`
-        // The RMA number came in the PO field (`waitingLine`).
         const rma = waiting.rmaId ? `; RMA ${str(asset, 'po_number')} left open, update it by hand` : ''
         log.warn(`Received ${unit}: ${problem ?? ''}${rma}`)
         return { leftFree: true }
@@ -319,7 +304,6 @@ function receivingLine(line: GlideRecord): ReceivingLine {
     }
 }
 
-/** Take a received purchase off the line's on-order count, on the line read afresh holding its `lineLock`. */
 function takeOffOrder(lineLock: HeldLock, line: GlideRecord): void {
     // Arrived, so no longer on order: re-sourcing covers quantity - allocated - on order and must not wait for it.
     // A refused count is logged to correct by hand; the unit still goes to the line, which would otherwise wait.
@@ -364,10 +348,6 @@ export function putAway(code: string, stockroomId: string): Scan {
     return change.ran ? change.value : STOCK_BUSY
 }
 
-/**
- * The put-away into `stockroom`, a NaaS stockroom of `type`, made holding the Asset's stock `lock` on its fresh read:
- * the Asset once saved, or why not.
- */
 function putAwayHolding(lock: HeldLock, asset: GlideRecord, stockroom: GlideRecord, type: StockroomType): Scan {
     const problem = putAwayProblem(readStage(asset), type)
     if (problem) return { reason: 'conflict', why: problem }
@@ -379,7 +359,6 @@ function putAwayHolding(lock: HeldLock, asset: GlideRecord, stockroom: GlideReco
     return { asset }
 }
 
-/** Confirm a scanned fleet asset is a staged asset of the Order numbered `orderNumber`. */
 export function pick(code: string, orderNumber: string): Scan {
     const found = lookUp(code)
     if ('reason' in found) return found
@@ -392,7 +371,6 @@ export function pick(code: string, orderNumber: string): Scan {
     return { asset }
 }
 
-/** The stockrooms the user may receive into (visibility rules apply), by name. */
 export function receivingStockrooms(): Array<{ id: string; name: string }> {
     const stockroom = new GlideRecord('alm_stockroom')
     stockroom.addEncodedQuery(providerStockroomCondition())

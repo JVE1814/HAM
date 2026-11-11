@@ -7,7 +7,6 @@ import { openJobCursor } from './job-cursor.ts'
 import { withLockTries } from './locks.ts'
 import { intProperty, stringProperty } from './properties.ts'
 
-/** The counter's row among the job cursors (platform/job-cursor), which holds the last number issued. */
 const SEQUENCE_JOB = 'provider_tag_sequence'
 
 /**

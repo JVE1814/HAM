@@ -6,10 +6,8 @@ import { contactScope, resolveVisibility, type ContactScope, type VisibilityScop
 import { beyondVisibility } from './beyond-visibility.ts'
 import { pluck } from './records.ts'
 
-/** The signed-in user's visibility and the identifiers it is scoped by (ADR 0005). */
 export interface SessionScope {
     scope: VisibilityScope
-    /** The scope the Customer contacts' read ACLs grant the user by (domain/visibility `contactScope`). */
     contactScope(): ContactScope
     userId: string
     customerId: string

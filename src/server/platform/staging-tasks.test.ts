@@ -5,11 +5,6 @@ import type { ClosedStagingTask } from '../domain/staging.ts'
 import { completeStaging, openStagingTask, stagingClosureProblem } from './staging-tasks.ts'
 import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 
-/*
- * Closing a Staging task, run against the in-memory stand-in for the platform: NSTG0001 stages unit FOC111 for Order
- * line ORL0001 of ORD0001, and has one mandatory step still open.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const ORDERS = 'x_daas_ham_order'
@@ -29,7 +24,6 @@ function inStage(stage: Stage): Row {
 
 const task: ClosedStagingTask = { number: 'NSTG0001', lineId: 'line1', failed: false }
 
-/** The task as its before-update rule is handed it. */
 function current(): GlideRecord {
     return recordOf<GlideRecord>(TASKS, rows(TASKS)[0])
 }

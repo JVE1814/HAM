@@ -7,11 +7,6 @@ import { findById } from './records.ts'
 import { raiseDueReturns } from './scheduled-returns.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
-/*
- * The daily job's Return for a temporary Order of two units (a switch and an access point) ending 2026-12-24, with the
- * default lead of 7 days, run against the in-memory stand-in for the platform.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const ORDERS = 'x_daas_ham_order'

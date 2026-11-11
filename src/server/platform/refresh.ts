@@ -29,7 +29,6 @@ import { log } from './log.ts'
 
 /** Refresh Orders for in-service Assets due within the horizon (P2.2, Q48: fully automatic). */
 
-/** Candidates a run raises at most, and the Assets due it reads per query. */
 const CANDIDATES_PER_RUN = 2000
 
 /**
@@ -152,7 +151,7 @@ function raiseWave({ customerId, siteId, agreementId, assets }: RefreshWave): st
         order.setValue('work_notes', `${unmatched.size} asset(s) have no sellable catalogued successor; their lines reuse the current model. Review before submitting.`)
         // Without the note nothing tells the account manager why the Order is a draft.
         if (!order.update()) warnRefused(order, `Refresh Order ${number}: note on its ${unmatched.size} unmatched asset(s) not saved`)
-        return number // left in draft for the account manager to adjust
+        return number
     }
     const submission = submitOrder(order)
     // Nobody is there to be told: the Order stays a draft for the account manager, with why in the log.

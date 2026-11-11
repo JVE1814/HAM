@@ -40,9 +40,8 @@ import { SITE_FIELD } from '../domain/fleet.ts'
 import { log } from './log.ts'
 
 /**
- * Orders up to sourcing (ADR 0004): raise an Order with its lines, submit it (entitlement, then approval or sourcing),
- * roll its approvals up, and cancel it. None of it tells the user anything: each gives what came of it, for the
- * trigger that asked (a form button, the record producer, the refresh job) to report.
+ * None of it tells the user anything: each gives what came of it, for the trigger that asked (a form button, the
+ * record producer, the refresh job) to report.
  */
 
 /**
@@ -53,14 +52,12 @@ function removeOrder(order: GlideRecord): string {
     return order.deleteRecord() ? '' : refusal(order, 'the delete was refused')
 }
 
-/** An Order to raise for a Customer's Site under its Agreement. */
 export interface NewOrder {
     orderType: OrderType
     customerId: string
     siteId: string
     agreementId: string
     installMode: InstallMode
-    /** The CSM case a replacement is raised for. */
     caseId?: string
     shortDescription: string
 }
@@ -141,7 +138,6 @@ export function submitProducedOrder(order: GlideRecord, devices: readonly NewLin
     return submitAsRaised(order, parties, raiser, missing, 0)
 }
 
-/** The Site template's non-optional items, as lines. */
 function siteTemplateLines(siteTemplateId: string): NewLine[] {
     const item = new GlideRecord('x_daas_ham_site_template_item')
     item.addQuery('site_template', siteTemplateId)
@@ -152,7 +148,6 @@ function siteTemplateLines(siteTemplateId: string): NewLine[] {
     return lines
 }
 
-/** The signed-in user as the raiser of `order`: an Order raiser when the Order create rule lets them create it. */
 function orderingUser(order: GlideRecord): Orderer {
     const { permitted, scope, customerId } = creatorOf(order)
     return { mayRaise: permitted, scope, customerId }
@@ -186,10 +181,6 @@ export function submitOrder(order: GlideRecord): Submission {
     return submitAsRaised(order, orderParties(order), orderingUser(order), [], 0)
 }
 
-/**
- * Submit the Order, queued again `tries` times before (`submitLater`), unless it cannot go ahead as raised
- * (domain/entitlement `ownershipFindings`, or the `unsaved` lines); then it stays a draft and the reasons are noted on it.
- */
 function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Orderer, unsaved: string[], tries: number): Submission {
     const findings = [...ownershipFindings(parties, raiser), ...unsaved]
     if (findings.length === 0) return submitAccepted(order, tries)
@@ -261,7 +252,6 @@ function submitHolding(usageLock: HeldLock | null, order: GlideRecord): Submissi
     const asked = putToApproval(order, ORDER_APPROVAL, {
         required: assessment.approvers,
         customerAdmins: customerAdminIds(str(order, 'customer')),
-        // The account manager, or else the asset managers, on the Provider's side.
         providerApprovers: providerApproverIds(str(order, 'agreement.account_manager')),
         noApprover: 'no account manager or asset manager to approve it',
     })
@@ -275,7 +265,6 @@ function submitHolding(usageLock: HeldLock | null, order: GlideRecord): Submissi
     return notSubmitted(`${asked.reason}.`)
 }
 
-/** An Order a submission finds out of draft: gone ahead, through another submission of it (submitted), or ended (not). */
 function alreadySubmitted(fresh: GlideRecord): Submission {
     const stage = fresh.getDisplayValue('stage')
     if (endedUnfulfilled(str(fresh, 'stage'))) return notSubmitted(`it is ${stage}`)
@@ -311,7 +300,6 @@ function submitLater(order: GlideRecord, tries: number): Submission {
     return { submitted: false, message: `Order not submitted yet: ${busy} in a minute`, queued: true }
 }
 
-/** Note on a draft why it is one; a refused note is logged. */
 function noteDraft(order: GlideRecord, note: string): void {
     order.setValue('work_notes', note)
     if (!order.update()) warnRefused(order, `${str(order, 'number')} left a draft, its note not saved (${note})`)
@@ -385,7 +373,6 @@ function warnIfLineLockLost(locks: readonly HeldLock[], number: string): void {
     locks.some((lock) => lock.lostAfter(`${number}: lines cancelled`, { check: 'check them for units received meanwhile' }))
 }
 
-/** How an Order's approvals are decided (platform/approvals): by its entitlement verdict, approved and sourced or rejected. */
 const ORDER_APPROVAL: ApprovalFlow = {
     awaitingStage: ORDER_STAGE.awaiting_approval,
     standIn: 'provider',
@@ -425,7 +412,6 @@ const LEFT_AT_ITS_STAGE: Record<LineExit['keeps'], string> = {
     provider: 'still on its line, release it once received',
 }
 
-/** The Order's lines that have not shipped, queried. */
 function openLines(orderId: string): GlideRecord {
     const line = new GlideRecord('x_daas_ham_order_line')
     line.addQuery('order', orderId)
@@ -441,7 +427,6 @@ function openLineIds(orderId: string): string[] {
     return ids
 }
 
-/** The purchase orders of the Order's lines that have not shipped, to cancel in Procurement. */
 function openPurchaseOrders(orderId: string): string[] {
     const line = openLines(orderId)
     const purchases: string[] = []
@@ -471,7 +456,6 @@ function cancelOpenLines(orderId: string, lockedIds: readonly string[]): boolean
     return done
 }
 
-/** Release the line's stock and cancel it; false when the platform refused any of it (logged). */
 function releaseAndCancel(line: GlideRecord): boolean {
     let done = true
     const asset = new GlideRecord('alm_hardware')

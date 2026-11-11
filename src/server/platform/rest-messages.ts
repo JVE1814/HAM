@@ -7,11 +7,6 @@ import { SHIPPING_MESSAGE } from '../domain/shipping.ts'
 import { log } from './log.ts'
 import { secretProperty, stringProperty } from './properties.ts'
 
-/**
- * RESTMessageV2 transport behind the HttpPort seam (ADR 0008), with what each of the app's REST messages
- * (fluent/oem/rest-messages.now.ts and the shipping aggregator's) takes at call time besides a request's own parameters.
- */
-
 /** The typings expose RESTMessageV2's Rhino constructor; at runtime it takes (message, function). */
 const RestMessage = RESTMessageV2 as unknown as new (message: string, fn: string) => RESTMessageV2
 
@@ -32,7 +27,6 @@ interface SettingVariable {
     property: PropertyOf<string>
 }
 
-/** What a REST message takes at call time besides the request's own parameters. */
 interface MessageVariables {
     secrets?: readonly SecretVariable[]
     settings?: readonly SettingVariable[]
@@ -102,7 +96,6 @@ export function restMessagePort(message: RestMessageName): HttpPort {
     }
 }
 
-/** A call of `message`.`fn` that got no answer, logged with its reason. */
 function noAnswer(message: string, fn: string, error: string): HttpResponse {
     log.warn(`${message}.${fn} failed: ${error}`)
     return { status: 0, body: '', error }

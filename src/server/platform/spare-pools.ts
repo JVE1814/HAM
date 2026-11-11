@@ -29,7 +29,6 @@ import { log } from './log.ts'
  * sized by, and the free stock it is filled from.
  */
 
-/** The Agreements whose deployed units size their Customer's Spare pools. */
 const POOL_AGREEMENTS = `${ACTIVE_AGREEMENTS}^spare_pool_ratio>0`
 
 /**
@@ -59,7 +58,6 @@ function sparePurchasesEnabled(): boolean {
     return false
 }
 
-/** The Customer's Agreements the top-up runs over, with their spare-pool ratios. */
 function poolAgreements(customerId: string): Map<string, number> {
     const agreement = new GlideRecord('x_daas_ham_agreement')
     agreement.addEncodedQuery(`${POOL_AGREEMENTS}^customer=${customerId}`)
@@ -69,7 +67,6 @@ function poolAgreements(customerId: string): Map<string, number> {
     return ratios
 }
 
-/** The deployed fleet units (ADR 0016) of each of the Agreements, by Model, each with its Agreement's ratio. */
 function deployedShares(ratios: ReadonlyMap<string, number>): DeployedShare[] {
     const ga = new GlideAggregate('alm_hardware')
     ga.addEncodedQuery(fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreementIN${[...ratios.keys()].join(',')}`))
@@ -81,7 +78,6 @@ function deployedShares(ratios: ReadonlyMap<string, number>): DeployedShare[] {
     while (ga.next()) {
         const agreementId = String(ga.getValue('x_daas_ham_agreement') ?? '')
         const modelId = String(ga.getValue('model') ?? '')
-        // A unit with no Model has no pool: no stock is free for it.
         if (modelId) shares.push({ agreementId, modelId, deployed: Number(ga.getAggregate('COUNT', '')), ratio: ratios.get(agreementId) ?? 0 })
     }
     return shares

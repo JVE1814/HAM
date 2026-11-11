@@ -3,9 +3,8 @@ import { oneOf } from '../domain/exhaustive.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { log } from './log.ts'
 
-/** Small Glide helpers shared by repositories and gateways. Keep this module free of business rules. */
+/** Keep this module free of business rules. */
 
-/** How a read treats the app's before-query visibility rules (ADR 0005). */
 export interface ReadOptions {
     /**
      * Read past the app's visibility rules (platform/beyond-visibility), for server logic that must find the record
@@ -21,7 +20,6 @@ export function findById(table: string, sysId: string, options: ReadOptions = {}
     return found ? gr : null
 }
 
-/** Values of one field for every record matching an encoded query (bounded by `limit`). */
 export function pluck(table: string, encodedQuery: string, field: string, limit = 10000): string[] {
     const gr = new GlideRecord(table)
     gr.addEncodedQuery(encodedQuery)
@@ -83,7 +81,6 @@ export function noneLeft(table: string, encodedQuery: string): boolean {
     return !left.hasNext()
 }
 
-/** Whether any record matches an encoded query (stops at the first). */
 export function exists(table: string, encodedQuery: string, options: ReadOptions = {}): boolean {
     const gr = new GlideRecord(table)
     gr.addEncodedQuery(encodedQuery)
@@ -93,7 +90,6 @@ export function exists(table: string, encodedQuery: string, options: ReadOptions
     return gr.hasNext()
 }
 
-/** How many records match an encoded query (one aggregate query). */
 export function count(table: string, encodedQuery: string): number {
     const ga = new GlideAggregate(table)
     ga.addEncodedQuery(encodedQuery)
@@ -203,7 +199,6 @@ export function bool(gr: ForeignRecord, field: string): boolean {
     return value === '1' || value === 'true' || value === (true as unknown)
 }
 
-/** How an import-set row processed on insert (ASN, lifecycle CSV, coverage CSV) ends: the state and comment it is saved with. */
 export interface RowOutcome {
     state: 'inserted' | 'updated' | 'error' | 'ignored'
     comment: string

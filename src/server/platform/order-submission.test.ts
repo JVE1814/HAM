@@ -9,12 +9,6 @@ import { sourcingRequestOf } from './sourcing-requests.ts'
 import { findById } from './records.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
-/*
- * Submitting an Order, run against the in-memory stand-in for the platform, job locks included (ADR 0013): draft
- * ORD0001 of Customer acme asks for one more switch under Agreement agr1, whose catalog offers it; an asset manager
- * submits it.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const ORDERS = 'x_daas_ham_order'
@@ -34,7 +28,6 @@ function order(): GlideRecord {
     return found
 }
 
-/** Another submission of the Agreement holds its usage lock, taken just now. */
 function holdUsageLock(): Row {
     const theirs = { sys_id: 'theirs', name: LOCK.agreementUsage('agr1'), sys_created_on: '2025-11-09 12:00:00' }
     ;(platform.tables[LOCKS] ??= []).push(theirs)
@@ -63,7 +56,6 @@ beforeEach(() => {
     platform.tables[LINES] = [{ sys_id: 'line1', number: 'ORL0001', order: 'order1', model: 'model1', quantity: '1', line_stage: 'new' }]
 })
 
-/** Every event queued, read as the sourcing event's script action reads its request. */
 function queuedRequests() {
     return platform.events.map((queued) => ({
         name: queued.name,

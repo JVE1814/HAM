@@ -3,11 +3,6 @@ import { fieldsOf, stageOf, type Stage } from '../domain/lifecycle.ts'
 import { receive } from './receiving.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
-/*
- * A scan at the depot of a unit coming back from a Site, run against the in-memory stand-in for the platform, job
- * locks included: the unit is on Return order RET0001, due back on 1 November, and is scanned on 9 November.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const ASSETS = 'alm_hardware'

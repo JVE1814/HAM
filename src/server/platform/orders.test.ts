@@ -8,11 +8,6 @@ import { PROPERTY } from '../domain/properties.ts'
 import { findById } from './records.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
-/*
- * Cancel order, an Order's rejection and a line's derived stage, run against the in-memory stand-in for the platform,
- * job locks included (ADR 0013): Order ORD0001 with two lines not shipped, a unit reserved for the second.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const ORDERS = 'x_daas_ham_order'
@@ -39,14 +34,12 @@ function order(): GlideRecord {
     return found
 }
 
-/** A receipt (or another cancel) holds the lock of `lineId`, taken just now. */
 function holdLineLock(lineId: string): Row {
     const theirs = { sys_id: 'theirs', name: LOCK.orderLine(lineId), sys_created_on: '2025-11-09 12:00:00' }
     ;(platform.tables[LOCKS] ??= []).push(theirs)
     return theirs
 }
 
-/** The locks held each time a row of `table` is saved, and the order the locks were taken in. */
 function watchLocks(table: string): { heldAtSave: string[][]; taken: string[] } {
     const watched = { heldAtSave: [] as string[][], taken: [] as string[] }
     platform.onSave = (saved, row, operation) => {

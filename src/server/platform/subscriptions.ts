@@ -10,8 +10,6 @@ import { withLockTries } from './locks.ts'
 import { log } from './log.ts'
 import { exists, findById, refusal, str, warnRefused } from './records.ts'
 
-/** Subscription lines (x_daas_ham_subscription_line): a pending one starts with its first Asset into service, a site package ends as the last unit leaves its Site. */
-
 /**
  * Attach an Asset going into service to the Subscription line it delivers and start that line (the caller saves the
  * Asset). False (and a warning) when its pending line cannot be started: billing skips pending lines, so the Asset must
@@ -68,7 +66,6 @@ function startLine(lineId: string, inServiceAt: number): string {
     return started.ran ? started.value : 'another go-live held its lock through every try'
 }
 
-/** Start the line read afresh, holding its `lock` (see startLine); the try is given up when the lock was lost before the save. */
 function startHolding(lock: HeldLock, lineId: string, inServiceAt: number): string | TryAgain {
     const line = findById('x_daas_ham_subscription_line', lineId)
     if (!line) return 'the line is gone'

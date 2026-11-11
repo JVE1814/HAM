@@ -12,7 +12,6 @@ import { findById, str } from './records.ts'
 /** parm1 of the sourcing event when it carries a submission queued again; '' for a sourcing pass. */
 const SUBMIT_AGAIN = 'submit'
 
-/** A request the sourcing event carries, and how often it was queued again. */
 export interface SourcingRequestEvent {
     request: 'pass' | 'submission'
     tries: number

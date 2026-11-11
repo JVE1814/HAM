@@ -9,8 +9,8 @@ import { num, str, warnRefused } from './records.ts'
 import { recoverAgainAtEnd } from './scheduled-returns.ts'
 
 /**
- * Agreement renewals (plan §13 Renewals): the warning ahead of an Agreement's end, and what a change of its end date re-arms. The
- * Agreement's `renewal_notified` mark, which makes the warning go once per end date, is read and written here only.
+ * The Agreement's `renewal_notified` mark, which makes the warning go once per end date, is read and written here
+ * only.
  */
 
 const RENEWAL_WARNED = 'renewal_notified'

@@ -23,8 +23,6 @@ import { refusal, str, warnRefused } from './records.ts'
 import { STOCK_STAGES } from '../domain/lifecycle.ts'
 import { log } from './log.ts'
 
-/** Stock that can serve an Order line, claiming it for one, giving it back, and changing it where a claim could race. */
-
 /**
  * Stock on no Order line that may serve `scope` for a `shortfall`, each unit under the Source whose query found it
  * (domain/sourcing `stockQueries`): a bounded number per Source (`candidateLimit`). A hot spare linked to a line stays
@@ -96,7 +94,6 @@ export function leaveOrderLine(asset: GlideRecord, exit: LineExit, context: stri
     return false
 }
 
-/** Where `moveAlongPath` stopped short: the move it did not make, and why. */
 export interface StoppedShort {
     to: Stage
     why: string
@@ -133,7 +130,6 @@ function releaseToProviderStock(asset: GlideRecord): void {
     asset.setValue('x_daas_ham_agreement', '')
 }
 
-/** A claim: the stages the Asset may be in, the stage it moves to, and the values it takes. */
 interface Claim {
     from: readonly Stage[]
     to: Stage
@@ -164,7 +160,6 @@ export function changeStock<T>(assetId: string, what: string, change: StockWork<
     return underStockLock(assetId, LOCK_TRIES, what, change)
 }
 
-/** Work on an Asset read afresh holding its stock `lock`; null when the Asset is gone. */
 type StockWork<T> = (asset: GlideRecord | null, lock: HeldLock) => T
 
 /**
@@ -207,7 +202,6 @@ function claimHolding(lock: HeldLock, asset: GlideRecord, wanted: Claim): GlideR
     return fresh.get(assetId) && shows(fresh, wanted) ? fresh : lockLost(assetId)
 }
 
-/** The Asset as domain/stock judges whether it is still free stock (`isFree`, `isClaimable`). */
 export function stockUnit(asset: GlideRecord): StockUnit {
     return {
         stage: readStage(asset),

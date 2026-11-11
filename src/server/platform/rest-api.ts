@@ -2,8 +2,6 @@ import { gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { EQUIPMENT_HANDLERS } from '../domain/roles.ts'
 
-/** Helpers for the Scripted REST resources in entry/. */
-
 export function reply(response: RESTAPIResponse, status: number, body: object): void {
     response.setStatus(status)
     response.setBody(body as never)
@@ -40,7 +38,6 @@ export function textBodyOf(request: RESTAPIRequest): Record<string, string> {
     return Object.fromEntries(Object.entries(bodyOf(request)).map(([name, value]) => [name, String(value ?? '').trim()]))
 }
 
-/** A path parameter, '' when absent. */
 export function pathParam(request: RESTAPIRequest, name: string): string {
     return String(request.pathParams[name] ?? '')
 }
@@ -51,7 +48,6 @@ export function queryParam(request: RESTAPIRequest, name: string): string {
     return raw === undefined || raw === null ? '' : String(raw)
 }
 
-/** A non-negative integer query parameter, or `fallback`. */
 export function queryInt(request: RESTAPIRequest, name: string, fallback: number): number {
     const value = parseInt(queryParam(request, name), 10)
     return Number.isFinite(value) && value >= 0 ? value : fallback
