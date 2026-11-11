@@ -5,8 +5,6 @@ import { importLifecycleRow, queueModelRefresh, queueModelsReachingMilestone, wr
 import { resolveNormalizationException } from '../platform/normalization.ts'
 import { finishImportRow, str, type ForeignRecord } from '../platform/records.ts'
 
-/** Model normalization, the lifecycle CSV, and Lifecycle phase / Refresh due date upkeep (P1.2), for fleet assets only (ADR 0016). */
-
 export function onNormalizationResolved(current: GlideRecord): void {
     const resolution = resolveNormalizationException(current)
     if (!resolution.learned) {
@@ -19,8 +17,7 @@ export function onNormalizationResolved(current: GlideRecord): void {
 
 /**
  * After rule on the platform's Model lifecycle table (ADR 0017), for a row inserted, deleted or changed in what a
- * Model's milestones are read from (the rule's condition): recompute the fleet assets of its Model in the background,
- * and of the Model it left when the row moved to another. A save the app's own write makes is left to that write,
+ * Model's milestones are read from (the rule's condition). A save the app's own write makes is left to that write,
  * which queues the pass once for all the milestones it saves.
  */
 export function onModelLifecycleChanged(current: ForeignRecord, previous: ForeignRecord | null): void {

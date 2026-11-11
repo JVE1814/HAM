@@ -9,8 +9,6 @@ import {
 import { str, type ForeignRecord } from '../platform/records.ts'
 import { abortWith } from '../platform/rule-api.ts'
 
-/** Disposal orders: approve, then retire each wiped Asset by its method (P2.5, Q61): platform/disposal. */
-
 export function uiSubmitDisposal(current: GlideRecord): void {
     const submission = submitDisposal(current)
     if (!submission.submitted && submission.why) gs.addErrorMessage(submission.why)

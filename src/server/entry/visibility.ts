@@ -16,18 +16,12 @@ import { str, type ForeignRecord } from '../platform/records.ts'
 import { currentSession } from '../platform/session.ts'
 import { hardwareRow, otherAssetClass, placementOf, rowOf, warnUnplaced } from '../platform/visibility.ts'
 
-/*
- * Every script here finds what to do from the table of the record it is handed (domain/visibility SCOPED_TABLES), so a
- * rule or an ACL is scoped by the table it sits on and nothing is chosen in the metadata.
- */
-
 const HARDWARE = SCOPED_TABLES.alm_hardware
 
 /**
  * The before-query business rules' script (shared/visibility.now.ts): restricts a list or look-up to what the user
  * may see (ADR 0005), by the scoping of the table queried. A rule on a table also runs for the queries of the tables
- * that extend it, which take its scoping. A query the app's own logic runs past the rules (platform/beyond-visibility)
- * is left as it is. On a table the app shares with the Provider's IT (ADR 0016) an inventory tech's NaaS records only
+ * that extend it, which take its scoping. On a table the app shares with the Provider's IT (ADR 0016) an inventory tech's NaaS records only
  * are narrowed: those outside NaaS stay in, for the platform to decide. A Customer contact is kept to their Customer
  * (and Sites) on every record.
  *
@@ -52,8 +46,7 @@ export function scopeRecords(current: ForeignRecord): void {
  * `rowVisible`), so on a shared table it passes a record outside NaaS where the rule leaves it in. A record that is
  * not a saved row (a New form, a check of the whole table) passes: it holds nothing to hide.
  *
- * An Asset (the ACL on alm_asset) of another class than hardware passes; hardware is checked as its rule keeps it, on
- * its alm_hardware record. Any other table with no scoping is refused to a reader the rules narrow, and logged, as
+ * Any other table with no scoping is refused to a reader the rules narrow, and logged, as
  * scopeRecords does.
  */
 export function readsRecord(current: GlideRecord): boolean {
@@ -67,7 +60,7 @@ export function readsRecord(current: GlideRecord): boolean {
 
 /**
  * Grant of the app's Allow-If read ACLs on alm_asset (NaaS provider staff, Customer contacts): a fleet asset the
- * reader's scope keeps (domain/visibility `grantsNaasRecord`). Any other Asset is left to the platform's ACLs.
+ * reader's scope keeps. Any other Asset is left to the platform's ACLs.
  */
 export function grantsFleetAsset(current: GlideRecord): boolean {
     if (otherAssetClass(current)) return false
@@ -109,7 +102,7 @@ export function readsAssetCost(current: GlideRecord): boolean {
 /**
  * Grant of the Customer contacts' Allow-If read ACLs on the app's own tables (each feature's access.now.ts): a record
  * of the reader's Customer and, for a site contact who is no Customer admin, of a Site that lists them, on the fields
- * the table's before-query rule filters on (domain/visibility `grantsContactRecord`). So a direct link, a dot-walk
+ * the table's before-query rule filters on. So a direct link, a dot-walk
  * from a visible record or a table with no rule (return lines, attestation items, shipment events, Site templates and
  * their items) shows a contact no other Customer's or Site's record. It decides for the contact the ACL's roles admit, whatever else the user holds: staff read through their
  * own ACLs. The reader's Customer and Sites are read once per transaction (platform/session), so a row costs no query.

@@ -14,8 +14,7 @@ import { log } from '../platform/log.ts'
  * Demo data for dev/test instances: two Customers with Sites, racks and stockrooms, models from the
  * four vendors, site templates, agreements, subscription lines, catalog entries, staging checklists,
  * demo users and stock. Run the "NaaS - load demo data" job, which the SDK installs unless the app is
- * installed with `now-sdk install --no-demoData` (as on production); it refuses an instance in use
- * (`demoRefusal`). Idempotent: records are looked up by a natural key before they are created.
+ * installed with `now-sdk install --no-demoData` (as on production); it refuses an instance in use. Idempotent.
  * Lifecycle dates are illustrative, not vendor EoX bulletins.
  */
 
@@ -66,7 +65,7 @@ function demoRefusal(): string | null {
     return `its Provider (${PROPERTY.providerCompany.name}) is ${named}, not ${DEMO_PROVIDER}: the instance is in use. Clear the property to load the demo data on a dev/test instance`
 }
 
-/** A demo Agreement loaded before Agreements had a currency bills in EUR, as its lines did; a refused save is logged. */
+/** A demo Agreement loaded before Agreements had a currency bills in EUR, as its lines did. */
 function keepCurrency(agreementId: string): void {
     const agreement = findById('x_daas_ham_agreement', agreementId)
     if (!agreement || str(agreement, 'currency')) return
@@ -74,7 +73,7 @@ function keepCurrency(agreementId: string): void {
     save(agreement, `agreement ${str(agreement, 'short_description')} (its currency)`)
 }
 
-/** The sys_id of the Model category named `name` (base system data), or '' (logged): its demo Models then get none. */
+/** The sys_id of the Model category named `name` (base system data). */
 function findCategory(name: string): string {
     const category = new GlideRecord('cmdb_model_category')
     if (category.get('name', name)) return category.getUniqueValue()
@@ -83,8 +82,8 @@ function findCategory(name: string): string {
 }
 
 /**
- * A demo Model loaded before the demo data set Model categories gets its category; one already set is kept. Found by
- * its OEM PID, as a NaaS Model is (ADR 0016); a refused save is logged.
+ * A demo Model loaded before the demo data set Model categories gets its category. Found by
+ * its OEM PID, as a NaaS Model is (ADR 0016).
  */
 function keepCategory(pid: string, categoryId: string): void {
     if (!categoryId) return
@@ -224,7 +223,6 @@ export function loadDemoData(): void {
         ensure('x_daas_ham_agreement_quantity', { agreement: agreementId, device_class: deviceClass }, { contracted_quantity: contracted })
     }
 
-    // A Subscription line bills in its Agreement's currency (EUR here).
     const line = (description: string, fields: Fields) => ensure('x_daas_ham_subscription_line', { description }, fields)
     const acmeHqPackage = line('Acme HQ site package', { agreement: acmeAgreement, customer: acme, line_type: 'site_package', site: acmeHq, monthly_rate: 4500, status: 'active', start_date: '2026-02-01' })
     line('Acme managed switches', { agreement: acmeAgreement, customer: acme, line_type: 'device_class', device_class: 'switch', monthly_rate: 45, status: 'pending' })
@@ -285,7 +283,6 @@ export function loadDemoData(): void {
         save(hq, 'site Acme HQ Amsterdam (its site contact)')
     }
 
-    // Every demo network asset is a fleet asset (ADR 0016): newAsset makes it one, the Provider owning it.
     const stock = (modelId: string, count: number, prefix: string, stage: Stage, fields: Fields) => {
         for (let i = 0; i < count; i++) {
             const serial = `${prefix}${String(i).padStart(4, '0')}`
@@ -326,7 +323,7 @@ export function loadDemoData(): void {
         live.setValue('x_daas_ham_ru_start', ru)
         ru -= 2
     })
-    // OEM coverage for the in-service demo switches (normally from the Cisco API or CSV import)
+    // OEM coverage (normally from the Cisco API or CSV import)
     eachLive('its coverage', (covered) => {
         ensure('x_daas_ham_oem_coverage', { serial_number: str(covered, 'serial_number'), contract_number: 'DEMO-SNTC-1' }, {
             asset: covered.getUniqueValue(),
@@ -352,7 +349,7 @@ export function loadDemoData(): void {
         decision_lead_days: 120,
         state: 'active',
     })
-    // Billing history of the in-service switches (normally opened by in-service detection), and their lease
+    // Billing history (normally opened by in-service detection), and their lease
     eachLive('its lease', (leased) => {
         ensure('x_daas_ham_service_interval', { asset: leased.getUniqueValue() }, {
             subscription_line: acmeHqPackage,

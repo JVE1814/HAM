@@ -17,22 +17,13 @@ import { putBackUntransferred, runSourcingPass } from '../platform/sourcing.ts'
 import { sourcingRequestOf } from '../platform/sourcing-requests.ts'
 import { fellShortOfStagingCentre } from '../platform/transfers.ts'
 
-/*
- * Order orchestration (ADR 0004):
- * submit -> entitlement -> approvals -> sourcing (event) -> staging -> ship -> install -> in service.
- * Stages after sourcing are derived from Asset stages (platform/fulfilment).
- *
- * The form buttons save the form before they act, so values typed before clicking are not lost, and stop when that
- * save is refused (the platform says why).
- */
-
 interface DeviceRow {
     model?: string
     quantity?: string | number
 }
 
 /**
- * Record producer post-insert script: give the Order its lines and submit it (platform/orders `submitProducedOrder`).
+ * Record producer post-insert script.
  * (`current` is typed unknown because the SDK passes its own GlideRecord type here.)
  */
 export function afterOrderProduced(producer: Record<string, unknown>, current: unknown): void {
@@ -50,8 +41,8 @@ export function afterOrderProduced(producer: Record<string, unknown>, current: u
 }
 
 /**
- * The device rows of the producer's multi-row variable, which arrives as JSON text; none when it is blank. Rows that
- * were sent but cannot be read are not taken for none: `unread` says why ('' when they were read), and the Order then
+ * The device rows of the producer's multi-row variable, which arrives as JSON text. Rows that
+ * were sent but cannot be read are not taken for none: `unread` says why, and the Order then
  * stays a draft rather than go ahead without the devices asked for.
  */
 function deviceRows(value: unknown): { rows: DeviceRow[]; unread: string } {
@@ -90,7 +81,7 @@ const ORDER_APPROVER_NAMES: Readonly<Record<Approver, string>> = {
 
 /**
  * UI action "Re-check approvals": roll an Order's approvals up again, as a decision does, for one whose last decision
- * could not be saved and that no request is left to move on; the user is told the outcome, or why there is none yet.
+ * could not be saved and that no request is left to move on.
  */
 export function uiRecheckApprovals(current: GlideRecord): void {
     // A refused form save (the platform says why) re-checks nothing: the rollup reads the Order afresh, so it would

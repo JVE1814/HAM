@@ -1,5 +1,3 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { billingMonthProblem, monthChangedError, PULL_PAGE, pullPageSize } from '../domain/billing.ts'
@@ -27,8 +25,6 @@ import { str, type ForeignRecord } from '../platform/records.ts'
 import { pathParam, queryInt, reply, requireRole } from '../platform/rest-api.ts'
 import { abortWith } from '../platform/rule-api.ts'
 import { closeServiceIntervals, openServiceInterval } from '../platform/service-intervals.ts'
-
-/** Billing periods: generate, review, close (lock) and export (plan §13 Billing export, Q66): platform/billing. */
 
 export function openMonthlyBillingPeriod(): void {
     openBillingPeriod(previousMonth(todayIso()))
@@ -107,10 +103,6 @@ export function getBillingLines(request: RESTAPIRequest, response: RESTAPIRespon
     reply(response, 200, page)
 }
 
-/**
- * After-update rule on alm_hardware stage changes: billing (the Service interval) starts when an Asset
- * enters service and stops when it leaves, on the day billingChange gives (Q52, ADR 0009).
- */
 export function onAssetServiceChange(current: ForeignRecord, previous: ForeignRecord): void {
     const change = billingChange(readStage(previous), readStage(current), {
         inServiceDate: glideToIsoDate(str(current, 'x_daas_ham_in_service_date')),

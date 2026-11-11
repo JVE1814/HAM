@@ -86,11 +86,9 @@ function state() {
 
 export const platform = {
     ...state(),
-    /** Back to an empty instance at the start of its clock. */
     reset(): void {
         Object.assign(platform, state())
     },
-    /** The messages logged as warnings. */
     get warnings(): string[] {
         return platform.logs.filter((line) => line.startsWith('warn ')).map((line) => line.slice('warn '.length))
     },
@@ -113,7 +111,6 @@ function isA(row: Row, table: string): boolean {
     return rowClass === table || (platform.parents[rowClass] ?? []).includes(table)
 }
 
-/** Every stored row of the hierarchy `table` is in. */
 function store(table: string): Row[] {
     return (platform.tables[rootOf(table)] ??= [])
 }
@@ -130,7 +127,6 @@ function referenceOf(table: string, field: string): string {
     return declared
 }
 
-/** The value of `path` on a row of `table`, dot-walked through the declared references; '' for blank or a path through an empty reference. */
 function walk(table: string, row: Row, path: string): string {
     const [field = '', ...rest] = path.split('.')
     const value = row[field] ?? ''
@@ -140,7 +136,6 @@ function walk(table: string, row: Row, path: string): string {
     return referenced ? walk(referenced.sys_class_name || target, referenced, rest.join('.')) : ''
 }
 
-/** What a row shows for itself where a form or a message names it. */
 function displayOf(row: Row): string {
     return row.display_name || row.number || row.name || row.sys_id || ''
 }
@@ -233,7 +228,6 @@ class GlideRecord extends Conditions {
     private fresh = false
     private error = ''
 
-    /** Hold `row` as if it had just been read (or, `fresh`, as a record not saved yet). */
     hold(row: Row, fresh: boolean): this {
         this.row = { ...row }
         this.read = fresh ? null : { ...row }
@@ -491,7 +485,6 @@ const gs = {
     isInteractive: () => platform.user.interactive,
 }
 
-/** What `@servicenow/glide` exports to the code under test. */
 export const glide = { GlideRecord, GlideAggregate, GlideDateTime, GlideTableHierarchy, gs }
 
 /**

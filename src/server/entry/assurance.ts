@@ -6,8 +6,6 @@ import { reconcileInstalledBase } from '../platform/reconciliation.ts'
 import { str } from '../platform/records.ts'
 import { pathParam, reply, requireScanner, textBodyOf } from '../platform/rest-api.ts'
 
-/** Audits, attestations and the daily reconciliation (P2.7, Q63). */
-
 function tellLeftOff(started: { number: string; leftOff: number }): void {
     if (started.leftOff > 0) gs.addErrorMessage(`${started.leftOff} asset(s) left off ${started.number} and not counted (see the system log)`)
 }
@@ -17,7 +15,7 @@ function tellUnsaved(started: { number: string; unsaved?: string }, what: string
 }
 
 /**
- * UI action "Start blind count" on a stockroom (platform/audits `startStockroomAudit`). The action is offered on NaaS
+ * UI action "Start blind count" on a stockroom. The action is offered on NaaS
  * stockrooms only; one whose type was cleared on a form opened before is refused.
  */
 export function uiStartStockroomAudit(current: GlideRecord): void {
@@ -58,7 +56,6 @@ export function uiCloseAudit(current: GlideRecord): void {
     if (close.unsaved > 0) gs.addErrorMessage(`Audit ${number} closed, but ${close.unsaved} line result(s) or exception(s) were not saved (see the system log)`)
 }
 
-/** Daily job: the installed base against monitoring, then the racks with an exception, each run whether the other fails. */
 export function reconcileInstalledBaseAndRacks(): void {
     try {
         reconcileInstalledBase()

@@ -146,7 +146,6 @@ interface BuiltRecord {
 
 let allRecords: BuiltRecord[] | undefined
 
-/** Every record of the update set, read from the one-record files the build writes (`<record_update table="...">`). */
 function builtRecords(): BuiltRecord[] {
     allRecords ??= readdirSync(UPDATES).flatMap((name) => {
         const xml = readFileSync(join(UPDATES, name), 'utf8')
@@ -606,7 +605,7 @@ describe('fields the forms, lists and record producers name', () => {
         }
     }
 
-    /** Whether `table` or a table it extends has the column. Every table has the platform's sys_ columns. */
+    /** Every table has the platform's sys_ columns. */
     function hasColumn(table: string, column: string): boolean {
         if (column.startsWith('sys_') || dictionary().columns.get(table)?.has(column) || UNDEFINED_BY_SDK[table]?.includes(column)) return true
         const sdk = sdkTable(table)
@@ -769,7 +768,6 @@ function builtAcls(): BuiltAcl[] {
         })
 }
 
-/** The ACLs on records: a field ACL grants no table. */
 const recordAcls = (): BuiltAcl[] => builtAcls().filter((acl) => !acl.field)
 
 const isCustomerRole = (role: string) => role === ROLE.customerAdmin || role === ROLE.siteContact
@@ -779,7 +777,6 @@ const isCustomerRole = (role: string) => role === ROLE.customerAdmin || role ===
  * below hold the built ACLs, audience and dashboard to it, so a role the metadata admits is one the page links for.
  */
 const PROVIDER_STAFF = [...PROVIDER_STAFF_IN_ORDER].sort()
-/** The roles that read the money tables (domain/roles MONEY_READERS), sorted. */
 const MONEY_READERS = [...MONEY_READERS_IN_ORDER].sort()
 
 describe('the Return write ACL', () => {

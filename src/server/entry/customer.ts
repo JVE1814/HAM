@@ -32,8 +32,6 @@ import { requestReturn } from '../platform/returns.ts'
 import { confirmInstall } from '../platform/delivery.ts'
 import { bodyOf, pathParam, reply, requireRole } from '../platform/rest-api.ts'
 
-/** The customer self-service page's routes (P2.9, Q49): what they show and take is platform/customer-page's. */
-
 function allowed(response: RESTAPIResponse): boolean {
     return requireRole(response, CUSTOMER_PAGE_USERS, 'Requires a customer admin or site contact role')
 }

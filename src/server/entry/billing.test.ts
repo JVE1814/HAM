@@ -5,8 +5,6 @@ import { EVENT } from '../domain/events.ts'
 import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 import type { GlideRecord } from '@servicenow/glide'
 
-/* Billing periods generated, changed under review and closed, against the in-memory stand-in for the platform. */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const PERIOD = 'x_daas_ham_billing_period'
@@ -25,7 +23,6 @@ function period(month: string): GlideRecord {
     return recordOf<GlideRecord>(PERIOD, row)
 }
 
-/** Run every generation chunk queued, as the event queue would, until none is left. */
 function drainGeneration(): void {
     for (let event = platform.events.shift(); event; event = platform.events.shift()) {
         if (event.name !== EVENT.billingGenerate) continue

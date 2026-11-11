@@ -5,12 +5,6 @@ import { workWindowRefusal } from '../platform/field-work.ts'
 import type { ForeignRecord } from '../platform/records.ts'
 import { currentSession } from '../platform/session.ts'
 
-/*
- * Shipping Orders to their Site, on-site work and install completion (P1.7). The form buttons save the form before
- * they act, so values typed before clicking (tracking number, carrier, Site, ...) are not lost, and stop when that save
- * is refused (the platform says why).
- */
-
 export function uiShipOrder(current: GlideRecord): void {
     // A refused form save (the platform says why) ships nothing: Ship reads the Order afresh, so a tracking number
     // typed but not saved would go unused.
@@ -35,9 +29,8 @@ export function uiConfirmInstalled(current: GlideRecord): void {
 
 /**
  * Condition of the before rule on wm_order (br_work_order_window), once a NaaS Order's planned start or end changes:
- * whether the save must be refused (platform/field-work `workWindowRefusal`). The rule refuses it with its Abort action, not with current.setAbortAction, which
- * the platform refuses from a scoped app on a record of a global table and saves anyway (as for racks.ts
- * refusesRackPlacement).
+ * whether the save must be refused. The rule refuses it with its Abort action, not with current.setAbortAction, which
+ * the platform refuses from a scoped app on a record of a global table and saves anyway.
  */
 export function refusesWorkWindow(current: ForeignRecord): boolean {
     return workWindowRefusal(current) !== null

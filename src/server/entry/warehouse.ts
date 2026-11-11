@@ -6,8 +6,6 @@ import { assetSummary, importAsnRow, lookUp, pick, putAway, receive, receivingSt
 import { finishImportRow } from '../platform/records.ts'
 import { pathParam, reply, requireRole, requireScanner, textBodyOf } from '../platform/rest-api.ts'
 
-/** Warehouse scanning API used by the warehouse React app (P1.5), and the ASN import rows: platform/receiving. */
-
 const REFUSAL_STATUS: Record<ScanRefusal['reason'], number> = {
     invalid: 400,
     unknown: 404,
