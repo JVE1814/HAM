@@ -14,8 +14,6 @@ import {
 } from '../../server/domain/vocabulary'
 import { assetManager, inventoryTech } from '../shared/roles.now'
 
-/* ATF: order entitlement routing, the spare-pool top-up and the In transfer stage. */
-
 // The vocabulary's values the fixtures below are created with, each under a name: for a value, a Test takes a
 // name, but no property access (VOCABULARY.value).
 const DEVICE_ADD = ORDER_TYPE.device_add
@@ -211,10 +209,9 @@ export const offCatalogOrderTest = Test(
 )
 
 /*
- * ATF: two owner decisions on Orders that the domain tests pin (domain/fulfilment `leftInTransit`, `refillsLine`,
- * `anythingShipped`; domain/oem-rma `advanceReplacementRma`), here on the instance: a break-fix unit lost in transit
- * fills its line again under the same OEM RMA and the Order's approval (suite "NaaS - P2"), and Cancel order is refused
- * once anything has shipped (suite "NaaS - P1"). The fixtures stand where Ship and sourcing leave an Order (stages,
+ * ATF: two owner decisions on Orders that the domain tests pin, here on the instance: a break-fix unit lost in transit
+ * fills its line again under the same OEM RMA and the Order's approval, and Cancel order is refused
+ * once anything has shipped. The fixtures stand where Ship and sourcing leave an Order (stages,
  * approval, entitlement and the Fleet flag are read-only on forms), so they insert without security enforcement.
  */
 
@@ -289,7 +286,6 @@ export const lostInTransitResourcingTest = Test(
             fieldValues: { order: order.record_id, model: model.record_id, quantity: 1, replaces_asset: failed.record_id, line_stage: LINE_SHIPPED },
             enforceSecurity: false,
         })
-        // The OEM's replacement arrived under this RMA and was shipped to the Site.
         const rma = atf.server.recordInsert({
             $id: Now.ID['atf_lit_rma'],
             table: 'x_daas_ham_oem_rma',
@@ -322,7 +318,6 @@ export const lostInTransitResourcingTest = Test(
             enforceSecurity: false,
         })
         atf.server.createUser({ $id: Now.ID['atf_lit_user'], firstName: 'ATF', lastName: 'Lost In Transit Manager', roles: [assetManager] })
-        // The carrier lost it: the asset manager declares it missing on the way (Shipped -> Missing).
         atf.server.recordUpdate({
             $id: Now.ID['atf_lit_declare_missing'],
             table: 'alm_hardware',
@@ -348,7 +343,7 @@ export const lostInTransitResourcingTest = Test(
             fieldValues: `line_stageINawaiting_stock,sourced^quantity=1^replaces_asset=${failed.record_id}`,
             assert: 'record_validated',
         })
-        // The save queued the Order's sourcing (platform/fulfilment `onLineAssetMoved`); the pass runs here, as its
+        // The save queued the Order's sourcing; the pass runs here, as its
         // script action runs it, so the test does not wait on the event queue. A pass the queued event runs first
         // leaves this one nothing to do, and the same outcome; one it is still running holds the Order's lock, so this
         // one waits for the RMA to be reopened, 20 seconds at most.
@@ -384,7 +379,6 @@ export const lostInTransitResourcingTest = Test(
     }
 })(outputs, steps, params, stepResult, assertEqual);`,
         })
-        // The same RMA serves the line, open again to ask the vendor for another replacement.
         atf.server.recordValidation({
             $id: Now.ID['atf_lit_validate_rma'],
             table: 'x_daas_ham_oem_rma',
@@ -570,10 +564,9 @@ export const cancelRefusedOnceShippedTest = Test(
 )
 
 /*
- * ATF: the daily job "NaaS - spare pool top-up" (entry/spare-pool `topUpSparePools`; suite "NaaS - P1"), run on a
- * fixture by its entry function in a server-side script step, in the session of whoever runs the test: one Spare pool
+ * One Spare pool
  * per Customer and Model, sized from all their deployed fleet units of it across their Agreements, each Agreement's
- * ratio on its own units, rounded up once (owner decision; domain/spare-pools `sparePools`). Here 2 units at 0.2 and 2 at
+ * ratio on its own units, rounded up once (owner decision). Here 2 units at 0.2 and 2 at
  * 0.3 make a pool of ceil(1.0) = 1; rounding per Agreement would make it ceil(0.4) + ceil(0.6) = 2. The job runs over
  * every Customer's pools on the instance, as its daily run does; ATF rolls its changes back with the test's. A script
  * cannot read an earlier step's output, so it finds the fixtures by their serial numbers. Fixtures setting the Fleet
@@ -646,7 +639,6 @@ export const sparePoolTopUpTest = Test(
             table: 'alm_stockroom',
             fieldValues: { name: 'ATF Spare Pool Depot', x_daas_ham_stockroom_type: CENTRAL_DEPOT },
         })
-        // In service at the Site: two fleet units under each Agreement.
         atf.server.recordInsert({
             $id: Now.ID['atf_spt_live_small_1'],
             table: 'alm_hardware',
@@ -711,7 +703,6 @@ export const sparePoolTopUpTest = Test(
             },
             enforceSecurity: false,
         })
-        // Free central stock of the Model: the pool takes one of the two.
         atf.server.recordInsert({
             $id: Now.ID['atf_spt_stock_1'],
             table: 'alm_hardware',
@@ -789,7 +780,7 @@ export const sparePoolTopUpTest = Test(
 )
 
 /*
- * ATF: the In transfer stage (ADR 0002), on a fleet asset (suite "NaaS - P1"). Inventory's transfer order logic saves
+ * ATF: the In transfer stage (ADR 0002), on a fleet asset. Inventory's transfer order logic saves
  * the Asset of a transfer order line in the transaction of whoever works the line, here an inventory tech. The fixture
  * setting the Fleet flag inserts without security enforcement: the flag is read-only on forms, and set server-side.
  * The tech's steps skip it too, still in the tech's session (so Inventory's rules and the app's run as for the tech):
@@ -798,7 +789,7 @@ export const sparePoolTopUpTest = Test(
  * to every session (read ACL script false, no admin override). None of that is the app's.
  *
  * Not tested here: that the same move off any transfer order line is refused. The lifecycle rule checks only a save
- * that a user without admin makes in an interactive session (entry/assets lifecycleRefusal), and ATF's server steps run
+ * that a user without admin makes in an interactive session, and ATF's server steps run
  * outside one. Like the lifecycle rule's other refusals, it is left to the manual checks of a first install
  * (docs/verify-on-instance.md, Transfer refusals).
  */
@@ -877,7 +868,6 @@ export const transferStageTest = Test(
         atf.server.impersonate({ $id: Now.ID['atf_xfer_impersonate'], user: tech.user })
         // Inventory's "Push Status to Asset/Consumable" saves the Asset In stock / Pending transfer, with its Active
         // transfer order flag set: the In transfer stage, which the app's rules on alm_hardware take as it is.
-        // Quantity requested keeps its default of 1. Without security enforcement, as said above.
         const line = atf.server.recordInsert({
             $id: Now.ID['atf_xfer_line'],
             table: 'alm_transfer_order_line',
@@ -893,7 +883,7 @@ export const transferStageTest = Test(
             enforceSecurity: false,
         })
         // Inventory's "Release Asset on TOL cancel/delete" saves it In stock / Available where it was, clearing the flag;
-        // in the same save the app gives it back the stage it left (platform/transfers takeBackStageAfterTransfer).
+        // in the same save the app gives it back the stage it left.
         atf.server.recordUpdate({
             $id: Now.ID['atf_xfer_cancel_line'],
             table: 'alm_transfer_order_line',

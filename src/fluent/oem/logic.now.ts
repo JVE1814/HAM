@@ -8,8 +8,6 @@ import { PROPERTY } from '../../server/domain/properties'
 import { REST_MESSAGE } from '../../server/domain/rest-message-names'
 import { admin } from '../shared/roles.now'
 
-/* OEM data (ADR 0008): coverage imports and expiry warnings, the sync jobs, claims, and each vendor's settings. */
-
 BusinessRule({
     $id: Now.ID['br_coverage_row'],
     name: 'NaaS - process OEM coverage import row',
@@ -87,8 +85,6 @@ ScheduledScript({
     timeZone: 'UTC',
     script: syncRmaStatus,
 })
-
-/* OEM claim and provisioning of staging steps (plan §13 OEM claim adapters, Q70). Every vendor is off until enabled. */
 
 ScheduledScript({
     $id: Now.ID['job_oem_claims'],

@@ -4,12 +4,11 @@ import { DEVICE_CLASS, INSTALL_STATUS, LEGAL_OWNER, STAGE_FIELDS, STOCKROOM_TYPE
 import { fieldTech, inventoryTech } from '../shared/roles.now'
 
 /*
- * ATF: the warehouse scanning API (entry/warehouse, P1.5; suite "NaaS - P1"): POST /receive, POST /putaway and
- * GET /assets/{code}. As in returns/tests.now.ts, the server-side scripts call the routes' handlers in the
+ * The server-side scripts call the routes' handlers in the
  * impersonated user's session (ATF's inbound REST step signs in through a basic auth profile, which this scope may not
  * create), so the handlers' role checks and the stockroom visibility rule (ADR 0005) apply as for that user. The scripts
  * find the fixtures by name; the stockroom the technician does not work at is found past the visibility rules
- * (platform/beyond-visibility), as the app's own server logic does. Fixtures setting the Fleet flag insert without
+ * as the app's own server logic does. Fixtures setting the Fleet flag insert without
  * security enforcement: the flag is read-only on forms.
  */
 
@@ -65,7 +64,7 @@ export const warehouseScanRulesTest = Test(
             table: 'cmdb_model',
             fieldValues: { name: 'ATF WH Switch', x_daas_ham_oem_pid: 'ATF-WH-24', x_daas_ham_device_class: SWITCH },
         })
-        // On its way to the depot (In transit), in no stockroom yet; tagged, so the receipt takes no Provider tag.
+        // Tagged, so the receipt takes no Provider tag.
         const arriving = atf.server.recordInsert({
             $id: Now.ID['atf_whs_arriving'],
             table: 'alm_hardware',
@@ -103,7 +102,6 @@ export const warehouseScanRulesTest = Test(
             roles: [inventoryTech],
             impersonate: false,
         })
-        // The technician works at their depot and the customer-site stockroom, not at the other depot.
         atf.server.recordInsert({
             $id: Now.ID['atf_whs_member_depot'],
             table: 'sys_user_grmember',

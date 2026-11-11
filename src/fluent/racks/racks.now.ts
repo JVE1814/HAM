@@ -9,9 +9,7 @@ import { ENTRY_MODULES } from '../shared/server-modules.now'
 import { providerStaff, staffAndCustomers } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
-/* Racks (P2.8): the placement rules and the rack elevation page. */
-
-/** A save sets an Asset's rack placement (its rack, lowest unit or face); written without spaces, as the rack rules' conditions are. */
+/** Written without spaces, as the rack rules' conditions are. */
 const PLACEMENT_SET = `current.${PLACEMENT_FIELDS.rack}.changes()||current.${PLACEMENT_FIELDS.ruStart}.changes()||current.${PLACEMENT_FIELDS.face}.changes()`
 
 // alm_hardware is a global table: the platform refuses current.setAbortAction from this scope and saves anyway, so
@@ -38,7 +36,7 @@ BusinessRule({
 
 // The same check when a racked Asset keeps its placement and gets a new Model (its height and power change) or joins
 // the fleet: "Add to fleet" saves the form first, while the unit is outside the fleet and no rule checks it, then
-// changes only the flag, so its placement is checked as one new to the rack (entry/racks refusesKeptPlacement). A
+// changes only the flag, so its placement is checked as one new to the rack. A
 // save that also sets the placement is the rule above's. An update only, as an insert with a rack sets the placement.
 BusinessRule({
     $id: Now.ID['br_rack_placement_model'],

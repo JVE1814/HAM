@@ -4,7 +4,7 @@ import { PROPERTY } from '../../server/domain/properties'
 import { REST_MESSAGE } from '../../server/domain/rest-message-names'
 
 /*
- * Outbound REST messages for OEM data (ADR 0008). A message without an OAuth 2.0 profile gets its secrets at call time
+ * A message without an OAuth 2.0 profile gets its secrets at call time
  * (platform/rest-messages). The profiles are instance configuration: client credentials via id.cisco.com for Cisco
  * Support, and a FortiCloud IAM API user with client_id "assetmanagement" for FortiCare.
  * Meraki and Mist have regional clouds: their functions call the host a property names (${meraki_host},
@@ -156,7 +156,7 @@ RestMessage({
 })
 
 /*
- * Claim and provisioning (plan §13 OEM claim adapters). GreenLake's OAuth 2.0 profile uses the Client Credentials
+ * GreenLake's OAuth 2.0 profile uses the Client Credentials
  * grant with token URL https://global.api.greenlake.hpe.com/authorization/v2/oauth2/<workspaceId>/token; the API
  * client's user needs Devices and Subscription edit permission. Check Point Zero Touch logs in once per run, and the
  * claim adapter sends the returned sid as the X-chkp-sid request header until it logs out.
