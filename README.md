@@ -277,7 +277,7 @@ documentation in [docs/research/external-contracts.md](docs/research/external-co
 | `npm run lint` | ESLint |
 | `npm test` | Vitest: the domain core, the platform services and visibility scripts against an in-memory stand-in for Glide, the client helpers, and the checks of the built metadata. Those checks all fail once any file under `src/fluent` or `src/server` (tests aside) is newer than `dist/app`: run `npm run build` first, or `npx vitest run src/server/domain` while working on rules |
 | `npm run build` | `now-sdk build` (Fluent type check, client bundle, app package) |
-| `npx now-sdk cicd testsuite run ...` | ATF suites **NaaS - P1**, **NaaS - P2** and **NaaS - P3** on an instance (`src/server/atf-scripts.test.ts` checks their server-side scripts beforehand; [running ATF](docs/verify-on-instance.md#running-atf)) |
+| `npx now-sdk cicd testsuite run ...` | ATF suites **NaaS - P1**, **NaaS - P2** and **NaaS - P3** on an instance (`src/server/built-metadata.test.ts` checks their server-side scripts beforehand; [running ATF](docs/verify-on-instance.md#running-atf)) |
 
 Layout:
 

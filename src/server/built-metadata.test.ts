@@ -315,10 +315,10 @@ describe('ATF server-side scripts', () => {
  */
 
 /**
- * The entry points the rules on other scopes' tables call, from their script or their condition, by module. Each takes
- * its record as a ForeignRecord (platform/records): a GlideRecord without setAbortAction and setWorkflow. Neither it
- * nor a helper it hands the record to can then call one, as the compiler follows the record; an entry point that takes
- * a GlideRecord does not compile here.
+ * The entry points the rules on other scopes' tables call, from their script or their condition, by module (its path
+ * under src/server). Each takes its record as a ForeignRecord (platform/records): a GlideRecord without setAbortAction
+ * and setWorkflow. Neither it nor a helper it hands the record to can then call one, as the compiler follows the
+ * record; an entry point that takes a GlideRecord does not compile here.
  */
 const ON_FOREIGN_TABLES = {
     'entry/assets.ts': {
@@ -368,7 +368,7 @@ describe('business rule conditions', () => {
 
     it("call only entry points that cannot abort a save on another scope's table, which is left to the rule's Abort action", () => {
         const elsewhere = rules().filter((rule) => !(rule.collection ?? '').startsWith('x_daas_ham_'))
-        const entryPoint = (path: string, fn: string) => `${path.slice(path.indexOf('entry/'))} ${fn}`
+        const entryPoint = (path: string, fn: string) => `${path.split('/src/server/')[1]} ${fn}`
         const called = elsewhere.flatMap((rule) => {
             const script = wrapped(rule.script ?? '')
             // An inline script would be read by no compiler.
@@ -1402,7 +1402,7 @@ describe('built substatus choice set', () => {
  * The ATF tests (each feature's tests.now.ts) run on an instance only, after an install. Read here, from the built tests, is what
  * goes wrong before that. A test in no suite is never run (`now-sdk cicd testsuite run` runs suites). A "Run Server
  * Side Script" step's script is text to the build: it loads server modules by the path the instance keeps them under,
- * which names the package version (logic/server-modules), and what it calls of them is checked by no compiler.
+ * which names the package version (fluent/shared/server-modules.now.ts), and what it calls of them is checked by no compiler.
  */
 describe('ATF tests', () => {
     const tests = () => records('sys_atf_test')
