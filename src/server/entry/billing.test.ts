@@ -115,6 +115,22 @@ describe('two months generating at once', () => {
     })
 })
 
+describe('Close period', () => {
+    it('queues the CSV export and the margin of a period it closes, and neither of one it does not', () => {
+        generate('2026-09')
+        const periodId = periodRow('2026-09')?.sys_id
+        expect(closePeriod(period('2026-09'))).toEqual({ done: true })
+        expect(platform.events.map((event) => [event.name, event.parm1])).toEqual([
+            [EVENT.billingExport, periodId],
+            [EVENT.marginCompute, periodId],
+        ])
+
+        platform.events.length = 0
+        expect(closePeriod(period('2026-09'))).toMatchObject({ done: false })
+        expect(platform.events).toEqual([])
+    })
+})
+
 describe('Close and Regenerate of one period at once', () => {
     it('does not close a period a Regenerate has emptied since its form was read', () => {
         generate('2026-09')

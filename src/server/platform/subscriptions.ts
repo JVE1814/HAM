@@ -4,7 +4,7 @@ import { chooseSubscriptionLine, type SubscriptionLineView } from '../domain/in-
 import { TRY_AGAIN, type HeldLock, type TryAgain } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { sitePackageHoldersQuery } from '../domain/returns.ts'
-import { SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
+import { SUBSCRIPTION_LINE_STATUS, SUBSCRIPTION_LINE_TYPE } from '../domain/vocabulary.ts'
 import { todayIso } from './clock.ts'
 import { withLockTries } from './locks.ts'
 import { log } from './log.ts'
@@ -41,7 +41,7 @@ export function attachToSubscription(asset: GlideRecord, inServiceAt: number): b
         liveOn: toIsoDate(inServiceAt),
     })
     if (!lineId) return true
-    if (lines.find((l) => l.id === lineId)?.status === 'pending') {
+    if (lines.find((l) => l.id === lineId)?.status === SUBSCRIPTION_LINE_STATUS.pending) {
         const unstarted = startLine(lineId, inServiceAt)
         if (unstarted) {
             const serial = str(asset, 'serial_number')
@@ -96,7 +96,7 @@ export function endSitePackageIfEmpty(siteId: string, agreementId: string): void
     const line = new GlideRecord('x_daas_ham_subscription_line')
     line.addQuery('agreement', agreementId)
     line.addQuery('site', siteId)
-    line.addQuery('line_type', 'site_package')
+    line.addQuery('line_type', SUBSCRIPTION_LINE_TYPE.site_package)
     line.addQuery('status', SUBSCRIPTION_LINE_STATUS.active)
     line.query()
     if (!line.hasNext()) return

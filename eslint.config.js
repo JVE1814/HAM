@@ -13,6 +13,8 @@ const SERVER_FILES = 'src/server/**/*.{ts,tsx,mts,cts,js,mjs,cjs}'
 /** Test code: what the build leaves out of the server modules, so the layer rules do not apply to it. */
 const TEST_CODE = nowConfig.serverModulesExcludePatterns.map((pattern) => `src/server/${pattern}`)
 
+const STATIC_IMPORTS = { selector: 'ImportExpression', message: 'A server module imports statically, so the layer rules see it (ADR 0003).' }
+
 export default tseslint.config(
     {
         ignores: [
@@ -58,10 +60,20 @@ export default tseslint.config(
     {
         files: [SERVER_FILES],
         ignores: TEST_CODE,
+        rules: { 'no-restricted-syntax': ['error', STATIC_IMPORTS] },
+    },
+    // A save without the business rules gets past the closed Billing period's lock, so it is made in one module.
+    {
+        files: ['src/server/{domain,platform,entry}/**/*.ts'],
+        ignores: [...TEST_CODE, 'src/server/platform/closed-period.ts', 'src/server/platform/records.ts'],
         rules: {
             'no-restricted-syntax': [
                 'error',
-                { selector: 'ImportExpression', message: 'A server module imports statically, so the layer rules see it (ADR 0003).' },
+                STATIC_IMPORTS,
+                {
+                    selector: "CallExpression[callee.property.name='setWorkflow']",
+                    message: 'A write past the business rules gets past the closed Billing period lock: make it in platform/closed-period.',
+                },
             ],
         },
     },

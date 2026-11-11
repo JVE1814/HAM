@@ -64,6 +64,7 @@ function openInterval(lock: HeldLock, asset: ForeignRecord, lineId: string, star
     const place = { lineId, siteId: str(asset, 'x_daas_ham_site') }
     const latest = latestClosedInterval(assetId)
     const closed = latest && {
+        record: latest,
         lineId: str(latest, 'subscription_line'),
         siteId: str(latest, 'site'),
         end: str(latest, 'end_date'),
@@ -72,9 +73,7 @@ function openInterval(lock: HeldLock, asset: ForeignRecord, lineId: string, star
     const reopen = 'reopen' in restart
     let interval: GlideRecord
     if (reopen) {
-        // restartInterval only reopens the latest interval, so it exists here.
-        if (!latest) return false
-        interval = latest
+        interval = restart.reopen.record
         interval.setValue('end_date', '')
     } else {
         interval = new GlideRecord('x_daas_ham_service_interval')

@@ -8,7 +8,7 @@ import {
     type EntitlementContext,
     type Usage,
 } from '../domain/entitlement.ts'
-import type { AgreementCurrency } from '../domain/billing.ts'
+import type { AgreementCurrency } from '../domain/money.ts'
 import { todayIso } from './clock.ts'
 import { bool, num, str } from './records.ts'
 
@@ -18,7 +18,7 @@ import { bool, num, str } from './records.ts'
  */
 export const ACTIVE_AGREEMENTS = 'state=active'
 
-/** The Agreement `field` names on `record`, with its Currency as stored (domain/billing `chooseCurrency`); null for none. */
+/** The Agreement `field` names on `record`, with its Currency as stored (domain/money `chooseCurrency`); null for none. */
 export function agreementCurrencyOf(record: GlideRecord, field: string): AgreementCurrency | null {
     const agreementId = str(record, field)
     if (!agreementId) return null

@@ -10,6 +10,7 @@ import {
     OEM_PID_FIELD,
     STOCKROOM_TYPE_FIELD,
 } from './domain/fleet'
+import { billingCsvRow, billingLineJson } from './domain/billing'
 import { replacementStep } from './domain/breakfix'
 import { CANCELLABLE_ORDER_STAGES } from './domain/fulfilment'
 import { LOCK_NAME_LENGTH } from './domain/lock-names'
@@ -210,6 +211,23 @@ const TEXT_LIMITS: ReadonlyArray<{ table: string; field: string; limit: number }
     { table: 'sys_script', field: 'condition', limit: 254 },
     { table: 'sys_ui_action', field: 'condition', limit: 254 },
 ]
+
+// A generated Billing line is written field by field (platform/billing), so a field its exports name that the table
+// lacks is no build error: the instance drops the value.
+describe('a Billing line as its exports read it', () => {
+    it('names only columns of x_daas_ham_billing_line', () => {
+        const prefix = 'sys_dictionary_x_daas_ham_billing_line_'
+        const columns = readdirSync(UPDATES)
+            .filter((name) => name.startsWith(prefix))
+            .map((name) => name.slice(prefix.length, -'.xml'.length))
+        const read = new Set<string>()
+        const reading = (field: string) => (read.add(field), '')
+        billingLineJson('', { value: reading, display: reading })
+        billingCsvRow('', { value: reading, display: reading })
+        expect(read.size).toBeGreaterThan(5)
+        expect(columns).toEqual(expect.arrayContaining([...read]))
+    })
+})
 
 describe('texts of the built records', () => {
     it('fit the column the instance stores them in', () => {

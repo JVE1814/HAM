@@ -2,19 +2,16 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { agreementCurrencyProblem, billingMonthProblem, currencyCode, monthBounds, monthChangedError, previousMonth } from '../domain/billing.ts'
+import { agreementCurrencyProblem, billingMonthProblem, monthChangedError, PULL_PAGE, pullPageSize } from '../domain/billing.ts'
+import { currencyCode, monthBounds, previousMonth } from '../domain/money.ts'
 import { EVENT } from '../domain/events.ts'
 import { ROLE } from '../domain/roles.ts'
 import {
     attachExport,
-    closedLineRefusal,
-    closedPeriodRefusal,
     closePeriod,
     generateChunk,
-    generateNewPeriod,
     linesPage,
     openBillingPeriod,
-    queueExport,
     recentPeriods,
     regeneratePeriod,
     requestExport,
@@ -22,8 +19,8 @@ import {
     type PeriodOutcome,
 } from '../platform/billing.ts'
 import { todayIso } from '../platform/clock.ts'
+import { closedLineRefusal, closedPeriodRefusal } from '../platform/closed-period.ts'
 import { jobEvent, subjectOf } from '../platform/events.ts'
-import { queueMarginCompute } from '../platform/margin.ts'
 import { str } from '../platform/records.ts'
 import { pathParam, queryInt, reply, requireRole } from '../platform/rest-api.ts'
 import { abortWith } from '../platform/rule-api.ts'
@@ -34,17 +31,13 @@ export function openMonthlyBillingPeriod(): void {
     openBillingPeriod(previousMonth(todayIso()))
 }
 
-export function startBillingPeriodGeneration(current: GlideRecord): void {
-    generateNewPeriod(current)
-}
-
 export function generateBillingLines(event: GlideRecord, current: GlideRecord): void {
     generateChunk(jobEvent(EVENT.billingGenerate, event, current))
 }
 
 function report(outcome: PeriodOutcome, done: string): void {
     if (!outcome.done) {
-        if (outcome.why) gs.addErrorMessage(outcome.why)
+        if ('why' in outcome) gs.addErrorMessage(outcome.why)
         return
     }
     gs.addInfoMessage(done)
@@ -61,12 +54,7 @@ export function uiResetBillingGeneration(current: GlideRecord): void {
 }
 
 export function uiCloseBillingPeriod(current: GlideRecord): void {
-    const closed = closePeriod(current)
-    if (closed.done) {
-        queueExport(current)
-        queueMarginCompute(current)
-    }
-    report(closed, `${str(current, 'period')} closed and locked; the CSV export and margin are being prepared`)
+    report(closePeriod(current), `${str(current, 'period')} closed and locked; the CSV export and margin are being prepared`)
 }
 
 export function uiExportBillingPeriod(current: GlideRecord): void {
@@ -117,13 +105,13 @@ function canPull(response: RESTAPIResponse): boolean {
 
 export function listBillingPeriods(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!canPull(response)) return
-    reply(response, 200, recentPeriods(Math.min(Math.max(queryInt(request, 'limit', 24), 1), 120)))
+    reply(response, 200, recentPeriods(pullPageSize(queryInt(request, 'limit', PULL_PAGE.periods.size), PULL_PAGE.periods)))
 }
 
 export function getBillingLines(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!canPull(response)) return
     const offset = queryInt(request, 'offset', 0)
-    const limit = Math.min(Math.max(queryInt(request, 'limit', 1000), 1), 5000)
+    const limit = pullPageSize(queryInt(request, 'limit', PULL_PAGE.lines.size), PULL_PAGE.lines)
     const page = linesPage(pathParam(request, 'id'), offset, limit)
     if (!page) return reply(response, 404, { error: 'Unknown billing period' })
     reply(response, 200, page)

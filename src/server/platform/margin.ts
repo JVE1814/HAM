@@ -1,9 +1,8 @@
 import { GlideAggregate, GlideRecord } from '@servicenow/glide'
-import { chooseCurrency, currencyCode, currencyKey, currencyOrThrow, monthBounds, overlapsMonth, type AgreementCurrency, type MonthBounds } from '../domain/billing.ts'
+import { chooseCurrency, currencyCode, currencyKey, currencyOrThrow, monthBounds, overlapsMonth, roundToCent, timeInMonth, type AgreementCurrency, type MonthBounds } from '../domain/money.ts'
 import { messageOf } from '../domain/errors.ts'
 import { stillCovered } from '../domain/leases.ts'
 import {
-    cents,
     CostLedger,
     costFactKey,
     labourCost,
@@ -15,9 +14,9 @@ import {
     type LeaseTerms,
 } from '../domain/margin.ts'
 import { memoized } from '../domain/memo.ts'
-import { SHIPMENT_STATUS, type LegalOwner } from '../domain/vocabulary.ts'
+import { BILLING_PERIOD_STATUS, SHIPMENT_STATUS, type LegalOwner } from '../domain/vocabulary.ts'
 import { agreementCurrencyOf, customerCurrencies } from './agreements.ts'
-import { recordMarginOutcome } from './billing.ts'
+import { recordMarginOutcome } from './closed-period.ts'
 import { runEventTableJob } from './chunked.ts'
 import { queueJob, type JobEvent } from './events.ts'
 import { EVENT } from '../domain/events.ts'
@@ -38,11 +37,15 @@ export function queueMarginCompute(period: GlideRecord): void {
 
 /**
  * One chunk of a margin pass for the period the event names: Asset costs over the month's Service intervals, then
- * labour and margin. A pass that stops is logged (the runner records it on the period while the pass is current).
+ * labour and margin. Only a closed period has Margin: its lines no longer change. A pass that stops is logged (the
+ * runner records it on the period while the pass is current).
  */
 export function computeMarginChunk(queued: JobEvent): void {
     const period = findById('x_daas_ham_billing_period', queued.subject)
     if (!period) return
+    if (str(period, 'status') !== BILLING_PERIOD_STATUS.closed) {
+        return void log.warn(`${queued.name}: dropped a margin chunk, as billing period ${str(period, 'period')} is not closed`)
+    }
     try {
         costServiceIntervals(period, queued)
     } catch (error) {
@@ -208,7 +211,7 @@ function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void
         const key = costFactKey(str(fact, 'customer'), str(fact, 'site'), str(fact, 'cost_type'), str(fact, 'currency'))
         const entry = pending.get(key)
         if (!entry) continue
-        fact.setValue('amount', cents(num(fact, 'amount') + entry.amount))
+        fact.setValue('amount', roundToCent(num(fact, 'amount') + entry.amount))
         if (!fact.update()) throwRefused(fact, `${entry.type} Cost fact not saved`)
         pending.delete(key)
     }
@@ -220,7 +223,7 @@ function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void
         added.setValue('site', entry.siteId)
         added.setValue('cost_type', entry.type)
         added.setValue('currency', entry.currency)
-        added.setValue('amount', cents(entry.amount))
+        added.setValue('amount', roundToCent(entry.amount))
         if (!added.insert()) throwRefused(added, `${entry.type} Cost fact not saved`)
     }
 }
@@ -242,7 +245,7 @@ function addFieldLabour(periodId: string, bounds: MonthBounds): Failed {
     const ledger = new CostLedger()
     const result: Failed = { failed: 0, lastError: '' }
     const workOrder = new GlideRecord('wm_order')
-    workOrder.addEncodedQuery(`x_daas_ham_purposeISNOTEMPTY^closed_at>=${bounds.first} 00:00:00^closed_at<=${bounds.last} 23:59:59`)
+    workOrder.addEncodedQuery(`x_daas_ham_purposeISNOTEMPTY^${timeInMonth('closed_at', bounds)}`)
     workOrder.query()
     while (workOrder.next()) {
         const customerId = str(workOrder, 'company')
@@ -279,7 +282,7 @@ function addShippingCosts(periodId: string, bounds: MonthBounds): Failed {
     const ledger = new CostLedger()
     const result: Failed = { failed: 0, lastError: '' }
     const shipment = new GlideRecord('x_daas_ham_shipment')
-    shipment.addEncodedQuery(`status!=${SHIPMENT_STATUS.voided}^cost>0^sys_created_on>=${bounds.first} 00:00:00^sys_created_on<=${bounds.last} 23:59:59`)
+    shipment.addEncodedQuery(`status!=${SHIPMENT_STATUS.voided}^cost>0^${timeInMonth('sys_created_on', bounds)}`)
     shipment.query()
     while (shipment.next()) {
         const currency = currencyCode(str(shipment, 'currency'))
@@ -300,7 +303,7 @@ function addShippingCosts(periodId: string, bounds: MonthBounds): Failed {
 
 /**
  * The amounts of a table's records matching an encoded query, summed per Customer, Site and currency. The currency is
- * read as Billing period totals read it (domain/billing `currencyKey`): a line edited during review to 'eur' is set
+ * read as Billing period totals read it (domain/money `currencyKey`): a line edited during review to 'eur' is set
  * against the 'EUR' costs of its Customer and Site (marginRows merges the rows of one key).
  */
 function sumsBy(table: string, encodedQuery: string): Amount[] {

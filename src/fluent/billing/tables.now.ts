@@ -1,12 +1,12 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DateColumn, DateTimeColumn, DecimalColumn, IntegerColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 import { FLEET_CONDITION } from '../../server/domain/fleet'
-import { BILLING_LINE_KIND_CHOICES, BILLING_PERIOD_STATUS_CHOICES } from '../../server/domain/vocabulary'
-import { PERIOD_ERROR_LENGTH } from '../../server/domain/billing'
+import { BILLING_LINE_KIND_CHOICES, BILLING_PERIOD_STATUS, BILLING_PERIOD_STATUS_CHOICES } from '../../server/domain/vocabulary'
+import { PERIOD_ERROR_LENGTH, TOTALS_TEXT_LENGTH } from '../../server/domain/billing'
 
 /* Service intervals, billing periods and their lines (plan §13 Billing export, Q52, Q66). */
 
-/** The days one Asset delivered a Subscription line: from in service to the day it goes on a Return order. */
+/** The days one Asset delivered a Subscription line: from the day it went in service to the day it left service. */
 export const x_daas_ham_service_interval = Table({
     name: 'x_daas_ham_service_interval',
     label: 'Service interval',
@@ -36,7 +36,7 @@ export const x_daas_ham_billing_period = Table({
         status: ChoiceColumn({
             label: 'Status',
             choices: BILLING_PERIOD_STATUS_CHOICES,
-            default: 'generating',
+            default: BILLING_PERIOD_STATUS.generating,
             readOnly: true,
             dropdown: 'dropdown_without_none',
         }),
@@ -52,7 +52,7 @@ export const x_daas_ham_billing_period = Table({
         line_count: IntegerColumn({ label: 'Lines', readOnly: true }),
         // Amounts of two currencies are never added: Totals holds one total per currency (e.g. 'EUR 1234.56; USD 99.00'),
         // and Total only the one while every line is in one currency (blank when they are in several).
-        totals: StringColumn({ label: 'Totals per currency', maxLength: 255, readOnly: true }),
+        totals: StringColumn({ label: 'Totals per currency', maxLength: TOTALS_TEXT_LENGTH, readOnly: true }),
         total_amount: DecimalColumn({ label: 'Total (lines in one currency)', readOnly: true }),
         closed_at: DateTimeColumn({ label: 'Closed at', readOnly: true }),
         closed_by: ReferenceColumn({ label: 'Closed by', referenceTable: 'sys_user', readOnly: true }),

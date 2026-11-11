@@ -3431,6 +3431,10 @@ declare global {
                         table: 'sys_module'
                         id: '1ab1430e2cc24d0db5823748a547d90e'
                     }
+                    src_server_domain_money_ts: {
+                        table: 'sys_module'
+                        id: '07e480f096554924a3d025340d701ab4'
+                    }
                     src_server_domain_normalization_ts: {
                         table: 'sys_module'
                         id: '7f5e18f231284281a67768a258883020'
@@ -3696,6 +3700,10 @@ declare global {
                     src_server_platform_clock_ts: {
                         table: 'sys_module'
                         id: '401af081928d430898e921643f5942ce'
+                    }
+                    'src_server_platform_closed-period_ts': {
+                        table: 'sys_module'
+                        id: '5cabd174deb142e1ac202c79090b2c01'
                     }
                     src_server_platform_coverage_ts: {
                         table: 'sys_module'

@@ -331,6 +331,10 @@ export const SUBSCRIPTION_LINE_TYPE_CHOICES = {
     device_class: { label: 'Per device class', sequence: 1 },
 } as const
 export type SubscriptionLineType = keyof typeof SUBSCRIPTION_LINE_TYPE_CHOICES
+export const SUBSCRIPTION_LINE_TYPE = {
+    site_package: 'site_package',
+    device_class: 'device_class',
+} as const satisfies Named<SubscriptionLineType>
 
 export const SUBSCRIPTION_LINE_STATUS_CHOICES = {
     pending: { label: 'Pending', sequence: 0 },
@@ -692,6 +696,10 @@ export const BILLING_LINE_KIND_CHOICES = {
     fee: { label: 'Fee', sequence: 1 },
 } as const
 export type BillingLineKind = keyof typeof BILLING_LINE_KIND_CHOICES
+export const BILLING_LINE_KIND = {
+    subscription: 'subscription',
+    fee: 'fee',
+} as const satisfies Named<BillingLineKind>
 
 export const COST_TYPE_CHOICES = {
     purchase: { label: 'Purchase (written off)', sequence: 0 },
