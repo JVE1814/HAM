@@ -8,9 +8,9 @@ import {
     broadStaff,
     customerAdmin,
     customerRoles,
+    feeEditors,
     fieldTech,
     inventoryTech,
-    leaseEditors,
     noc,
     orderRaisers,
     providerStaff,
@@ -155,7 +155,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_fee_event',
     operation: 'create',
-    roles: leaseEditors,
+    roles: feeEditors,
 })
 
 Acl({
@@ -163,7 +163,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_fee_event',
     operation: 'write',
-    roles: leaseEditors,
+    roles: feeEditors,
 })
 
 Acl({

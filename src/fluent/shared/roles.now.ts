@@ -114,6 +114,9 @@ export const returnWorkers = [ROLE.assetManager, ROLE.inventoryTech, ROLE.noc]
 /** Who writes Lease schedules and their decisions. */
 export const leaseEditors = [ROLE.assetManager, ROLE.finance]
 
+/** Who raises or corrects a Fee event by hand, besides the charges the returns workflow raises (platform/fees). */
+export const feeEditors = [ROLE.assetManager, ROLE.finance]
+
 /** Who opens or closes a Service interval by hand, when a stage change could not (platform/service-intervals). */
 export const intervalEditors = [ROLE.assetManager, ROLE.finance]
 
