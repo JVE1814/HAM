@@ -1,16 +1,12 @@
 import { GlideRecord } from '@servicenow/glide'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { closeAudit, recordScan, startSiteAudit, startStockroomAudit } from './audits.ts'
+import { LOCK } from '../domain/lock-names.ts'
+import { ROLE } from '../domain/roles.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
+import { assetIn } from '../test-support/stored-asset.ts'
 
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
-
-const visit = vi.hoisted(() => ({ installed: [] as string[], workOrder: 'wo1' as string | null }))
-
-vi.mock('./session.ts', () => ({ currentSession: () => ({ scope: 'everything', customerId: '', stockroomIds: () => [], siteIds: () => [] }) }))
-vi.mock('./clock.ts', () => ({ nowGlide: () => '2026-11-09 10:00:00' }))
-vi.mock('./installed-assets.ts', () => ({ installedAssetIds: () => visit.installed }))
-vi.mock('./field-work.ts', () => ({ openFieldWork: () => (visit.workOrder ? { workOrderId: visit.workOrder } : null) }))
 
 const AUDITS = 'x_daas_ham_audit'
 const LINES = 'x_daas_ham_audit_line'
@@ -50,8 +46,7 @@ beforeEach(() => {
         [AUDITS]: () => ({ number: `AUD${rows(AUDITS).length + 1}`, active: 'true' }),
         [EXCEPTIONS]: () => ({ status: 'open' }),
     }
-    visit.installed = []
-    visit.workOrder = 'wo1'
+    platform.user = { ...platform.user, id: 'manager', roles: [ROLE.assetManager] }
 })
 
 describe('closeAudit', () => {
@@ -100,38 +95,43 @@ describe('closeAudit', () => {
 })
 
 describe('starting an audit', () => {
-    const site = () => {
+    const site = (installed: string[]) => {
         platform.tables.cmn_location = [{ sys_id: 'site1', name: 'Acme HQ', company: 'acme' }]
+        platform.tables.alm_hardware = [
+            ...installed.map((sys_id) => assetIn('in_service', { sys_id, x_daas_ham_site: 'site1', x_daas_ham_fleet: 'true' })),
+            assetIn('in_service', { sys_id: 'elsewhere', x_daas_ham_site: 'site2', x_daas_ham_fleet: 'true' }),
+            assetIn('in_service', { sys_id: 'provider-it', x_daas_ham_site: 'site1', x_daas_ham_fleet: 'false' }),
+            assetIn('available', { sys_id: 'on-a-shelf', x_daas_ham_site: 'site1', x_daas_ham_fleet: 'true' }),
+        ]
         return record('cmn_location', 'site1')
     }
 
     it('expects the Assets installed at the Site and links the work order, saved once the list is made', () => {
-        visit.installed = ['a1', 'a2']
-        expect(startSiteAudit(site())).toEqual({ started: true, workOrderOpened: true, number: 'AUD1', expected: 2, leftOff: 0 })
-        expect(rows(AUDITS)[0]).toMatchObject({ audit_type: 'site', site: 'site1', customer: 'acme', state: '2', expected_count: '2', work_order: 'wo1' })
+        expect(startSiteAudit(site(['a1', 'a2']))).toEqual({ started: true, workOrderOpened: true, number: 'AUD1', expected: 2, leftOff: 0 })
+        const audit = rows(AUDITS)[0]
+        expect(audit).toMatchObject({ audit_type: 'site', site: 'site1', customer: 'acme', state: '2', expected_count: '2' })
+        expect(rows('wm_order')).toEqual([expect.objectContaining({ sys_id: audit.work_order, initiated_from: audit.sys_id, location: 'site1' })])
         expect(rows(LINES).map((line) => line.asset)).toEqual(['a1', 'a2'])
     })
 
     it('leaves an Asset the platform refuses off the count, and says when no work order was opened', () => {
-        visit.installed = ['a1', 'a2']
-        visit.workOrder = null
-        platform.refuses = (table, row) => (table === LINES && row.asset === 'a2' ? 'no' : '')
-        expect(startSiteAudit(site())).toEqual({ started: true, workOrderOpened: false, number: 'AUD1', expected: 1, leftOff: 1 })
+        platform.refuses = (table, row) => ((table === LINES && row.asset === 'a2') || table === 'change_request' ? 'no' : '')
+        expect(startSiteAudit(site(['a1', 'a2']))).toEqual({ started: true, workOrderOpened: false, number: 'AUD1', expected: 1, leftOff: 1 })
         expect(rows(AUDITS)[0].expected_count).toBe('1')
-        expect(platform.warnings).toEqual([expect.stringMatching(/\ba2\b.*\bAUD1\b.*: no$/)])
+        expect(rows(AUDITS)[0].work_order ?? '').toBe('')
+        expect(platform.warnings).toContainEqual(expect.stringMatching(/\ba2\b.*\bAUD1\b.*: no$/))
     })
 
     it('says why when what starting set on the audit is not saved: the audit stands', () => {
-        visit.installed = ['a1']
         platform.refuses = (table, _row, operation) => (table === AUDITS && operation === 'update' ? 'read only' : '')
-        expect(startSiteAudit(site())).toEqual({ started: true, workOrderOpened: true, number: 'AUD1', expected: 1, leftOff: 0, unsaved: 'read only' })
+        expect(startSiteAudit(site(['a1']))).toEqual({ started: true, workOrderOpened: true, number: 'AUD1', expected: 1, leftOff: 0, unsaved: 'read only' })
         expect(rows(AUDITS)[0].expected_count).toBeUndefined()
         expect(platform.warnings).toEqual([expect.stringMatching(/\bAUD1\b.*: read only$/)])
     })
 
     it('starts none the platform refuses, and no blind count of a stockroom outside NaaS', () => {
         platform.refuses = (table) => (table === AUDITS ? 'not allowed' : '')
-        expect(startSiteAudit(site())).toEqual({ started: false, reason: 'not allowed' })
+        expect(startSiteAudit(site([]))).toEqual({ started: false, reason: 'not allowed' })
         platform.tables.alm_stockroom = [{ sys_id: 'sr1', name: 'IT store', x_daas_ham_stockroom_type: '' }]
         expect(startStockroomAudit(record('alm_stockroom', 'sr1'))).toEqual({
             started: false,
@@ -144,6 +144,7 @@ describe('starting an audit', () => {
 describe('recordScan', () => {
     it('records the scan as found, or says why the platform refused it', () => {
         const audit = countedAudit()
+        platform.clock = Date.parse('2026-11-09T10:00:00Z')
         expect(recordScan(audit, 'FOC222')).toBe('recorded')
         expect(rows(LINES).at(-1)).toMatchObject({ audit: 'audit1', scanned_code: 'FOC222', result: 'found', scanned_at: '2026-11-09 10:00:00' })
         platform.refuses = (table) => (table === LINES ? 'full' : '')
@@ -166,7 +167,7 @@ describe('recordScan', () => {
 describe('a scan and a close of one audit', () => {
     it('take turns under its lock: neither records nor closes anything while the other holds it', () => {
         const audit = countedAudit()
-        platform.tables[LOCKS] = [{ sys_id: 'lock1', name: 'audit_audit1', sys_created_on: '2025-11-09 12:00:00' }]
+        platform.tables[LOCKS] = [{ sys_id: 'lock1', name: LOCK.audit('audit1'), sys_created_on: '2025-11-09 12:00:00' }]
         const lines = rows(LINES).length
         expect(recordScan(audit, 'FOC222')).toBe('busy')
         expect(closeAudit(audit)).toEqual({ outcome: 'busy' })
