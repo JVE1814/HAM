@@ -14,10 +14,10 @@ import {
     sourcingPurpose,
     stillToBuy,
     type ShortfallRoute,
-    type Source,
     type SourcingRequest,
     type UnmovedStock,
 } from '../domain/sourcing.ts'
+import type { Source } from '../domain/stock.ts'
 import type { OrderType } from '../domain/vocabulary.ts'
 import { moveAndSave } from './assets.ts'
 import { todayIso } from './clock.ts'

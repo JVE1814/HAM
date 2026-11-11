@@ -3519,9 +3519,17 @@ declare global {
                         table: 'sys_module'
                         id: '5d9175c379eb44d897c8d889b00da54f'
                     }
+                    'src_server_domain_spare-pools_ts': {
+                        table: 'sys_module'
+                        id: 'e1ed38f9bdcd4b5c9672a3e4ed0b81a8'
+                    }
                     src_server_domain_staging_ts: {
                         table: 'sys_module'
                         id: '6544c45b3f2d4508ba508c33ebffe964'
+                    }
+                    src_server_domain_stock_ts: {
+                        table: 'sys_module'
+                        id: '5f15a35903b9404e82d4cadf0d3c2358'
                     }
                     'src_server_domain_support-risk_ts': {
                         table: 'sys_module'

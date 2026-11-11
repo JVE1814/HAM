@@ -14,7 +14,7 @@ import {
     stockReturnMoves,
 } from '../domain/leases.ts'
 import { isRetired, SERVING_STAGES, type Stage, STOCK_STAGES } from '../domain/lifecycle.ts'
-import { isFree } from '../domain/sourcing.ts'
+import { isFree } from '../domain/stock.ts'
 import { LEASE_END_ACTION, type LeaseEndAction, LEGAL_OWNER, TASK_STATE } from '../domain/vocabulary.ts'
 import { assetManagerIds } from './approvals.ts'
 import { moveAsset, readStage } from './assets.ts'

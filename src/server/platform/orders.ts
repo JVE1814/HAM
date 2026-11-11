@@ -15,7 +15,7 @@ import {
 import { anythingShipped, endedUnfulfilled, OPEN_LINE_STAGES, ORDER_TASK_STATE } from '../domain/fulfilment.ts'
 import { LONG_HOLD_LOCK_TRIES, REQUEUE, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { cancelledUnit } from '../domain/sourcing.ts'
+import { cancelledUnit } from '../domain/stock.ts'
 import { type EntitlementVerdict, type InstallMode, LINE_STAGE, ORDER_STAGE, type OrderType } from '../domain/vocabulary.ts'
 import { entitlementContext } from './agreements.ts'
 import {
@@ -426,7 +426,7 @@ export function rollUpOrderApprovals(orderId: string): ApprovalRollup | null {
 }
 
 /**
- * Give an allocated Asset back to stock (domain/sourcing `cancelledUnit`): hot spares stay in the Spare pool, the rest
+ * Give an allocated Asset back to stock (domain/stock `cancelledUnit`): hot spares stay in the Spare pool, the rest
  * become free stock. A unit in transfer stays in transfer (domain/lifecycle `checkTransition`): only its reservation
  * goes, and it is free stock once Inventory lets it go (entry/assets `onTransferReleased`). False when the platform
  * refuses that or the closing of its Staging tasks (logged).

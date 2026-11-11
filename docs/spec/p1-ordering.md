@@ -246,7 +246,7 @@
 A Customer has one Spare pool per Model (owner decision), sized from all their deployed fleet units
 of that Model across their active Agreements with a spare-pool ratio, each Agreement's ratio applied
 to its own units and the sum rounded up once: `size = ceil(Σ deployed × ratio)` and
-`shortfall = size − reserved spares` (`domain/sourcing.ts` `sparePools`). Units on an Agreement
+`shortfall = size − reserved spares` (`domain/spare-pools.ts` `sparePools`). Units on an Agreement
 without a ratio, or not active, add nothing to the pool. The daily pass runs over those Agreements;
 each Customer's pools are topped up once, from the row of their first Agreement by sys_id
 (`sparePoolLead`), and their other Agreements' rows are passed over.
