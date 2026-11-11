@@ -344,8 +344,10 @@ describe('restartInterval', () => {
     })
 
     it('reopens an interval at the same line and Site that ends on or after the restart day', () => {
-        expect(restartInterval({ ...here, end: '2026-11-10' }, here, '2026-11-10')).toEqual({ reopen: true })
-        expect(restartInterval({ ...here, end: '2026-11-12' }, here, '2026-11-10')).toEqual({ reopen: true })
+        const endsThatDay = { ...here, end: '2026-11-10' }
+        const endsLater = { ...here, end: '2026-11-12' }
+        expect(restartInterval(endsThatDay, here, '2026-11-10')).toEqual({ reopen: endsThatDay })
+        expect(restartInterval(endsLater, here, '2026-11-10')).toEqual({ reopen: endsLater })
     })
 
     it('starts the day after an interval elsewhere that covers the restart day', () => {

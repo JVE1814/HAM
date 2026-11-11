@@ -55,7 +55,7 @@ export function intervalEnd(start: string, closedOn: string): string {
 }
 
 /** Where an Asset delivers (or delivered) a Subscription line. */
-export interface IntervalPlace {
+interface IntervalPlace {
     lineId: string
     siteId: string
 }
@@ -65,9 +65,13 @@ export interface IntervalPlace {
  * `latest` (end inclusive): one at the same place that ends on or after `start` is reopened, so no day
  * is billed twice; one elsewhere makes the new interval start the day after it ends; otherwise it starts on `start`.
  */
-export function restartInterval(latest: (IntervalPlace & { end: string }) | null, place: IntervalPlace, start: string): { reopen: true } | { start: string } {
+export function restartInterval<Closed extends IntervalPlace & { end: string }>(
+    latest: Closed | null,
+    place: IntervalPlace,
+    start: string,
+): { reopen: Closed } | { start: string } {
     if (!latest || latest.end < start) return { start }
-    return latest.lineId === place.lineId && latest.siteId === place.siteId ? { reopen: true } : { start: addDays(latest.end, 1) }
+    return latest.lineId === place.lineId && latest.siteId === place.siteId ? { reopen: latest } : { start: addDays(latest.end, 1) }
 }
 
 /** What a Subscription line is billed by, as stored on it. */
