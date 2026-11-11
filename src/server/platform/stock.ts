@@ -84,24 +84,16 @@ export function moveToSparePool(assetId: string, customerId: string, agreementId
 
 /**
  * Take `asset` off its Order line and save it where `exit` sends it. False when the platform refuses the move or the
- * save (logged with `context`): the Asset stays on the line.
+ * save (logged with `context`): the Asset stays on the line. Every unit that leaves a line leaves it here, one that
+ * stays its Customer's (a hot spare, a unit that failed staging or left in transit) as much as one given back.
  */
 export function leaveOrderLine(asset: GlideRecord, exit: LineExit, context: string): boolean {
     if (exit.keeps === 'provider') releaseToProviderStock(asset)
-    else takeOffOrderLine(asset)
+    else asset.setValue('x_daas_ham_order_line', '')
     if (exit.to) return moveAndSave(asset, exit.to, context)
     if (asset.update()) return true
     warnRefused(asset, context)
     return false
-}
-
-/**
- * Take a unit off its Order line and no more (the caller saves): one that stays its Customer's (a hot spare, a unit
- * that failed staging or left in transit). Every unit that leaves a line is taken off it here, by
- * `releaseToProviderStock` or by `leaveOrderLine`.
- */
-export function takeOffOrderLine(asset: GlideRecord): void {
-    asset.setValue('x_daas_ham_order_line', '')
 }
 
 /**
@@ -110,7 +102,7 @@ export function takeOffOrderLine(asset: GlideRecord): void {
  * the stage it goes back to and saves it, each with its own answer to a refusal.
  */
 export function releaseToProviderStock(asset: GlideRecord): void {
-    takeOffOrderLine(asset)
+    asset.setValue('x_daas_ham_order_line', '')
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('x_daas_ham_agreement', '')
 }
