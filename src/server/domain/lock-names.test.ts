@@ -10,6 +10,7 @@ function oneOfEach(id: string): string[] {
         LOCK.refreshOrders(),
         LOCK.agreementUsage(id),
         LOCK.oemClaimRun(),
+        LOCK.oemCoverageRun(),
         LOCK.seenAsset(id),
         LOCK.receiveSerial(id),
         LOCK.receiveAsset(id),
@@ -40,6 +41,7 @@ describe('LOCK', () => {
         expect(LOCK.refreshOrders()).toBe('refresh_orders')
         expect(LOCK.agreementUsage(a)).toBe(`agreement_usage_${a}`)
         expect(LOCK.oemClaimRun()).toBe('oem_claim_run')
+        expect(LOCK.oemCoverageRun()).toBe('oem_coverage_run')
         expect(LOCK.seenAsset(a)).toBe(`seen_asset_${a}`)
         expect(LOCK.receiveSerial('FOC123')).toBe('receive_serial_FOC123')
         expect(LOCK.receiveAsset(a)).toBe(`receive_asset_${a}`)
@@ -66,8 +68,8 @@ describe('LOCK', () => {
     it('gives every lock, and every record of one, a name of its own', () => {
         expect(oneOfEach(sysId('a'))).toHaveLength(Object.keys(LOCK).length)
         const names = [...oneOfEach(sysId('a')), ...oneOfEach(sysId('b'))]
-        // The three locks that name no record are the same whatever the record.
-        expect(new Set(names).size).toBe(names.length - 3)
+        // The four locks that name no record are the same whatever the record.
+        expect(new Set(names).size).toBe(names.length - 4)
     })
 
     it('locks each fee identity on its own', () => {

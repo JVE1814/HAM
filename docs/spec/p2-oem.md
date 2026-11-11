@@ -54,6 +54,9 @@ and none of its serials is sent to an OEM, even a unit of a NaaS Model.
     for the run when nothing of it is stale, when a batch has errors or a refused save, or after its
     one batch when it is rate-limited (Fortinet). A vendor whose saves keep being refused for some
     Asset gets one batch per run until the cause is fixed, because that Asset stays the stalest.
+  - The run holds the job lock `oem_coverage_run` throughout (ADR 0013). A run that finds it held
+    (the scheduled run beside *Execute now*) checks nothing, so two runs never insert one serial's
+    contract twice.
   - Contracts are upserted per serial + contract number.
   - Each Asset gets its coverage end and service level (latest covering contract) and its annual
     support cost from the contracts of its serial, and is stamped as checked. Assets sharing a serial

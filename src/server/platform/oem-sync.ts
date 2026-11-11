@@ -2,10 +2,13 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
 import { coverageDisposition, type CoverageAnswer } from '../domain/coverage.ts'
 import { naasModelCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
+import type { HeldLock } from '../domain/job-lock.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { enabledRoutes, pidKey, type CoverageRoute } from '../domain/oem/adapters.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
 import { daysAgoGlide, nowMs } from './clock.ts'
 import { applyCoverage, staleAssets } from './coverage.ts'
+import { withLock } from './locks.ts'
 import { writeModelLifecycle } from './model-lifecycle.ts'
 import { oemContext, oemEnabled } from './oem-http.ts'
 import { recordRmaStatuses, rmasToAskAbout } from './oem-rma.ts'
@@ -83,8 +86,19 @@ export function syncLifecycle(): void {
  * budget is spent. The enabled vendors take turns, one batch each per round, so one with a backlog cannot starve the
  * others and none leaves the budget unused while another is behind. The first round runs whatever the time, so each
  * vendor gets at least one batch per run. Checked assets drop out of the query, so no cursor is needed.
+ *
+ * The run holds its lock throughout (domain/lock-names `oemCoverageRun`, ADR 0013). Two runs at once (the 4-hourly job
+ * and an *Execute now*) would load the same stalest Assets and both insert a serial's new contract, and the copy that
+ * is not updated afterwards keeps a stale coverage end. A run that finds the lock held checks nothing; one that has
+ * lost it starts no further batch.
  */
 export function syncCoverage(): void {
+    const lockName = LOCK.oemCoverageRun()
+    if (withLock(lockName, syncCoverageHolding).ran) return
+    gs.info(`[x_daas_ham] OEM coverage not checked: another run holds the ${lockName} lock and checks it`)
+}
+
+function syncCoverageHolding(lock: HeldLock): void {
     const started = nowMs()
     const budgetMs = intProperty(PROPERTY.jobBudgetSeconds) * 1000
     const staleBefore = daysAgoGlide(intProperty(PROPERTY.coverageRefreshDays))
@@ -93,6 +107,7 @@ export function syncCoverage(): void {
         const behind: typeof due = []
         for (const turn of due) {
             if (round > 0 && nowMs() - started > budgetMs) return
+            if (!lock.held()) return
             if (syncCoverageBatch(turn.vendor, turn.route, staleBefore)) behind.push(turn)
         }
         due = behind

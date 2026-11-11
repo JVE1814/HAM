@@ -78,7 +78,7 @@ cannot deadlock; the sys_id order only makes two such holders of one Order meet 
 first. Every other holder of an `order_line_` lock holds one at a time and takes nothing earlier in
 the order under it, and two cancels of one Order exclude each other through `source_order_`.
 
-`refresh_orders` < `agreement_usage` < `oem_claim_run` < `seen_asset` < `receive_serial` <
+`refresh_orders` < `agreement_usage` < `oem_claim_run` < `oem_coverage_run` < `seen_asset` < `receive_serial` <
 `receive_asset` < `source_order` < `ship_order` < `track_shipment` < `return_label` < `order_line` <
 `provider_tag_sequence` < `spare_pool` < `reserve_asset` < `return_request` < `return_asset` <
 `fee` < `audit` < `recon_exception` < `subscription_line` < `service_interval` < `billing_period` < job
@@ -143,6 +143,11 @@ failed. It holds no other lock when it takes it, does not retry, and sends nothi
 held. Under it, it saves staging steps, whose rules take no lock. A run that outlasts it loads no
 more due steps once it has lost it, so it calls no vendor after that, and it saves what its calls so
 far returned. A step found done when a failure is saved is left done.
+The 4-hourly OEM coverage run holds `oem_coverage_run` for the whole run, so a run and an *Execute
+now* at once never load the same stalest Assets and both insert a serial's new contract: the copy
+not updated afterwards would keep a stale coverage end. It holds no other lock when it takes it,
+does not retry, and checks nothing when it finds it held. Under it, it saves coverage records and
+Assets, and every lock their rules take comes later in the order. A run that has lost it starts no further batch.
 A unit is put on a Return order under `return_asset_<Asset sys_id>`: the check that it awaits no other
 return and the insert of its line are one critical section, so two Returns raised at once (a request
 sent twice, the record producer beside the customer page or an Agreement's end) never both take it.

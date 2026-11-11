@@ -25,6 +25,8 @@ export const LOCK = {
     agreementUsage: (agreementId: string) => named(`agreement_usage_${agreementId}`),
     /** Held by an OEM claim run throughout, so two runs never send a step to its vendor twice. */
     oemClaimRun: () => named('oem_claim_run'),
+    /** Held by an OEM coverage run throughout, so two runs never insert the same serial's contract twice. */
+    oemCoverageRun: () => named('oem_coverage_run'),
     /** An Asset's sightings (the device-events REST handler, the in-service detection job) take turns under it. */
     seenAsset: (assetId: string) => named(`seen_asset_${assetId}`),
     /**
