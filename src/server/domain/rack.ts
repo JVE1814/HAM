@@ -28,7 +28,7 @@ export interface Placement {
 }
 
 /** A device placed in a rack, as its callers read it: the Asset's fields, and its Model's height and draw. */
-export interface RackedDevice {
+interface RackedDevice {
     /** The Asset's sys_id. */
     id: string
     tag: string

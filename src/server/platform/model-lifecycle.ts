@@ -39,14 +39,14 @@ import { findById, refusal, rowError, str, type RowOutcome } from './records.ts'
 const DESCRIPTION_MAX_LENGTH = 1000
 
 /** Where a milestone's date comes from: kept as one line in the row's description. */
-export interface LifecycleProvenance {
+interface LifecycleProvenance {
     source: LifecycleSource
     /** The bulletin or document the source gives the date in (a URL or an id), when it names one. */
     reference?: string
 }
 
 /** What a write did with the milestones it was given. */
-export interface LifecycleWrite {
+interface LifecycleWrite {
     /** Milestones the Model had no row of the app's for. */
     inserted: number
     /** Milestones whose date or provenance changed. */

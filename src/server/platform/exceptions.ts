@@ -12,7 +12,7 @@ import { EXCEPTION_STATUS, type ExceptionType } from '../domain/vocabulary.ts'
 const TABLE = 'x_daas_ham_recon_exception'
 
 /** What an exception is about: an Asset, or a CI such as a rack. */
-export type ExceptionSubject = { assetId: string } | { ciId: string }
+type ExceptionSubject = { assetId: string } | { ciId: string }
 
 /** The subject as the exception's field and its sys_id. */
 function fieldOf(subject: ExceptionSubject): { field: 'asset' | 'ci'; id: string } {
@@ -25,7 +25,7 @@ interface ExceptionFacts {
 }
 
 /** One exception a check found: its type and what to say of it. */
-export interface FoundException {
+interface FoundException {
     type: ExceptionType
     detail: string
 }
@@ -34,7 +34,7 @@ export interface FoundException {
  * What came of a raise: an exception of its type is `open` for the subject (opened now or before), the platform
  * `refused` the insert (logged), or other holders kept its lock through every try and none is open yet (`busy`).
  */
-export type ExceptionRaise = 'open' | 'refused' | 'busy'
+type ExceptionRaise = 'open' | 'refused' | 'busy'
 
 /**
  * Open an exception of `type` for the subject unless one is already open. Two runs (an overlapping reconciliation, two

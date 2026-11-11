@@ -393,7 +393,7 @@ export interface SyncTurn<K extends keyof VendorRoutes> {
 }
 
 /** A coverage CSV row as loaded (vendors without an API), each column as text. */
-export interface CoverageRow {
+interface CoverageRow {
     vendor: string
     serial: string
     contractNumber: string
@@ -403,7 +403,7 @@ export interface CoverageRow {
     annualCost: string
 }
 
-export type ParsedCoverageRow = { ok: true; vendor: OemVendor; fact: CoverageFact; annualCost?: number } | { ok: false; reason: string }
+type ParsedCoverageRow = { ok: true; vendor: OemVendor; fact: CoverageFact; annualCost?: number } | { ok: false; reason: string }
 
 /** A coverage row's contract, which covers its serial over the dates it gives, or why the row is refused. */
 export function parseCoverageRow(row: CoverageRow): ParsedCoverageRow {

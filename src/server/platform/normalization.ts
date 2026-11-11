@@ -29,7 +29,7 @@ const ALIAS_TABLE = 'x_daas_ham_manufacturer_alias'
 const RULE_TABLE = 'x_daas_ham_model_match_rule'
 const EXCEPTION_TABLE = 'x_daas_ham_norm_exception'
 
-export interface NormalizationData {
+interface NormalizationData {
     aliases: ManufacturerAlias[]
     rules: ModelMatchRule[]
 }
@@ -68,7 +68,7 @@ function modelByPid(pid: string): string {
     return model.next() ? model.getUniqueValue() : ''
 }
 
-export type Resolution = { modelId: string } | { modelId: ''; reason: string }
+type Resolution = { modelId: string } | { modelId: ''; reason: string }
 
 /** PID first, then aliases + match rules. */
 export function resolveModel(raw: { manufacturer: string; model: string }, data: NormalizationData): Resolution {

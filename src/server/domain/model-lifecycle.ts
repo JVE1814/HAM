@@ -85,7 +85,7 @@ export interface AssetLifecycleFacts {
 /** An Asset without an Agreement has no basis stored, and refreshes on whichever comes first. */
 const NO_AGREEMENT_BASIS: RefreshBasis = 'earliest'
 
-export interface AssetLifecycleStamp {
+interface AssetLifecycleStamp {
     phase: LifecyclePhase
     /** Refresh due date as YYYY-MM-DD, or '' when none can be determined. */
     refreshDue: string

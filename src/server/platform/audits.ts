@@ -38,9 +38,9 @@ interface StartedAudit {
     unsaved?: string
 }
 
-export type AuditStart = ({ started: true } & StartedAudit) | { started: false; reason: string }
+type AuditStart = ({ started: true } & StartedAudit) | { started: false; reason: string }
 
-export type SiteAuditStart = ({ started: true; workOrderOpened: boolean } & StartedAudit) | { started: false; reason: string }
+type SiteAuditStart = ({ started: true; workOrderOpened: boolean } & StartedAudit) | { started: false; reason: string }
 
 function newAudit(type: AuditType, shortDescription: string): GlideRecord {
     const audit = new GlideRecord(AUDIT)
@@ -133,7 +133,7 @@ export function findOpenVisibleAudit(key: string): GlideRecord | null {
  * What came of a scan: `recorded`; `not_open` when the audit closed since it was found; `busy` when its close (or
  * another scan) held its lock through every try; `refused` by the platform (logged).
  */
-export type ScanRecord = 'recorded' | 'not_open' | 'busy' | 'refused'
+type ScanRecord = 'recorded' | 'not_open' | 'busy' | 'refused'
 
 /** Record one scan against an open audit, under the audit's lock, which its close takes too. */
 export function recordScan(audit: GlideRecord, code: string): ScanRecord {
@@ -160,7 +160,7 @@ export function recordScan(audit: GlideRecord, code: string): ScanRecord {
  * else `closed`, with how many line results and exceptions the platform refused (`unsaved`, each logged), to fix by
  * hand.
  */
-export type AuditClose =
+type AuditClose =
     | { outcome: 'not_open' }
     | { outcome: 'busy' }
     | { outcome: 'not_saved'; reason: string }
