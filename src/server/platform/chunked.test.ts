@@ -418,6 +418,18 @@ describe('an event job whose passes supersede each other under its lock (ADR 001
         expect(platform.events).toEqual([{ name: EVENT_NAME, record: 'rec1', parm1: SUBJECT, parm2: `${token}:a`, delayed: true }])
     })
 
+    it('runs a chunk past an abandoned lock, clearing it as it writes', () => {
+        items('a', 'b')
+        const token = startPass(JOB, JOB_STATUS.running)
+        platform.tables[LOCKS] = [{ sys_id: 'dead', name: JOB, sys_created_on: '2025-11-09 10:00:00' }]
+        const { pass, calls } = lockedPass(JOB)
+        const run = job(pass)
+        expect(runEventTableJob(queued(`${token}:`), run.spec)).toMatchObject({ done: true, superseded: false, lastError: '' })
+        expect(run.handled).toEqual(['a', 'b'])
+        expect(calls).toEqual(['complete'])
+        expect(platform.tables[LOCKS]).toEqual([])
+    })
+
     it('asks again for a fresh pass when a start finds the lock held', () => {
         items('a')
         platform.tables[LOCKS] = [{ sys_id: 'held', name: JOB, sys_created_on: '2025-11-09 11:59:00' }]

@@ -63,8 +63,15 @@ export function whyNotRun(attempt: Exclude<LockAttempt<unknown>, { ran: true }>,
     return attempt.held ? held : messageOf(attempt.error)
 }
 
-/** Whether a holder has the lock `name` now: a cheap probe only, since taking the lock is what decides. */
+/**
+ * Whether a holder has the lock `name` now: a cheap probe only, since taking the lock is what decides. A lock taken as
+ * abandoned does not count, so its caller goes on to a take, which clears it.
+ */
 export function isLocked(name: string): boolean {
+    return exists(LOCK_TABLE, `name=${name}^sys_created_on>=${abandonedBefore()}`)
+}
+
+function hasLockRow(name: string): boolean {
     return exists(LOCK_TABLE, `name=${name}`)
 }
 
@@ -74,11 +81,11 @@ function take(name: string): string | null {
     clearAbandoned(name)
     const second = insertLock(name)
     if (second.id) return second.id
-    if (isLocked(name)) return null
+    if (hasLockRow(name)) return null
     // The holder let go between the refusal and the probe: one more try, so only a refusal with no lock row throws.
     const third = insertLock(name)
     if (third.id) return third.id
-    if (!isLocked(name)) throw new Error(`job lock ${name} could not be taken: ${third.error}`)
+    if (!hasLockRow(name)) throw new Error(`job lock ${name} could not be taken: ${third.error}`)
     return null
 }
 
@@ -93,10 +100,15 @@ function insertLock(name: string): { id: string | null; error: string } {
 
 /** Clear the lock `name` when it is abandoned; one whose delete is refused is logged, as it is held until removed. */
 function clearAbandoned(name: string): void {
+    if (deleteWhere(LOCK_TABLE, `name=${name}^sys_created_on<${abandonedBefore()}`)) return
+    gs.warn(`[x_daas_ham] Abandoned job lock ${name} not cleared (its delete was refused): every take finds it held until it is removed`)
+}
+
+/** The time a lock taken before it is abandoned (ABANDONED_AFTER_MINUTES ago). */
+function abandonedBefore(): string {
     const cutoff = new GlideDateTime()
     cutoff.addSeconds(-ABANDONED_AFTER_MINUTES * 60)
-    if (deleteWhere(LOCK_TABLE, `name=${name}^sys_created_on<${cutoff.getValue()}`)) return
-    gs.warn(`[x_daas_ham] Abandoned job lock ${name} not cleared (its delete was refused): every take finds it held until it is removed`)
+    return cutoff.getValue()
 }
 
 /**
