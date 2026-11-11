@@ -286,9 +286,11 @@ src/fluent/      Fluent metadata (*.now.ts): a folder per feature, shared/, work
 src/server/
   domain/        pure TypeScript business rules, unit-tested (ADR 0003)
   platform/      Glide access: the operations (raise, source, ship, receive, bill) as services,
-                 with their repositories and gateways
-  entry/         one thin adapter per trigger (business rule, job, REST, UI action): reads its
-                 inputs, calls a platform service, reports the outcome
+                 with their repositories and gateways. Fluent wires one of its functions to a
+                 trigger directly when there is nothing to read from the trigger or report back
+  entry/         a thin adapter for each trigger that needs one (business rule, REST, UI action,
+                 record producer): reads its inputs, calls a platform service, reports the
+                 outcome in the trigger's terms
   test-support/  the tests' in-memory stand-in for Glide and their encoded-query evaluator
 src/client/      React UI pages (warehouse, rack elevation, customer self-service)
 ```
@@ -317,17 +319,20 @@ Conventions that the build or tests enforce:
   `npm run check` builds before it tests).
 - What a query, qualifier or condition tells NaaS records by (the Fleet flag, a NaaS stockroom type,
   an OEM PID, a customer Site) is a constant of `domain/fleet.ts`, which the Fluent metadata imports.
-- Entry-point parameters must be named after the platform globals (`current`, `previous`, `event`,
-  `producer`, `request`, `response`): the SDK wrapper passes them by name (`built-metadata.test.ts`).
+- A function wired from Fluent, in `entry/` or `platform/`, names its parameters after the platform
+  globals (`current`, `previous`, `event`, `producer`, `request`, `response`): the SDK wrapper
+  passes them by name (`built-metadata.test.ts`). An entry function that would only forward to a
+  platform function is not written, and the Fluent record names the platform function
+  ([ADR 0003](docs/adr/0003-pure-domain-core-with-glide-adapters.md)).
 - A business rule condition fits the 254-character field and loads a module by its installed path,
   `x_daas_ham/<package name>/<version>/src/...` (`fluent/shared/server-modules.now.ts` builds it from
   `package.json` and `now.config.json`), calling a function it exports (`built-metadata.test.ts`). A
   before rule on a table of another scope (`alm_hardware`, `wm_order`) refuses that way, with its
   Abort action, and its script only adds the reason: the platform ignores `current.setAbortAction`
-  and `setWorkflow` called from this scope on such a table. So an entry point wired on one takes its
+  and `setWorkflow` called from this scope on such a table. So a function wired on one takes its
   record as a `ForeignRecord` (`platform/records.ts`), a type without those two methods: neither it
   nor a helper it hands the record to compiles with such a call. `built-metadata.test.ts` holds the
-  entry points the rules on those tables call to that type, and a rule with an Abort action to
+  functions the rules on those tables call to that type, and a rule with an Abort action to
   having a condition. The platform runs a condition on every save of the table, whatever the rule's
   filter, so it starts with the change test that keeps the module unloaded on other saves
   ([external-contracts.md](docs/research/external-contracts.md#servicenow-platform)).
