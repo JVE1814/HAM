@@ -1,6 +1,10 @@
+import { ROLE } from './roles.ts'
 import { DEVICE_EVENT_KIND_CHOICES, DEVICE_EVENT_SOURCE_CHOICES, type DeviceEventKind, type DeviceEventSource } from './vocabulary.ts'
 
 /** Seen signals posted by the Provider's NMS (validated before anything touches the database). */
+
+/** Who posts Seen signals to the device-events route, and so creates device events: the Provider NMS, and asset managers. */
+export const DEVICE_EVENT_SENDERS = [ROLE.integration, ROLE.assetManager]
 
 export interface DeviceEvent {
     /** Serial number, Provider tag or Customer tag of the Asset. */

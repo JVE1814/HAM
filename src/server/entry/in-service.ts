@@ -1,7 +1,6 @@
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { parseDeviceEvents } from '../domain/device-events.ts'
+import { DEVICE_EVENT_SENDERS, parseDeviceEvents } from '../domain/device-events.ts'
 import { PROPERTY } from '../domain/properties.ts'
-import { ROLE } from '../domain/roles.ts'
 import { nowMs } from '../platform/clock.ts'
 import { applyDeviceEvents, purgeDeviceEventsOlderThan } from '../platform/in-service.ts'
 import { intProperty } from '../platform/properties.ts'
@@ -11,7 +10,7 @@ import { reply, requireRole } from '../platform/rest-api.ts'
 
 /** POST /api/x_daas_ham/naas/device_events - Seen signals from the Provider NMS (platform/in-service `applyDeviceEvents`). */
 export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIResponse): void {
-    if (!requireRole(response, [ROLE.integration, ROLE.assetManager], 'Requires the x_daas_ham.integration role')) return
+    if (!requireRole(response, DEVICE_EVENT_SENDERS, 'Requires the x_daas_ham.integration role')) return
     const parsed = parseDeviceEvents(request.body.data, intProperty(PROPERTY.eventsMaxBatch), nowMs())
     if ('error' in parsed) return reply(response, 400, { error: parsed.error })
     const { unknown, busy } = applyDeviceEvents(parsed.events)

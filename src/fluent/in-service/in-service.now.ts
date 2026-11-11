@@ -18,7 +18,8 @@ import { FLEET_CONDITION } from '../../server/domain/fleet'
 import { purgeDeviceEvents } from '../../server/entry/in-service'
 import { detectPendingInService } from '../../server/platform/in-service'
 import { PROPERTY } from '../../server/domain/properties'
-import { admin, assetManager, broadStaff, integration } from '../shared/roles.now'
+import { DEVICE_EVENT_SENDERS } from '../../server/domain/device-events'
+import { admin, broadStaff } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
 /* In service: the Seen signals monitoring posts, the job that reads them and their settings. */
@@ -112,7 +113,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_device_event',
     operation: 'create',
-    roles: [integration, assetManager],
+    roles: DEVICE_EVENT_SENDERS,
 })
 
 Acl({
