@@ -2,10 +2,12 @@ import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import { raiseDueAttestations } from '../platform/attestations.ts'
 import { closeAudit, findOpenVisibleAudit, recordScan, startSiteAudit, startStockroomAudit } from '../platform/audits.ts'
+import { recheckFlaggedRacks } from '../platform/racks.ts'
+import { reconcileInstalledBase } from '../platform/reconciliation.ts'
 import { str } from '../platform/records.ts'
 import { pathParam, reply, requireScanner, textBodyOf } from '../platform/rest-api.ts'
 
-/** Audits and attestations (P2.7, Q63). */
+/** Audits, attestations and the daily reconciliation (P2.7, Q63). */
 
 function tellLeftOff(started: { number: string; leftOff: number }): void {
     if (started.leftOff > 0) gs.addErrorMessage(`${started.leftOff} asset(s) left off ${started.number} and not counted (see the system log)`)
@@ -59,4 +61,13 @@ export function uiCloseAudit(current: GlideRecord): void {
 
 export function raiseAttestations(): void {
     raiseDueAttestations()
+}
+
+/** Daily job: the installed base against monitoring, then the racks with an exception, each run whether the other fails. */
+export function reconcileInstalledBaseAndRacks(): void {
+    try {
+        reconcileInstalledBase()
+    } finally {
+        recheckFlaggedRacks()
+    }
 }

@@ -1,8 +1,7 @@
 import { gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import type { RackList, SiteList } from '../domain/rest-contracts.ts'
-import { keepsPlacement, placementRefusal, rackElevation, racksAtSite, recheckFlaggedRacks, recheckRacksOf, visibleSites } from '../platform/racks.ts'
-import { reconcileInstalledBase } from '../platform/reconciliation.ts'
+import { keepsPlacement, placementRefusal, rackElevation, racksAtSite, recheckRacksOf, visibleSites } from '../platform/racks.ts'
 import type { ForeignRecord } from '../platform/records.ts'
 import { pathParam, queryParam, reply } from '../platform/rest-api.ts'
 import { currentSession } from '../platform/session.ts'
@@ -47,14 +46,6 @@ export function explainRackRefusal(current: ForeignRecord, previous: ForeignReco
  */
 export function recheckRackPlacement(current: ForeignRecord, previous: ForeignRecord): void {
     recheckRacksOf(current, previous)
-}
-
-export function reconcileInstalledBaseAndRacks(): void {
-    try {
-        reconcileInstalledBase()
-    } finally {
-        recheckFlaggedRacks()
-    }
 }
 
 function forbidden(response: RESTAPIResponse): boolean {

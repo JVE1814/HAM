@@ -1,8 +1,7 @@
 import '@servicenow/sdk/global'
 import { ScheduledScript, UiAction } from '@servicenow/sdk/core'
-import { raiseAttestations, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudit } from '../../server/entry/assurance'
+import { raiseAttestations, reconcileInstalledBaseAndRacks, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudit } from '../../server/entry/assurance'
 import { CURRENT_IS_NAAS_STOCKROOM, SITE_FIELD } from '../../server/domain/fleet'
-import { reconcileInstalledBaseAndRacks } from '../../server/entry/racks'
 import { assetManager, fieldTech, scanners, stockroomWorkers } from '../shared/roles.now'
 
 /* Audits, attestations and reconciliation (P2.7): actions and jobs. */
