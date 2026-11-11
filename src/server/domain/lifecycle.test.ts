@@ -9,6 +9,7 @@ import {
     isBillable,
     isDeployed,
     notRetiredCondition,
+    pathTo,
     stageAfterTransfer,
     stageChangeRefusal,
     stageOf,
@@ -108,6 +109,39 @@ describe('disposalStage', () => {
         expect(disposalStage('itad_recycle')).toBe('disposed')
         expect(disposalStage('return_to_customer')).toBe('returned_to_customer')
         expect(disposalStage('return_to_lessor')).toBe('returned_to_lessor')
+    })
+})
+
+describe('pathTo', () => {
+    it("takes a lease's stock to pending wipe, a Spare pool unit through available, each move one a lessor's unit may make", () => {
+        const lessorOwned: TransitionFacts = { hasSite: false, hasAgreement: false, legalOwner: 'lessor', wipeEvidenceComplete: false }
+        expect(pathTo('available', 'pending_wipe')).toEqual(['pending_wipe'])
+        const path = pathTo('spare_pool', 'pending_wipe')
+        expect(path).toEqual(['available', 'pending_wipe'])
+        path.forEach((to, i) => expect(checkTransition(i === 0 ? 'spare_pool' : path[i - 1], to, lessorOwned), to).toEqual({ allowed: true }))
+    })
+
+    it('retires a pending-wipe unit through pending disposal, by each disposal method', () => {
+        const methods = ['broker_resale', 'oem_takeback', 'itad_recycle', 'return_to_customer', 'return_to_lessor'] as const
+        for (const method of methods) {
+            expect(pathTo('pending_wipe', disposalStage(method))).toEqual(['pending_disposal', disposalStage(method)])
+            expect(pathTo('pending_disposal', disposalStage(method))).toEqual([disposalStage(method)])
+        }
+    })
+
+    it('walks no unit through a stage out of stock: an installed one is not returned on the way', () => {
+        expect(pathTo('in_service', 'pending_wipe')).toEqual(['pending_wipe'])
+        expect(checkTransition('in_service', 'pending_wipe', deployable).allowed).toBe(false)
+    })
+
+    it('makes no move for a unit already there', () => {
+        expect(pathTo('pending_wipe', 'pending_wipe')).toEqual([])
+    })
+
+    it('tries a stage it cannot reach as the one move, which the lifecycle refuses', () => {
+        expect(pathTo('disposed', 'available')).toEqual(['available'])
+        expect(checkTransition('disposed', 'available', deployable).allowed).toBe(false)
+        expect(pathTo(null, 'available')).toEqual(['available'])
     })
 })
 

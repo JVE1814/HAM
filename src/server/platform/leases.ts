@@ -11,13 +11,12 @@ import {
     leaseDecisionProblem,
     leaseMismatch,
     stillCovered,
-    stockReturnMoves,
 } from '../domain/leases.ts'
 import { isRetired, SERVING_STAGES, type Stage, STOCK_STAGES } from '../domain/lifecycle.ts'
 import { isFree } from '../domain/stock.ts'
 import { type DisposalMethod, LEASE_END_ACTION, type LeaseEndAction, LEGAL_OWNER, TASK_STATE } from '../domain/vocabulary.ts'
 import { assetManagerIds } from './users.ts'
-import { moveAsset, readStage } from './assets.ts'
+import { readStage } from './assets.ts'
 import { runEventTableJob } from './chunked.ts'
 import { todayIso } from './clock.ts'
 import { fire, queueJob, type JobEvent } from './events.ts'
@@ -26,7 +25,7 @@ import { queueRefresh } from './lifecycle-dates.ts'
 import { stringProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { bool, count, exists, findById, num, pluck, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
-import { changeStock, releaseToProviderStock, stockUnit } from './stock.ts'
+import { changeStock, moveAlongPath, stockUnit } from './stock.ts'
 import { log } from './log.ts'
 
 /**
@@ -283,27 +282,20 @@ function withdrawFromStock(found: GlideRecord): GlideRecord | 'taken' | 'refused
 }
 
 /**
- * Save the Asset through its stock-return moves (domain/leases `stockReturnMoves`) holding its stock `lock`; false
- * (logged) when one is refused, or the lock was lost: a holder that outlasted it (ADR 0013) may overlap a claim. Each
- * move is saved through the lock, which platform/assets `moveAndSave` does not do.
+ * Move the stock Asset to pending wipe, where its return-to-lessor disposal starts and sourcing and the spare-pool
+ * top-up no longer find it, holding its stock `lock`; false (logged) when a move is refused, or the lock was lost: a
+ * holder that outlasted it (ADR 0013) may overlap a claim. Each move is saved through the lock, which platform/assets
+ * `moveAndSave` does not do.
  */
 function moveOutOfStock(lock: HeldLock, asset: GlideRecord): boolean {
-    const moves = stockReturnMoves(readStage(asset))
-    for (const to of moves) {
-        // Out of the Customer's Spare pool: Provider stock again, as when an Order lets a unit go.
-        if (to === 'available') releaseToProviderStock(asset)
-        const verdict = moveAsset(asset, to)
-        if (!verdict.allowed) return notMoved(asset, to, verdict.reason)
-        const saved = lock.save(`Lease return: ${str(asset, 'serial_number')} moved to ${to}`, () => asset.update())
-        if (saved === 'lock lost') return notMoved(asset, to, 'its stock lock was lost')
-        if (saved === 'refused') return notMoved(asset, to, refusal(asset))
-    }
-    return moves.length > 0
-}
-
-function notMoved(asset: GlideRecord, to: Stage, reason: string): false {
-    log.warn(`Lease return: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
-    return false
+    const serial = str(asset, 'serial_number')
+    const stopped = moveAlongPath(asset, 'pending_wipe', (to) => {
+        const saved = lock.save(`Lease return: ${serial} moved to ${to}`, () => asset.update())
+        if (saved === 'lock lost') return 'its stock lock was lost'
+        return saved === 'refused' ? refusal(asset) : ''
+    })
+    if (stopped) log.warn(`Lease return: ${serial} not moved to ${stopped.to}: ${stopped.why}`)
+    return !stopped
 }
 
 /**

@@ -11,9 +11,8 @@ import {
     leaseDecisionProblem,
     leaseMismatch,
     stillCovered,
-    stockReturnMoves,
 } from './leases'
-import { ALL_STAGES, checkTransition, type Stage, type TransitionFacts } from './lifecycle'
+import { ALL_STAGES, type Stage } from './lifecycle'
 import { recordMatches as matches } from '../test-support/encoded-query'
 import { assetIn, type SampleRecord } from '../test-support/stored-asset'
 
@@ -127,36 +126,6 @@ describe('stillCovered', () => {
     it('covers fleet assets only (ADR 0016)', () => {
         expect(stagesCovered(stillCovered('x_daas_ham_lease=L1'), { x_daas_ham_fleet: 'false', x_daas_ham_lease: 'L1' })).toEqual([])
         expect(stagesCovered(stillCovered('x_daas_ham_lease=L1'), { x_daas_ham_fleet: '', x_daas_ham_lease: 'L1' })).toEqual([])
-    })
-})
-
-describe('stockReturnMoves', () => {
-    const lessorOwned: TransitionFacts = {
-        hasSite: false,
-        hasAgreement: false,
-        legalOwner: 'lessor',
-        wipeEvidenceComplete: false,
-    }
-
-    it('takes free stock to pending wipe, and spare-pool stock there through available', () => {
-        expect(stockReturnMoves('available')).toEqual(['pending_wipe'])
-        expect(stockReturnMoves('spare_pool')).toEqual(['available', 'pending_wipe'])
-    })
-
-    it('moves nothing that is not stock', () => {
-        expect(stockReturnMoves('in_service')).toEqual([])
-        expect(stockReturnMoves('reserved')).toEqual([])
-        expect(stockReturnMoves(null)).toEqual([])
-    })
-
-    it('only makes moves the lifecycle allows, one save at a time', () => {
-        for (const from of ALL_STAGES) {
-            let stage = from
-            for (const to of stockReturnMoves(from)) {
-                expect(checkTransition(stage, to, lessorOwned), `${stage} -> ${to}`).toEqual({ allowed: true })
-                stage = to
-            }
-        }
     })
 })
 

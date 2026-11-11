@@ -45,7 +45,7 @@ import { intProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { bool, choice, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { creatorOf } from './session.ts'
-import { releaseToProviderStock } from './stock.ts'
+import { moveAlongPath } from './stock.ts'
 import { endSitePackageIfEmpty } from './subscriptions.ts'
 import { SITE_FIELD } from '../domain/fleet.ts'
 import { log } from './log.ts'
@@ -431,9 +431,8 @@ export function evaluateReturnLine(line: GlideRecord): Evaluation {
     })
     // Charged before refurbishing hands the unit back to the Provider; choosing the evaluation again charges it once.
     if (choice<ReturnCondition>(line, 'condition') === 'damaged') recordFee('damaged', asset, str(line, 'return_order'))
-    if (target === 'available') releaseToProviderStock(asset)
-    const refused = moveRefusal(asset, target)
-    if (refused) return notEvaluated(`The asset was not moved to ${target}: ${refused}`)
+    const stopped = moveAlongPath(asset, target)
+    if (stopped) return notEvaluated(`The asset was not moved to ${target}: ${stopped.why}`)
     line.setValue('status', RETURN_LINE_STATUS.evaluated)
     if (!line.update()) {
         return notEvaluated(`The asset went to ${target}, but its return line was not marked evaluated: ${refusal(line)}`)
