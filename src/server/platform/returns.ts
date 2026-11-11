@@ -16,6 +16,7 @@ import {
     returnDueDate,
     returnRequestFindings,
     SETTLED_BY_RECEIPT,
+    stagesTakenBack,
     swapReturnTrigger,
     type RequestedReturn,
     type ReturnRequester,
@@ -295,7 +296,7 @@ export function requestReturn(request: RequestedEquipment): RequestOutcome {
 function raiseRequested(request: RequestedEquipment, site: GlideRecord | null): RequestOutcome {
     const { produced, customerId, siteId } = request
     const trigger = requestedTrigger(request.decommission)
-    const requested = isSiteRecovery(trigger) ? installedAssetIds({ siteId, returning: trigger }) : fleetAssetsAt(siteId, request.listedAssetIds)
+    const requested = isSiteRecovery(trigger) ? installedAssetIds({ siteId, stages: stagesTakenBack(trigger) }) : fleetAssetsAt(siteId, request.listedAssetIds)
     if (!produced && requested.length === 0) {
         return notRaised('nothing', request.decommission ? 'The site has no installed devices' : "Choose at least one of the site's devices")
     }
