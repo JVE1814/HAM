@@ -59,6 +59,11 @@ export interface ClaimRoute {
      * identifier) and batches split per account leave some of the budget for the next run.
      */
     perCall: number
+    /**
+     * Whose cloud account the calls put the device in: the Customer's (ClaimTarget.account), so a step without one is
+     * refused unsent, or the Provider's own (GreenLake workspace, FortiCloud registration).
+     */
+    account: 'customer' | 'provider'
 }
 
 /** Licensing and zero-touch need the device claimed first: on a staging task that also has a claim step, their step waits for it (initialAutomationStatus). */
@@ -122,6 +127,8 @@ export interface ClaimStore {
     settle(outcomes: readonly ClaimOutcome[]): void
 }
 
+const NO_ACCOUNT = 'no cloud account configured for this customer'
+
 function stepsFor(route: ClaimRoute, remaining: number): number {
     return Math.min(MAX_STEPS_PER_LOAD, Math.max(1, Math.ceil(remaining * route.perCall)))
 }
@@ -156,9 +163,11 @@ export function runVendorClaims(
         if (remaining <= 0 || !stillHeld()) break
         const targets = store.due(vendor, action, stepsFor(route, remaining))
         if (targets.length === 0) continue
-        const run = route.run(targets, whileHeld(transport(route.message)), remaining)
+        const noAccount = route.account === 'customer' ? targets.filter((target) => !target.account) : []
+        const run = route.run(noAccount.length > 0 ? targets.filter((target) => target.account) : targets, whileHeld(transport(route.message)), remaining)
         calls += run.calls
-        store.settle(run.outcomes.map((outcome) => ({ ...outcome, message: outcome.message.slice(0, AUTOMATION_MESSAGE_LENGTH) })))
+        const outcomes = [...noAccount.map((target) => ({ stepId: target.stepId, ok: false, message: NO_ACCOUNT })), ...run.outcomes]
+        store.settle(outcomes.map((outcome) => ({ ...outcome, message: outcome.message.slice(0, AUTOMATION_MESSAGE_LENGTH) })))
     }
     return { calls, lockLost }
 }

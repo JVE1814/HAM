@@ -42,16 +42,11 @@ function outcome(target: ClaimTarget, response: HttpResponse, okMessage: string)
         : { stepId: target.stepId, ok: false, message: failureText(response) }
 }
 
-function unusable(
-    targets: readonly ClaimTarget[],
-    needs: 'serial' | 'claimCode' | 'mac',
-    needsAccount = true,
-): { usable: ClaimTarget[]; outcomes: ClaimOutcome[] } {
+function unusable(targets: readonly ClaimTarget[], needs: 'serial' | 'claimCode' | 'mac'): { usable: ClaimTarget[]; outcomes: ClaimOutcome[] } {
     const outcomes: ClaimOutcome[] = []
     const usable: ClaimTarget[] = []
     for (const target of targets) {
-        if (needsAccount && !target.account) outcomes.push({ stepId: target.stepId, ok: false, message: 'no cloud account configured for this customer' })
-        else if (!target[needs] || !target.serial) outcomes.push({ stepId: target.stepId, ok: false, message: `missing ${needs === 'claimCode' ? 'claim code' : needs}` })
+        if (!target[needs] || !target.serial) outcomes.push({ stepId: target.stepId, ok: false, message: `missing ${needs === 'claimCode' ? 'claim code' : needs}` })
         else usable.push(target)
     }
     return { usable, outcomes }
@@ -126,7 +121,7 @@ const mistClaim: ClaimAdapter = (targets, http, maxCalls) => {
 
 /** HPE GreenLake: POST /devices/v1/devices { network: [{ serialNumber, macAddress }], compute: [], storage: [] } into the Provider's workspace (202), five devices per call. */
 const greenLakeAdd: ClaimAdapter = (targets, http, maxCalls) => {
-    const { usable, outcomes } = unusable(targets, 'mac', false)
+    const { usable, outcomes } = unusable(targets, 'mac')
     let calls = 0
     for (const batch of batches(usable, GREENLAKE_ADD_BATCH).slice(0, Math.max(0, maxCalls))) {
         const body = JSON.stringify({ network: batch.map((t) => ({ serialNumber: t.serial, macAddress: t.mac })), compute: [], storage: [] })
@@ -171,8 +166,7 @@ const greenLakeSubscribe: ClaimAdapter = (targets, http, maxCalls) => {
 
 /** FortiCloud Asset Management: POST products/register { registrationUnits } (status 0 = registered). */
 const fortiRegister: ClaimAdapter = (targets, http, maxCalls) => {
-    // Registration goes to the Provider's own FortiCloud account: no per-customer account needed.
-    const { usable, outcomes } = unusable(targets, 'serial', false)
+    const { usable, outcomes } = unusable(targets, 'serial')
     let calls = 0
     for (const batch of chunks(usable, FORTICLOUD_REGISTER_BATCH).slice(0, Math.max(0, maxCalls))) {
         const body = JSON.stringify({ registrationUnits: batch.map((t) => ({ serialNumber: t.serial, description: 'NaaS staging', isGovernment: false })) })
@@ -243,10 +237,15 @@ const checkPointZeroTouch: ClaimAdapter = (targets, http, maxCalls) => {
     return { outcomes, calls }
 }
 
-export const MERAKI_CLAIM: ClaimRoute = { message: REST_MESSAGE.meraki.name, run: merakiClaim, perCall: MERAKI_CLAIM_BATCH }
-export const MIST_CLAIM: ClaimRoute = { message: REST_MESSAGE.mist.name, run: mistClaim, perCall: MIST_CLAIM_BATCH }
-export const GREENLAKE_ADD: ClaimRoute = { message: REST_MESSAGE.greenLake.name, run: greenLakeAdd, perCall: GREENLAKE_ADD_BATCH }
-export const GREENLAKE_SUBSCRIBE: ClaimRoute = { message: REST_MESSAGE.greenLake.name, run: greenLakeSubscribe, perCall: 1 / GREENLAKE_SUBSCRIBE_CALLS }
-export const FORTICLOUD_REGISTER: ClaimRoute = { message: REST_MESSAGE.fortiCare.name, run: fortiRegister, perCall: FORTICLOUD_REGISTER_BATCH }
-export const FORTIZTP_PROVISION: ClaimRoute = { message: REST_MESSAGE.fortiZtp.name, run: fortiZtp, perCall: 1 }
-export const ZERO_TOUCH_CLAIM: ClaimRoute = { message: REST_MESSAGE.checkPoint.name, run: checkPointZeroTouch, perCall: 1 }
+export const MERAKI_CLAIM: ClaimRoute = { message: REST_MESSAGE.meraki.name, run: merakiClaim, perCall: MERAKI_CLAIM_BATCH, account: 'customer' }
+export const MIST_CLAIM: ClaimRoute = { message: REST_MESSAGE.mist.name, run: mistClaim, perCall: MIST_CLAIM_BATCH, account: 'customer' }
+export const GREENLAKE_ADD: ClaimRoute = { message: REST_MESSAGE.greenLake.name, run: greenLakeAdd, perCall: GREENLAKE_ADD_BATCH, account: 'provider' }
+export const GREENLAKE_SUBSCRIBE: ClaimRoute = {
+    message: REST_MESSAGE.greenLake.name,
+    run: greenLakeSubscribe,
+    perCall: 1 / GREENLAKE_SUBSCRIBE_CALLS,
+    account: 'customer',
+}
+export const FORTICLOUD_REGISTER: ClaimRoute = { message: REST_MESSAGE.fortiCare.name, run: fortiRegister, perCall: FORTICLOUD_REGISTER_BATCH, account: 'provider' }
+export const FORTIZTP_PROVISION: ClaimRoute = { message: REST_MESSAGE.fortiZtp.name, run: fortiZtp, perCall: 1, account: 'customer' }
+export const ZERO_TOUCH_CLAIM: ClaimRoute = { message: REST_MESSAGE.checkPoint.name, run: checkPointZeroTouch, perCall: 1, account: 'customer' }

@@ -98,13 +98,9 @@ describe('Meraki claim', () => {
         expect(run([target('A')], http, 10).outcomes).toEqual([{ stepId: 'A', ok: false, message: 'no response: java.net.UnknownHostException: api.meraki.com' }])
     })
 
-    it('fails a batch on an API error and needs an org', () => {
+    it('fails a batch on an API error', () => {
         const { http } = fake([{ status: 400, body: JSON.stringify({ errors: ['Device already claimed in another organization'] }) }])
-        const result = run([target('A'), target('B', { account: '' })], http, 10)
-        expect(result.outcomes).toEqual([
-            { stepId: 'B', ok: false, message: 'no cloud account configured for this customer' },
-            { stepId: 'A', ok: false, message: 'HTTP 400: Device already claimed in another organization' },
-        ])
+        expect(run([target('A')], http, 10).outcomes).toEqual([{ stepId: 'A', ok: false, message: 'HTTP 400: Device already claimed in another organization' }])
     })
 })
 
@@ -258,14 +254,12 @@ describe('Fortinet', () => {
 
     it('makes one FortiZTP call per device within the budget, and needs the FortiManager', () => {
         const { http, calls } = fake([{ status: 200, body: '{}' }])
-        const result = FORTIZTP_PROVISION.run([target('A', { account: '' }), target('B'), target('C'), target('D')], http, 2)
+        const result = FORTIZTP_PROVISION.run([target('B'), target('C'), target('D')], http, 2)
         expect(calls).toHaveLength(2)
         expect(result.outcomes.map((o) => [o.stepId, o.ok])).toEqual([
-            ['A', false],
             ['B', true],
             ['C', true],
         ])
-        expect(result.outcomes[0].message).toBe('no cloud account configured for this customer')
     })
 })
 
@@ -333,11 +327,10 @@ describe('Check Point Zero Touch', () => {
 
     it('refuses an account that is not "<account id>/<template id>" and a missing MAC without logging in', () => {
         const { http, calls } = fake([reply(claimed)])
-        const result = run([target('A', { account: 'branch-tpl' }), target('B', { account: '1/2', mac: '' }), target('C', { account: '' })], http, 5)
+        const result = run([target('A', { account: 'branch-tpl' }), target('B', { account: '1/2', mac: '' })], http, 5)
         expect(calls).toHaveLength(0)
         expect(result.outcomes).toEqual([
             { stepId: 'B', ok: false, message: 'missing mac' },
-            { stepId: 'C', ok: false, message: 'no cloud account configured for this customer' },
             { stepId: 'A', ok: false, message: 'cloud account must be "<User Center account id>/<template id>"' },
         ])
     })
@@ -510,6 +503,18 @@ describe('runVendorClaims', () => {
             { stepId: 'A', ok: false, message: `HTTP 400: ${error}`.slice(0, 255) },
         ])
         expect(settled[1].message).toHaveLength(255)
+    })
+
+    it("refuses unsent a step without the Customer's account, only where the calls go to the Customer's account", () => {
+        const { store, settled } = fakeStore({ oem_claim: [target('A', { account: '' })], oem_ztp: [target('B', { account: '' }), target('C', { account: 'FMG-1' })] })
+        const { transport, calls } = fakeTransport([succeed])
+        expect(runVendorClaims('fortinet', claimRoutes('fortinet'), store, transport, 8, () => true).calls).toBe(2)
+        expect(calls.map((c) => c.fn)).toEqual(['register_products', 'provision_device'])
+        expect(settled).toEqual([
+            { stepId: 'A', ok: true, message: 'registered in FortiCloud' },
+            { stepId: 'B', ok: false, message: 'no cloud account configured for this customer' },
+            { stepId: 'C', ok: true, message: 'provisioned to FortiManager FMG-1' },
+        ])
     })
 
     it('leaves loaded steps the budget did not reach for the next run', () => {
