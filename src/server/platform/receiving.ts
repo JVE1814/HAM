@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { validateAsnRows, type AsnRowCheck } from '../domain/asn.ts'
+import { asnRowProblem } from '../domain/asn.ts'
 import { normalizeSerial } from '../domain/serials.ts'
 import { naasStockroomType, OEM_PID_FIELD, providerStockroomCondition, receiptProblem, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
 import { LOCK_TRIES, type HeldLock, type LockAttempt } from '../domain/job-lock.ts'
@@ -391,8 +391,8 @@ export function receivingStockrooms(): Array<{ id: string; name: string }> {
 export function importAsnRow(row: GlideRecord): RowOutcome {
     const serial = normalizeSerial(str(row, 'serial'))
     // Most refused rows (a missing field, a serial known long since) are refused here, without the lock.
-    const check = checkAsnRow(row, serial)
-    if (!check.ok) return rowError(check.reason)
+    const problem = checkAsnRow(row, serial)
+    if (problem) return rowError(problem)
 
     const raw = { manufacturer: str(row, 'manufacturer'), model: str(row, 'pid') }
     const resolution = resolveModel(raw, loadNormalizationData())
@@ -416,7 +416,7 @@ export function importAsnRow(row: GlideRecord): RowOutcome {
     }
     const existing = () => {
         const again = checkAsnRow(row, serial)
-        return again.ok ? null : rowError(again.reason)
+        return again ? rowError(again) : null
     }
     const attempt = createReceivedAsset(serial, modelId, 'in_transit', values, existing, LOCK_TRIES)
     if (!attempt.ran) return loadAgain(serial, whyNotRun(attempt, 'a scan or another row is receiving it'))
@@ -433,12 +433,11 @@ function loadAgain(serial: string, why: string): RowOutcome {
 }
 
 /**
- * The row checked (domain/asn `validateAsnRows`): its mandatory fields, and that no Asset has its serial yet. Any
+ * The row checked (domain/asn `asnRowProblem`): its mandatory fields, and that no Asset has its serial yet. Any
  * Asset counts, the Provider IT's too (ADR 0016), read past the importer's before-query rules (ADR 0005): an inventory
  * tech sees only their stockrooms' Assets, and an Asset in transit or on order is in none yet.
  */
-function checkAsnRow(row: GlideRecord, serial: string): AsnRowCheck {
-    const fields = { serial, pid: str(row, 'pid'), poNumber: str(row, 'po_number') }
-    return validateAsnRows([fields], findAnyAssetBySerial(serial) ? new Set([serial]) : new Set())[0]
+function checkAsnRow(row: GlideRecord, serial: string): string | null {
+    return asnRowProblem({ serial, pid: str(row, 'pid'), poNumber: str(row, 'po_number') }, !!findAnyAssetBySerial(serial))
 }
 
