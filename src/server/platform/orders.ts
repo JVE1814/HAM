@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { APPROVAL, approversToAsk } from '../domain/approvals.ts'
+import { APPROVAL } from '../domain/approvals.ts'
 import type { NamedRecord } from '../domain/customer-parties.ts'
 import {
     approversFor,
@@ -269,14 +269,11 @@ function submitHolding(usageLock: HeldLock | null, order: GlideRecord): Submissi
         warnIfUsageLockLost(usageLock, order)
         return { submitted: true }
     }
-    const customerAdmins = customerAdminIds(str(order, 'customer'))
-    // The account manager, or else the asset managers, on the Provider's side.
-    const provider = providerApproverIds(str(order, 'agreement.account_manager'))
-    const asked = putToApproval(order, {
-        awaitingStage: ORDER_APPROVAL.awaitingStage,
-        approverIds: approversToAsk(assessment.approvers, customerAdmins, provider),
+    const asked = putToApproval(order, ORDER_APPROVAL, {
         required: assessment.approvers,
-        customerAdmins,
+        customerAdmins: customerAdminIds(str(order, 'customer')),
+        // The account manager, or else the asset managers, on the Provider's side.
+        providerApprovers: providerApproverIds(str(order, 'agreement.account_manager')),
         noApprover: 'no account manager or asset manager to approve it',
     })
     if (asked.awaiting) {
@@ -411,6 +408,7 @@ function warnIfLineLockLost(locks: readonly HeldLock[], number: string): void {
 /** How an Order's approvals are decided (platform/approvals): by its entitlement verdict, approved and sourced or rejected. */
 const ORDER_APPROVAL: ApprovalFlow = {
     awaitingStage: ORDER_STAGE.awaiting_approval,
+    standIn: 'provider',
     required: (order) => approversFor(str(order, 'entitlement_verdict') as EntitlementVerdict),
     decide: (order, outcome) => (outcome === 'approved' ? startSourcing(order) : rejectOrder(order)),
 }

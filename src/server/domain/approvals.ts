@@ -23,36 +23,44 @@ export function rollupApprovals(required: readonly Approver[], decisions: readon
 }
 
 /**
- * Tag raw approvals with their group: the Customer admins asked decide for the customer-admin
- * group; everyone else (the account manager or the asset managers standing in for them) for the
- * account-manager group. With no Customer admin asked, the customer-admin approval is given by the
- * provider-side approvers.
+ * Who decides for the admins of a Customer that has none, a choice each kind of task makes: its provider-side
+ * approvers (`provider`), or nobody, so it cannot be approved where the customer-admin group is required.
+ */
+export type StandIn = 'provider' | 'nobody'
+
+/**
+ * Tag raw approvals with their group: the Customer admins asked decide for the customer-admin group; everyone else
+ * (the account manager or the asset managers) for the account-manager group, and with no Customer admin asked, for
+ * the customer-admin group too when they `standIn` for the admins.
  */
 export function groupDecisions(
     approvals: ReadonlyArray<{ approverId: string; state: ApprovalState }>,
     customerAdminIds: readonly string[],
+    standIn: StandIn,
 ): ApprovalDecision[] {
+    const providerForAdmins = customerAdminIds.length === 0 && standIn === 'provider'
     return approvals.flatMap(({ approverId, state }): ApprovalDecision[] => {
         if (customerAdminIds.includes(approverId)) return [{ group: 'customer_admin', state }]
         const provider: ApprovalDecision = { group: 'account_manager', state }
-        return customerAdminIds.length === 0 ? [provider, { group: 'customer_admin', state }] : [provider]
+        return providerForAdmins ? [provider, { group: 'customer_admin', state }] : [provider]
     })
 }
 
 /**
  * Who is asked to decide for the `required` groups: the Customer's admins for the customer-admin group, the
  * provider-side approvers for the account-manager group, and those too in place of the admins of a Customer that has
- * none (`groupDecisions` then counts their decision for both groups). Each is asked once.
+ * none when they `standIn` for them (`groupDecisions` then counts their decision for both groups). Each is asked once.
  */
 export function approversToAsk(
     required: readonly Approver[],
     customerAdminIds: readonly string[],
     providerApproverIds: readonly string[],
+    standIn: StandIn,
 ): string[] {
+    const forAdmins = customerAdminIds.length > 0 || standIn === 'nobody' ? customerAdminIds : providerApproverIds
     const ids = new Set<string>()
     for (const group of required) {
-        const admins = group === 'customer_admin' ? customerAdminIds : []
-        for (const id of admins.length > 0 ? admins : providerApproverIds) ids.add(id)
+        for (const id of group === 'customer_admin' ? forAdmins : providerApproverIds) ids.add(id)
     }
     return [...ids]
 }
