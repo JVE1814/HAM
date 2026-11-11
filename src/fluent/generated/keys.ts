@@ -3455,6 +3455,10 @@ declare global {
                         id: 'f19ec875c0b445ccb4062a3fa36da90b'
                         deleted: true
                     }
+                    'src_server_domain_oem_sync-adapters_ts': {
+                        table: 'sys_module'
+                        id: 'cb48e29b847541708f1a5b7fe0d6ea83'
+                    }
                     src_server_domain_oem_types_ts: {
                         table: 'sys_module'
                         id: '300abf5a6e4f44b8a34f21b962e05a03'

@@ -1,4 +1,5 @@
-import { isSyncVendor, SYNC_MESSAGE, type OemContext, type SyncVendor } from '../domain/oem/adapters.ts'
+import { isSyncVendor, SYNC_MESSAGE, type SyncVendor } from '../domain/oem/adapters.ts'
+import type { OemContext } from '../domain/oem/sync-adapters.ts'
 import { PROPERTY, type PropertyOf } from '../domain/properties.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
 import { boolProperty, stringProperty } from './properties.ts'

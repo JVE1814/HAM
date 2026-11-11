@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { enabledRoute, enabledRoutes, OEM_ADAPTERS, SYNC_ORDER, type OemContext } from './adapters'
+import { enabledRoute, enabledRoutes, OEM_ADAPTERS, SYNC_ORDER } from './adapters'
+import type { OemContext } from './sync-adapters'
 import type { HttpRequest, HttpResponse } from '../http'
 import type { OemVendor } from '../vocabulary'
 

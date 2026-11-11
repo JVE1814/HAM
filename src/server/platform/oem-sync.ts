@@ -4,7 +4,8 @@ import { coverageDisposition, type CoverageAnswer } from '../domain/coverage.ts'
 import { naasModelCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { enabledRoutes, pidKey, type CoverageRoute } from '../domain/oem/adapters.ts'
+import { enabledRoutes, type CoverageRoute } from '../domain/oem/adapters.ts'
+import { pidKey } from '../domain/oem/sync-adapters.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import type { OemVendor } from '../domain/vocabulary.ts'
 import { daysAgoGlide, nowMs } from './clock.ts'
@@ -44,7 +45,7 @@ function ofVendor(vendor: OemVendor, errors: readonly string[]): string[] {
 }
 
 /**
- * `vendor`'s NaaS Models (those with an OEM PID), by PID as an OEM's answer is matched to them (domain/oem/adapters
+ * `vendor`'s NaaS Models (those with an OEM PID), by PID as an OEM's answer is matched to them (domain/oem/sync-adapters
  * `pidKey`): the PID to ask for each key, as the first of its Models stores it (trimmed), and the Models with it.
  */
 function naasModelsByPid(vendor: OemVendor): { asked: Map<string, string>; models: Map<string, string[]> } {
