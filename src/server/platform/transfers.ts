@@ -2,7 +2,6 @@ import { GlideRecord } from '@servicenow/glide'
 import { stageAfterTransfer, transferFellThrough, type TransferContext } from '../domain/lifecycle.ts'
 import { createMarks } from '../domain/marks.ts'
 import { PROPERTY } from '../domain/properties.ts'
-import type { TransferResult } from '../domain/sourcing.ts'
 import { moveAsset, moveRefusal, readStage } from './assets.ts'
 import { log } from './log.ts'
 import { stagingStockroom, stringProperty } from './properties.ts'
@@ -14,6 +13,8 @@ import { hasOpenStagingTask } from './staging-tasks.ts'
  * line is open, Inventory keeps its Asset In transfer (domain/lifecycle; external-contracts N38); once it lets the
  * Asset go, the Asset takes back the stage it left (`takeBackStageAfterTransfer`).
  */
+
+export type TransferResult = { ok: true; transferId: string } | { ok: false; reason: string }
 
 /**
  * Request a transfer order moving reserved stock to the staging centre. Inventory takes a unit onto a line only from
@@ -120,7 +121,7 @@ export function takeBackStageAfterTransfer(current: ForeignRecord, previous: For
  * What the Asset Inventory let go carries, and where it was left (domain/lifecycle `TransferContext`): what tells the
  * stage it left (`stageAfterTransfer`) and whether its transfer fell through (`transferFellThrough`).
  */
-export function transferContext(asset: ForeignRecord): TransferContext {
+function transferContext(asset: ForeignRecord): TransferContext {
     const company = str(asset, 'company')
     const staging = stagingStockroom()
     return {
