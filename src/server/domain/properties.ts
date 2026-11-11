@@ -18,7 +18,7 @@ export const PROPERTY = {
     tagDigits: { name: 'x_daas_ham.tag.digits', default: 7 },
     /**
      * The staging centre's stockroom, which is also the Provider's one depot: purchases and spare-pool buys ship to it,
-     * sourcing stages and transfers stock there, and Shipment labels name it as the sender (platform/staging-tasks
+     * sourcing stages and transfers stock there, and Shipment labels name it as the sender (platform/properties
      * `stagingStockroom`).
      */
     stagingStockroom: { name: 'x_daas_ham.staging.default_stockroom', default: '' },

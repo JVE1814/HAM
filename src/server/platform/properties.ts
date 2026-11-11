@@ -1,5 +1,5 @@
 import { gs } from '@servicenow/glide'
-import type { PropertyOf } from '../domain/properties.ts'
+import { PROPERTY, type PropertyOf } from '../domain/properties.ts'
 
 /** An integer property; its declared value when it is unset or no number. */
 export function intProperty(property: PropertyOf<number>): number {
@@ -23,4 +23,9 @@ export function boolProperty(property: PropertyOf<boolean>): boolean {
  */
 export function secretProperty(property: PropertyOf<string>): string {
     return gs.getProperty(property.name, property.default)
+}
+
+/** The staging centre's stockroom: where purchased units ship to, Assets are staged and shipments leave from ('' while none is set). */
+export function stagingStockroom(): string {
+    return stringProperty(PROPERTY.stagingStockroom)
 }
