@@ -15,19 +15,8 @@ import {
 } from '../domain/warehouse.ts'
 import { DEFAULT_STAGING_SOURCE } from '../domain/staging.ts'
 import { LINE_STAGE, type StagingSource, type StockroomType } from '../domain/vocabulary.ts'
-import {
-    findAnyAssetBySerial,
-    fleetCandidate,
-    identifyAnyAsset,
-    identifyAsset,
-    isFleetAsset,
-    joinFleet,
-    moveAndSave,
-    moveAsset,
-    newAsset,
-    readStage,
-    type AssetIdentified,
-} from './assets.ts'
+import { findAnyAssetBySerial, identifyAnyAsset, identifyAsset, type AssetIdentified } from './asset-identifiers.ts'
+import { fleetCandidate, isFleetAsset, joinFleet, moveAndSave, moveAsset, newAsset, readStage } from './assets.ts'
 import { sourceOrderAgain, unitsOnLine } from './fulfilment.ts'
 import { attemptLock, whyNotRun, withLock } from './locks.ts'
 import { loadNormalizationData, recordNormalizationException, resolveModel } from './normalization.ts'
@@ -101,7 +90,7 @@ function stockroomType(stockroom: GlideRecord): StockroomType | null {
 }
 
 /**
- * The fleet asset a scanned code names (platform/assets `identifyAsset`: serial, else Provider tag, else Customer tag),
+ * The fleet asset a scanned code names (platform/asset-identifiers `identifyAsset`: serial, else Provider tag, else Customer tag),
  * or why it is not used: none carries it (`unknown`), or two do, as two Customers may share a Customer tag (`conflict`).
  */
 function scannedAsset(code: string): Scan {

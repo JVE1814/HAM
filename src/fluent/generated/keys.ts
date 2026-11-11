@@ -3661,6 +3661,10 @@ declare global {
                         table: 'sys_module'
                         id: 'd468b0b5ac1a4e869f1728ab7ac91030'
                     }
+                    'src_server_platform_asset-identifiers_ts': {
+                        table: 'sys_module'
+                        id: 'f2b01a16dc0a4b549aef4b80a83e99ea'
+                    }
                     src_server_platform_assets_ts: {
                         table: 'sys_module'
                         id: '64007da49c55498eac75188cbad4c7bc'

@@ -2,7 +2,7 @@ import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_in
 import { parseDeviceEvents } from '../domain/device-events.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { ROLE } from '../domain/roles.ts'
-import { findAssetByIdentifier } from '../platform/assets.ts'
+import { findAssetByIdentifier } from '../platform/asset-identifiers.ts'
 import { nowMs } from '../platform/clock.ts'
 import { applyDeviceEvent, detectPendingInService, purgeDeviceEventsOlderThan } from '../platform/in-service.ts'
 import { lifecycleReaders } from '../platform/lifecycle-dates.ts'
@@ -13,7 +13,7 @@ import { reply, requireRole } from '../platform/rest-api.ts'
 
 /**
  * POST /api/x_daas_ham/naas/device_events - Seen signals from the Provider NMS. An identifier is matched to a fleet
- * asset only (platform/assets `findAssetByIdentifier`, ADR 0016): one the Provider IT's equipment carries, like one no
+ * asset only (platform/asset-identifiers `findAssetByIdentifier`, ADR 0016): one the Provider IT's equipment carries, like one no
  * Asset carries, is reported in `unknown_identifiers` and stored as no event.
  */
 export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIResponse): void {
