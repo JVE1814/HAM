@@ -22,15 +22,14 @@ describe('compareAudit', () => {
         expect(compareAudit(expected, ['FOC111', 'FOC222', 'FOC333']).missing).toEqual([])
     })
 
-    it('matches a scan by serial before another unit\'s Provider or Customer tag', () => {
+    it('names by a scan the unit whose serial it is, else whose Provider tag, else whose Customer tag', () => {
         const units = [
-            { assetId: 'a1', serial_number: 'FOC111', asset_tag: 'NAAS-1', x_daas_ham_customer_tag: '' },
-            { assetId: 'a2', serial_number: 'FOC222', asset_tag: 'NAAS-2', x_daas_ham_customer_tag: 'FOC111' },
+            { assetId: 'a1', serial_number: 'X1', asset_tag: 'NAAS-1', x_daas_ham_customer_tag: '' },
+            { assetId: 'a2', serial_number: 'FOC222', asset_tag: 'X1', x_daas_ham_customer_tag: 'X2' },
+            { assetId: 'a3', serial_number: 'FOC333', asset_tag: 'X2', x_daas_ham_customer_tag: 'X1' },
         ]
-        const result = compareAudit(units, ['FOC111', 'FOC222'])
-        expect(result.matched).toEqual(['a1', 'a2'])
-        expect(result.missing).toEqual([])
-        expect(result.unexpected).toEqual([])
+        expect(compareAudit(units, ['X1'])).toEqual({ matched: ['a1'], missing: ['a2', 'a3'], unexpected: [] })
+        expect(compareAudit(units, ['X2'])).toEqual({ matched: ['a3'], missing: ['a1', 'a2'], unexpected: [] })
     })
 
     it('falls back to the Customer tag only when no serial or Provider tag carries the code', () => {
