@@ -7,7 +7,7 @@ import { todayIso } from './clock.ts'
 import { installedAssetIds, installedAssetIdsBySite } from './installed-assets.ts'
 import { intProperty } from './properties.ts'
 import { exists, findById, str, warnRefused } from './records.ts'
-import { raiseReturn } from './returns.ts'
+import { raiseReturn, RETURN } from './returns.ts'
 
 /**
  * The Returns a date brings: an Agreement past its end and a temporary deployment about to end bring their equipment
@@ -16,7 +16,6 @@ import { raiseReturn } from './returns.ts'
  */
 
 const END_RETURN_RAISED = 'end_return_raised'
-const RETURN = 'x_daas_ham_return_order'
 
 /** Raise the Returns due today (the daily job): see `recoverEndedAgreements` and `returnTemporaryDeployments`. */
 export function raiseDueReturns(): void {

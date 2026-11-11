@@ -156,6 +156,7 @@ export function groupExpiringCoverage(rows: readonly ExpiringCoverage[]): Map<st
 }
 
 export const COVERAGE_CHECKED_FIELD = 'x_daas_ham_coverage_checked'
+export const COVERAGE_END_FIELD = 'x_daas_ham_coverage_end'
 
 /**
  * Encoded alm_hardware query: `vendor`'s fleet assets (ADR 0016: the Provider IT's serials are never sent to an OEM)
@@ -175,4 +176,4 @@ export function withoutCoverage(coverageEnd: string, today: string): boolean {
  * Encoded query on alm_hardware: the installed fleet assets (ADR 0016) without OEM coverage (`withoutCoverage`), as the
  * workspace lists and counts them.
  */
-export const INSTALLED_WITHOUT_COVERAGE = `${INSTALLED_CONDITION}^x_daas_ham_coverage_endISEMPTY^ORx_daas_ham_coverage_end<javascript:gs.beginningOfToday()^${FLEET_CONDITION}`
+export const INSTALLED_WITHOUT_COVERAGE = `${INSTALLED_CONDITION}^${COVERAGE_END_FIELD}ISEMPTY^OR${COVERAGE_END_FIELD}<javascript:gs.beginningOfToday()^${FLEET_CONDITION}`

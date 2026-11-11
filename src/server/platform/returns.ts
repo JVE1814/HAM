@@ -55,7 +55,7 @@ import { log } from './log.ts'
  * Return order closes when every line is evaluated or missing. Every write of a line's status is made here.
  */
 
-const RETURN = 'x_daas_ham_return_order'
+export const RETURN = 'x_daas_ham_return_order'
 const RETURN_LINE = 'x_daas_ham_return_order_line'
 
 /** A Return to raise: why, for whom and from where, how its units come back, and the Assets to bring back. */

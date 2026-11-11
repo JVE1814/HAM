@@ -10,6 +10,8 @@ import { count, findById, refusal, str, warnRefused } from './records.ts'
 
 /** OEM RMA records (opening the RMA with the vendor is manual, ADR 0008). */
 
+const RMA = 'x_daas_ham_oem_rma'
+
 /** The vendor an RMA is opened with when the defective Asset's Model names no OEM source. */
 const DEFAULT_RMA_VENDOR: OemVendor = 'cisco'
 
@@ -18,7 +20,7 @@ const SHIP_BACK_DAYS = 10
 
 /** Open an OEM RMA for an advance replacement: its sys_id, or '' (logged) when the platform refuses it. */
 export function openOemRma(input: { defectiveAsset: GlideRecord; orderLineId: string; caseId: string }): string {
-    const rma = new GlideRecord('x_daas_ham_oem_rma')
+    const rma = new GlideRecord(RMA)
     rma.initialize()
     rma.setValue('vendor', str(input.defectiveAsset, 'model.x_daas_ham_oem_source') || DEFAULT_RMA_VENDOR)
     rma.setValue('defective_asset', input.defectiveAsset.getUniqueValue())
@@ -35,7 +37,7 @@ export function openOemRma(input: { defectiveAsset: GlideRecord; orderLineId: st
 
 /** The RMAs still open for a defective Asset (domain/oem-rma `RMA_OPEN`), oldest first, with the line each serves. */
 export function openRmasFor(defectiveAssetId: string): OpenRma[] {
-    const rma = new GlideRecord('x_daas_ham_oem_rma')
+    const rma = new GlideRecord(RMA)
     rma.addQuery('defective_asset', defectiveAssetId)
     rma.addQuery('state', 'IN', RMA_OPEN.join(','))
     rma.orderBy('sys_created_on')
@@ -60,7 +62,7 @@ export function openRmasFor(defectiveAssetId: string): OpenRma[] {
  * the line counts its replacement as on its way; false (logged) when the platform refuses.
  */
 export function reuseOemRma(reuse: RmaReuse, orderLineId: string): boolean {
-    const rma = findById('x_daas_ham_oem_rma', reuse.rma.rmaId)
+    const rma = findById(RMA, reuse.rma.rmaId)
     const notReused = `OEM RMA ${reuse.rma.rmaNumber || reuse.rma.rmaId} not reused`
     if (!rma) {
         log.warn(`${notReused}: not found`)
@@ -79,7 +81,7 @@ export function reuseOemRma(reuse: RmaReuse, orderLineId: string): boolean {
  * replacement still to come.
  */
 export function markReplacementReceived(rmaId: string, replacementSerial: string): void {
-    const rma = findById('x_daas_ham_oem_rma', rmaId)
+    const rma = findById(RMA, rmaId)
     if (!rma) return
     rma.setValue('state', RMA_STATE.replacement_received)
     rma.setValue('replacement_serial', replacementSerial)
@@ -88,13 +90,13 @@ export function markReplacementReceived(rmaId: string, replacementSerial: string
 
 /** OEM advance replacements still expected for an Order line. */
 export function openRmaCount(orderLineId: string): number {
-    return count('x_daas_ham_oem_rma', `order_line=${orderLineId}^stateIN${RMA_AWAITED.join(',')}`)
+    return count(RMA, `order_line=${orderLineId}^stateIN${RMA_AWAITED.join(',')}`)
 }
 
 /** The Order line waiting for the OEM replacement announced under this RMA number. */
 export function lineAwaitingRma(rmaNumber: string, modelId: string): { lineId: string; rmaId: string } | null {
     if (!rmaNumber) return null
-    const rma = new GlideRecord('x_daas_ham_oem_rma')
+    const rma = new GlideRecord(RMA)
     rma.addQuery('rma_number', rmaNumber)
     rma.addQuery('order_line.line_stage', LINE_STAGE.awaiting_stock)
     rma.addQuery('order_line.model', modelId)
@@ -112,7 +114,7 @@ const RMAS_PER_SYNC = 200
  * RMAS_PER_SYNC, least recently synced (never synced) first; their sys_ids, and their RMA numbers each once.
  */
 export function rmasToAskAbout(vendor: OemVendor): { ids: string[]; rmaNumbers: string[] } {
-    const rma = new GlideRecord('x_daas_ham_oem_rma')
+    const rma = new GlideRecord(RMA)
     rma.addQuery('vendor', vendor)
     rma.addQuery('state', 'IN', RMA_AT_OEM.join(','))
     rma.addNotNullQuery('rma_number')
@@ -135,7 +137,7 @@ export function rmasToAskAbout(vendor: OemVendor): { ids: string[]; rmaNumbers: 
 export function recordRmaStatuses(rmaIds: readonly string[], statusOf: ReadonlyMap<string, string>): string[] {
     const syncedAt = nowGlide()
     const refused: string[] = []
-    const asked = new GlideRecord('x_daas_ham_oem_rma')
+    const asked = new GlideRecord(RMA)
     asked.addQuery('sys_id', 'IN', rmaIds.join(','))
     asked.query()
     while (asked.next()) {
