@@ -19,11 +19,10 @@ import {
 } from '@servicenow/sdk/core'
 import { OEM_VENDOR_CHOICES, ORDER_STAGE, REPLACEMENT_TIER, RMA_STATE, RMA_STATE_CHOICES } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION } from '../../server/domain/fleet'
-import { uiDefectiveReturnedToOem, uiRaiseReplacement } from '../../server/entry/breakfix'
+import { onReplacementComplete, uiDefectiveReturnedToOem, uiRaiseReplacement } from '../../server/entry/breakfix'
 import { takeFailedAssetTerms } from '../../server/platform/breakfix'
 import { PLATFORM_ROLE } from '../../server/domain/roles'
 import { EVENT } from '../../server/domain/events'
-import { onReplacementComplete } from '../../server/entry/replacements'
 import { admin, assetManager, noc, providerStaff, returnWorkers, stockroomWorkers } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 

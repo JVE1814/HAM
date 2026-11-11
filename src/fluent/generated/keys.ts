@@ -3623,6 +3623,7 @@ declare global {
                     src_server_entry_replacements_ts: {
                         table: 'sys_module'
                         id: '5db7011938264dba8bcedc5c375ee2ed'
+                        deleted: true
                     }
                     src_server_entry_returns_ts: {
                         table: 'sys_module'
