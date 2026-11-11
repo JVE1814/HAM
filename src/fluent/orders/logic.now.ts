@@ -11,8 +11,6 @@ import { EVENT } from '../../server/domain/events'
 import { PROPERTY } from '../../server/domain/properties'
 import { accountManager, admin, assetManager, commercialEditors, orderRaisers } from '../shared/roles.now'
 
-/* Orders: the approval roll-up, the form's buttons, hardware refresh and sourcing. */
-
 BusinessRule({
     $id: Now.ID['br_order_approval_decision'],
     name: 'NaaS - roll up order approvals',
@@ -24,7 +22,7 @@ BusinessRule({
     script: onOrderApprovalDecision,
 })
 
-/* Form buttons on Orders. Stage transitions after "Submit" are derived from asset stages. */
+/* Stage transitions after "Submit" are derived from asset stages. */
 
 UiAction({
     $id: Now.ID['ua_order_submit'],
@@ -67,8 +65,6 @@ UiAction({
     script: uiCancelOrder,
 })
 
-/* Hardware refresh (Q48). */
-
 ScheduledScript({
     $id: Now.ID['job_raise_refresh_orders'],
     name: 'NaaS - raise refresh orders',
@@ -110,7 +106,7 @@ Property({
 })
 
 /*
- * Fleet assets' stage changes that move their Order lines and transfers. Rules on alm_hardware are written as
+ * Rules on alm_hardware are written as
  * fluent/fleet/logic.now.ts says: the change test, then the Fleet flag.
  */
 
@@ -126,7 +122,6 @@ BusinessRule({
     script: takeBackStageAfterTransfer,
 })
 
-// Also takes a unit that left its line in transit off it.
 BusinessRule({
     $id: Now.ID['br_asset_stage_to_order_line'],
     name: 'NaaS - asset stage advances order line',

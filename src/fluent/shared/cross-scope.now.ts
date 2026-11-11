@@ -1,8 +1,6 @@
 import '@servicenow/sdk/global'
 import { CrossScopePrivilege } from '@servicenow/sdk/core'
 
-/* Runtime access this app needs to tables owned by other scopes (ADR 0001). */
-
 CrossScopePrivilege({
     $id: Now.ID['xsp_alm_hardware_read'],
     operation: 'read',

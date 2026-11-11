@@ -20,13 +20,8 @@ import { ROLE } from '../../server/domain/roles'
 import { admin } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
-/*
- * What the app's background work runs on: where each job keeps its place and its lock, the settings every job reads
- * (jobs are chunked where they touch many assets, ADR 0007), the preflight check and the demo data loader.
- */
-
 /**
- * One row per background job, read and written only by src/server/platform/job-cursor.ts. Most are cursors (ADR 0007):
+ * One row per background job. Most are cursors (ADR 0007):
  * where a scheduled chunked job stopped, so the next run resumes there, or, for a job whose passes replace each other
  * (`margin_<period>`, `billing_generate_<period>`), the current pass's token. Two rows are not cursors and are kept
  * here under the names they have always had, so an upgrade keeps them: `provider_tag_sequence`, whose Cursor is the
@@ -42,7 +37,6 @@ export const x_daas_ham_job_cursor = Table({
         last_run: DateTimeColumn({ label: 'Last run' }),
         last_status: StringColumn({ label: 'Last status', maxLength: 255 }),
         processed_total: IntegerColumn({ label: 'Processed (last run)', default: 0 }),
-        // A pass's records that failed so far, over all its runs, and the last error (platform/chunked `runTableJob`).
         failed_total: IntegerColumn({ label: 'Failed (this pass)', default: 0 }),
         last_error: StringColumn({ label: 'Last error', maxLength: 1000 }),
     },
@@ -100,7 +94,7 @@ Property({
 /*
  * Demo data (installMethod demo): the SDK installs it unless the app is installed with `now-sdk install --no-demoData`,
  * so install production that way (README "Install"). Run it once with "Execute Now"; it loads nothing on an instance in
- * use (entry/demo-seed `demoRefusal`).
+ * use.
  */
 
 /*

@@ -3,7 +3,7 @@ import { Acl } from '@servicenow/sdk/core'
 import { customerRoles } from './roles.now'
 
 /*
- * REST_Endpoint ACLs of the scripted REST API (rest-api.now.ts). A route that names no ACL enforces the platform's
+ * A route that names no ACL enforces the platform's
  * "Scripted REST External Default" (SCRIPTED_REST_EXTERNAL_DEFAULT), so it admits no customer user. The routes built
  * for customer users (the customer self-service and rack pages) list that ACL and the app's customer one
  * (`staffOrCustomer`); a user passes either one, as on the platform's own CSM case API. Those routes also turn off

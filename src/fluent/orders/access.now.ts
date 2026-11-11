@@ -46,7 +46,7 @@ Acl({
 
 /*
  * A customer admin creates an Order of their own Customer only. Every Order rule check of a customer admin is asked
- * of an Order that names its Customer (the producer's, platform/orders `orderingUser`), so one naming none is refused.
+ * of an Order that names its Customer, so one naming none is refused.
  */
 Acl({
     $id: Now.ID['acl_order_create_customer'],
@@ -91,7 +91,7 @@ Acl({
     script: grantsCustomerRecord,
 })
 
-// No customer role: a customer admin's lines are the record producer's, which its script adds (platform/orders).
+// No customer role: a customer admin's lines are the record producer's, which its script adds.
 Acl({
     $id: Now.ID['acl_order_line_create'],
     type: 'record',

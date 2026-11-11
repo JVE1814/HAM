@@ -6,11 +6,8 @@ import warehousePage from '../../client/warehouse.html'
 import { admin, scanners, stockroomWorkers } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
-/* The warehouse: ASN rows from distributors, Provider tags and the scanning page. */
-
 /*
- * An import-set staging table. Load a CSV into it with System Import Sets > Load Data; rows are processed by the
- * after-insert rule below (no transform map), which sets the row's import state and comment.
+ * An import-set staging table. Load a CSV into it with System Import Sets > Load Data.
  */
 
 /** Advance shipment notice lines from a distributor. */
@@ -86,8 +83,6 @@ Acl({
     roles: stockroomWorkers,
 })
 
-/* The warehouse scanning app (receive, put away, pick, look up, print labels). */
-
 /** The page's name: its address is this with .do, and its ACL is named by it. */
 export const WAREHOUSE_PAGE = 'x_daas_ham_warehouse'
 
@@ -116,7 +111,6 @@ Record({
         application: naasMenu,
         link_type: 'DIRECT',
         query: `${WAREHOUSE_PAGE}.do`,
-        // The roles the page's ACL grants (above).
         roles: scanners,
         active: true,
         order: 110,

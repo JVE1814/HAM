@@ -8,9 +8,9 @@ import { customerAdmin, inventoryTech, noc } from './roles.now'
  * on audits, which keep an inventory tech to the blind counts of their stockrooms; POST
  * /api/x_daas_ham/naas/audits/{id}/scan records a scan only on one of those. Run: now-sdk cicd testsuite run (suite
  * "NaaS - P1"). Fixtures setting the Fleet flag insert without security enforcement: the flag is read-only on forms,
- * and the app's intake paths set it server-side, as these do. As in returns/tests.now.ts, the scan test's scripts call
- * the route's handler (entry/assurance `scanAudit`) in the impersonated user's session; the other stockroom's blind
- * count is found past the visibility rules (platform/beyond-visibility), as the app's own server logic does.
+ * and the app's intake paths set it server-side, as these do. The scan test's scripts call
+ * the route's handler in the impersonated user's session; the other stockroom's blind
+ * count is found past the visibility rules, as the app's own server logic does.
  */
 
 // The vocabulary's values the fixtures below are created with, each under a name: for a value, a Test takes a
@@ -124,7 +124,7 @@ export const inventoryTechVisibilityTest = Test(
             fieldValues: { serial_number: 'ATF-ITV-OUT-0001', stockroom: other.record_id, install_status: IN_STOCK, quantity: 1, x_daas_ham_fleet: true },
             enforceSecurity: false,
         })
-        // The same unit outside the fleet: the rule keeps it in (domain/visibility `outsideNaasConditions`), for the platform to decide.
+        // The same unit outside the fleet: the rule keeps it in, for the platform to decide.
         atf.server.recordInsert({
             $id: Now.ID['atf_itv_asset_outside'],
             table: 'alm_hardware',

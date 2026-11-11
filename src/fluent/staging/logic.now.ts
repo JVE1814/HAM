@@ -5,8 +5,6 @@ import { STAGING_TASK_STATE } from '../../server/domain/staging'
 import { PROPERTY } from '../../server/domain/properties'
 import { admin } from '../shared/roles.now'
 
-/* Record-change rules of staging (ADR 0004) and the staging centre's stockroom setting. */
-
 BusinessRule({
     $id: Now.ID['br_staging_step_stamp'],
     name: 'NaaS - stamp staging step',
