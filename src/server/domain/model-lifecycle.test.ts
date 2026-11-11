@@ -103,6 +103,11 @@ describe('parseLifecycleRow', () => {
         })
     })
 
+    it('reads a row with no date, PID or not, as one with nothing to import', () => {
+        expect(parseLifecycleRow({ pid: '', endOfSale: ' ' })).toEqual({ ok: true, pid: '', dates: {} })
+        expect(parseLifecycleRow({ pid: 'X' })).toEqual({ ok: true, pid: 'X', dates: {} })
+    })
+
     it('rejects rows without a PID or with malformed dates', () => {
         expect(parseLifecycleRow({ pid: ' ', endOfSale: '2024-04-30' })).toEqual({ ok: false, reason: 'PID is required' })
         expect(parseLifecycleRow({ pid: 'X', endOfSupport: '30/04/2029' })).toEqual({ ok: false, reason: 'endOfSupport must be YYYY-MM-DD' })

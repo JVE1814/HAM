@@ -41,6 +41,12 @@ describe('importLifecycleRow', () => {
         expect(readModelLifecycle(MODEL)).toEqual({ endOfSale: '2025-06-30', endOfSupport: '2030-06-30' })
     })
 
+    it('marks a row with no date at all ignored, whatever its PID', () => {
+        expect(importLifecycleRow(lifecycleRow({ pid: 'UNKNOWN-PID' }))).toMatchObject({ state: 'ignored' })
+        expect(importLifecycleRow(lifecycleRow({ pid: '', manufacturer: '' }))).toMatchObject({ state: 'ignored' })
+        expect(platform.tables.cmdb_model_lifecycle ?? []).toEqual([])
+    })
+
     it('still refuses a row with a date and no PID, or a PID no Model has', () => {
         expect(importLifecycleRow(lifecycleRow({ pid: ' ', end_of_sale: '2025-06-30' }))).toEqual({ state: 'error', comment: 'PID is required' })
         expect(importLifecycleRow(lifecycleRow({ pid: 'UNKNOWN-PID', end_of_sale: '2025-06-30' }))).toEqual({

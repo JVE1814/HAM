@@ -165,6 +165,7 @@ export function importLifecycleRow(row: GlideRecord): RowOutcome {
         endOfLife: str(row, 'end_of_life'),
     })
     if (!parsed.ok) return failed(parsed.reason)
+    if (Object.keys(parsed.dates).length === 0) return { state: 'ignored', comment: `No milestone date${parsed.pid ? ` for ${parsed.pid}` : ''}` }
 
     const resolution = resolveModel({ manufacturer: str(row, 'manufacturer'), model: parsed.pid }, loadNormalizationData())
     if (!resolution.modelId) return failed(`PID ${parsed.pid} does not map to a model`)
@@ -173,7 +174,5 @@ export function importLifecycleRow(row: GlideRecord): RowOutcome {
 
     const written = writeModelLifecycle(resolution.modelId, parsed.dates, { source: 'csv', reference: str(row, 'source_reference') })
     if (written.refused.length > 0) return failed(`Lifecycle for ${parsed.pid} not saved: ${written.refused.join('; ')}`)
-    const known = written.updated + written.unchanged
-    if (known + written.inserted === 0) return { state: 'ignored', comment: `No milestone date for ${parsed.pid}` }
-    return { state: known > 0 ? 'updated' : 'inserted', comment: `Lifecycle for ${parsed.pid}` }
+    return { state: written.updated + written.unchanged > 0 ? 'updated' : 'inserted', comment: `Lifecycle for ${parsed.pid}` }
 }

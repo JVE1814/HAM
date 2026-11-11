@@ -94,9 +94,8 @@ export type LifecycleRow = { pid: string } & { [K in keyof LifecycleDates]?: str
 
 export type ParsedLifecycleRow = { ok: true; pid: string; dates: LifecycleDates } | { ok: false; reason: string }
 
+/** A row with no date at all parses, PID or not (a blank line at the end of a CSV): it has nothing to import. */
 export function parseLifecycleRow(row: LifecycleRow): ParsedLifecycleRow {
-    const pid = row.pid.trim()
-    if (!pid) return { ok: false, reason: 'PID is required' }
     const dates: LifecycleDates = {}
     for (const { field } of MILESTONES) {
         const value = (row[field] ?? '').trim()
@@ -104,6 +103,8 @@ export function parseLifecycleRow(row: LifecycleRow): ParsedLifecycleRow {
         if (!isIsoDate(value)) return { ok: false, reason: `${field} must be YYYY-MM-DD` }
         dates[field] = value
     }
+    const pid = row.pid.trim()
+    if (!pid && Object.keys(dates).length > 0) return { ok: false, reason: 'PID is required' }
     return { ok: true, pid, dates }
 }
 
