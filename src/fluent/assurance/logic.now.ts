@@ -1,6 +1,7 @@
 import '@servicenow/sdk/global'
 import { ScheduledScript, UiAction } from '@servicenow/sdk/core'
-import { raiseAttestations, reconcileInstalledBaseAndRacks, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudit } from '../../server/entry/assurance'
+import { reconcileInstalledBaseAndRacks, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudit } from '../../server/entry/assurance'
+import { raiseDueAttestations } from '../../server/platform/attestations'
 import { CURRENT_IS_NAAS_STOCKROOM, SITE_FIELD } from '../../server/domain/fleet'
 import { assetManager, fieldTech, scanners, stockroomWorkers } from '../shared/roles.now'
 
@@ -62,5 +63,5 @@ ScheduledScript({
     frequency: 'daily',
     executionTime: { hours: 6, minutes: 10, seconds: 0 },
     timeZone: 'UTC',
-    script: raiseAttestations,
+    script: raiseDueAttestations,
 })

@@ -2,14 +2,10 @@ import { gs, type GlideRecord } from '@servicenow/glide'
 import { todayIso } from '../platform/clock.ts'
 import { queueRefresh, runRefreshPass } from '../platform/lifecycle-dates.ts'
 import { importLifecycleRow, queueModelRefresh, queueModelsReachingMilestone, writingModelLifecycle } from '../platform/model-lifecycle.ts'
-import { normalizeNaasRawModels, resolveNormalizationException } from '../platform/normalization.ts'
+import { resolveNormalizationException } from '../platform/normalization.ts'
 import { finishImportRow, str, type ForeignRecord } from '../platform/records.ts'
 
 /** Model normalization, the lifecycle CSV, and Lifecycle phase / Refresh due date upkeep (P1.2), for fleet assets only (ADR 0016). */
-
-export function normalizeRawModels(): void {
-    normalizeNaasRawModels()
-}
 
 export function onNormalizationResolved(current: GlideRecord): void {
     const resolution = resolveNormalizationException(current)

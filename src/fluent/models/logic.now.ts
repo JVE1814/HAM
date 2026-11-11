@@ -1,7 +1,6 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, Record, ScheduledScript, ScriptAction } from '@servicenow/sdk/core'
 import {
-    normalizeRawModels,
     onAgreementTermsChanged,
     onModelLifecycleChanged,
     onNormalizationResolved,
@@ -10,6 +9,7 @@ import {
     refreshModelAssets,
     rollLifecyclePhases,
 } from '../../server/entry/models'
+import { normalizeNaasRawModels } from '../../server/platform/normalization'
 import { MILESTONE_ROW_CHANGED, MODEL_LIFECYCLE } from '../../server/domain/model-lifecycle'
 import { NORM_EXCEPTION_STATUS } from '../../server/domain/vocabulary'
 import { EVENT } from '../../server/domain/events'
@@ -116,7 +116,7 @@ ScheduledScript({
     executionInterval: { hours: 1 },
     executionStart: '2026-01-01 00:20:00',
     timeZone: 'UTC',
-    script: normalizeRawModels,
+    script: normalizeNaasRawModels,
 })
 
 ScheduledScript({

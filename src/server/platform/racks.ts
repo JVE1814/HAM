@@ -156,7 +156,12 @@ function recheckRack(rackId: string): void {
     settleExceptions({ ciId: rackId }, rack ? str(rack, 'company') : '', RACK_EXCEPTION_TYPES, found)
 }
 
-/** Re-check the rack a saved Asset is placed in, and the one the save took it out of (`recheckRack`), each once. */
+/**
+ * After rule on alm_hardware: re-check the rack the Asset is placed in, and the one it left (`recheckRack`), each once,
+ * now the save is written. The before rule checks against the placements saved before, so two saves into the same
+ * units (or the last of a rack's power) at the same moment can both pass it. Each after rule runs once its own save is
+ * written, so the later of the two reads both and raises the exception; a later save that clears it resolves it.
+ */
 export function recheckRacksOf(current: ForeignRecord, previous: ForeignRecord | null): void {
     const left = previous ? str(previous, PLACEMENT_FIELDS.rack) : ''
     for (const rackId of new Set([str(current, PLACEMENT_FIELDS.rack), left])) if (rackId) recheckRack(rackId)

@@ -3,7 +3,7 @@ import { stageChangeRefusal, voidsWipeEvidence } from '../domain/lifecycle.ts'
 import { ROLE } from '../domain/roles.ts'
 import { clearWipeEvidence, readStage, transitionFacts } from '../platform/assets.ts'
 import type { ForeignRecord } from '../platform/records.ts'
-import { onTransferOrderLine, takeBackStageAfterTransfer } from '../platform/transfers.ts'
+import { onTransferOrderLine } from '../platform/transfers.ts'
 
 /**
  * Why a save that changes the stage breaks the lifecycle (domain/lifecycle `stageChangeRefusal`), or null when it may
@@ -33,17 +33,6 @@ export function refusesLifecycleChange(current: ForeignRecord, previous: Foreign
 /** Script of that rule, run only when its condition refuses the save: why, as the error message. */
 export function explainLifecycleRefusal(current: ForeignRecord, previous: ForeignRecord): void {
     gs.addErrorMessage(lifecycleRefusal(current, previous) ?? 'This stage change is refused')
-}
-
-/**
- * Before-update rule on alm_hardware once Inventory's *Active transfer order* flag changes (br_asset_transfer_released),
- * ahead of the lifecycle rule: an Asset Inventory lets go from its transfer order line takes back the stage it left
- * (platform/transfers `takeBackStageAfterTransfer`), in the same save, so the lifecycle rule checks that move and the
- * after rules see it. A unit whose transfer to the staging centre fell through is reserved again there and put back by
- * the after rule (`onAllocatedAssetStageChange`).
- */
-export function onTransferReleased(current: ForeignRecord, previous: ForeignRecord): void {
-    takeBackStageAfterTransfer(current, previous)
 }
 
 /**

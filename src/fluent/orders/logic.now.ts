@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, Property, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
 import { onAllocatedAssetStageChange, onOrderApprovalDecision, sourceOrder, uiCancelOrder, uiRecheckApprovals, uiSubmitOrder } from '../../server/entry/orders'
-import { onTransferReleased } from '../../server/entry/assets'
+import { takeBackStageAfterTransfer } from '../../server/platform/transfers'
 import { topUpSparePools } from '../../server/entry/spare-pool'
 import { CURRENT_FLEET_STAGE_CHANGED, CURRENT_IS_FLEET } from '../../server/domain/fleet'
 import { INSTALL_MODE, ORDER_STAGE, STAGE_FIELDS } from '../../server/domain/vocabulary'
@@ -167,7 +167,7 @@ BusinessRule({
     action: ['update'],
     order: 80,
     condition: `current.active_to.changes() && ${CURRENT_IS_FLEET}`,
-    script: onTransferReleased,
+    script: takeBackStageAfterTransfer,
 })
 
 // Also takes a unit that left its line in transit off it.

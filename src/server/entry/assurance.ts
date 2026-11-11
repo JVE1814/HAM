@@ -1,6 +1,5 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { raiseDueAttestations } from '../platform/attestations.ts'
 import { closeAudit, findOpenVisibleAudit, recordScan, startSiteAudit, startStockroomAudit } from '../platform/audits.ts'
 import { recheckFlaggedRacks } from '../platform/racks.ts'
 import { reconcileInstalledBase } from '../platform/reconciliation.ts'
@@ -57,10 +56,6 @@ export function uiCloseAudit(current: GlideRecord): void {
     if (close.outcome === 'busy') return void gs.addErrorMessage(`Audit ${number} not closed: a scan is being recorded; close it again`)
     if (close.outcome === 'not_saved') return void gs.addErrorMessage(`Audit ${number} not closed: ${close.reason}`)
     if (close.unsaved > 0) gs.addErrorMessage(`Audit ${number} closed, but ${close.unsaved} line result(s) or exception(s) were not saved (see the system log)`)
-}
-
-export function raiseAttestations(): void {
-    raiseDueAttestations()
 }
 
 /** Daily job: the installed base against monitoring, then the racks with an exception, each run whether the other fails. */

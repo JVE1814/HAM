@@ -37,7 +37,7 @@ import {
     type RmaState,
     type ShipmentStatus,
 } from './domain/vocabulary'
-import { clearVoidedWipeEvidence, explainLifecycleRefusal, onTransferReleased, refusesLifecycleChange } from './entry/assets'
+import { clearVoidedWipeEvidence, explainLifecycleRefusal, refusesLifecycleChange } from './entry/assets'
 import { onAssetServiceChange } from './entry/billing'
 import { onCaseFailedAsset } from './entry/breakfix'
 import { explainWorkWindowRefusal, onWorkOrderClosed, refusesWorkWindow } from './entry/delivery'
@@ -45,7 +45,9 @@ import { onDisposalApprovalDecision } from './entry/disposal'
 import { onAssetLeaseChanged } from './entry/leases'
 import { onModelLifecycleChanged } from './entry/models'
 import { onAllocatedAssetStageChange, onOrderApprovalDecision } from './entry/orders'
-import { explainRackRefusal, recheckRackPlacement, refusesKeptPlacement, refusesRackPlacement } from './entry/racks'
+import { explainRackRefusal, refusesKeptPlacement, refusesRackPlacement } from './entry/racks'
+import { recheckRacksOf } from './platform/racks'
+import { takeBackStageAfterTransfer } from './platform/transfers'
 import { scopeRecords } from './entry/visibility'
 import { EVENT } from './domain/events'
 import { oemContext } from './platform/oem-http'
@@ -316,7 +318,7 @@ describe('ATF server-side scripts', () => {
  * record; an entry point that takes a GlideRecord does not compile here.
  */
 const ON_FOREIGN_TABLES = {
-    'entry/assets.ts': { clearVoidedWipeEvidence, explainLifecycleRefusal, onTransferReleased, refusesLifecycleChange },
+    'entry/assets.ts': { clearVoidedWipeEvidence, explainLifecycleRefusal, refusesLifecycleChange },
     'entry/billing.ts': { onAssetServiceChange },
     'entry/breakfix.ts': { onCaseFailedAsset },
     'entry/delivery.ts': { explainWorkWindowRefusal, onWorkOrderClosed, refusesWorkWindow },
@@ -324,8 +326,10 @@ const ON_FOREIGN_TABLES = {
     'entry/leases.ts': { onAssetLeaseChanged },
     'entry/models.ts': { onModelLifecycleChanged },
     'entry/orders.ts': { onAllocatedAssetStageChange, onOrderApprovalDecision },
-    'entry/racks.ts': { explainRackRefusal, recheckRackPlacement, refusesKeptPlacement, refusesRackPlacement },
+    'entry/racks.ts': { explainRackRefusal, refusesKeptPlacement, refusesRackPlacement },
     'entry/visibility.ts': { scopeRecords },
+    'platform/racks.ts': { recheckRacksOf },
+    'platform/transfers.ts': { takeBackStageAfterTransfer },
 } satisfies Record<string, Record<string, (current: ForeignRecord, previous: ForeignRecord) => unknown>>
 
 describe('business rule conditions', () => {

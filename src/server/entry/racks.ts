@@ -1,7 +1,7 @@
 import { gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
 import type { RackList, SiteList } from '../domain/rest-contracts.ts'
-import { keepsPlacement, placementRefusal, rackElevation, racksAtSite, recheckRacksOf, visibleSites } from '../platform/racks.ts'
+import { keepsPlacement, placementRefusal, rackElevation, racksAtSite, visibleSites } from '../platform/racks.ts'
 import type { ForeignRecord } from '../platform/records.ts'
 import { pathParam, queryParam, reply } from '../platform/rest-api.ts'
 import { currentSession } from '../platform/session.ts'
@@ -36,16 +36,6 @@ export function refusesKeptPlacement(current: ForeignRecord, previous: ForeignRe
  */
 export function explainRackRefusal(current: ForeignRecord, previous: ForeignRecord | null): void {
     gs.addErrorMessage(placementRefusal(current, previous) ?? 'This rack placement is refused')
-}
-
-/**
- * After rule on alm_hardware: re-check the rack the Asset is placed in, and the one it left, now the save is written.
- * The before rule checks against the placements saved before, so two saves into the same units (or the last of a
- * rack's power) at the same moment can both pass it. Each after rule runs once its own save is written, so the later
- * of the two reads both and raises the exception; a later save that clears it resolves it.
- */
-export function recheckRackPlacement(current: ForeignRecord, previous: ForeignRecord): void {
-    recheckRacksOf(current, previous)
 }
 
 function forbidden(response: RESTAPIResponse): boolean {

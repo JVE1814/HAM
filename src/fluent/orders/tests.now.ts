@@ -893,7 +893,7 @@ export const transferStageTest = Test(
             enforceSecurity: false,
         })
         // Inventory's "Release Asset on TOL cancel/delete" saves it In stock / Available where it was, clearing the flag;
-        // in the same save the app gives it back the stage it left (entry/assets onTransferReleased).
+        // in the same save the app gives it back the stage it left (platform/transfers takeBackStageAfterTransfer).
         atf.server.recordUpdate({
             $id: Now.ID['atf_xfer_cancel_line'],
             table: 'alm_transfer_order_line',
