@@ -89,14 +89,6 @@ export function buyoutTerms(
     return { assets: assetIds.length, ...buyoutSplit(lease.price, assetIds) }
 }
 
-/**
- * One share of `amount` split evenly over `count` Assets (0 without any), unrounded: a lease payment's share for
- * Margin, whose costs are summed before they are rounded. An amount to be stored per Asset is split by `evenSplit`.
- */
-export function evenShare(amount: number, count: number): number {
-    return count > 0 ? amount / count : 0
-}
-
 interface EvenSplit {
     share: number
     extra: number

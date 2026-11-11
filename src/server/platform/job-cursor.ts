@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { isCurrentPass as namesCurrentPass } from '../domain/chunked-job.ts'
+import { isCurrentPass as namesCurrentPass, JOB_ERROR_LENGTH, JOB_STATUS_LENGTH } from '../domain/chunked-job.ts'
 import { nowGlide, nowMs } from './clock.ts'
 import { log } from './log.ts'
 import { num, refusal, str } from './records.ts'
@@ -34,6 +34,7 @@ export const JOB_STATUS = {
 /** What a save changes on a job's row; what is left out stays as it is. */
 export interface JobCursorValues {
     cursor?: string
+    /** Kept up to the column's length, as `lastError` is. */
     status?: string
     processed?: number
     /** The records of the pass that failed so far, over all its runs. */
@@ -80,9 +81,6 @@ function find(job: string): GlideRecord | null {
     return record.get('job', job) ? record : null
 }
 
-/** The length of the Last error column (operations/operations.now.ts). */
-const LAST_ERROR_LENGTH = 1000
-
 function rowOf(record: GlideRecord): JobCursor {
     return {
         cursor: str(record, 'cursor'),
@@ -91,10 +89,10 @@ function rowOf(record: GlideRecord): JobCursor {
         lastError: str(record, 'last_error'),
         save: (values) => {
             if (values.cursor !== undefined) record.setValue('cursor', values.cursor)
-            if (values.status !== undefined) record.setValue('last_status', values.status)
+            if (values.status !== undefined) record.setValue('last_status', values.status.slice(0, JOB_STATUS_LENGTH))
             if (values.processed !== undefined) record.setValue('processed_total', values.processed)
             if (values.failed !== undefined) record.setValue('failed_total', values.failed)
-            if (values.lastError !== undefined) record.setValue('last_error', values.lastError.slice(0, LAST_ERROR_LENGTH))
+            if (values.lastError !== undefined) record.setValue('last_error', values.lastError.slice(0, JOB_ERROR_LENGTH))
             if (values.ranNow) record.setValue('last_run', nowGlide())
             return record.update() ? null : refusal(record)
         },

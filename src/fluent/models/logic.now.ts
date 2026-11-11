@@ -1,6 +1,5 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, Record, ScheduledScript, ScriptAction } from '@servicenow/sdk/core'
-import { onAgreementTermsChanged, refreshAgreementAssets } from '../../server/entry/agreements'
 import { onModelLifecycleChanged, onNormalizationResolved, processLifecycleRow, refreshModelAssets, rollLifecyclePhases } from '../../server/entry/models'
 import { normalizeNaasRawModels } from '../../server/platform/normalization'
 import { MILESTONE_ROW_CHANGED, MODEL_LIFECYCLE } from '../../server/domain/model-lifecycle'
@@ -23,17 +22,6 @@ BusinessRule({
     order: 200,
     condition: MILESTONE_ROW_CHANGED,
     script: onModelLifecycleChanged,
-})
-
-BusinessRule({
-    $id: Now.ID['br_agreement_terms_changed'],
-    name: 'NaaS - agreement refresh terms changed',
-    table: 'x_daas_ham_agreement',
-    when: 'after',
-    action: ['update'],
-    order: 200,
-    condition: 'current.refresh_cycle_months.changes() || current.refresh_basis.changes()',
-    script: onAgreementTermsChanged,
 })
 
 BusinessRule({
@@ -76,27 +64,6 @@ ScriptAction({
     active: true,
     script: refreshModelAssets,
     description: "Recomputes lifecycle phase and refresh due date for a model's assets in time-boxed chunks.",
-})
-
-Record({
-    $id: Now.ID['event_agreement_terms'],
-    table: 'sysevent_register',
-    data: {
-        suffix: 'agreement.terms',
-        event_name: EVENT.agreementTermsChanged,
-        table: 'x_daas_ham_agreement',
-        description: "An agreement's refresh terms changed; parm1 = agreement, parm2 = cursor.",
-        priority: 200,
-    },
-})
-
-ScriptAction({
-    $id: Now.ID['sa_agreement_terms'],
-    name: 'NaaS - refresh due of agreement assets',
-    eventName: EVENT.agreementTermsChanged,
-    active: true,
-    script: refreshAgreementAssets,
-    description: "Recomputes refresh due dates for an agreement's deployed assets in time-boxed chunks.",
 })
 
 ScheduledScript({

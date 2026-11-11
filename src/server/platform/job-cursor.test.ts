@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { completePass, findJobCursor, isCurrentPass, JOB_STATUS, openJobCursor, retirePass, startPass } from './job-cursor.ts'
+import { JOB_ERROR_LENGTH, JOB_STATUS_LENGTH } from '../domain/chunked-job.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
@@ -46,6 +47,11 @@ describe('the job cursor repository', () => {
         platform.clock += 60000
         expect(openJobCursor('job1').save({ cursor: '42' })).toBeNull()
         expect(cursorRow('job1')).toMatchObject({ cursor: '42', last_status: 'x', last_run: '2025-11-09 12:00:00' })
+    })
+
+    it('cuts a status and an error to the lengths of their columns', () => {
+        openJobCursor('job1').save({ status: 's'.repeat(JOB_STATUS_LENGTH + 1), lastError: 'e'.repeat(JOB_ERROR_LENGTH + 1) })
+        expect(cursorRow('job1')).toMatchObject({ last_status: 's'.repeat(JOB_STATUS_LENGTH), last_error: 'e'.repeat(JOB_ERROR_LENGTH) })
     })
 
     it('reports a refused save with why', () => {

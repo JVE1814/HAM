@@ -32,12 +32,13 @@ export function warnAgreementRenewals(today: string): void {
 }
 
 /**
- * An Agreement's end date changed (the caller saves it): the renewal warning goes again ahead of the new end, and an
- * Agreement that has not ended by it has its equipment recovered again once it has (domain/renewals `recoversAgainAt`).
+ * An Agreement's end date changed (a before rule, so the save that changed it stores this too): the renewal warning
+ * goes again ahead of the new end, and an Agreement that has not ended by it has its equipment recovered again once it
+ * has (domain/renewals `recoversAgainAt`).
  */
-export function rearmForNewEnd(agreement: GlideRecord): void {
-    agreement.setValue(RENEWAL_WARNED, false)
-    if (recoversAgainAt(str(agreement, 'ends'), todayIso())) recoverAgainAtEnd(agreement)
+export function rearmForNewEnd(current: GlideRecord): void {
+    current.setValue(RENEWAL_WARNED, false)
+    if (recoversAgainAt(str(current, 'ends'), todayIso())) recoverAgainAtEnd(current)
 }
 
 /**

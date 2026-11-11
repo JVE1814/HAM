@@ -1,6 +1,5 @@
 import { activeDays, divideRounded, fromCents, monthBounds, toCents, type MonthBounds } from './money.ts'
 import { addDays, addMonths } from './calendar.ts'
-import { evenShare } from './leases.ts'
 import { legalOwnerOf } from './lifecycle.ts'
 import type { CostType, LegalOwner } from './vocabulary.ts'
 
@@ -93,10 +92,11 @@ function writeOffShare(
 
 /**
  * While a buyout transfer runs, Assets leave the schedule one by one, so the payment keeps being split over
- * the Assets it covered when the buyout was decided.
+ * the Assets it covered when the buyout was decided. The share is not rounded: costs are summed before they are.
  */
 function leaseShare(lease: Pick<LeaseTerms, 'monthlyPayment' | 'coveredAssets' | 'buyoutAssets'>): number {
-    return evenShare(lease.monthlyPayment, Math.max(lease.coveredAssets, lease.buyoutAssets))
+    const assets = Math.max(lease.coveredAssets, lease.buyoutAssets)
+    return assets > 0 ? lease.monthlyPayment / assets : 0
 }
 
 function leaseRunsIn(lease: LeaseTerms, bounds: MonthBounds): boolean {

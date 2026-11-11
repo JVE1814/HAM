@@ -221,10 +221,16 @@ export function decideGenerationReset(
 /** The length of the errors a Billing period records: its `last_error` (generation) and its `margin_error`. */
 export const PERIOD_ERROR_LENGTH = 255
 
+/** `text` as a Billing period stores it in either error field: the platform refuses or cuts a longer value unseen. */
+export function periodError(text: string): string {
+    return text.slice(0, PERIOD_ERROR_LENGTH)
+}
+
 /** The generation error a reset period records, which Close period refuses on until a Regenerate clears it. */
 export function resetGenerationError(byUser: string, idleMinutes: number): string {
-    const note = `Generation reset by hand by ${byUser} after ${idleMinutes} minutes without activity; its lines may be incomplete: Regenerate before closing`
-    return note.slice(0, PERIOD_ERROR_LENGTH)
+    return periodError(
+        `Generation reset by hand by ${byUser} after ${idleMinutes} minutes without activity; its lines may be incomplete: Regenerate before closing`,
+    )
 }
 
 /**
