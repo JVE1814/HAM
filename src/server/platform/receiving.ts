@@ -6,7 +6,7 @@ import { LOCK_TRIES, type HeldLock, type LockAttempt } from '../domain/job-lock.
 import type { Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import type { AssetSummary } from '../domain/rest-contracts.ts'
-import { allocationProblem, awaitsReceipt, putAwayProblem, receivingProblem, type ReceivingLine } from '../domain/warehouse.ts'
+import { allocationProblem, awaitsReceipt, pickProblem, putAwayProblem, receivingProblem, type ReceivingLine } from '../domain/warehouse.ts'
 import { DEFAULT_STAGING_SOURCE } from '../domain/staging.ts'
 import { LINE_STAGE, type StagingSource, type StockroomType } from '../domain/vocabulary.ts'
 import { findAnyAssetBySerial, identifyAnyAsset, identifyAsset, type AssetIdentified } from './asset-identifiers.ts'
@@ -363,12 +363,8 @@ export function pick(code: string, orderNumber: string): Scan {
     const found = lookUp(code)
     if ('reason' in found) return found
     const asset = found.asset
-    const ownOrder = str(asset, 'x_daas_ham_order_line.order.number')
-    if (!ownOrder || ownOrder !== orderNumber) {
-        return { reason: 'conflict', why: ownOrder ? `Belongs to ${ownOrder}` : 'Not allocated to an order' }
-    }
-    if (readStage(asset) !== 'staged') return { reason: 'conflict', why: `Not ready to ship (${readStage(asset)})` }
-    return { asset }
+    const problem = pickProblem(str(asset, 'x_daas_ham_order_line.order.number'), orderNumber, readStage(asset))
+    return problem ? { reason: 'conflict', why: problem } : { asset }
 }
 
 export function receivingStockrooms(): Array<{ id: string; name: string }> {

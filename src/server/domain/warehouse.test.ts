@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ALL_STAGES, type Stage } from './lifecycle'
-import { allocationProblem, awaitsReceipt, putAwayProblem, receivingProblem } from './warehouse'
+import { allocationProblem, awaitsReceipt, pickProblem, putAwayProblem, receivingProblem } from './warehouse'
 import type { StockroomType } from './vocabulary'
 
 describe('awaitsReceipt', () => {
@@ -86,5 +86,23 @@ describe('putAwayProblem', () => {
             expect(putAwayProblem('staged', into)).toBe('Cannot be put away (staged)')
             expect(putAwayProblem(null, into)).toBe('Cannot be put away (unknown stage)')
         }
+    })
+})
+
+describe('pickProblem', () => {
+    it('picks a staged unit of the Order being picked', () => {
+        expect(pickProblem('ORD1', 'ORD1', 'staged')).toBeNull()
+    })
+
+    it('refuses a unit on no Order, or on another Order, naming that Order', () => {
+        expect(pickProblem('', 'ORD1', 'staged')).toBe('Not allocated to an order')
+        expect(pickProblem('', '', 'staged')).toBe('Not allocated to an order')
+        expect(pickProblem('ORD2', 'ORD1', 'staged')).toBe('Belongs to ORD2')
+    })
+
+    it('refuses a unit of the Order in any stage but staged, naming its stage', () => {
+        const others = ALL_STAGES.filter((stage) => stage !== 'staged')
+        expect(others.filter((stage) => pickProblem('ORD1', 'ORD1', stage) === null)).toEqual([])
+        expect(pickProblem('ORD1', 'ORD1', 'staging')).toBe('Not ready to ship (staging)')
     })
 })
