@@ -147,6 +147,8 @@ export interface EventJobResult extends ChunkedJobResult {
  * clears what both wrote. A superseded, retried or restarted chunk reports `done: false` and no counts.
  */
 export function runEventTableJob<R, T = R>(queued: JobEvent, spec: EventJob<T, R>): EventJobResult {
+    // An event job's query is scoped by its subject: without one it would match every record that names none.
+    if (!queued.subject) return { processed: 0, failed: 0, done: false, cursor: queued.position, lastError: '', superseded: false }
     if (spec.pass?.underLock) return runSupersedingChunk(queued, spec, spec.pass.job, spec.pass.underLock)
     if (spec.pass) return runTriggeredChunk(queued, spec, spec.pass.job)
     const result = runOverTable(spec, {

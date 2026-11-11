@@ -320,8 +320,6 @@ function notMoved(asset: GlideRecord, to: Stage, reason: string): false {
  */
 export function transferToProvider(queued: JobEvent, lease: GlideRecord): void {
     const leaseId = queued.subject
-    // Never run with a blank lease: the query would match every Asset that has no lease.
-    if (!leaseId) return
     // Each Asset's cost is its share of the price to the cent, fixed when the buyout was decided (domain/leases
     // `buyoutCost`); a share stored before shares were split to the cent is rounded, with no cent left over to place.
     const split = { share: num(lease, 'buyout_share'), extraThrough: str(lease, 'buyout_extra_through') }
