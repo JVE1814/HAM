@@ -1,11 +1,8 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { evaluateReturnLine, requestProducedReturn } from '../platform/returns.ts'
 
-/** Returns, decommissions and depot evaluation (P2.4): platform/returns. */
-
 /**
- * Record producer "Return or decommission equipment" post-insert script: raise the Return it just saved for the
- * devices it lists (platform/returns `requestProducedReturn`, which removes one that is not raised). (`current` is
+ * Record producer "Return or decommission equipment" post-insert script. (`current` is
  * typed unknown because the SDK passes its own GlideRecord type here.)
  */
 export function afterReturnProduced(producer: Record<string, unknown>, current: unknown): void {

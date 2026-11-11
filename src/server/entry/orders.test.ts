@@ -4,8 +4,6 @@ import { afterOrderProduced } from './orders.ts'
 import { submitProducedOrder, type Submission } from '../platform/orders.ts'
 import { platform, recordOf } from '../test-support/fake-glide.ts'
 
-/* What the raiser of an Order from the record producer is told, for each outcome of its submission. */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 vi.mock('../platform/orders.ts', async (original) => ({ ...(await original<typeof import('../platform/orders.ts')>()), submitProducedOrder: vi.fn() }))
 

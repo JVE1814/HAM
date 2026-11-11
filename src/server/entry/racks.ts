@@ -6,8 +6,6 @@ import { keepsPlacement, placementRefusal, rackElevation, racksAtSite, visibleSi
 import type { ForeignRecord } from '../platform/records.ts'
 import { pathParam, queryParam, reply, requireRole } from '../platform/rest-api.ts'
 
-/** Rack placement and the rack elevation view (P2.8, Q67). */
-
 /**
  * Condition of the before rule on alm_hardware (br_rack_placement): whether the save must be refused. The rule refuses
  * it with its Abort action, not with current.setAbortAction: the platform refuses that call from a scoped app on a

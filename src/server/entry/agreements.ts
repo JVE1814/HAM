@@ -1,5 +1,3 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { agreementCurrencyProblem } from '../domain/billing.ts'
 import { currencyCode } from '../domain/money.ts'
@@ -8,11 +6,9 @@ import { str } from '../platform/records.ts'
 import { rearmForNewEnd, renewAgreement } from '../platform/renewals.ts'
 import { abortWith } from '../platform/rule-api.ts'
 
-/** Agreements: their currency, their refresh terms, and their renewal (plan §13 Renewals). */
-
 /**
- * Before insert/update rule on Agreements (when the currency changes): a currency that is no three-letter code is
- * refused as it is entered (domain/billing `agreementCurrencyProblem`), rather than failing every line of the Agreement
+ * A currency that is no three-letter code is
+ * refused as it is entered, rather than failing every line of the Agreement
  * at the next generation; one entered in lower case is saved upper-cased, as billing reads it.
  */
 export function guardAgreementCurrency(current: GlideRecord): void {

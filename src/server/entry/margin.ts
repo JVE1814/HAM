@@ -1,12 +1,8 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { EVENT } from '../domain/events.ts'
 import { jobEvent } from '../platform/events.ts'
 import { computeMarginChunk, queueMarginCompute } from '../platform/margin.ts'
 import { str } from '../platform/records.ts'
-
-/** Cost facts and Margin per Customer and Site, computed when a Billing period closes (plan §13 Margin / TCO): platform/margin. */
 
 export function uiRecomputeMargin(current: GlideRecord): void {
     queueMarginCompute(current)

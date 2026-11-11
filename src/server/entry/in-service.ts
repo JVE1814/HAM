@@ -6,9 +6,7 @@ import { applyDeviceEvents, purgeDeviceEventsOlderThan } from '../platform/in-se
 import { intProperty } from '../platform/properties.ts'
 import { reply, requireRole } from '../platform/rest-api.ts'
 
-/** In-service detection: Seen signals in, billing start out (P1.8). */
-
-/** POST /api/x_daas_ham/naas/device_events - Seen signals from the Provider NMS (platform/in-service `applyDeviceEvents`). */
+/** POST /api/x_daas_ham/naas/device_events - Seen signals from the Provider NMS. */
 export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!requireRole(response, DEVICE_EVENT_SENDERS, 'Requires the x_daas_ham.integration role')) return
     const parsed = parseDeviceEvents(request.body.data, intProperty(PROPERTY.eventsMaxBatch), nowMs())

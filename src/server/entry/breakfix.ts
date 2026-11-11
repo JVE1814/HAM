@@ -3,8 +3,6 @@ import { noteReplacementComplete, raiseReplacement } from '../platform/breakfix.
 import { returnDefectiveToOem } from '../platform/oem-rma.ts'
 import { str } from '../platform/records.ts'
 
-/** Break-fix: a CSM case about a failed Asset drives a device-replace Order (P2.3, Q58). */
-
 export function uiRaiseReplacement(current: GlideRecord): void {
     const replacement = raiseReplacement(current)
     switch (replacement.outcome) {
@@ -28,8 +26,7 @@ export function uiDefectiveReturnedToOem(current: GlideRecord): void {
 
 /**
  * Script action of x_daas_ham.replacement.complete (break-fix/break-fix.now.ts), queued on a replacement Order once it is
- * complete (platform/fulfilment `recomputeOrder`): its case is saved, so that the case's replacement SLA stops. The
- * Order is the event's record, read again by its sys_id there.
+ * complete: its case is saved, so that the case's replacement SLA stops.
  */
 export function onReplacementComplete(event: GlideRecord): void {
     noteReplacementComplete(str(event, 'instance'))

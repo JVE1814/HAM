@@ -6,13 +6,11 @@ import type { ForeignRecord } from '../platform/records.ts'
 import { onTransferOrderLine } from '../platform/transfers.ts'
 
 /**
- * Why a save that changes the stage breaks the lifecycle (domain/lifecycle `stageChangeRefusal`), or null when it may
+ * Why a save that changes the stage breaks the lifecycle, or null when it may
  * be saved (docs/spec/p1-fulfilment.md, Lifecycle stages): a save a user without admin makes in their own transaction
  * must follow it, a form edit or out-of-box logic that user's action runs (Inventory pushing a transfer order line's
  * stage to its Asset, external-contracts N38: In transfer only while the Asset is on an open line); background
- * processes and administrators are not checked. Only reads: the wipe evidence a save into staging voids is cleared by
- * a rule of its own (clearVoidedWipeEvidence), and only a move out of the Provider reads that evidence, never one into
- * staging.
+ * processes and administrators are not checked.
  */
 function lifecycleRefusal(current: ForeignRecord, previous: ForeignRecord): string | null {
     if (!gs.isInteractive() || gs.hasRole(ROLE.admin)) return null
@@ -23,8 +21,7 @@ function lifecycleRefusal(current: ForeignRecord, previous: ForeignRecord): stri
 /**
  * Condition of the before-update rule on alm_hardware (br_asset_enforce_lifecycle), once the stage changes: whether
  * the save must be refused. The rule refuses it with its Abort action, not with current.setAbortAction, which the
- * platform refuses from a scoped app on a record of a global table and saves anyway (as for racks.ts
- * refusesRackPlacement).
+ * platform refuses from a scoped app on a record of a global table and saves anyway.
  */
 export function refusesLifecycleChange(current: ForeignRecord, previous: ForeignRecord): boolean {
     return lifecycleRefusal(current, previous) !== null

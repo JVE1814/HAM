@@ -8,8 +8,6 @@ import { str } from '../platform/records.ts'
 import { queryParam, reply } from '../platform/rest-api.ts'
 import { labelReturn, retryTracking, trackShipment, voidLabel } from '../platform/shipping.ts'
 
-/** Shipping aggregator: labels for ship-back returns, voided labels and tracking webhooks (plan §13 Shipping aggregator, Q73): platform/shipping. */
-
 export function uiCreateReturnLabel(current: GlideRecord): void {
     const label = labelReturn(current)
     if (!label.bought) return void gs.addErrorMessage(label.why)
@@ -18,8 +16,8 @@ export function uiCreateReturnLabel(current: GlideRecord): void {
 }
 
 /**
- * UI action "Mark label voided" on a Shipment, once the person voided the label with the carrier (platform/shipping
- * `voidLabel`). Edits on the form are not saved with it.
+ * UI action "Mark label voided" on a Shipment, once the person voided the label with the carrier.
+ * Edits on the form are not saved with it.
  */
 export function uiMarkLabelVoided(current: GlideRecord): void {
     const outcome = voidLabel(current.getUniqueValue(), str(current, 'tracking_number'))
@@ -33,7 +31,7 @@ export function uiMarkLabelVoided(current: GlideRecord): void {
  * the X-NaaS-Webhook-Token header, or by ?token= when the header is absent (ADR 0012). A Shipment or tracking event
  * the platform refuses is answered 500, not as a success, so an aggregator that retries failed deliveries
  * sends the update again. An update held off by its Shipment's tracking lock is answered 202 and applied in the
- * background (platform/shipping `trackShipment`), not left to the aggregator; only one that cannot be queued is
+ * background, not left to the aggregator; only one that cannot be queued is
  * answered 503.
  */
 export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIResponse): void {
@@ -59,7 +57,6 @@ export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIRes
 }
 
 export function retryTrackingUpdate(event: GlideRecord, current: GlideRecord): void {
-    // The Shipment is gone: nothing to apply.
     if (!current.getUniqueValue()) return
     retryTracking(current, str(event, 'parm1'), timesRequeued(event))
 }

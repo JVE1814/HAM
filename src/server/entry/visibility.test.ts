@@ -50,7 +50,7 @@ const OTHER_DEPOT = { sys_id: 'sr9', x_daas_ham_stockroom_type: 'central_depot' 
 
 let users = 0
 /**
- * Sign in a user of Customer cust1, in the Assignment group of stockroom sr1 and a contact of site1. Each is a new user: the modules
+ * Each is a new user: the modules
  * keep a user's session, and where a table is placed, for as long as they are loaded (on the platform, a transaction).
  */
 function signIn(reader: Reader): void {
