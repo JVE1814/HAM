@@ -1,6 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { fleetCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
 import {
+    aliasedManufacturer,
     fleetOnRawModelQuery,
     LEARNED_RULE,
     MODEL_TABLE,
@@ -197,10 +198,12 @@ function closeNonNaasExceptions(naasRawModelIds: readonly string[]): void {
 }
 
 /**
- * Teach the rules: an exact rule for a resolved exception, and an alias when its manufacturer name was unknown. A blank
- * or punctuation-only name gets no alias, since none could ever match it; the exact rule still serves rows that name a
- * known manufacturer. False (and a warning) when the platform refuses the alias or the rule, so the caller does not
- * take the raw pair as mapped; a refused alias stops before the rule, so a retry learns each once.
+ * Teach the rules: an exact rule for a resolved exception, and an alias when its manufacturer name was unknown. The
+ * rule is kept under the manufacturer the raw name's alias names, which normalization looks its rules up by, and
+ * under the resolved Model's when no alias covers the name. A blank or punctuation-only name gets no alias, since none
+ * could ever match it; the exact rule still serves rows that name a known manufacturer. False (and a warning) when the
+ * platform refuses the alias or the rule, so the caller does not take the raw pair as mapped; a refused alias stops
+ * before the rule, so a retry learns each once.
  */
 function learnFromResolution(exception: GlideRecord, data: NormalizationData): boolean {
     const modelId = str(exception, 'resolved_model')
@@ -218,7 +221,7 @@ function learnFromResolution(exception: GlideRecord, data: NormalizationData): b
     const rule = new GlideRecord('x_daas_ham_model_match_rule')
     rule.initialize()
     rule.setValue('order', LEARNED_RULE.order)
-    rule.setValue('manufacturer', manufacturerId)
+    rule.setValue('manufacturer', aliasedManufacturer(rawManufacturer, data.aliases) ?? manufacturerId)
     rule.setValue('match_type', LEARNED_RULE.matchType)
     rule.setValue('pattern', str(exception, 'raw_model'))
     rule.setValue('model', modelId)

@@ -78,13 +78,21 @@ export function unusableRules(rules: readonly ModelMatchRule[]): ModelMatchRule[
     return rules.filter((rule) => rule.matchType === 'regex' && regexOf(rule.pattern) === null)
 }
 
+/**
+ * The manufacturer a raw manufacturer name is read as: the one its alias names. Match rules are kept under it, which
+ * need not be the manufacturer of the Model they map to (an alias *Cisco* covers Cisco Meraki's models too).
+ */
+export function aliasedManufacturer(rawManufacturer: string, aliases: readonly ManufacturerAlias[]): string | undefined {
+    const key = manufacturerKey(rawManufacturer)
+    return key ? aliases.find((a) => manufacturerKey(a.alias) === key)?.manufacturerId : undefined
+}
+
 export function normalizeModel(
     raw: { manufacturer: string; model: string },
     aliases: readonly ManufacturerAlias[],
     rules: readonly ModelMatchRule[],
 ): NormalizationResult {
-    const key = manufacturerKey(raw.manufacturer)
-    const manufacturerId = key ? aliases.find((a) => manufacturerKey(a.alias) === key)?.manufacturerId : undefined
+    const manufacturerId = aliasedManufacturer(raw.manufacturer, aliases)
     if (!manufacturerId) return { matched: false, reason: 'unknown_manufacturer' }
 
     const rule = rules

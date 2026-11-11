@@ -16,8 +16,10 @@
   refused leaves it unmarked, so the next run retries.
 - Unmapped pairs become counted **normalization exceptions**. Setting *resolved model* on one creates
   an exact rule, and an alias if the manufacturer was unknown (none for a blank or punctuation-only
-  one, which no alias could match). An exception whose alias or rule the platform refuses stays open
-  with an error message (clear its resolved model and set it again to retry).
+  one, which no alias could match). The rule is kept under the manufacturer the raw name's alias
+  points at, which can differ from the resolved Model's (*Cisco* resolved to a Cisco Meraki Model).
+  An exception whose alias or rule the platform refuses stays open with an error message (clear its
+  resolved model and set it again to retry).
 
 ## Lifecycle (`domain/model-lifecycle.ts`)
 
