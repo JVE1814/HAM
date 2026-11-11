@@ -112,7 +112,7 @@ function stockroomPaths(scoping: TableScoping): string[] {
  * read ACLs' row checks pass it (outsideNaas, the same test on one record), so the platform's own ACLs and rules alone
  * decide whether they see it (see leavesOutsideNaas for Customer contacts). None on the app's own tables.
  */
-export function outsideNaasConditions(scoping: TableScoping): string[] {
+function outsideNaasConditions(scoping: TableScoping): string[] {
     switch (scoping.naas) {
         case undefined:
             return []
@@ -214,7 +214,7 @@ function leavesOutsideNaas(scope: VisibilityScope): boolean {
 }
 
 /** Whether `scope` is a Customer contact's (a customer admin or a site contact), kept to their own Customer. */
-export function isCustomerContact(scope: VisibilityScope): boolean {
+function isCustomerContact(scope: VisibilityScope): boolean {
     return scope === 'own_customer' || scope === 'own_sites'
 }
 

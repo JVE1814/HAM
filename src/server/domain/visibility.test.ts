@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { recordMatches as matches } from '../test-support/encoded-query'
 import { naasStockroomCondition, outsideNaasStockroomCondition } from './fleet'
-import { EQUIPMENT_HANDLERS, ROLE } from './roles'
+import { ROLE } from './roles'
 import {
     actsAsCustomerAdmin,
     contactScope,
@@ -9,8 +9,6 @@ import {
     grantsContactRecord,
     grantsNaasRecord,
     grantsReturnOfOwnCustomer,
-    isCustomerContact,
-    outsideNaasConditions,
     readsFleetProviderField,
     resolveVisibility,
     rowVisible,
@@ -82,9 +80,10 @@ describe('visibilityFilter', () => {
 
     it("keeps site contacts to their own Customer, as the read ACLs do, so another Customer's Site listing them shows nothing", () => {
         const locationFields = { customer: 'company', site: 'sys_id' }
-        expect(visibilityFilter('own_sites', locationFields, { ...ids, siteIds: () => ['site1', 'other_customer_site'] })).toBe(
-            'company=cust1^sys_idINsite1,other_customer_site',
-        )
+        const filter = visibilityFilter('own_sites', locationFields, { ...ids, siteIds: () => ['site1', 'other_customer_site'] }) ?? ''
+        expect(matches(filter, { company: 'cust1', sys_id: 'site1' })).toBe(true)
+        expect(matches(filter, { company: 'cust9', sys_id: 'other_customer_site' })).toBe(false)
+        expect(matches(filter, { company: 'cust1', sys_id: 'site2' })).toBe(false)
         expect(visibilityFilter('own_sites', locationFields, { ...ids, customerId: '' })).toBe('sys_id=-1')
     })
 
@@ -129,7 +128,7 @@ const SCOPES: readonly VisibilityScope[] = ['everything', 'unscoped', 'assigned_
 const TABLES = Object.keys(SCOPED_TABLES) as ScopedTable[]
 const scopingOfTable = (table: ScopedTable): TableScoping => SCOPED_TABLES[table]
 /** The tables the app shares with the Provider's IT: those with records outside NaaS. */
-const SHARED_TABLES = TABLES.filter((table) => outsideNaasConditions(scopingOfTable(table)).length > 0)
+const SHARED_TABLES = TABLES.filter((table) => scopingOfTable(table).naas !== undefined)
 
 /** The readers the rules narrow: an inventory tech of stockroom sr1, and Customer cust1's admin and its contact at site1. */
 type Reader = 'tech' | 'admin' | 'contact'
@@ -305,18 +304,20 @@ describe('a reader with no stockroom, Site or Customer', () => {
 describe('visibilityFilter on a table shared with the Provider IT', () => {
     const ids = IDS[1]
 
-    it('is hardware, stockrooms and transfer orders, and no table of the app', () => {
-        expect(SHARED_TABLES).toEqual(['alm_hardware', 'alm_stockroom', 'alm_transfer_order'])
-    })
-
     it('keeps a Customer contact to their Customer (and Sites) on every record, fleet or not', () => {
         for (const scope of ['own_customer', 'own_sites'] as const) {
             for (const table of SHARED_TABLES) {
-                const withoutNaas: TableScoping = { ...scopingOfTable(table), naas: undefined }
-                expect(visibilityFilter(scope, scopingOfTable(table), ids), `${scope} ${table}`).toBe(visibilityFilter(scope, withoutNaas, ids))
+                const filter = visibilityFilter(scope, scopingOfTable(table), ids) ?? ''
+                const withoutNaas = visibilityFilter(scope, { ...scopingOfTable(table), naas: undefined }, ids) ?? ''
+                for (const record of recordsLike(table)) {
+                    expect(matches(filter, record), `${scope} ${table} ${JSON.stringify(record)}`).toBe(matches(withoutNaas, record))
+                }
             }
         }
-        expect(visibilityFilter('own_sites', SCOPED_TABLES.alm_hardware, ids)).toBe('company=cust1^x_daas_ham_siteINsite1,site9')
+        const contactSees = (record: Record<string, string>) => matches(visibilityFilter('own_sites', SCOPED_TABLES.alm_hardware, ids) ?? '', record)
+        expect(contactSees({ x_daas_ham_fleet: 'false', company: 'cust1', x_daas_ham_site: 'site9' })).toBe(true)
+        expect(contactSees({ x_daas_ham_fleet: 'false', company: 'cust9', x_daas_ham_site: 'site1' })).toBe(false)
+        expect(contactSees({ x_daas_ham_fleet: 'false', company: 'cust1', x_daas_ham_site: 'site2' })).toBe(false)
     })
 
     it("narrows an inventory tech's fleet assets only: the Provider IT's hardware, flag false or blank, passes", () => {
@@ -442,12 +443,8 @@ describe('changes to hardware by hand', () => {
     }
     const unread: ScopedRow = { saved: true, valueOf: () => expect.unreachable('field read'), missing: () => expect.unreachable('record read') }
 
-    it('tell Customer contacts from staff and users the app does not scope', () => {
-        expect(SCOPES.filter(isCustomerContact)).toEqual(['own_customer', 'own_sites'])
-    })
-
     it('let an asset editor save a fleet asset their scope keeps: an inventory tech only in their stockrooms', () => {
-        expect(EQUIPMENT_HANDLERS).toEqual([ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech])
+        expect(writesFleetAsset('everything', holding(ROLE.assetManager), fleet({ stockroom: 'sr9' }), ids)).toBe(true)
         expect(writesFleetAsset('everything', holding(ROLE.fieldTech), fleet({ stockroom: 'sr9' }), ids)).toBe(true)
         expect(writesFleetAsset('assigned_stockrooms', holding(ROLE.inventoryTech), fleet({ stockroom: 'sr1' }), ids)).toBe(true)
         expect(writesFleetAsset('assigned_stockrooms', holding(ROLE.inventoryTech), fleet({ stockroom: 'sr9' }), ids)).toBe(false)
