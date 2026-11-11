@@ -2,7 +2,8 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { agreementCurrencyProblem, billingMonthProblem, currencyCode, monthBounds, monthChangedError, previousMonth } from '../domain/billing.ts'
+import { agreementCurrencyProblem, billingMonthProblem, monthChangedError } from '../domain/billing.ts'
+import { currencyCode, monthBounds, previousMonth } from '../domain/money.ts'
 import { EVENT } from '../domain/events.ts'
 import { ROLE } from '../domain/roles.ts'
 import {

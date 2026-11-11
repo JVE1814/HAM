@@ -1,4 +1,4 @@
-import { currencyCode } from './billing.ts'
+import { currencyCode } from './money.ts'
 import { failureText, isSuccess, type HttpPort } from './http.ts'
 import { asArray, field, isoDate, parseJson, text } from './json.ts'
 import { SHIPMENT_STATUS, type ShipmentStatus } from './vocabulary.ts'

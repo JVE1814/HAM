@@ -1,4 +1,4 @@
-import { activeDays, divideRounded, fromCents, monthBounds, toCents, type MonthBounds } from './billing.ts'
+import { activeDays, divideRounded, fromCents, monthBounds, toCents, type MonthBounds } from './money.ts'
 import { addDays, addMonths } from './calendar.ts'
 import { evenShare } from './leases.ts'
 import { legalOwnerOf } from './lifecycle.ts'
@@ -6,7 +6,7 @@ import type { CostType, LegalOwner } from './vocabulary.ts'
 
 /**
  * Cost facts and Margin per Customer and Site (plan §13 Margin / TCO, Q72), each in one currency: costs take their Agreement's (a
- * shipment's, its carrier's), and amounts of two currencies are never added (domain/billing `chooseCurrency`).
+ * shipment's, its carrier's), and amounts of two currencies are never added (domain/money `chooseCurrency`).
  */
 
 export interface LeaseTerms {
@@ -147,7 +147,7 @@ export class CostLedger {
 export interface Amount {
     customerId: string
     siteId: string
-    /** A three-letter code (domain/billing `currencyCode`). */
+    /** A three-letter code (domain/money `currencyCode`). */
     currency: string
     amount: number
 }
@@ -165,10 +165,6 @@ export interface MarginRow {
     margin: number
     /** Margin as a share of revenue, in percent to one decimal; null without revenue. */
     marginPct: number | null
-}
-
-export function cents(value: number): number {
-    return fromCents(toCents(value))
 }
 
 /**

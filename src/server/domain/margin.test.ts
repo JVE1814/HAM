@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { monthBounds } from './billing'
+import { monthBounds } from './money'
 import { addMonths } from './calendar'
 import {
-    cents,
     CostLedger,
     costFactKey,
     labourCost,
@@ -257,15 +256,6 @@ describe('marginRows', () => {
         // A margin of 0.99 on 200.00 is 0.495%, which rounds to 0.5% (and -0.5% for a loss of 0.99).
         expect(marginRows([{ customerId: 'a', siteId: '', currency: 'EUR', amount: 200 }], [{ customerId: 'a', siteId: '', currency: 'EUR', amount: 199.01 }])[0].marginPct).toBe(0.5)
         expect(marginRows([{ customerId: 'a', siteId: '', currency: 'EUR', amount: 200 }], [{ customerId: 'a', siteId: '', currency: 'EUR', amount: 200.99 }])[0].marginPct).toBe(-0.5)
-    })
-})
-
-describe('cents', () => {
-    it('rounds to the cent half away from zero', () => {
-        expect(cents(1.005)).toBe(1.01)
-        expect(cents(2.675)).toBe(2.68)
-        expect(cents(-1.005)).toBe(-1.01)
-        expect(cents(0.1 + 0.2)).toBe(0.3)
     })
 })
 
