@@ -30,9 +30,11 @@ The flag is set by every path through which the app creates or takes in a unit, 
   and nothing else: it moves no stage and opens no Service interval.
 
 The column defaults that stamped a NaaS value on every row the Provider's IT creates are gone: an Asset's Legal owner
-(once *Provider*, and a dropdown without *None*, which a form saved), a Model's *Track as asset* (once true) and a
-Stockroom's type (once *Central depot*). The app's intake paths set those values instead (`newAsset` and adoption set
-the Legal owner; the demo data sets the others), and a blank Legal owner still counts as the Provider's.
+(once *Provider*, and a dropdown without *None*, which a form saved) and a Stockroom's type (once *Central depot*).
+The app's intake paths set those values instead (`newAsset` and adoption set the Legal owner; the demo data sets the
+stockroom type), and a blank Legal owner still counts as the Provider's. A Model's *Track as asset*, which had such a
+default too, is gone altogether: the platform's asset tracking strategy says how a Model's units are tracked
+(ADR 0018).
 
 ## Consequences
 
@@ -45,7 +47,7 @@ the Legal owner; the demo data sets the others), and a blank Legal owner still c
 - `platform/assets` `identifyAsset` (and `findAssetByIdentifier` on it) finds fleet assets only, by serial, else
   Provider tag, else Customer tag, refusing a code two Assets carry in that field, so the warehouse look-up, put-away,
   pick and the device-events API (where another identifier is reported unknown) never act on IT's units. A receipt,
-  and the serial check before an Asset is created, look at every Asset (`includeNonFleet`), so one physical unit never
+  and the serial check before an Asset is created, look at every Asset (`findAnyAsset`), so one physical unit never
   gets a second record; an ASN row for a serial any Asset carries is refused as before.
 - The app's business rules on `alm_hardware` act on fleet assets only: each condition tests the flag after its change
   test and before it loads a module (ADR 0002 and the 254-character condition limit).
@@ -54,8 +56,9 @@ the Legal owner; the demo data sets the others), and a blank Legal owner still c
   `domain/fleet`'s condition, so its picker offers fleet assets, NaaS Models or NaaS stockrooms only, also on a column
   the app itself writes, as a user editing the record can change it. The workspace lists, the dashboard and the
   navigator modules on those tables carry the condition in every `^NQ` clause too. Fluent metadata cannot call
-  `domain/fleet`, so these are literals: `fleet-queries.test.ts` checks each against it, and fails on a reference or
-  query added without one.
+  `domain/fleet`'s functions, so it imports the conditions as constants written out there:
+  `built-metadata.test.ts` checks each built reference, list, module and dashboard source against them, and fails on
+  one added without.
 - Adoption puts a racked unit's placement into its rack as the rack checks count it (they count fleet assets only), so
   *Add to fleet* is checked as placing the unit there (Q67): one that would overlap a fleet asset on its face, leave
   the rack or take it over its power budget is refused with the placement's reason, and stays outside the fleet.
@@ -66,7 +69,8 @@ the Legal owner; the demo data sets the others), and a blank Legal owner still c
 - Adopting a unit in service does not start its billing, which starts on a go-live (ADR 0009).
 - Dropping the column defaults stops new values only. On an instance where an earlier version was installed, they were
   written on every row that existed then and on each one created since without a value, and they stay: the Provider
-  IT's storerooms count as central depots, its hardware has the Legal owner *Provider*, and its Models are tracked as
-  assets. The install does not clear them, as a stamped IT storeroom has the same values as a NaaS central depot; an
-  administrator clears them by hand ([Fleet after an upgrade](../verify-on-instance.md#fleet-after-an-upgrade)). On
-  the development instance, 9 of its 12 stockrooms were the platform's own IT warehouses stamped *Central depot*.
+  IT's storerooms count as central depots and its hardware has the Legal owner *Provider* (its Models' *Track as
+  asset* stays set too, in a column the app no longer has, ADR 0018). The install does not clear them, as a stamped IT
+  storeroom has the same values as a NaaS central depot; an administrator clears them by hand
+  ([Fleet after an upgrade](../verify-on-instance.md#fleet-after-an-upgrade)). On the development instance, 9 of its
+  12 stockrooms were the platform's own IT warehouses stamped *Central depot*.

@@ -1,6 +1,7 @@
-import type { LineStage } from './fulfilment.ts'
+import { PROVIDER_STOCKROOM_TYPES } from './fleet.ts'
+import { endedUnfulfilled } from './fulfilment.ts'
 import type { Stage } from './lifecycle.ts'
-import { orderEnded, type StockroomType } from './sourcing.ts'
+import type { LineStage, StockroomType } from './vocabulary.ts'
 
 /** What the warehouse scanning app (P1.5) may do with a scanned Asset, by its Lifecycle stage. */
 
@@ -14,12 +15,12 @@ export function awaitsReceipt(stage: Stage | null): boolean {
 }
 
 /**
- * Stockroom types arriving units (bought or returned) are received into: the Provider's central depots and staging
- * centres. A customer-site stockroom holds that Customer's own site stock: a bought unit received there would be
- * sourced only for that Customer's replacements, as a hot spare that skips staging, and a returned unit would await
+ * Stockroom types arriving units (bought or returned) are received into: the Provider's own, its central depots and
+ * staging centres. A customer-site stockroom holds that Customer's own site stock: a bought unit received there would
+ * be sourced only for that Customer's replacements, as a hot spare that skips staging, and a returned unit would await
  * evaluation away from the depot.
  */
-export const RECEIVING_STOCKROOM_TYPES: readonly StockroomType[] = ['central_depot', 'staging_centre']
+export const RECEIVING_STOCKROOM_TYPES = PROVIDER_STOCKROOM_TYPES
 
 /** Why an arriving unit cannot be received into a Stockroom of this type, or null when it can. */
 export function receivingProblem(into: StockroomType): string | null {
@@ -38,13 +39,13 @@ export interface ReceivingLine {
 
 /**
  * Why a received unit no longer goes to the Order line it was found for, or null when it does: its Order must be
- * neither cancelled nor rejected (domain/sourcing `orderEnded`), and the line must still await stock and have room
- * (fewer Assets on it than ordered). It is found before its lock is taken, so another receipt or a sourcing run may
- * have filled it since, or it may have moved on (cancelled, say). The Order comes first: a cancel or rejection saves the
- * Order before its lines, and a line whose cancel was refused stays awaiting stock on its ended Order.
+ * neither cancelled nor rejected (domain/fulfilment `endedUnfulfilled`), and the line must still await stock and have
+ * room (fewer Assets on it than ordered). It is found before its lock is taken, so another receipt or a sourcing run
+ * may have filled it since, or it may have moved on (cancelled, say). The Order comes first: a cancel or rejection saves
+ * the Order before its lines, and a line whose cancel was refused stays awaiting stock on its ended Order.
  */
 export function allocationProblem(line: ReceivingLine): string | null {
-    if (orderEnded(line.orderStage)) return `its Order is ${line.orderStage}`
+    if (endedUnfulfilled(line.orderStage)) return `its Order is ${line.orderStage}`
     if (line.stage !== 'awaiting_stock') return `it is no longer awaiting stock (${line.stage || 'unknown stage'})`
     if (line.allocated >= line.quantity) return `it already has all ${line.quantity} unit(s)`
     return null

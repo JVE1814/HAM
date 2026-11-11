@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { scanQueue } from './scan-queue'
 
-/** A promise and the functions that settle it. */
 function deferred() {
     let resolve!: () => void
     let reject!: (error: Error) => void
@@ -12,7 +11,6 @@ function deferred() {
     return { promise, resolve, reject }
 }
 
-/** Lets queued promise callbacks run. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe('scanQueue', () => {

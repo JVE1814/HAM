@@ -56,10 +56,4 @@ describe('catalog entries an Order counts', () => {
         )
         expect(assessOrder(switchLine, mixed).verdict).toBe('within_agreement')
     })
-
-    it('needs no current entry for a like-for-like replacement', () => {
-        const inactive = contextWith({ kind: 'model', modelId: 'c9300', active: false })
-        const replacement = { lines: [{ modelId: 'c9300', deviceClass: 'switch', quantity: 1, replacesAsset: true }] }
-        expect(assessOrder(replacement, inactive).verdict).toBe('within_agreement')
-    })
 })

@@ -1,33 +1,14 @@
-import type { Approver } from './entitlement.ts'
-import type { LegalOwner, Stage } from './lifecycle.ts'
+import type { Approver } from './approvals.ts'
+import { disposalMethodsFor, legalOwnerOf, type Stage } from './lifecycle.ts'
+import type { DisposalMethod, LegalOwner } from './vocabulary.ts'
 
 /** Disposal orders (P2.5, Q61). */
-
-export type DisposalMethod = 'broker_resale' | 'oem_takeback' | 'itad_recycle' | 'return_to_customer' | 'return_to_lessor'
-
-const STAGE: Record<DisposalMethod, Stage> = {
-    broker_resale: 'sold',
-    oem_takeback: 'returned_to_oem',
-    itad_recycle: 'disposed',
-    return_to_customer: 'returned_to_customer',
-    return_to_lessor: 'returned_to_lessor',
-}
-
-const ALLOWED: Record<Exclude<LegalOwner, ''>, readonly DisposalMethod[]> = {
-    provider: ['broker_resale', 'oem_takeback', 'itad_recycle'],
-    customer: ['return_to_customer'],
-    lessor: ['return_to_lessor'],
-}
-
-export function disposalStage(method: DisposalMethod): Stage {
-    return STAGE[method]
-}
 
 /** A line's Asset as Complete disposal finds it; `customerId` is its company: the Customer it belongs to (ADR 0006). */
 export interface DisposalLine {
     /** It is a fleet asset (ADR 0016): the app retires no equipment of the Provider IT's. */
     fleet: boolean
-    legalOwner: LegalOwner
+    legalOwner: LegalOwner | ''
     method: DisposalMethod
     wipeComplete: boolean
     stage: Stage | null
@@ -38,14 +19,15 @@ export interface DisposalLine {
 
 /** Why a line cannot be completed yet (empty when it can). */
 export function disposalLineBlockers(line: DisposalLine): string[] {
-    const owner = line.legalOwner || 'provider'
+    const owner = legalOwnerOf(line.legalOwner)
+    const methods = disposalMethodsFor(owner)
     const blockers: string[] = []
     if (!line.fleet) blockers.push('asset is not a fleet asset')
     if (line.stage !== 'pending_wipe' && line.stage !== 'pending_disposal') {
         blockers.push(`asset is ${line.stage ?? 'in an unmodelled stage'}, not awaiting wipe or disposal`)
     }
-    if (!ALLOWED[owner].includes(line.method)) {
-        blockers.push(`a ${owner}-owned asset can only be ${ALLOWED[owner].map((m) => m.replace(/_/g, ' ')).join(' or ')}`)
+    if (!methods.includes(line.method)) {
+        blockers.push(`a ${owner}-owned asset can only be ${methods.map((m) => m.replace(/_/g, ' ')).join(' or ')}`)
     }
     // An order with no Customer asked no Customer admins, so it returns no customer-owned Asset.
     if (owner === 'customer' && (!line.orderCustomerId || line.customerId !== line.orderCustomerId)) {
@@ -55,9 +37,8 @@ export function disposalLineBlockers(line: DisposalLine): string[] {
     return blockers
 }
 
-/** An Asset on a Disposal order at submit: its legal owner, the Customer it belongs to (its company), its name. */
 export interface DisposalAsset {
-    legalOwner: LegalOwner
+    legalOwner: LegalOwner | ''
     customerId: string
     label: string
 }
@@ -86,6 +67,6 @@ export function disposalScopeRefusal(orderStages: readonly string[]): string {
 }
 
 /** The provider always approves; Customer admins too when a customer-owned Asset is involved. */
-export function disposalApprovers(owners: readonly LegalOwner[]): Approver[] {
+export function disposalApprovers(owners: ReadonlyArray<LegalOwner | ''>): Approver[] {
     return owners.includes('customer') ? ['account_manager', 'customer_admin'] : ['account_manager']
 }

@@ -8,9 +8,12 @@ import {
     rawModelsToNormalizeQuery,
     siteCiOnRawModelQuery,
     shouldLearnAlias,
+    unusableRules,
     type ModelMatchRule,
 } from './normalization'
 import { seenWithoutFleetAssetQuery } from './reconciliation'
+import { recordMatches as matches } from '../test-support/encoded-query'
+import { through } from '../test-support/stored-asset'
 
 const aliases = [
     { alias: 'Cisco Systems, Inc.', manufacturerId: 'cisco' },
@@ -65,6 +68,12 @@ describe('normalizeModel', () => {
         expect(result).toEqual({ matched: false, manufacturerId: 'cisco', reason: 'no_matching_rule' })
     })
 
+    it('names the regex rules whose pattern is no regular expression, which it skipped', () => {
+        expect(unusableRules(rules).map((rule) => rule.id)).toEqual(['r4'])
+        expect(unusableRules(rules.filter((rule) => rule.id !== 'r4'))).toEqual([])
+        expect(unusableRules([{ ...rules[0], pattern: '([' }])).toEqual([])
+    })
+
     it('reports an unknown manufacturer', () => {
         expect(normalizeModel({ manufacturer: 'Acme', model: 'X1' }, aliases, rules)).toEqual({
             matched: false,
@@ -91,22 +100,41 @@ describe('shouldLearnAlias', () => {
     })
 })
 
+/** A raw model still to normalize: no OEM PID, mapped to no canonical Model. */
+const RAW = { x_daas_ham_oem_pid: '', x_daas_ham_normalized_to: '' }
+const CANONICAL = { x_daas_ham_oem_pid: 'C9300-48P-E', x_daas_ham_normalized_to: '' }
+const MAPPED = { x_daas_ham_oem_pid: '', x_daas_ham_normalized_to: 'c9300-48p' }
+
 describe('fleetOnRawModelQuery', () => {
-    it('finds fleet assets only, on a Model with no OEM PID not yet normalized (ADR 0016)', () => {
-        const conditions = fleetOnRawModelQuery().split('^')
-        expect(conditions).toEqual([
-            'modelISNOTEMPTY',
-            'model.x_daas_ham_oem_pidISEMPTY',
-            'model.x_daas_ham_normalized_toISEMPTY',
-            'x_daas_ham_fleet=true',
-        ])
-        expect(fleetOnRawModelQuery()).not.toContain('^NQ')
+    const asset = (fleet: string, model: Record<string, string>, modelId = 'raw1') => through('model.', model, { x_daas_ham_fleet: fleet, model: modelId })
+    const found = (record: Record<string, string>) => matches(fleetOnRawModelQuery(), record)
+
+    it('finds a fleet asset on a Model with no OEM PID that is not yet normalized', () => {
+        expect(found(asset('true', RAW))).toBe(true)
+    })
+
+    it('leaves out a fleet asset whose Model has its OEM PID or is mapped already, and one on no Model', () => {
+        expect(found(asset('true', CANONICAL))).toBe(false)
+        expect(found(asset('true', MAPPED))).toBe(false)
+        expect(found(asset('true', RAW, ''))).toBe(false)
+    })
+
+    it("leaves out the Provider IT's equipment, whose raw models are not NaaS's to map (ADR 0016)", () => {
+        expect(found(asset('false', RAW))).toBe(false)
+        expect(found(asset('', RAW))).toBe(false)
     })
 })
 
 describe('rawModelsToNormalizeQuery', () => {
-    it('keeps the raw models to those fleet assets are on, each once', () => {
-        expect(rawModelsToNormalizeQuery(['m1', 'm2', 'm1', ''])).toBe('x_daas_ham_oem_pidISEMPTY^x_daas_ham_normalized_toISEMPTY^sys_idINm1,m2')
+    const found = (query: string | null, model: Record<string, string>) => matches(query ?? 'sys_id=-1', model)
+
+    it('finds, of the raw models named, those still to normalize', () => {
+        const query = rawModelsToNormalizeQuery(['m1', 'm2', 'm1', ''])
+        expect(found(query, { sys_id: 'm1', ...RAW })).toBe(true)
+        expect(found(query, { sys_id: 'm2', ...RAW })).toBe(true)
+        expect(found(query, { sys_id: 'm3', ...RAW })).toBe(false)
+        expect(found(query, { sys_id: 'm1', ...CANONICAL })).toBe(false)
+        expect(found(query, { sys_id: 'm1', ...MAPPED })).toBe(false)
     })
 
     it('gives no query without one, which would map every raw model', () => {
@@ -116,31 +144,56 @@ describe('rawModelsToNormalizeQuery', () => {
 })
 
 describe('siteCiOnRawModelQuery', () => {
+    /** A network-gear CI at a customer Site that points at no Asset: one reconciliation reports seen without asset. */
+    const seenWithoutAsset = { asset: '', 'location.x_daas_ham_is_site': 'true' }
+    const ci = (model: Record<string, string>, own: Record<string, string> = {}) => through('model_id.', model, { ...seenWithoutAsset, model_id: 'raw1', ...own })
+    const found = (record: Record<string, string>) => matches(siteCiOnRawModelQuery(), record)
+
     it('finds the devices reported seen without a fleet asset, on a raw model not yet normalized', () => {
-        const query = siteCiOnRawModelQuery()
-        expect(query.startsWith(`${seenWithoutFleetAssetQuery()}^`)).toBe(true)
-        expect(query.endsWith('^model_idISNOTEMPTY^model_id.x_daas_ham_oem_pidISEMPTY^model_id.x_daas_ham_normalized_toISEMPTY')).toBe(true)
-        expect(query).not.toContain('^NQ')
+        expect(found(ci(RAW))).toBe(true)
+        expect(found(ci(CANONICAL))).toBe(false)
+        expect(found(ci(MAPPED))).toBe(false)
+        expect(found(ci(RAW, { model_id: '' }))).toBe(false)
+    })
+
+    it('leaves out a device on a raw model that is not reported: on a fleet asset, or not at a customer Site', () => {
+        expect(matches(seenWithoutFleetAssetQuery(), seenWithoutAsset)).toBe(true)
+        expect(found(ci(RAW, { asset: 'a1', 'asset.ref_alm_hardware.x_daas_ham_fleet': 'true' }))).toBe(false)
+        expect(found(ci(RAW, { 'location.x_daas_ham_is_site': 'false' }))).toBe(false)
     })
 })
 
 describe('notNaasRawModelsQuery', () => {
-    it('keeps the raw models open exceptions name that are unmapped and not mapped by the job, each id once', () => {
-        expect(notNaasRawModelsQuery(['it1', 'naas1', 'it1', ''], ['naas1', 'naas2', 'naas1'])).toBe(
-            'x_daas_ham_oem_pidISEMPTY^x_daas_ham_normalized_toISEMPTY^sys_idINit1,naas1^sys_idNOT INnaas1,naas2',
-        )
+    const found = (query: string | null, model: Record<string, string>) => matches(query ?? 'sys_id=-1', model)
+
+    it('finds the raw models open exceptions name that are still unmapped and that the job does not map', () => {
+        const query = notNaasRawModelsQuery(['it1', 'naas1', 'it1', ''], ['naas1', 'naas2', 'naas1'])
+        expect(found(query, { sys_id: 'it1', ...RAW })).toBe(true)
+        expect(found(query, { sys_id: 'naas1', ...RAW })).toBe(false)
+        expect(found(query, { sys_id: 'it1', ...CANONICAL })).toBe(false)
+        expect(found(query, { sys_id: 'it1', ...MAPPED })).toBe(false)
+        expect(found(query, { sys_id: 'it2', ...RAW })).toBe(false)
     })
 
-    it('takes every unmapped raw model named when no raw model is NaaS', () => {
-        expect(notNaasRawModelsQuery(['it1'], [])).toBe('x_daas_ham_oem_pidISEMPTY^x_daas_ham_normalized_toISEMPTY^sys_idINit1')
+    it('takes every unmapped raw model named when no raw model is NaaS, with no empty list left for the platform to read', () => {
+        const query = notNaasRawModelsQuery(['it1'], [])
+        expect(found(query, { sys_id: 'it1', ...RAW })).toBe(true)
+        expect(found(query, { sys_id: 'it2', ...RAW })).toBe(false)
+        expect(query).not.toMatch(/(IN|=)(\^|$)/)
     })
 
     it('gives no query when no open exception names a raw model, which would match every raw model', () => {
         expect(notNaasRawModelsQuery([], ['naas1'])).toBeNull()
         expect(notNaasRawModelsQuery([''], [])).toBeNull()
     })
+})
 
-    it('reads the exceptions the hourly job raised only, not those of ASN rows', () => {
-        expect(RAW_MODEL_EXCEPTIONS_QUERY).toBe('status=open^source_table=cmdb_hardware_product_model')
+describe('RAW_MODEL_EXCEPTIONS_QUERY', () => {
+    it('finds the open exceptions the hourly job raised on a raw model, not those of ASN rows nor a resolved one', () => {
+        const raised = { status: 'open', source_table: 'cmdb_hardware_product_model' }
+        expect(matches(RAW_MODEL_EXCEPTIONS_QUERY, raised)).toBe(true)
+        expect(matches(RAW_MODEL_EXCEPTIONS_QUERY, { ...raised, source_table: 'x_daas_ham_asn_import' })).toBe(false)
+        expect(matches(RAW_MODEL_EXCEPTIONS_QUERY, { ...raised, source_table: '' })).toBe(false)
+        expect(matches(RAW_MODEL_EXCEPTIONS_QUERY, { ...raised, status: 'resolved' })).toBe(false)
     })
 })

@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
     awaitsInstall,
@@ -8,8 +7,9 @@ import {
     type InstallState,
 } from './install-confirmation'
 import { ALL_STAGES, fieldsOf } from './lifecycle'
+import { STAGE_FIELDS, type InstallMode, type OrderStage } from './vocabulary'
 
-function order(stage: string, installMode: string, shipped = 0): InstallState {
+function order(stage: OrderStage, installMode: InstallMode, shipped = 0): InstallState {
     return { stage, installMode, shippedUnits: () => shipped }
 }
 
@@ -55,7 +55,7 @@ describe('beingInstalled', () => {
     })
 
     it('is false once the Order is complete, cancelled or not yet sourced, whatever its units', () => {
-        for (const stage of ['complete', 'cancelled', 'draft', 'awaiting_approval', 'sourcing']) {
+        for (const stage of ['complete', 'cancelled', 'draft', 'awaiting_approval', 'sourcing'] as const) {
             expect(beingInstalled(order(stage, 'fsm_engineer', 1))).toBe(false)
         }
     })
@@ -112,21 +112,10 @@ describe('mayConfirmInstall', () => {
     })
 })
 
-describe('the Confirm installed action', () => {
-    const action = readFileSync(new URL('../../fluent/ui/order-actions.now.ts', import.meta.url), 'utf8')
-        .split('UiAction({')
-        .find((source) => source.includes("actionName: 'x_daas_ham_confirm_installed'"))
-    const condition = /condition:\s*"([^"]*)"/.exec(action ?? '')?.[1] ?? ''
-
-    it('fits the 254 characters the condition column holds (a longer one is cut off on the instance)', () => {
-        expect(condition).not.toBe('')
-        expect(condition.length).toBeLessThanOrEqual(254)
-    })
-
-    it('looks for the units awaitsInstall moves, by a substatus no other stage has', () => {
-        // The condition has no room for the install status, so the substatus alone must mean shipped.
-        const substatus = /addQuery\('substatus','([^']*)'\)/.exec(condition)?.[1]
-        expect(ALL_STAGES.filter((stage) => fieldsOf(stage).substatus === substatus)).toEqual(['shipped'])
-        expect(awaitsInstall('shipped')).toBe(true)
+describe('the units Confirm installed moves', () => {
+    // The action's condition has no room for the install status (254 characters), so it finds them by substatus alone.
+    it('are told by a substatus no other stage has', () => {
+        expect(ALL_STAGES.filter((stage) => awaitsInstall(stage))).toEqual(['shipped'])
+        expect(ALL_STAGES.filter((stage) => fieldsOf(stage).substatus === STAGE_FIELDS.shipped.substatus)).toEqual(['shipped'])
     })
 })

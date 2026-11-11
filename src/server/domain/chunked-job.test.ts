@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { cursorReport, runChunked, writeChunkUnderLock, writeHoldingLock, type ChunkedJobPorts, type LockedChunkPorts } from './chunked-job'
+import {
+    cursorReport,
+    isCurrentPass,
+    lockLostIn,
+    passParm,
+    readPassParm,
+    runChunked,
+    usableBatchSize,
+    writeChunkUnderLock,
+    type ChunkedJobPorts,
+    type LockedChunkPorts,
+} from './chunked-job'
 
 function fakePorts(keys: string[], opts: { cursor?: string; tickMs?: number; failOn?: string[] } = {}) {
     let clock = 0
@@ -132,6 +143,57 @@ describe('cursorReport', () => {
     })
 })
 
+describe('usableBatchSize', () => {
+    it.each([
+        [500, 500],
+        [2.9, 2],
+        [0, 1],
+        [-5, 1],
+        [Number.NaN, 1],
+    ])('makes %s a batch of %i', (configured, size) => {
+        expect(usableBatchSize(configured)).toBe(size)
+    })
+})
+
+describe('a pass position in parm2', () => {
+    it('carries the pass token and the cursor, and reads back', () => {
+        expect(passParm({ token: '1762689600000', cursor: 'abc123' })).toBe('1762689600000:abc123')
+        expect(readPassParm('1762689600000:abc123')).toEqual({ token: '1762689600000', cursor: 'abc123' })
+    })
+
+    it("has an empty cursor on a pass's first event", () => {
+        expect(passParm({ token: '1762689600000', cursor: '' })).toBe('1762689600000:')
+        expect(readPassParm('1762689600000:')).toEqual({ token: '1762689600000', cursor: '' })
+    })
+
+    it('reads back a cursor that holds the separator', () => {
+        const position = { token: '1762689600000', cursor: 'a:b' }
+        expect(readPassParm(passParm(position))).toEqual(position)
+    })
+
+    // '' is what a fresh trigger queues; a bare cursor or an event in another encoding names no pass either.
+    it.each(['', 'abc123', 'a period sys_id'])('reads %j as naming no pass and no cursor', (parm2) => {
+        expect(readPassParm(parm2)).toEqual({ token: '', cursor: '' })
+    })
+
+    it('reads a cursor without a token as naming no pass', () => {
+        expect(readPassParm(':abc123')).toEqual({ token: '', cursor: 'abc123' })
+    })
+})
+
+describe('isCurrentPass', () => {
+    it('lets only the current pass go on', () => {
+        expect(isCurrentPass('1762689600000', '1762689600000')).toBe(true)
+        expect(isCurrentPass('1762689600000', '1762680000000')).toBe(false)
+    })
+
+    it('stops every pass of a job whose pass was retired, and events that name no pass', () => {
+        expect(isCurrentPass('', '1762689600000')).toBe(false)
+        expect(isCurrentPass('', '')).toBe(false)
+        expect(isCurrentPass('1762689600000', '')).toBe(false)
+    })
+})
+
 type Write = 'flush' | 'complete'
 
 function lockedChunk(opts: { current?: boolean; heldUntil?: Write; throwsIn?: Write } = {}) {
@@ -206,33 +268,20 @@ describe('writeChunkUnderLock', () => {
     })
 })
 
-describe('writeHoldingLock', () => {
+describe('lockLostIn', () => {
     it('gives nothing for a write that held the lock throughout', () => {
-        expect(writeHoldingLock(() => true, () => {})).toBeNull()
+        expect(lockLostIn({ lock: 'held', value: undefined })).toBeNull()
     })
 
     it('reports a write that finished after losing the lock', () => {
-        let held = true
-        expect(writeHoldingLock(() => held, () => (held = false))).toEqual({ outcome: 'lost', error: '' })
+        expect(lockLostIn({ lock: 'lost', threw: false, value: undefined })).toEqual({ outcome: 'lost', error: '' })
     })
 
     it('reports a write that threw after losing the lock, with what it threw', () => {
-        let held = true
-        const write = () => {
-            held = false
-            throw 'deadlock'
-        }
-        expect(writeHoldingLock(() => held, write)).toEqual({ outcome: 'lost', error: 'deadlock' })
-    })
-
-    it('throws on from a write that threw still holding the lock', () => {
-        expect(() =>
-            writeHoldingLock(
-                () => true,
-                () => {
-                    throw new Error('insert refused')
-                },
-            ),
-        ).toThrow('insert refused')
+        expect(lockLostIn({ lock: 'lost', threw: true, error: 'deadlock' })).toEqual({ outcome: 'lost', error: 'deadlock' })
+        expect(lockLostIn({ lock: 'lost', threw: true, error: new Error('insert refused') })).toEqual({
+            outcome: 'lost',
+            error: 'insert refused',
+        })
     })
 })

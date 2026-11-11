@@ -1,6 +1,9 @@
-import { normalizeSerial } from './asn.ts'
 import { appendTo } from './collections.ts'
+import { FLEET_CONDITION, fleetCondition, INSTALLED_CONDITION } from './fleet.ts'
+import { notRetiredCondition } from './lifecycle.ts'
 import type { CoverageFact, CoverageFetched } from './oem/types.ts'
+import { normalizeSerial } from './serials.ts'
+import type { OemVendor } from './vocabulary.ts'
 
 /** One coverage contract, as an Asset's coverage is summarised from it. */
 export interface CoverageView {
@@ -24,7 +27,6 @@ export interface CoverageSummary {
  */
 export const OPEN_ENDED_COVERAGE_END = '9999-12-31'
 
-/** Until when a contract covers its Asset: its end date, OPEN_ENDED_COVERAGE_END when it has none, null when it does not cover. */
 function coveredUntil(contract: CoverageView): string | null {
     return contract.covered ? contract.endDate || OPEN_ENDED_COVERAGE_END : null
 }
@@ -112,7 +114,6 @@ export function answersByContract(answers: readonly CoverageAnswer[]): Map<strin
     return byContract
 }
 
-/** A stored coverage contract and the serial it covers. */
 export interface SerialCoverage extends CoverageView {
     serial: string
 }
@@ -138,3 +139,40 @@ export function coverageBySerial(serials: Iterable<string>, contracts: readonly 
     }
     return coverage
 }
+
+export interface ExpiringCoverage {
+    customerId: string
+    endDate: string
+}
+
+export function groupExpiringCoverage(rows: readonly ExpiringCoverage[]): Map<string, { count: number; firstEnd: string }> {
+    const groups = new Map<string, { count: number; firstEnd: string }>()
+    for (const row of rows) {
+        const group = groups.get(row.customerId)
+        if (!group) groups.set(row.customerId, { count: 1, firstEnd: row.endDate })
+        else groups.set(row.customerId, { count: group.count + 1, firstEnd: row.endDate < group.firstEnd ? row.endDate : group.firstEnd })
+    }
+    return groups
+}
+
+export const COVERAGE_CHECKED_FIELD = 'x_daas_ham_coverage_checked'
+
+/**
+ * Encoded alm_hardware query: `vendor`'s fleet assets (ADR 0016: the Provider IT's serials are never sent to an OEM)
+ * whose coverage is to be asked again: not retired, with a serial, and never checked or last checked before
+ * `staleBefore` (a stored date/time).
+ */
+export function staleCoverageQuery(vendor: OemVendor, staleBefore: string): string {
+    const stale = `${COVERAGE_CHECKED_FIELD}ISEMPTY^OR${COVERAGE_CHECKED_FIELD}<${staleBefore}`
+    return `${fleetCondition()}^model.x_daas_ham_oem_source=${vendor}^${notRetiredCondition()}^serial_numberISNOTEMPTY^${stale}`
+}
+
+export function withoutCoverage(coverageEnd: string, today: string): boolean {
+    return !coverageEnd || coverageEnd < today
+}
+
+/**
+ * Encoded query on alm_hardware: the installed fleet assets (ADR 0016) without OEM coverage (`withoutCoverage`), as the
+ * workspace lists and counts them.
+ */
+export const INSTALLED_WITHOUT_COVERAGE = `${INSTALLED_CONDITION}^x_daas_ham_coverage_endISEMPTY^ORx_daas_ham_coverage_end<javascript:gs.beginningOfToday()^${FLEET_CONDITION}`

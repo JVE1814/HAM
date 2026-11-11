@@ -1,3 +1,5 @@
+import { PLATFORM_ROLE } from './visibility.ts'
+
 /** Install prerequisites that Fluent cannot declare as plugin dependencies (README "Required plugins"). */
 
 export const REQUIRED_TABLES: ReadonlyArray<{ table: string; provider: string }> = [
@@ -9,20 +11,11 @@ export const REQUIRED_TABLES: ReadonlyArray<{ table: string; provider: string }>
     { table: 'wm_order', provider: 'Field Service Management' },
     { table: 'change_request', provider: 'Change Management' },
     { table: 'cmdb_ci_rack', provider: 'CMDB' },
+    { table: 'cmdb_hardware_model_lifecycle', provider: 'Model Management' },
     { table: 'sysapproval_approver', provider: 'Approvals' },
 ]
 
-export const REQUIRED_ROLES: readonly string[] = [
-    'asset',
-    'inventory_user',
-    'inventory_admin',
-    'procurement_user',
-    'procurement_admin',
-    'report_user',
-    'snc_external',
-    'canvas_user',
-    'sn_customerservice_agent',
-]
+export const REQUIRED_ROLES: readonly string[] = Object.values(PLATFORM_ROLE)
 
 export interface PreflightReport {
     ok: boolean

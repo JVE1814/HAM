@@ -35,9 +35,11 @@ and none of its serials is sent to an OEM, even a unit of a NaaS Model.
 
 - **Lifecycle (daily)**: every NaaS Model (one with an OEM PID) with an OEM data source.
   - API milestones fill in or replace stored ones but never erase them.
-  - The record's source becomes that vendor.
+  - Each milestone is a row of the platform's Model lifecycle table (ADR 0017); the description of a row the
+    vendor gives names that vendor's API and the bulletin. A milestone stored as given already is not saved
+    again, so a row's *Updated* is when its date or provenance last changed. A row the platform refuses is logged.
   - The lifecycle-change event recalculates the Model's fleet assets (their Lifecycle phase and
-    Refresh due date); the Provider IT's units of the Model are not stamped.
+    Refresh due date), once per Model whose date changed; the Provider IT's units of the Model are not stamped.
 - **Coverage (every 4 h, time-boxed)**:
   - Covers fleet assets not retired and not checked for `x_daas_ham.oem.coverage_refresh_days`,
     oldest first.
@@ -68,8 +70,8 @@ and none of its serials is sent to an OEM, even a unit of a NaaS Model.
     the serials keep their coverage and are asked again only after the refresh interval, so
     permanent rejections do not hold the queue.
   - Lifecycle answers are merged: a new date replaces the stored one, and dates a vendor does not
-    give (for example an end of life from the CSV import) are kept. A coverage response without a
-    start date keeps the stored one.
+    give (for example an end of life from the CSV import) are kept; the CSV import merges the same way. A
+    coverage response without a start date keeps the stored one.
   - Models are matched to a lifecycle answer by PID, ignoring case and surrounding spaces (each PID
     is asked once; Models sharing it each get the dates). An answer for no Model, and a lifecycle
     save the platform refuses, are logged. Each job logs its first 20 errors per run and one line
@@ -86,5 +88,5 @@ and none of its serials is sent to an OEM, even a unit of a NaaS Model.
 - **CSV**: rows loaded into *OEM coverage import rows* (vendor, serial, contract, service level,
   start, end) and *Lifecycle import rows* are processed on insert. A coverage row applies to the fleet
   asset with its serial; one whose serial no fleet asset carries (none, or only the Provider IT's) is
-  marked error *no fleet asset with serial ...*. A row whose coverage or Model lifecycle the platform
-  refuses is marked error with the reason, to load again once the cause is fixed.
+  marked error *no fleet asset with serial ...*. A row whose coverage, or one of whose lifecycle
+  milestones, the platform refuses is marked error with the reason, to load again once the cause is fixed.

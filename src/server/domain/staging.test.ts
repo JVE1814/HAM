@@ -5,6 +5,7 @@ import {
     newerTask,
     selectStagingTemplate,
     stageOnClosure,
+    stagingClosing,
     stagingClosureRefusal,
     stagingOutcome,
     type ClosingAsset,
@@ -55,6 +56,13 @@ describe('stageOnClosure', () => {
     it('stages a unit that passed and sends one that failed for evaluation', () => {
         expect(stageOnClosure(false)).toBe('staged')
         expect(stageOnClosure(true)).toBe('pending_evaluation')
+    })
+})
+
+describe('stagingClosing', () => {
+    it('takes Closed Complete as complete, Closed Incomplete and Closed Skipped as skipped, and no open state', () => {
+        expect(['3', '4', '7'].map(stagingClosing)).toEqual(['complete', 'skipped', 'skipped'])
+        expect(['-5', '1', '2', ''].map(stagingClosing)).toEqual([null, null, null, null])
     })
 })
 

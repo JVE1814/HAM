@@ -2,7 +2,9 @@
 
 Assets live in the platform's `alm_hardware` / `alm_asset` tables (with `cmdb_model`, `alm_stockroom`,
 `cmn_location`, `ast_contract`), and we add scoped `x_daas_ham_*` columns to them with `Table({ augments })`.
-Scoped tables exist only for concepts the platform lacks (Agreements, Orders, Staging tasks, ...).
+Scoped tables exist only for concepts the platform lacks (Agreements, Orders, Staging tasks, ...); a Model's
+manufacturer milestones, which the platform has a table for, live there (ADR 0017), and where the platform has a
+field for something the app adds none (ADR 0018).
 A parallel asset table would have broken the asset↔CI sync, Procurement receiving, CSM/FSM references
 and out-of-box reporting, and would consume custom-table entitlement.
 

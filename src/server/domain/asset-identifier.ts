@@ -18,7 +18,6 @@ export type IdentifierField = (typeof IDENTIFIER_FIELDS)[number]
 /** How many Assets carrying the identifier in one field are read: two are enough to tell it is ambiguous. */
 export const IDENTIFIER_READ_LIMIT = 2
 
-/** Which of the Assets read for one field the identifier names: none, the one at `index`, or it is ambiguous. */
 export type FieldMatch = { kind: 'none' } | { kind: 'one'; index: number } | { kind: 'ambiguous' }
 
 /**

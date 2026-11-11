@@ -1,9 +1,13 @@
-import { OPEN_LINE_STAGES } from './entitlement.ts'
-import type { LineStage } from './fulfilment.ts'
-import type { LeaseEndAction } from './leases.ts'
-import { fleetStagesQuery, naasStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
-import type { Stage } from './lifecycle.ts'
-import type { ShortfallRoute } from './returns.ts'
+import { endedUnfulfilled, OPEN_LINE_STAGES } from './fulfilment.ts'
+import { fleetStagesQuery, providerStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
+import { STOCK_STAGES, type Stage } from './lifecycle.ts'
+import {
+    type LeaseEndAction,
+    LINE_STAGE,
+    type LineStage,
+    type OrderType,
+    STOCKROOM_TYPE,
+} from './vocabulary.ts'
 
 /**
  * Sourcing: where an Order line's Assets come from.
@@ -13,19 +17,14 @@ import type { ShortfallRoute } from './returns.ts'
  * Order's Site first, then the Spare pool, then central stock, then purchase.
  */
 
-export type StockroomType = 'central_depot' | 'staging_centre' | 'customer_site'
 export type Source = 'customer_site_stock' | 'spare_pool' | 'central_stock'
 
+/** Stock that may serve a request, under the Source whose query found it (`stockQueries`). */
 export interface StockCandidate {
     assetId: string
     modelId: string
-    stage: 'available' | 'spare_pool'
     stockroomId: string
-    stockroomType: StockroomType
-    /** Customer the Asset is reserved for (spare pool) or whose site stockroom holds it; '' if free stock. */
-    reservedFor: string
-    /** The Site a customer-site stockroom stands at; '' for the Provider's own stockrooms. */
-    siteId: string
+    source: Source
 }
 
 export interface SourcingRequest {
@@ -43,22 +42,90 @@ export interface SourcingPlan {
     summary: string
 }
 
-/** Who stock is sought for: a line's Customer and Site, or no one (customerId '') for free stock only. */
-type Seeker = Pick<SourcingRequest, 'customerId' | 'siteId'>
-
-function sourceOf(candidate: StockCandidate, seeker: Seeker): Source | null {
-    if (candidate.stockroomType === 'customer_site') {
-        // A spare at another of the Customer's Sites is not shipped from there: it is no hot spare for this Site.
-        const here = candidate.reservedFor === seeker.customerId && candidate.siteId === seeker.siteId
-        return here ? 'customer_site_stock' : null
-    }
-    if (candidate.stage === 'spare_pool') return candidate.reservedFor === seeker.customerId ? 'spare_pool' : null
-    return candidate.reservedFor === '' ? 'central_stock' : null
-}
-
 const PRIORITY: Record<SourcingRequest['purpose'], readonly Source[]> = {
     new: ['spare_pool', 'central_stock'],
     replace: ['customer_site_stock', 'spare_pool', 'central_stock'],
+}
+
+/** What a line of an Order of this type is sourced for: a device replace takes the hot spare at its Site first. */
+export function sourcingPurpose(orderType: OrderType | ''): SourcingRequest['purpose'] {
+    return orderType === 'device_replace' ? 'replace' : 'new'
+}
+
+/**
+ * How many candidates to read per Source for a shortfall: more than are needed, as a claim may find a candidate taken
+ * since it was read, yet bounded, so a large stock is not read whole for a small need.
+ */
+export function candidateLimit(shortfall: number): number {
+    return shortfall * 5 + 50
+}
+
+export interface LineNeed {
+    quantity: number
+    /** Assets on the line, in any stage. */
+    allocated: number
+    /** Units bought for it and not yet received (its On order count). */
+    onOrder: number
+    /** OEM advance replacements still to come for it (domain/oem-rma `RMA_AWAITED`). */
+    awaitedRmas: number
+}
+
+export function lineShortfall(line: LineNeed): number {
+    return line.quantity - line.allocated - line.onOrder - line.awaitedRmas
+}
+
+/**
+ * Units to buy when the line is saved: what the pass planned (`toPurchase`), less any need met since it read the line,
+ * as when a receipt is allocated with nothing left on order to take it off. `shortfall` is read afresh at the save and
+ * counts the stock the pass `putBack` (not bought). A need grown meanwhile is left to a later pass, which picks stock
+ * before it buys.
+ */
+export function stillToBuy(toPurchase: number, shortfall: number, putBack: number): number {
+    return Math.max(0, Math.min(toPurchase, shortfall - putBack))
+}
+
+/**
+ * Whether stock picked in `fromStockroomId` needs a transfer order to the staging centre before it is staged: it sits
+ * in another stockroom. Stock already there, or in no stockroom, is staged where it is, and so is all of it while no
+ * staging centre is set.
+ */
+export function needsTransfer(fromStockroomId: string, stagingStockroomId: string): boolean {
+    return !!stagingStockroomId && !!fromStockroomId && fromStockroomId !== stagingStockroomId
+}
+
+/** The Asset a break-fix line replaces, as sourcing weighs an OEM advance replacement for the line's shortfall. */
+export interface ReplacedUnit {
+    modelId: string
+    /** The day its OEM coverage ends; '' with none. */
+    coverageEnd: string
+}
+
+export type ShortfallRoute = 'none' | 'purchase' | 'oem_advance_replacement'
+
+/**
+ * Where what a line of `modelId` still misses goes: a covered unit that fails with no stock left is replaced by the OEM
+ * in advance, anything else is purchased. Only a break-fix line for the same Model as the unit it replaces, covered by
+ * the OEM today, can be served by an advance replacement; pass `replaced` for a break-fix line only (null otherwise): a
+ * refresh line also names the Asset it replaces, but that Asset is healthy.
+ */
+export function shortfallRouteFor(modelId: string, replaced: ReplacedUnit | null, today: string, missing: number): ShortfallRoute {
+    if (missing <= 0) return 'none'
+    const coveredToday = !!replaced && replaced.modelId === modelId && replaced.coverageEnd >= today
+    return coveredToday ? 'oem_advance_replacement' : 'purchase'
+}
+
+/**
+ * What Cancel order does with a unit it takes off its line, by the stage the unit is in:
+ * - `stays_spare`: a hot spare stays in its Customer's Spare pool, only unlinked from the line;
+ * - `stays_in_transfer`: a unit in transfer is the Provider's again but stays in transfer (domain/lifecycle
+ *   `checkTransition`), free stock once Inventory lets it go;
+ * - `free_stock`: any other unit becomes the Provider's free stock, available.
+ */
+export type CancelledUnit = 'stays_spare' | 'stays_in_transfer' | 'free_stock'
+
+export function cancelledUnit(stage: Stage | null): CancelledUnit {
+    if (stage === 'spare_pool') return 'stays_spare'
+    return stage === 'in_transfer' ? 'stays_in_transfer' : 'free_stock'
 }
 
 /** What a sourcing run looks for: the line's request less its quantity; a customerId of '' wants free stock only. */
@@ -103,29 +170,34 @@ export function isClaimable(unit: StockUnit, from: readonly Stage[]): boolean {
     return isFree(unit, from) && unit.leaseEndAction !== RETURNING
 }
 
+/** The stock of one Source that may serve a request, as an encoded alm_hardware query. */
+export interface SourceQuery {
+    source: Source
+    query: string
+}
+
 /**
  * Encoded alm_hardware queries for the stock that may serve `scope`, one per Source in priority order, so a limit on
  * each cuts within its Source only and other Customers' spares never crowd it out: the Customer's site stockroom
- * stock at the Site or one of its Rooms (replacements), its Spare pool, and free stock in the Provider's NaaS
- * stockrooms (central depots and staging centres). Only fleet assets in NaaS stockrooms are stock (ADR 0016): every
- * clause carries the Fleet flag, and stock in a stockroom with no NaaS stockroom type, or in none, is the Provider
- * IT's. Stock on an Order line or bound for its Lessor (`isClaimable`) is never a candidate. `sourceOf` still decides
- * each one.
+ * stock at the Site or one of its Rooms (replacements; a spare at another of its Sites is not shipped from there, so
+ * it is no hot spare for this one), its Spare pool, and free stock in the Provider's NaaS stockrooms (central depots
+ * and staging centres). Only fleet assets in NaaS stockrooms are stock (ADR 0016): every clause carries the Fleet
+ * flag, and stock in a stockroom with no NaaS stockroom type, or in none, is the Provider IT's. Stock on an Order line
+ * or bound for its Lessor (`isClaimable`) is never a candidate. What a query finds is stock of its Source: nothing
+ * else says what a Source is.
  */
-export function stockQueries(scope: StockScope): string[] {
+export function stockQueries(scope: StockScope): SourceQuery[] {
     const base = `model=${scope.modelId}^x_daas_ham_order_lineISEMPTY^${NOT_LESSOR_BOUND}`
-    const type = `stockroom.${STOCKROOM_TYPE_FIELD}`
-    // A NaaS stockroom type rules out a blank one, so != needs no ISEMPTY beside it.
-    const provider = `${base}^${naasStockroomCondition('stockroom.')}^${type}!=customer_site`
-    const customerSite = `${base}^${type}=customer_site^stockroom.x_daas_ham_customer=${scope.customerId}`
+    const provider = `${base}^${providerStockroomCondition('stockroom.')}`
+    const customerSite = `${base}^stockroom.${STOCKROOM_TYPE_FIELD}=${STOCKROOM_TYPE.customer_site}^stockroom.x_daas_ham_customer=${scope.customerId}`
     const atSite = `stockroom.location=${scope.siteId}^ORstockroom.location.parent=${scope.siteId}`
     const bySource: Record<Source, string> = {
-        customer_site_stock: fleetStagesQuery(['available', 'spare_pool'], `${customerSite}^${atSite}`),
+        customer_site_stock: fleetStagesQuery(STOCK_STAGES, `${customerSite}^${atSite}`),
         spare_pool: fleetStagesQuery(['spare_pool'], `${provider}^company=${scope.customerId}`),
         central_stock: fleetStagesQuery(['available'], provider),
     }
     const sources: readonly Source[] = scope.customerId ? PRIORITY[scope.purpose] : ['central_stock']
-    return sources.map((source) => bySource[source])
+    return sources.map((source) => ({ source, query: bySource[source] }))
 }
 
 const LABEL: Record<Source, string> = {
@@ -143,7 +215,7 @@ export function planSourcing(request: SourcingRequest, stock: readonly StockCand
     const picks: SourcingPlan['picks'] = []
     for (const source of PRIORITY[request.purpose]) {
         const matching = stock
-            .filter((c) => c.modelId === request.modelId && sourceOf(c, request) === source)
+            .filter((c) => c.modelId === request.modelId && c.source === source)
             .sort((a, b) => a.stockroomId.localeCompare(b.stockroomId) || a.assetId.localeCompare(b.assetId))
         for (const candidate of matching) {
             if (picks.length >= wanted) break
@@ -160,10 +232,8 @@ export function planSourcing(request: SourcingRequest, stock: readonly StockCand
     return { picks, toPurchase, summary: parts.join(', ') }
 }
 
-/** What came of requesting a purchase: the purchase order created, or why there is none. */
 export type PurchaseResult = { ok: true; poId: string } | { ok: false; reason: string }
 
-/** What came of requesting a transfer order to the staging centre: the one created, or why there is none. */
 export type TransferResult = { ok: true; transferId: string } | { ok: false; reason: string }
 
 /** Picked stock left where it was, and no longer reserved, because no transfer order to the staging centre came of it. */
@@ -215,85 +285,12 @@ function routedOutcome(route: ShortfallRoute, line: { planSummary: string; missi
     return { ...sourced, purchaseOrder: bought.poId, purchased: line.missing }
 }
 
-/** Order stages in which nothing is sourced, even for a line a refused save left open. */
-const ENDED_ORDER_STAGES: readonly string[] = ['cancelled', 'rejected']
-
-/**
- * Whether an Order ended unfilled (cancelled or rejected): nothing is sourced, received or derived for its lines, even
- * one a refused save left open. Its cancel or rejection saves it before its lines.
- */
-export function orderEnded(orderStage: string): boolean {
-    return ENDED_ORDER_STAGES.includes(orderStage)
-}
+/** The stages of the lines a sourcing pass sources: not sourced yet, or short of stock again. */
+export const LINES_TO_SOURCE: readonly LineStage[] = [LINE_STAGE.new, LINE_STAGE.awaiting_stock]
 
 /** Whether an Order line still waits to be filled: not shipped or cancelled, its Order not cancelled or rejected. */
 export function lineStillOpen(line: { lineStage: string; orderStage: string }): boolean {
-    return OPEN_LINE_STAGES.includes(line.lineStage as LineStage) && !orderEnded(line.orderStage)
-}
-
-/** The states of an OEM RMA (x_daas_ham_oem_rma.state). */
-export type RmaState = 'to_open' | 'open' | 'replacement_received' | 'defective_returned' | 'closed'
-
-/** RMAs whose replacement is still to come: their line counts each as a unit on its way. */
-export const RMA_AWAITED: readonly RmaState[] = ['to_open', 'open']
-
-/** RMAs still open, the defective unit not yet back with the OEM (as the workspace's Open OEM RMAs list them). */
-export const RMA_OPEN: readonly RmaState[] = ['to_open', 'open', 'replacement_received']
-
-/** An RMA for the Asset a break-fix line replaces, as `advanceReplacementRma` weighs it. */
-export interface OpenRma {
-    rmaId: string
-    rmaNumber: string
-    state: RmaState
-    /** The Order line it serves; '' for none. */
-    lineId: string
-    /** Whether that line still waits to be filled (`lineStillOpen`); false for none. */
-    lineOpen: boolean
-}
-
-/** An open RMA a line's advance replacement goes under, and the state it is saved in. */
-export interface RmaReuse {
-    rma: OpenRma
-    state: RmaState
-    /** Its replacement was received (then lost in transit or failed staging): the vendor is asked for another. */
-    askAgain: boolean
-}
-
-/**
- * Whether a break-fix line whose shortfall goes to an OEM advance replacement reuses an RMA already open for the unit
- * it replaces, or (null) opens one: the OEM is not asked twice for one defective unit. Reused, the RMA serves the line
- * and its replacement is awaited, so the line waits for it; one whose replacement was received goes back to open. The
- * line's own RMA comes first, then one still awaited, then the first given (`rmas` oldest first). One that another
- * open line waits for is that line's.
- */
-export function advanceReplacementRma(lineId: string, rmas: readonly OpenRma[]): RmaReuse | null {
-    const rank = (rma: OpenRma) => (rma.lineId === lineId ? 0 : 2) + (RMA_AWAITED.includes(rma.state) ? 0 : 1)
-    // A scan, not a sort: the platform's Array sort need not keep equals in the order given.
-    let best: OpenRma | null = null
-    for (const rma of rmas) {
-        const reusable = RMA_OPEN.includes(rma.state) && (rma.lineId === lineId || !rma.lineOpen)
-        if (reusable && (!best || rank(rma) < rank(best))) best = rma
-    }
-    if (!best) return null
-    const askAgain = !RMA_AWAITED.includes(best.state)
-    return { rma: best, state: askAgain ? 'open' : best.state, askAgain }
-}
-
-/**
- * The job lock (ADR 0013) an Order's sourcing passes take turns under, so two never count the same shortfall, and that
- * Cancel order holds, so a pass never reserves or buys for lines being cancelled.
- */
-export function sourcingLockName(orderId: string): string {
-    return `source_order_${orderId}`
-}
-
-/**
- * The job lock (ADR 0013) an Order line's need is read and changed under: sourcing reads its units and on-order count
- * there and saves what it bought, and a receipt takes its unit off order and allocates it. So neither change is lost,
- * and sourcing's count never sees half a receipt.
- */
-export function orderLineLockName(lineId: string): string {
-    return `order_line_${lineId}`
+    return OPEN_LINE_STAGES.includes(line.lineStage as LineStage) && !endedUnfulfilled(line.orderStage)
 }
 
 /**
@@ -363,7 +360,7 @@ export function sparePoolLead(agreementIds: readonly string[]): string {
 /** Free central stock of a model to move into a Customer's Spare pool (top-up). */
 export function pickForSparePool(stock: readonly StockCandidate[], modelId: string, count: number): string[] {
     return stock
-        .filter((c) => c.modelId === modelId && sourceOf(c, freeStockOf(modelId)) === 'central_stock')
+        .filter((c) => c.modelId === modelId && c.source === 'central_stock')
         .sort((a, b) => a.stockroomId.localeCompare(b.stockroomId) || a.assetId.localeCompare(b.assetId))
         .slice(0, Math.max(0, count))
         .map((c) => c.assetId)

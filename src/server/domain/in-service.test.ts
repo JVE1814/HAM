@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chooseSubscriptionLine, decideInService } from './in-service'
+import { chooseSubscriptionLine, decideInService, seenSourceOf } from './in-service'
 
 describe('decideInService', () => {
     const installed = { stage: 'pending_in_service' as const, installCompletedAt: 1_000, temporary: false }
@@ -69,5 +69,13 @@ describe('chooseSubscriptionLine', () => {
         it('never gives a Site-specific line to an asset without a site', () => {
             expect(chooseSubscriptionLine([siteA], { siteId: '', deviceClass: 'switch' })).toBeNull()
         })
+    })
+})
+
+describe('seenSourceOf', () => {
+    it("takes Discovery's own sightings as discovery and any other source's as a connector's", () => {
+        expect(seenSourceOf('ServiceNow')).toBe('discovery')
+        expect(seenSourceOf('SG-Meraki')).toBe('connector')
+        expect(seenSourceOf('')).toBe('connector')
     })
 })

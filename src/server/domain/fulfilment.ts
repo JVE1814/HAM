@@ -1,25 +1,11 @@
-import type { ApprovalDecision } from './approvals.ts'
-import type { Approver } from './entitlement.ts'
 import { assertNever, oneOf } from './exhaustive.ts'
 import type { Stage } from './lifecycle.ts'
+import { ORDER_STAGE, TASK_STATE, type LineStage, type OrderStage } from './vocabulary.ts'
 
 /**
  * Order-line and Order stages are derived, never set by hand: a line follows the slowest of its
  * Assets, an Order follows the slowest of its live lines.
  */
-
-export type LineStage =
-    | 'new'
-    | 'awaiting_stock'
-    | 'sourced'
-    | 'staging'
-    | 'ready_to_ship'
-    | 'shipped'
-    | 'installed'
-    | 'in_service'
-    | 'cancelled'
-
-export type OrderStage = 'sourcing' | 'preparing' | 'delivering' | 'installing' | 'complete' | 'cancelled'
 
 /**
  * How far an allocated Asset has progressed along fulfilment (higher is further). A unit in transfer is on its way to
@@ -46,21 +32,30 @@ const LINE_FOR_PROGRESS: Record<number, LineStage> = {
     6: 'in_service',
 }
 
-/** A line's stages in the order a line goes through them; cancelled is none of them. */
+/**
+ * The stages a live Order line goes through, in order: every subset of them below is cut from this. Cancelled is none
+ * of them.
+ */
 const LINE_ORDER = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped', 'installed', 'in_service'] as const satisfies readonly LineStage[]
+const SHIPPED_AT = LINE_ORDER.indexOf('shipped')
 
 type LiveLineStage = (typeof LINE_ORDER)[number]
 
 /** Every line stage, to read x_daas_ham_order_line.line_stage with (platform/records `choice`). */
 export const LINE_STAGES: readonly LineStage[] = [...LINE_ORDER, 'cancelled']
 
-/** How far along LINE_ORDER a line stage is; -1 for cancelled or a stage the app does not know. */
 function rank(stage: LineStage): number {
     return (LINE_ORDER as readonly LineStage[]).indexOf(stage)
 }
 
+/**
+ * Order line stages before the line has shipped: such a line's whole quantity counts as in-flight usage, and it is
+ * what cancelling or rejecting its Order cancels.
+ */
+export const OPEN_LINE_STAGES: readonly LineStage[] = LINE_ORDER.slice(0, SHIPPED_AT)
+
 /** Line stages at which the line's equipment has left the Provider. */
-const DELIVERED: ReadonlySet<LineStage> = new Set(['shipped', 'installed', 'in_service'])
+const DELIVERED: ReadonlySet<LineStage> = new Set(LINE_ORDER.slice(SHIPPED_AT))
 
 /**
  * Stages a unit on a line can hold before Ship sends it. Missing and available are among them, as a unit lost or put
@@ -80,14 +75,11 @@ const BEFORE_SHIP: ReadonlySet<Stage> = new Set([
     'missing',
 ])
 
-/** Whether a unit on a line in `stage` was sent to the Site (and may have come back since). */
 function sent(stage: Stage | null): stage is Stage {
     return stage !== null && !BEFORE_SHIP.has(stage)
 }
 
-/** What a line's stage is derived from. */
 export interface LineFacts {
-    /** The stage the line is in now. */
     current: LineStage
     quantity: number
     assetStages: ReadonlyArray<Stage | null>
@@ -126,7 +118,7 @@ export function leftInTransit(from: Stage | null, to: Stage | null): boolean {
 }
 
 /** Line stages before install: a unit that leaves one in transit is still owed to it. */
-const REFILLABLE: readonly LineStage[] = ['awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped']
+const REFILLABLE: readonly LineStage[] = LINE_ORDER.slice(LINE_ORDER.indexOf('awaiting_stock'), SHIPPED_AT + 1)
 
 /**
  * Whether a unit that left its line in transit (`leftInTransit`) is taken off it and the line filled again: back to
@@ -136,14 +128,6 @@ const REFILLABLE: readonly LineStage[] = ['awaiting_stock', 'sourced', 'staging'
  */
 export function refillsLine(line: { stage: LineStage; siteRecovery: boolean }): boolean {
     return !line.siteRecovery && REFILLABLE.includes(line.stage)
-}
-
-/** Return triggers that bring back all of a Site, units in transit too (domain/returns `SITE_RECOVERY_STAGES`). */
-const SITE_RECOVERY_TRIGGERS = ['site_decommission', 'agreement_end']
-
-/** Encoded query on x_daas_ham_return_order_line: the Asset is awaited back on a whole-Site recovery. */
-export function siteRecoveryLineQuery(assetId: string): string {
-    return `asset=${assetId}^status=awaiting^return_order.triggerIN${SITE_RECOVERY_TRIGGERS.join(',')}`
 }
 
 /** What Cancel order reads of an Order: the stages of its lines and of every Asset on them. */
@@ -161,26 +145,63 @@ export function anythingShipped(order: OrderShipment): boolean {
     return order.lineStages.some((stage) => DELIVERED.has(stage)) || order.unitStages.some(sent)
 }
 
-const APPROVER_NAMES: Record<Approver, string> = {
-    customer_admin: 'a Customer admin',
-    account_manager: 'the account manager (or the asset managers)',
+/**
+ * The platform's task states an Order takes: Work in Progress from its approval on, and the state it closes with as
+ * it ends complete (Closed Complete), rejected (Closed Incomplete) or cancelled (Closed Skipped).
+ */
+export const ORDER_TASK_STATE = {
+    inProgress: TASK_STATE.workInProgress,
+    complete: TASK_STATE.closedComplete,
+    rejected: TASK_STATE.closedIncomplete,
+    cancelled: TASK_STATE.closedSkipped,
+} as const
+
+/** The task state an Order is closed with as it enters `stage`; undefined for a stage that leaves it open. */
+export function closedStateFor(stage: OrderStage): number | undefined {
+    return stage === 'complete' || stage === 'rejected' || stage === 'cancelled' ? ORDER_TASK_STATE[stage] : undefined
 }
 
 /**
- * Why approvals that roll up to neither outcome (domain/approvals `rollupApprovals` gives requested) keep an Order
- * awaiting approval, as Re-check approvals tells the user: whose approval is missing, and whether a request to them is
- * still waiting.
+ * Stages in which an Order ended without delivering anything: nothing is sourced for it any more, even for a line a
+ * refused save left open, and a replacement Order in one of them may be raised again (domain/breakfix).
  */
-export function approvalAwaited(required: readonly Approver[], decisions: readonly ApprovalDecision[]): string {
-    const approved = new Set(decisions.filter((d) => d.state === 'approved').map((d) => d.group))
-    const missing = required.filter((group) => !approved.has(group))
-    const who = missing.map((group) => APPROVER_NAMES[group]).join(' and ')
-    const waiting = decisions.some((d) => d.state === 'requested' && missing.includes(d.group))
-    return waiting ? `waiting for ${who} to decide` : `no approval from ${who} and none still requested`
+export const UNFULFILLED_ORDER_STAGES: readonly OrderStage[] = [ORDER_STAGE.rejected, ORDER_STAGE.cancelled]
+
+/**
+ * Whether an Order ended unfulfilled (cancelled or rejected): nothing is sourced, received or derived for its lines,
+ * even one a refused save left open. Its cancel or rejection saves it before its lines.
+ */
+export function endedUnfulfilled(orderStage: string): boolean {
+    return (UNFULFILLED_ORDER_STAGES as readonly string[]).includes(orderStage)
 }
 
-/** Order stages its lines no longer move: before approval, and once rejected, cancelled or complete. */
-const SETTLED_ORDER_STAGES: readonly string[] = ['draft', 'awaiting_approval', 'rejected', 'cancelled', 'complete']
+/** Stages in which an Order has ended, fulfilled or not. Every other Order is open (`OPEN_ORDERS_QUERY`). */
+export const ENDED_ORDER_STAGES: readonly OrderStage[] = [ORDER_STAGE.complete, ORDER_STAGE.cancelled, ORDER_STAGE.rejected]
+
+/**
+ * Encoded query on x_daas_ham_order: the Orders that have not ended. A constant written out from the stage names, as
+ * Fluent metadata reads no function call: its lists, modules and dashboard tiles import it (domain/fulfilment.test.ts
+ * holds it to `ENDED_ORDER_STAGES`).
+ */
+export const OPEN_ORDERS_QUERY = `stageNOT IN${ORDER_STAGE.complete},${ORDER_STAGE.cancelled},${ORDER_STAGE.rejected}`
+
+/** Encoded query on x_daas_ham_order: the Orders waiting for an approval, which the workspace lists and the dashboard counts. */
+export const ORDERS_AWAITING_APPROVAL_QUERY = `stage=${ORDER_STAGE.awaiting_approval}`
+
+/**
+ * Stages in which Cancel order is offered: from a draft until Ship, before any of the Order's equipment is at its Site
+ * (the action's condition is written from these; the built action is checked against them).
+ */
+export const CANCELLABLE_ORDER_STAGES: readonly OrderStage[] = [
+    ORDER_STAGE.draft,
+    ORDER_STAGE.awaiting_approval,
+    ORDER_STAGE.sourcing,
+    ORDER_STAGE.preparing,
+    ORDER_STAGE.delivering,
+]
+
+/** Order stages its lines no longer move: before approval, and once it has ended. */
+const SETTLED_ORDER_STAGES: readonly string[] = [ORDER_STAGE.draft, ORDER_STAGE.awaiting_approval, ...ENDED_ORDER_STAGES]
 
 /** Whether an Order's stage still follows its lines (a complete Order stays complete when its Assets leave service). */
 export function followsLines(orderStage: string): boolean {

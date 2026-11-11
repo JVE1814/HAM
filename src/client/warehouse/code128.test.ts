@@ -11,6 +11,15 @@ describe('encodeCode128', () => {
         expect(bars.slice(-24, -13)).toBe('11101000110') // value 55 (checksum)
     })
 
+    it("puts each character's own bars between the start and the checksum, in the order written", () => {
+        // From the Code 128 table: Start B is value 104, A is 33, B is 34; the checksum is (104 + 33*1 + 34*2) mod 103 = 102.
+        const startB = '11010010000'
+        const a = '10100011000'
+        const b = '10001011000'
+        const value102 = '11110101110'
+        expect(encodeCode128('AB')).toBe(`${startB}${a}${b}${value102}1100011101011`)
+    })
+
     it('rejects characters outside printable ASCII', () => {
         expect(() => encodeCode128('é')).toThrow(/printable ASCII/)
     })

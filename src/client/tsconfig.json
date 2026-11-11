@@ -11,12 +11,12 @@
         "skipLibCheck": true,
         "strict": true,
         "noEmit": true,
+        "allowImportingTsExtensions": true,
         "types": []
     },
     "include": [
         "./**/*.ts",
-        "./**/*.tsx",
-        "../server/domain/rack.ts"
+        "./**/*.tsx"
     ],
     "exclude": [
         "./**/*.test.ts"

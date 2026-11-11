@@ -11,9 +11,9 @@ import {
     serviceIntervalCosts,
     type AssetCostFacts,
     type CostEntry,
-    type CostType,
     type LeaseTerms,
 } from './margin'
+import type { CostType } from './vocabulary'
 
 const november = monthBounds('2026-11')
 const wholeMonth = { start: '2026-01-15' }

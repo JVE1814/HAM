@@ -80,9 +80,10 @@ rack exception are re-checked as well (see Racks), and their rack exceptions ope
   the rack: one that does not fit, or would take the rack over its power budget, is refused with
   the reason and stays outside the fleet (ADR 0016).
 - **Power budget (plan §13 Rack power budget)**: a rack with a *power capacity (W)* also refuses a placement that would
-  take the typical power (the Models' *typical power (W)*) of all devices in it, both faces, over
-  the capacity, when the change adds draw (a device new to the rack, or a different Model). Moves
-  within the rack are always allowed. The elevation page shows used against available power.
+  take the typical power (the Models' *Power (watts)*, the platform's `cmdb_model.power_consumption`,
+  ADR 0018) of all devices in it, both faces, over the capacity, when the change adds draw (a device
+  new to the rack, or a different Model). Moves within the rack are always allowed. The elevation
+  page shows used against available power.
 - The checks read the placements already saved, so two saves into the same units of one rack at the
   same moment can both pass (the check is a before rule, and a lock taken there ends before the
   record is written). Once a save that changes an Asset's rack, lowest unit, face or Model, or adds
@@ -125,7 +126,7 @@ contacts: their Sites).
 | Everyone | see installed equipment by Site; report a faulty device (CSM case with the failed asset); see open orders and returns; confirm self-installed orders, including the units already shipped of an Order back in preparing after a unit was lost in transit |
 | Customer admins | request returns of selected devices or a site decommission; answer attestations |
 
-The equipment listed is the Customer's fleet assets (ADR 0016; `domain/visibility.ts`
+The equipment listed is the Customer's fleet assets (ADR 0016; `domain/customer-page.ts`
 `customerEquipmentQuery`), from shipped to a Site to awaiting return, grouped by Site; one with no
 Site (a data gap) is listed under *No site*, and one that has lost its Agreement (another) is listed
 all the same. The Provider IT's hardware, such as laptops in use, is outside the fleet and is not
@@ -139,7 +140,7 @@ The page calls the app's REST API under `/api/x_daas_ham/naas`. Its routes, and 
 (`/sites`, `/racks`), do not require the `snc_internal` role, which customer users (`snc_external`)
 lack. They admit a user who passes either the platform's *Scripted REST External Default* ACL
 (internal users) or the app's REST ACL for customer admins and site contacts
-(`security/rest-acls.now.ts`), and each handler checks the role and the Customer. A call the
+(`shared/rest-acls.now.ts`), and each handler checks the role and the Customer. A call the
 platform refuses answers
 HTTP 422, so it can be sent again:
 
@@ -150,7 +151,7 @@ HTTP 422, so it can be sent again:
 - `POST /customer/attestations/{id}` when an answer or the submission is refused, or the attestation
   is still pending or was cancelled, without submitting.
 
-New equipment is ordered through the *Request network equipment* catalog item.
+New equipment is ordered through the *Request network equipment* record producer.
 
 On the Order form too, Customer contacts can use *Confirm installed* only on self-install Orders; asset
 managers and field techs confirm any Order being installed (for instance when its work order was closed

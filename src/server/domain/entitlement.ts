@@ -1,7 +1,18 @@
+import type { Approver } from './approvals.ts'
+import {
+    actorRefusal,
+    agreementFinding,
+    CHOOSE_CUSTOMER,
+    siteFinding,
+    type ActWording,
+    type NamedRecord,
+    type NamedSite,
+} from './customer-parties.ts'
 import { fleetStagesQuery } from './fleet.ts'
-import type { LineStage } from './fulfilment.ts'
+import { OPEN_LINE_STAGES, UNFULFILLED_ORDER_STAGES } from './fulfilment.ts'
 import { DEPLOYED_STAGES } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
+import { ORDER_STAGE, type CatalogEntryType, type EntitlementVerdict, type OrderStage } from './vocabulary.ts'
 
 /**
  * Entitlement: is an Order within the Customer's Agreement?
@@ -16,11 +27,8 @@ import type { VisibilityScope } from './visibility.ts'
  * Lines replacing a deployed Asset (break-fix, refresh) are exempt from both checks.
  */
 
-export type Approver = 'customer_admin' | 'account_manager'
-export type EntitlementVerdict = 'within_agreement' | 'off_catalog' | 'over_quota'
-
 export interface CatalogEntryView {
-    kind: 'model' | 'site_template'
+    kind: CatalogEntryType
     modelId?: string
     siteTemplateId?: string
     active: boolean
@@ -67,7 +75,8 @@ export interface EntitlementAssessment {
     findings: string[]
 }
 
-function isCurrent(entry: CatalogEntryView, today: string): boolean {
+/** Whether the Customer's catalog offers the entry on `today`: it is active and inside its validity dates. */
+export function isCurrent(entry: CatalogEntryView, today: string): boolean {
     if (!entry.active) return false
     if (entry.validFrom && entry.validFrom > today) return false
     if (entry.validTo && entry.validTo < today) return false
@@ -107,20 +116,11 @@ export function assessOrder(request: OrderRequest, context: EntitlementContext):
     return { verdict, approvers: approversFor(verdict), findings }
 }
 
-/**
- * A record an Order names, with the Customer it belongs to: '' for none (a Site template offered to every
- * Customer), null when it cannot be read.
- */
-export interface NamedRecord {
-    id: string
-    customerId: string | null
-}
-
 /** The Customer an Order is for and the records it names; a record the Order does not name is left out. */
 export interface OrderParties {
     customerId: string
     agreement?: NamedRecord
-    site?: NamedRecord & { isSite: boolean }
+    site?: NamedSite
     siteTemplate?: NamedRecord
 }
 
@@ -131,15 +131,14 @@ export interface Orderer {
     customerId: string
 }
 
+const RAISING_ORDERS: ActWording = { act: 'raise orders', actForOwn: 'order' }
+
 /**
- * Why this person may not raise an Order for the Customer, or null when they may. Only Order raisers raise Orders, and
- * site contacts never do; provider staff and the service desk raise them for any Customer, a customer admin only for
- * their own.
+ * Why this person may not raise an Order for the Customer, or null when they may (domain/customer-parties
+ * `actorRefusal`): only Order raisers raise Orders, a customer admin only for their own Customer.
  */
 export function raiserRefusal(customerId: string, orderer: Orderer): string | null {
-    if (!orderer.mayRaise || orderer.scope === 'own_sites') return 'You may not raise orders'
-    if (orderer.scope === 'own_customer' && customerId !== orderer.customerId) return 'You can only order for your own customer'
-    return null
+    return actorRefusal(customerId, { ...orderer, permitted: orderer.mayRaise }, RAISING_ORDERS)
 }
 
 /** Whether the Order names no Site template, or one offered to its Customer or to every Customer. */
@@ -155,17 +154,14 @@ export function siteTemplateOffered(order: OrderParties): boolean {
 export function ownershipFindings(order: OrderParties, orderer: Orderer): string[] {
     const refusal = raiserRefusal(order.customerId, orderer)
     if (refusal) return [refusal]
-    if (!order.customerId) return ['Choose the customer']
-    const findings: string[] = []
-    if (!order.agreement) findings.push("Choose one of the customer's agreements")
-    else if (order.agreement.customerId !== order.customerId) findings.push("The agreement is not one of the customer's agreements")
-    if (!order.site) findings.push("Choose one of the customer's sites")
-    else if (!order.site.isSite || order.site.customerId !== order.customerId) findings.push("The site is not one of the customer's sites")
+    if (!order.customerId) return [CHOOSE_CUSTOMER]
+    const findings = [agreementFinding(order.customerId, order.agreement), siteFinding(order.customerId, order.site)].filter(
+        (finding): finding is string => finding !== null,
+    )
     if (!siteTemplateOffered(order)) findings.push('The site template is not offered to the customer')
     return findings
 }
 
-/** Who must approve an Order with this verdict. */
 export function approversFor(verdict: EntitlementVerdict | ''): Approver[] {
     switch (verdict) {
         case 'over_quota':
@@ -176,12 +172,6 @@ export function approversFor(verdict: EntitlementVerdict | ''): Approver[] {
             return []
     }
 }
-
-/**
- * Order line stages before the line has shipped: such a line's whole quantity counts as in-flight usage, and it is
- * what cancelling or rejecting its Order cancels.
- */
-export const OPEN_LINE_STAGES: readonly LineStage[] = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship']
 
 /**
  * Encoded query on alm_hardware: the Agreement's fleet assets (ADR 0016) counted as deployed usage. One still on an
@@ -196,24 +186,18 @@ export function deployedUsageQuery(agreementId: string): string {
  * Whether assessing these lines reads the Agreement's usage: only lines that add a unit do (`assessOrder` exempts those
  * replacing an Asset). An Order with none gets the same verdict whatever is in flight, and its lines going into flight
  * beside a submission that reads usage read as if it had come first or last, so its submission need not take turns
- * (`agreementUsageLockName`).
+ * (domain/lock-names `agreementUsage`).
  */
 export function readsUsage(lines: readonly RequestedLine[]): boolean {
     return lines.some((line) => !line.replacesAsset)
 }
 
-/**
- * The job lock (ADR 0013) an Agreement's submissions take turns under: each reads the Agreement's usage, assesses its
- * Order and saves it out of draft, which makes it count in flight, before the next reads. Two read at once would each
- * miss the other and could both go ahead within a Contracted quantity only one fits.
- */
-export function agreementUsageLockName(agreementId: string): string {
-    return `agreement_usage_${agreementId}`
-}
+/** Order stages whose lines use nothing of an Agreement: a draft is not asked for yet, and one that ended unfulfilled never will be. */
+const NOT_YET_LIVE_OR_UNFULFILLED: readonly OrderStage[] = [ORDER_STAGE.draft, ...UNFULFILLED_ORDER_STAGES]
 
 /** Encoded query on x_daas_ham_order_line: the Agreement's open lines on live Orders other than `excludeOrderId`. */
 export function inFlightLinesQuery(agreementId: string, excludeOrderId: string): string {
-    return `order.agreement=${agreementId}^order!=${excludeOrderId}^order.stageNOT INdraft,rejected,cancelled^line_stageIN${OPEN_LINE_STAGES.join(',')}`
+    return `order.agreement=${agreementId}^order!=${excludeOrderId}^order.stageNOT IN${NOT_YET_LIVE_OR_UNFULFILLED.join(',')}^line_stageIN${OPEN_LINE_STAGES.join(',')}`
 }
 
 function sum(values: number[]): number {

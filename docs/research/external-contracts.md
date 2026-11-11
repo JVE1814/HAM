@@ -10,7 +10,13 @@ documentation, and the official ServiceNow SDK packages in `node_modules` (`@ser
 `sdk-build-plugins` and `sdk-build-core` 4.14.0; `@servicenow/glide` 27.0.5). Where the primary
 reference needs a login, a vendor knowledge-base article or a third-party SDK is cited and labelled
 as such, and the item is marked accordingly. No repository file other than this note was changed.
-Line numbers refer to the repository as it stood on the research date.
+Line numbers refer to the repository as it stood on the research date. The short names are of that
+date too: since the entry modules became adapters (ADR 0003), the code cited from `oem-sync.ts`,
+`margin.ts`, `leases.ts`, `billing.ts`, `delivery.ts` and `in-service.ts` is in
+`src/server/platform/` under the same name, that of `assurance.ts` in `platform/audits.ts`,
+`attestations.ts` and `reconciliation.ts`, of `warehouse.ts` in `platform/receiving.ts`, of
+`spare-pool.ts` in `platform/spare-pools.ts`; `STAGE_FIELDS` is in `domain/vocabulary.ts`; and
+`substatus-choices.test.ts` gave way to `src/server/built-metadata.test.ts`.
 
 Verdicts: **matches** (the app agrees with the source), **partially** (the core contract agrees,
 but a limit, edge case or secondary field does not), **differs** (the app contradicts the source),
@@ -22,12 +28,20 @@ Short file names used below:
 |---|---|
 | `adapters.ts`, `adapters.test.ts` | `src/server/domain/oem/` |
 | `claims.ts`, `claims.test.ts` | `src/server/domain/oem/` |
-| `oem-messages.now.ts`, `oem-claims.now.ts`, `shipping.now.ts`, `rest.now.ts`, `rules.now.ts` | `src/fluent/logic/` |
-| `oem.now.ts`, `staging.now.ts`, `substatus-choices.now.ts` | `src/fluent/data/` |
+| `oem-messages.now.ts`, `oem-claims.now.ts`, `shipping.now.ts`, `rest.now.ts`, `rules.now.ts` | `src/fluent/logic/` then; see below |
+| `oem.now.ts`, `staging.now.ts`, `substatus-choices.now.ts` | `src/fluent/data/` then; see below |
 | `oem-sync.ts`, `entry/oem-claims.ts`, `entry/shipping.ts`, `margin.ts`, `leases.ts`, `billing.ts`, `delivery.ts`, `in-service.ts`, `assurance.ts`, `warehouse.ts`, `spare-pool.ts`, `demo-seed.ts` | `src/server/entry/` |
 | `rest-port.ts`, `properties.ts`, `procurement.ts`, `field-work.ts`, `assets.ts`, `rest-api.ts` | `src/server/platform/` |
 | `http.ts`, `json.ts`, `domain/shipping.ts`, `shipping.test.ts`, `lifecycle.ts`, `model-lifecycle.ts`, `substatus-choices.test.ts` | `src/server/domain/` |
 | `keys.ts` | `src/fluent/generated/` |
+
+`src/fluent` has since been grouped by feature, so the `.now.ts` files named here are those of the
+research date. Their records are now in `oem/rest-messages.now.ts` (`oem-messages.now.ts`),
+`oem/logic.now.ts` (`oem-claims.now.ts`), `delivery/logic.now.ts` (`shipping.now.ts`),
+`shared/rest-api.now.ts` (`rest.now.ts`), the `logic.now.ts` of `fleet/`, `staging/`, `delivery/`
+and `orders/` (`rules.now.ts`), `oem/tables.now.ts` and `break-fix/break-fix.now.ts` (`oem.now.ts`),
+`staging/tables.now.ts` and `oem/tables.now.ts` (`staging.now.ts`), and `fleet/tables.now.ts`
+(`substatus-choices.now.ts`).
 
 
 **Status (2026-11-07):** every change under "Changes needed in the app" has been applied, except the
@@ -753,13 +767,17 @@ Sources:
 | `GlideSysAttachment.write()` and `deleteAttachment()` | As used (`billing.ts:243,255-258`) | Same signatures | matches | N25, N26 |
 | `sys_attachment` fields | `table_name`, `table_sys_id`, `file_name` (`billing.ts:268`) | Documented | matches | N27, N28 |
 | Scripted REST `request.queryParams` | Each parameter is an array (`rest-api.ts:12`) | Type Array; examples are arrays | matches | N29 |
-| `GlideRecord.updateMultiple()` and clearing a field | Clears `billing_period` record by record (`billing.ts` unlinkFees) | `updateMultiple` does not clear values unless set to `'NULL'` | matches | N30 |
+| `GlideRecord.updateMultiple()` and clearing a field | Clears `billing_period` record by record (`platform/fees.ts` takeOffPeriod) | `updateMultiple` does not clear values unless set to `'NULL'` | matches | N30 |
 | `RESTMessageV2(name, methodName)`, `setStringParameterNoEscape` | As used; app URL-encodes values itself (`rest-port.ts:8,26-28`) | Constructor documented; neither method URL-encodes | matches | N31, N32, N33 |
-| `GlideAggregate.groupBy` on date fields | Grouped `start_date`/`end_date` read as `YYYY-MM-DD` (`billing.ts` intervalsByLine) | Format of a grouped `glide_date` key not documented | unverifiable | N34 |
-| `setWorkflow(false)` on a global table from the scoped app | No longer relied on there: a read past the visibility rules on `alm_hardware` marks its GlideRecord while its query runs and the app's before-query rules skip a marked record (`platform/beyond-visibility.ts`, `entry/visibility.ts` restrict); `setWorkflow(false)` stays on `x_daas_ham_*` tables | "This method can't be set for cross-scoped applications"; refused on the instance, so the rules still run. Module state reaches the rules the query sets off, within that transaction only | matches | N30, N35, N37 |
-| `current.setAbortAction(true)` in a before rule on a global table | No longer used there: the rules on `alm_hardware` and `wm_order` refuse with their Abort action (`assets.ts` refusesLifecycleChange, `delivery.ts` refusesWorkWindow, `racks.ts` refusesRackPlacement); the rules on `x_daas_ham_*` tables keep it | Refused on the instance: the save goes through. The rule's own Abort action refuses it, whoever saves, and its script still runs | matches | N35, N36 |
+| `GlideAggregate.groupBy` on date fields | Grouped `start_date`/`end_date` read as `YYYY-MM-DD` (`platform/billing.ts` intervalsByLine) | Format of a grouped `glide_date` key not documented | unverifiable | N34 |
+| `setWorkflow(false)` on a global table from the scoped app | No longer relied on there: a read past the visibility rules on `alm_hardware` marks its GlideRecord while its query runs and the app's before-query rules skip a marked record (`platform/beyond-visibility.ts`, `entry/visibility.ts` `scopeRecords`); `setWorkflow(false)` stays on `x_daas_ham_*` tables | "This method can't be set for cross-scoped applications"; refused on the instance, so the rules still run. Module state reaches the rules the query sets off, within that transaction only | matches | N30, N35, N37 |
+| `current.setAbortAction(true)` in a before rule on a global table | No longer used there: the rules on `alm_hardware` and `wm_order` refuse with their Abort action (`entry/assets.ts` refusesLifecycleChange, `entry/delivery.ts` refusesWorkWindow, `entry/racks.ts` refusesRackPlacement); the rules on `x_daas_ham_*` tables keep it | Refused on the instance: the save goes through. The rule's own Abort action refuses it, whoever saves, and its script still runs | matches | N35, N36 |
 | Business rule condition and filter | The check is the condition, behind a change test in the condition itself (`rules.now.ts`, `assurance.now.ts`) | The condition runs on every save the rule's table and action match, even when the filter does not; the rule fires only when both hold | matches | N36 |
 | Out-of-box transfer order line logic and the Asset | Inventory works the transfer orders sourcing raises, each unit handed over *In stock / Available* just before its line is inserted (`platform/transfers.ts` requestTransfer). Both combinations Inventory sets are one stage, *In transfer*, entered only while `active_to` is set and left only once it is cleared (`domain/lifecycle.ts`, `entry/assets.ts` refusesLifecycleChange); an Asset Inventory lets go takes back the stage it left (`entry/assets.ts` onTransferReleased) | *Push Status to Asset/Consumable* sets *In stock / Pending transfer* or *In transit / Reserved* with `active_to` set, and *In stock / Available* in the to-stockroom with it cleared at Received; *Release Asset on TOL cancel/delete* sets *In stock / Available* where the Asset is and clears it; *Validate TOL and check availibility* takes onto a line only an Asset *In stock / Available* with `active_to` clear. Each saves through `alm_asset` in the user's transaction, and the app's `alm_hardware` rules run on that save | matches | N38, N39 |
+| The platform's Model lifecycle table | A Model's manufacturer milestones are rows of `cmdb_model_lifecycle`, written as `cmdb_hardware_model_lifecycle` with lifecycle type `publisher`, source `internal`, the milestone as `lifecycle_phase` and its date as `start_date`; a write updates the active row of one Model, type, phase and source and never deletes; asset managers hold `model_manager` (`platform/model-lifecycle.ts`, ADR 0017) | Both tables are Model Management's (`com.snc.model`), with those columns and phase values; before rules refuse an insert without a start date, a second active row for one Model, type, phase and source, and a hardware lifecycle row for a Model that is not a hardware Model; this scope may read, create and update, not delete; create and write need `model_manager`, read `snc_internal` | matches (the app's use was not run on the instance) | N40 |
+| Platform fields the app uses in place of its own | An inventory tech's Stockrooms from `alm_stockroom.assignment_group` and `sys_user_grmember` (`platform/session.ts`); a Model's typical power from `cmdb_model.power_consumption` (`platform/racks.ts`); a lease's Lessor and schedule number in `ast_contract.vendor` and `vendor_contract`; on-site work linked through `wm_order.initiated_from` and `change_request.parent` (`platform/field-work.ts`, the rules on `wm_order`); ADR 0018 | The columns exist with those types; `sys_user_group` lets other scopes read only, `sys_user_grmember` read, create and update; no platform rule reads a contract's vendor fields, a work order's *Initiated from* or (beyond running the parent's workflows) a task's *Parent* | matches (the app's use was not run on the instance) | N41 |
+| ATF *Record Validation* on a date field | The ATF tests check a date with the `ON` form, `endsON2028-01-31@javascript:gs.dateGenerate('2028-01-31','start')@javascript:gs.dateGenerate('2028-01-31','end')` (`src/fluent/leases/tests.now.ts`) | The step matches the record loaded in memory against the condition, not the database, and there a date `=` a literal day is shifted by the session time zone; `ON` matches the day in every time zone | matches | N42 |
+| A row inserted into an import-set table outside an import set | The app processes its import rows by business rule and ships no transform map (ADR 0018); an ATF test that inserts such a row does not fail on server errors and checks the outcome (`src/fluent/models/tests.now.ts`) | The platform transforms the row at once and, where the table has no transform map, logs the error *Transform map record not provided, transform stopped*; the insert is written and the app's rule runs | matches | N43 |
 
 Notes:
 
@@ -836,7 +854,7 @@ Notes:
   existing value, use the setValue() method and set the field to 'NULL'." Also "use the setValue()
   method instead of direct assignments" and "Do not use this method with the chooseWindow() or
   setLimit() methods when working with large tables." The docs example calls `addQuery`, `setValue`,
-  `updateMultiple`, with no `query()`. Optional simplification in `billing.ts` unlinkFees:
+  `updateMultiple`, with no `query()`. Optional simplification in `platform/fees.ts` takeOffPeriod:
   `fee.setValue('billing_period', 'NULL'); fee.updateMultiple()`; the current loop is also correct.
 - **RESTMessageV2.** Scoped and global, `sn_ws` namespace: `RESTMessageV2(String name, String
   methodName)`; name is "The name of the REST message record in the REST Message [sys_rest_message]
@@ -951,7 +969,7 @@ Sources:
   `setWorkflow(false)` on `sys_user` and `alm_transfer_order_line` is refused like on `alm_hardware`
   (`isWorkflow()` stays true); on `x_daas_ham_order_line` it applies. Only the app may add a
   before-query rule to an app table: the platform's *Reject before-Q for out-of-scope tables*
-  refused one on `x_daas_ham_stockroom_member` saved from global.
+  refused one saved from global on a table of the app.
 - N38: Brazil instance, 2026-11-09. Read on the instance: the before rule *Push Status to
   Asset/Consumable* on `alm_transfer_order_line` (global, order 500, insert and update, condition
   `!current.isActionAborted() && (current.stage.changes() || current.asset.changes() ||
@@ -1002,6 +1020,70 @@ Sources:
   leaves the stage of a Cancelled line as it is, so a task closed after its line was cancelled saves
   neither the line nor its Asset. `alm_transfer_order_line.stage` holds `draft`, `requested`,
   `shipment_preparation`, `in_transit`, `received`, `delivered` and `cancelled`.
+- N40: Brazil instance, 2026-11-09, read through the Table API without saving anything (no Hardware
+  Asset Management Professional on it; both tables empty). `cmdb_model_lifecycle` (*Model
+  Lifecycle*, extendable) and its child `cmdb_hardware_model_lifecycle` (*Hardware Model Lifecycle*,
+  no column of its own) belong to `com.snc.model`. Columns: `model` (reference `cmdb_model`),
+  `lifecycle_phase` (default `availability`; choices `availability`, `end_of_sale`,
+  `end_of_support`, `end_of_extended_support`, `end_of_life`), `lifecycle_type` (default `internal`;
+  `internal`, `publisher`), `source` (read-only, default `internal`; `internal`, `service_now`),
+  `start_date` (*Phase start date*, a date, mandatory), `end_date`, `description` (string, 1000),
+  `risk`, `active` (default true), `current_lifecycle_phase` (read-only). Application access of
+  both tables: read, create and update from other scopes, not delete. Their active business rules
+  are four before rules on `cmdb_model_lifecycle`, all of order 100 and refusing with
+  `setAbortAction`: *Error message on invalid date format* (insert, filter `start_dateISEMPTY`),
+  *Unique lifecycle creation per model* (insert and update of an active row: another active row of
+  `cmdb_model_lifecycle` with the same `source`, `lifecycle_type`, `lifecycle_phase` and `model`),
+  *Verfiy model on lifecycle* (a row of a class whose Model's class is not the mapped one,
+  `cmdb_hardware_model_lifecycle` to `cmdb_hardware_product_model` and `cmdb_model_lifecycle` to
+  `cmdb_model`, or any row for a software Model) and *Phase start and end date validation* (an end
+  date not after the start date). ACLs on `cmdb_model_lifecycle`: read `snc_internal`; create, write
+  and delete `model_manager`; list edit `nobody`. `model_manager` is a `com.snc.model` role;
+  `procurement_user`, `sam` and `category_manager` contain it, `asset` does not. Default list of
+  both tables: `model`, `lifecycle_phase`, `lifecycle_type`, `source`, `start_date`.
+- N41: Brazil instance, 2026-11-09, read through the Table API without saving anything (no Hardware
+  Asset Management Professional on it).
+  - Stockrooms and groups. `alm_stockroom.assignment_group` (*Assignment group*) references
+    `sys_user_group` and is the second field of the stockroom's default form. ACLs: create and write
+    on `alm_stockroom` take `inventory_admin`; create and write on `sys_user_grmember` take
+    `user_admin`. Application access: `sys_user_grmember` and `alm_stockroom` allow read, create and
+    update from other scopes, not delete; `task` allows read; `sys_user_group` allows read only.
+    Active before-query rules: none on `sys_user_grmember`; on `sys_user_group` the platform's *group
+    query* (active groups only, for an interactive user without `admin` or `user_admin`); on
+    `alm_stockroom` only the app's.
+  - Models. `cmdb_model.power_consumption` is an integer labelled *Power (watts)*, on the hardware
+    Model's default form. `cmdb_model.asset_tracking_strategy` (*Asset tracking strategy*, default
+    `leave_to_category`) has the choices `leave_to_category` (*Leave to category*),
+    `track_as_consumable` (*Create consumable asset*) and `do_not_track` (*Don't create assets*).
+  - Contracts. `ast_contract.vendor` (*Vendor*) references `core_company` with the qualifier
+    `vendor=true`; `vendor_contract` (*Contract number*) is a string of 40, mandatory and the table's
+    display field; `number` is read-only with a number default. None of the 23 active business rules
+    on `ast_contract` names `vendor` in its script.
+  - Task references. `sm_order.initiated_from` (*Initiated from*, which `wm_order` inherits) and
+    `task.parent` (*Parent*) reference `task`. No active business rule on `task`, `change_request`,
+    `sm_order` or `wm_order` names `initiated_from`; *Date Checks* on `sm_task` reads an assigned
+    crew's. The script includes that name it are `WorkManagementInitiation`, `SMDateValidation`,
+    `QueryRangeACLAuditor` and Customer Service's `CaseReportUtils`. The active rules on `task` and
+    `change_request` whose script names `.parent` are the three async *Affected group / location /
+    cost center notifications* and *SNC - Run parent workflows* (after insert and update), which
+    broadcasts an update to the workflow contexts of the parent record.
+- N42: development instance (Brazil, session time zone America/Los_Angeles), 2026-11-09, ATF run
+  of the app's suites. In *NaaS - extending a lease moves its end date and closes the decision*, a
+  *Record Validation* step with `ends=2028-01-31` failed on a Lease schedule whose stored `ends`
+  was 2028-01-31 (*Record ... did not match conditions: End date = 2028-01-31 and End-of-lease
+  action = Undecided*): the step matches the loaded record in memory against the condition
+  (`GlideFilter.checkRecord`), where a date compared with `=` to a literal day is shifted by the
+  session time zone, so west of UTC it matches the day after. The same step with the `ON` form the
+  condition builder writes
+  (`endsON2028-01-31@javascript:gs.dateGenerate('2028-01-31','start')@javascript:gs.dateGenerate('2028-01-31','end')`)
+  passed, and the run then passed all 14 tests.
+- N43: development instance (Brazil), 2026-11-09, ATF run of the app's suites. In *NaaS - a
+  lifecycle import row stores its milestones on the model*, a *Record Insert* step into
+  `x_daas_ham_eox_import` (an import-set table, extending `sys_import_set_row`) outside an import
+  set made the platform log *Transform map record not provided, transform stopped*, and the test,
+  which then failed on any server error, failed with that message. The table has no transform map:
+  the app's business rule processes the row. With *Fail on server error* off, the test passed: the
+  row was inserted, the rule ran, and the steps that check the outcome held.
 
 ## Changes needed in the app
 
@@ -1244,27 +1326,29 @@ recommended hardening are described in the notes of their area.
   before rule on such a table refuses with its Abort action: its check is the condition and its script
   only adds the message; the platform runs a condition whatever the filter (N36), so the condition
   starts with the change test that keeps the module unloaded on other saves. **Done** for the rack
-  placement rule (`assurance.now.ts`, `racks.ts` refusesRackPlacement), `NaaS - enforce asset
-  lifecycle` (`alm_hardware`, `assets.ts` refusesLifecycleChange; the wipe evidence a save into
-  staging voids is cleared by a rule of its own, `assets.ts` clearVoidedWipeEvidence) and `NaaS -
-  work inside the change window` (`wm_order`, `delivery.ts` refusesWorkWindow). No other
-  rule refuses a save on another scope's table: the before rule on `sn_customerservice_case`
-  (`breakfix.ts` onCaseFailedAsset) and the lease rule and transfer release rule on `alm_hardware`
-  (`leases.ts` onAssetLeaseChanged, `entry/assets.ts` onTransferReleased) only set fields, and the
-  rest that refuse run on `x_daas_ham_*` tables, where `setAbortAction` works
-  (`entry-points.test.ts` keeps it that way). With the lifecycle rule's refusal holding, it also
+  placement rule (`assurance.now.ts`, `entry/racks.ts` refusesRackPlacement), `NaaS - enforce asset
+  lifecycle` (`alm_hardware`, `entry/assets.ts` refusesLifecycleChange; the wipe evidence a save
+  into staging voids is cleared by a rule of its own, `entry/assets.ts` clearVoidedWipeEvidence) and
+  `NaaS - work inside the change window` (`wm_order`, `entry/delivery.ts` refusesWorkWindow). No
+  other rule refuses a save on another scope's table: the before rule on `sn_customerservice_case`
+  (`entry/breakfix.ts` onCaseFailedAsset) and the lease rule and transfer release rule on
+  `alm_hardware` (`entry/leases.ts` onAssetLeaseChanged, `entry/assets.ts` onTransferReleased) only
+  set fields, and the rest that refuse run on `x_daas_ham_*` tables, where `setAbortAction` works
+  (`built-metadata.test.ts` keeps it that way). With the lifecycle rule's refusal holding, it also
   checks the Asset saves Inventory's transfer order logic makes for an inventory tech working a line
   (N38); the next item models them.
   The reads ADR 0005 runs past the visibility rules on `alm_hardware` no longer call `setWorkflow`:
   each marks its GlideRecord while its query runs (`platform/beyond-visibility.ts`) and the app's
-  before-query rules leave a marked record's query as it is (N37). **Done** for `racks.ts` slotsIn,
-  `platform/assets.ts` findAssetByIdentifier (`beyondVisibility`), `platform/fulfilment.ts`
-  assetStages and readPastRules, `platform/service-intervals.ts` inServiceNow, `delivery.ts`
-  shippable and Ship's re-read, `warehouse.ts` arrivingAsset, `imports.ts` serialExists,
-  `in-service.ts` freshAsset, `returns.ts` endSitePackageIfEmpty and the survivor check of
-  `records.ts` deleteWhere. The mark skips only the app's rules: on `alm_asset`, Customer Service's
-  and the platform's query rules still run, for users with Customer Service roles, which the app
-  does not grant. `approvals.ts` isActiveUser reads `sys_user`, where the app has no rule and the
+  before-query rules leave a marked record's query as it is (N37). **Done** for `platform/racks.ts`
+  slotsIn, `platform/assets.ts` findAssetByIdentifier (`beyondVisibility`) and findAnyAsset (a
+  receipt's look-up and the serial check of an ASN row), `platform/records.ts` findById with
+  `beyondVisibility` (the sighting's and the receipt's fresh read), `platform/fulfilment.ts`
+  assetStages, `platform/service-intervals.ts` inServiceNow, `platform/delivery.ts` shippable and
+  Ship's re-read, `platform/subscriptions.ts` endSitePackageIfEmpty, `platform/session.ts`,
+  `platform/staging-tasks.ts`, `platform/tags.ts` and the survivor check of `platform/records.ts`
+  deleteWhere. The mark skips only the app's rules: on `alm_asset`, Customer Service's and the
+  platform's query rules still run, for users with Customer Service roles, which the app does not
+  grant. `platform/approvals.ts` isActiveUser reads `sys_user`, where the app has no rule and the
   platform's *user query* rule only hides inactive users, which it asks for anyway. No app logic
   saves a record of another scope's table with the rules off: each read above that is saved runs
   every rule on the save, as it did when `setWorkflow(true)` came before it.
@@ -1279,7 +1363,7 @@ recommended hardening are described in the notes of their area.
   onTransferReleased, `domain/lifecycle.ts` stageAfterTransfer). Sourcing hands each reserved unit
   over *In stock / Available* just before it inserts the unit's line (`platform/transfers.ts`
   requestTransfer), and a unit whose line is cancelled or deleted short of the staging centre is put
-  back as free stock and its Order sourced again (`entry/orders.ts` putBackUntransferred).
+  back as free stock and its Order sourced again (`platform/sourcing.ts` putBackUntransferred).
 
 ## Still needs an instance or vendor login
 

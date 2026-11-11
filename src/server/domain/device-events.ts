@@ -1,22 +1,21 @@
-/** Seen signals posted by the Provider's NMS (validated before anything touches the database). */
+import { DEVICE_EVENT_KIND_CHOICES, DEVICE_EVENT_SOURCE_CHOICES, type DeviceEventKind, type DeviceEventSource } from './vocabulary.ts'
 
-export type DeviceEventKind = 'seen' | 'down' | 'up'
-export type SeenSource = 'discovery' | 'connector' | 'nms'
+/** Seen signals posted by the Provider's NMS (validated before anything touches the database). */
 
 export interface DeviceEvent {
     /** Serial number, Provider tag or Customer tag of the Asset. */
     identifier: string
     event: DeviceEventKind
     observedAt: number
-    source: SeenSource
+    source: DeviceEventSource
 }
 
 export type ParsedEvents =
     | { events: DeviceEvent[]; rejected: Array<{ index: number; reason: string }> }
     | { error: string }
 
-const KINDS: readonly DeviceEventKind[] = ['seen', 'down', 'up']
-const SOURCES: readonly SeenSource[] = ['discovery', 'connector', 'nms']
+const KINDS = Object.keys(DEVICE_EVENT_KIND_CHOICES) as DeviceEventKind[]
+const SOURCES = Object.keys(DEVICE_EVENT_SOURCE_CHOICES) as DeviceEventSource[]
 
 /** Monitoring clocks may run slightly ahead; anything further in the future is rejected. */
 const MAX_CLOCK_SKEW_MS = 5 * 60_000
@@ -33,7 +32,7 @@ const ISO_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(
 
 /**
  * The events of a batch, validated (a malformed one is rejected by its index in the batch) and in the order they were
- * observed, oldest first: last_seen only moves forward (entry/in-service), so a batch listing a later sighting before an
+ * observed, oldest first: last_seen only moves forward (platform/in-service), so a batch listing a later sighting before an
  * earlier one would otherwise put a pending Asset in service at the later one, its first days unbilled. Events observed
  * at the same instant keep their order in the batch.
  */
@@ -48,7 +47,7 @@ export function parseDeviceEvents(body: unknown, maxBatch: number, now: number):
         const identifier = typeof item?.identifier === 'string' ? item.identifier.trim() : ''
         const event = item?.event as DeviceEventKind
         const observedAt = typeof item?.observed_at === 'string' ? parseTimestamp(item.observed_at) : NaN
-        const source = (item?.source ?? 'nms') as SeenSource
+        const source = (item?.source ?? 'nms') as DeviceEventSource
         if (!identifier) return void rejected.push({ index, reason: 'identifier is required' })
         if (!KINDS.includes(event)) return void rejected.push({ index, reason: 'event must be one of seen, down, up' })
         if (Number.isNaN(observedAt)) return void rejected.push({ index, reason: OBSERVED_AT_FORMAT })
@@ -80,4 +79,12 @@ function parseTimestamp(value: string): number {
     date.setUTCHours(hour, minute, second, millis)
     const offset = (match[8] === '-' ? -1 : 1) * (offsetHours * 60 + offsetMinutes) * 60_000
     return date.getTime() - offset
+}
+
+/**
+ * Whether an event is stored: device events keep state changes only, so a sighting that follows a stored sighting adds
+ * nothing. `lastStored` (the kind of the Asset's newest stored event, '' for none) is read only for a sighting.
+ */
+export function isStateChange(kind: DeviceEventKind, lastStored: () => string): boolean {
+    return kind !== 'seen' || lastStored() !== 'seen'
 }

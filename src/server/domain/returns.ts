@@ -1,16 +1,29 @@
 import { addDays } from './calendar.ts'
-import type { NamedRecord } from './entitlement.ts'
-import type { LeaseEndAction } from './leases.ts'
+import { actorRefusal, CHOOSE_CUSTOMER, siteFinding, type ActWording, type NamedSite } from './customer-parties.ts'
 import { fleetStagesQuery } from './fleet.ts'
-import { DEPLOYED_STAGES, SERVING_STAGES, type LegalOwner, type Stage } from './lifecycle.ts'
+import { DEPLOYED_STAGES, INSTALLED_STAGES, SERVING_STAGES, type Stage } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
+import {
+    type EvaluationOutcome,
+    FEE_STATUS,
+    type FeeType,
+    type InstallMode,
+    type LeaseEndAction,
+    type LegalOwner,
+    ORDER_STAGE,
+    type OrderStage,
+    type ReturnLineStatus,
+    type ReturnMethod,
+    RETURN_TRIGGER,
+    type ReturnTrigger,
+    TASK_STATE,
+} from './vocabulary.ts'
 
-/** Returns, depot evaluation, Fee events and break-fix shortfalls (P2.3–P2.4). */
+/** Returns, depot evaluation and Fee events (P2.4). */
 
-/** The Customer a requested Return is for and the Site it names, with the Customer that Site belongs to. */
 export interface RequestedReturn {
     customerId: string
-    site?: NamedRecord & { isSite: boolean }
+    site?: NamedSite
 }
 
 /** The person requesting a Return: whether the Return create rule lets them, how far they see (ADR 0005) and their own Customer. */
@@ -20,34 +33,79 @@ export interface ReturnRequester {
     customerId: string
 }
 
+const REQUESTING_RETURNS: ActWording = { act: 'request returns', actForOwn: 'request returns' }
+
 /**
- * Why this person may not request a Return for the Customer, or null when they may. As for an Order (domain/entitlement
- * `raiserRefusal`): only those the Return create rule lets in ask for returns, and site contacts never do; provider
- * staff and the service desk ask for any Customer, a customer admin only for their own.
+ * Why this person may not request a Return for the Customer, or null when they may (domain/customer-parties
+ * `actorRefusal`, as for an Order): only those the Return create rule lets in ask for returns, a customer admin only
+ * for their own Customer.
  */
 export function returnRequesterRefusal(customerId: string, requester: ReturnRequester): string | null {
-    if (!requester.mayRequest || requester.scope === 'own_sites') return 'You may not request returns'
-    if (requester.scope === 'own_customer' && customerId !== requester.customerId) {
-        return 'You can only request returns for your own customer'
-    }
-    return null
+    return actorRefusal(customerId, { ...requester, permitted: requester.mayRequest }, REQUESTING_RETURNS)
+}
+
+/** Why a requested Return cannot be raised, and what it is about: who asks for it, or the Customer and Site it names. */
+export interface ReturnRequestFinding {
+    about: 'requester' | 'site'
+    message: string
 }
 
 /**
  * Why a requested Return cannot be raised; empty when it can: the person must be allowed to request it for its Customer
  * (`returnRequesterRefusal`), and the Site must be one of the Customer's sites.
  */
-export function returnRequestFindings(request: RequestedReturn, requester: ReturnRequester): string[] {
+export function returnRequestFindings(request: RequestedReturn, requester: ReturnRequester): ReturnRequestFinding[] {
     const refusal = returnRequesterRefusal(request.customerId, requester)
-    if (refusal) return [refusal]
-    if (!request.customerId) return ['Choose the customer']
-    if (!request.site) return ["Choose one of the customer's sites"]
-    if (!request.site.isSite || request.site.customerId !== request.customerId) return ["The site is not one of the customer's sites"]
-    return []
+    if (refusal) return [{ about: 'requester', message: refusal }]
+    const misplaced = request.customerId ? siteFinding(request.customerId, request.site) : CHOOSE_CUSTOMER
+    return misplaced ? [{ about: 'site', message: misplaced }] : []
 }
 
+/**
+ * The platform's task states a Return order takes: Work in Progress while units are awaited or evaluated, Closed
+ * Complete once every line is settled (or it has none).
+ */
+export const RETURN_TASK_STATE = { inProgress: TASK_STATE.workInProgress, closed: TASK_STATE.closedComplete } as const
+
+/** The stages of a temporary deployment whose end date is watched: its equipment is being installed or is installed. */
+export const TEMPORARY_RETURN_STAGES: readonly OrderStage[] = [ORDER_STAGE.installing, ORDER_STAGE.complete]
+
+/** Encoded query on Fee events: the open ones, not yet billed nor waived, which the workspace lists. */
+export const OPEN_FEES_QUERY = `status=${FEE_STATUS.open}`
+
+/** The status of a Return line whose unit is still expected back: not at the depot yet, nor declared missing. */
+export const AWAITED: ReturnLineStatus = 'awaiting'
+
+/** The lines an arriving unit settles: awaited, or declared missing and now turning up late. */
+export const SETTLED_BY_RECEIPT: readonly ReturnLineStatus[] = ['awaiting', 'missing']
+
+/** The lines that keep their Return order open: every other is evaluated or declared missing. */
+export const KEEPS_RETURN_OPEN: readonly ReturnLineStatus[] = ['awaiting', 'received']
+
+/** Returns whose unit the swap's own work order collects, so they open no de-install work of their own. */
+const COLLECTED_BY_SWAP: readonly ReturnTrigger[] = ['refresh_swap_back', 'defective_return']
+
+/** Whether a Return opens a de-install change and work order: a field de-install no swap work order already covers. */
+export function opensDeinstallWork(trigger: ReturnTrigger, method: ReturnMethod): boolean {
+    return method === 'fsm_deinstall' && !COLLECTED_BY_SWAP.includes(trigger)
+}
+
+/** How the units of an Order come back: the Site ships back what it installed itself, a field engineer collects the rest. */
+export function collectionMethod(installMode: InstallMode | ''): ReturnMethod {
+    return installMode === 'self_install' ? 'ship_back' : 'fsm_deinstall'
+}
+
+/** Whether a unit received `today` came back after its Return order's due date ('' = none set, never late). */
+export function receivedLate(dueBack: string, today: string): boolean {
+    return !!dueBack && today > dueBack
+}
+
+/** The days a Customer has to hand equipment back when its Agreement names no allowance. */
+const DEFAULT_RETURN_ALLOWANCE_DAYS = 30
+
+/** The day a Return raised on `raisedOn` is due back: after its Agreement's allowance (0 when it names none). */
 export function returnDueDate(raisedOn: string, allowanceDays: number): string {
-    return addDays(raisedOn, allowanceDays)
+    return addDays(raisedOn, allowanceDays || DEFAULT_RETURN_ALLOWANCE_DAYS)
 }
 
 export type OverdueStep = 'none' | 'escalate' | 'declare_missing'
@@ -69,8 +127,25 @@ export function sitePackageHoldersQuery(line: { siteId: string; agreementId: str
     return fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_site=${line.siteId}^x_daas_ham_agreement=${line.agreementId}`)
 }
 
-/** Installed at a Site: in service, temporary or awaiting first sighting (temporary ends, audits, attestations). */
-export const INSTALLED_STAGES: readonly Stage[] = ['in_service', 'temporary_deployment', 'pending_in_service']
+/**
+ * A whole-Site recovery: the Returns that bring back all of a Site, by their trigger. What makes a Return one, the
+ * stages it takes units in and the lines that await them are all said here.
+ */
+const SITE_RECOVERY_TRIGGERS: readonly ReturnTrigger[] = [RETURN_TRIGGER.site_decommission, RETURN_TRIGGER.agreement_end]
+
+export function isSiteRecovery(trigger: ReturnTrigger): boolean {
+    return SITE_RECOVERY_TRIGGERS.includes(trigger)
+}
+
+/** The trigger of a Return its Customer requests: for the whole Site (a decommission), or for the devices it lists. */
+export function requestedTrigger(decommission: boolean): ReturnTrigger {
+    return decommission ? RETURN_TRIGGER.site_decommission : RETURN_TRIGGER.device_removal
+}
+
+/** Encoded query on x_daas_ham_return_order_line: the Asset is awaited back on a whole-Site recovery. */
+export function siteRecoveryLineQuery(assetId: string): string {
+    return `asset=${assetId}^status=${AWAITED}^return_order.triggerIN${SITE_RECOVERY_TRIGGERS.join(',')}`
+}
 
 /**
  * What a whole-Site recovery (agreement end, site decommission) takes back: every unit serving the Site, including
@@ -79,11 +154,17 @@ export const INSTALLED_STAGES: readonly Stage[] = ['in_service', 'temporary_depl
  */
 export const SITE_RECOVERY_STAGES: readonly Stage[] = SERVING_STAGES
 
-export type EvaluationOutcome = 'refurbish' | 'oem_rma' | 'scrap' | 'return_to_owner'
+/**
+ * The stages of the units at a Site a Return with this trigger takes back: a whole-Site recovery those still shipped
+ * there too, any other the installed ones.
+ */
+export function stagesTakenBack(trigger: ReturnTrigger): readonly Stage[] {
+    return isSiteRecovery(trigger) ? SITE_RECOVERY_STAGES : INSTALLED_STAGES
+}
 
 /** Who an evaluated Asset belongs to: its Legal owner and the end action of its lease ('' without one). */
 export interface EvaluatedOwnership {
-    legalOwner: LegalOwner
+    legalOwner: LegalOwner | ''
     leaseEndAction: LeaseEndAction | ''
 }
 
@@ -108,12 +189,6 @@ function ownerTakesBack({ legalOwner, leaseEndAction }: EvaluatedOwnership): boo
     return legalOwner === 'customer' || (legalOwner === 'lessor' && leaseEndAction === 'return')
 }
 
-export type FeeType = 'lost' | 'damaged' | 'late_return'
-
-export function feeAmount(type: FeeType, agreementFees: Record<FeeType, number>): number {
-    return agreementFees[type]
-}
-
 /** What makes two Fee events the same charge: one type, for one Asset on one Return order (that is, its line). */
 export interface FeeIdentity {
     type: FeeType
@@ -123,18 +198,5 @@ export interface FeeIdentity {
 
 /** The x_daas_ham_fee_event query for the charges of `fee` that count, any not waived: it is charged at most once. */
 export function chargedFeeQuery(fee: FeeIdentity): string {
-    return `fee_type=${fee.type}^asset=${fee.assetId}^return_order=${fee.returnOrderId}^status!=waived`
-}
-
-/** The job lock (ADR 0013) a fee is charged under: one per fee identity, within the lock name's 100 characters. */
-export function feeLockName(fee: FeeIdentity): string {
-    return `fee_${fee.type}_${fee.assetId}_${fee.returnOrderId}`
-}
-
-export type ShortfallRoute = 'none' | 'purchase' | 'oem_advance_replacement'
-
-/** A covered unit that fails with no stock left is replaced by the OEM in advance; anything else is purchased. */
-export function shortfallRoute(input: { missing: number; purpose: 'new' | 'replace'; coveredToday: boolean }): ShortfallRoute {
-    if (input.missing <= 0) return 'none'
-    return input.purpose === 'replace' && input.coveredToday ? 'oem_advance_replacement' : 'purchase'
+    return `fee_type=${fee.type}^asset=${fee.assetId}^return_order=${fee.returnOrderId}^status!=${FEE_STATUS.waived}`
 }

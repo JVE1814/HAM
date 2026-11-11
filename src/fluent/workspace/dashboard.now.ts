@@ -1,15 +1,25 @@
 import '@servicenow/sdk/global'
 import { Dashboard } from '@servicenow/sdk/core'
 import { naasWorkspace } from './workspace.now'
+import { OPEN_ORDERS_QUERY, ORDERS_AWAITING_APPROVAL_QUERY } from '../../server/domain/fulfilment'
+import { FLEET_IN_STAGE, FLEET_INSTALLED } from '../../server/domain/fleet'
+import { IN_SERVICE_ON_ENDED_LINE, IN_SERVICE_UNBILLED } from '../../server/domain/billing'
+import { INSTALLED_PAST_SUPPORT } from '../../server/domain/model-lifecycle'
+import { INSTALLED_WITHOUT_COVERAGE } from '../../server/domain/coverage'
+import { OPEN_EXCEPTIONS_QUERY } from '../../server/domain/reconciliation'
+import { ROLE } from '../../server/domain/visibility'
+import { SUBSCRIPTION_LINE_STATUS } from '../../server/domain/vocabulary'
 
 /*
  * Workspace landing dashboard: operations, billing integrity (P1), lifecycle risk (P2) and margin (P3).
  *
  * alm_hardware also holds the Provider IT's equipment (ADR 0016), so every source on it counts fleet assets only: its
- * filter carries domain/fleet `fleetCondition()` in each ^NQ clause, as `inFleet` builds it (a condition after ^NQ
- * binds to the last clause only). Fluent metadata cannot call domain code, so the queries are literals that
- * domain/fleet-queries.test.ts checks.
+ * filter holds the fleet condition in each ^NQ clause (a condition after ^NQ binds to the last clause only), which
+ * built-metadata.test.ts checks. The queries are the domain's constants, the same the workspace lists show.
  */
+
+/** A record of the Billing period that started last month. */
+const LAST_MONTH = 'billing_period.period_startONLast month@javascript:gs.beginningOfLastMonth()@javascript:gs.endOfLastMonth()'
 
 export const naasDashboard = Dashboard({
     $id: Now.ID['dash_naas'],
@@ -28,7 +38,7 @@ export const naasDashboard = Dashboard({
                                 label: 'Order',
                                 sourceType: 'table',
                                 tableOrViewName: 'x_daas_ham_order',
-                                filterQuery: 'stageNOT INcomplete,cancelled,rejected',
+                                filterQuery: OPEN_ORDERS_QUERY,
                                 id: 'open_orders',
                             },
                         ],
@@ -48,7 +58,7 @@ export const naasDashboard = Dashboard({
                                 label: 'Order',
                                 sourceType: 'table',
                                 tableOrViewName: 'x_daas_ham_order',
-                                filterQuery: 'stage=awaiting_approval',
+                                filterQuery: ORDERS_AWAITING_APPROVAL_QUERY,
                                 id: 'awaiting_approval',
                             },
                         ],
@@ -88,7 +98,7 @@ export const naasDashboard = Dashboard({
                                 label: 'Fleet asset',
                                 sourceType: 'table',
                                 tableOrViewName: 'alm_hardware',
-                                filterQuery: 'install_status=1^substatus=pending_in_service^x_daas_ham_fleet=true',
+                                filterQuery: FLEET_IN_STAGE.pending_in_service,
                                 id: 'pending_in_service',
                             },
                         ],
@@ -108,7 +118,7 @@ export const naasDashboard = Dashboard({
                                 label: 'Order',
                                 sourceType: 'table',
                                 tableOrViewName: 'x_daas_ham_order',
-                                filterQuery: 'stageNOT INcomplete,cancelled,rejected',
+                                filterQuery: OPEN_ORDERS_QUERY,
                                 id: 'orders_by_stage',
                             },
                         ],
@@ -130,7 +140,7 @@ export const naasDashboard = Dashboard({
                                 label: 'Fleet asset',
                                 sourceType: 'table',
                                 tableOrViewName: 'alm_hardware',
-                                filterQuery: 'install_status=6^substatus=reserved_spare_pool^x_daas_ham_fleet=true',
+                                filterQuery: FLEET_IN_STAGE.spare_pool,
                                 id: 'spares_by_customer',
                             },
                         ],
@@ -158,7 +168,7 @@ export const naasDashboard = Dashboard({
                                 label: 'Fleet asset',
                                 sourceType: 'table',
                                 tableOrViewName: 'alm_hardware',
-                                filterQuery: 'install_status=1^substatusISEMPTY^x_daas_ham_subscription_lineISEMPTY^x_daas_ham_fleet=true',
+                                filterQuery: IN_SERVICE_UNBILLED,
                                 id: 'unbilled',
                             },
                         ],
@@ -180,7 +190,7 @@ export const naasDashboard = Dashboard({
                                 label: 'Fleet asset',
                                 sourceType: 'table',
                                 tableOrViewName: 'alm_hardware',
-                                filterQuery: 'install_status=1^substatusISEMPTY^x_daas_ham_subscription_line.status=ended^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()^x_daas_ham_fleet=true^NQinstall_status=1^substatus=temporary_deployment^x_daas_ham_subscription_line.status=ended^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()^x_daas_ham_fleet=true',
+                                filterQuery: IN_SERVICE_ON_ENDED_LINE,
                                 id: 'ended_line',
                             },
                         ],
@@ -200,7 +210,7 @@ export const naasDashboard = Dashboard({
                                 label: 'Subscription line',
                                 sourceType: 'table',
                                 tableOrViewName: 'x_daas_ham_subscription_line',
-                                filterQuery: 'status=pending',
+                                filterQuery: `status=${SUBSCRIPTION_LINE_STATUS.pending}`,
                                 id: 'pending_lines',
                             },
                         ],
@@ -220,7 +230,7 @@ export const naasDashboard = Dashboard({
                                 label: 'Subscription line',
                                 sourceType: 'table',
                                 tableOrViewName: 'x_daas_ham_subscription_line',
-                                filterQuery: 'status=active',
+                                filterQuery: `status=${SUBSCRIPTION_LINE_STATUS.active}`,
                                 id: 'lines_by_customer',
                             },
                         ],
@@ -242,7 +252,7 @@ export const naasDashboard = Dashboard({
                     $id: Now.ID['dash_w_past_support'],
                     component: 'single-score',
                     componentProps: {
-                        dataSources: [{ label: 'Fleet asset', sourceType: 'table', tableOrViewName: 'alm_hardware', filterQuery: 'install_status=1^x_daas_ham_lifecycle_phaseINend_of_support,end_of_extended_support,end_of_life^x_daas_ham_fleet=true', id: 'dash_w_past_support_ds' }],
+                        dataSources: [{ label: 'Fleet asset', sourceType: 'table', tableOrViewName: 'alm_hardware', filterQuery: INSTALLED_PAST_SUPPORT, id: 'dash_w_past_support_ds' }],
                         headerTitle: 'Installed past end of support',
                         metrics: [{ dataSource: 'dash_w_past_support_ds', id: 'dash_w_past_support_m', aggregateFunction: 'COUNT', axisId: 'primary' }],
                     },
@@ -255,7 +265,7 @@ export const naasDashboard = Dashboard({
                     $id: Now.ID['dash_w_no_coverage'],
                     component: 'single-score',
                     componentProps: {
-                        dataSources: [{ label: 'Fleet asset', sourceType: 'table', tableOrViewName: 'alm_hardware', filterQuery: 'install_status=1^x_daas_ham_coverage_endISEMPTY^ORx_daas_ham_coverage_end<javascript:gs.beginningOfToday()^x_daas_ham_fleet=true', id: 'dash_w_no_coverage_ds' }],
+                        dataSources: [{ label: 'Fleet asset', sourceType: 'table', tableOrViewName: 'alm_hardware', filterQuery: INSTALLED_WITHOUT_COVERAGE, id: 'dash_w_no_coverage_ds' }],
                         headerTitle: 'Installed without OEM coverage',
                         metrics: [{ dataSource: 'dash_w_no_coverage_ds', id: 'dash_w_no_coverage_m', aggregateFunction: 'COUNT', axisId: 'primary' }],
                     },
@@ -267,7 +277,7 @@ export const naasDashboard = Dashboard({
                     $id: Now.ID['dash_w_open_exceptions'],
                     component: 'single-score',
                     componentProps: {
-                        dataSources: [{ label: 'x_daas_ham_recon_exception', sourceType: 'table', tableOrViewName: 'x_daas_ham_recon_exception', filterQuery: 'status=open', id: 'dash_w_open_exceptions_ds' }],
+                        dataSources: [{ label: 'x_daas_ham_recon_exception', sourceType: 'table', tableOrViewName: 'x_daas_ham_recon_exception', filterQuery: OPEN_EXCEPTIONS_QUERY, id: 'dash_w_open_exceptions_ds' }],
                         headerTitle: 'Open reconciliation exceptions',
                         metrics: [{ dataSource: 'dash_w_open_exceptions_ds', id: 'dash_w_open_exceptions_m', aggregateFunction: 'COUNT', axisId: 'primary' }],
                     },
@@ -291,7 +301,7 @@ export const naasDashboard = Dashboard({
                     $id: Now.ID['dash_w_phase'],
                     component: 'vertical-bar',
                     componentProps: {
-                        dataSources: [{ label: 'Fleet asset', sourceType: 'table', tableOrViewName: 'alm_hardware', filterQuery: 'install_status=1^x_daas_ham_fleet=true', id: 'dash_w_phase_ds' }],
+                        dataSources: [{ label: 'Fleet asset', sourceType: 'table', tableOrViewName: 'alm_hardware', filterQuery: FLEET_INSTALLED, id: 'dash_w_phase_ds' }],
                         headerTitle: 'Installed base by lifecycle phase',
                         metrics: [{ dataSource: 'dash_w_phase_ds', id: 'dash_w_phase_m', aggregateFunction: 'COUNT', axisId: 'primary' }],
                         groupBy: [{ groupBy: [{ dataSource: 'dash_w_phase_ds', groupByField: 'x_daas_ham_lifecycle_phase' }], maxNumberOfGroups: 10, showOthers: true }],
@@ -304,7 +314,7 @@ export const naasDashboard = Dashboard({
                     $id: Now.ID['dash_w_exception_types'],
                     component: 'donut',
                     componentProps: {
-                        dataSources: [{ label: 'x_daas_ham_recon_exception', sourceType: 'table', tableOrViewName: 'x_daas_ham_recon_exception', filterQuery: 'status=open', id: 'dash_w_exception_types_ds' }],
+                        dataSources: [{ label: 'x_daas_ham_recon_exception', sourceType: 'table', tableOrViewName: 'x_daas_ham_recon_exception', filterQuery: OPEN_EXCEPTIONS_QUERY, id: 'dash_w_exception_types_ds' }],
                         headerTitle: 'Open exceptions by type',
                         metrics: [{ dataSource: 'dash_w_exception_types_ds', id: 'dash_w_exception_types_m', aggregateFunction: 'COUNT', axisId: 'primary' }],
                         groupBy: [{ groupBy: [{ dataSource: 'dash_w_exception_types_ds', groupByField: 'exception_type' }], maxNumberOfGroups: 10, showOthers: true }],
@@ -327,7 +337,7 @@ export const naasDashboard = Dashboard({
                     $id: Now.ID['dash_w_revenue_last_month'],
                     component: 'vertical-bar',
                     componentProps: {
-                        dataSources: [{ label: 'Revenue last month', sourceType: 'table', tableOrViewName: 'x_daas_ham_margin', filterQuery: 'billing_period.period_startONLast month@javascript:gs.beginningOfLastMonth()@javascript:gs.endOfLastMonth()', id: 'dash_w_revenue_last_month_ds' }],
+                        dataSources: [{ label: 'Revenue last month', sourceType: 'table', tableOrViewName: 'x_daas_ham_margin', filterQuery: LAST_MONTH, id: 'dash_w_revenue_last_month_ds' }],
                         headerTitle: 'Revenue last month (per currency)',
                         metrics: [{ dataSource: 'dash_w_revenue_last_month_ds', id: 'dash_w_revenue_last_month_m', aggregateFunction: 'SUM', field: 'revenue', axisId: 'primary' }],
                         groupBy: [{ groupBy: [{ dataSource: 'dash_w_revenue_last_month_ds', groupByField: 'currency' }], maxNumberOfGroups: 10, showOthers: false }],
@@ -340,7 +350,7 @@ export const naasDashboard = Dashboard({
                     $id: Now.ID['dash_w_cost_last_month'],
                     component: 'vertical-bar',
                     componentProps: {
-                        dataSources: [{ label: 'Cost last month', sourceType: 'table', tableOrViewName: 'x_daas_ham_margin', filterQuery: 'billing_period.period_startONLast month@javascript:gs.beginningOfLastMonth()@javascript:gs.endOfLastMonth()', id: 'dash_w_cost_last_month_ds' }],
+                        dataSources: [{ label: 'Cost last month', sourceType: 'table', tableOrViewName: 'x_daas_ham_margin', filterQuery: LAST_MONTH, id: 'dash_w_cost_last_month_ds' }],
                         headerTitle: 'Cost last month (per currency)',
                         metrics: [{ dataSource: 'dash_w_cost_last_month_ds', id: 'dash_w_cost_last_month_m', aggregateFunction: 'SUM', field: 'cost', axisId: 'primary' }],
                         groupBy: [{ groupBy: [{ dataSource: 'dash_w_cost_last_month_ds', groupByField: 'currency' }], maxNumberOfGroups: 10, showOthers: false }],
@@ -353,7 +363,7 @@ export const naasDashboard = Dashboard({
                     $id: Now.ID['dash_w_margin_last_month'],
                     component: 'vertical-bar',
                     componentProps: {
-                        dataSources: [{ label: 'Margin last month', sourceType: 'table', tableOrViewName: 'x_daas_ham_margin', filterQuery: 'billing_period.period_startONLast month@javascript:gs.beginningOfLastMonth()@javascript:gs.endOfLastMonth()', id: 'dash_w_margin_last_month_ds' }],
+                        dataSources: [{ label: 'Margin last month', sourceType: 'table', tableOrViewName: 'x_daas_ham_margin', filterQuery: LAST_MONTH, id: 'dash_w_margin_last_month_ds' }],
                         headerTitle: 'Margin last month (per currency)',
                         metrics: [{ dataSource: 'dash_w_margin_last_month_ds', id: 'dash_w_margin_last_month_m', aggregateFunction: 'SUM', field: 'margin', axisId: 'primary' }],
                         groupBy: [{ groupBy: [{ dataSource: 'dash_w_margin_last_month_ds', groupByField: 'currency' }], maxNumberOfGroups: 10, showOthers: false }],
@@ -389,7 +399,7 @@ export const naasDashboard = Dashboard({
                     $id: Now.ID['dash_w_cost_by_type'],
                     component: 'heatmap',
                     componentProps: {
-                        dataSources: [{ label: 'Cost fact', sourceType: 'table', tableOrViewName: 'x_daas_ham_cost_fact', filterQuery: 'billing_period.period_startONLast month@javascript:gs.beginningOfLastMonth()@javascript:gs.endOfLastMonth()', id: 'dash_w_cost_by_type_ds' }],
+                        dataSources: [{ label: 'Cost fact', sourceType: 'table', tableOrViewName: 'x_daas_ham_cost_fact', filterQuery: LAST_MONTH, id: 'dash_w_cost_by_type_ds' }],
                         headerTitle: 'Cost last month by type and currency',
                         metrics: [{ dataSource: 'dash_w_cost_by_type_ds', id: 'dash_w_cost_by_type_m', aggregateFunction: 'SUM', field: 'amount', axisId: 'primary' }],
                         groupBy: [
@@ -412,18 +422,18 @@ export const naasDashboard = Dashboard({
     ],
     visibilities: [{ $id: Now.ID['dash_naas_visibility'], experience: naasWorkspace }],
     /*
-     * Read by the workspace's six roles (its route ACL in workspace.now.ts, security/roles.now.ts `providerStaff`); an app
+     * Read by the workspace's six roles (its route ACL in workspace.now.ts, shared/roles.now.ts `providerStaff`); an app
      * administrator holds them all. A dashboard's tabs take no permissions of their own, so each widget's data is its
-     * table's read ACL's: the Margin tab's margin and cost facts are `moneyReaders`' alone (acls-commercial.now.ts), and
+     * table's read ACL's: the Margin tab's margin and cost facts are `moneyReaders`' alone (margin/margin.now.ts), and
      * an inventory tech reads no subscription lines or reconciliation exceptions, so those widgets show the others
-     * nothing. The security tests check this list against the workspace's roles.
+     * nothing. built-metadata.test.ts holds this list to the workspace's roles.
      */
     permissions: [
-        { $id: Now.ID['dash_naas_read_asset_manager'], role: Now.ref('sys_user_role', { name: 'x_daas_ham.asset_manager' }), canRead: true },
-        { $id: Now.ID['dash_naas_read_inventory_tech'], role: Now.ref('sys_user_role', { name: 'x_daas_ham.inventory_tech' }), canRead: true },
-        { $id: Now.ID['dash_naas_read_field_tech'], role: Now.ref('sys_user_role', { name: 'x_daas_ham.field_tech' }), canRead: true },
-        { $id: Now.ID['dash_naas_read_noc'], role: Now.ref('sys_user_role', { name: 'x_daas_ham.noc' }), canRead: true },
-        { $id: Now.ID['dash_naas_read_account_manager'], role: Now.ref('sys_user_role', { name: 'x_daas_ham.account_manager' }), canRead: true },
-        { $id: Now.ID['dash_naas_read_finance'], role: Now.ref('sys_user_role', { name: 'x_daas_ham.finance' }), canRead: true },
+        { $id: Now.ID['dash_naas_read_asset_manager'], role: Now.ref('sys_user_role', { name: ROLE.assetManager }), canRead: true },
+        { $id: Now.ID['dash_naas_read_inventory_tech'], role: Now.ref('sys_user_role', { name: ROLE.inventoryTech }), canRead: true },
+        { $id: Now.ID['dash_naas_read_field_tech'], role: Now.ref('sys_user_role', { name: ROLE.fieldTech }), canRead: true },
+        { $id: Now.ID['dash_naas_read_noc'], role: Now.ref('sys_user_role', { name: ROLE.noc }), canRead: true },
+        { $id: Now.ID['dash_naas_read_account_manager'], role: Now.ref('sys_user_role', { name: ROLE.accountManager }), canRead: true },
+        { $id: Now.ID['dash_naas_read_finance'], role: Now.ref('sys_user_role', { name: ROLE.finance }), canRead: true },
     ],
 })

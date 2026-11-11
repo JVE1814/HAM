@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import type { HttpRequest, HttpResponse } from '../http'
 import {
-    CLAIM_PREREQUISITE,
     CLAIM_ROUTES,
     CLAIM_VENDORS,
     dependentActions,
     dueStepsQuery,
+    settledStatus,
     initialAutomationStatus,
     runVendorClaims,
-    type ClaimAction,
     type ClaimOutcome,
     type ClaimStore,
     type ClaimTarget,
 } from './claims'
+import type { ClaimAction } from '../vocabulary'
+import { recordMatches } from '../../test-support/encoded-query'
 
 function fake(responses: Array<HttpResponse | ((request: HttpRequest) => HttpResponse)>) {
     const calls: HttpRequest[] = []
@@ -301,6 +302,9 @@ describe('Check Point Zero Touch', () => {
         const { http, calls } = fake([reply(claimed)])
         expect(run(many('Z', 5).map((t) => ({ ...t, account: '1/2' })), http, 4)).toMatchObject({ calls: 4 })
         expect(calls.map((c) => c.fn)).toEqual(['login', 'claim_gateway', 'claim_gateway', 'logout'])
+        const three = fake([succeed])
+        expect(run([target('A', { account: '1/2' }), target('B', { account: '1/2' })], three.http, 3).calls).toBe(3)
+        expect(three.calls.map((c) => c.fn)).toEqual(['login', 'claim_gateway', 'logout'])
         const idle = fake([reply(claimed)])
         expect(run([target('A', { account: '1/2' })], idle.http, 2)).toEqual({ outcomes: [], calls: 0 })
         expect(idle.calls).toHaveLength(0)
@@ -320,12 +324,6 @@ describe('Check Point Zero Touch', () => {
         expect(result).toEqual({ outcomes: [{ stepId: 'A', ok: false, message: 'Zero Touch login failed: no session id returned' }], calls: 1 })
     })
 
-    it('needs room for login, one claim and logout (three calls)', () => {
-        const { http, calls } = fake([succeed])
-        expect(run([target('A', { account: '1/2' }), target('B', { account: '1/2' })], http, 3).calls).toBe(3)
-        expect(calls.map((c) => c.fn)).toEqual(['login', 'claim_gateway', 'logout'])
-    })
-
     it('refuses an account that is not "<account id>/<template id>" and a missing MAC without logging in', () => {
         const { http, calls } = fake([reply(claimed)])
         const result = run([target('A', { account: 'branch-tpl' }), target('B', { account: '1/2', mac: '' }), target('C', { account: '' })], http, 5)
@@ -338,16 +336,16 @@ describe('Check Point Zero Touch', () => {
     })
 })
 
-/** A ClaimStore over fixed due steps per action (cut to `limit`), recording what is loaded and settled (each settle call's step ids in `settles`). */
+/** A ClaimStore over fixed due steps per action (cut to `limit`), recording the actions loaded and what is settled (each settle call's step ids in `settles`). */
 function fakeStore(due: Partial<Record<ClaimAction, ClaimTarget[]>> = {}) {
-    const loads: Array<[ClaimAction, number]> = []
+    const loads: ClaimAction[] = []
     const vendors: string[] = []
     const settled: ClaimOutcome[] = []
     const settles: string[][] = []
     const store: ClaimStore = {
         due: (vendor, action, limit) => {
             vendors.push(vendor)
-            loads.push([action, limit])
+            loads.push(action)
             return (due[action] ?? []).slice(0, limit)
         },
         settle: (outcomes) => {
@@ -378,25 +376,27 @@ const succeed = (request: HttpRequest): HttpResponse =>
           : { status: 200, body: JSON.stringify({ status: 0 }) }
 
 describe('runVendorClaims', () => {
-    it('loads the steps of the vendor it runs, sized for Mist and Check Point too', () => {
+    it('loads the steps of the vendor it runs, for the actions that vendor has', () => {
         const { store, loads, vendors } = fakeStore()
         runVendorClaims('mist', store, fakeTransport([succeed]).transport, 1)
         runVendorClaims('checkpoint', store, fakeTransport([succeed]).transport, 8)
         expect(vendors).toEqual(['mist', 'checkpoint'])
-        expect(loads).toEqual([
-            ['oem_claim', 100],
-            ['oem_ztp', 8],
-        ])
+        expect(loads).toEqual(['oem_claim', 'oem_ztp'])
     })
 
-    it('loads as many steps as the budget can carry, at most 200', () => {
-        const { store, loads } = fakeStore()
-        runVendorClaims('meraki', store, fakeTransport([succeed]).transport, 8)
-        runVendorClaims('meraki', store, fakeTransport([succeed]).transport, 1)
-        expect(loads).toEqual([
-            ['oem_claim', 200],
-            ['oem_claim', 50],
-        ])
+    it.each([
+        ['meraki', 'oem_claim', 3],
+        ['mist', 'oem_claim', 2],
+        ['aruba', 'oem_claim', 8],
+        ['aruba', 'oem_licence', 8],
+        ['fortinet', 'oem_claim', 8],
+        ['fortinet', 'oem_ztp', 8],
+        ['checkpoint', 'oem_ztp', 8],
+    ] as const)('loads enough of the due steps to make every call it is allowed (%s %s, %i calls)', (vendor, action, maxCalls) => {
+        const { store } = fakeStore({ [action]: many('S', 300).map((t) => ({ ...t, account: '1/2' })) })
+        const { transport, calls } = fakeTransport([succeed])
+        expect(runVendorClaims(vendor, store, transport, maxCalls)).toBe(maxCalls)
+        expect(calls).toHaveLength(maxCalls)
     })
 
     it('adds Aruba devices before assigning subscriptions, from one shared budget', () => {
@@ -406,10 +406,7 @@ describe('runVendorClaims', () => {
         })
         const { transport, messages, calls } = fakeTransport([succeed])
         expect(runVendorClaims('aruba', store, transport, 8)).toBe(7)
-        expect(loads).toEqual([
-            ['oem_claim', 40],
-            ['oem_licence', 4],
-        ])
+        expect(loads).toEqual(['oem_claim', 'oem_licence'])
         expect(messages).toEqual(['NaaS HPE GreenLake', 'NaaS HPE GreenLake'])
         expect(calls.map((c) => c.fn)).toEqual(['add_devices', ...Array(3).fill(['find_device', 'assign_subscription']).flat()])
         expect(settled.map((o) => o.stepId)).toEqual(['A', 'B', 'L0', 'L1', 'L2'])
@@ -423,10 +420,7 @@ describe('runVendorClaims', () => {
         const { store, loads } = fakeStore({ oem_claim: [target('A', { account: '' })], oem_ztp: [target('B', { account: 'FMG-1' })] })
         const { transport, messages } = fakeTransport([succeed])
         expect(runVendorClaims('fortinet', store, transport, 8)).toBe(2)
-        expect(loads).toEqual([
-            ['oem_claim', 80],
-            ['oem_ztp', 7],
-        ])
+        expect(loads).toEqual(['oem_claim', 'oem_ztp'])
         expect(messages).toEqual(['NaaS FortiCare', 'NaaS FortiZTP'])
     })
 
@@ -441,10 +435,7 @@ describe('runVendorClaims', () => {
         runVendorClaims('aruba', store, transport, 8, () => ++checks <= 1)
         expect(calls.map((c) => c.fn)).toEqual(['add_devices'])
         expect(settled.map((o) => o.stepId)).toEqual(['A', 'B'])
-        expect(loads).toEqual([
-            ['oem_claim', 40],
-            ['oem_licence', 4],
-        ])
+        expect(loads).toEqual(['oem_claim', 'oem_licence'])
     })
 
     it('loads no later action after the lock is lost', () => {
@@ -453,24 +444,21 @@ describe('runVendorClaims', () => {
         runVendorClaims('fortinet', store, transport, 8, () => false)
         expect(calls).toEqual([])
         expect(settled).toEqual([])
-        expect(loads).toEqual([['oem_claim', 80]])
+        expect(loads).toEqual(['oem_claim'])
     })
 
     it('spends no calls on an action with no due steps', () => {
         const { store, loads } = fakeStore()
         const { transport, messages } = fakeTransport([succeed])
         expect(runVendorClaims('aruba', store, transport, 8)).toBe(0)
-        expect(loads).toEqual([
-            ['oem_claim', 40],
-            ['oem_licence', 4],
-        ])
+        expect(loads).toEqual(['oem_claim', 'oem_licence'])
         expect(messages).toEqual([])
     })
 
     it('does not load later actions once the budget is spent', () => {
         const { store, loads } = fakeStore({ oem_claim: [target('A')], oem_ztp: [target('B')] })
         expect(runVendorClaims('fortinet', store, fakeTransport([succeed]).transport, 1)).toBe(1)
-        expect(loads).toEqual([['oem_claim', 10]])
+        expect(loads).toEqual(['oem_claim'])
     })
 
     it('loads nothing when no calls are allowed', () => {
@@ -519,41 +507,55 @@ describe('runVendorClaims', () => {
     })
 })
 
+/** `gs.minutesAgoStart(n)` as a stored date/time: n minutes before 2026-11-09 12:00:00. */
+function minutesAgo(expression: string): string {
+    const minutes = /^gs\.minutesAgoStart\((\d+)\)$/.exec(expression)?.[1]
+    if (minutes === undefined) throw new Error(`no value for ${expression}`)
+    return new Date(Date.parse('2026-11-09T12:00:00Z') - Number(minutes) * 60000).toISOString().slice(0, 19).replace('T', ' ')
+}
+
+/** An open licence step of an active staging task on an Aruba fleet asset: pending, never sent. */
+const pendingStep = (fields: Record<string, string> = {}) => ({
+    automation: 'oem_licence',
+    done: 'false',
+    automation_status: 'pending',
+    attempts: '0',
+    sys_updated_on: '2026-11-09 11:59:00',
+    'staging_task.active': 'true',
+    'staging_task.asset.model.x_daas_ham_oem_source': 'aruba',
+    'staging_task.asset.x_daas_ham_fleet': 'true',
+    ...fields,
+})
+/** The same step failed once, a day ago. */
+const failedStep = (fields: Record<string, string> = {}) => pendingStep({ automation_status: 'failed', attempts: '1', sys_updated_on: '2026-11-08 12:00:00', ...fields })
+const due = (step: Record<string, string>) => recordMatches(dueStepsQuery('aruba', 'oem_licence'), step, minutesAgo)
+
 describe('dueStepsQuery', () => {
-    it("finds open pending steps, and failed ones to retry, of the vendor's fleet assets and the action in each OR group", () => {
-        const groups = dueStepsQuery('aruba', 'oem_licence')
-            .split('^NQ')
-            .map((group) => group.split('^'))
-        expect(groups).toHaveLength(2)
-        for (const group of groups) {
-            expect(group).toEqual(
-                expect.arrayContaining([
-                    'automation=oem_licence',
-                    'done=false',
-                    'staging_task.active=true',
-                    'staging_task.asset.model.x_daas_ham_oem_source=aruba',
-                    'staging_task.asset.x_daas_ham_fleet=true',
-                ]),
-            )
+    it('finds a pending step at once, and a failed one once it has waited, while it has attempts left', () => {
+        expect(due(pendingStep())).toBe(true)
+        expect(due(failedStep())).toBe(true)
+        expect(due(failedStep({ sys_updated_on: '2026-11-09 11:59:00' }))).toBe(false)
+        expect(due(failedStep({ attempts: '1000' }))).toBe(false)
+    })
+
+    it("finds, pending or failed, only the open steps of the action on the vendor's fleet assets whose staging task is active", () => {
+        for (const step of [pendingStep, failedStep]) {
+            expect(due(step({ automation: 'oem_claim' }))).toBe(false)
+            expect(due(step({ done: 'true' }))).toBe(false)
+            expect(due(step({ 'staging_task.active': 'false' }))).toBe(false)
+            expect(due(step({ 'staging_task.asset.model.x_daas_ham_oem_source': 'meraki' }))).toBe(false)
+            expect(due(step({ 'staging_task.asset.x_daas_ham_fleet': 'false' }))).toBe(false)
+            expect(due(step({ 'staging_task.asset.x_daas_ham_fleet': '' }))).toBe(false)
         }
-        expect(groups[0]).toContain('automation_status=pending')
-        expect(groups[1]).toEqual(expect.arrayContaining(['automation_status=failed', 'attempts<5', 'sys_updated_on<javascript:gs.minutesAgoStart(30)']))
     })
 
     it('never finds steps waiting for their prerequisite step', () => {
-        const statuses = dueStepsQuery('aruba', 'oem_licence')
-            .split(/\^NQ|\^/)
-            .filter((clause) => clause.startsWith('automation_status'))
-        expect(new Set(statuses)).toEqual(new Set(['automation_status=pending', 'automation_status=failed']))
+        expect(due(pendingStep({ automation_status: 'waiting' }))).toBe(false)
+        expect(due(failedStep({ automation_status: 'waiting' }))).toBe(false)
     })
 })
 
-describe('CLAIM_PREREQUISITE', () => {
-    it('makes licensing and zero-touch wait for the claim; the claim waits for nothing', () => {
-        expect(CLAIM_PREREQUISITE).toEqual({ oem_licence: 'oem_claim', oem_ztp: 'oem_claim' })
-        expect(CLAIM_PREREQUISITE.oem_claim).toBeUndefined()
-    })
-
+describe('dependentActions', () => {
     it('lists the actions that wait on each action', () => {
         expect(dependentActions('oem_claim')).toEqual(['oem_licence', 'oem_ztp'])
         expect(dependentActions('oem_licence')).toEqual([])
@@ -574,5 +576,14 @@ describe('initialAutomationStatus', () => {
 
     it('makes the claim step, which waits for nothing, pending', () => {
         expect(initialAutomationStatus('oem_claim', ['oem_claim', 'oem_licence', 'oem_ztp'])).toBe('pending')
+    })
+})
+
+describe('settledStatus', () => {
+    it('ticks a step whose call succeeded and fails the others, which are due again later', () => {
+        expect(settledStatus({ stepId: 's1', ok: true, message: '' })).toBe('done')
+        expect(settledStatus({ stepId: 's1', ok: false, message: 'no' })).toBe('failed')
+        expect(due(failedStep({ automation_status: settledStatus({ stepId: 's1', ok: false, message: 'no' }) }))).toBe(true)
+        expect(due(failedStep({ automation_status: settledStatus({ stepId: 's1', ok: true, message: '' }) }))).toBe(false)
     })
 })

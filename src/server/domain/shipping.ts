@@ -1,23 +1,14 @@
 import { currencyCode } from './billing.ts'
 import { failureText, isSuccess, type HttpPort } from './http.ts'
 import { asArray, field, isoDate, parseJson, text } from './json.ts'
+import { SHIPMENT_STATUS, type ShipmentStatus } from './vocabulary.ts'
+import { REST_MESSAGE } from './rest-message-names.ts'
 
 /**
  * Shipping aggregator (plan §13 Shipping aggregator, Q73): one adapter buys labels and reads tracking webhooks. Requests
  * follow the ShipEngine label shape; webhooks are read in both ShipEngine and EasyPost shapes so the
  * Provider can use either.
  */
-
-/** A shipment's status: `voided` is set by a person who voided the label with the carrier, never by tracking. */
-export type ShipmentStatus =
-    | 'label_created'
-    | 'in_transit'
-    | 'out_for_delivery'
-    | 'delivered'
-    | 'exception'
-    | 'returned'
-    | 'unknown'
-    | 'voided'
 
 export interface Address {
     name: string
@@ -80,7 +71,7 @@ function partRequired(part: (typeof ADDRESS_PARTS)[number], side: 'from' | 'to',
 }
 
 /** What is missing from the sender (`from`) or recipient (`to`) address before a carrier will accept it, or null. */
-export function addressProblem(address: Address, side: 'from' | 'to' = 'to'): string | null {
+export function addressProblem(address: Address, side: 'from' | 'to'): string | null {
     const country = countryCode(address.country)
     const missing = ADDRESS_PARTS.filter((part) => !address[part] && partRequired(part, side, country))
     if (missing.length > 0) return `missing ${missing.join(', ')}`
@@ -107,7 +98,7 @@ function toAggregatorAddress(address: Address): Record<string, string> {
 }
 
 /** The most boxes one label covers; larger shipments get their tracking numbers by hand. */
-export const MAX_LABEL_PACKAGES = 20
+const MAX_LABEL_PACKAGES = 20
 
 /** How many boxes a label covers: a whole number, at least 1 (buyLabel refuses more than MAX_LABEL_PACKAGES first). */
 export function packageCount(n: number): number {
@@ -143,8 +134,7 @@ export function buyLabel(http: HttpPort, input: LabelInput): LabelResult {
         const problem = addressProblem(address, side)
         if (problem) return { ok: false, error: `${side} address ${problem}` }
     }
-    const response = http({ fn: 'create_label', params: {}, body: labelRequestBody(input) })
-    // An answer's status and message, or the transport's reason when none came (as the OEM adapters say it).
+    const response = http({ fn: REST_MESSAGE.shipping.fn.createLabel, params: {}, body: labelRequestBody(input) })
     if (!isSuccess(response.status)) return { ok: false, error: failureText(response) }
     const json = parseJson(response.body)
     const trackingNumber = text(field(json, 'tracking_number'))
@@ -214,7 +204,6 @@ function easyPostStatus(status: unknown): ShipmentStatus {
     return lookupStatus(EASYPOST_STATUS, text(status).toLowerCase())
 }
 
-/** "City, Country" from whichever parts the carrier sent. */
 function placeName(...parts: string[]): string {
     return parts.filter(Boolean).join(', ')
 }
@@ -283,10 +272,14 @@ export function parseTrackingWebhook(body: unknown): TrackingUpdate | { error: s
     return { error: 'not a tracking update (no tracking number)' }
 }
 
-const FINAL: ReadonlySet<ShipmentStatus> = new Set(['delivered', 'returned', 'voided'])
+const FINAL: ReadonlySet<ShipmentStatus> = new Set([SHIPMENT_STATUS.delivered, SHIPMENT_STATUS.returned, SHIPMENT_STATUS.voided])
 
-/** Encoded query on x_daas_ham_shipment: shipments not delivered, returned or voided (their label is still in use). */
-export const OPEN_SHIPMENTS = `statusNOT IN${[...FINAL].join(',')}`
+/**
+ * Encoded query on x_daas_ham_shipment: shipments not delivered, returned or voided (their label is still in use).
+ * Written out from the status names, as Fluent metadata, which imports it for the workspace's list, reads no function
+ * call (domain/shipping.test.ts holds it to the final statuses).
+ */
+export const OPEN_SHIPMENTS = `statusNOT IN${SHIPMENT_STATUS.delivered},${SHIPMENT_STATUS.returned},${SHIPMENT_STATUS.voided}`
 
 /**
  * The status a shipment takes from a tracking update. Webhooks can arrive late or out of order, so a
@@ -322,7 +315,6 @@ export function returnLabelRefusal(trackingNumber: string, status: ShipmentStatu
     return `Return label ${trackingNumber} is still open and its status is unknown; check it with the carrier before buying another`
 }
 
-/** A label as an Order or a Shipment names it: its tracking number and carrier. */
 export interface LabelRef {
     trackingNumber: string
     carrier: string
@@ -347,23 +339,32 @@ export function voidedLabelOrderNote(order: LabelRef, label: LabelRef): string |
 }
 
 /**
+ * The length of what a carrier says, as stored: a Shipment's `status_detail` and a Shipment event's `description`. An
+ * event is known again by its description cut to this length (`trackingEventKey`), so the columns must hold as much.
+ */
+export const TRACKING_DESCRIPTION_LENGTH = 255
+
+/** The length of a Shipment event's `location`. */
+export const TRACKING_LOCATION_LENGTH = 120
+
+/**
  * What a tracking update does to a shipment: its next status, the status detail to store (only when
- * the shipment took the update's status, at most 255 characters) and whether it was delivered just now.
+ * the shipment took the update's status, cut to the stored length) and whether it was delivered just now.
  */
 export function applyTracking(previous: ShipmentStatus, update: TrackingUpdate): { status: ShipmentStatus; detail?: string; deliveredNow: boolean } {
     const status = nextShipmentStatus(previous, update.status)
     const deliveredNow = status === 'delivered' && previous !== 'delivered'
-    return status === update.status ? { status, detail: update.description.slice(0, 255), deliveredNow } : { status, deliveredNow }
+    return status === update.status ? { status, detail: update.description.slice(0, TRACKING_DESCRIPTION_LENGTH), deliveredNow } : { status, deliveredNow }
 }
 
-/** The identity of a stored tracking event: when it happened and what the carrier said (as stored, 255 characters). */
+/** The identity of a stored tracking event: when it happened and what the carrier said (as stored, cut to its length). */
 export function trackingEventKey(event: { occurredAt: string; description: string }): string {
-    return `${event.occurredAt}|${event.description.slice(0, 255)}`
+    return `${event.occurredAt}|${event.description.slice(0, TRACKING_DESCRIPTION_LENGTH)}`
 }
 
 /**
  * The events of a tracking update not stored yet (the aggregator resends the whole history), once
- * each, cut to the stored lengths (description 255, location 120 characters).
+ * each, cut to the stored lengths of its description and location.
  */
 export function newTrackingEvents(known: ReadonlySet<string>, events: readonly TrackingEvent[]): TrackingEvent[] {
     const seen = new Set<string>()
@@ -372,7 +373,12 @@ export function newTrackingEvents(known: ReadonlySet<string>, events: readonly T
         const key = trackingEventKey(event)
         if (known.has(key) || seen.has(key)) continue
         seen.add(key)
-        fresh.push({ occurredAt: event.occurredAt, status: event.status, description: event.description.slice(0, 255), location: event.location.slice(0, 120) })
+        fresh.push({
+            occurredAt: event.occurredAt,
+            status: event.status,
+            description: event.description.slice(0, TRACKING_DESCRIPTION_LENGTH),
+            location: event.location.slice(0, TRACKING_LOCATION_LENGTH),
+        })
     }
     return fresh
 }
@@ -444,7 +450,7 @@ export function trackingRetryParams(
     const head = {
         trackingNumber: update.trackingNumber,
         status: update.status,
-        description: update.description.slice(0, 255),
+        description: update.description.slice(0, TRACKING_DESCRIPTION_LENGTH),
         estimatedDelivery: update.estimatedDelivery,
         deliveredAt: update.deliveredAt,
         // Of the whole update, not only the events carried: those already stored are left out.

@@ -3,27 +3,57 @@ import {
     buyoutCost,
     buyoutPurchase,
     buyoutSplit,
+    buyoutTerms,
+    decidedLease,
+    earliestReviewedEnd,
     evenShare,
     evenSplit,
-    groupExpiringCoverage,
     leaseDecisionProblem,
     leaseMismatch,
-    renewedEnd,
     stillCovered,
     stockReturnMoves,
-    withinLead,
 } from './leases'
-import { ALL_STAGES, checkTransition, type TransitionFacts } from './lifecycle'
+import { ALL_STAGES, checkTransition, type Stage, type TransitionFacts } from './lifecycle'
+import { recordMatches as matches } from '../test-support/encoded-query'
+import { assetIn, type SampleRecord } from '../test-support/stored-asset'
 
-describe('withinLead', () => {
-    it('is due from lead days before the end date onwards', () => {
-        expect(withinLead('2027-03-01', '2026-11-01', 120)).toBe(true)
-        expect(withinLead('2027-03-01', '2026-10-31', 120)).toBe(false)
-        expect(withinLead('2026-01-01', '2026-11-07', 30)).toBe(true)
+describe('earliestReviewedEnd', () => {
+    it('keeps reviewing an undecided lease for 30 days past its end', () => {
+        expect(earliestReviewedEnd('2026-11-09')).toBe('2026-10-10')
+    })
+})
+
+describe('decidedLease', () => {
+    it('records a buy out or a return as the end action, and nothing else', () => {
+        expect(decidedLease('buyout', '')).toEqual({ endAction: 'buyout' })
+        expect(decidedLease('return', '2027-01-01')).toEqual({ endAction: 'return' })
     })
 
-    it('never fires without an end date', () => {
-        expect(withinLead('', '2026-11-07', 30)).toBe(false)
+    it('moves an extended lease to its new end, undecided and with its mismatch cleared', () => {
+        expect(decidedLease('extend', '2027-06-30')).toEqual({ endAction: 'undecided', ends: '2027-06-30', mismatch: false })
+    })
+})
+
+describe('buyoutTerms', () => {
+    it('fixes the covered count and the split of the price to the cent when a buyout is first applied', () => {
+        const four = () => ['a4', 'a2', 'a3', 'a1']
+        expect(buyoutTerms('buyout', { fixedAssets: 0, price: 1000 }, four)).toEqual({ assets: 4, share: 250, extraThrough: '' })
+        expect(buyoutTerms('buyout', { fixedAssets: 0, price: 0 }, four)).toEqual({ assets: 4, share: 0, extraThrough: '' })
+        expect(buyoutTerms('buyout', { fixedAssets: 0, price: 1000 }, () => [])).toEqual({ assets: 0, share: 0, extraThrough: '' })
+        // 10000.00 over 3 leaves one cent, which the first Asset by sys_id takes.
+        expect(buyoutTerms('buyout', { fixedAssets: 0, price: 10000 }, () => ['a3', 'a1', 'a2'])).toEqual({ assets: 3, share: 3333.33, extraThrough: 'a1' })
+    })
+
+    it('keeps terms already fixed, without counting the Assets again', () => {
+        const counted = () => {
+            throw new Error('counted')
+        }
+        expect(buyoutTerms('buyout', { fixedAssets: 4, price: 1000 }, counted)).toBeNull()
+    })
+
+    it('fixes none for any other decision', () => {
+        expect(buyoutTerms('return', { fixedAssets: 0, price: 1000 }, () => ['a1'])).toBeNull()
+        expect(buyoutTerms('extend', { fixedAssets: 0, price: 1000 }, () => ['a1'])).toBeNull()
     })
 })
 
@@ -77,14 +107,26 @@ describe('leaseDecisionProblem', () => {
 })
 
 describe('stillCovered', () => {
+    const RETIRED = ['disposed', 'sold', 'returned_to_oem', 'returned_to_customer', 'returned_to_lessor']
+    const stagesCovered = (query: string, fields: SampleRecord) => ALL_STAGES.filter((stage) => matches(query, assetIn(stage, fields)))
+
+    it('keeps the fleet assets the lease condition finds, in stock or at a Site', () => {
+        const onLease = stagesCovered(stillCovered('x_daas_ham_lease=L1'), { x_daas_ham_fleet: 'true', x_daas_ham_lease: 'L1' })
+        expect(onLease).toEqual(ALL_STAGES.filter((stage) => !RETIRED.includes(stage)))
+        expect(stagesCovered(stillCovered('x_daas_ham_lease=L1'), { x_daas_ham_fleet: 'true', x_daas_ham_lease: 'L2' })).toEqual([])
+    })
+
     it('leaves retired units, which keep their lease as history, out of what the lease covers', () => {
-        expect(stillCovered('x_daas_ham_lease=L1')).toBe('x_daas_ham_lease=L1^install_status!=7^x_daas_ham_fleet=true')
-        const bought = 'x_daas_ham_lease.end_action=buyout'
-        expect(stillCovered(bought)).toBe(`${bought}^install_status!=7^x_daas_ham_fleet=true`)
+        const boughtOut = stillCovered('x_daas_ham_lease.end_action=buyout')
+        for (const stage of RETIRED as Stage[]) {
+            expect(matches(boughtOut, assetIn(stage, { x_daas_ham_fleet: 'true', 'x_daas_ham_lease.end_action': 'buyout' })), stage).toBe(false)
+        }
+        expect(matches(boughtOut, assetIn('in_service', { x_daas_ham_fleet: 'true', 'x_daas_ham_lease.end_action': 'buyout' }))).toBe(true)
     })
 
     it('covers fleet assets only (ADR 0016)', () => {
-        expect(stillCovered('x_daas_ham_lease=L1').split('^')).toContain('x_daas_ham_fleet=true')
+        expect(stagesCovered(stillCovered('x_daas_ham_lease=L1'), { x_daas_ham_fleet: 'false', x_daas_ham_lease: 'L1' })).toEqual([])
+        expect(stagesCovered(stillCovered('x_daas_ham_lease=L1'), { x_daas_ham_fleet: '', x_daas_ham_lease: 'L1' })).toEqual([])
     })
 })
 
@@ -125,38 +167,6 @@ describe('buyoutPurchase', () => {
 
     it('records no purchase without a buyout price, so the Asset keeps its cost and purchase date', () => {
         expect(buyoutPurchase(0, '2026-11-07')).toBeUndefined()
-    })
-})
-
-describe('renewedEnd', () => {
-    it('adds the renewal term (at least one month)', () => {
-        expect(renewedEnd('2026-12-31', 12)).toBe('2027-12-31')
-        expect(renewedEnd('2026-12-31', 0)).toBe('2027-01-31')
-        expect(renewedEnd('2026-11-15', 3)).toBe('2027-02-15')
-    })
-
-    it('keeps a month-end end at month end, so a day clamped in a short month is not lost', () => {
-        expect(renewedEnd('2026-11-30', 3)).toBe('2027-02-28')
-        expect(renewedEnd('2027-02-28', 3)).toBe('2027-05-31')
-        expect(renewedEnd('2027-02-28', 12)).toBe('2028-02-29')
-        expect(renewedEnd('2026-09-30', 3)).toBe('2026-12-31')
-        expect(renewedEnd('2027-04-30', 1)).toBe('2027-05-31')
-    })
-
-    it('clamps an end past the last day of a shorter month, as before', () => {
-        expect(renewedEnd('2027-01-30', 1)).toBe('2027-02-28')
-    })
-})
-
-describe('groupExpiringCoverage', () => {
-    it('counts contracts per customer and keeps the first end date', () => {
-        const groups = groupExpiringCoverage([
-            { customerId: 'acme', endDate: '2026-12-20' },
-            { customerId: 'acme', endDate: '2026-12-01' },
-            { customerId: 'globex', endDate: '2027-01-05' },
-        ])
-        expect(groups.get('acme')).toEqual({ count: 2, firstEnd: '2026-12-01' })
-        expect(groups.get('globex')).toEqual({ count: 1, firstEnd: '2027-01-05' })
     })
 })
 

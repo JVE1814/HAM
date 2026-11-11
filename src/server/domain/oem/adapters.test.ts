@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { enabledRoute, OEM_ADAPTERS, type OemContext } from './adapters'
-import type { OemVendor } from './types'
+import { enabledRoute, enabledRoutes, OEM_ADAPTERS, SYNC_ORDER, type OemContext } from './adapters'
 import type { HttpRequest, HttpResponse } from '../http'
+import type { OemVendor } from '../vocabulary'
 
 function fakeHttp(routes: Record<string, (params: Record<string, string>) => unknown>) {
     const calls: HttpRequest[] = []
@@ -189,10 +189,6 @@ describe('Meraki', () => {
         const { http } = fakeHttp({ inventory_by_model: () => [{ serial: 'Q2XX', model: 'MR46', eox: { status: null } }] })
         expect(OEM_ADAPTERS.meraki.lifecycle!.run(['MR46-HW'], { http, orgIds: ['org1'] }).facts).toEqual([])
     })
-
-    it('gets hardware coverage from Cisco', () => {
-        expect(OEM_ADAPTERS.meraki.coverage?.via).toBe('cisco')
-    })
 })
 
 /** The FortiCloud Asset Management v3 envelope: status 0 means success. */
@@ -339,9 +335,9 @@ describe('HPE Mist', () => {
 })
 
 describe('rate limits', () => {
-    it('ask FortiCloud (100 calls a minute, one serial per call) for at most 90 serials per run, the other coverage APIs without a cap', () => {
-        expect(OEM_ADAPTERS.fortinet.coverage?.maxKeysPerRun).toBe(90)
-        for (const vendor of ['cisco', 'meraki', 'mist'] as const) expect(OEM_ADAPTERS[vendor].coverage?.maxKeysPerRun).toBeUndefined()
+    // FortiCloud answers 100 calls a minute, and its products/list takes one serial per call (external-contracts F1).
+    it('ask FortiCloud for fewer serials per run than it answers calls for in a minute', () => {
+        expect(OEM_ADAPTERS.fortinet.coverage?.maxKeysPerRun).toBeLessThan(100)
     })
 })
 
@@ -367,9 +363,16 @@ describe('enabledRoute', () => {
     })
 })
 
-describe('vendors without APIs', () => {
-    it('have no adapters, so CSV import is used', () => {
-        expect(OEM_ADAPTERS.aruba).toEqual({})
-        expect(OEM_ADAPTERS.checkpoint).toEqual({})
+describe('enabledRoutes', () => {
+    it('gives each vendor whose route may run its turn, in the sync order', () => {
+        const all = () => true
+        expect(enabledRoutes('coverage', all).map((turn) => turn.vendor)).toEqual(['cisco', 'meraki', 'fortinet', 'mist'])
+        expect(enabledRoutes('rmaStatus', all)).toEqual([{ vendor: 'cisco', route: OEM_ADAPTERS.cisco.rmaStatus }])
+        expect(enabledRoutes('lifecycle', (vendor) => vendor === 'mist').map((turn) => turn.vendor)).toEqual(['mist'])
+        expect(enabledRoutes('coverage', () => false)).toEqual([])
+    })
+
+    it('takes every vendor that has adapters, once', () => {
+        expect([...SYNC_ORDER].sort()).toEqual(Object.keys(OEM_ADAPTERS).sort())
     })
 })

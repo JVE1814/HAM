@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { HttpRequest } from './http'
 import {
@@ -26,10 +25,10 @@ import {
     webhookToken,
     type Address,
     type LabelInput,
-    type ShipmentStatus,
     type TrackingEvent,
     type TrackingUpdate,
 } from './shipping'
+import { SHIPMENT_STATUS_CHOICES, type ShipmentStatus } from './vocabulary'
 
 const depot: Address = { name: 'NaaS Depot', company: 'Demo NaaS Provider', phone: '+31 30 000', line1: '1 Depot Way', city: 'Utrecht', postalCode: '3511AA', country: 'nl' }
 const site: Address = { name: 'Acme HQ reception', phone: '+31 20 000', line1: '5 Main St', city: 'Amsterdam', postalCode: '1011AB', country: 'The Netherlands' }
@@ -93,8 +92,8 @@ describe('packageCount', () => {
 
 describe('addressProblem', () => {
     it('names the missing parts', () => {
-        expect(addressProblem({ ...site, line1: '', postalCode: '' })).toBe('missing line1, postalCode')
-        expect(addressProblem(site)).toBeNull()
+        expect(addressProblem({ ...site, line1: '', postalCode: '' }, 'to')).toBe('missing line1, postalCode')
+        expect(addressProblem(site, 'to')).toBeNull()
     })
 
     it('needs the phone on the sender (ship_from) side only', () => {
@@ -102,20 +101,19 @@ describe('addressProblem', () => {
         expect(addressProblem(noPhone, 'from')).toBe('missing phone')
         expect(addressProblem({ ...noPhone, city: '' }, 'from')).toBe('missing phone, city')
         expect(addressProblem(noPhone, 'to')).toBeNull()
-        expect(addressProblem(noPhone)).toBeNull()
         expect(addressProblem(depot, 'from')).toBeNull()
     })
 
     it('needs a state in the U.S. and Canada', () => {
         const austin: Address = { name: 'Acme Austin', phone: '+1 512 000 0000', line1: '1 Congress Ave', city: 'Austin', postalCode: '78701', country: 'US' }
-        expect(addressProblem(austin)).toBe('missing state')
+        expect(addressProblem(austin, 'to')).toBe('missing state')
         expect(addressProblem({ ...austin, country: 'Canada' }, 'from')).toBe('missing state')
-        expect(addressProblem({ ...austin, state: 'TX' })).toBeNull()
-        expect(addressProblem(site)).toBeNull()
+        expect(addressProblem({ ...austin, state: 'TX' }, 'to')).toBeNull()
+        expect(addressProblem(site, 'to')).toBeNull()
     })
 
     it('needs a country it can turn into an ISO code', () => {
-        expect(addressProblem({ ...site, country: 'Atlantis' })).toBe('unknown country "Atlantis" (use the ISO code)')
+        expect(addressProblem({ ...site, country: 'Atlantis' }, 'to')).toBe('unknown country "Atlantis" (use the ISO code)')
     })
 })
 
@@ -348,15 +346,10 @@ describe('parseTrackingWebhook', () => {
 
 describe('OPEN_SHIPMENTS', () => {
     it('leaves out the final statuses, whose label is no longer in use', () => {
-        expect(OPEN_SHIPMENTS).toBe('statusNOT INdelivered,returned,voided')
-    })
-
-    it('is what the workspace list of shipments under way shows', () => {
-        const list = readFileSync(new URL('../../fluent/workspace/list-menu.now.ts', import.meta.url), 'utf8')
-            .split('$id: Now.ID[')
-            .find((source) => source.startsWith("'ws_shipments_open']"))
-        const condition = /condition:\s*'([^']*)'/.exec(list ?? '')?.[1] ?? ''
-        expect(condition.split('^ORDERBY')[0]).toBe(OPEN_SHIPMENTS)
+        // The statuses a later tracking update no longer moves on.
+        const statuses = Object.keys(SHIPMENT_STATUS_CHOICES) as ShipmentStatus[]
+        const final = statuses.filter((status) => status !== 'label_created' && nextShipmentStatus(status, 'label_created') === status)
+        expect(OPEN_SHIPMENTS).toBe(`statusNOT IN${final.join(',')}`)
     })
 })
 
@@ -430,27 +423,6 @@ describe('voidedLabelOrderNote', () => {
     })
 })
 
-describe('Mark label voided', () => {
-    const action = readFileSync(new URL('../../fluent/logic/shipping.now.ts', import.meta.url), 'utf8')
-        .split('$id: Now.ID[')
-        .find((source) => source.startsWith("'ua_shipment_mark_voided']"))
-    const condition = /condition:\s*"([^"]*)"/.exec(action ?? '')?.[1] ?? ''
-
-    it('is offered on return and outbound Shipments alike', () => {
-        expect(condition).toContain("current.direction == 'return'")
-        expect(condition).toContain("current.direction == 'to_site'")
-    })
-
-    it('is offered in exactly the statuses labelVoidable allows', () => {
-        const offered = [...condition.matchAll(/current\.status == '([a-z_]+)'/g)].map((match) => match[1])
-        const all: ShipmentStatus[] = [
-            'label_created', 'in_transit', 'out_for_delivery', 'delivered',
-            'exception', 'returned', 'unknown', 'voided',
-        ]
-        expect(offered.sort()).toEqual(all.filter(labelVoidable).sort())
-    })
-})
-
 describe('nextShipmentStatus', () => {
     it('follows the carrier until the shipment is delivered or returned', () => {
         expect(nextShipmentStatus('label_created', 'in_transit')).toBe('in_transit')
@@ -504,9 +476,18 @@ describe('applyTracking', () => {
 })
 
 describe('trackingEventKey', () => {
-    it('is the time and the stored description', () => {
-        expect(trackingEventKey({ occurredAt: '2026-11-06T14:02:00Z', description: 'Delivered' })).toBe('2026-11-06T14:02:00Z|Delivered')
-        expect(trackingEventKey({ occurredAt: 't', description: 'y'.repeat(300) })).toBe(`t|${'y'.repeat(255)}`)
+    const delivered = { occurredAt: '2026-11-06T14:02:00Z', description: 'Delivered' }
+
+    it('is the same for the same time and description, and another for another time or description', () => {
+        expect(trackingEventKey({ ...delivered })).toBe(trackingEventKey(delivered))
+        expect(trackingEventKey({ ...delivered, occurredAt: '2026-11-06T14:03:00Z' })).not.toBe(trackingEventKey(delivered))
+        expect(trackingEventKey({ ...delivered, description: 'Delivered, front desk' })).not.toBe(trackingEventKey(delivered))
+    })
+
+    it('tells descriptions apart as far as they are stored: by their first 255 characters', () => {
+        const stored = { ...delivered, description: 'y'.repeat(255) }
+        expect(trackingEventKey({ ...stored, description: `${stored.description}, signed` })).toBe(trackingEventKey(stored))
+        expect(trackingEventKey({ ...stored, description: `${'y'.repeat(254)}z` })).not.toBe(trackingEventKey(stored))
     })
 })
 
@@ -555,7 +536,6 @@ describe('trackingRetryParams and parseTrackingRetry', () => {
     }
 
     it('carries the whole update in one parameter when it fits', () => {
-        expect(TRACKING_RETRY_CHARS).toBe(4000)
         const params = trackingRetryParams(update, new Set())
         expect(params).toHaveLength(1)
         expect(parseTrackingRetry(params![0])).toEqual({ update, newestAt: delivered.occurredAt })

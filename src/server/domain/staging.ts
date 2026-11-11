@@ -1,6 +1,8 @@
 import type { Stage } from './lifecycle.ts'
+import { TASK_STATE, type StagingSource } from './vocabulary.ts'
 
-/** Staging: choosing the checklist for an Asset, telling when it is done, and when its task may be closed. */
+/** How an Asset is staged when nothing says otherwise: by the Provider, in house. */
+export const DEFAULT_STAGING_SOURCE: StagingSource = 'in_house'
 
 export interface StagingTemplateView {
     id: string
@@ -8,7 +10,7 @@ export interface StagingTemplateView {
     customerId: string
     manufacturerId: string
     deviceClass: string
-    source: 'in_house' | 'distributor'
+    source: StagingSource
     active: boolean
 }
 
@@ -16,7 +18,7 @@ export interface StagingSubject {
     customerId: string
     manufacturerId: string
     deviceClass: string
-    source: 'in_house' | 'distributor'
+    source: StagingSource
 }
 
 /** The most specific active template whose non-blank fields all match (customer > manufacturer > device class). */
@@ -46,11 +48,10 @@ export function stageOnClosure(failed: boolean): Stage {
     return failed ? 'pending_evaluation' : 'staged'
 }
 
-/** A Staging task being closed, as the closure rules read it. */
 export interface ClosingTask {
     number: string
-    /** Closed Complete (state 3), which moves the Asset; or Closed Incomplete or Skipped (4, 7), which move nothing. */
-    closing: 'complete' | 'skipped'
+    /** Closed Complete, which moves the Asset; or Closed Incomplete or Skipped, which move nothing (`stagingClosing`). */
+    closing: StagingClosing
     failed: boolean
     /** The Order line it stages for; '' on a task made by hand, which acts on the unit's own line. */
     lineId: string
@@ -58,7 +59,8 @@ export interface ClosingTask {
     newerTask: string
 }
 
-/** The task's Asset, as read when the task is closed. */
+export type ClosedStagingTask = Pick<ClosingTask, 'number' | 'failed' | 'lineId'>
+
 export interface ClosingAsset {
     serial: string
     stage: Stage | null
@@ -71,17 +73,14 @@ export interface ClosingAsset {
 /**
  * Why closing `task` complete cannot move `asset` to the stage closing sends it to (`stageOnClosure`), with what to do,
  * or null when it can (into staging first when still reserved for the line, its move into staging refused when the
- * task opened) or it is there already, which moves nothing. Otherwise the unit must be on the task's line, or in staging off any line after a failed
- * close whose move the platform refused (entry/staging `failStaging`): one on another line, or released, no longer
- * waits on this task. And it must be in staging, or reserved for the line. One in transfer goes into staging only once
- * the staging centre receives it with its task open (domain/lifecycle `stageAfterTransfer`); closed before, the task
- * would leave it reserved there with no task to move it on. From any other stage the lifecycle moves it neither to
- * staged nor to pending evaluation.
+ * task opened) or it is there already, which moves nothing. Otherwise the unit must be on the task's line, or in staging
+ * off any line after a failed close whose move the platform refused (platform/staging-tasks `failStaging`): one on
+ * another line, or released, no longer waits on this task. And it must be in staging, or reserved for the line. One in
+ * transfer goes into staging only once the staging centre receives it with its task open (domain/lifecycle
+ * `stageAfterTransfer`); closed before, the task would leave it reserved there with no task to move it on. From any
+ * other stage the lifecycle moves it neither to staged nor to pending evaluation.
  */
-export function closureMoveProblem(
-    task: Pick<ClosingTask, 'number' | 'failed' | 'lineId'>,
-    asset: Pick<ClosingAsset, 'serial' | 'stage' | 'lineId'>,
-): string | null {
+export function closureMoveProblem(task: ClosedStagingTask, asset: Pick<ClosingAsset, 'serial' | 'stage' | 'lineId'>): string | null {
     const { number } = task
     const to = stageOnClosure(task.failed)
     // Moved already (the task reopened and closed again): it moves nothing more.
@@ -156,4 +155,24 @@ export function newerTask(task: OpenedTask, others: readonly OpenedTask[]): stri
     let newest = task
     for (const other of others) if (after(other, newest)) newest = other
     return newest === task ? '' : newest.number
+}
+
+/**
+ * The platform's task states a Staging task is closed with: Closed Complete once staged, Closed Skipped when its unit
+ * left staging (the app's own skips), and Closed Incomplete, which only a person sets.
+ */
+export const STAGING_TASK_STATE = {
+    closed: TASK_STATE.closedComplete,
+    incomplete: TASK_STATE.closedIncomplete,
+    skipped: TASK_STATE.closedSkipped,
+} as const
+
+/** How closing a Staging task closes it: complete, which moves its Asset, or skipped (or incomplete), which moves nothing. */
+export type StagingClosing = 'complete' | 'skipped'
+
+/** How the task state `state` closes a Staging task (`STAGING_TASK_STATE`), or null for a state that leaves it open. */
+export function stagingClosing(state: string): StagingClosing | null {
+    if (state === String(STAGING_TASK_STATE.closed)) return 'complete'
+    if (state === String(STAGING_TASK_STATE.incomplete) || state === String(STAGING_TASK_STATE.skipped)) return 'skipped'
+    return null
 }

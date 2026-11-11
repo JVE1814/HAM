@@ -1,28 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { devicePlacement, rackElevation, type PowerBudget } from '../../server/domain/rack'
-import { rackApi, type Rack, type RackDevice, type Site } from './api'
+import type { AssetStage, RackDevice, RackElevation, RackListing, Site } from '../../server/domain/rest-contracts'
+import { supportRisk, type SupportRisk } from '../../server/domain/support-risk'
+import { PROVIDER_STAFF } from '../../server/domain/visibility'
+import { RACK_FACE_CHOICES, type RackFace } from '../../server/domain/vocabulary'
+import { stageText } from '../stage'
+import { rackApi } from './api'
 
 type ColourBy = 'stage' | 'customer' | 'risk'
 
-const STAGE_COLOURS: Record<string, string> = {
+const STAGE_COLOURS: Partial<Record<AssetStage, string>> = {
     in_service: 'var(--ok)',
     pending_in_service: 'var(--warn)',
-    pending_return: 'var(--muted)',
     temporary_deployment: 'var(--accent)',
 }
 
-function riskOf(device: RackDevice, today: string): 'high' | 'medium' | 'low' {
-    if (['end_of_support', 'end_of_extended_support', 'end_of_life'].includes(device.lifecyclePhase)) return 'high'
-    if (!device.coverageEnd || device.coverageEnd < today) return 'high'
-    if (device.lifecyclePhase === 'end_of_sale' || (device.refreshDue && device.refreshDue < addDays(today, 180))) return 'medium'
-    return 'low'
-}
+const RISK_COLOURS: Record<SupportRisk, string> = { high: 'var(--error)', medium: 'var(--warn)', low: 'var(--ok)' }
 
-function addDays(date: string, days: number): string {
-    return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)
-}
-
-const RISK_COLOURS = { high: 'var(--error)', medium: 'var(--warn)', low: 'var(--ok)' }
+const FACES = Object.keys(RACK_FACE_CHOICES) as RackFace[]
 
 function hashColour(text: string): string {
     let hash = 0
@@ -31,18 +26,11 @@ function hashColour(text: string): string {
 }
 
 /**
- * The roles that open an Asset's form (roles.now.ts `providerStaff`, which alm_hardware's read ACLs admit; named here,
- * as the page cannot import Fluent records, and kept equal to it by staff-roles.test.ts). Customer admins and site
- * contacts are external users (snc_external) the platform UI does not open for, so their rack shows no link.
+ * The roles that open an Asset's form: provider staff, which alm_hardware's read ACLs admit (domain/visibility
+ * PROVIDER_STAFF, the list the metadata's `providerStaff` is). Customer admins and site contacts are external users
+ * (snc_external) the platform UI does not open for, so their rack shows no link.
  */
-const STAFF_ROLES = [
-    'x_daas_ham.asset_manager',
-    'x_daas_ham.inventory_tech',
-    'x_daas_ham.field_tech',
-    'x_daas_ham.noc',
-    'x_daas_ham.account_manager',
-    'x_daas_ham.finance',
-].join(',')
+const STAFF_ROLES = PROVIDER_STAFF.join(',')
 
 /**
  * Whether the user may open an Asset's form, read from g_user, which the page's sdk:now-ux-globals tag defines (admin
@@ -53,10 +41,6 @@ function opensAssetForms(): boolean {
     return user?.hasRoleFromList?.(STAFF_ROLES) ?? false
 }
 
-/**
- * Runs `load` for the latest selection only: a fetch the selection moved past is aborted and its answer or error
- * dropped, so a slow reply for the previous site or rack never overwrites the current one. Returns the effect cleanup.
- */
 function latest<T>(load: (signal: AbortSignal) => Promise<T>, apply: (value: T) => void, fail: (message: string) => void): () => void {
     const controller = new AbortController()
     load(controller.signal).then(
@@ -73,16 +57,15 @@ function latest<T>(load: (signal: AbortSignal) => Promise<T>, apply: (value: T) 
 export default function App() {
     const [sites, setSites] = useState<Site[]>([])
     const [siteId, setSiteId] = useState('')
-    const [racks, setRacks] = useState<Rack[]>([])
+    const [racks, setRacks] = useState<RackListing[]>([])
     const [rackId, setRackId] = useState('')
-    const [detail, setDetail] = useState<{ rack: Rack; devices: RackDevice[] } | null>(null)
+    const [detail, setDetail] = useState<RackElevation | null>(null)
     const [colourBy, setColourBy] = useState<ColourBy>('stage')
     const [error, setError] = useState('')
     const [linkAssets] = useState(opensAssetForms)
     const today = new Date().toISOString().slice(0, 10)
 
     useEffect(() => latest(rackApi.sites, setSites, setError), [])
-    // A new choice clears the last failure: the message shown is always about what is on screen.
     useEffect(() => {
         setRacks([])
         setRackId('')
@@ -100,14 +83,14 @@ export default function App() {
     // Keyed by sys_id, as the elevation's rows are: two devices can share a tag, or have neither a tag nor a serial.
     const byId = useMemo(() => new Map((detail?.devices ?? []).map((d) => [d.id, d])), [detail])
     const colour = (device: RackDevice) =>
-        colourBy === 'customer' ? hashColour(device.customer) : colourBy === 'risk' ? RISK_COLOURS[riskOf(device, today)] : STAGE_COLOURS[device.stage] ?? 'var(--muted)'
+        colourBy === 'customer' ? hashColour(device.customer) : colourBy === 'risk' ? RISK_COLOURS[supportRisk(device, today)] : STAGE_COLOURS[device.stage] ?? 'var(--neutral)'
 
     return (
         <main className="racks">
             <h1>Rack elevations</h1>
             {error && <p className="error">{error}</p>}
             <section className="pickers">
-                <label>
+                <label className="field">
                     Site
                     <select value={siteId} onChange={(e) => setSiteId(e.target.value)}>
                         <option value="">Choose a site</option>
@@ -118,7 +101,7 @@ export default function App() {
                         ))}
                     </select>
                 </label>
-                <label>
+                <label className="field">
                     Rack
                     <select value={rackId} onChange={(e) => setRackId(e.target.value)} disabled={racks.length === 0}>
                         <option value="">{racks.length ? 'Choose a rack' : 'No racks'}</option>
@@ -129,7 +112,7 @@ export default function App() {
                         ))}
                     </select>
                 </label>
-                <label>
+                <label className="field">
                     Colour by
                     <select value={colourBy} onChange={(e) => setColourBy(e.target.value as ColourBy)}>
                         <option value="stage">Lifecycle stage</option>
@@ -138,10 +121,10 @@ export default function App() {
                     </select>
                 </label>
             </section>
-            {detail?.rack.power && <PowerBar power={detail.rack.power} />}
+            {detail && <PowerBar power={detail.rack.power} />}
             {detail && (
                 <section className="faces">
-                    {(['front', 'rear'] as const).map((face) => (
+                    {FACES.map((face) => (
                         <div key={face} className="face">
                             <h2>
                                 {detail.rack.name} · {face}
@@ -154,11 +137,11 @@ export default function App() {
                                             <span className="unit">{row.unit}</span>
                                             {device &&
                                                 (linkAssets ? (
-                                                    <a href={`/alm_hardware.do?sys_id=${device.id}`} target="_blank" rel="noreferrer" title={`${device.serial} · ${device.stage}`}>
+                                                    <a href={`/alm_hardware.do?sys_id=${device.id}`} target="_blank" rel="noreferrer" title={`${device.serial} · ${stageText(device.stage)}`}>
                                                         {row.label} · {device.model}
                                                     </a>
                                                 ) : (
-                                                    <span className="device-name" title={`${device.serial} · ${device.stage}`}>
+                                                    <span className="device-name" title={`${device.serial} · ${stageText(device.stage)}`}>
                                                         {row.label} · {device.model}
                                                     </span>
                                                 ))}

@@ -1,9 +1,10 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
     activeDays,
     agreementCurrencyProblem,
-    BILLED_STAGES,
+    billingCsvHeader,
+    billingCsvRow,
+    billingLineJson,
     billingMonthProblem,
     billsFromIntervals,
     chooseCurrency,
@@ -13,17 +14,16 @@ import {
     decideGenerationReset,
     divideRounded,
     fromCents,
-    generationEventParm,
     IN_SERVICE_ON_ENDED_LINE,
+    IN_SERVICE_UNBILLED,
+    NO_LINE,
+    ON_ENDED_LINE,
     intervalEnd,
-    isCurrentGeneration,
     isMonth,
     monthBounds,
     overlapsMonth,
     previousMonth,
     prorate,
-    readGenerationEventParm,
-    RESET_AFTER_IDLE_MINUTES,
     resetGenerationError,
     restartInterval,
     roundToCent,
@@ -33,10 +33,15 @@ import {
     toCsv,
     totalsText,
     withinLine,
+    type BillingLineField,
     type ChargeSources,
     type ServiceInterval,
+    type StoredBillingLine,
 } from './billing'
-import { ALL_STAGES, isBillable } from './lifecycle'
+import { fleetStagesQuery } from './fleet'
+import { IN_USE_STAGES } from './lifecycle'
+import { recordMatches as matches } from '../test-support/encoded-query'
+import { assetIn, type SampleRecord } from '../test-support/stored-asset'
 
 const nov = monthBounds('2026-11')
 const feb = monthBounds('2028-02')
@@ -64,8 +69,20 @@ describe('isMonth', () => {
 })
 
 describe('overlapsMonth', () => {
+    const overlaps = (start_date: string, end_date: string) => matches(overlapsMonth(nov), { start_date, end_date })
+
     it('selects ranges starting by the month end and not ended before it began', () => {
-        expect(overlapsMonth(nov)).toBe('start_date<=2026-11-30^end_dateISEMPTY^ORend_date>=2026-11-01')
+        expect(overlaps('2026-10-01', '')).toBe(true)
+        expect(overlaps('2026-11-30', '')).toBe(true)
+        expect(overlaps('2026-10-01', '2026-11-01')).toBe(true)
+        expect(overlaps('2026-11-10', '2026-11-20')).toBe(true)
+        expect(overlaps('2026-11-30', '2026-12-31')).toBe(true)
+    })
+
+    it('leaves out ranges that start after the month or ended before it', () => {
+        expect(overlaps('2026-12-01', '')).toBe(false)
+        expect(overlaps('2026-12-01', '2026-12-31')).toBe(false)
+        expect(overlaps('2026-10-01', '2026-10-31')).toBe(false)
     })
 })
 
@@ -516,22 +533,34 @@ describe('withinLine', () => {
 })
 
 describe('IN_SERVICE_ON_ENDED_LINE', () => {
+    /** Today is 2026-11-09: the day the tile's query compares a line's end date with. */
+    const flagged = (asset: SampleRecord) => matches(IN_SERVICE_ON_ENDED_LINE, asset, () => '2026-11-09')
+    const LINE = 'x_daas_ham_subscription_line'
+    /** A fleet asset in service on a line with this status and end date. */
+    const billed = (status: string, endDate: string) => assetIn('in_service', { x_daas_ham_fleet: 'true', [`${LINE}.status`]: status, [`${LINE}.end_date`]: endDate })
+
     it('flags billed fleet assets whose line was set ended or is past its end date', () => {
-        expect(BILLED_STAGES).toEqual(ALL_STAGES.filter((stage) => isBillable(stage)))
-        expect(BILLED_STAGES.length).toBeGreaterThan(0)
-        const ended = 'x_daas_ham_subscription_line.status=ended^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()'
-        const fleet = 'x_daas_ham_fleet=true'
-        expect(IN_SERVICE_ON_ENDED_LINE).toBe(
-            `install_status=1^substatusISEMPTY^${ended}^${fleet}^NQinstall_status=1^substatus=temporary_deployment^${ended}^${fleet}`,
-        )
+        expect(flagged(billed('ended', ''))).toBe(true)
+        expect(flagged(billed('active', '2026-11-08'))).toBe(true)
+        expect(flagged({ ...billed('ended', ''), ...assetIn('temporary_deployment') })).toBe(true)
+        expect(flagged({ ...billed('active', '2026-11-08'), ...assetIn('temporary_deployment') })).toBe(true)
     })
 
-    it('is what the Billing integrity dashboard counts', () => {
-        const tile = readFileSync(new URL('../../fluent/workspace/dashboard.now.ts', import.meta.url), 'utf8')
-            .split('$id: Now.ID[')
-            .find((source) => source.startsWith("'dash_w_ended_line_in_service']"))
-        expect(/headerTitle:\s*'([^']*)'/.exec(tile ?? '')?.[1]).toBe('In service on an ended line')
-        expect(/filterQuery:\s*'([^']*)'/.exec(tile ?? '')?.[1]).toBe(IN_SERVICE_ON_ENDED_LINE)
+    it('leaves an asset on a line still running: no end date, or one not yet past (the end date itself is billed)', () => {
+        expect(flagged(billed('active', ''))).toBe(false)
+        expect(flagged(billed('active', '2026-11-09'))).toBe(false)
+        expect(flagged(billed('active', '2027-01-31'))).toBe(false)
+    })
+
+    it("leaves out an asset that is not billed, and the Provider IT's (ADR 0016)", () => {
+        for (const stage of ['pending_in_service', 'pending_return', 'shipped'] as const) expect(flagged({ ...billed('ended', ''), ...assetIn(stage) }), stage).toBe(false)
+        expect(flagged({ ...billed('ended', ''), x_daas_ham_fleet: 'false' })).toBe(false)
+        expect(flagged({ ...billed('active', '2026-11-08'), ...assetIn('temporary_deployment'), x_daas_ham_fleet: '' })).toBe(false)
+    })
+
+    it('is, like the unbilled tile, the query the server would build: the dashboard imports the constant', () => {
+        expect(IN_SERVICE_ON_ENDED_LINE).toBe(fleetStagesQuery(IN_USE_STAGES, ON_ENDED_LINE))
+        expect(IN_SERVICE_UNBILLED).toBe(fleetStagesQuery(['in_service'], NO_LINE))
     })
 })
 
@@ -540,7 +569,6 @@ describe('decideGenerationReset', () => {
     const minutesAgo = (minutes: number) => now - minutes * 60000
 
     it('resets a generating period once its latest activity is 30 minutes old', () => {
-        expect(RESET_AFTER_IDLE_MINUTES).toBe(30)
         expect(decideGenerationReset('generating', [minutesAgo(30)], now)).toEqual({ reset: true, idleMinutes: 30 })
         expect(decideGenerationReset('generating', [minutesAgo(240), minutesAgo(45)], now)).toEqual({ reset: true, idleMinutes: 45 })
         expect(decideGenerationReset('generating', [undefined, minutesAgo(31)], now)).toEqual({ reset: true, idleMinutes: 31 })
@@ -582,42 +610,75 @@ describe('resetGenerationError', () => {
     })
 })
 
-describe('generation event parm', () => {
-    it('carries the period and its pass token, and reads back', () => {
-        expect(generationEventParm({ periodId: 'p1', token: '1762689600000' })).toBe('p1:1762689600000')
-        expect(readGenerationEventParm('p1:1762689600000')).toEqual({ periodId: 'p1', token: '1762689600000' })
+describe('a Billing line as exported', () => {
+    function storedLine(values: Partial<Record<BillingLineField, string>>, names: Partial<Record<BillingLineField, string>>): StoredBillingLine {
+        return { value: (field) => values[field] ?? '', display: (field) => names[field] ?? '' }
+    }
+
+    const subscription = storedLine(
+        {
+            kind: 'subscription',
+            customer: 'c1',
+            agreement: 'a1',
+            subscription_line: 'sl1',
+            site: 's1',
+            description: 'Switches - Lyon, HQ',
+            units: '42',
+            monthly_rate: '12.5',
+            amount: '17.5',
+            currency: 'EUR',
+        },
+        { customer: 'Acme, Inc.', agreement: 'AGR0001', subscription_line: 'Switches', site: 'Lyon' },
+    )
+    const fee = storedLine(
+        { kind: 'fee', customer: 'c1', agreement: 'a1', fee_event: 'f1', description: 'Lost fee: SN1 (2026-10-12)', units: '1', amount: '350', currency: 'EUR' },
+        { customer: 'Acme, Inc.', agreement: 'AGR0001', fee_event: 'FEE0001' },
+    )
+
+    it('is a CSV row of its period and columns, a reference by its display value', () => {
+        expect(toCsv([billingCsvHeader(), billingCsvRow('2026-10', subscription), billingCsvRow('2026-10', fee)])).toBe(
+            'period,kind,customer,agreement,subscription_line,site,description,units,monthly_rate,amount,currency\r\n' +
+                '2026-10,subscription,"Acme, Inc.",AGR0001,Switches,Lyon,"Switches - Lyon, HQ",42,12.5,17.5,EUR\r\n' +
+                '2026-10,fee,"Acme, Inc.",AGR0001,,,Lost fee: SN1 (2026-10-12),1,0,350,EUR\r\n',
+        )
     })
 
-    it('reads an event from before passes were tracked as belonging to no pass', () => {
-        expect(readGenerationEventParm('p1')).toEqual({ periodId: 'p1', token: '' })
-        expect(readGenerationEventParm('')).toEqual({ periodId: '', token: '' })
+    it('is a pull API line of its stored values, with the display values the API names', () => {
+        expect(billingLineJson('l1', subscription)).toEqual({
+            id: 'l1',
+            kind: 'subscription',
+            customerId: 'c1',
+            customer: 'Acme, Inc.',
+            agreement: 'AGR0001',
+            subscriptionLine: 'sl1',
+            siteId: 's1',
+            site: 'Lyon',
+            feeEvent: '',
+            description: 'Switches - Lyon, HQ',
+            units: 42,
+            monthlyRate: 12.5,
+            amount: 17.5,
+            currency: 'EUR',
+        })
+        expect(billingLineJson('l2', fee)).toEqual({
+            id: 'l2',
+            kind: 'fee',
+            customerId: 'c1',
+            customer: 'Acme, Inc.',
+            agreement: 'AGR0001',
+            subscriptionLine: '',
+            siteId: '',
+            site: '',
+            feeEvent: 'f1',
+            description: 'Lost fee: SN1 (2026-10-12)',
+            units: 1,
+            monthlyRate: 0,
+            amount: 350,
+            currency: 'EUR',
+        })
     })
-})
 
-describe('isCurrentGeneration', () => {
-    it('lets only the current pass go on', () => {
-        expect(isCurrentGeneration('1762689600000', '1762689600000')).toBe(true)
-        expect(isCurrentGeneration('1762689600000', '1762680000000')).toBe(false)
-    })
-
-    it('stops every pass of a period reset by hand, and events without a pass', () => {
-        expect(isCurrentGeneration('', '1762689600000')).toBe(false)
-        expect(isCurrentGeneration('', '')).toBe(false)
-        expect(isCurrentGeneration('1762689600000', '')).toBe(false)
-    })
-})
-
-describe('the Reset generation action', () => {
-    const action = readFileSync(new URL('../../fluent/logic/billing.now.ts', import.meta.url), 'utf8')
-        .split('UiAction({')
-        .find((source) => source.includes("actionName: 'x_daas_ham_billing_reset_generation'"))
-
-    it('is offered to admins only, on a period still generating', () => {
-        expect(action).toContain('roles: [admin],')
-        expect(action).toContain(`condition: "current.status == 'generating'"`)
-    })
-
-    it('tells how long a generation must have shown no activity', () => {
-        expect(/hint:\s*'([^']*)'/.exec(action ?? '')?.[1]).toContain(`no activity for ${RESET_AFTER_IDLE_MINUTES} minutes`)
+    it('reads a number column that is empty or unreadable as 0', () => {
+        expect(billingLineJson('l3', storedLine({ units: 'n/a' }, {}))).toMatchObject({ units: 0, monthlyRate: 0, amount: 0 })
     })
 })

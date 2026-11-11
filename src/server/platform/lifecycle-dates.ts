@@ -1,12 +1,20 @@
-import { GlideRecord } from '@servicenow/glide'
+import type { GlideRecord } from '@servicenow/glide'
 import { inFleet } from '../domain/fleet.ts'
+import { DEPLOYED_STAGES, notRetiredCondition, SERVING_STAGES, stagesQuery } from '../domain/lifecycle.ts'
 import { assetLifecycleStamp, type AssetLifecycleFacts, type LifecycleDates } from '../domain/model-lifecycle.ts'
 import { memoized } from '../domain/memo.ts'
-import { runEventTableJob, type EventTableJob } from './chunked.ts'
+import type { LeaseEndAction, RefreshBasis } from '../domain/vocabulary.ts'
+import { runEventTableJob } from './chunked.ts'
 import { glideToIsoDate, todayIso } from './clock.ts'
-import { findById, num, refusal, str } from './records.ts'
+import { EVENT, jobEvent, queueJob } from './events.ts'
+import { readModelLifecycle } from './model-lifecycle.ts'
+import { choice, findById, num, str, throwRefused } from './records.ts'
 
-/** Lifecycle phase and Refresh due date of an Asset, from its Model lifecycle, Agreement and Lease schedule. */
+/**
+ * Lifecycle phase and Refresh due date of an Asset, from its Model lifecycle, Agreement and Lease schedule: the stamp
+ * itself, and the three background passes that recompute it for the fleet assets of a Model, an Agreement or a Lease
+ * schedule once what it is worked out from changes (`REFRESH_PASS`: each pass's event and the Assets it covers).
+ */
 
 /** What an Asset's lifecycle dates are worked out from besides the Asset itself, each looked up by sys_id. */
 export interface LifecycleReaders {
@@ -18,31 +26,19 @@ export interface LifecycleReaders {
     leases: (leaseId: string) => AssetLifecycleFacts['lease']
 }
 
-/** Read a Model's lifecycle milestones (none when it has no Model lifecycle record). */
-export function modelLifecycle(modelId: string): LifecycleDates {
-    const gr = new GlideRecord('x_daas_ham_model_lifecycle')
-    if (!modelId || !gr.get('model', modelId)) return {}
-    return {
-        endOfSale: str(gr, 'end_of_sale') || undefined,
-        endOfSupport: str(gr, 'end_of_support') || undefined,
-        endOfExtendedSupport: str(gr, 'end_of_extended_support') || undefined,
-        endOfLife: str(gr, 'end_of_life') || undefined,
-    }
-}
-
 type AgreementRefreshTerms = Pick<AssetLifecycleFacts, 'refreshBasis' | 'refreshCycleMonths'>
 
 function agreementRefreshTerms(agreementId: string): AgreementRefreshTerms {
     const agreement = findById('x_daas_ham_agreement', agreementId)
     return {
-        refreshBasis: agreement ? str(agreement, 'refresh_basis') : '',
+        refreshBasis: agreement ? choice<RefreshBasis>(agreement, 'refresh_basis') : '',
         refreshCycleMonths: agreement ? num(agreement, 'refresh_cycle_months') : 0,
     }
 }
 
 function leaseTerms(leaseId: string): AssetLifecycleFacts['lease'] {
     const lease = findById('x_daas_ham_lease_schedule', leaseId)
-    return lease ? { endAction: str(lease, 'end_action'), ends: str(lease, 'ends') } : undefined
+    return lease ? { endAction: choice<LeaseEndAction>(lease, 'end_action'), ends: str(lease, 'ends') } : undefined
 }
 
 /**
@@ -50,7 +46,7 @@ function leaseTerms(leaseId: string): AssetLifecycleFacts['lease'] {
  * lifetime: create them once per job chunk or request, never at module scope.
  */
 export function lifecycleReaders(): LifecycleReaders {
-    return { models: memoized(modelLifecycle), agreements: memoized(agreementRefreshTerms), leases: memoized(leaseTerms) }
+    return { models: memoized(readModelLifecycle), agreements: memoized(agreementRefreshTerms), leases: memoized(leaseTerms) }
 }
 
 /** The Asset fields its lifecycle stamp is worked out from, with the stamp it carries now. */
@@ -92,25 +88,46 @@ export function applyLifecycleDates(asset: GlideRecord, readers: LifecycleReader
     return inputs.phase !== phase || inputs.refreshDue !== refreshDue
 }
 
-/** An event-driven pass recomputing the lifecycle dates of the fleet assets matching `query`. */
-export type LifecycleRefresh = Pick<EventTableJob<StampInputs>, 'eventName' | 'record' | 'parm1' | 'cursor'> & {
-    /** Encoded query on alm_hardware; the pass keeps it to fleet assets. */
-    query: string
+/**
+ * The refresh passes, each an event job (platform/chunked) named after what its Assets share: the event that carries
+ * it, queued on that record, and the Assets it recomputes, as an encoded query on alm_hardware given the record's
+ * sys_id.
+ * - `model`: a Model's milestones changed, or one is crossed today: its Assets not retired. Queued by
+ *   platform/model-lifecycle `queueModelRefresh`, for a NaaS Model only: that module, which this one reads the
+ *   milestones through, alone knows which Models those are.
+ * - `agreement`: an Agreement's refresh terms changed: its deployed Assets (`queueRefresh`).
+ * - `lease`: a returned Lease schedule's end changed, or its return was decided: its serving Assets (`queueRefresh`).
+ */
+const REFRESH_PASS = {
+    model: { event: EVENT.lifecycleChanged, assets: (modelId: string) => `model=${modelId}^${notRetiredCondition()}` },
+    agreement: {
+        event: EVENT.agreementTermsChanged,
+        assets: (agreementId: string) => stagesQuery(DEPLOYED_STAGES, `x_daas_ham_agreement=${agreementId}`),
+    },
+    lease: { event: EVENT.leaseAssets, assets: (leaseId: string) => stagesQuery(SERVING_STAGES, `x_daas_ham_lease=${leaseId}`) },
+} as const
+
+export type RefreshPass = keyof typeof REFRESH_PASS
+
+/** Queue the `pass` of `subject` (an Agreement or a Lease schedule): its Assets are recomputed in the background. */
+export function queueRefresh(pass: Exclude<RefreshPass, 'model'>, subject: GlideRecord): void {
+    queueJob(REFRESH_PASS[pass].event, subject)
 }
 
 /**
- * Run one chunk of a lifecycle refresh pass: recompute each matching fleet asset's Lifecycle phase and Refresh due
- * date (saving only those that changed), reading each Model lifecycle, Agreement and Lease schedule once per chunk;
- * the event is queued again until the pass is complete. The Provider IT's units of a NaaS Model are left alone (ADR
- * 0016): every clause of `query` carries the Fleet flag.
+ * Run one chunk of a refresh `pass`, for the script action of its event (`event` and `current` are the platform's):
+ * recompute the Lifecycle phase and Refresh due date of each fleet asset the pass covers (saving only those that
+ * changed), reading each Model lifecycle, Agreement and Lease schedule once per chunk; the event is queued again until
+ * the pass is complete. The Provider IT's units of a NaaS Model are left alone (ADR 0016): every clause of the pass's
+ * query carries the Fleet flag.
  */
-export function refreshLifecycleDates(pass: LifecycleRefresh): void {
+export function runRefreshPass(pass: RefreshPass, event: GlideRecord, current: GlideRecord): void {
+    const queued = jobEvent(REFRESH_PASS[pass].event, event, current)
     // Never run for a blank model, agreement or lease: the query would match every Asset without one.
-    if (!pass.parm1) return
+    if (!queued.subject) return
     const readers = lifecycleReaders()
-    runEventTableJob({
-        ...pass,
-        query: inFleet(pass.query),
+    runEventTableJob(queued, {
+        query: inFleet(REFRESH_PASS[pass].assets(queued.subject)),
         table: 'alm_hardware',
         read: stampInputs,
         handle: (inputs, assetId) => {
@@ -118,8 +135,9 @@ export function refreshLifecycleDates(pass: LifecycleRefresh): void {
             const { phase, refreshDue } = stampOf(inputs, readers)
             if (inputs.phase === phase && inputs.refreshDue === refreshDue) return
             const asset = findById('alm_hardware', assetId)
+            if (!asset || !applyLifecycleDates(asset, readers)) return
             // Refused, it fails as a record of the chunk, which the runner logs: the Asset keeps its old dates until the next pass.
-            if (asset && applyLifecycleDates(asset, readers) && !asset.update()) throw new Error(`lifecycle dates not saved: ${refusal(asset)}`)
+            if (!asset.update()) throwRefused(asset, 'lifecycle dates not saved')
         },
     })
 }

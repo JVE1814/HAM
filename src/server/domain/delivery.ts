@@ -1,15 +1,11 @@
-import type { Stage } from './lifecycle.ts'
-import { INSTALLED_STAGES } from './returns.ts'
+import { INSTALLED_STAGES, type Stage } from './lifecycle.ts'
+import type { FieldPurpose, InstallMode, OrderType } from './vocabulary.ts'
 
 /**
  * Shipping an Order to its Site: when "Ship" is refused, what label it buys and what on-site work it opens, and when
  * install completion takes a replaced Asset out of service (P1.7).
  */
 
-export type OrderType = 'site_rollout' | 'device_add' | 'device_replace' | 'temporary' | 'refresh'
-export type InstallMode = 'fsm_engineer' | 'self_install' | 'subcontractor' | 'remote_hands'
-
-/** What "Ship" needs to know about an Order. */
 export interface ShipFacts {
     orderType: OrderType
     installMode: InstallMode
@@ -31,11 +27,19 @@ export interface ShipFacts {
     shippingEnabled: boolean
 }
 
+/** What the on-site work an Order opens is for: installing its units, or swapping them for those they replace. */
+const ORDER_WORK_PURPOSES = ['install', 'swap'] as const satisfies readonly FieldPurpose[]
+
 /** The change request and FSM work order to open at the Site (Q57). */
 export interface OnSiteWork {
     changeType: 'standard' | 'normal'
-    purpose: 'install' | 'swap'
+    purpose: (typeof ORDER_WORK_PURPOSES)[number]
     subcontracted: boolean
+}
+
+/** Whether a work order of this purpose (as stored) is an Order's on-site work, whose closing completes the install. */
+export function installsOrder(purpose: string): boolean {
+    return (ORDER_WORK_PURPOSES as readonly string[]).includes(purpose)
 }
 
 /**

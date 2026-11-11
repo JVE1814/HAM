@@ -4,10 +4,11 @@ import {
     billingChange,
     checkTransition,
     DEPLOYED_STAGES,
+    disposalStage,
     fieldsOf,
     isBillable,
     isDeployed,
-    SERVING_STAGES,
+    notRetiredCondition,
     stageAfterTransfer,
     stageChangeRefusal,
     stageOf,
@@ -18,6 +19,8 @@ import {
     type TransferContext,
     type TransitionFacts,
 } from './lifecycle'
+import { recordMatches as matches } from '../test-support/encoded-query'
+import { assetIn, through, type SampleRecord } from '../test-support/stored-asset'
 
 const deployable: TransitionFacts = {
     hasSite: true,
@@ -54,6 +57,57 @@ describe('stage mapping', () => {
 
     it.each(ALL_STAGES)('reads the combination %s is stored as back as that stage', (stage) => {
         expect(stageOf(fieldsOf(stage))).toBe(stage)
+    })
+})
+
+/*
+ * What a stage is stored as is not this code's to remake. The pairs without a substatus of the app's own are the
+ * platform's choices, which Asset Management and Inventory read and set too (external-contracts N6-N8, N38), and every
+ * Asset on an instance already carries the pair it was saved with.
+ */
+describe('fieldsOf', () => {
+    const STORED = [
+        ['on_order', '2', ''],
+        ['in_transit', '9', ''],
+        ['available', '6', 'available'],
+        ['reserved', '6', 'reserved'],
+        ['spare_pool', '6', 'reserved_spare_pool'],
+        ['staging', '6', 'staging'],
+        ['staged', '6', 'staged'],
+        ['in_transfer', '6', 'pending_transfer'],
+        ['shipped', '9', 'shipped_to_site'],
+        ['pending_in_service', '1', 'pending_in_service'],
+        ['in_service', '1', ''],
+        ['temporary_deployment', '1', 'temporary_deployment'],
+        ['pending_return', '1', 'pending_return'],
+        ['pending_evaluation', '6', 'pending_evaluation'],
+        ['pending_oem_rma', '3', 'pending_oem_rma'],
+        ['pending_wipe', '6', 'pending_wipe'],
+        ['pending_disposal', '6', 'pending_disposal'],
+        ['missing', '8', 'lost'],
+        ['disposed', '7', 'disposed'],
+        ['sold', '7', 'sold'],
+        ['returned_to_oem', '7', 'vendor_credit'],
+        ['returned_to_customer', '7', 'returned_to_customer'],
+        ['returned_to_lessor', '7', 'lease_return'],
+    ] as const
+
+    it.each(STORED)('stores %s as install status %s with substatus "%s"', (stage, installStatus, substatus) => {
+        expect(fieldsOf(stage)).toEqual({ installStatus, substatus })
+    })
+
+    it('is held to a stored pair above for every stage', () => {
+        expect(STORED.map(([stage]) => stage).sort()).toEqual([...ALL_STAGES].sort())
+    })
+})
+
+describe('disposalStage', () => {
+    it('maps each disposal method to the retired stage', () => {
+        expect(disposalStage('broker_resale')).toBe('sold')
+        expect(disposalStage('oem_takeback')).toBe('returned_to_oem')
+        expect(disposalStage('itad_recycle')).toBe('disposed')
+        expect(disposalStage('return_to_customer')).toBe('returned_to_customer')
+        expect(disposalStage('return_to_lessor')).toBe('returned_to_lessor')
     })
 })
 
@@ -355,36 +409,37 @@ describe('isDeployed', () => {
 })
 
 describe('stagesQuery', () => {
-    it('builds one OR-ed clause per stage, each carrying the base query', () => {
-        expect(stagesQuery(['in_service', 'shipped'], 'x_daas_ham_agreement=a1')).toBe(
-            'install_status=1^substatusISEMPTY^x_daas_ham_agreement=a1^NQinstall_status=9^substatus=shipped_to_site^x_daas_ham_agreement=a1',
-        )
+    const stagesFound = (query: string, fields: SampleRecord = {}) => ALL_STAGES.filter((stage) => matches(query, assetIn(stage, fields)))
+
+    it('finds the Assets in the stages asked for, and in no other', () => {
+        expect(stagesFound(stagesQuery(['in_service', 'shipped']))).toEqual(['shipped', 'in_service'])
+        expect(stagesFound(stagesQuery(['available']))).toEqual(['available'])
     })
 
-    it('works without a base query', () => {
-        expect(stagesQuery(['available'])).toBe('install_status=6^substatus=available')
+    it('keeps the Assets of every stage to the base query', () => {
+        const query = stagesQuery(['in_service', 'shipped'], 'x_daas_ham_agreement=a1')
+        expect(stagesFound(query, { x_daas_ham_agreement: 'a1' })).toEqual(['shipped', 'in_service'])
+        expect(stagesFound(query, { x_daas_ham_agreement: 'a2' })).toEqual([])
     })
 
-    it("gives in transfer a clause for each of Inventory's combinations, each carrying the base query", () => {
-        expect(stagesQuery(['in_transfer'])).toBe('install_status=6^substatus=pending_transfer^NQinstall_status=9^substatus=reserved')
-        expect(stagesQuery(['reserved', 'in_transfer'], 'model=m1', 'asset.')).toBe(
-            'asset.install_status=6^asset.substatus=reserved^model=m1' +
-                '^NQasset.install_status=6^asset.substatus=pending_transfer^model=m1' +
-                '^NQasset.install_status=9^asset.substatus=reserved^model=m1',
-        )
+    it("finds a unit in transfer in either of Inventory's combinations, each kept to the base query", () => {
+        const query = stagesQuery(['reserved', 'in_transfer'], 'model=m1')
+        const pendingTransfer = { install_status: '6', substatus: 'pending_transfer' }
+        const inTransitReserved = { install_status: '9', substatus: 'reserved' }
+        for (const unit of [pendingTransfer, inTransitReserved, assetIn('reserved')]) {
+            expect(matches(query, { ...unit, model: 'm1' }), JSON.stringify(unit)).toBe(true)
+            expect(matches(query, { ...unit, model: 'm2' }), JSON.stringify(unit)).toBe(false)
+        }
+        expect(stagesFound(query, { model: 'm1' })).toEqual(['reserved', 'in_transfer'])
     })
 
-    it('dot-walks to the asset from a related table', () => {
-        expect(stagesQuery(['in_service', 'available'], 'covered=true', 'asset.')).toBe(
-            'asset.install_status=1^asset.substatusISEMPTY^covered=true^NQasset.install_status=6^asset.substatus=available^covered=true',
-        )
-    })
-})
-
-describe('serving and deployed stages', () => {
-    it('serves customers at or on the way to a site, and counts assets coming back as deployed too', () => {
-        expect(SERVING_STAGES).toEqual(['shipped', 'pending_in_service', 'in_service', 'temporary_deployment'])
-        expect(DEPLOYED_STAGES).toEqual([...SERVING_STAGES, 'pending_return'])
+    it('reads the stage of the Asset a record of a related table points at', () => {
+        const query = stagesQuery(['in_service', 'available'], 'covered=true', 'asset.')
+        const found = (covered: string) => ALL_STAGES.filter((stage) => matches(query, through('asset.', assetIn(stage), { covered })))
+        expect(found('true')).toEqual(['available', 'in_service'])
+        expect(found('false')).toEqual([])
+        // The record's own fields are not the Asset's.
+        expect(matches(query, { ...assetIn('in_service'), covered: 'true' })).toBe(false)
     })
 })
 
@@ -418,5 +473,17 @@ describe('billingChange', () => {
         expect(billingChange('in_service', 'temporary_deployment', dates)).toBeNull()
         expect(billingChange('pending_return', 'pending_evaluation', dates)).toBeNull()
         expect(billingChange(null, 'available', dates)).toBeNull()
+    })
+})
+
+describe('notRetiredCondition', () => {
+    it('leaves out the Assets in a retired stage, and no other', () => {
+        const kept = ALL_STAGES.filter((stage) => matches(notRetiredCondition(), assetIn(stage)))
+        const retired: readonly Stage[] = ['disposed', 'sold', 'returned_to_oem', 'returned_to_customer', 'returned_to_lessor']
+        expect(kept).toEqual(ALL_STAGES.filter((stage) => !retired.includes(stage)))
+    })
+
+    it('keeps an Asset in a combination the app does not model', () => {
+        expect(matches(notRetiredCondition(), { install_status: '6', substatus: 'defective' })).toBe(true)
     })
 })

@@ -1,15 +1,15 @@
 import type { Stage } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
+import type { InstallMode, OrderStage } from './vocabulary.ts'
 
 /**
  * Who may record an Order as installed (P1 fulfilment, Q49). An install by an FSM engineer, a subcontractor or
  * remote hands completes when its work order is closed; a self-install waits for the Customer to confirm it.
  */
 
-/** What these rules read of an Order. */
 export interface InstallState {
-    stage: string
-    installMode: string
+    stage: OrderStage
+    installMode: InstallMode
     /** How many of its units are shipped (`awaitsInstall`): read only for an Order held back before installing. */
     shippedUnits(): number
 }
@@ -37,7 +37,6 @@ export function beingInstalled(order: InstallState): boolean {
     return order.stage === 'installing' || (HELD_BACK.includes(order.stage) && order.shippedUnits() > 0)
 }
 
-/** Whether the Order waits for its Customer to confirm a self-install. */
 export function awaitsSelfInstallConfirmation(order: InstallState): boolean {
     return order.installMode === 'self_install' && beingInstalled(order)
 }

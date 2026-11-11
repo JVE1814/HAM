@@ -1,4 +1,6 @@
 import { addMonths, earliest, isIsoDate } from './calendar.ts'
+import { FLEET_CONDITION, INSTALLED_CONDITION } from './fleet.ts'
+import { LEASE_END_ACTION, type LeaseEndAction, LIFECYCLE_PHASE, type LifecyclePhase, type RefreshBasis } from './vocabulary.ts'
 
 /** A Model's manufacturer support milestones (ISO dates). */
 export interface LifecycleDates {
@@ -8,26 +10,35 @@ export interface LifecycleDates {
     endOfLife?: string
 }
 
-export type LifecyclePhase = 'available' | 'end_of_sale' | 'end_of_support' | 'end_of_extended_support' | 'end_of_life'
-
-const MILESTONES: ReadonlyArray<[keyof LifecycleDates, LifecyclePhase]> = [
-    ['endOfLife', 'end_of_life'],
-    ['endOfExtendedSupport', 'end_of_extended_support'],
-    ['endOfSupport', 'end_of_support'],
-    ['endOfSale', 'end_of_sale'],
+/**
+ * The milestones in the order a manufacturer reaches them: the date each is kept in, the Lifecycle phase an Asset is in
+ * once its Model has reached it (also the `lifecycle_phase` of its row in the platform's Model lifecycle table, ADR
+ * 0017), and its name in messages. Reading, checking, merging and storing milestones all go through this list.
+ */
+export const MILESTONES: ReadonlyArray<{ field: keyof LifecycleDates; phase: LifecyclePhase; label: string }> = [
+    { field: 'endOfSale', phase: 'end_of_sale', label: 'end of sale' },
+    { field: 'endOfSupport', phase: 'end_of_support', label: 'end of support' },
+    { field: 'endOfExtendedSupport', phase: 'end_of_extended_support', label: 'end of extended support' },
+    { field: 'endOfLife', phase: 'end_of_life', label: 'end of life' },
 ]
 
 /** What an Asset contributes to its Lifecycle phase and Refresh due date. */
 export interface AssetLifecycleFacts {
-    /** The Asset's Agreement refresh basis as stored: 'cycle' | 'end_of_support' | 'earliest', or '' when the Asset has no Agreement (treated as 'earliest'). Any other value gives no basis date. */
-    refreshBasis: string
+    /**
+     * The Asset's Agreement refresh basis as stored, or '' when the Asset has no Agreement (`NO_AGREEMENT_BASIS`). A
+     * value stored past the list gives no basis date.
+     */
+    refreshBasis: RefreshBasis | ''
     /** YYYY-MM-DD the Asset went into service; absent until it has. */
     inServiceDate?: string
     /** The Agreement's refresh cycle; 0 (or no Agreement) means no cycle date. */
     refreshCycleMonths: number
-    /** The Asset's Lease schedule, when it is on one. */
-    lease?: { endAction: string; ends: string }
+    /** The Asset's Lease schedule, when it is on one: its end action ('' when none is stored) and its end, a date or date-time as stored. */
+    lease?: { endAction: LeaseEndAction | ''; ends: string }
 }
+
+/** An Asset without an Agreement has no basis stored, and refreshes on whichever comes first. */
+const NO_AGREEMENT_BASIS: RefreshBasis = 'earliest'
 
 export interface AssetLifecycleStamp {
     phase: LifecyclePhase
@@ -45,11 +56,11 @@ export function assetLifecycleStamp(asset: AssetLifecycleFacts, model: Lifecycle
 }
 
 function lifecyclePhaseOn(dates: LifecycleDates, today: string): LifecyclePhase {
-    for (const [field, phase] of MILESTONES) {
+    const reached = MILESTONES.filter(({ field }) => {
         const date = dates[field]
-        if (date && date <= today) return phase
-    }
-    return 'available'
+        return !!date && date <= today
+    })
+    return reached.length > 0 ? reached[reached.length - 1].phase : 'available'
 }
 
 function refreshDueDate(asset: AssetLifecycleFacts, model: LifecycleDates): string {
@@ -61,8 +72,8 @@ function refreshDueDate(asset: AssetLifecycleFacts, model: LifecycleDates): stri
 function byBasis(asset: AssetLifecycleFacts, inServiceDate: string, endOfSupport: string | undefined): string | undefined {
     const byCycle = asset.refreshCycleMonths > 0 ? addMonths(inServiceDate, asset.refreshCycleMonths) : undefined
     const bySupport = endOfSupport || undefined
-    // An Asset without an Agreement has no basis stored, and refreshes on whichever comes first.
-    switch (asset.refreshBasis || 'earliest') {
+    const basis: RefreshBasis = asset.refreshBasis || NO_AGREEMENT_BASIS
+    switch (basis) {
         case 'cycle':
             return byCycle
         case 'end_of_support':
@@ -76,37 +87,29 @@ function byBasis(asset: AssetLifecycleFacts, inServiceDate: string, endOfSupport
 
 /** The date a leased Asset must be off the network: its lease end, once the decision is to return it. */
 function returnBy(lease: AssetLifecycleFacts['lease']): string | undefined {
-    return lease?.endAction === 'return' && lease.ends ? lease.ends.slice(0, 10) : undefined
+    return lease?.endAction === LEASE_END_ACTION.return && lease.ends ? lease.ends.slice(0, 10) : undefined
 }
 
 export type LifecycleRow = { pid: string } & { [K in keyof LifecycleDates]?: string }
 
 export type ParsedLifecycleRow = { ok: true; pid: string; dates: LifecycleDates } | { ok: false; reason: string }
 
-const MILESTONE_ORDER: ReadonlyArray<[keyof LifecycleDates, string]> = [
-    ['endOfSale', 'end of sale'],
-    ['endOfSupport', 'end of support'],
-    ['endOfExtendedSupport', 'end of extended support'],
-    ['endOfLife', 'end of life'],
-]
-
-/** Validate one CSV row of manufacturer milestones. */
 export function parseLifecycleRow(row: LifecycleRow): ParsedLifecycleRow {
     const pid = row.pid.trim()
     if (!pid) return { ok: false, reason: 'PID is required' }
     const dates: LifecycleDates = {}
-    for (const [field] of MILESTONE_ORDER) {
+    for (const { field } of MILESTONES) {
         const value = (row[field] ?? '').trim()
         if (!value) continue
         if (!isIsoDate(value)) return { ok: false, reason: `${field} must be YYYY-MM-DD` }
         dates[field] = value
     }
-    const present = MILESTONE_ORDER.filter(([field]) => dates[field])
+    const present = MILESTONES.filter(({ field }) => dates[field])
     for (let i = 1; i < present.length; i++) {
-        const [earlierField, earlierLabel] = present[i - 1]
-        const [laterField, laterLabel] = present[i]
-        if (dates[earlierField]! > dates[laterField]!) {
-            return { ok: false, reason: `Milestones must not go backwards (${earlierLabel} after ${laterLabel})` }
+        const earlier = present[i - 1]
+        const later = present[i]
+        if (dates[earlier.field]! > dates[later.field]!) {
+            return { ok: false, reason: `Milestones must not go backwards (${earlier.label} after ${later.label})` }
         }
     }
     return { ok: true, pid, dates }
@@ -114,10 +117,19 @@ export function parseLifecycleRow(row: LifecycleRow): ParsedLifecycleRow {
 
 /** Combine stored milestones with a newer source: present values win, missing ones keep what was there. */
 export function mergeLifecycle(existing: LifecycleDates, incoming: LifecycleDates): LifecycleDates {
-    return {
-        endOfSale: incoming.endOfSale || existing.endOfSale,
-        endOfSupport: incoming.endOfSupport || existing.endOfSupport,
-        endOfExtendedSupport: incoming.endOfExtendedSupport || existing.endOfExtendedSupport,
-        endOfLife: incoming.endOfLife || existing.endOfLife,
-    }
+    const merged: LifecycleDates = {}
+    for (const { field } of MILESTONES) merged[field] = incoming[field] || existing[field]
+    return merged
 }
+
+export const PAST_SUPPORT_PHASES: readonly LifecyclePhase[] = [
+    LIFECYCLE_PHASE.end_of_support,
+    LIFECYCLE_PHASE.end_of_extended_support,
+    LIFECYCLE_PHASE.end_of_life,
+]
+
+/**
+ * Encoded query on alm_hardware: the installed fleet assets (ADR 0016) whose Model is past its end of support
+ * (`PAST_SUPPORT_PHASES`; domain/model-lifecycle.test.ts holds it to the list), as the workspace lists and counts them.
+ */
+export const INSTALLED_PAST_SUPPORT = `${INSTALLED_CONDITION}^x_daas_ham_lifecycle_phaseIN${LIFECYCLE_PHASE.end_of_support},${LIFECYCLE_PHASE.end_of_extended_support},${LIFECYCLE_PHASE.end_of_life}^${FLEET_CONDITION}`

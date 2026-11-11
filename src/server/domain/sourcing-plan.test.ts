@@ -6,11 +6,10 @@ import { planSourcing, type SourcingRequest, type StockCandidate } from './sourc
  * spare-pool tests change separately).
  */
 
-const depot = { stockroomId: 'depot', stockroomType: 'central_depot', siteId: '' } as const
 const stock: StockCandidate[] = [
-    { assetId: 'central-1', modelId: 'c9300', stage: 'available', ...depot, reservedFor: '' },
-    { assetId: 'central-2', modelId: 'c9300', stage: 'available', ...depot, reservedFor: '' },
-    { assetId: 'pool-1', modelId: 'c9300', stage: 'spare_pool', ...depot, reservedFor: 'acme' },
+    { assetId: 'central-1', modelId: 'c9300', stockroomId: 'depot', source: 'central_stock' },
+    { assetId: 'central-2', modelId: 'c9300', stockroomId: 'depot', source: 'central_stock' },
+    { assetId: 'pool-1', modelId: 'c9300', stockroomId: 'depot', source: 'spare_pool' },
 ]
 
 const request = (quantity: number): SourcingRequest => ({ modelId: 'c9300', quantity, customerId: 'acme', siteId: 'hq', purpose: 'new' })

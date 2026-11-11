@@ -222,15 +222,15 @@
   was refused stays open. For a line that closed while the pass picked stock for it, nothing is bought
   or saved, and the warning *<line> closed while it was sourced: nothing bought for it* names the
   units still on it to release and the transfer orders to cancel. A cancel that outlasted its lock
-  (ADR 0013) logs *<Order> cancelled after its sourcing lock was lost*, to check its lines for stock
-  reserved or bought meanwhile. One that outlasted the Ship lock logs *<Order> cancelled after its
-  Ship lock was lost*, to check for units shipped meanwhile, and one that outlasted a line's lock
-  logs *<Order>: lines cancelled after a line's lock was lost*, to check them for units received
-  meanwhile. A receipt reads the line and its Order again under the line's lock and gives its unit
-  only to a line awaiting stock on an Order neither cancelled nor rejected (P1 fulfilment spec). A
-  line's stage derived from its Assets is never saved on a cancelled line or one whose Order ended,
-  and a line whose Order ended while its stage was saved is cancelled again, so nothing reopens a
-  line its Order's cancel or rejection closed.
+  (ADR 0013) logs *<Order> cancelled after its lock source_order_<sys_id> was lost*, to check its
+  lines for stock reserved or bought meanwhile. One that outlasted the Ship lock logs *<Order>
+  cancelled after its lock ship_order_<sys_id> was lost*, to check for units shipped meanwhile, and
+  one that outlasted a line's lock logs *<Order>: lines cancelled after its lock order_line_<sys_id>
+  was lost*, to check them for units received meanwhile. A receipt reads the line and its Order
+  again under the line's lock and gives its unit only to a line awaiting stock on an Order neither
+  cancelled nor rejected (P1 fulfilment spec). A line's stage derived from its Assets is never saved
+  on a cancelled line or one whose Order ended, and a line whose Order ended while its stage was
+  saved is cancelled again, so nothing reopens a line its Order's cancel or rejection closed.
 
 ## Spare-pool top-up (daily)
 

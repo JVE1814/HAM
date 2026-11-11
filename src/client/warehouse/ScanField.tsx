@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
 
-/** Input types a user types text into; typing anywhere else on the page is a scan meant for the scan field. */
 const TEXT_INPUTS = new Set(['text', 'search', 'email', 'number', 'password', 'tel', 'url'])
 
 function takesText(target: EventTarget | null): boolean {
@@ -129,7 +128,9 @@ export default function ScanField({
 
     return (
         <form className="scan" onSubmit={submit}>
-            <label htmlFor="scan-input">{label}</label>
+            <label className="field" htmlFor="scan-input">
+                {label}
+            </label>
             <div className="scan-row">
                 <input
                     id="scan-input"

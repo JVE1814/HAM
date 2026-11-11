@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { customerApi, type AttestationItem, type CustomerAsset, type Overview } from './api'
+import type { AttestationItem, CustomerAsset, CustomerOverview } from '../../server/domain/rest-contracts'
+import { ATTESTATION_RESPONSE_CHOICES, type AttestationResponse } from '../../server/domain/vocabulary'
+import { stageText } from '../stage'
+import { customerApi } from './api'
 
 type Tab = 'equipment' | 'orders' | 'attest'
 
 export default function App() {
-    const [overview, setOverview] = useState<Overview | null>(null)
+    const [overview, setOverview] = useState<CustomerOverview | null>(null)
     const [tab, setTab] = useState<Tab>('equipment')
     const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
 
@@ -16,7 +19,6 @@ export default function App() {
     }, [])
     useEffect(load, [load])
 
-    // One action at a time: a second click while one is on its way sends nothing (a return requested twice would raise two).
     const inFlight = useRef(false)
     const [busy, setBusy] = useState(false)
     const run: Runner = (action) => {
@@ -62,17 +64,14 @@ export default function App() {
     )
 }
 
-/** Starts an action unless one is on its way, then shows its outcome and reloads the page's data. */
 type Runner = (action: () => Promise<string>) => void
 
 interface ActionProps {
-    overview: Overview
+    overview: CustomerOverview
     run: Runner
-    /** An action is on its way: the buttons wait for it. */
     busy: boolean
 }
 
-/** A device already awaiting a return is not offered for another. */
 const returnable = (asset: CustomerAsset) => asset.stage !== 'pending_return'
 
 function Equipment({ overview, run, busy }: ActionProps) {
@@ -136,7 +135,7 @@ function Equipment({ overview, run, busy }: ActionProps) {
                                             {asset.serial}
                                             {asset.customerTag ? ` · ${asset.customerTag}` : ''}
                                         </td>
-                                        <td>{asset.stage.replace(/_/g, ' ')}</td>
+                                        <td>{stageText(asset.stage)}</td>
                                         <td>{asset.refreshDue}</td>
                                         <td>
                                             <button
@@ -243,6 +242,8 @@ function Orders({ overview, run, busy }: ActionProps) {
     )
 }
 
+const ANSWERS = Object.keys(ATTESTATION_RESPONSE_CHOICES) as AttestationResponse[]
+
 function Attestations({ overview, run, busy }: ActionProps) {
     const [answers, setAnswers] = useState<Record<string, AttestationItem['response']>>({})
     if (overview.attestations.length === 0) return <section className="card">Nothing to confirm right now.</section>
@@ -264,7 +265,7 @@ function Attestations({ overview, run, busy }: ActionProps) {
                                         <td>{item.model}</td>
                                         <td>{item.serial}</td>
                                         <td>
-                                            {(['confirmed', 'missing', 'unknown'] as const).map((response) => (
+                                            {ANSWERS.map((response) => (
                                                 <label key={response} className="radio">
                                                     <input
                                                         type="radio"
@@ -272,7 +273,7 @@ function Attestations({ overview, run, busy }: ActionProps) {
                                                         checked={item.response === response}
                                                         onChange={() => setAnswers((a) => ({ ...a, [item.id]: response }))}
                                                     />
-                                                    {response === 'confirmed' ? 'Present' : response === 'missing' ? 'Not present' : "Don't know"}
+                                                    {ATTESTATION_RESPONSE_CHOICES[response].label}
                                                 </label>
                                             ))}
                                         </td>

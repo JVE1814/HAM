@@ -1,19 +1,15 @@
-import { outsideFleetCondition } from './fleet.ts'
+import { outsideFleetCondition, SITE_CONDITION } from './fleet.ts'
 import { overlaps, powerBudget, type Placement, type RackSpec } from './rack.ts'
+import { normalizeSerial } from './serials.ts'
+import { EXCEPTION_STATUS, type ExceptionType } from './vocabulary.ts'
 
 /** Reconciliation exceptions between installed Assets and monitoring (P2.7), and in racks (Q67). */
 
-export type ExceptionType =
-    | 'unseen'
-    | 'serial_mismatch'
-    | 'location_mismatch'
-    | 'seen_without_asset'
-    | 'audit_missing'
-    | 'attested_missing'
-    | RackExceptionType
+/** The types the daily comparison of an installed Asset with monitoring raises and resolves (`reconcileAsset`). */
+export const MONITORING_EXCEPTION_TYPES = ['unseen', 'serial_mismatch', 'location_mismatch'] as const satisfies readonly ExceptionType[]
 
 /** The types a rack check raises and resolves: each is the rack's, open once per rack. */
-export const RACK_EXCEPTION_TYPES = ['rack_overlap', 'rack_over_power'] as const
+export const RACK_EXCEPTION_TYPES = ['rack_overlap', 'rack_over_power'] as const satisfies readonly ExceptionType[]
 
 export type RackExceptionType = (typeof RACK_EXCEPTION_TYPES)[number]
 
@@ -42,7 +38,7 @@ const CI_HARDWARE = 'asset.ref_alm_hardware.'
  * NaaS's to report. The caller adds how recently it was discovered.
  */
 export function seenWithoutFleetAssetQuery(): string {
-    const atSite = ['location.', 'location.parent.', 'location.parent.parent.'].map((via) => `${via}x_daas_ham_is_site=true`)
+    const atSite = ['location.', 'location.parent.', 'location.parent.parent.'].map((via) => `${via}${SITE_CONDITION}`)
     return `assetISEMPTY^OR${outsideFleetCondition(CI_HARDWARE)}^${atSite.join('^OR')}`
 }
 
@@ -58,6 +54,9 @@ export function stillSeenWithoutFleetAssetQuery(ciIds: readonly string[]): strin
     return ids.length > 0 ? `sys_idIN${ids.join(',')}^${seenWithoutFleetAssetQuery()}` : null
 }
 
+/** Encoded query on reconciliation exceptions: the open ones, which the navigator, the workspace and the dashboard list and count. */
+export const OPEN_EXCEPTIONS_QUERY = `status=${EXCEPTION_STATUS.open}`
+
 /**
  * Encoded query on reconciliation exceptions: the open ones of `types` on an Asset outside the fleet (ADR 0016). The
  * daily reconciliation checks fleet assets only, so it would never find these cleared: raised before the Fleet flag on
@@ -65,7 +64,7 @@ export function stillSeenWithoutFleetAssetQuery(ciIds: readonly string[]): strin
  * deleted) counts as outside.
  */
 export function outsideFleetExceptionsQuery(types: readonly ExceptionType[]): string {
-    return `status=open^exception_typeIN${types.join(',')}^assetISNOTEMPTY^${outsideFleetCondition('asset.')}`
+    return `${OPEN_EXCEPTIONS_QUERY}^exception_typeIN${types.join(',')}^assetISNOTEMPTY^${outsideFleetCondition('asset.')}`
 }
 
 /** Disagreements between an installed Asset and what monitoring reports. */
@@ -73,7 +72,7 @@ export function reconcileAsset(asset: InstalledAssetView, now: number, unseenDay
     const exceptions: ExceptionType[] = []
     if (asset.lastSeenAt === undefined || now - asset.lastSeenAt > unseenDays * 86_400_000) exceptions.push('unseen')
     if (asset.ci) {
-        if (asset.ci.serial && asset.ci.serial.trim().toUpperCase() !== asset.serial.trim().toUpperCase()) exceptions.push('serial_mismatch')
+        if (asset.ci.serial && normalizeSerial(asset.ci.serial) !== normalizeSerial(asset.serial)) exceptions.push('serial_mismatch')
         const located = asset.ci.locationIds.filter(Boolean)
         if (located.length > 0 && asset.siteId && !located.includes(asset.siteId)) exceptions.push('location_mismatch')
     }

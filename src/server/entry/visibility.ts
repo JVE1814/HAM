@@ -1,129 +1,107 @@
-import { GlideRecord, gs } from '@servicenow/glide'
-import { naasStockroomType, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
+import { GlideRecord, GlideTableHierarchy, gs } from '@servicenow/glide'
+import { memoized } from '../domain/memo.ts'
 import {
     deletesFleetAsset,
+    grantsContactRecord,
     grantsNaasRecord,
-    OUTSIDE_NAAS,
+    grantsReturnOfOwnCustomer,
     readsFleetProviderField,
     rowVisible,
-    SCOPE,
+    SCOPED_TABLES,
+    scopingOf,
     visibilityFilter,
     writesFleetAsset,
     writesFleetCommercialField,
-    type ScopedRecords,
     type ScopedRow,
+    type TableScoping,
 } from '../domain/visibility.ts'
-import { isFleetAsset } from '../platform/assets.ts'
 import { beyondVisibility, readsBeyondVisibility } from '../platform/beyond-visibility.ts'
-import { str } from '../platform/records.ts'
+import { str, type ForeignRecord } from '../platform/records.ts'
 import { currentSession } from '../platform/session.ts'
 
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 
-/**
- * Before-query business rules that restrict lists and lookups to what the user may see (ADR 0005). A query the app's
- * own logic runs past them (platform/beyond-visibility) is left as it is. On a table the app shares with the Provider's
- * IT (ADR 0016) a rule narrows an inventory tech's NaaS records only: those OUTSIDE_NAAS matches stay in, for the
- * platform to decide. A Customer contact is kept to their Customer (and Sites) on every record.
+/*
+ * Every script here finds what to do from the table of the record it is handed (domain/visibility SCOPED_TABLES), so a
+ * rule or an ACL is scoped by the table it sits on and nothing is chosen in the metadata.
  */
 
-function restrict(current: GlideRecord, records: ScopedRecords): void {
+const ASSET_TABLE = 'alm_asset'
+const HARDWARE = SCOPED_TABLES.alm_hardware
+
+/**
+ * `table`, then each table it extends, nearest first (the scoped GlideTableHierarchy#getTables, documented to give an
+ * array of names; a list of another kind is read from its text). None when the platform gives no list or refuses:
+ * the table is then one the app cannot place, which hides records and never shows them.
+ */
+function withParents(table: string): string[] {
+    try {
+        const tables: unknown = new GlideTableHierarchy(table).getTables()
+        const names: unknown[] = Array.isArray(tables) ? tables : String(tables ?? '').split(',')
+        return names.map((name) => String(name).replace(/[^\w]/g, '')).filter(Boolean)
+    } catch {
+        return []
+    }
+}
+
+interface Placement {
+    scoping: TableScoping | null
+    /** Whether it is alm_asset or one of its classes, the tables the app's ACLs on alm_asset are asked about. */
+    asset: boolean
+}
+
+/*
+ * Placed once per table and transaction (a module's state lasts one transaction, docs/research/external-contracts.md
+ * N37). A table with an entry of its own, as every table a rule or an ACL of the app sits on has, costs no look-up of
+ * its hierarchy.
+ */
+const placementOf = memoized((table: string): Placement => {
+    const own = scopingOf([table])
+    if (own) return { scoping: own, asset: own === HARDWARE }
+    if (table === ASSET_TABLE) return { scoping: null, asset: true }
+    const tables = withParents(table)
+    return { scoping: scopingOf(tables), asset: tables.includes(ASSET_TABLE) }
+})
+
+const warnUnplaced = memoized((table: string) => {
+    gs.warn(`NaaS visibility: ${table} is no scoped table and extends none, so it shows a reader the rules narrow nothing`)
+    return true
+})
+
+/**
+ * The before-query business rules' script (shared/visibility.now.ts): restricts a list or look-up to what the user
+ * may see (ADR 0005), by the scoping of the table queried. A rule on a table also runs for the queries of the tables
+ * that extend it, which take its scoping. A query the app's own logic runs past the rules (platform/beyond-visibility)
+ * is left as it is. On a table the app shares with the Provider's IT (ADR 0016) an inventory tech's NaaS records only
+ * are narrowed: those outside NaaS stay in, for the platform to decide. A Customer contact is kept to their Customer
+ * (and Sites) on every record.
+ *
+ * A table with no scoping cannot be queried here unless a rule is put on a table that has no entry: it is then shown
+ * to no reader the rules narrow, and logged, so the mistake hides records and never shows them.
+ */
+export function scopeRecords(current: ForeignRecord): void {
     if (readsBeyondVisibility(current)) return
+    const table = current.getTableName()
+    const { scoping } = placementOf(table)
+    if (!scoping) warnUnplaced(table)
     const session = currentSession()
-    const filter = visibilityFilter(session.scope, SCOPE[records], session, OUTSIDE_NAAS[records])
+    const filter = visibilityFilter(session.scope, scoping, session)
     if (filter) current.addEncodedQuery(filter)
 }
 
-export function scopeAssets(current: GlideRecord): void {
-    restrict(current, 'assets')
-}
-
-export function scopeStockrooms(current: GlideRecord): void {
-    restrict(current, 'stockrooms')
-}
-
-export function scopeTransferOrders(current: GlideRecord): void {
-    restrict(current, 'transferOrders')
-}
-
-export function scopeStagingTasks(current: GlideRecord): void {
-    restrict(current, 'stagingTasks')
-}
-
-/** An inventory tech sees the blind counts of their Stockrooms; a site audit has no Stockroom, so it drops out. */
-export function scopeAudits(current: GlideRecord): void {
-    restrict(current, 'audits')
-}
-
-export function scopeAuditLines(current: GlideRecord): void {
-    restrict(current, 'auditLines')
-}
-
-export function scopeOrders(current: GlideRecord): void {
-    restrict(current, 'orders')
-}
-
-export function scopeOrderLines(current: GlideRecord): void {
-    restrict(current, 'orderLines')
-}
-
-export function scopeCustomerRecords(current: GlideRecord): void {
-    restrict(current, 'customerRecords')
-}
-
-export function scopeCustomerSiteRecords(current: GlideRecord): void {
-    restrict(current, 'customerSiteRecords')
-}
-
-/**
- * Row checks of the Deny-Unless read ACLs (security/acls-visibility.now.ts, ADR 0005) on the tables the rules narrow to
- * an inventory tech's Stockrooms: a record is read only when the before-query rule would have kept it. A rule can only
- * append conditions, which an `^NQ` in the query binds to its last clause, so a list or a direct link can reach a
- * record the rule would hide; the ACL denies it. Each reads the fields of the same SCOPE as its table's rule, and on a
- * shared table it passes a record outside NaaS where the rule leaves it in (domain/visibility `leavesOutsideNaas`).
- * A record that is not a saved row (a New form, a check of the whole table) passes: it holds nothing to hide.
- */
-
-/** Where a row check reads a record's scoping fields, and how it tells a record outside NaaS on a shared table. */
-interface RowSource {
-    /** The record that holds the fields: `current` unless given (an Asset's hardware record, hardwareOf). */
-    record?: () => GlideRecord | null
-    /** Whether the record is one OUTSIDE_NAAS matches; omitted on the app's own tables. */
-    outsideNaas?: (record: GlideRecord) => boolean
-}
-
-/** `current` as domain/visibility reads a row, its record loaded once and only if a field is read. */
-function scopedRow(current: GlideRecord, source: RowSource = {}): ScopedRow {
+function scopedRow(current: GlideRecord, holder?: () => GlideRecord | null): ScopedRow {
     let loaded: GlideRecord | null | undefined
     const record = (): GlideRecord | null => {
-        if (loaded === undefined) loaded = source.record ? source.record() : current
+        if (loaded === undefined) loaded = holder ? holder() : current
         return loaded
     }
-    const outsideNaas = source.outsideNaas
     return {
         saved: !current.isNewRecord() && !!current.getUniqueValue(),
         valueOf: (field) => {
             const found = record()
             return found ? str(found, field) : ''
         },
-        outsideNaas: outsideNaas
-            ? () => {
-                  const found = record()
-                  return !!found && outsideNaas(found)
-              }
-            : undefined,
+        missing: holder ? () => record() === null : undefined,
     }
-}
-
-function readable(current: GlideRecord, records: ScopedRecords, source?: RowSource): boolean {
-    const session = currentSession()
-    return rowVisible(session.scope, SCOPE[records], scopedRow(current, source), session)
-}
-
-/** Whether the Stockroom `via` dot-walks to is a NaaS stockroom (one with a NaaS stockroom type). */
-function naasStockroom(record: GlideRecord, via = ''): boolean {
-    return naasStockroomType(str(record, `${via}${STOCKROOM_TYPE_FIELD}`)) !== null
 }
 
 /*
@@ -150,13 +128,29 @@ function hardwareOf(current: GlideRecord): GlideRecord | null {
     return beyondVisibility(hardware, () => hardware.get(current.getUniqueValue())) ? hardware : null
 }
 
-function hardwareSource(current: GlideRecord): RowSource {
-    return { record: () => hardwareOf(current), outsideNaas: (hardware) => !isFleetAsset(hardware) }
+function hardwareRow(current: GlideRecord): ScopedRow {
+    return scopedRow(current, () => hardwareOf(current))
 }
 
-/** Row check of an Asset (Deny-Unless, on alm_asset): another class passes; hardware is checked as its rule keeps it. */
-export function readsAsset(current: GlideRecord): boolean {
-    return otherAssetClass(current) || readable(current, 'assets', hardwareSource(current))
+/**
+ * The Deny-Unless read ACLs' script (shared/visibility.now.ts, ADR 0005), on the tables the rules narrow to an
+ * inventory tech's Stockrooms: a record is read only when the table's before-query rule would have kept it. A rule
+ * can only append conditions, which an `^NQ` in the query binds to its last clause, so a list or a direct link can
+ * reach a record the rule would hide; the ACL denies it. It decides on the same scoping as the rule (domain/visibility
+ * `rowVisible`), so on a shared table it passes a record outside NaaS where the rule leaves it in. A record that is
+ * not a saved row (a New form, a check of the whole table) passes: it holds nothing to hide.
+ *
+ * An Asset (the ACL on alm_asset) of another class than hardware passes; hardware is checked as its rule keeps it, on
+ * its alm_hardware record. Any other table with no scoping is refused to a reader the rules narrow, and logged, as
+ * scopeRecords does.
+ */
+export function readsRecord(current: GlideRecord): boolean {
+    const session = currentSession()
+    const table = current.getTableName()
+    const { scoping, asset } = placementOf(table)
+    if (asset) return otherAssetClass(current) || rowVisible(session.scope, HARDWARE, hardwareRow(current), session)
+    if (!scoping) warnUnplaced(table)
+    return rowVisible(session.scope, scoping, scopedRow(current), session)
 }
 
 /**
@@ -166,11 +160,11 @@ export function readsAsset(current: GlideRecord): boolean {
 export function grantsFleetAsset(current: GlideRecord): boolean {
     if (otherAssetClass(current)) return false
     const session = currentSession()
-    return grantsNaasRecord(session.scope, SCOPE.assets, scopedRow(current, hardwareSource(current)), session)
+    return grantsNaasRecord(session.scope, HARDWARE, hardwareRow(current), session)
 }
 
 /*
- * Changes to hardware by hand (security/acls-hardware.now.ts, ADR 0005): Deny-Unless ACLs on alm_asset, beside the
+ * Changes to hardware by hand (fleet/access.now.ts, ADR 0005): Deny-Unless ACLs on alm_asset, beside the
  * platform's Allow-If ones there, which the platform's `asset` role (inventory and field techs hold it) passes for every
  * Asset. On a fleet asset they keep saving to the asset editors whose scope keeps it, deleting to app administrators,
  * and the company and cost to asset managers (domain/visibility); any other Asset passes, left to the platform.
@@ -178,49 +172,48 @@ export function grantsFleetAsset(current: GlideRecord): boolean {
 
 const hasRole = (role: string): boolean => gs.hasRole(role)
 
-/** Row check of the Deny-Unless write ACL on alm_asset: a fleet asset is saved only by an asset editor who sees it. */
 export function writesAsset(current: GlideRecord): boolean {
     if (otherAssetClass(current)) return true
     const session = currentSession()
-    return writesFleetAsset(session.scope, hasRole, scopedRow(current, hardwareSource(current)), session)
+    return writesFleetAsset(session.scope, hasRole, hardwareRow(current), session)
 }
 
-/** Check of the Deny-Unless delete ACL on alm_asset: a fleet asset is deleted only by an app administrator. */
 export function deletesAsset(current: GlideRecord): boolean {
     if (otherAssetClass(current)) return true
-    return deletesFleetAsset(hasRole, scopedRow(current, hardwareSource(current)))
+    return deletesFleetAsset(hasRole, hardwareRow(current))
 }
 
-/** Check of the Deny-Unless write ACLs on alm_asset.company and alm_asset.cost: an asset manager's, on a fleet asset. */
 export function writesAssetCommercialField(current: GlideRecord): boolean {
     if (otherAssetClass(current)) return true
-    return writesFleetCommercialField(hasRole, scopedRow(current, hardwareSource(current)))
+    return writesFleetCommercialField(hasRole, hardwareRow(current))
 }
 
 /** Check of the Deny-Unless read ACL on alm_asset.cost: a fleet asset's cost is not a Customer contact's to read. */
 export function readsAssetCost(current: GlideRecord): boolean {
     if (otherAssetClass(current)) return true
-    return readsFleetProviderField(currentSession().scope, scopedRow(current, hardwareSource(current)))
+    return readsFleetProviderField(currentSession().scope, hardwareRow(current))
 }
 
-export function readsStockroom(current: GlideRecord): boolean {
-    return readable(current, 'stockrooms', { outsideNaas: (stockroom) => !naasStockroom(stockroom) })
+/**
+ * Grant of the Customer contacts' Allow-If read ACLs on the app's own tables (each feature's access.now.ts,
+ * acls-logistics.now.ts): a record of the reader's Customer and, for a site contact who is no Customer admin, of a
+ * Site that lists them, on the fields the table's before-query rule filters on (domain/visibility
+ * `grantsContactRecord`). So a direct link, a dot-walk from a visible record or a table with no rule (return lines,
+ * attestation items, shipment events, Site templates and their items) shows a contact no other Customer's or Site's
+ * record. It decides for the contact the ACL's roles admit, whatever else the user holds: staff read through their
+ * own ACLs. The reader's Customer and Sites are read once per transaction (platform/session), so a row costs no query.
+ *
+ * It is also the grant of the customer admins' create ACL on Orders: an Order that names their own Customer, and none
+ * that names no Customer (a record that is not a saved row is judged by its values).
+ */
+export function grantsCustomerRecord(current: GlideRecord): boolean {
+    const session = currentSession()
+    const table = current.getTableName()
+    const { scoping } = placementOf(table)
+    if (!scoping) warnUnplaced(table)
+    return grantsContactRecord(session.contactScope(), scoping, scopedRow(current), session)
 }
 
-export function readsTransferOrder(current: GlideRecord): boolean {
-    return readable(current, 'transferOrders', {
-        outsideNaas: (order) => !naasStockroom(order, 'from_stockroom.') && !naasStockroom(order, 'to_stockroom.'),
-    })
-}
-
-export function readsStagingTask(current: GlideRecord): boolean {
-    return readable(current, 'stagingTasks')
-}
-
-export function readsAudit(current: GlideRecord): boolean {
-    return readable(current, 'audits')
-}
-
-export function readsAuditLine(current: GlideRecord): boolean {
-    return readable(current, 'auditLines')
+export function createsCustomerReturn(current: GlideRecord): boolean {
+    return grantsReturnOfOwnCustomer(currentSession().customerId, str(current, SCOPED_TABLES.x_daas_ham_return_order.customer))
 }

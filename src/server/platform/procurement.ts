@@ -14,7 +14,7 @@ import { findById, refusal, str } from './records.ts'
  */
 export function requestPurchase(input: { modelId: string; quantity: number; description: string }): PurchaseResult {
     const shipTo = stagingStockroom()
-    if (!shipTo) return noPurchase(input.description, `set ${PROPERTY.stagingStockroom}`)
+    if (!shipTo) return noPurchase(input.description, `set ${PROPERTY.stagingStockroom.name}`)
     const model = findById('cmdb_model', input.modelId)
     if (model && !str(model, 'cmdb_model_category')) {
         return noPurchase(input.description, `give Model ${str(model, 'name')} a Model category: Procurement refuses a line item without one`)
@@ -49,14 +49,28 @@ export function purchaseOrderId(number: string): string {
 const CLOSED_PURCHASE_STATUSES = 'received,canceled,cancelled'
 
 /**
- * Units of a model on purchase orders (by description prefix) that are not yet received or
- * cancelled. A line item can be received or canceled on its own under a PO that is still open,
- * so both the PO status and the line status are checked.
+ * How the purchase orders of the top-up of a Customer's Spare pools begin their description. Procurement's purchase
+ * order has no field for what a purchase is for, so the top-up's are told from an Order line's by this prefix: it is
+ * how the open ones are found again.
  */
-export function openPurchaseQuantity(descriptionPrefix: string, modelId: string): number {
+function sparePurchasePrefix(customerId: string): string {
+    return `Spare-pool top-up ${customerId}:`
+}
+
+/** Request the purchase of `quantity` spares of a Model for a Customer's Spare pool (the daily top-up). */
+export function requestSparePurchase(customerId: string, modelId: string, quantity: number): PurchaseResult {
+    return requestPurchase({ modelId, quantity, description: `${sparePurchasePrefix(customerId)} ${quantity} unit(s)` })
+}
+
+/**
+ * Units of a Model the spare-pool top-up bought for a Customer that are not yet received or cancelled. A line item
+ * can be received or canceled on its own under a PO that is still open, so both the PO status and the line status are
+ * checked.
+ */
+export function openSparePurchaseQuantity(customerId: string, modelId: string): number {
     const item = new GlideRecord('proc_po_item')
     item.addQuery('model', modelId)
-    item.addQuery('purchase_order.short_description', 'STARTSWITH', descriptionPrefix)
+    item.addQuery('purchase_order.short_description', 'STARTSWITH', sparePurchasePrefix(customerId))
     item.addQuery('purchase_order.status', 'NOT IN', CLOSED_PURCHASE_STATUSES)
     item.addQuery('status', 'NOT IN', CLOSED_PURCHASE_STATUSES)
     item.query()

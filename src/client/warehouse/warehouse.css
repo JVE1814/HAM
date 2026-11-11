@@ -1,76 +1,24 @@
-:root {
-    --bg: #f6f7f9;
-    --fg: #1d2330;
-    --muted: #5d6677;
-    --accent: #1f6feb;
-    --ok: #1a7f37;
-    --error: #b42318;
-    --card: #ffffff;
-    --border: #d7dbe2;
-    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-}
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg: #12151b;
-        --fg: #e6e9ef;
-        --muted: #9aa3b2;
-        --card: #1b2029;
-        --border: #2f3542;
-    }
-}
-body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--fg);
-}
 .warehouse {
     max-width: 720px;
-    margin: 0 auto;
-    padding: 16px;
 }
 header h1 {
     font-size: 1.25rem;
     margin: 0 0 12px;
 }
-nav {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
 button {
     min-height: 44px;
     padding: 0 16px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    color: var(--fg);
     font-size: 1rem;
-}
-button.active,
-button[type='submit'] {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
 }
 .context {
     display: grid;
     gap: 12px;
     margin: 16px 0;
 }
-label {
-    display: grid;
-    gap: 4px;
-    color: var(--muted);
-    font-size: 0.9rem;
-}
 input,
 select {
     min-height: 44px;
     padding: 0 12px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    color: var(--fg);
     font-size: 1.1rem;
 }
 .scan-row {

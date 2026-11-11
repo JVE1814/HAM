@@ -1,5 +1,6 @@
 import { inFleet, OEM_PID_FIELD } from './fleet.ts'
 import { seenWithoutFleetAssetQuery } from './reconciliation.ts'
+import { type MatchType, NORM_EXCEPTION_STATUS } from './vocabulary.ts'
 
 /**
  * Model normalization: map the raw manufacturer/model strings reported by Discovery, connectors and
@@ -15,7 +16,7 @@ export interface ModelMatchRule {
     id: string
     order: number
     manufacturerId: string
-    matchType: 'exact' | 'prefix' | 'regex'
+    matchType: MatchType
     pattern: string
     modelId: string
     active: boolean
@@ -57,12 +58,24 @@ function ruleMatches(rule: ModelMatchRule, model: string): boolean {
         case 'prefix':
             return modelKey(model).startsWith(modelKey(rule.pattern))
         case 'regex':
-            try {
-                return new RegExp(rule.pattern, 'i').test(model.trim())
-            } catch {
-                return false
-            }
+            return regexOf(rule.pattern)?.test(model.trim()) ?? false
     }
+}
+
+function regexOf(pattern: string): RegExp | null {
+    try {
+        return new RegExp(pattern, 'i')
+    } catch {
+        return null
+    }
+}
+
+/**
+ * The regex rules whose pattern is no regular expression. Normalization goes on without them, as if they were inactive,
+ * so the raw models they were meant for stay unmapped until the pattern is corrected: the caller says so once.
+ */
+export function unusableRules(rules: readonly ModelMatchRule[]): ModelMatchRule[] {
+    return rules.filter((rule) => rule.matchType === 'regex' && regexOf(rule.pattern) === null)
 }
 
 export function normalizeModel(
@@ -85,8 +98,23 @@ export function normalizeModel(
 /** The table of raw hardware models, as Discovery and connectors create them, that normalization maps. */
 export const RAW_MODEL_TABLE = 'cmdb_hardware_product_model'
 
+/**
+ * The Model table, which RAW_MODEL_TABLE extends. A canonical Model is found on it by its OEM PID, and a raw model is
+ * marked normalized through it: both fields are this table's.
+ */
+export const MODEL_TABLE = 'cmdb_model'
+
 /** The raw model field that records the canonical Model it was mapped to. */
-const NORMALIZED_TO = 'x_daas_ham_normalized_to'
+export const NORMALIZED_TO = 'x_daas_ham_normalized_to'
+
+/** The order a model match rule gets when none is entered: the default of its `order` column. */
+export const DEFAULT_RULE_ORDER = 100
+
+/**
+ * The rule learned from a resolved exception: an exact match on its raw model, at the order a rule gets when none is
+ * entered, so a rule given a lower order still wins.
+ */
+export const LEARNED_RULE = { order: DEFAULT_RULE_ORDER, matchType: 'exact' } as const satisfies Pick<ModelMatchRule, 'order' | 'matchType'>
 
 /** Encoded condition: the Model in `field` has no OEM PID (it is a raw model, ADR 0016) and is not yet normalized. */
 function onUnmappedRawModel(field: string): string {
@@ -126,11 +154,14 @@ export function rawModelsToNormalizeQuery(rawModelIds: readonly string[]): strin
 /** The reason a normalization exception is closed with when its raw model is not NaaS's to map. */
 export const NOT_NAAS_REASON = 'not_naas'
 
+/** Encoded query on normalization exceptions: the open ones, which the navigator and the workspace list. */
+export const OPEN_NORM_EXCEPTIONS_QUERY = `status=${NORM_EXCEPTION_STATUS.open}`
+
 /**
  * Encoded query on normalization exceptions: the open ones the hourly normalization raised, whose source is a raw
  * model. Those an ASN row raised name the import row instead.
  */
-export const RAW_MODEL_EXCEPTIONS_QUERY = `status=open^source_table=${RAW_MODEL_TABLE}`
+export const RAW_MODEL_EXCEPTIONS_QUERY = `${OPEN_NORM_EXCEPTIONS_QUERY}^source_table=${RAW_MODEL_TABLE}`
 
 /**
  * Encoded query on RAW_MODEL_TABLE: of the raw models open exceptions name (`exceptionModelIds`), those that are not

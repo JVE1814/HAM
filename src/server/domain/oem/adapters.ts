@@ -1,12 +1,15 @@
+import { chunks } from '../collections.ts'
 import { failureText, isSuccess, type HttpPort } from '../http.ts'
-import { asArray, chunks, field, isoDate, parseJson, text } from '../json.ts'
-import type { CoverageFact, CoverageFetched, Fetched, LifecycleFact, OemVendor, RmaFact } from './types.ts'
+import { asArray, field, isoDate, parseJson, text } from '../json.ts'
+import type { OemVendor } from '../vocabulary.ts'
+import type { CoverageFact, CoverageFetched, Fetched, LifecycleFact, RmaFact } from './types.ts'
 import { fortiCloudError } from './forticloud.ts'
+import { REST_MESSAGE, type RestFunction } from '../rest-message-names.ts'
 
 /*
  * Vendor adapters (ADR 0008). Response shapes follow the vendors' public API documentation; mappers
  * read tolerantly so optional or renamed fields degrade to "unknown" rather than failing.
- * Request functions name the REST message functions declared in fluent/logic/oem-messages.now.ts.
+ * Request functions name the REST message functions declared in fluent/oem/rest-messages.now.ts.
  */
 
 export interface OemContext {
@@ -17,7 +20,7 @@ export interface OemContext {
 
 type Capability<Result> = (keys: readonly string[], context: OemContext) => Result
 
-function call(context: OemContext, fn: string, params: Record<string, string>, errors: string[]): unknown {
+function call(context: OemContext, fn: RestFunction, params: Record<string, string>, errors: string[]): unknown {
     const response = context.http({ fn, params })
     if (!isSuccess(response.status)) {
         errors.push(`${fn} ${JSON.stringify(params)}: ${failureText(response)}`)
@@ -45,8 +48,11 @@ function eoxBatches(pids: readonly string[]): string[][] {
     return out
 }
 
-/** A PID as compared with another: Cisco answers in its own case (WS-C3850-24T for ws-c3850-24t asked). */
-function pidKey(pid: string): string {
+/**
+ * A PID as compared with another, trimmed and in upper case, as the OEMs write it: Cisco answers in its own case
+ * (WS-C3850-24T for ws-c3850-24t asked), and Models are matched to an OEM's answer by it.
+ */
+export function pidKey(pid: string): string {
     return pid.trim().toUpperCase()
 }
 
@@ -67,7 +73,7 @@ const ciscoLifecycle: Capability<Fetched<LifecycleFact>> = (pids, context) => {
     const facts: LifecycleFact[] = []
     const errors: string[] = []
     for (const batch of eoxBatches(pids)) {
-        const json = call(context, 'eox_by_pid', { pids: batch.join(',') }, errors)
+        const json = call(context, REST_MESSAGE.ciscoSupport.fn.eoxByPid, { pids: batch.join(',') }, errors)
         for (const record of asArray(field(json, 'EOXRecord'))) {
             if (field(record, 'EOXError')) continue // product without an EoX bulletin
             const product = text(field(record, 'EOLProductID'))
@@ -98,7 +104,7 @@ const ciscoCoverage: Capability<CoverageFetched> = (serials, context) => {
     const failed: string[] = []
     const rejected: string[] = []
     for (const batch of chunks(serials, 50)) {
-        const json = call(context, 'coverage_by_serial', { serials: batch.join(',') }, errors)
+        const json = call(context, REST_MESSAGE.ciscoSupport.fn.coverageBySerial, { serials: batch.join(',') }, errors)
         // A failed call says nothing about the batch (asked again next run). An answer without
         // serial_numbers is Cisco's own error (e.g. EXCEEDED_OUTPUT): asked again only after the
         // refresh interval, so a batch that always errors does not hold the queue.
@@ -143,7 +149,7 @@ const ciscoRmaStatus: Capability<Fetched<RmaFact>> = (rmaNumbers, context) => {
     const facts: RmaFact[] = []
     const errors: string[] = []
     for (const rma of rmaNumbers) {
-        const json = call(context, 'rma_status', { rma }, errors)
+        const json = call(context, REST_MESSAGE.ciscoSupport.fn.rmaStatus, { rma }, errors)
         for (const record of asArray(field(json, 'returns', 'RmaRecord'))) {
             const rmaNumber = text(field(record, 'rmaNo')) || rma
             const status = text(field(record, 'status'))
@@ -171,7 +177,7 @@ const merakiLifecycle: Capability<Fetched<LifecycleFact>> = (pids, context) => {
     const errors: string[] = []
     for (const pid of pids) {
         for (const orgId of context.orgIds) {
-            const json = call(context, 'inventory_by_model', { org_id: orgId, model: merakiModel(pid) }, errors)
+            const json = call(context, REST_MESSAGE.meraki.fn.inventoryByModel, { org_id: orgId, model: merakiModel(pid) }, errors)
             const device = asArray(json).find(hasEoxDates)
             if (!device) continue
             facts.push({
@@ -190,7 +196,6 @@ const merakiLifecycle: Capability<Fetched<LifecycleFact>> = (pids, context) => {
 
 // --- Fortinet Asset Management API v3 --------------------------------------------------------
 
-/** The asset's contract that has a term ending on the given date, else its first contract. */
 function fortinetContract(asset: unknown, end: string | undefined): unknown {
     const contracts = asArray(field(asset, 'contracts'))
     const matching = contracts.find((c) => end !== undefined && asArray(field(c, 'terms')).some((t) => isoDate(field(t, 'endDate')) === end))
@@ -203,7 +208,7 @@ const fortinetCoverage: Capability<CoverageFetched> = (serials, context) => {
     const failed: string[] = []
     const rejected: string[] = []
     for (const serial of serials) {
-        const json = call(context, 'products_list', { serial }, errors)
+        const json = call(context, REST_MESSAGE.fortiCare.fn.productsList, { serial }, errors)
         if (json === undefined) {
             failed.push(serial)
             continue
@@ -242,11 +247,13 @@ const fortinetCoverage: Capability<CoverageFetched> = (serials, context) => {
 
 // --- HPE Mist (JSI inventory) ----------------------------------------------------------------
 
+type MistLookup = typeof REST_MESSAGE.mist.fn.jsiByModel | typeof REST_MESSAGE.mist.fn.jsiBySerial
+
 /**
  * The first org's matching JSI items. `answered` is true when items were found, or every org answered
  * that it has none; if any org's call failed and nothing was found, the device may be in that org.
  */
-function mistLookup(context: OemContext, fn: 'jsi_by_model' | 'jsi_by_serial', params: Record<string, string>, errors: string[]): { items: unknown[]; answered: boolean } {
+function mistLookup(context: OemContext, fn: MistLookup, params: Record<string, string>, errors: string[]): { items: unknown[]; answered: boolean } {
     let anyFailed = false
     for (const orgId of context.orgIds) {
         const json = call(context, fn, { org_id: orgId, ...params }, errors)
@@ -265,7 +272,7 @@ const mistLifecycle: Capability<Fetched<LifecycleFact>> = (pids, context) => {
     const errors: string[] = []
     for (const pid of pids) {
         // JSI: end_of_sale_time is end of sale, eos_time is end of support (epoch seconds).
-        const item = mistLookup(context, 'jsi_by_model', { model: pid }, errors).items.find((i) => field(i, 'end_of_sale_time') || field(i, 'eos_time'))
+        const item = mistLookup(context, REST_MESSAGE.mist.fn.jsiByModel, { model: pid }, errors).items.find((i) => field(i, 'end_of_sale_time') || field(i, 'eos_time'))
         if (!item) continue
         facts.push({
             pid,
@@ -281,7 +288,7 @@ const mistCoverage: Capability<CoverageFetched> = (serials, context) => {
     const errors: string[] = []
     const failed: string[] = []
     for (const serial of serials) {
-        const { items, answered } = mistLookup(context, 'jsi_by_serial', { serial }, errors)
+        const { items, answered } = mistLookup(context, REST_MESSAGE.mist.fn.jsiBySerial, { serial }, errors)
         if (!answered) failed.push(serial)
         const item = items[0]
         if (!item) continue
@@ -299,9 +306,27 @@ const mistCoverage: Capability<CoverageFetched> = (serials, context) => {
     return { facts, errors, failed, rejected: [] }
 }
 
+/**
+ * The REST message that serves each vendor's lifecycle, coverage and RMA calls: the vendors whose API the sync jobs
+ * read (`SyncVendor`). Only these may have routes below, a route names one of them as its `via`, and platform/oem-http
+ * must hold the enabled property of each: a vendor given a route without its message or its switch does not compile.
+ */
+export const SYNC_MESSAGE = {
+    cisco: REST_MESSAGE.ciscoSupport.name,
+    meraki: REST_MESSAGE.meraki.name,
+    fortinet: REST_MESSAGE.fortiCare.name,
+    mist: REST_MESSAGE.mist.name,
+} as const satisfies Partial<Record<OemVendor, string>>
+
+export type SyncVendor = keyof typeof SYNC_MESSAGE
+
+export function isSyncVendor(vendor: OemVendor): vendor is SyncVendor {
+    return vendor in SYNC_MESSAGE
+}
+
 interface Route<Result> {
     /** Vendor whose REST message serves the call (Meraki hardware coverage comes from Cisco SN2INFO). */
-    via: OemVendor
+    via: SyncVendor
     run: Capability<Result>
 }
 
@@ -316,8 +341,10 @@ interface VendorRoutes {
     rmaStatus?: Route<Fetched<RmaFact>>
 }
 
-/** What each vendor's API can do; missing capabilities fall back to CSV import. */
-export const OEM_ADAPTERS: Record<OemVendor, VendorRoutes> = {
+type NoRoutes = { [K in keyof VendorRoutes]?: never }
+
+/** What each vendor's API can do; missing capabilities fall back to CSV import. A vendor outside SYNC_MESSAGE has none. */
+export const OEM_ADAPTERS: { [V in OemVendor]: V extends SyncVendor ? VendorRoutes : NoRoutes } = {
     cisco: {
         lifecycle: { via: 'cisco', run: ciscoLifecycle },
         coverage: { via: 'cisco', run: ciscoCoverage },
@@ -335,6 +362,15 @@ export const OEM_ADAPTERS: Record<OemVendor, VendorRoutes> = {
 }
 
 /**
+ * The order the sync jobs take the vendors in. It is an order, not the list of vendors, which is `OemVendor`: the type
+ * below fails when a vendor is missing from it.
+ */
+export const SYNC_ORDER = ['cisco', 'meraki', 'fortinet', 'mist', 'aruba', 'checkpoint'] as const satisfies readonly OemVendor[]
+
+type Holds<T extends true> = T
+type _EveryVendorHasItsTurn = Holds<[OemVendor] extends [(typeof SYNC_ORDER)[number]] ? true : false>
+
+/**
  * `vendor`'s route for `capability` when it may run: `vendor` is enabled and so is the vendor whose REST message
  * serves the call. Meraki coverage therefore needs Cisco enabled too, and with Meraki off no Meraki serial goes to
  * Cisco SN2INFO.
@@ -346,4 +382,17 @@ export function enabledRoute<K extends keyof VendorRoutes>(
 ): VendorRoutes[K] | undefined {
     const route = OEM_ADAPTERS[vendor][capability]
     return route && enabled(vendor) && enabled(route.via) ? route : undefined
+}
+
+export interface SyncTurn<K extends keyof VendorRoutes> {
+    vendor: OemVendor
+    route: NonNullable<VendorRoutes[K]>
+}
+
+/** The vendors a sync job of `capability` calls, in SYNC_ORDER: those whose route may run (enabledRoute). */
+export function enabledRoutes<K extends keyof VendorRoutes>(capability: K, enabled: (vendor: OemVendor) => boolean): Array<SyncTurn<K>> {
+    return SYNC_ORDER.flatMap((vendor) => {
+        const route = enabledRoute(vendor, capability, enabled)
+        return route ? [{ vendor, route }] : []
+    })
 }

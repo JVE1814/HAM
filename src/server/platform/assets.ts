@@ -1,31 +1,40 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { normalizeSerial } from '../domain/asn.ts'
 import { ambiguousIdentifier, fieldMatch, IDENTIFIER_FIELDS, IDENTIFIER_READ_LIMIT } from '../domain/asset-identifier.ts'
-import { FLEET_FIELD, fleetCondition, fleetField, OEM_PID_FIELD, STOCKROOM_TYPE_FIELD, type FleetCandidate } from '../domain/fleet.ts'
+import { normalizeSerial } from '../domain/serials.ts'
+import {
+    adoptionProblem,
+    FLEET_FIELD,
+    fleetCondition,
+    OEM_PID_FIELD,
+    STOCKROOM_TYPE_FIELD,
+    type FleetCandidate,
+} from '../domain/fleet.ts'
 import {
     checkTransition,
     fieldsOf,
     stageOf,
-    type LegalOwner,
     type Stage,
     type TransitionFacts,
     type TransitionVerdict,
     voidsWipeEvidence,
 } from '../domain/lifecycle.ts'
+import { PLACEMENT_FIELDS } from '../domain/rack.ts'
+import { LEGAL_OWNER, type LegalOwner } from '../domain/vocabulary.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
-import { bool, refusal, str } from './records.ts'
+import { PROPERTY, stringProperty } from './properties.ts'
+import { bool, refusal, str, warnRefused, type ForeignRecord, type ReadOptions } from './records.ts'
 
 /** Reading and moving Assets (alm_hardware) through their Lifecycle stage (ADR 0002). */
 
-export function readStage(asset: GlideRecord): Stage | null {
+export function readStage(asset: ForeignRecord): Stage | null {
     return stageOf({ installStatus: str(asset, 'install_status'), substatus: str(asset, 'substatus') })
 }
 
-export function transitionFacts(asset: GlideRecord): TransitionFacts {
+export function transitionFacts(asset: ForeignRecord): TransitionFacts {
     return {
         hasSite: !!str(asset, 'x_daas_ham_site'),
         hasAgreement: !!str(asset, 'x_daas_ham_agreement'),
-        legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner,
+        legalOwner: str(asset, 'x_daas_ham_legal_owner') as LegalOwner | '',
         wipeEvidenceComplete: !!str(asset, 'x_daas_ham_wiped_on') && !!str(asset, 'x_daas_ham_wipe_certificate'),
     }
 }
@@ -33,71 +42,82 @@ export function transitionFacts(asset: GlideRecord): TransitionFacts {
 /**
  * Move an Asset to `to` if the lifecycle allows it (set its fields; the caller saves the record). A move into staging
  * also clears the wipe evidence (domain/lifecycle `voidsWipeEvidence`); a save that sets the stage some other way has
- * it cleared by a before-update rule (entry/assets `clearVoidedWipeEvidence`). `force` lets administrators correct
- * assets in stages the app does not model.
+ * it cleared by a before-update rule (entry/assets `clearVoidedWipeEvidence`).
  */
-export function moveAsset(asset: GlideRecord, to: Stage, options: { force?: boolean } = {}): TransitionVerdict {
+export function moveAsset(asset: ForeignRecord, to: Stage): TransitionVerdict {
     const from = readStage(asset)
-    const verdict = options.force ? ({ allowed: true } as const) : checkTransition(from, to, transitionFacts(asset))
+    const verdict = checkTransition(from, to, transitionFacts(asset))
     if (verdict.allowed) {
-        const fields = fieldsOf(to)
-        asset.setValue('install_status', fields.installStatus)
-        asset.setValue('substatus', fields.substatus ?? '')
+        writeStage(asset, to)
         if (voidsWipeEvidence(from, to)) clearWipeEvidence(asset)
     }
     return verdict
 }
 
+function writeStage(asset: ForeignRecord, stage: Stage): void {
+    const fields = fieldsOf(stage)
+    asset.setValue('install_status', fields.installStatus)
+    asset.setValue('substatus', fields.substatus ?? '')
+}
+
 /** Clear the Asset's wipe evidence (the caller saves): a wipe recorded before no longer covers the unit. */
-export function clearWipeEvidence(asset: GlideRecord): void {
+export function clearWipeEvidence(asset: ForeignRecord): void {
     asset.setValue('x_daas_ham_wiped_on', '')
     asset.setValue('x_daas_ham_wipe_certificate', '')
 }
 
 /**
- * Move and save; false (and a warning, not a throw) when the lifecycle or the platform refuses, so the caller stops
- * before work that needs the move. A refused record keeps the unsaved move: it is not re-read, as it may be a query's
- * cursor or found past the before-query rules.
+ * Move the Asset to `to` and save it; why it was not moved ('' once saved): the lifecycle's reason for a move it
+ * refuses, the platform's for a save it refuses. Nothing is logged: the caller puts the reason where it belongs (on a
+ * line, in the log, before the user). A refused record keeps the unsaved move: it is not re-read, as it may be a
+ * query's cursor or found past the before-query rules.
+ */
+export function moveRefusal(asset: GlideRecord, to: Stage): string {
+    const verdict = moveAsset(asset, to)
+    if (!verdict.allowed) return verdict.reason
+    return asset.update() ? '' : refusal(asset, `the asset could not be saved as ${to}`)
+}
+
+/**
+ * Move and save (`moveRefusal`); false (and a warning, not a throw) when the lifecycle or the platform refuses, so the
+ * caller stops before work that needs the move.
  */
 export function moveAndSave(asset: GlideRecord, to: Stage, context: string): boolean {
-    const verdict = moveAsset(asset, to)
-    if (verdict.allowed && asset.update()) return true
-    const reason = verdict.allowed ? refusal(asset) : verdict.reason
+    const reason = moveRefusal(asset, to)
+    if (!reason) return true
     gs.warn(`[x_daas_ham] ${context}: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
     return false
 }
 
 /** The Asset left its Site: free its Rack units (the caller saves). */
 export function clearRackPlacement(asset: GlideRecord): void {
-    asset.setValue('x_daas_ham_rack', '')
-    asset.setValue('x_daas_ham_ru_start', '')
-    asset.setValue('x_daas_ham_rack_face', '')
+    for (const field of Object.values(PLACEMENT_FIELDS)) asset.setValue(field, '')
 }
 
 /**
  * A new, unsaved hardware Asset of `modelId` in `stage`: a fleet asset (ADR 0016) the Provider owns until a lease or a
- * Customer says otherwise, as the columns stamp no default on the rows the Provider's IT creates. Sets the fields the
- * platform treats as mandatory on assets (model category, quantity), which GlideRecord inserts do not enforce. Every
- * Asset the app creates is made here.
+ * Customer says otherwise, as the columns stamp no default on the rows the Provider's IT creates, and the Provider's
+ * own stock (its company, ADR 0006) until a caller holds it for a Customer. Sets the fields the platform treats as
+ * mandatory on assets (model category, quantity), which GlideRecord inserts do not enforce. Every Asset the app
+ * creates is made here.
  */
 export function newAsset(modelId: string, stage: Stage): GlideRecord {
     const asset = new GlideRecord('alm_hardware')
     asset.initialize()
     asset.setValue(FLEET_FIELD, true)
-    asset.setValue('x_daas_ham_legal_owner', 'provider')
+    asset.setValue('x_daas_ham_legal_owner', LEGAL_OWNER.provider)
+    asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('model', modelId)
     asset.setValue('quantity', 1)
     const model = new GlideRecord('cmdb_model')
     if (model.get(modelId)) asset.setValue('model_category', str(model, 'cmdb_model_category').split(',')[0])
-    const fields = fieldsOf(stage)
-    asset.setValue('install_status', fields.installStatus)
-    asset.setValue('substatus', fields.substatus ?? '')
+    writeStage(asset, stage)
     return asset
 }
 
-/** Whether the Asset (or the one `via` dot-walks to, e.g. `asset.`) is a fleet asset (ADR 0016). */
-export function isFleetAsset(record: GlideRecord, via = ''): boolean {
-    return bool(record, fleetField(via))
+/** Whether the Asset is a fleet asset (ADR 0016). */
+export function isFleetAsset(asset: ForeignRecord): boolean {
+    return bool(asset, FLEET_FIELD)
 }
 
 /**
@@ -106,60 +126,60 @@ export function isFleetAsset(record: GlideRecord, via = ''): boolean {
  */
 export function joinFleet(asset: GlideRecord): void {
     asset.setValue(FLEET_FIELD, true)
-    if (!str(asset, 'x_daas_ham_legal_owner')) asset.setValue('x_daas_ham_legal_owner', 'provider')
+    if (!str(asset, 'x_daas_ham_legal_owner')) asset.setValue('x_daas_ham_legal_owner', LEGAL_OWNER.provider)
 }
 
-/** The Asset as domain/fleet `adoptionProblem` and `receiptProblem` judge it. */
+/**
+ * Adopt equipment the Provider already has into the fleet ("Add to fleet") and save it, when domain/fleet
+ * `adoptionProblem` allows it; why it was not adopted ('' once saved): that problem, or the platform's reason for the
+ * save it refused, logged with the Asset named as `name`. alm_hardware is a global table, but what the platform refuses
+ * from this scope is a rule's setAbortAction, not a save: the Asset is saved as any script saves one.
+ */
+export function adoptIntoFleet(asset: GlideRecord, name: string): string {
+    const problem = adoptionProblem(fleetCandidate(asset))
+    if (problem) return problem
+    joinFleet(asset)
+    return asset.update() ? '' : warnRefused(asset, `${name} not added to the fleet`)
+}
+
 export function fleetCandidate(asset: GlideRecord): FleetCandidate {
+    const { hasSite, hasAgreement } = transitionFacts(asset)
     return {
         fleet: isFleetAsset(asset),
         stage: readStage(asset),
         modelPid: str(asset, `model.${OEM_PID_FIELD}`),
         stockroomType: str(asset, `stockroom.${STOCKROOM_TYPE_FIELD}`),
-        hasSite: !!str(asset, 'x_daas_ham_site'),
-        hasAgreement: !!str(asset, 'x_daas_ham_agreement'),
+        hasSite,
+        hasAgreement,
     }
 }
 
-/** What an identifier names (platform/assets `identifyAsset`): the one Asset, none, or more than one (refused). */
+/** What an identifier names (`identifyAsset`): the one Asset, none, or more than one (refused, saying why). */
 export type AssetIdentified = { asset: GlideRecord } | { ambiguous: string } | null
 
-/** Options of an identifier lookup (`identifyAsset`). */
-export interface IdentifierLookup {
-    beyondVisibility?: boolean
-    includeNonFleet?: boolean
+interface IdentifierLookup {
+    fleetOnly: boolean
+    beyondVisibility: boolean
 }
+
+const ARRIVING: IdentifierLookup = { fleetOnly: false, beyondVisibility: true }
 
 /**
  * The fleet asset (ADR 0016) this identifier names: by serial number, else Provider tag, else Customer tag (domain/
  * asset-identifier); `{ ambiguous }`, saying why, when two Assets carry it in the first of those fields that any does,
  * as two Customers may give their switches one Customer tag; null when none carries it. `beyondVisibility` reads past
- * the app's before-query visibility rules (ADR 0005, platform/beyond-visibility): receiving must find incoming units
- * that belong to no stockroom yet, and the device-events API must find any fleet asset (it reports another identifier
- * unknown). Its later saves run every rule. `includeNonFleet` finds the Provider IT's Assets too, a fleet asset first
- * when both carry the identifier: for a receipt, which takes in a unit Procurement created on order and must not
- * create a second Asset for a serial IT holds.
+ * the app's before-query visibility rules (ADR 0005, platform/beyond-visibility): the device-events API must find any
+ * fleet asset (it reports another identifier unknown). Its later saves run every rule.
  */
-export function identifyAsset(identifier: string, options: IdentifierLookup = {}): AssetIdentified {
-    const code = identifier.trim()
-    if (!code) return null
-    for (const field of IDENTIFIER_FIELDS) {
-        const value = field.field === 'serial_number' ? normalizeSerial(code) : code
-        const found = assetsCarrying(field.field, value, options)
-        const match = fieldMatch(found.map((asset) => asset.fleet))
-        if (match.kind === 'ambiguous') return { ambiguous: ambiguousIdentifier(code, field) }
-        if (match.kind === 'none') continue
-        const asset = found[match.index].record()
-        return asset ? { asset } : null
-    }
-    return null
+export function identifyAsset(identifier: string, options: ReadOptions = {}): AssetIdentified {
+    return identify(identifier, { fleetOnly: true, beyondVisibility: !!options.beyondVisibility })
 }
 
 /**
  * The fleet asset this identifier names (`identifyAsset`), or null when none does or it is ambiguous (logged), for a
  * caller that reports both as an unknown identifier.
  */
-export function findAssetByIdentifier(identifier: string, options: IdentifierLookup = {}): GlideRecord | null {
+export function findAssetByIdentifier(identifier: string, options: ReadOptions = {}): GlideRecord | null {
     const identified = identifyAsset(identifier, options)
     if (identified && 'ambiguous' in identified) {
         gs.warn(`[x_daas_ham] Identifier ${identifier.trim()} refused: ${identified.ambiguous}`)
@@ -168,23 +188,54 @@ export function findAssetByIdentifier(identifier: string, options: IdentifierLoo
     return identified?.asset ?? null
 }
 
-/** One Asset carrying an identifier: whether it is a fleet asset, and the record itself (null once it is gone). */
+/**
+ * Any Asset a scanned `code` names as `identifyAsset` reads it, the Provider IT's too (ADR 0016), a fleet asset chosen
+ * over one of the Provider IT's that carries the same code, read past the app's visibility rules (ADR 0005): an
+ * arriving unit belongs to no stockroom yet. What a receipt looks a scanned unit up by, and checks again under the
+ * serial's lock just as it was looked up before it, so a serial never has two Assets and a serial IT holds is refused
+ * rather than given a second Asset.
+ */
+export function identifyAnyAsset(code: string): AssetIdentified {
+    return identify(code, ARRIVING)
+}
+
+/**
+ * Any Asset with the serial number `serial`, the Provider IT's too, a fleet asset first, read past the app's visibility
+ * rules: what an ASN row's serial column duplicates (an Asset whose tag happens to read the same is another unit), and
+ * what the row's holder of the serial's lock checks before it creates the Asset.
+ */
+export function findAnyAssetBySerial(serial: string): GlideRecord | null {
+    const code = serial.trim()
+    if (!code) return null
+    return assetsCarrying('serial_number', normalizeSerial(code), ARRIVING)[0]?.record() ?? null
+}
+
+function identify(identifier: string, lookup: IdentifierLookup): AssetIdentified {
+    const code = identifier.trim()
+    if (!code) return null
+    for (const field of IDENTIFIER_FIELDS) {
+        const value = field.field === 'serial_number' ? normalizeSerial(code) : code
+        const found = assetsCarrying(field.field, value, lookup)
+        const match = fieldMatch(found.map((asset) => asset.fleet))
+        if (match.kind === 'ambiguous') return { ambiguous: ambiguousIdentifier(code, field) }
+        if (match.kind === 'none') continue
+        const asset = found[match.index]?.record()
+        return asset ? { asset } : null
+    }
+    return null
+}
+
 interface Carrier {
     fleet: boolean
     record: () => GlideRecord | null
 }
 
-/**
- * The Assets (at most IDENTIFIER_READ_LIMIT) whose `field` is `value`: fleet assets only, or fleet ones first with
- * `includeNonFleet`. The query's own record is handed back while it is still on the first one; only when a second
- * one is read past it is the first read again, by sys_id, the same way (past the visibility rules or not).
- */
-function assetsCarrying(field: string, value: string, options: IdentifierLookup): Carrier[] {
-    const read = (record: GlideRecord, run: () => boolean | void) => (options.beyondVisibility ? beyondVisibility(record, run) : run())
+function assetsCarrying(field: string, value: string, lookup: IdentifierLookup): Carrier[] {
+    const read = (record: GlideRecord, run: () => boolean | void) => (lookup.beyondVisibility ? beyondVisibility(record, run) : run())
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery(field, value)
-    if (options.includeNonFleet) asset.orderByDesc(FLEET_FIELD)
-    else asset.addEncodedQuery(fleetCondition())
+    if (lookup.fleetOnly) asset.addEncodedQuery(fleetCondition())
+    else asset.orderByDesc(FLEET_FIELD)
     asset.setLimit(IDENTIFIER_READ_LIMIT)
     read(asset, () => asset.query())
     if (!asset.next()) return []

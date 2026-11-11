@@ -25,10 +25,15 @@ impersonating a user who holds that role and no other NaaS role.
 ### Install log
 
 *System Applications > Application install history* (`sys_upgrade_history_log`) lists one *Skipped
-Error* row per global table the app adds columns to (`sys_documentation_<table>__en`, eight of
+Error* row per global table the app adds columns to (`sys_documentation_<table>__en`, seven of
 them): SDK 4.14 writes a table label for each augmented table, and the platform keeps the table's
-own. Any other *Skipped Error* row is a defect. The development instance's install of 2026-11-09
-logged these eight and no other.
+own. Any other *Skipped Error* row is a defect. The development instance's install of 2026-11-09,
+of the earlier version, which also added columns to `change_request`, logged eight and no other.
+
+The app no longer adds a column to `change_request` (ADR 0018), so the build now carries a delete
+for the label it used to write there (`sys_documentation_change_request__en`, under the app's own
+sys_id, which the platform never stored): after the install, check that the *Change Request* table
+still has its label (*System Definition > Tables*). This was not run on an instance.
 
 ### Preflight check
 
@@ -51,7 +56,7 @@ those values; on an older release check that both exist.
 
 ### Cross-scope access
 
-The privileges in `security/cross-scope.now.ts` match the scopes the instance reports
+The privileges in `shared/cross-scope.now.ts` match the scopes the instance reports
 (`alm_hardware`, `change_request`, `wm_order`, `proc_po`, `sys_attachment`, ...), including delete
 on `alm_transfer_order` and its lines, which sourcing uses to remove a transfer order created only
 in part (otherwise the line's sourcing summary names it for cancelling). Procurement lets no other
@@ -85,6 +90,31 @@ Confirm that *NaaS - the tracking webhook needs its token and records a delivery
 before the run, confirm it is empty again after. `src/server/atf-scripts.test.ts` fails when the
 version in `package.json` changes, until the scripts' module paths are updated to match.
 
+### Model lifecycle
+
+ADR 0017; the platform's table and its rules were read on a Brazil instance, the app's use of it was
+not run there. A lifecycle import row for a NaaS Model stores one active row per milestone in
+`cmdb_model_lifecycle` (class *Hardware Model Lifecycle*, type *Publisher*, source *Internal*, the
+provenance as its description), stamps the Model's fleet assets with their Lifecycle phase, and
+queues `x_daas_ham.model.lifecycle` once; loaded again, it saves nothing. A milestone an asset
+manager changes in *Model lifecycle* stamps them again, and one of a Model without an OEM PID queues
+nothing.
+
+**After an upgrade** from a version that had `x_daas_ham_model_lifecycle`, check that the table is
+still there with its rows (the build deletes its ACLs, form, list and labels, not the table). The
+app no longer reads them: load them again through the lifecycle import or enter them by hand.
+
+### Platform fields
+
+**After an upgrade** from a version that had the app's own columns (ADR 0018): the old columns stay,
+unread. Fill in each lease's *Vendor* (its Lessor) and *Contract number* (until then a reference to
+the lease shows blank, and its return-to-lessor disposal order gets no vendor) and each racked
+Model's *Power (watts)* (until then it counts as 0 W in a rack's power budget). A work order opened
+by the earlier version has no *Initiated from*: set it to its NaaS Order while the work is open, or
+closing it will not confirm the install and its planned start is not checked against the change
+window (*Confirm installed* on the Order does the former). Stockroom members are entered again as
+group members ([Stockroom assignment](#stockroom-assignment)).
+
 ### Procurement and FSM data
 
 The stored `proc_po` / `proc_po_item` status values and column names, `wm_order` state 3 = Closed
@@ -111,7 +141,7 @@ one: list `cmdb_model` with `x_daas_ham_oem_pidISNOTEMPTY^cmdb_model_categoryISE
 The instance stores the name of a business rule, UI action, script action, email notification,
 SLA definition, REST message and scripted REST API or route in a column of 40 characters, and cuts
 a longer one off without a warning (scheduled scripts and properties: 100).
-`src/server/record-names.test.ts` keeps every name the Fluent sources give within its limit. Check
+`src/server/built-metadata.test.ts` keeps every name in the built records within its limit. Check
 that the rule list (`sys_script`, filter *Name starts with NaaS*) shows no name cut off.
 
 ### Long text on forms
@@ -126,13 +156,15 @@ label, and the browser console shows no error. The same holds for a disposal lin
 
 ### Reference display
 
-A table extending `ast_contract` inherits its display field, `vendor_contract`, which an Agreement
-and a Lease schedule leave empty, so a reference to one would show blank. Each overrides `number`
-as its display field (`sys_dictionary_override` on `number` with *Display override* true): a
-Subscription line's *Agreement* shows the Agreement's number (`NAG...`), and an Asset's *Lease
-schedule* the lease's (`NLS...`). On the development instance on 2026-11-09 the lease showed
-`NLS0001001` and an Agreement reference was blank, as `data/agreements.now.ts` then gave the
-Agreement no override.
+A table extending `ast_contract` inherits its display field, `vendor_contract` (*Contract number*),
+which an Agreement leaves empty, so a reference to one would show blank. The Agreement overrides
+`number` as its display field (`sys_dictionary_override` on `number` with *Display override* true):
+a Subscription line's *Agreement* shows the Agreement's number (`NAG...`). A Lease schedule has no
+such override (ADR 0018): its *Contract number* is mandatory, and an Asset's *Lease schedule* shows
+it. On the development instance on 2026-11-09, on the earlier version, whose lease still overrode
+`number`, the lease showed `NLS0001001` and an Agreement reference was blank, as
+`agreements/tables.now.ts` then gave the Agreement no override. A lease's reference showing its
+Contract number was not run on an instance.
 
 ### Scale
 
@@ -152,9 +184,9 @@ only where the OEM claim run's check for stranded steps goes on from, with no st
 
 *Fleet* (`x_daas_ham_fleet`) on `alm_hardware` is a read-only boolean, default false, with the
 index `x_daas_ham_hw_fleet`, and the install sets it true on no row. The dictionary entries of
-*Legal owner* (`alm_hardware`), *Track as asset* (`cmdb_model`) and *Stockroom type*
-(`alm_stockroom`) have no default value, and *Legal owner* offers *-- None --*: an Asset, Model or
-Stockroom the Provider's IT creates on its form gets none of them.
+*Legal owner* (`alm_hardware`) and *Stockroom type* (`alm_stockroom`) have no default value, and
+*Legal owner* offers *-- None --*: an Asset or Stockroom the Provider's IT creates on its form gets
+neither.
 
 ### Add to fleet
 
@@ -215,25 +247,39 @@ development instance, 9 of its 12 stockrooms were the platform's own IT warehous
   central depots (the demo's *Central Depot Utrecht* is one), so do not use *Update All*. Select
   the Provider IT's storerooms only and clear *Stockroom type* with *Update Selected*. Until then a
   Provider IT storeroom counts as a central depot: it is offered for receiving and a blind count,
-  and an inventory tech who is not its member does not see it. A NaaS depot cleared by mistake is
-  no longer offered for receiving or a blind count, receiving there answers HTTP 400 and sourcing
-  does not draw on its stock, until its type is set back to *Central depot*.
+  and an inventory tech who is not in its Assignment group does not see it. A NaaS depot cleared by
+  mistake is no longer offered for receiving or a blind count, receiving there answers HTTP 400 and
+  sourcing does not draw on its stock, until its type is set back to *Central depot*.
 - `alm_hardware`, filter
   `x_daas_ham_fleet=false^ORx_daas_ham_fleetISEMPTY^x_daas_ham_legal_owner=provider`: clear *Legal
   owner* with *Update All*. A NaaS unit not yet adopted loses nothing: a blank Legal owner counts as
   the Provider's, and adoption sets it.
-- `cmdb_model`, filter `x_daas_ham_oem_pidISEMPTY^x_daas_ham_track_as_asset=true`: set *Track as
-  asset* to false with *Update All* (a NaaS Model has an OEM PID).
+
+The earlier version's *Track as asset* default on `cmdb_model` needs no clean-up: the app no longer
+has that column (ADR 0018), and it stays on the instance with its values, unread.
 
 ## Access and visibility (ADR 0005)
+
+### Stockroom assignment
+
+ADR 0018; the platform's columns, ACLs and table access were read on a Brazil instance, the app's
+use of them was not run there. An inventory-tech-only user who is a member of a NaaS stockroom's
+*Assignment group* sees that stockroom's fleet assets, staging tasks and blind counts and no other
+NaaS stockroom's; taken out of the group, none. With demo data, the group *NaaS demo depot team* is
+installed (a `sys_user_group` record in the app's demo data) and the demo job makes `naas.inventory`
+its member and sets it on *Central Depot Utrecht* and *Staging Centre Utrecht*; if the system log
+says the group was not found, create it by that name and run the job again.
+
+**After an upgrade** from a version that had `x_daas_ham_stockroom_member`, the app no longer reads
+its rows: give each NaaS stockroom an *Assignment group* holding its techs.
 
 ### Inventory tech access
 
 Also after upgrading an existing install. The ACLs that `security/acls*.now.ts` give `broadStaff`
 (agreements, subscription lines, catalog entries, site templates, fee events, attestations, leases,
-OEM coverage and cloud accounts, model data, device events, reconciliation exceptions, stockroom
-members, ...) no longer list `x_daas_ham.inventory_tech` in `sys_security_acl_role`. Impersonating
-an inventory-tech-only user, the Agreements list is denied, other stockrooms' blind counts and site
+OEM coverage and cloud accounts, model data, device events, reconciliation exceptions, ...) no
+longer list `x_daas_ham.inventory_tech` in `sys_security_acl_role`. Impersonating an
+inventory-tech-only user, the Agreements list is denied, other stockrooms' blind counts and site
 audits are not listed, and in the warehouse app receiving one returned unit of a multi-unit site
 package keeps its subscription line active, receiving the last one ends it, and a late one records
 the late-return fee. Impersonating a field-tech-only user, the warehouse app offers only Audit and
@@ -254,18 +300,17 @@ already fills (in none of the tech's stockrooms) is refused with the overlap rea
 ### Hardware ACLs on `alm_asset`
 
 `sys_security_acl` holds no record ACL (one with no field) of the app on `alm_hardware`; its field
-ACLs there are on the app's own columns. The records keyed
-`acl_alm_hardware_read_staff` and `acl_alm_hardware_read_customer` (`keys.ts`) name `alm_asset`,
-with *Applies To* `sys_class_name=alm_hardware`, and **after an upgrade** they were moved there,
-not copied. Beside them, the row check keyed `acl_alm_asset_read_scope` is a Deny-Unless read ACL
+ACLs there are on the app's own columns. The records keyed `acl_alm_hardware_read_staff` and
+`acl_alm_hardware_read_customer` (`keys.ts`) name `alm_asset`, with *Applies To*
+`sys_class_name=alm_hardware`, and **after an upgrade** they were moved there, not copied. Beside them, the row check keyed `acl_alm_asset_read_scope` is a Deny-Unless read ACL
 with no role, whose script is a function of the app's module. A user with no NaaS role (the service
 desk, an IT asset manager) reads hardware, fleet assets included, as the platform's ACLs allow,
-except the app's Provider columns (support cost, claim code, Lessor, lease), which only provider
-staff read.
+except the app's Provider columns (support cost, claim code, lease), which only provider staff
+read.
 
 ### Row checks
 
-`security/acls-visibility.now.ts`. Impersonating an inventory-tech-only user assigned to one
+`shared/visibility.now.ts`. Impersonating an inventory-tech-only user assigned to one
 stockroom, the list `alm_hardware_list.do?sysparm_query=sys_id=<fleet asset of another
 stockroom>^NQsys_id=<fleet asset of theirs>` shows only their unit, with a *rows removed by
 security constraints* gap: the Deny-Unless check on `alm_asset` applies to an `alm_hardware` record
@@ -276,19 +321,19 @@ with such gaps (ADR 0005). A New form of an Audit or a Staging task opens.
 
 ### Changes to hardware by hand
 
-ADR 0005, `security/acls-hardware.now.ts`. Impersonating an inventory-tech-only user, a fleet asset
-of their stockroom saves, but its company, cost, Agreement, subscription line, lease, Lessor, Legal
-owner and Fleet are read-only, the form offers no Delete, and `DELETE
+ADR 0005, `fleet/access.now.ts`. Impersonating an inventory-tech-only user, a fleet asset
+of their stockroom saves, but its company, cost, Agreement, subscription line, lease, Legal owner
+and Fleet are read-only, the form offers no Delete, and `DELETE
 /api/now/table/alm_hardware/<id>` is refused; a list edit of cost on `alm_asset_list.do` is refused
 on a fleet row; a laptop outside the fleet saves, deletes and takes a new company and cost as
 before. An asset manager changes a fleet asset's company and cost; only an app administrator
 deletes one. A consumable's cost is still writable as before. Impersonating a Customer contact who
 also holds `sn_customerservice.customer`, `GET /api/now/table/alm_hardware/<their fleet asset>`
-returns no cost, support cost, claim code, Lessor or lease, and a Shipment returns no cost.
+returns no cost, support cost, claim code or lease, and a Shipment returns no cost.
 
 ### Customer creates
 
-`security/acls.now.ts`. As a customer admin, `POST /api/now/table/x_daas_ham_order` for another
+`orders/access.now.ts`, `returns/access.now.ts`. As a customer admin, `POST /api/now/table/x_daas_ham_order` for another
 Customer and `POST /api/now/table/x_daas_ham_order_line` are refused; a `POST` of a Return order
 for another Customer is refused (this confirms the create rule sees the posted values); the
 customer page's *Return selected* and the two record producers still work. As a service desk
@@ -298,7 +343,7 @@ producer opens the Return it raised.
 
 ### REST access for customer users
 
-`logic/rest.now.ts`, `security/rest-acls.now.ts`. In *System Web Services > Scripted REST APIs >
+`shared/rest-api.now.ts`, `shared/rest-acls.now.ts`. In *System Web Services > Scripted REST APIs >
 NaaS asset management*, the routes `/sites`, `/racks`, `/racks/{id}` and the five `/customer/...`
 routes have *Requires SNC Internal role* off and the ACLs *Scripted REST External Default* and
 *x_daas_ham NaaS customer routes*. The latter is an execute REST_Endpoint ACL with the roles
@@ -357,6 +402,14 @@ An Order is submitted only when its user passes the Order create rule (`GlideRec
 The daily job *NaaS - raise refresh orders* relies on its *Run as* user (expected to be the system
 user) passing it; one without an Order raiser role leaves its refresh Orders as drafts with the
 work note *You may not raise orders*.
+
+### On-site work links
+
+ADR 0018; not run on an instance. Shipping an Order with an engineer install opens a change whose
+*Parent* is the Order and a work order whose *Initiated from* is the Order and whose *Parent* is the
+change; closing that work order complete confirms the install. A work order the Provider's IT
+initiated from another task (an incident, say) is left alone: closing it runs nothing of the app's,
+and its planned dates are not checked.
 
 ### Units that leave in transit
 

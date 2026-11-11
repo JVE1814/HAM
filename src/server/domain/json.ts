@@ -45,9 +45,3 @@ export function isoDate(value: unknown): string | undefined {
     const match = raw.match(/^(\d{4}-\d{2}-\d{2})/)
     return match && isIsoDate(match[1]) ? match[1] : undefined
 }
-
-export function chunks<T>(items: readonly T[], size: number): T[][] {
-    const out: T[][] = []
-    for (let i = 0; i < items.length; i += Math.max(1, size)) out.push(items.slice(i, i + Math.max(1, size)))
-    return out
-}

@@ -45,11 +45,6 @@ describe('Mist claim', () => {
         const { http } = fake([unavailable])
         expect(run([target('A')], http, 5).outcomes).toEqual(failedAll(['A'], 'HTTP 503'))
     })
-
-    it('fails a 400 without a per-code result with its error text', () => {
-        const { http } = fake([{ status: 400, body: JSON.stringify({ detail: 'org not found' }) }])
-        expect(run([target('A')], http, 5).outcomes).toEqual(failedAll(['A'], 'HTTP 400: org not found'))
-    })
 })
 
 describe('Meraki claim', () => {

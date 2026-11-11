@@ -1,21 +1,33 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { naasStockroomType, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
+import { messageOf } from '../domain/errors.ts'
+import { LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import type { Stage } from '../domain/lifecycle.ts'
-import { isClaimable, stockQueries, type StockCandidate, type StockScope, type StockUnit } from '../domain/sourcing.ts'
+import { LOCK } from '../domain/lock-names.ts'
+import {
+    candidateLimit,
+    isClaimable,
+    stockQueries,
+    type StockCandidate,
+    type StockScope,
+    type StockUnit,
+} from '../domain/sourcing.ts'
 import { moveAsset, readStage } from './assets.ts'
-import { withLockTries, type HeldLock } from './locks.ts'
-import { bool, refusal, str } from './records.ts'
+import { attemptLock, type LockRun } from './locks.ts'
+import { PROPERTY, stringProperty } from './properties.ts'
+import { refusal, str } from './records.ts'
+import { STOCK_STAGES } from '../domain/lifecycle.ts'
 
-/** Stock that can serve an Order line, claiming it for one, and changing it where a claim could race. */
+/** Stock that can serve an Order line, claiming it for one, giving it back, and changing it where a claim could race. */
 
 /**
- * Stock on no Order line that may serve `scope` (domain/sourcing `stockQueries`): up to `limit` per Source, by
- * stockroom then sys_id so the limit cuts the same way each run. A hot spare linked to a line stays in the pool but
- * is taken.
+ * Stock on no Order line that may serve `scope` for a `shortfall`, each unit under the Source whose query found it
+ * (domain/sourcing `stockQueries`): a bounded number per Source (`candidateLimit`), by stockroom then sys_id so the
+ * limit cuts the same way each run. A hot spare linked to a line stays in the pool but is taken.
  */
-export function stockCandidates(scope: StockScope, limit: number): StockCandidate[] {
+export function stockCandidates(scope: StockScope, shortfall: number): StockCandidate[] {
+    const limit = candidateLimit(shortfall)
     const candidates: StockCandidate[] = []
-    for (const query of stockQueries(scope)) {
+    for (const { source, query } of stockQueries(scope)) {
         const asset = new GlideRecord('alm_hardware')
         asset.addEncodedQuery(query)
         asset.orderBy('stockroom')
@@ -23,39 +35,10 @@ export function stockCandidates(scope: StockScope, limit: number): StockCandidat
         asset.setLimit(limit)
         asset.query()
         while (asset.next()) {
-            const candidate = candidateOf(asset, scope.modelId)
-            if (candidate) candidates.push(candidate)
+            candidates.push({ assetId: asset.getUniqueValue(), modelId: scope.modelId, stockroomId: str(asset, 'stockroom'), source })
         }
     }
     return candidates
-}
-
-/**
- * The Asset as sourcing weighs it, or null when it is no stock: not available or in a spare pool, or in a stockroom
- * with no NaaS stockroom type (ADR 0016), which the queries leave out too.
- */
-function candidateOf(asset: GlideRecord, modelId: string): StockCandidate | null {
-    const stage = readStage(asset)
-    if (stage !== 'available' && stage !== 'spare_pool') return null
-    const stockroomType = naasStockroomType(str(asset, `stockroom.${STOCKROOM_TYPE_FIELD}`))
-    if (!stockroomType) return null
-    const atCustomerSite = stockroomType === 'customer_site'
-    const pooledFor = stage === 'spare_pool' ? str(asset, 'company') : ''
-    return {
-        assetId: asset.getUniqueValue(),
-        modelId,
-        stage,
-        stockroomId: str(asset, 'stockroom'),
-        stockroomType,
-        reservedFor: atCustomerSite ? str(asset, 'stockroom.x_daas_ham_customer') : pooledFor,
-        siteId: atCustomerSite ? stockroomSite(asset) : '',
-    }
-}
-
-/** The Site the Asset's stockroom stands at: its location when that is a Site, else the Site of the Room it is in. */
-function stockroomSite(asset: GlideRecord): string {
-    const location = str(asset, 'stockroom.location')
-    return bool(asset, 'stockroom.location.x_daas_ham_is_site') ? location : str(asset, 'stockroom.location.parent')
 }
 
 export interface Reservation {
@@ -69,7 +52,7 @@ export interface Reservation {
  * free or the save is refused (see `claim`).
  */
 export function reserveAsset(assetId: string, reservation: Reservation): GlideRecord | null {
-    return claim(assetId, { from: ['available', 'spare_pool'], to: 'reserved', values: lineValues(reservation) })
+    return claim(assetId, { from: STOCK_STAGES, to: 'reserved', values: lineValues(reservation) })
 }
 
 /**
@@ -77,7 +60,7 @@ export function reserveAsset(assetId: string, reservation: Reservation): GlideRe
  * in the pool and is installed from where it is. Null when it is no longer free or the save is refused (see `claim`).
  */
 export function linkHotSpare(assetId: string, reservation: Reservation): GlideRecord | null {
-    return claim(assetId, { from: ['available', 'spare_pool'], to: 'spare_pool', values: lineValues(reservation) })
+    return claim(assetId, { from: STOCK_STAGES, to: 'spare_pool', values: lineValues(reservation) })
 }
 
 /**
@@ -97,6 +80,26 @@ function lineValues(reservation: Reservation): Record<string, string> {
     }
 }
 
+/**
+ * Take a unit off its Order line and no more (the caller saves): one that stays its Customer's (a hot spare, a unit
+ * that failed staging or left in transit). Every unit that leaves a line is taken off it here or by
+ * `releaseToProviderStock`.
+ */
+export function takeOffOrderLine(asset: GlideRecord): void {
+    asset.setValue('x_daas_ham_order_line', '')
+}
+
+/**
+ * Give a unit back to Provider stock, the inverse of a reservation (`lineValues`): it is the Provider's own again
+ * (its company, ADR 0006), under no Agreement and on no Order line. Sets the fields only: the caller moves the Asset to
+ * the stage it goes back to and saves it, each with its own answer to a refusal.
+ */
+export function releaseToProviderStock(asset: GlideRecord): void {
+    takeOffOrderLine(asset)
+    asset.setValue('company', stringProperty(PROPERTY.providerCompany))
+    asset.setValue('x_daas_ham_agreement', '')
+}
+
 /** A claim: the stages the Asset may be in, the stage it moves to, and the values it takes. */
 interface Claim {
     from: readonly Stage[]
@@ -112,52 +115,41 @@ interface Claim {
  * read and one save, and the unit then counts as short just as one another run claimed.
  */
 function claim(assetId: string, wanted: Claim): GlideRecord | null {
-    let claimed: GlideRecord | null = null
-    underStockLock(assetId, 1, 'claimed', (asset, lock) => {
-        claimed = asset && claimHolding(lock, asset, wanted)
-    })
-    return claimed
+    const claimed = underStockLock(assetId, 1, 'claimed', (asset, lock) => asset && claimHolding(lock, asset, wanted))
+    return claimed.ran ? claimed.value : null
 }
-
-/**
- * Tries at an Asset's stock lock for a change someone waits on (a put-away scan, a lease return): a claim holds it for
- * one read and one save.
- */
-const CHANGE_TRIES = 5
 
 /**
  * Change an in-stock Asset that a claim could take meanwhile (withdrawing it for its Lessor, putting it away), under
  * the lock claims take, so a claim lands wholly before `change` reads the Asset or after it saves. `change` gets the
  * Asset read afresh there (null when it is gone), to check again before it saves; a holder that outlasts the lock (ADR
- * 0013) may overlap a claim, so it saves only while `lock.held()`. False when other holders kept the lock through every
- * try, or it could not be taken (logged with `what`): `change` did not run. Its own errors escape.
+ * 0013) may overlap a claim, so it saves through `lock`. What `change` returned, or `ran: false` when other holders
+ * kept the lock through every try (a claim holds it for one read and one save, and someone waits on the change), or
+ * it could not be taken (logged with `what`): `change` did not run. Its own errors escape.
  */
-export function changeStock(assetId: string, what: string, change: StockWork): boolean {
-    return underStockLock(assetId, CHANGE_TRIES, what, change)
+export function changeStock<T>(assetId: string, what: string, change: StockWork<T>): LockRun<T> {
+    return underStockLock(assetId, LOCK_TRIES, what, change)
 }
 
 /** Work on an Asset read afresh holding its stock `lock`; null when the Asset is gone. */
-type StockWork = (asset: GlideRecord | null, lock: HeldLock) => void
+type StockWork<T> = (asset: GlideRecord | null, lock: HeldLock) => T
 
 /**
- * Run `work` holding the Asset's stock lock (`reserve_asset_<sys_id>`), which every claim and every change a claim
- * could race takes. Taking the lock throws only when an insert is refused with no lock row (platform/locks); that is
- * logged as the Asset not `what`, and it is left as it is.
+ * Run `work` holding the Asset's stock lock, which every claim and every change a claim could race takes. A lock that
+ * cannot be taken (the insert is refused with no lock row, platform/locks) is logged as the Asset not `what`, and it is
+ * left as it is.
  */
-function underStockLock(assetId: string, tries: number, what: string, work: StockWork): boolean {
-    let started = false
-    try {
-        return withLockTries(`reserve_asset_${assetId}`, tries, (lock) => {
-            started = true
+function underStockLock<T>(assetId: string, tries: number, what: string, work: StockWork<T>): LockRun<T> {
+    const attempt = attemptLock(
+        LOCK.reserveAsset(assetId),
+        (lock) => {
             const asset = new GlideRecord('alm_hardware')
-            work(asset.get(assetId) ? asset : null, lock)
-        })
-    } catch (error) {
-        // An error from the work itself is the caller's to report; one from taking the lock leaves the Asset as it is.
-        if (started) throw error
-        gs.warn(`[x_daas_ham] Asset ${assetId} not ${what}: ${error instanceof Error ? error.message : String(error)}`)
-        return false
-    }
+            return work(asset.get(assetId) ? asset : null, lock)
+        },
+        tries,
+    )
+    if (!attempt.ran && !attempt.held) gs.warn(`[x_daas_ham] Asset ${assetId} not ${what}: ${messageOf(attempt.error)}`)
+    return attempt
 }
 
 /**
@@ -171,12 +163,13 @@ function claimHolding(lock: HeldLock, asset: GlideRecord, wanted: Claim): GlideR
     if (!isClaimable(stockUnit(asset), wanted.from)) return null
     if (!moveAsset(asset, wanted.to).allowed) return null
     for (const [field, value] of Object.entries(wanted.values)) asset.setValue(field, value)
-    if (!lock.held()) return lockLost(assetId)
-    if (!asset.update()) {
+    const saved = lock.write(() => asset.update())
+    if (!saved.written) return lockLost(assetId)
+    if (!saved.value) {
         gs.warn(`[x_daas_ham] Asset ${str(asset, 'serial_number') || assetId} not claimed as ${wanted.to}: ${refusal(asset)}`)
         return null
     }
-    if (lock.held()) return asset
+    if (!saved.lockLost) return asset
     const fresh = new GlideRecord('alm_hardware')
     return fresh.get(assetId) && shows(fresh, wanted) ? fresh : lockLost(assetId)
 }

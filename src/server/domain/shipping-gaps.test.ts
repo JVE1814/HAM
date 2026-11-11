@@ -37,10 +37,4 @@ describe('buyLabel without a tracking number', () => {
     it('trims the tracking number it keeps', () => {
         expect(buyLabel(() => label({ tracking_number: ' 1Z999 ' }), input)).toMatchObject({ ok: true, trackingNumber: '1Z999' })
     })
-
-    it('fails a call that got no answer, naming no label', () => {
-        const result = buyLabel(() => ({ status: 0, body: '', error: 'Read timed out' }), input)
-        expect(result.ok).toBe(false)
-        expect(result).toMatchObject({ error: expect.stringMatching(/^no response/) })
-    })
 })

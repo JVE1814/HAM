@@ -9,7 +9,6 @@ export interface Marks<T> {
 }
 
 export function createMarks<T>(): Marks<T> {
-    // One entry per `during` still running, so an item marked twice is listed twice.
     const marked: T[] = []
     return {
         during(item, run) {

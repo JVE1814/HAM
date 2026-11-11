@@ -1,490 +1,58 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
-import { GlideRecord, gs } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { normalizeSerial, receiveSerialLockName } from '../domain/asn.ts'
-import { naasStockroomType, receiptProblem, STOCKROOM_TYPE_FIELD } from '../domain/fleet.ts'
-import type { StockroomType } from '../domain/sourcing.ts'
+import type { StockroomList } from '../domain/rest-contracts.ts'
 import { ROLE } from '../domain/visibility.ts'
-import {
-    allocationProblem,
-    awaitsReceipt,
-    putAwayProblem,
-    RECEIVING_STOCKROOM_TYPES,
-    receivingProblem,
-    type ReceivingLine,
-} from '../domain/warehouse.ts'
-import {
-    fleetCandidate,
-    identifyAsset,
-    isFleetAsset,
-    joinFleet,
-    moveAndSave,
-    moveAsset,
-    newAsset,
-    readStage,
-    type AssetIdentified,
-    type IdentifierLookup,
-} from '../platform/assets.ts'
-import { beyondVisibility } from '../platform/beyond-visibility.ts'
-import { lineAssetStages } from '../platform/fulfilment.ts'
-import { withLock, type HeldLock } from '../platform/locks.ts'
-import { loadNormalizationData, resolveModel } from '../platform/normalization.ts'
-import { PROPERTY, stringProperty } from '../platform/properties.ts'
-import { lineAwaitingRma } from '../platform/oem-rma.ts'
-import { purchaseOrderId } from '../platform/procurement.ts'
-import { findById, num, refusal, str } from '../platform/records.ts'
-import { openStagingTask } from '../platform/staging-tasks.ts'
-import { changeStock, reserveAsset } from '../platform/stock.ts'
-import { nextProviderTag } from '../platform/tags.ts'
-import { resourceOrder, withOrderLineLock } from './orders.ts'
-import { receiveReturnedAsset } from './returns.ts'
-import { reply } from '../platform/rest-api.ts'
+import { assetSummary, lookUp, pick, putAway, receive, receivingStockrooms, type Scan, type ScanRefusal } from '../platform/receiving.ts'
+import { pathParam, reply, requireRole, requireScanner, textBodyOf } from '../platform/rest-api.ts'
 
-/** Warehouse scanning API used by the warehouse React app (P1.5). */
+/** Warehouse scanning API used by the warehouse React app (P1.5): platform/receiving. */
 
-interface AssetSummary {
-    id: string
-    serial: string
-    providerTag: string
-    customerTag: string
-    model: string
-    pid: string
-    stage: string
-    stockroom: string
-    customer: string
-    orderLine: string
+const REFUSAL_STATUS: Record<ScanRefusal['reason'], number> = {
+    invalid: 400,
+    unknown: 404,
+    conflict: 409,
+    refused: 422,
+    busy: 503,
 }
 
-function summarise(asset: GlideRecord): AssetSummary {
-    return {
-        id: asset.getUniqueValue(),
-        serial: str(asset, 'serial_number'),
-        providerTag: str(asset, 'asset_tag'),
-        customerTag: str(asset, 'x_daas_ham_customer_tag'),
-        model: asset.getDisplayValue('model'),
-        pid: str(asset, 'model.x_daas_ham_oem_pid'),
-        stage: readStage(asset) ?? 'unknown',
-        stockroom: asset.getDisplayValue('stockroom'),
-        customer: asset.getDisplayValue('company'),
-        orderLine: asset.getDisplayValue('x_daas_ham_order_line'),
-    }
+function answer(response: RESTAPIResponse, scan: Scan): void {
+    if ('asset' in scan) return reply(response, 200, assetSummary(scan.asset))
+    reply(response, REFUSAL_STATUS[scan.reason], { error: scan.why })
 }
 
 /** Receive, put away, pick and the stockroom list are depot work: inventory techs (asset managers and admins too). */
 function allowed(response: RESTAPIResponse): boolean {
-    if (gs.hasRole(ROLE.inventoryTech)) return true
-    reply(response, 403, { error: 'Requires the inventory tech role' })
-    return false
-}
-
-/** A look-up only reads the Asset, so field techs, who read every Asset, may look up too. */
-function allowedLookup(response: RESTAPIResponse): boolean {
-    if (gs.hasRole(ROLE.inventoryTech) || gs.hasRole(ROLE.fieldTech)) return true
-    reply(response, 403, { error: 'Requires the inventory tech or field tech role' })
-    return false
-}
-
-/** The stockroom, if the user may see it (the stockroom visibility rule applies to this lookup). */
-function visibleStockroom(stockroomId: string | undefined): GlideRecord | null {
-    return findById('alm_stockroom', stockroomId ?? '')
-}
-
-/** The stockroom's NaaS type, or null outside NaaS: a stockroom with no type is the Provider IT's (ADR 0016). */
-function stockroomType(stockroom: GlideRecord): StockroomType | null {
-    return naasStockroomType(str(stockroom, STOCKROOM_TYPE_FIELD))
-}
-
-/** A visible stockroom with no stockroom type is the Provider IT's: no NaaS unit is received or put away there. */
-const NOT_NAAS_STOCKROOM = 'Choose a NaaS stockroom: this one has no stockroom type'
-
-function body(request: RESTAPIRequest): Record<string, string> {
-    const data = request.body.data as Record<string, unknown> | null
-    return Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [k, String(v ?? '').trim()]))
+    return requireRole(response, [ROLE.inventoryTech], 'Requires the inventory tech role')
 }
 
 /**
- * The fleet asset a scanned code names (platform/assets `identifyAsset`: serial, else Provider tag, else Customer tag),
- * or why it is not used: none carries it (404), or two do, as two Customers may share a Customer tag (409).
+ * GET /assets/{code}: look a fleet asset up by serial, Provider tag or Customer tag (not the Provider IT's). A look-up
+ * only reads the Asset, so field techs, who read every Asset, may look up too.
  */
-function scannedAsset(code: string): { asset: GlideRecord } | Unsaved {
-    return scanned(identifyAsset(code)) ?? NOT_FOUND
-}
-
-/** An identifier lookup as a scan reads it: the Asset, an ambiguous code refused (409), or null when none carries it. */
-function scanned(identified: AssetIdentified): { asset: GlideRecord } | Unsaved | null {
-    if (identified && 'ambiguous' in identified) return { status: 409, error: identified.ambiguous }
-    return identified
-}
-
-/** GET /assets/{code}: look a fleet asset up by serial, Provider tag or Customer tag (not the Provider IT's). */
 export function lookupAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
-    if (!allowedLookup(response)) return
-    const found = scannedAsset(String(request.pathParams.code ?? ''))
-    if ('error' in found) return refuse(response, found)
-    reply(response, 200, summarise(found.asset))
+    if (!requireScanner(response)) return
+    answer(response, lookUp(pathParam(request, 'code')))
 }
 
-/**
- * POST /receive { code, stockroom, pid?, manufacturer? }: confirm an in-transit asset (ASN) or create
- * one received without an ASN; tag it and allocate it to an Order line waiting for this purchase.
- *
- * Every unit received is a fleet asset (ADR 0016). One the app created (an ASN row, a first scan) already is; one
- * Procurement created on order for a purchase order joins the fleet as it is received (domain/fleet `receiptProblem`).
- * Any other Asset outside the fleet is the Provider IT's and is refused, and its serial is never given a second Asset.
- *
- * Two scans of one unit (two devices, or a rescan while the first is still running) would both find it awaiting
- * receipt, each take a Provider tag and allocate it. So the receipt is made under a lock on the Asset, from a fresh
- * read; a scan that finds the lock held saves nothing and is told to scan again, and the rescan finds it received.
- * Two first scans of one unknown serial would both create its Asset, so that is done under a lock on the serial the
- * same way. A unit for a waiting Order line is also received, reserved and staged under the line's lock
- * (`receiveHolding`), and given to it only while the line, read again there, still waits and has room on an Order
- * neither cancelled nor rejected (`allocateHolding`). Taking a lock throws only when an insert is refused with no lock
- * row (platform/locks); that error escapes.
- */
 export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    const input = body(request)
+    const input = textBodyOf(request)
     if (!input.code || !input.stockroom) return reply(response, 400, { error: 'code and stockroom are required' })
-
-    const stockroom = visibleStockroom(input.stockroom)
-    if (!stockroom) return reply(response, 400, { error: 'Choose one of your stockrooms' })
-    // A visible stockroom may be a customer site (asset managers see them all); units arrive only at the Provider's own.
-    const type = stockroomType(stockroom)
-    const wrongStockroom = type ? receivingProblem(type) : NOT_NAAS_STOCKROOM
-    if (wrongStockroom) return reply(response, 400, { error: wrongStockroom })
-
-    // Arriving units (bought or returned) sit in none of the user's stockrooms yet, so the lookup goes past the stockroom
-    // rule; only those stages are received below, never stock held elsewhere. It finds the Provider IT's Assets too, so
-    // a serial IT holds is refused below rather than given a second Asset. A code two Assets carry is refused (409).
-    let found = scanned(identifyAsset(input.code, ARRIVING))
-    if (!found) {
-        if (!input.pid) return reply(response, 404, { error: 'Unknown serial: scan the PID too to receive without an ASN' })
-        found = createReceivedAsset(input)
-    }
-    if ('error' in found) return refuse(response, found)
-    const assetId = found.asset.getUniqueValue()
-    // Not the stock lock (platform/stock) the allocation's reservation takes: a second take of a lock is refused.
-    const taken = withLock(`receive_asset_${assetId}`, (lock) => {
-        receiveHolding(lock, response, assetId, input.stockroom)
-    })
-    if (!taken) refuse(response, SCAN_AGAIN)
+    answer(response, receive({ code: input.code, pid: input.pid, manufacturer: input.manufacturer }, input.stockroom))
 }
 
-/** Why a receipt saved nothing: the HTTP status and error it answers with. */
-interface Unsaved {
-    status: number
-    error: string
-}
-
-const SCAN_AGAIN: Unsaved = { status: 503, error: 'Another scan is receiving this unit: scan again' }
-
-const LINE_BUSY: Unsaved = { status: 503, error: 'Its order line is being sourced, received or cancelled: scan again' }
-
-const STOCK_BUSY: Unsaved = { status: 503, error: 'This unit is being reserved or moved: scan again' }
-
-const NOT_FOUND: Unsaved = { status: 404, error: 'No fleet asset with that serial or tag' }
-
-/** How a receipt looks a unit up: past the stockroom rule, the Provider IT's Assets too (see `receiveAsset`). */
-const ARRIVING: IdentifierLookup = { beyondVisibility: true, includeNonFleet: true }
-
-function refuse(response: RESTAPIResponse, unsaved: Unsaved): void {
-    reply(response, unsaved.status, { error: unsaved.error })
-}
-
-/** The receipt, made holding the Asset's `lock`: the stage is read again here, so only one scan receives the unit. */
-function receiveHolding(lock: HeldLock, response: RESTAPIResponse, assetId: string, stockroomId: string): void {
-    const asset = arrivingAsset(assetId)
-    if (!asset) return refuse(response, NOT_FOUND)
-    const stage = readStage(asset)
-    // Outside the fleet, only a unit awaiting receipt is taken in, joining the fleet with this receipt's save; any
-    // other is the Provider IT's (ADR 0016) and never reaches the returns process below.
-    const outsideFleet = receiptProblem(fleetCandidate(asset), awaitsReceipt(stage))
-    if (outsideFleet) return reply(response, 409, { error: `Not received: ${outsideFleet}` })
-    if (!isFleetAsset(asset)) joinFleet(asset)
-    // A unit coming back from a Site is received ('') or refused, staying pending return (or missing) for a rescan, and
-    // its unsaved move is not shown. Any other unit (null) is received as stock below.
-    const returnRefusal = receiveReturnedAsset(asset, stockroomId)
-    if (returnRefusal) return reply(response, 422, { error: `Not received: ${returnRefusal}` })
-    if (returnRefusal === '') return reply(response, 200, summarise(asset))
-    if (!awaitsReceipt(stage) || !moveAsset(asset, 'available').allowed) {
-        // Found past the stockroom rule: a unit held in a stockroom the user cannot see is not described to them.
-        if (!findById('alm_hardware', assetId)) return refuse(response, NOT_FOUND)
-        return reply(response, 409, { error: `Not awaiting receipt (${stage ?? 'unknown stage'})` })
-    }
-    const tag = str(asset, 'asset_tag') || nextProviderTag()
-    if (!tag) return reply(response, 503, { error: 'Other receipts are taking Provider tags: scan again' })
-    asset.setValue('asset_tag', tag)
-    asset.setValue('stockroom', stockroomId)
-    const waiting = waitingLine(asset)
-    if (!waiting) {
-        const unsaved = saveReceipt(lock, asset)
-        return unsaved ? refuse(response, unsaved) : reply(response, 200, summarise(asset))
-    }
-    // Saved, taken off order, reserved and staged under the line's lock, where sourcing counts the line's units and
-    // on-order count and a cancel of its Order releases them (entry/orders), so each sees all of the receipt or none of
-    // it. A scan that cannot take it is told to scan again and saves nothing, so the rescan finds the unit still
-    // awaiting receipt.
-    const lineId = waiting.line.getUniqueValue()
-    // Set inside the line's lock.
-    let received = LINE_BUSY as Unsaved | Allocation
-    withOrderLineLock(lineId, (lineLock) => {
-        received = saveReceipt(lock, asset) ?? allocateHolding(lineLock, asset, waiting)
-    })
-    if ('error' in received) return refuse(response, received)
-    // Received as free stock: the line it was found for no longer waits for it (logged).
-    if ('leftFree' in received) return reply(response, 200, summarise(asset))
-    if (!received.reserved) {
-        // The receipt is saved; the reservation is not, so no Staging task opens. Off order and not allocated, the
-        // line is a unit short, so its Order is sourced again: a sourcing run's stock pick, made outside the line's
-        // lock, may have taken the unit between its save and its reservation. Read again for the reply: a run that
-        // claimed the unit first has put it on its own line.
-        resourceOrder(str(waiting.line, 'order'))
-        return reply(response, 200, summarise(findById('alm_hardware', assetId) ?? asset))
-    }
-    reply(response, 200, summarise(received.reserved))
-}
-
-/** Save the receipt holding the Asset's `lock`: null once saved, or why not. */
-function saveReceipt(lock: HeldLock, asset: GlideRecord): Unsaved | null {
-    // A holder that outlasted the lock (ADR 0013) may overlap the next scan's receipt: it saves only while it holds it.
-    if (!lock.held()) return SCAN_AGAIN
-    // A refused save leaves the unit in transit or on order for a rescan, and allocates nothing.
-    return asset.update() ? null : { status: 422, error: `Not received: ${refusal(asset)}` }
-}
-
-/**
- * The Asset read again by sys_id, past the stockroom rule as the scan's lookup was (see `receiveAsset`). The receipt's
- * saves run the lifecycle, billing and asset-CI rules.
- */
-function arrivingAsset(assetId: string): GlideRecord | null {
-    const asset = new GlideRecord('alm_hardware')
-    asset.addQuery('sys_id', assetId)
-    beyondVisibility(asset, () => asset.query())
-    return asset.next() ? asset : null
-}
-
-/**
- * The Asset of an unknown serial scanned with its PID. The check that no Asset has the serial and the insert are made
- * under a lock on the serial (domain/asn `receiveSerialLockName`), checking again there, so two first scans of one
- * unit, or a scan and its ASN row, create it once; a scan that finds the lock held is told to scan again, and the
- * rescan finds the Asset by serial.
- */
-function createReceivedAsset(input: Record<string, string>): { asset: GlideRecord } | Unsaved {
-    const resolution = resolveModel({ manufacturer: input.manufacturer ?? '', model: input.pid }, loadNormalizationData())
-    const modelId = resolution.modelId
-    if (!modelId) return { status: 422, error: `PID ${input.pid} does not map to a model` }
-    const serial = normalizeSerial(input.code)
-    // Set inside the serial's lock, which an ASN row for the serial takes too (entry/imports).
-    let created = SCAN_AGAIN as { asset: GlideRecord } | Unsaved
-    withLock(receiveSerialLockName(serial), (lock) => {
-        // Any Asset with the serial, the Provider IT's too: the receipt refuses it rather than create a second one.
-        created = scanned(identifyAsset(input.code, ARRIVING)) ?? insertReceivedAsset(lock, modelId, serial)
-    })
-    return created
-}
-
-/**
- * Insert the Asset holding the serial's `lock`: a holder that outlasted it (ADR 0013) leaves it to the next scan. Made
- * by `newAsset`, it is a fleet asset the Provider owns.
- */
-function insertReceivedAsset(lock: HeldLock, modelId: string, serial: string): { asset: GlideRecord } | Unsaved {
-    if (!lock.held()) return SCAN_AGAIN
-    const asset = newAsset(modelId, 'on_order')
-    asset.setValue('serial_number', serial)
-    asset.setValue('company', stringProperty(PROPERTY.providerCompany))
-    if (!asset.insert()) return { status: 422, error: `Not received: ${refusal(asset)}` }
-    if (!lock.held()) gs.warn(`[x_daas_ham] Asset ${serial} created after its lock was lost: check it exists once`)
-    return { asset }
-}
-
-/** An Order line waiting for a received unit, with the OEM RMA the unit replaces under ('' for a purchase). */
-interface WaitingLine {
-    line: GlideRecord
-    rmaId: string
-}
-
-/**
- * The Order line a received purchase (or OEM advance replacement, announced with its RMA number in the PO field) goes
- * straight to, or null.
- */
-function waitingLine(asset: GlideRecord): WaitingLine | null {
-    const poNumber = str(asset, 'po_number')
-    if (!poNumber) return null
-    const line = new GlideRecord('x_daas_ham_order_line')
-    const viaRma = lineAwaitingRma(poNumber, str(asset, 'model'))
-    if (viaRma) return line.get(viaRma.lineId) ? { line, rmaId: viaRma.rmaId } : null
-    // A line lists every purchase order it raised, so units of an earlier one still find it.
-    const poId = purchaseOrderId(poNumber)
-    if (!poId) return null
-    line.addQuery('purchase_orders', 'CONTAINS', poId)
-    line.addQuery('model', str(asset, 'model'))
-    line.addQuery('line_stage', 'awaiting_stock')
-    line.setLimit(1)
-    line.query()
-    return line.next() ? { line, rmaId: '' } : null
-}
-
-/** What a saved receipt came to on its line: reserved for it (null when that was not saved), or left free stock. */
-type Allocation = { reserved: GlideRecord | null } | { leftFree: true }
-
-/**
- * Give the saved receipt to the line waiting for it, holding the line's `lineLock`: a purchase comes off its on-order
- * count, an advance replacement marks its RMA received, and the unit is reserved for the line (null when it is not,
- * logged) and staged (`stageReserved`). The line was found before its lock was taken, so it is read again here, with
- * its Order: one another receipt or a sourcing run filled since, that moved on, or whose Order was cancelled or
- * rejected (domain/warehouse `allocationProblem`), is left as it is and the unit stays free stock (logged), its RMA, if
- * any, still open and named.
- */
-function allocateHolding(lineLock: HeldLock, asset: GlideRecord, waiting: WaitingLine): Allocation {
-    const line = findById('x_daas_ham_order_line', waiting.line.getUniqueValue())
-    const problem = line ? allocationProblem(receivingLine(line)) : 'it no longer exists'
-    if (!line || problem) {
-        const unit = `${str(asset, 'serial_number')} left in stock, not given to ${str(waiting.line, 'number')}`
-        // The RMA number came in the PO field (`waitingLine`).
-        const rma = waiting.rmaId ? `; RMA ${str(asset, 'po_number')} left open, update it by hand` : ''
-        gs.warn(`[x_daas_ham] Received ${unit}: ${problem ?? ''}${rma}`)
-        return { leftFree: true }
-    }
-    if (waiting.rmaId) markReplacementReceived(waiting.rmaId, asset)
-    else takeOffOrder(lineLock, line)
-    // Received, the unit is free stock a sourcing run may pick too, so it is reserved the way sourcing claims stock:
-    // under the Asset's stock lock, from a fresh read (platform/stock). Only one of them gets it.
-    const reserved = reserveAsset(asset.getUniqueValue(), {
-        orderLineId: line.getUniqueValue(),
-        customerId: str(line, 'order.customer'),
-        agreementId: str(line, 'order.agreement'),
-    })
-    if (!reserved) {
-        const why = 'another run claimed it, or the save was refused'
-        gs.warn(`[x_daas_ham] Received ${str(asset, 'serial_number')} not reserved for ${str(line, 'number')}: ${why}`)
-        return { reserved: null }
-    }
-    return { reserved: stageReserved(lineLock, reserved, line) }
-}
-
-/** The line as `allocationProblem` judges it; its Assets are counted past the user's stockroom rule (ADR 0005). */
-function receivingLine(line: GlideRecord): ReceivingLine {
-    return {
-        stage: str(line, 'line_stage') as ReceivingLine['stage'],
-        orderStage: str(line, 'order.stage'),
-        quantity: num(line, 'quantity'),
-        allocated: lineAssetStages(line.getUniqueValue()).length,
-    }
-}
-
-function markReplacementReceived(rmaId: string, asset: GlideRecord): void {
-    const rma = findById('x_daas_ham_oem_rma', rmaId)
-    if (!rma) return
-    rma.setValue('state', 'replacement_received')
-    rma.setValue('replacement_serial', str(asset, 'serial_number'))
-    // The unit still goes to its line, which needs it; an RMA left open counts as a replacement still to come.
-    if (rma.update()) return
-    gs.warn(`[x_daas_ham] RMA ${str(rma, 'rma_number')} not marked replacement received: ${refusal(rma)}`)
-}
-
-/** Take a received purchase off the line's on-order count, on the line read afresh holding its `lineLock`. */
-function takeOffOrder(lineLock: HeldLock, line: GlideRecord): void {
-    // Arrived, so no longer on order: re-sourcing covers quantity - allocated - on order and must not wait for it.
-    // A refused count is logged to correct by hand; the unit still goes to the line, which would otherwise wait.
-    line.setValue('quantity_to_purchase', Math.max(0, num(line, 'quantity_to_purchase') - 1))
-    const number = str(line, 'number')
-    if (!line.update()) return void gs.warn(`[x_daas_ham] ${number} keeps a unit on order: ${refusal(line)}`)
-    // A holder that outlasted the lock (ADR 0013) may have counted beside a sourcing pass that took it over.
-    if (!lineLock.held()) gs.warn(`[x_daas_ham] ${number} counted after its lock was lost: check its On order count`)
-}
-
-/**
- * Stage a unit reserved on receipt for `line`, still holding its `lineLock`: a cancel of its Order, which takes the lock
- * (entry/orders `cancelOrder`), then finds the unit and its Staging task, or neither. The Asset as it now stands, for
- * the reply.
- */
-function stageReserved(lineLock: HeldLock, reserved: GlideRecord, line: GlideRecord): GlideRecord {
-    // Checked after each write: a holder that outlasted the lock (ADR 0013) may overlap a cancel that took it over, so
-    // it stages no further.
-    const lost = (what: string): boolean => {
-        if (lineLock.held()) return false
-        gs.warn(`[x_daas_ham] ${str(line, 'number')}: ${str(reserved, 'serial_number')} ${what} after the line's lock was lost: check it is still on the line`)
-        return true
-    }
-    // Without its Staging task the Asset stays reserved for the line, not staging with no task to finish. A refused
-    // move (moveAndSave warns) leaves it reserved too, so it is read again for the reply.
-    if (lost('reserved') || !openStagingTask(reserved, line.getUniqueValue()) || lost('given a Staging task')) return reserved
-    if (moveAndSave(reserved, 'staging', 'receiving')) lost('moved into staging')
-    else reserved.get(reserved.getUniqueValue())
-    return reserved
-}
-
-/**
- * POST /putaway { code, stockroom }: record the stockroom an in-stock asset now sits in, when it is free to move there.
- * A sourcing run or the spare-pool top-up may claim free stock between the check and the save, and a claimed unit stays
- * where its line expects it, so the put-away is made under the lock claims take, from a fresh read (platform/stock
- * `changeStock`). A scan that cannot take it is told to scan again and saves nothing.
- */
 export function putAwayAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    const input = body(request)
-    const stockroom = visibleStockroom(input.stockroom)
-    if (!stockroom) return reply(response, 400, { error: 'Choose one of your stockrooms' })
-    const type = stockroomType(stockroom)
-    if (!type) return reply(response, 400, { error: NOT_NAAS_STOCKROOM })
-    // A fleet asset only: the Provider IT's are not found.
-    const found = scannedAsset(input.code ?? '')
-    if ('error' in found) return refuse(response, found)
-    // Set inside the Asset's stock lock.
-    let putAway = STOCK_BUSY as Unsaved | { asset: GlideRecord }
-    changeStock(found.asset.getUniqueValue(), 'put away', (asset, lock) => {
-        putAway = asset ? putAwayHolding(lock, asset, stockroom, type) : NOT_FOUND
-    })
-    if ('error' in putAway) return refuse(response, putAway)
-    reply(response, 200, summarise(putAway.asset))
+    const input = textBodyOf(request)
+    answer(response, putAway(input.code ?? '', input.stockroom ?? ''))
 }
 
-/**
- * The put-away into `stockroom`, a NaaS stockroom of `type`, made holding the Asset's stock `lock` on its fresh read:
- * the Asset once saved, or why not.
- */
-function putAwayHolding(
-    lock: HeldLock,
-    asset: GlideRecord,
-    stockroom: GlideRecord,
-    type: StockroomType,
-): Unsaved | { asset: GlideRecord } {
-    const problem = putAwayProblem(readStage(asset), type)
-    if (problem) return { status: 409, error: problem }
-    // A holder that outlasted the lock (ADR 0013) may overlap a claim: it saves only while it holds it.
-    if (!lock.held()) return STOCK_BUSY
-    asset.setValue('stockroom', stockroom.getUniqueValue())
-    if (!asset.update()) return { status: 422, error: `Not put away: ${refusal(asset)}` }
-    return { asset }
-}
-
-/** POST /pick { code, order }: confirm a scanned fleet asset is a staged asset of this Order. */
 export function pickAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    const input = body(request)
-    const found = scannedAsset(input.code ?? '')
-    if ('error' in found) return refuse(response, found)
-    const asset = found.asset
-    const orderNumber = str(asset, 'x_daas_ham_order_line.order.number')
-    if (orderNumber !== input.order) {
-        return reply(response, 409, { error: orderNumber ? `Belongs to ${orderNumber}` : 'Not allocated to an order' })
-    }
-    if (readStage(asset) !== 'staged') return reply(response, 409, { error: `Not ready to ship (${readStage(asset)})` })
-    reply(response, 200, summarise(asset))
+    const input = textBodyOf(request)
+    answer(response, pick(input.code ?? '', input.order))
 }
 
-/** GET /stockrooms: stockrooms the user may receive into (visibility rules apply). */
 export function listStockrooms(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    const stockroom = new GlideRecord('alm_stockroom')
-    stockroom.addQuery('x_daas_ham_stockroom_type', 'IN', RECEIVING_STOCKROOM_TYPES.join(','))
-    stockroom.orderBy('name')
-    stockroom.setLimit(500)
-    stockroom.query()
-    const list: Array<{ id: string; name: string; type: string }> = []
-    while (stockroom.next()) {
-        list.push({ id: stockroom.getUniqueValue(), name: str(stockroom, 'name'), type: str(stockroom, 'x_daas_ham_stockroom_type') })
-    }
-    reply(response, 200, { stockrooms: list })
+    reply(response, 200, { stockrooms: receivingStockrooms() } satisfies StockroomList)
 }

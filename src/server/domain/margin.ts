@@ -1,16 +1,14 @@
 import { activeDays, divideRounded, fromCents, monthBounds, toCents, type MonthBounds } from './billing.ts'
 import { addDays, addMonths } from './calendar.ts'
 import { evenShare } from './leases.ts'
-import type { LegalOwner } from './lifecycle.ts'
+import { legalOwnerOf } from './lifecycle.ts'
+import type { CostType, LegalOwner } from './vocabulary.ts'
 
 /**
  * Cost facts and Margin per Customer and Site (plan §13 Margin / TCO, Q72), each in one currency: costs take their Agreement's (a
  * shipment's, its carrier's), and amounts of two currencies are never added (domain/billing `chooseCurrency`).
  */
 
-export type CostType = 'purchase' | 'lease' | 'oem_support' | 'field_labour' | 'shipping'
-
-/** What an Asset's Lease schedule charges, as stored on it. */
 export interface LeaseTerms {
     /** Lease schedule start and end, date or date-time; '' = open. */
     starts: string
@@ -23,10 +21,9 @@ export interface LeaseTerms {
     buyoutAssets: number
 }
 
-/** What an Asset's costs are worked out from, as stored on it. */
 export interface AssetCostFacts {
     /** As stored; '' counts as provider. */
-    legalOwner: LegalOwner
+    legalOwner: LegalOwner | ''
     purchaseCost: number
     /** '' when unknown. */
     purchaseDate: string
@@ -53,7 +50,7 @@ export function serviceIntervalCosts(
 ): Array<Pick<CostEntry, 'type' | 'amount'>> {
     const share = activeDays(bounds, interval.start, interval.end) / bounds.days
     const costs: Array<Pick<CostEntry, 'type' | 'amount'>> = []
-    const owner = asset.legalOwner || 'provider'
+    const owner = legalOwnerOf(asset.legalOwner)
     if (owner === 'provider' && asset.purchaseCost > 0 && amortisationMonths > 0) {
         const writeOff = writeOffShare(interval, writeOffStart(asset), bounds, amortisationMonths)
         const monthly = asset.purchaseCost / amortisationMonths
@@ -67,7 +64,6 @@ export function serviceIntervalCosts(
     return costs
 }
 
-/** The day the write-off starts: the purchase date, else the day first in service ('' when unknown). */
 function writeOffStart(asset: AssetCostFacts): string {
     return asset.purchaseDate.slice(0, 10) || asset.inServiceDate.slice(0, 10)
 }
@@ -104,14 +100,12 @@ export function leaseShare(lease: Pick<LeaseTerms, 'monthlyPayment' | 'coveredAs
     return evenShare(lease.monthlyPayment, Math.max(lease.coveredAssets, lease.buyoutAssets))
 }
 
-/** Whether the lease (either end open) is payable in the month. */
 function leaseRunsIn(lease: LeaseTerms, bounds: MonthBounds): boolean {
     const starts = lease.starts.slice(0, 10)
     const ends = lease.ends.slice(0, 10)
     return (!starts || starts <= bounds.last) && (!ends || ends >= bounds.first)
 }
 
-/** Where a cost or revenue belongs: a Customer, a Site ('' for customer-level amounts such as fees) and a currency. */
 function marginKey(customerId: string, siteId: string, currency: string): string {
     return `${customerId}|${siteId}|${currency}`
 }
@@ -158,12 +152,10 @@ export interface Amount {
     amount: number
 }
 
-/** An amount of one cost type for a Customer and Site, as a Cost fact holds it. */
 export interface CostEntry extends Amount {
     type: CostType
 }
 
-/** Revenue against cost for a Customer and Site in one currency. */
 export interface MarginRow {
     customerId: string
     siteId: string
@@ -175,7 +167,6 @@ export interface MarginRow {
     marginPct: number | null
 }
 
-/** Rounded to the cent, half away from zero (domain/billing `toCents`). */
 export function cents(value: number): number {
     return fromCents(toCents(value))
 }

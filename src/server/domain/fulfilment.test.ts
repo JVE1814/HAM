@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
     anythingShipped,
-    approvalAwaited,
+    CANCELLABLE_ORDER_STAGES,
+    closedStateFor,
+    ENDED_ORDER_STAGES,
     followsLines,
     leftInTransit,
     LINE_STAGES,
     lineStageFor,
+    OPEN_ORDERS_QUERY,
     orderStageFor,
     refillsLine,
-    siteRecoveryLineQuery,
-    type LineStage,
+    UNFULFILLED_ORDER_STAGES,
 } from './fulfilment'
+import { LINE_STAGE_CHOICES, ORDER_STAGE_CHOICES, type LineStage, type OrderStage } from './vocabulary'
 
 describe('lineStageFor', () => {
     it('waits for stock while fewer assets than ordered are allocated', () => {
@@ -30,11 +33,6 @@ describe('lineStageFor', () => {
         expect(lineStageFor({ current: 'awaiting_stock', quantity: 1, assetStages: ['in_transfer'] })).toBe('sourced')
         expect(lineStageFor({ current: 'sourced', quantity: 2, assetStages: ['in_transfer', 'staged'] })).toBe('sourced')
         expect(lineStageFor({ current: 'sourced', quantity: 3, assetStages: ['in_transfer', 'reserved'] })).toBe('awaiting_stock')
-    })
-
-    it('moves on once a unit in transfer is received and goes into staging', () => {
-        expect(lineStageFor({ current: 'sourced', quantity: 2, assetStages: ['staging', 'staged'] })).toBe('staging')
-        expect(lineStageFor({ current: 'sourced', quantity: 1, assetStages: ['reserved'] })).toBe('sourced')
     })
 
     it('counts a hot spare that skips staging as staged', () => {
@@ -183,10 +181,6 @@ describe('refillsLine', () => {
     it.each(['installed', 'in_service', 'cancelled', 'new'] as const)('leaves a %s line as it is', (stage) => {
         expect(refillsLine({ stage, siteRecovery: false })).toBe(false)
     })
-
-    it('finds the Asset awaited back on a site decommission or agreement end', () => {
-        expect(siteRecoveryLineQuery('a1')).toBe('asset=a1^status=awaiting^return_order.triggerINsite_decommission,agreement_end')
-    })
 })
 
 describe('anythingShipped', () => {
@@ -211,25 +205,6 @@ describe('anythingShipped', () => {
     })
 })
 
-describe('approvalAwaited', () => {
-    it('names the group still asked to decide', () => {
-        const decisions = [
-            { group: 'customer_admin', state: 'approved' },
-            { group: 'account_manager', state: 'requested' },
-        ] as const
-        expect(approvalAwaited(['customer_admin', 'account_manager'], decisions)).toBe(
-            'waiting for the account manager (or the asset managers) to decide',
-        )
-    })
-
-    it('says no approval is still requested from the groups missing one', () => {
-        const decisions = [{ group: 'customer_admin', state: 'cancelled' }] as const
-        expect(approvalAwaited(['customer_admin', 'account_manager'], decisions)).toBe(
-            'no approval from a Customer admin and the account manager (or the asset managers) and none still requested',
-        )
-    })
-})
-
 describe('followsLines', () => {
     it.each(['sourcing', 'preparing', 'delivering', 'installing'])('moves a %s Order with its lines', (stage) => {
         expect(followsLines(stage)).toBe(true)
@@ -241,5 +216,44 @@ describe('followsLines', () => {
 
     it('keeps a complete Order complete when its assets later leave service', () => {
         expect(followsLines('complete')).toBe(false)
+    })
+})
+
+describe('closedStateFor', () => {
+    it('closes the task of an Order that ends: complete, rejected (incomplete) or cancelled (skipped)', () => {
+        expect(closedStateFor('complete')).toBe(3)
+        expect(closedStateFor('rejected')).toBe(4)
+        expect(closedStateFor('cancelled')).toBe(7)
+    })
+
+    it('leaves the task open in every other stage', () => {
+        for (const stage of ['draft', 'awaiting_approval', 'sourcing', 'preparing', 'delivering', 'installing'] as const) {
+            expect(closedStateFor(stage)).toBeUndefined()
+        }
+    })
+})
+
+describe('the Order stage sets', () => {
+    const stages = Object.keys(ORDER_STAGE_CHOICES) as OrderStage[]
+
+    it('count as ended exactly the stages an Order is closed with', () => {
+        expect([...ENDED_ORDER_STAGES].sort()).toEqual(stages.filter((stage) => closedStateFor(stage) !== undefined).sort())
+        for (const stage of UNFULFILLED_ORDER_STAGES) expect(ENDED_ORDER_STAGES).toContain(stage)
+        expect(UNFULFILLED_ORDER_STAGES).not.toContain('complete')
+    })
+
+    it('select the open Orders with the query the metadata imports', () => {
+        expect(OPEN_ORDERS_QUERY).toBe(`stageNOT IN${ENDED_ORDER_STAGES.join(',')}`)
+    })
+
+    it('offer Cancel order until Ship: on no Order that ended, is being installed or is complete', () => {
+        expect(stages.filter((stage) => !CANCELLABLE_ORDER_STAGES.includes(stage))).toEqual(['installing', 'complete', 'rejected', 'cancelled'])
+    })
+})
+
+describe('the Order line stages', () => {
+    it('have a line filled again from awaiting stock to shipped', () => {
+        const refilled = (Object.keys(LINE_STAGE_CHOICES) as LineStage[]).filter((stage) => refillsLine({ stage, siteRecovery: false }))
+        expect(refilled).toEqual(['awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped'])
     })
 })

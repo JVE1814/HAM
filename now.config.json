@@ -3,6 +3,7 @@
     "scopeId": "376fd598866143a1a4eee74cce6c6075",
     "name": "NaaS Hardware Asset Management",
     "tsconfigPath": "./src/server/tsconfig.json",
+    "serverModulesExcludePatterns": ["**/*.test.ts", "**/*.test.js", "**/*.d.ts", "test-support/**"],
     "packageSourceCodeOnInstance": true,
     "legacyChoices": false,
     "description": "Hardware asset management for a Network-as-a-Service provider: agreements, site orders, sourcing, staging, install, in-service billing, break-fix, refresh, returns, disposal."

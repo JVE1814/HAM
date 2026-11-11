@@ -1,12 +1,12 @@
+import { RACK_FACE_CHOICES, type RackFace } from './vocabulary.ts'
+
 /**
  * Rack placement (P2.8) and power budget (plan §13 Rack power budget): units are numbered from 1 at the bottom; a device
  * occupies ruStart..ruStart+height-1.
  */
 
-export type RackFace = 'front' | 'rear'
-
 /** Every rack face, to read x_daas_ham_rack_face with (platform/records `choice`). */
-export const RACK_FACES: readonly RackFace[] = ['front', 'rear']
+export const RACK_FACES: readonly RackFace[] = Object.keys(RACK_FACE_CHOICES) as RackFace[]
 
 export interface Placement {
     /**
@@ -56,6 +56,14 @@ export interface RackSpec {
     powerCapacityW: number
 }
 
+export const PLACEMENT_FIELDS = { rack: 'x_daas_ham_rack', ruStart: 'x_daas_ham_ru_start', face: 'x_daas_ham_rack_face' } as const
+
+/** The height taken for a rack that records none (cmdb_ci_rack.rack_units empty or 0): a full-height rack. */
+export const DEFAULT_RACK_UNITS = 42
+
+/** The face a placed Asset is on when it records none. */
+export const DEFAULT_RACK_FACE: RackFace = 'front'
+
 /**
  * Why `candidate` cannot go where it is placed, or null if it fits: space on its face, and power for
  * the whole rack. `previousPowerW` is the draw the device had in this rack before the change
@@ -63,20 +71,16 @@ export interface RackSpec {
  * raises its draw, but allows a move or a swap to a Model that draws no more.
  */
 export function placementProblem(rack: RackSpec, placements: readonly Placement[], candidate: Placement, previousPowerW?: number): string | null {
-    const top = candidate.ruStart + Math.max(1, candidate.height) - 1
+    const top = topUnit(candidate)
     if (candidate.ruStart < 1 || top > rack.units) {
         return `Rack units ${candidate.ruStart}-${top} do not fit in a ${rack.units}U rack`
     }
     const others = placements.filter((other) => other.assetId !== candidate.assetId)
     for (const other of others) {
-        if (other.face !== candidate.face) continue
-        const otherTop = other.ruStart + Math.max(1, other.height) - 1
-        for (let unit = candidate.ruStart; unit <= top; unit++) {
-            if (unit >= other.ruStart && unit <= otherTop) return `Rack unit ${unit} is taken by ${labelOf(other)}`
-        }
+        const unit = sharedUnit(candidate, other)
+        if (unit !== null) return `Rack unit ${unit} is taken by ${labelOf(other)}`
     }
     const budget = powerBudget(rack.powerCapacityW, [...others, candidate])
-    // The other devices draw the same before and after, so only the candidate's own draw can raise it.
     const raisesDraw = previousPowerW === undefined || drawW(candidate) > Math.max(0, previousPowerW)
     if (raisesDraw && budget.capacityW > 0 && budget.usedW > budget.capacityW) {
         return `The rack's power budget would be exceeded: ${budget.usedW} W of ${budget.capacityW} W`
@@ -94,6 +98,12 @@ function drawW(placement: Placement): number {
 
 function topUnit(placement: Placement): number {
     return placement.ruStart + Math.max(1, placement.height) - 1
+}
+
+function sharedUnit(a: Placement, b: Placement): number | null {
+    if (a.face !== b.face) return null
+    const unit = Math.max(a.ruStart, b.ruStart)
+    return unit <= Math.min(topUnit(a), topUnit(b)) ? unit : null
 }
 
 /** Two devices on one face of a rack that share units; `unit` is the lowest unit they share. */
@@ -115,11 +125,8 @@ export function overlaps(placements: readonly Placement[]): Overlap[] {
     const found: Overlap[] = []
     placements.forEach((a, i) => {
         for (const b of placements.slice(i + 1)) {
-            if (a.face !== b.face) continue
-            const unit = Math.max(a.ruStart, b.ruStart)
-            if (unit <= Math.min(topUnit(a), topUnit(b))) {
-                found.push({ assetIds: [a.assetId, b.assetId], labels: [labelOf(a), labelOf(b)], face: a.face, unit })
-            }
+            const unit = sharedUnit(a, b)
+            if (unit !== null) found.push({ assetIds: [a.assetId, b.assetId], labels: [labelOf(a), labelOf(b)], face: a.face, unit })
         }
     })
     return found.sort((x, y) => x.unit - y.unit)
@@ -153,7 +160,7 @@ export function rackElevation(rackUnits: number, placements: readonly Placement[
     const rows: ElevationRow[] = []
     let unit = rackUnits
     while (unit >= 1) {
-        const device = placements.find((p) => p.face === face && unit >= p.ruStart && unit <= p.ruStart + Math.max(1, p.height) - 1)
+        const device = placements.find((p) => p.face === face && unit >= p.ruStart && unit <= topUnit(p))
         if (device) {
             const span = unit - device.ruStart + 1
             rows.push({ unit, assetId: device.assetId, label: labelOf(device), span })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDays, addMonths, daysBetween, earliest, endOfMonth, isIsoDate, isMonthEnd, toIsoDate } from './calendar'
+import { addDays, addMonths, daysBetween, earliest, endOfMonth, isIsoDate, isMonthEnd, toIsoDate, withinLead } from './calendar'
 
 describe('calendar', () => {
     it('adds months and clamps to the end of shorter months', () => {
@@ -43,5 +43,17 @@ describe('calendar', () => {
         expect(isIsoDate('2026-13-01')).toBe(false)
         expect(isIsoDate('2026-00-10')).toBe(false)
         expect(isIsoDate('2026-01-00')).toBe(false)
+    })
+})
+
+describe('withinLead', () => {
+    it('is due from lead days before the end date onwards', () => {
+        expect(withinLead('2027-03-01', '2026-11-01', 120)).toBe(true)
+        expect(withinLead('2027-03-01', '2026-10-31', 120)).toBe(false)
+        expect(withinLead('2026-01-01', '2026-11-07', 30)).toBe(true)
+    })
+
+    it('never fires without an end date', () => {
+        expect(withinLead('', '2026-11-07', 30)).toBe(false)
     })
 })

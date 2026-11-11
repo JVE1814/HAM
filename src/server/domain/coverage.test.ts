@@ -6,10 +6,15 @@ import {
     coverageBySerial,
     coverageDisposition,
     coverageSummary,
+    groupExpiringCoverage,
     mergeCoverage,
     OPEN_ENDED_COVERAGE_END,
+    staleCoverageQuery,
+    withoutCoverage,
 } from './coverage'
 import type { CoverageFact } from './oem/types'
+import { recordMatches as matches } from '../test-support/encoded-query'
+import { assetIn } from '../test-support/stored-asset'
 
 describe('coverageSummary', () => {
     it('is covered until the latest end date among covering contracts', () => {
@@ -185,5 +190,53 @@ describe('coverageBySerial', () => {
 
     it('keys the coverage by normalised serial', () => {
         expect([...coverageBySerial([' foc1 '], [], today).keys()]).toEqual(['FOC1'])
+    })
+})
+
+describe('staleCoverageQuery', () => {
+    const query = staleCoverageQuery('cisco', '2026-11-01 00:00:00')
+    /** A Cisco fleet asset in service with a serial, its coverage never checked. */
+    const unchecked = assetIn('in_service', { x_daas_ham_fleet: 'true', 'model.x_daas_ham_oem_source': 'cisco', serial_number: 'FOC1', x_daas_ham_coverage_checked: '' })
+
+    it("asks again for a vendor's fleet assets never checked, or last checked before the cut-off", () => {
+        expect(matches(query, unchecked)).toBe(true)
+        expect(matches(query, { ...unchecked, x_daas_ham_coverage_checked: '2026-10-31 23:59:59' })).toBe(true)
+        expect(matches(query, { ...unchecked, x_daas_ham_coverage_checked: '2026-11-01 00:00:00' })).toBe(false)
+        expect(matches(query, { ...unchecked, x_daas_ham_coverage_checked: '2026-11-02 08:00:00' })).toBe(false)
+    })
+
+    it("sends no other vendor's serial, no Asset without one, no retired unit, and none of the Provider IT's (ADR 0016)", () => {
+        expect(matches(query, { ...unchecked, 'model.x_daas_ham_oem_source': 'fortinet' })).toBe(false)
+        expect(matches(query, { ...unchecked, serial_number: '' })).toBe(false)
+        expect(matches(query, { ...unchecked, ...assetIn('returned_to_oem') })).toBe(false)
+        expect(matches(query, { ...unchecked, x_daas_ham_fleet: 'false' })).toBe(false)
+        expect(matches(query, { ...unchecked, x_daas_ham_fleet: '' })).toBe(false)
+        // Stale and outside the fleet: the ^OR of the two date conditions lets no other condition go.
+        expect(matches(query, { ...unchecked, x_daas_ham_fleet: 'false', x_daas_ham_coverage_checked: '2026-10-01 00:00:00' })).toBe(false)
+    })
+
+    it('asks for a unit in stock or at a Site alike', () => {
+        for (const stage of ['available', 'spare_pool', 'shipped', 'pending_return'] as const) expect(matches(query, { ...unchecked, ...assetIn(stage) }), stage).toBe(true)
+    })
+})
+
+describe('withoutCoverage', () => {
+    it('is no coverage end, or one before today', () => {
+        expect(withoutCoverage('', '2026-11-07')).toBe(true)
+        expect(withoutCoverage('2026-11-06', '2026-11-07')).toBe(true)
+        expect(withoutCoverage('2026-11-07', '2026-11-07')).toBe(false)
+        expect(withoutCoverage('2027-01-01', '2026-11-07')).toBe(false)
+    })
+})
+
+describe('groupExpiringCoverage', () => {
+    it('counts contracts per customer and keeps the first end date', () => {
+        const groups = groupExpiringCoverage([
+            { customerId: 'acme', endDate: '2026-12-20' },
+            { customerId: 'acme', endDate: '2026-12-01' },
+            { customerId: 'globex', endDate: '2027-01-05' },
+        ])
+        expect(groups.get('acme')).toEqual({ count: 2, firstEnd: '2026-12-01' })
+        expect(groups.get('globex')).toEqual({ count: 1, firstEnd: '2027-01-05' })
     })
 })

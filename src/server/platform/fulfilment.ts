@@ -1,22 +1,28 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import {
+    closedStateFor,
+    endedUnfulfilled,
     followsLines,
     leftInTransit,
     lineStageFor,
     orderStageFor,
     refillsLine,
-    siteRecoveryLineQuery,
-    type LineStage,
     type OrderShipment,
 } from '../domain/fulfilment.ts'
 import type { Stage } from '../domain/lifecycle.ts'
-import { orderEnded } from '../domain/sourcing.ts'
+import { siteRecoveryLineQuery } from '../domain/returns.ts'
+import { LINE_STAGE, ORDER_STAGE, type LineStage } from '../domain/vocabulary.ts'
 import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
-import { fire } from './events.ts'
-import { bool, exists, findById, num, refusal, str } from './records.ts'
+import { EVENT, fire } from './events.ts'
+import { cancelLine, saveLineStage } from './order-lines.ts'
+import { exists, findById, num, str, warnRefused, type ForeignRecord } from './records.ts'
+import { takeOffOrderLine } from './stock.ts'
 
-/** Keeps Order-line and Order stages in step with their Assets (derived, see domain/fulfilment). */
+/**
+ * Keeps Order-line and Order stages in step with their Assets (derived, see domain/fulfilment), and has a line that
+ * lost a unit filled again.
+ */
 
 /**
  * The stages of every Asset on a line, read past the user's before-query rules (ADR 0005): an inventory tech closing a
@@ -26,16 +32,32 @@ export function lineAssetStages(lineId: string): Array<Stage | null> {
     return assetStages('x_daas_ham_order_line', lineId)
 }
 
+/**
+ * How many Assets are on a line, in any stage: what sourcing counts as allocated and what a receipt checks the line
+ * still has room beside. Counted as the line's stage is derived, past the user's rules.
+ */
+export function unitsOnLine(lineId: string): number {
+    return lineAssetStages(lineId).length
+}
+
 /** The stages of the Order's lines and of every Asset on them, read past the user's before-query rules (as above). */
 export function orderShipment(orderId: string): OrderShipment {
+    return { lineStages: lineStagesOf(orderId), unitStages: assetStages('x_daas_ham_order_line.order', orderId) }
+}
+
+/**
+ * The stage of each of the Order's lines: the one read of them, for what the Order has shipped and for the stage it
+ * derives from them. Read past the user's before-query rules, the way the Assets on the lines are
+ * (platform/beyond-visibility). The rules scope a line by its Order's Customer and Site (domain/visibility), so
+ * whoever sees the Order sees each of its lines anyway: a stage is never derived from some of them.
+ */
+function lineStagesOf(orderId: string): LineStage[] {
     const line = new GlideRecord('x_daas_ham_order_line')
-    // Only read, never saved, so the rules need not be turned back on.
-    line.setWorkflow(false)
     line.addQuery('order', orderId)
-    line.query()
-    const lineStages: LineStage[] = []
-    while (line.next()) lineStages.push(str(line, 'line_stage') as LineStage)
-    return { lineStages, unitStages: assetStages('x_daas_ham_order_line.order', orderId) }
+    beyondVisibility(line, () => line.query())
+    const stages: LineStage[] = []
+    while (line.next()) stages.push(str(line, 'line_stage') as LineStage)
+    return stages
 }
 
 function assetStages(field: string, id: string): Array<Stage | null> {
@@ -53,56 +75,70 @@ export function recomputeLine(lineId: string): void {
 }
 
 /**
+ * Queue the Order's sourcing (the event's script action sources its lines that are new or awaiting stock): for a line
+ * that lost a unit, or a unit received for a line and not reserved for it. Queued, not run: sourcing takes the Order's
+ * sourcing lock and saves other Assets, and the saves that ask for it hold locks of their own (ADR 0013).
+ */
+export function sourceOrderAgain(orderId: string): void {
+    const order = findById('x_daas_ham_order', orderId)
+    if (order) queueSourcing(order)
+}
+
+/** Queue the sourcing of `order`, as its approval does first. */
+export function queueSourcing(order: GlideRecord): void {
+    fire(EVENT.sourceOrder, order)
+}
+
+/**
+ * A unit left the Order line, already taken off it (a failed staging, a transfer to the staging centre fallen
+ * through): the line's stage is derived again, back to awaiting stock while it is short, and its Order is sourced
+ * again, queued (`sourceOrderAgain`). The one sequence for a unit that leaves its line; one lost in transit differs
+ * only in how the line is derived (`onLineAssetMoved`).
+ */
+export function lineLostUnit(lineId: string): void {
+    const line = findById('x_daas_ham_order_line', lineId)
+    if (!line) return
+    deriveLine(line, false)
+    sourceOrderAgain(str(line, 'order'))
+}
+
+/**
  * An Asset on `lineId` moved `from` -> `to` (the after-update rule on alm_hardware): the line's stage is derived again.
  * A unit that left it in transit while still owed to it (domain/fulfilment `leftInTransit`, `refillsLine`) is first
- * taken off it, and the line is derived as filled again, back to awaiting stock: then the id of its Order, to source
- * again, else ''.
+ * taken off it, and the line is derived as filled again, back to awaiting stock: its Order is then sourced again,
+ * queued (`sourceOrderAgain`).
  *
  * No lock is taken. The unit comes off the line before the line is saved as awaiting stock, so a sourcing pass or a
- * receipt counting the reopened line never counts it (each counts only a line awaiting stock). The sourcing is left to
- * the caller to queue (entry/orders `resourceOrder`), not run in this save: it takes the Order's sourcing lock and
- * saves other Assets, and this save's own after rule takes the Asset's service-interval lock (ADR 0013).
+ * receipt counting the reopened line never counts it (each counts only a line awaiting stock). The sourcing is queued,
+ * not run in this save, whose own after rule takes the Asset's service-interval lock (ADR 0013).
  */
-export function onLineAssetMoved(asset: GlideRecord, lineId: string, from: Stage | null, to: Stage | null): string {
+export function onLineAssetMoved(asset: ForeignRecord, lineId: string, from: Stage | null, to: Stage | null): void {
     // Read past the user's rules: unlike a derived stage, a line not filled again now never is.
-    const line = leftInTransit(from, to) ? readPastRules('x_daas_ham_order_line', lineId) : null
-    if (!line) {
-        recomputeLine(lineId)
-        return ''
-    }
+    const line = leftInTransit(from, to) ? findById('x_daas_ham_order_line', lineId, { beyondVisibility: true }) : null
+    if (!line) return recomputeLine(lineId)
     const stage = str(line, 'line_stage') as LineStage
     const siteRecovery = exists('x_daas_ham_return_order_line', siteRecoveryLineQuery(asset.getUniqueValue()))
     if (!refillsLine({ stage, siteRecovery }) || !takeOffLine(asset.getUniqueValue(), line, to as Stage)) {
-        deriveLine(line, false)
-        return ''
+        return void deriveLine(line, false)
     }
     const next = deriveLine(line, true)
     // Left at its stage, the line is not sourced again, and a later change no longer fills it again.
     if (next === null) gs.warn(`[x_daas_ham] ${str(line, 'number')} lost a unit in transit but is not sourced again`)
-    return next === 'awaiting_stock' ? str(line, 'order') : ''
-}
-
-/**
- * The record, read past the app's before-query visibility rules (platform/beyond-visibility), the only before-query
- * rules on an app table (the platform refuses another scope's); its saves run every rule (null when not found).
- */
-function readPastRules(table: string, sysId: string): GlideRecord | null {
-    const record = new GlideRecord(table)
-    return beyondVisibility(record, () => record.get(sysId)) ? record : null
+    if (next === 'awaiting_stock') sourceOrderAgain(str(line, 'order'))
 }
 
 /** Take a unit that left `line` in transit off it (logged); false when the platform refuses (logged): it stays on. */
 function takeOffLine(assetId: string, line: GlideRecord, to: Stage): boolean {
-    // A fresh record: saving `current` again from its own after rule would run its rules twice.
-    const asset = readPastRules('alm_hardware', assetId)
+    // A fresh record, read past the user's rules: saving `current` again from its own after rule would run its rules twice.
+    const asset = findById('alm_hardware', assetId, { beyondVisibility: true })
     if (!asset) return false
-    asset.setValue('x_daas_ham_order_line', '')
+    takeOffOrderLine(asset)
     const what = `${str(asset, 'serial_number')} left ${str(line, 'number')} in transit (${to})`
     if (asset.update()) {
         gs.info(`[x_daas_ham] ${what}: taken off the line, which is filled again`)
         return true
     }
-    gs.warn(`[x_daas_ham] ${what} but stays on it, which is not sourced again: ${refusal(asset)}`)
+    warnRefused(asset, `${what} but stays on it, which is not sourced again`)
     return false
 }
 
@@ -112,9 +148,9 @@ function takeOffLine(assetId: string, line: GlideRecord, to: Stage): boolean {
  *
  * A cancel or rejection saves its Order before it cancels the lines, under their locks, but a derive takes no lock: one
  * that read the line before the cancel could save its stage after, reopening the line. So a line read afresh as
- * cancelled, or on an Order that ended (domain/sourcing `orderEnded`), is not moved on, and one whose Order ended while
- * its stage was saved is cancelled again: either the cancel's save came after this one, or the Order was cancelled
- * before this save and the line with it.
+ * cancelled, or on an Order that ended unfulfilled (domain/fulfilment `endedUnfulfilled`), is not moved on, and one
+ * whose Order ended while its stage was saved is cancelled again: either the cancel's save came after this one, or the
+ * Order was cancelled before this save and the line with it.
  */
 function deriveLine(line: GlideRecord, refill: boolean): LineStage | null {
     const current = str(line, 'line_stage') as LineStage
@@ -122,17 +158,14 @@ function deriveLine(line: GlideRecord, refill: boolean): LineStage | null {
     const assetStages = lineAssetStages(line.getUniqueValue())
     const next = lineStageFor({ current, quantity: num(line, 'quantity'), assetStages, refill })
     if (next !== current) {
-        if (closedNow(line)) return 'cancelled'
-        line.setValue('line_stage', next)
-        const number = str(line, 'number')
-        if (!line.update()) {
-            warnNotMoved(line, `${number} not moved to ${next}`)
+        if (closedNow(line)) return LINE_STAGE.cancelled
+        if (!saveLineStage(line, next)) {
+            notMoved(line, next)
             return null
         }
-        if (next !== 'cancelled' && closedNow(line)) {
-            line.setValue('line_stage', 'cancelled')
-            if (!line.update()) warnNotMoved(line, `${number} moved to ${next} beside its Order's cancel, not cancelled again`)
-            return 'cancelled'
+        if (next !== LINE_STAGE.cancelled && closedNow(line)) {
+            if (!cancelLine(line)) warnRefused(line, `${str(line, 'number')} moved to ${next} beside its Order's cancel, not cancelled again`)
+            return LINE_STAGE.cancelled
         }
     }
     recomputeOrder(str(line, 'order'))
@@ -141,65 +174,29 @@ function deriveLine(line: GlideRecord, refill: boolean): LineStage | null {
 
 /** Whether the line, read afresh past the user's rules, is cancelled or on an Order cancelled or rejected. */
 function closedNow(line: GlideRecord): boolean {
-    const fresh = readPastRules('x_daas_ham_order_line', line.getUniqueValue())
-    return !!fresh && (str(fresh, 'line_stage') === 'cancelled' || orderEnded(str(fresh, 'order.stage')))
+    const fresh = findById('x_daas_ham_order_line', line.getUniqueValue(), { beyondVisibility: true })
+    return !!fresh && (str(fresh, 'line_stage') === LINE_STAGE.cancelled || endedUnfulfilled(str(fresh, 'order.stage')))
 }
-
-/**
- * Queued on a replacement Order once it is complete (registered in logic/aftersales.now.ts, whose script action calls
- * noteReplacementComplete with the Order's sys_id).
- */
-export const REPLACEMENT_COMPLETE_EVENT = 'x_daas_ham.replacement.complete'
 
 export function recomputeOrder(orderId: string): void {
     const order = findById('x_daas_ham_order', orderId)
     if (!order || !followsLines(str(order, 'stage'))) return
-    const line = new GlideRecord('x_daas_ham_order_line')
-    line.addQuery('order', orderId)
-    line.query()
-    const stages: LineStage[] = []
-    while (line.next()) stages.push(str(line, 'line_stage') as LineStage)
+    const stages = lineStagesOf(orderId)
     if (stages.length === 0) return
     const next = orderStageFor(stages)
     if (next === str(order, 'stage')) return
     order.setValue('stage', next)
-    if (next === 'complete') order.setValue('state', 3)
-    if (next === 'cancelled') order.setValue('state', 7)
-    if (!order.update()) return warnNotMoved(order, `${str(order, 'number')} not moved to ${next}`)
-    // Its case is saved by the event's script action (noteReplacementComplete), not in this save.
-    if (next === 'complete' && str(order, 'case')) fire(REPLACEMENT_COMPLETE_EVENT, order)
-}
-
-/**
- * A replacement Order completed: its case is saved with a work note. The replacement SLAs on the case stop once the Order
- * it links is complete (logic/aftersales.now.ts), but the SLA engine weighs a case's SLAs only when the case is saved,
- * and completing the Order does not save it. Only an open case that still links this Order, now complete, is saved. A
- * case not found, or a refused save, leaves the SLA running, to breach: that is logged, to save the case by hand.
- *
- * Run from the event queue (REPLACEMENT_COMPLETE_EVENT), never in the save that completes the Order: that save is often
- * made in a user's interactive session (an asset manager moving the unit to in service on the form, a customer contact
- * confirming the install), where Customer Service's before-query rule 'Case query rules' narrows every read of a case to
- * the CSM query rules of a user without case_admin: one whose rules do not grant them the case would not find it. A
- * script action runs as system outside any interactive session, where that rule does not apply (it requires
- * gs.isInteractive()).
- */
-export function noteReplacementComplete(orderId: string): void {
-    const order = readPastRules('x_daas_ham_order', orderId)
-    if (!order || str(order, 'stage') !== 'complete') return
-    const caseId = str(order, 'case')
-    if (!caseId) return
-    const kase = findById('sn_customerservice_case', caseId)
-    if (!kase) return void gs.warn(`[x_daas_ham] ${str(order, 'number')} complete, but its case ${caseId} was not found: save the case to stop its SLA`)
-    if (!bool(kase, 'active') || str(kase, 'x_daas_ham_replacement_order') !== order.getUniqueValue()) return
-    kase.setValue('work_notes', `Replacement order ${str(order, 'number')} is complete: the replacement is installed.`)
-    if (kase.update()) return
-    gs.warn(`[x_daas_ham] ${str(kase, 'number')}: replacement SLA not stopped, the case save was refused: ${refusal(kase)}; save the case`)
+    const closed = closedStateFor(next)
+    if (closed !== undefined) order.setValue('state', closed)
+    if (!order.update()) return notMoved(order, next)
+    // Its case is saved by the event's script action (platform/breakfix `noteReplacementComplete`), not in this save.
+    if (next === ORDER_STAGE.complete && str(order, 'case')) fire(EVENT.replacementComplete, order)
 }
 
 /**
  * Stages are derived again only when an Asset next changes, so a refused save is logged: it can hold a line, and the
  * Order with the actions offered at its stage (Ship, Confirm installed), where they are.
  */
-function warnNotMoved(record: GlideRecord, what: string): void {
-    gs.warn(`[x_daas_ham] ${what}: ${refusal(record)}`)
+function notMoved(record: GlideRecord, to: string): void {
+    warnRefused(record, `${str(record, 'number')} not moved to ${to}`)
 }

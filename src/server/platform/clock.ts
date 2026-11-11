@@ -1,10 +1,18 @@
 import { GlideDateTime } from '@servicenow/glide'
-import { toIsoDate } from '../domain/calendar.ts'
+import { DAY_MS, toIsoDate } from '../domain/calendar.ts'
 
 /** Conversions between Glide date/time values (UTC "yyyy-MM-dd HH:mm:ss") and domain values. */
 
 export function nowMs(): number {
     return new GlideDateTime().getNumericValue()
+}
+
+export function nowGlide(): string {
+    return msToGlide(nowMs())
+}
+
+export function daysAgoGlide(days: number): string {
+    return msToGlide(nowMs() - days * DAY_MS)
 }
 
 export function todayIso(): string {

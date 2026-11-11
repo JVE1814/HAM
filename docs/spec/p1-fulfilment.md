@@ -163,8 +163,8 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
   left in stock, not given to <line>: ...* is logged, for example *...: its Order is cancelled*; for
   an advance replacement it adds *RMA <number> left open, update it by hand*. A receipt that
   outlasted the line's lock (ADR 0013) stages no further after it is lost, and logs *<line>:
-  <serial> reserved (or given a Staging task, or moved into staging) after the line's lock was lost:
-  check it is still on the line*.
+  <serial> reserved (or given a Staging task, or moved into staging) after its lock
+  order_line_<sys_id> was lost: check it is still on the line*.
 - **Put-away** records the stockroom an Asset now sits in (for an inventory tech, one of theirs):
   - available stock and returned units awaiting evaluation, wipe or disposal go into any stockroom;
   - a unit being staged (one received for a waiting PO line among them) goes only into a staging
@@ -231,7 +231,7 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
 - For every mode except self-install, Ship opens a change and an FSM work order. A device replace
   uses a standard change; everything else uses a normal change.
 - If the tracking number, or the change and work order, cannot be saved on the Order, Ship still
-  ships and says so; the Shipment, change and work order name the Order, to link them by hand.
+  ships and says so; the Shipment, change (its *Parent*) and work order (its *Initiated from*) name the Order, to link them by hand.
 - Ship runs one at a time per Order, under a job lock on it (`ship_order_<sys_id>`), and reads the
   Order's tracking number and work order afresh. A Ship pressed while another of the same Order is
   running ships, buys and opens nothing and says another Ship is running. A Ship after it finds the

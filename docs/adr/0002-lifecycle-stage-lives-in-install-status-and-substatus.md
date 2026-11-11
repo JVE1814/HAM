@@ -53,7 +53,7 @@ checks an allowed-moves matrix. A second state field would drift whenever out-of
     Inventory lets go anywhere else (its line cancelled or deleted) is reserved again where it was,
     where nothing moves it on: its transfer has fallen through (`transferFellThrough`). The after rule
     on its stage change puts it back as free stock, skips its Staging task and sources its Order again
-    (`entry/orders.ts` `putBackUntransferred`). Sourcing itself removes the lines of a transfer order
+    (`platform/sourcing.ts` `putBackUntransferred`). Sourcing itself removes the lines of a transfer order
     it could not complete; it marks those units for the transaction, as reads past the visibility
     rules mark their record (ADR 0005, external-contracts N37), so their release is not taken for a
     transfer fallen through, and puts them back itself.

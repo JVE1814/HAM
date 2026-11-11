@@ -21,14 +21,22 @@
 
 ## Lifecycle (`domain/model-lifecycle.ts`)
 
-- One lifecycle record per Model. The CSV import accepts ISO dates of real calendar days (it refuses
-  2026-02-31) and refuses milestones that go backwards.
+- A Model's milestones are kept in the platform's Model lifecycle table (`cmdb_model_lifecycle`, ADR 0017), one
+  row per Model and milestone: lifecycle type *Publisher*, the milestone as the lifecycle phase, its date as the
+  phase start date. The app writes its rows as hardware lifecycle rows of source *Internal*, with where the date
+  comes from (manual, CSV import, a vendor's API, and the bulletin it names) as the description. It reads every
+  active Publisher row of the Model, so a milestone the Provider's IT keeps by hand or ServiceNow's content service
+  supplies counts too; where two rows give the same milestone, the *Internal* one wins.
+- The CSV import accepts ISO dates of real calendar days (it refuses 2026-02-31) and refuses milestones that go
+  backwards. A milestone a row leaves blank keeps the date stored; a row with no date at all is marked *ignored*.
+  No row is ever removed by the app: a milestone stored by mistake is deactivated or deleted in the list by hand.
 - **Lifecycle phase** on a day is the latest milestone reached: end of sale → end of support → end of
   extended support → end of life.
 - **Refresh due** = in-service date + the Agreement's refresh cycle, or the Model's end of support, or
   whichever is earlier, per the Agreement's refresh basis.
 - Recalculation runs in time-boxed chunks:
-  - for a Model, when its lifecycle record changes or a milestone date is reached (daily);
+  - for a NaaS Model, when a milestone of its changes (a rule on the platform's table, which leaves the Provider
+    IT's Models alone) or a milestone date is reached (daily);
   - for an Agreement's deployed Assets, when its refresh terms change.
 
 ## Visibility (`domain/visibility.ts`, ADR 0005)
@@ -36,34 +44,39 @@
 | User | Sees |
 |---|---|
 | asset manager, field tech, NOC, account manager, finance, admin | everything |
-| inventory tech only | fleet assets, NaaS stockrooms, transfer orders from or to a NaaS stockroom, staging tasks and audits (with their lines) of their stockrooms; plus, across all stockrooms and Customers, the ASN imports, staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and Disposal orders; no other app table; the Provider IT's hardware, stockrooms and transfer orders as the platform allows |
+| inventory tech only | fleet assets, NaaS stockrooms, transfer orders from or to a NaaS stockroom, staging tasks and audits (with their lines) of their stockrooms; plus, across all stockrooms and Customers, the ASN imports, staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and Disposal orders; no other app table; the Provider IT's hardware, stockrooms and transfer orders, and Model lifecycle milestones, as the platform allows |
 | customer admin | their Customer's fleet assets (and no other company's hardware), Orders, lines, Return orders and lines, Shipments and events, Attestations and items, Agreements, subscription lines, catalog entries and Fee events; Site templates with their items, their Customer's and those offered to every Customer (checked by the read ACL, no before-query rule) |
 | site contact | their Customer's fleet assets (and no other company's hardware), Orders and lines, Return orders and lines, Shipments and events, and Attestations and items at the Sites listing them as contacts; no Fee events |
-| service desk (`sn_customerservice_agent`, no NaaS role) | every Customer's Agreements, Site templates with their items, Orders and lines, and Return orders and lines, to raise, submit and follow them (read ACLs of its own, `security/acls.now.ts`); no other app table; hardware as the platform's ACLs allow |
+| service desk (`sn_customerservice_agent`, no NaaS role) | every Customer's Agreements, Site templates with their items, Orders and lines, and Return orders and lines, to raise, submit and follow them (read ACLs of its own, in the features' `access.now.ts`); no other app table; hardware as the platform's ACLs allow |
 | anyone else with no NaaS role | whatever the platform's ACLs and rules allow, fleet assets included |
 
-On hardware, the app's own Provider columns (support cost, claim code, Lessor and lease) are read by provider staff
-alone, whoever reads the Asset, and a Customer contact does not read a fleet asset's *Cost*, which Customer Service's
-ACLs grant its contacts, nor a Shipment's carrier cost (`security/acls-hardware.now.ts`,
-`security/acls-logistics.now.ts`).
+On hardware, the app's own Provider columns (support cost, claim code and lease) are read by provider staff alone,
+whoever reads the Asset, and a Customer contact does not read a fleet asset's *Cost*, which Customer Service's
+ACLs grant its contacts, nor a Shipment's carrier cost (`fleet/access.now.ts`,
+`delivery/access.now.ts`).
+
+An inventory tech's stockrooms are the NaaS stockrooms whose *Assignment group* (the platform's
+`alm_stockroom.assignment_group`) is a group they are a member of (ADR 0018).
 
 Before-query rules add the filter; for a site contact it checks the record's Customer as well as its
 Site, as the ACLs do, so another Customer's Site that lists them shows them nothing. Customer ACLs
 re-check the Customer and, for a site contact without the customer admin role, that the record's
 Site lists them as a contact, so neither a direct link nor a dot-walk from a visible record shows
 another Site's records. Return lines, attestation items and shipment events have no before-query
-rule: their ACL is the only check. Users with no stockroom, Site or
+rule: their ACL is the only check. Each table's scoping fields are written once, in `SCOPED_TABLES`
+(`domain/visibility.ts`); the rules' one script (`scopeRecords`) and the ACLs' (`readsRecord`,
+`grantsCustomerRecord`, `grantsFleetAsset`, all in `entry/visibility.ts`) find them by the record's table. Users with no stockroom, Site or
 Customer see nothing in the restricted tables. For inventory techs the rules only narrow rows: tables they
 may not read at all are closed by the read ACLs' role lists, not by a match-nothing filter, because a rule
-also applies to the server logic their actions set off (`INVENTORY_TECH_TABLES` in `domain/visibility.ts`
-lists what they read). For Customer contacts, a rule on a table with no Customer field (or no Site field,
+also applies to the server logic their actions set off (`built-metadata.test.ts` lists what they
+read and checks the built ACLs against it). For Customer contacts, a rule on a table with no Customer field (or no Site field,
 for Site contacts) matches nothing: Site contacts get no NaaS Stockrooms, Agreements, subscription lines,
 catalog entries or Fee events, and no Customer contact gets Staging tasks or transfer orders of NaaS
 stockrooms.
 
 **Shared tables** (ADR 0016). On `alm_hardware`, `alm_stockroom` and `alm_transfer_order`, which hold the
 Provider IT's records too, the rules narrow an inventory tech's NaaS records only and keep the others in
-(`OUTSIDE_NAAS`): hardware outside the fleet (flag false or blank), stockrooms with no NaaS stockroom type, and
+(`outsideNaasConditions`): hardware outside the fleet (flag false or blank), stockrooms with no NaaS stockroom type, and
 transfer orders between two such stockrooms. An inventory tech, who holds the platform's `asset` and `inventory_user`
 roles, sees those as other asset users do. A Customer contact is kept to their Customer (and Sites) on every record of
 those tables, fleet or not, as before: Customer Service's own contact rules on `alm_asset` run in interactive sessions
@@ -78,9 +91,9 @@ without a NaaS role lost all hardware.
 
 **Row checks.** A rule can only append conditions, and one appended after an `^NQ` binds to the last clause only,
 so a list query with `^NQ` clauses or a direct link could reach a record the rule hides. Each table the rules
-narrow to an inventory tech's stockrooms (`STOCKROOM_SCOPED_TABLES`) therefore has a Deny-Unless read ACL
-(`security/acls-visibility.now.ts`), hardware's on `alm_asset` so an `alm_asset` list is checked too. Its script checks
-the record with `rowVisible` on the same fields as the table's rule (`SCOPE`) and keeps exactly what the rule keeps: an
+narrow to an inventory tech's stockrooms (those whose `SCOPED_TABLES` entry names a Stockroom) therefore has a Deny-Unless read ACL
+(`shared/visibility.now.ts`), hardware's on `alm_asset` so an `alm_asset` list is checked too. Its script checks
+the record with `rowVisible` on the same `SCOPED_TABLES` entry as the table's rule and keeps exactly what the rule keeps: an
 inventory tech with no broader role reads a fleet asset, NaaS stockroom, transfer order touching a NaaS stockroom,
 staging task or audit only of their stockrooms, and a Customer contact hardware and the other records only of their
 Customer (and Sites). Staff who see everything and users with no NaaS role pass it, and so does a record that is not

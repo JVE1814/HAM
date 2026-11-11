@@ -1,6 +1,6 @@
 import { andEachClause } from './encoded-query.ts'
 import { stagesQuery, type Stage } from './lifecycle.ts'
-import type { StockroomType } from './sourcing.ts'
+import { INSTALL_STATUS, STAGE_FIELDS, STOCKROOM_TYPE, type StockroomType } from './vocabulary.ts'
 
 /**
  * Fleet assets (ADR 0016): the equipment the Provider runs as part of the network service, which is all this app acts
@@ -15,17 +15,20 @@ import type { StockroomType } from './sourcing.ts'
  * the fleet condition out.
  */
 
-/** The alm_hardware boolean that marks a fleet asset. */
 export const FLEET_FIELD = 'x_daas_ham_fleet'
 
-/** The Fleet flag, dot-walked from another table through `via` (e.g. `asset.`, `x_daas_ham_failed_asset.`). */
-export function fleetField(via = ''): string {
-    return `${via}${FLEET_FIELD}`
-}
+/**
+ * Encoded condition matching fleet assets only, on alm_hardware itself. A constant, like the two NaaS conditions below,
+ * because Fluent metadata reads constants only: its reference qualifiers, list filters and dashboard queries import it.
+ */
+export const FLEET_CONDITION = `${FLEET_FIELD}=true`
 
-/** Encoded condition matching fleet assets only (through `via` from another table). */
+/** The same as a script condition on `current`, an Asset: what a business rule's or UI action's condition tests. */
+export const CURRENT_IS_FLEET = `current.${FLEET_FIELD} == true`
+
+/** Encoded condition matching fleet assets only (through `via` from another table, e.g. `asset.`). */
 export function fleetCondition(via = ''): string {
-    return `${fleetField(via)}=true`
+    return `${via}${FLEET_CONDITION}`
 }
 
 /**
@@ -33,7 +36,8 @@ export function fleetCondition(via = ''): string {
  * not left to how `!=` treats an empty value.
  */
 export function outsideFleetCondition(via = ''): string {
-    return `${fleetField(via)}=false^OR${fleetField(via)}ISEMPTY`
+    const flag = `${via}${FLEET_FIELD}`
+    return `${flag}=false^OR${flag}ISEMPTY`
 }
 
 /**
@@ -52,11 +56,36 @@ export function fleetStagesQuery(stages: readonly Stage[], base = '', via = ''):
     return inFleet(stagesQuery(stages, base, via), via)
 }
 
-/** The Stockroom field that holds its type (alm_stockroom.x_daas_ham_stockroom_type). */
+/**
+ * Fleet assets in one stage, as `fleetStagesQuery([stage])` gives them: the constants Fluent metadata imports for its
+ * lists, modules and dashboard tiles (domain/fleet.test.ts holds each to the function's result).
+ */
+export const FLEET_IN_STAGE = {
+    in_service: `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${FLEET_CONDITION}`,
+    pending_in_service: `install_status=${STAGE_FIELDS.pending_in_service.installStatus}^substatus=${STAGE_FIELDS.pending_in_service.substatus}^${FLEET_CONDITION}`,
+    available: `install_status=${STAGE_FIELDS.available.installStatus}^substatus=${STAGE_FIELDS.available.substatus}^${FLEET_CONDITION}`,
+    spare_pool: `install_status=${STAGE_FIELDS.spare_pool.installStatus}^substatus=${STAGE_FIELDS.spare_pool.substatus}^${FLEET_CONDITION}`,
+    in_transit: `install_status=${STAGE_FIELDS.in_transit.installStatus}^substatusISEMPTY^${FLEET_CONDITION}`,
+} as const
+
+/**
+ * Encoded condition on alm_hardware: installed at a Site, which is In use by install status, whatever the substatus.
+ * Every query about installed fleet assets starts from it.
+ */
+export const INSTALLED_CONDITION = `install_status=${INSTALL_STATUS.inUse}`
+
+export const FLEET_INSTALLED = `${INSTALLED_CONDITION}^${FLEET_CONDITION}`
+
 export const STOCKROOM_TYPE_FIELD = 'x_daas_ham_stockroom_type'
 
-/** The types of NaaS stockrooms. A stockroom with no type (or another) is the Provider IT's, not NaaS. */
-export const NAAS_STOCKROOM_TYPES: readonly StockroomType[] = ['central_depot', 'staging_centre', 'customer_site']
+/** The types of NaaS stockrooms: every type there is. A stockroom with no type (or another) is the Provider IT's, not NaaS. */
+export const NAAS_STOCKROOM_TYPES: readonly StockroomType[] = Object.values(STOCKROOM_TYPE)
+
+/** Encoded condition matching NaaS stockrooms, on alm_stockroom itself (domain/fleet.test.ts holds it to the list above). */
+export const NAAS_STOCKROOM_CONDITION = `${STOCKROOM_TYPE_FIELD}IN${STOCKROOM_TYPE.central_depot},${STOCKROOM_TYPE.staging_centre},${STOCKROOM_TYPE.customer_site}`
+
+/** The same as a script condition on `current`, a Stockroom (domain/fleet.test.ts holds it to the list above too). */
+export const CURRENT_IS_NAAS_STOCKROOM = `current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.central_depot}' || current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.staging_centre}' || current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.customer_site}'`
 
 /** The NaaS stockroom type `value` (a stored type) names, or null for a stockroom outside NaaS. */
 export function naasStockroomType(value: string): StockroomType | null {
@@ -65,21 +94,67 @@ export function naasStockroomType(value: string): StockroomType | null {
 
 /** Encoded condition matching NaaS stockrooms (through `via`, e.g. `stockroom.` from an Asset). */
 export function naasStockroomCondition(via = ''): string {
-    return `${via}${STOCKROOM_TYPE_FIELD}IN${NAAS_STOCKROOM_TYPES.join(',')}`
+    return `${via}${NAAS_STOCKROOM_CONDITION}`
 }
 
-/** The Model field that holds its OEM PID (cmdb_model.x_daas_ham_oem_pid). */
+/**
+ * Encoded condition matching stockrooms outside NaaS (through `via`, e.g. `from_stockroom.`): another type, or none,
+ * which is not left to how `NOT IN` treats an empty value. The complement of `naasStockroomCondition`.
+ */
+export function outsideNaasStockroomCondition(via = ''): string {
+    const type = `${via}${STOCKROOM_TYPE_FIELD}`
+    return `${type}NOT IN${NAAS_STOCKROOM_TYPES.join(',')}^OR${type}ISEMPTY`
+}
+
+/**
+ * The Provider's own NaaS stockrooms, by type: its central depots and staging centres, which hold its free stock and
+ * the Spare pools and take in arriving units. The one other NaaS type, a customer-site stockroom, holds that Customer's
+ * site stock at a Site.
+ */
+export const PROVIDER_STOCKROOM_TYPES: readonly StockroomType[] = [STOCKROOM_TYPE.central_depot, STOCKROOM_TYPE.staging_centre]
+
+/** Encoded condition matching the Provider's own NaaS stockrooms (through `via`, e.g. `stockroom.` from an Asset). */
+export function providerStockroomCondition(via = ''): string {
+    return `${via}${STOCKROOM_TYPE_FIELD}IN${PROVIDER_STOCKROOM_TYPES.join(',')}`
+}
+
 export const OEM_PID_FIELD = 'x_daas_ham_oem_pid'
 
-/** Whether a Model with this OEM PID is a NaaS Model: it has one. */
+/** Encoded condition matching NaaS Models, on cmdb_model itself. */
+export const NAAS_MODEL_CONDITION = `${OEM_PID_FIELD}ISNOTEMPTY`
+
+/**
+ * The platform's `lifecycle_type` of a milestone a manufacturer publishes (cmdb_model_lifecycle, ADR 0017); the other,
+ * Internal, is an organisation's own plan for a Model.
+ */
+export const PUBLISHER_LIFECYCLE_TYPE = 'publisher'
+
+/**
+ * Encoded query on cmdb_model_lifecycle: the milestones the manufacturers publish for NaaS Models, by Model and date
+ * (ADR 0017: the table holds the milestones of the Provider IT's Models too).
+ */
+export const NAAS_MODEL_MILESTONES = `model.${NAAS_MODEL_CONDITION}^lifecycle_type=${PUBLISHER_LIFECYCLE_TYPE}^ORDERBYmodel^ORDERBYstart_date`
+
 export function isNaasModel(oemPid: string): boolean {
     return oemPid.trim() !== ''
 }
 
 /** Encoded condition matching NaaS Models (through `via`, e.g. `model.` from an Asset). */
 export function naasModelCondition(via = ''): string {
-    return `${via}${OEM_PID_FIELD}ISNOTEMPTY`
+    return `${via}${NAAS_MODEL_CONDITION}`
 }
+
+/**
+ * The Location field that marks a customer Site (cmn_location.x_daas_ham_is_site): what tells a Site from the Provider
+ * IT's locations on the shared table.
+ */
+export const SITE_FIELD = 'x_daas_ham_is_site'
+
+/** Encoded condition matching customer Sites, on cmn_location itself. */
+export const SITE_CONDITION = `${SITE_FIELD}=true`
+
+/** A Customer's Sites, once the Customer's sys_id is appended: what a Site picker's qualifier completes. */
+export const SITES_OF_CUSTOMER_QUERY = `${SITE_CONDITION}^company=`
 
 /** An Asset as adoption into the fleet (or a receipt taking it in) judges it. */
 export interface FleetCandidate {

@@ -2,19 +2,23 @@
 
 ## Lease schedules (Q65)
 
-- A **Lease schedule** extends `ast_contract`: Lessor, schedule number, monthly payment (all its
-  Assets), buyout price, end date, and how many days ahead the decision is due (default 120).
+- A **Lease schedule** extends `ast_contract`: Lessor (the contract's *Vendor*), the number the
+  Lessor gives the schedule (its *Contract number*, which a reference to the lease shows), monthly
+  payment (all its Assets), buyout price, end date, and how many days ahead the decision is due
+  (default 120). Vendor and Contract number are the platform's own fields (ADR 0018), required of a
+  lease.
 - A fleet asset is covered by setting its *Lease schedule*, while it is not retired. Its Legal owner
-  becomes *lessor* and its Lessor the schedule's Lessor. A unit returned to the Lessor or the OEM (or
+  becomes *lessor*; its Lessor is the schedule's, read through the Lease schedule (the Asset keeps
+  no copy, ADR 0018). A unit returned to the Lessor or the OEM (or
   disposed of) keeps its Lease schedule as history, but is no longer counted (*Covered assets* on the
   decision, *Assets covered at buyout*, Margin's lease share), transferred by a buyout or re-queued
   by the daily review.
 - Leases are over fleet assets only (ADR 0016). A unit of the Provider IT's given a Lease schedule
-  keeps its Legal owner and Lessor, and is neither counted, flagged for a mismatch, bought out,
+  keeps its Legal owner, and is neither counted, flagged for a mismatch, bought out,
   returned to the Lessor, given a Refresh due date nor warned about for its coverage. When such a
   unit joins the fleet (*Add to fleet*, or a warehouse receipt of a unit awaiting receipt) with its
-  Lease schedule already set, its Legal owner becomes *lessor* and its Lessor the schedule's Lessor
-  in the save that adds it, as if the schedule had just been set.
+  Lease schedule already set, its Legal owner becomes *lessor* in the save that adds it, as if the
+  schedule had just been set.
 - **Mismatch** (daily): a lease whose Assets serve Customers (shipped, pending in service, in
   service, temporary) under an Agreement that ends after the lease, or has no end date, is flagged
   and the asset managers are emailed once. If the flag cannot be saved, it is logged and the alert

@@ -1,60 +1,132 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
     adoptionProblem,
+    CURRENT_IS_FLEET,
+    CURRENT_IS_NAAS_STOCKROOM,
     FLEET_FIELD,
+    FLEET_IN_STAGE,
     fleetCondition,
-    fleetField,
     fleetStagesQuery,
     inFleet,
     isNaasModel,
+    NAAS_MODEL_CONDITION,
+    NAAS_STOCKROOM_CONDITION,
     NAAS_STOCKROOM_TYPES,
     naasModelCondition,
     naasStockroomCondition,
     naasStockroomType,
-    OEM_PID_FIELD,
     outsideFleetCondition,
+    outsideNaasStockroomCondition,
+    PROVIDER_STOCKROOM_TYPES,
+    providerStockroomCondition,
     receiptProblem,
+    SITES_OF_CUSTOMER_QUERY,
     STOCKROOM_TYPE_FIELD,
     type FleetCandidate,
 } from './fleet'
-import { ALL_STAGES, stagesQuery, type Stage } from './lifecycle'
+import { ALL_STAGES, type Stage } from './lifecycle'
+import { STOCKROOM_TYPE_CHOICES } from './vocabulary'
+import { recordMatches as matches } from '../test-support/encoded-query'
+import { assetIn, through, type SampleRecord } from '../test-support/stored-asset'
+
+const FLEET = { [FLEET_FIELD]: 'true' }
+const OUTSIDE = { [FLEET_FIELD]: 'false' }
+/** A row from before the Fleet flag column. */
+const UNFLAGGED = { [FLEET_FIELD]: '' }
 
 describe('the fleet condition', () => {
-    it('names the Fleet flag, dot-walked from another table when asked', () => {
-        expect(fleetField()).toBe('x_daas_ham_fleet')
-        expect(fleetCondition()).toBe('x_daas_ham_fleet=true')
-        expect(fleetCondition('asset.')).toBe('asset.x_daas_ham_fleet=true')
+    it('finds the Assets flagged as fleet, on the Asset or through a reference to it', () => {
+        expect([FLEET, OUTSIDE, UNFLAGGED].map((asset) => matches(fleetCondition(), asset))).toEqual([true, false, false])
+        expect([FLEET, OUTSIDE, UNFLAGGED].map((asset) => matches(fleetCondition('asset.'), through('asset.', asset)))).toEqual([true, false, false])
+        expect(matches(fleetCondition('asset.'), FLEET)).toBe(false)
     })
 
     it('counts a blank flag (a row from before the column) as outside the fleet', () => {
-        expect(outsideFleetCondition()).toBe('x_daas_ham_fleet=false^ORx_daas_ham_fleetISEMPTY')
-        expect(outsideFleetCondition('asset.')).toBe('asset.x_daas_ham_fleet=false^ORasset.x_daas_ham_fleetISEMPTY')
+        expect([FLEET, OUTSIDE, UNFLAGGED].map((asset) => matches(outsideFleetCondition(), asset))).toEqual([false, true, true])
+        expect([FLEET, OUTSIDE, UNFLAGGED].map((asset) => matches(outsideFleetCondition('asset.'), through('asset.', asset)))).toEqual([false, true, true])
     })
 
-    it('is ANDed into every top-level OR clause of a query', () => {
-        expect(inFleet('install_status=1^NQinstall_status=6')).toBe(
-            'install_status=1^x_daas_ham_fleet=true^NQinstall_status=6^x_daas_ham_fleet=true',
-        )
-        expect(inFleet('model=m1', 'asset.')).toBe('model=m1^asset.x_daas_ham_fleet=true')
+    it('keeps every alternative of a query to fleet assets', () => {
+        const query = inFleet('install_status=1^NQinstall_status=6')
+        for (const install_status of ['1', '6']) {
+            expect(matches(query, { ...FLEET, install_status }), install_status).toBe(true)
+            expect(matches(query, { ...OUTSIDE, install_status }), install_status).toBe(false)
+            expect(matches(query, { ...UNFLAGGED, install_status }), install_status).toBe(false)
+        }
+        expect(matches(query, { ...FLEET, install_status: '7' })).toBe(false)
     })
 
-    it('stands alone on an empty query', () => {
-        expect(inFleet('')).toBe('x_daas_ham_fleet=true')
+    it('reads the flag through a reference when the query is on another table', () => {
+        const query = inFleet('model=m1', 'asset.')
+        expect(matches(query, through('asset.', FLEET, { model: 'm1' }))).toBe(true)
+        expect(matches(query, through('asset.', OUTSIDE, { model: 'm1' }))).toBe(false)
+        expect(matches(query, through('asset.', FLEET, { model: 'm2' }))).toBe(false)
+    })
+
+    it('finds every fleet asset, and no other, on an empty query', () => {
+        expect([FLEET, OUTSIDE, UNFLAGGED].map((asset) => matches(inFleet(''), asset))).toEqual([true, false, false])
+    })
+})
+
+/** A Stockroom of each NaaS type, the Provider IT's (no type) and one of a type NaaS does not have. */
+const STOCKROOM_TYPES = ['central_depot', 'staging_centre', 'customer_site', '', 'it_storeroom'] as const
+const typesFound = (condition: string, via = '') => STOCKROOM_TYPES.filter((type) => matches(condition, { [`${via}${STOCKROOM_TYPE_FIELD}`]: type }))
+
+/*
+ * Fluent metadata reads constants only, so each condition it takes exists as a constant text beside the list or the
+ * function the server code uses: the two forms must say the same.
+ */
+describe('the conditions the metadata imports', () => {
+    /** Whether a script condition holds for `current`, a record with these field values. */
+    const holds = (condition: string, current: Record<string, unknown>) => new Function('current', `return ${condition}`)(current) as boolean
+
+    it('find the NaaS stockrooms: those of a NaaS type, and none with another type or without one', () => {
+        expect(typesFound(NAAS_STOCKROOM_CONDITION)).toEqual(NAAS_STOCKROOM_TYPES)
+    })
+
+    it("find a Customer's Sites once the Customer is appended, and none of its other locations", () => {
+        const query = `${SITES_OF_CUSTOMER_QUERY}cust1`
+        expect(matches(query, { x_daas_ham_is_site: 'true', company: 'cust1' })).toBe(true)
+        expect(matches(query, { x_daas_ham_is_site: 'true', company: 'cust9' })).toBe(false)
+        expect(matches(query, { x_daas_ham_is_site: 'false', company: 'cust1' })).toBe(false)
+        expect(matches(query, { x_daas_ham_is_site: '', company: 'cust1' })).toBe(false)
+    })
+
+    it('name every stockroom type as a NaaS stockroom’s', () => {
+        expect([...NAAS_STOCKROOM_TYPES].sort()).toEqual(Object.keys(STOCKROOM_TYPE_CHOICES).sort())
+    })
+
+    it('list the fleet assets of one stage as fleetStagesQuery does', () => {
+        for (const [stage, query] of Object.entries(FLEET_IN_STAGE)) expect({ stage, query }).toEqual({ stage, query: fleetStagesQuery([stage as Stage]) })
+    })
+
+    it('test the same in a script: the Fleet flag, and each NaaS stockroom type', () => {
+        expect(holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: true })).toBe(true)
+        expect(holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: false })).toBe(false)
+        expect(holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: '' })).toBe(false)
+        for (const type of NAAS_STOCKROOM_TYPES) expect(holds(CURRENT_IS_NAAS_STOCKROOM, { [STOCKROOM_TYPE_FIELD]: type }), type).toBe(true)
+        expect(holds(CURRENT_IS_NAAS_STOCKROOM, { [STOCKROOM_TYPE_FIELD]: '' })).toBe(false)
+        expect(holds(CURRENT_IS_NAAS_STOCKROOM, { [STOCKROOM_TYPE_FIELD]: 'it_storeroom' })).toBe(false)
     })
 })
 
 describe('fleetStagesQuery', () => {
-    it('keeps every stage clause to fleet assets', () => {
+    const stagesFound = (query: string, fields: SampleRecord) => ALL_STAGES.filter((stage) => matches(query, assetIn(stage, fields)))
+
+    it('finds the fleet assets in the stages asked for that the base query keeps, and no Asset outside the fleet', () => {
         const query = fleetStagesQuery(['available', 'in_service'], 'model=m1')
-        const clauses = query.split('^NQ')
-        expect(clauses).toHaveLength(2)
-        for (const clause of clauses) expect(clause).toMatch(/\^model=m1\^x_daas_ham_fleet=true$/)
-        expect(query).toBe(`${stagesQuery(['available'], 'model=m1')}^x_daas_ham_fleet=true^NQ${stagesQuery(['in_service'], 'model=m1')}^x_daas_ham_fleet=true`)
+        expect(stagesFound(query, { ...FLEET, model: 'm1' })).toEqual(['available', 'in_service'])
+        expect(stagesFound(query, { ...FLEET, model: 'm2' })).toEqual([])
+        expect(stagesFound(query, { ...OUTSIDE, model: 'm1' })).toEqual([])
+        expect(stagesFound(query, { ...UNFLAGGED, model: 'm1' })).toEqual([])
     })
 
-    it('dot-walks the stage and the flag alike', () => {
-        expect(fleetStagesQuery(['in_service'], '', 'asset.')).toBe('asset.install_status=1^asset.substatusISEMPTY^asset.x_daas_ham_fleet=true')
+    it('reads the stage and the flag alike through a reference to the Asset', () => {
+        const query = fleetStagesQuery(['in_service'], '', 'asset.')
+        expect(matches(query, through('asset.', assetIn('in_service', FLEET)))).toBe(true)
+        expect(matches(query, through('asset.', assetIn('in_service', OUTSIDE)))).toBe(false)
+        expect(matches(query, through('asset.', assetIn('pending_in_service', FLEET)))).toBe(false)
+        expect(matches(query, assetIn('in_service', FLEET))).toBe(false)
     })
 })
 
@@ -70,11 +142,19 @@ describe('NaaS stockrooms', () => {
         expect(naasStockroomType('it_storeroom')).toBeNull()
     })
 
-    it('are queried by their types, never by an empty one', () => {
-        expect(naasStockroomCondition('stockroom.')).toBe(
-            'stockroom.x_daas_ham_stockroom_typeINcentral_depot,staging_centre,customer_site',
-        )
-        expect(NAAS_STOCKROOM_TYPES).not.toContain('')
+    it('are found by their types through a reference, never by an empty type', () => {
+        expect(typesFound(naasStockroomCondition('stockroom.'), 'stockroom.')).toEqual(NAAS_STOCKROOM_TYPES)
+        expect(typesFound(naasStockroomCondition())).toEqual(NAAS_STOCKROOM_TYPES)
+    })
+
+    it('leave every other stockroom, one with no type included, to the condition for those outside NaaS', () => {
+        expect(typesFound(outsideNaasStockroomCondition())).toEqual(['', 'it_storeroom'])
+        expect(typesFound(outsideNaasStockroomCondition('from_stockroom.'), 'from_stockroom.')).toEqual(['', 'it_storeroom'])
+    })
+
+    it("are the Provider's own, its central depots and staging centres, or a Customer's site stockroom", () => {
+        expect([...PROVIDER_STOCKROOM_TYPES, 'customer_site'].sort()).toEqual([...NAAS_STOCKROOM_TYPES].sort())
+        expect(typesFound(providerStockroomCondition('stockroom.'), 'stockroom.')).toEqual(PROVIDER_STOCKROOM_TYPES)
     })
 })
 
@@ -83,7 +163,13 @@ describe('NaaS Models', () => {
         expect(isNaasModel('C9300-48P-E')).toBe(true)
         expect(isNaasModel('')).toBe(false)
         expect(isNaasModel('  ')).toBe(false)
-        expect(naasModelCondition('model.')).toBe('model.x_daas_ham_oem_pidISNOTEMPTY')
+    })
+
+    it('are found by that OEM PID, on the Model or through a reference to it', () => {
+        expect(matches(NAAS_MODEL_CONDITION, { x_daas_ham_oem_pid: 'C9300-48P-E' })).toBe(true)
+        expect(matches(NAAS_MODEL_CONDITION, { x_daas_ham_oem_pid: '' })).toBe(false)
+        expect(matches(naasModelCondition('model.'), { 'model.x_daas_ham_oem_pid': 'C9300-48P-E' })).toBe(true)
+        expect(matches(naasModelCondition('model.'), { 'model.x_daas_ham_oem_pid': '' })).toBe(false)
     })
 })
 
@@ -153,46 +239,5 @@ describe('receiptProblem', () => {
             'it is not a fleet asset: an asset manager adds it to the fleet first',
         )
         expect(receiptProblem(outside, false)).toMatch(/not a fleet asset/)
-    })
-})
-
-/* The Fluent metadata spells the fields out as literals; they must be the ones this module names. */
-describe('the Fluent metadata', () => {
-    const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
-    const augments = source('../../fluent/data/augments.now.ts')
-    const table = (name: string) => augments.split(`export const ${name} = Table({`)[1]?.split('\n})')[0] ?? ''
-    const column = (body: string, field: string) => body.split(`${field}:`)[1]?.split('}),')[0] ?? ''
-
-    it('declares the Fleet flag on alm_hardware, default false, read-only and indexed', () => {
-        const hardware = table('alm_hardware')
-        const fleet = column(hardware, FLEET_FIELD)
-        expect(fleet).toMatch(/^\s*BooleanColumn\(/)
-        expect(fleet).toMatch(/label: 'Fleet'/)
-        expect(fleet).toMatch(/default: false/)
-        expect(fleet).toMatch(/readOnly: true/)
-        expect(fleet).toMatch(/hint: '/)
-        expect(hardware).toMatch(new RegExp(`element: '${FLEET_FIELD}'`))
-    })
-
-    it('stamps no NaaS value on the rows the Provider IT creates', () => {
-        const DEFAULT = /^\s*default:|[{,]\s*default:/m
-        expect(column(table('alm_hardware'), 'x_daas_ham_legal_owner')).not.toMatch(DEFAULT)
-        expect(column(table('alm_hardware'), 'x_daas_ham_legal_owner')).not.toMatch(/dropdown_without_none/)
-        expect(column(table('cmdb_model'), 'x_daas_ham_track_as_asset')).not.toMatch(DEFAULT)
-        expect(column(table('alm_stockroom'), STOCKROOM_TYPE_FIELD)).not.toMatch(DEFAULT)
-        // The check itself finds a default where there is one.
-        expect(column(table('alm_hardware'), FLEET_FIELD)).toMatch(DEFAULT)
-        expect(table('cmdb_model')).toMatch(new RegExp(`${OEM_PID_FIELD}: StringColumn`))
-    })
-
-    it('offers only fleet assets as a case’s failed asset', () => {
-        const failed = column(table('sn_customerservice_case'), 'x_daas_ham_failed_asset')
-        expect(failed).toMatch(new RegExp(`referenceQual: '${fleetCondition()}'`))
-    })
-
-    it('offers Add to fleet only on an Asset not yet in the fleet', () => {
-        const action = source('../../fluent/ui/fleet-actions.now.ts')
-        expect(action).toMatch(new RegExp(`condition: 'current\\.${FLEET_FIELD} != true'`))
-        expect(action).toMatch(/roles: \[assetManager, admin\]/)
     })
 })

@@ -1,16 +1,16 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { transferFellThrough, type TransferContext } from '../domain/lifecycle.ts'
+import { stageAfterTransfer, transferFellThrough, type TransferContext } from '../domain/lifecycle.ts'
 import { createMarks } from '../domain/marks.ts'
 import type { TransferResult } from '../domain/sourcing.ts'
-import { moveAsset } from './assets.ts'
-import { beyondVisibility } from './beyond-visibility.ts'
+import { moveAsset, moveRefusal, readStage } from './assets.ts'
 import { PROPERTY, stagingStockroom, stringProperty } from './properties.ts'
-import { bool, deleteWhere, refusal, str } from './records.ts'
+import { bool, deleteWhere, refusal, str, type ForeignRecord } from './records.ts'
+import { hasOpenStagingTask } from './staging-tasks.ts'
 
 /**
  * Transfer orders (alm_transfer_order) moving stock between the Provider's stockrooms, one line per Asset. While a
  * line is open, Inventory keeps its Asset In transfer (domain/lifecycle; external-contracts N38); once it lets the
- * Asset go, the Asset takes back the stage it left (entry/assets `onTransferReleased`).
+ * Asset go, the Asset takes back the stage it left (`takeBackStageAfterTransfer`).
  */
 
 /**
@@ -52,10 +52,8 @@ export function requestTransfer(input: {
 
 /** Save the Asset In stock / Available for Inventory to take onto a line; why not, or null once saved. */
 function handOver(asset: GlideRecord): string | null {
-    const serial = str(asset, 'serial_number')
-    const verdict = moveAsset(asset, 'available')
-    if (!verdict.allowed) return `${serial} could not be handed over: ${verdict.reason}`
-    return asset.update() ? null : `${serial} could not be handed over: ${refusal(asset)}`
+    const refused = moveRefusal(asset, 'available')
+    return refused ? `${str(asset, 'serial_number')} could not be handed over: ${refused}` : null
 }
 
 /** Insert the Asset's line on the transfer order; why not, or null once inserted. */
@@ -93,20 +91,40 @@ function withdrawing<R>(assets: readonly GlideRecord[], remove: () => R): R {
  * onto a line and clears with In stock / Available when the line is received, cancelled or deleted, in the same save.
  * The flag, not a query of the lines: on a line's insert the Asset is saved before the line is written.
  */
-export function onTransferOrderLine(asset: GlideRecord): boolean {
+export function onTransferOrderLine(asset: ForeignRecord): boolean {
     return bool(asset, 'active_to')
+}
+
+/**
+ * In the save by which Inventory lets `asset` go from its transfer order line (`before`: the Asset as stored), give it
+ * back the stage it left; the save under way carries it. Inventory clears its flag and saves the Asset In stock:
+ * Available (Reserved for a line requested for a user) in the transfer order's to-stockroom once received, Available
+ * where it was when the line is cancelled or deleted (external-contracts N38, N39). The Asset takes back the stage it
+ * left instead (domain/lifecycle `stageAfterTransfer`); the stockroom Inventory set is kept. Any other save is left as
+ * it is: one putting the Asset onto a line, or one leaving it in transfer with the flag cleared (its line received
+ * after its last task was closed skipped), for its stage to be set by hand. A stage the lifecycle refuses is logged.
+ */
+export function takeBackStageAfterTransfer(asset: ForeignRecord, before: ForeignRecord): void {
+    const now = readStage(asset)
+    const released = readStage(before) === 'in_transfer' && now !== 'in_transfer' && !onTransferOrderLine(asset)
+    if (!released) return
+    const stage = stageAfterTransfer(transferContext(asset))
+    // From the stock Inventory made it: each stage it can take back is a move the matrix allows from there.
+    const verdict = moveAsset(asset, stage)
+    if (verdict.allowed) return
+    gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left its transfer as ${now}, not ${stage}: ${verdict.reason}`)
 }
 
 /**
  * What the Asset Inventory let go carries, and where it was left (domain/lifecycle `TransferContext`): what tells the
  * stage it left (`stageAfterTransfer`) and whether its transfer fell through (`transferFellThrough`).
  */
-export function transferContext(asset: GlideRecord): TransferContext {
+export function transferContext(asset: ForeignRecord): TransferContext {
     const company = str(asset, 'company')
     const staging = stagingStockroom()
     return {
         onOrderLine: !!str(asset, 'x_daas_ham_order_line'),
-        stagingTaskOpen: openStagingTask(asset.getUniqueValue()),
+        stagingTaskOpen: hasOpenStagingTask(asset.getUniqueValue()),
         heldForCustomer: !!company && company !== stringProperty(PROPERTY.providerCompany),
         atStagingCentre: !!staging && str(asset, 'stockroom') === staging,
         withdrawnBySourcing: withdrawn.has(String(asset.getUniqueValue())),
@@ -118,19 +136,6 @@ export function transferContext(asset: GlideRecord): TransferContext {
  * cancelled or deleted (domain/lifecycle `transferFellThrough`): read once the save that let it go is made, from the
  * Asset as saved.
  */
-export function fellShortOfStagingCentre(asset: GlideRecord): boolean {
+export function fellShortOfStagingCentre(asset: ForeignRecord): boolean {
     return !onTransferOrderLine(asset) && transferFellThrough(transferContext(asset))
-}
-
-/**
- * Whether a Staging task is open for the Asset, read past the visibility rules (ADR 0005): an inventory tech receiving
- * the line at the staging centre does not see a task whose Asset is still stored in the stockroom it left.
- */
-function openStagingTask(assetId: string): boolean {
-    const task = new GlideRecord('x_daas_ham_staging_task')
-    task.addQuery('asset', assetId)
-    task.addQuery('active', true)
-    task.setLimit(1)
-    beyondVisibility(task, () => task.query())
-    return task.hasNext()
 }

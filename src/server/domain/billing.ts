@@ -1,6 +1,6 @@
 import { addDays, addMonths, daysBetween } from './calendar.ts'
-import { fleetStagesQuery } from './fleet.ts'
-import { ALL_STAGES, isBillable, type Stage } from './lifecycle.ts'
+import { FLEET_CONDITION } from './fleet.ts'
+import { STAGE_FIELDS, SUBSCRIPTION_LINE_STATUS } from './vocabulary.ts'
 
 /** Billing periods: daily proration of Subscription lines and Fee events (plan §13 Billing export, Q52, Q66). */
 
@@ -12,7 +12,6 @@ export interface MonthBounds {
     days: number
 }
 
-/** A calendar month as YYYY-MM (what monthBounds takes). */
 export function isMonth(value: string): boolean {
     return /^\d{4}-(0[1-9]|1[0-2])$/.test(value)
 }
@@ -33,7 +32,6 @@ export function overlapsMonth(bounds: MonthBounds): string {
     return `start_date<=${bounds.last}^end_dateISEMPTY^ORend_date>=${bounds.first}`
 }
 
-/** The calendar month before the one `today` falls in. */
 export function previousMonth(today: string): string {
     return addMonths(`${today.slice(0, 7)}-01`, -1).slice(0, 7)
 }
@@ -70,12 +68,10 @@ export function toCents(amount: number): number {
     return (amount < 0 ? -rounded : rounded) || 0
 }
 
-/** Whole cents as an amount (what a Decimal field is given). */
 export function fromCents(cents: number): number {
     return cents / 100
 }
 
-/** An amount rounded to the cent, half away from zero (toCents). */
 export function roundToCent(amount: number): number {
     return fromCents(toCents(amount))
 }
@@ -150,7 +146,6 @@ export interface AgreementCurrency {
     currency: string
 }
 
-/** The currency an amount is kept in, or why it has none. */
 export type CurrencyChoice = { currency: string } | { problem: string }
 
 /**
@@ -171,6 +166,12 @@ export function chooseCurrency(agreement: AgreementCurrency | null, customerCurr
     if (codes.length === 1 && codes[0]) return { currency: codes[0] }
     const has = codes.length === 0 ? 'none' : codes.map((code) => code || 'no currency').join(', ')
     return { problem: `it names no Agreement, and its Customer's Agreements are in ${has}: set its Agreement` }
+}
+
+/** The currency chosen; throws with why there is none, so the line or cost fails (and is counted) instead of guessing one. */
+export function currencyOrThrow(choice: CurrencyChoice): string {
+    if ('problem' in choice) throw new Error(`no currency: ${choice.problem}`)
+    return choice.currency
 }
 
 /** The days one Asset (or `count` Assets) delivered a Subscription line at a Site (end inclusive; none while still in service). */
@@ -212,14 +213,12 @@ export interface SubscriptionLineTerms {
     currency: string
     /** The package's Site ('' on a per-device line). */
     siteId: string
-    /** The Subscription line's own description. */
     description: string
     /** The line's own dates, end inclusive: a site package bills them, a per-device line its intervals within them. */
     start?: string
     end?: string
 }
 
-/** Whether a Subscription line is billed from its Service intervals (a per-device line). */
 export function billsFromIntervals(line: Pick<SubscriptionLineTerms, 'lineType'>): boolean {
     return line.lineType === 'device_class'
 }
@@ -243,19 +242,24 @@ export function withinLine(interval: DayRange, line: Partial<DayRange>): DayRang
     return end !== undefined && end < start ? null : { start, end }
 }
 
-/** The stages in which an Asset delivers its Subscription line and is billed from its Service interval. */
-export const BILLED_STAGES: readonly Stage[] = ALL_STAGES.filter((stage) => isBillable(stage))
+export const NO_LINE = 'x_daas_ham_subscription_lineISEMPTY'
+
+/**
+ * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets in service on no Subscription line,
+ * which nothing bills. `fleetStagesQuery(['in_service'], NO_LINE)` written out for the tile to import.
+ */
+export const IN_SERVICE_UNBILLED = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${NO_LINE}^${FLEET_CONDITION}`
+
+export const ON_ENDED_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION_LINE_STATUS.ended}^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()`
 
 /**
  * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets (ADR 0016) billed from a Service
  * interval whose Subscription line has ended (set ended, or past its end date; the end date itself is billed). Their
  * days after the line's end are not billed (withinLine), so they are flagged; nothing moves them to another line.
+ * It is `fleetStagesQuery(IN_USE_STAGES, ON_ENDED_LINE)` written out, one clause per stage in use: the dashboard tile
+ * imports it, and Fluent metadata reads no function call (domain/billing.test.ts holds it to the function's result).
  */
-export const IN_SERVICE_ON_ENDED_LINE = fleetStagesQuery(
-    BILLED_STAGES,
-    'x_daas_ham_subscription_line.status=ended' +
-        '^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()',
-)
+export const IN_SERVICE_ON_ENDED_LINE = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${ON_ENDED_LINE}^${FLEET_CONDITION}^NQinstall_status=${STAGE_FIELDS.temporary_deployment.installStatus}^substatus=${STAGE_FIELDS.temporary_deployment.substatus}^${ON_ENDED_LINE}^${FLEET_CONDITION}`
 
 /** What one Subscription line bills at one Site for the month: the content of its Billing line. */
 export interface Charge {
@@ -295,7 +299,6 @@ export function subscriptionCharges(line: SubscriptionLineTerms, bounds: MonthBo
     })
 }
 
-/** The units the line bills per Site, in order of first appearance; Sites with none are left out. */
 function unitsBySite(line: SubscriptionLineTerms, bounds: MonthBounds, sources: ChargeSources): Map<string, number> {
     const bySite = new Map<string, number>()
     if (line.lineType === 'site_package') {
@@ -314,7 +317,6 @@ function unitsBySite(line: SubscriptionLineTerms, bounds: MonthBounds, sources: 
 /** How long a generating Billing period must show no activity before an admin may reset it (Reset generation). */
 export const RESET_AFTER_IDLE_MINUTES = 30
 
-/** Whether an admin may reset a period's generation by hand now, and how long it has shown no activity. */
 export type GenerationReset = { reset: true; idleMinutes: number } | { reset: false; why: string }
 
 /**
@@ -341,36 +343,86 @@ export function decideGenerationReset(
     }
 }
 
+/** The length of the errors a Billing period records: its `last_error` (generation) and its `margin_error`. */
+export const PERIOD_ERROR_LENGTH = 255
+
 /** The generation error a reset period records, which Close period refuses on until a Regenerate clears it. */
 export function resetGenerationError(byUser: string, idleMinutes: number): string {
     const note = `Generation reset by hand by ${byUser} after ${idleMinutes} minutes without activity; its lines may be incomplete: Regenerate before closing`
-    return note.slice(0, 255)
+    return note.slice(0, PERIOD_ERROR_LENGTH)
 }
 
-/** What a generation event's parm1 names: the period, and the pass the event belongs to ('' for none). */
-export interface GenerationEventParm {
-    periodId: string
-    token: string
+/** A column of a Billing line, as its exports give it. */
+interface BillingLineColumn<Field extends string = string> {
+    field: Field
+    /** A reference reads as its display value in the CSV. */
+    type: 'text' | 'number' | 'reference'
+    /** Whether the CSV export has the column, headed by its field name. */
+    csv: boolean
+    /** The pull API's name for the column's stored value. */
+    json?: string
+    /** The pull API's name for a reference's display value. */
+    jsonDisplay?: string
 }
 
 /**
- * The parm1 of a period's generation events: its sys_id and the pass's token, so that the queued events of a pass that
- * was reset or replaced by a Regenerate are told from the current pass's and dropped.
+ * What a Billing line holds besides its period, in the order every export gives it: the CSV attached to a closed
+ * period and the pull API's lines are both read off this list (`billingCsvRow`, `billingLineJson`), and a generated
+ * line sets these fields (`BillingLineValues`).
  */
-export function generationEventParm(parm: GenerationEventParm): string {
-    return `${parm.periodId}:${parm.token}`
+const BILLING_LINE_COLUMNS = [
+    { field: 'kind', type: 'text', csv: true, json: 'kind' },
+    { field: 'customer', type: 'reference', csv: true, json: 'customerId', jsonDisplay: 'customer' },
+    { field: 'agreement', type: 'reference', csv: true, jsonDisplay: 'agreement' },
+    { field: 'subscription_line', type: 'reference', csv: true, json: 'subscriptionLine' },
+    { field: 'site', type: 'reference', csv: true, json: 'siteId', jsonDisplay: 'site' },
+    { field: 'fee_event', type: 'reference', csv: false, json: 'feeEvent' },
+    { field: 'description', type: 'text', csv: true, json: 'description' },
+    { field: 'units', type: 'number', csv: true, json: 'units' },
+    { field: 'monthly_rate', type: 'number', csv: true, json: 'monthlyRate' },
+    { field: 'amount', type: 'number', csv: true, json: 'amount' },
+    { field: 'currency', type: 'text', csv: true, json: 'currency' },
+] as const satisfies readonly BillingLineColumn[]
+
+export type BillingLineField = (typeof BILLING_LINE_COLUMNS)[number]['field']
+
+/** The fields a generated Billing line is given; one left out keeps the column's default. */
+export type BillingLineValues = { readonly [field in BillingLineField]?: string | number }
+
+/** A stored Billing line as an export reads it. */
+export interface StoredBillingLine {
+    /** The field's stored value ('' when empty). */
+    value(field: BillingLineField): string
+    display(field: BillingLineField): string
 }
 
-/** A generation event's parm1 read back; one without a token (queued before passes were tracked) belongs to no pass. */
-export function readGenerationEventParm(parm1: string): GenerationEventParm {
-    const separator = parm1.indexOf(':')
-    if (separator < 0) return { periodId: parm1, token: '' }
-    return { periodId: parm1.slice(0, separator), token: parm1.slice(separator + 1) }
+const COLUMNS: ReadonlyArray<BillingLineColumn<BillingLineField>> = BILLING_LINE_COLUMNS
+const CSV_COLUMNS = COLUMNS.filter((column) => column.csv)
+
+function storedValue(line: StoredBillingLine, column: BillingLineColumn<BillingLineField>): string | number {
+    const value = line.value(column.field)
+    if (column.type !== 'number') return value
+    const number = Number(value)
+    return Number.isFinite(number) ? number : 0
 }
 
-/** Whether an event's pass `token` is the period's current pass (`currentToken`, '' once reset by hand). */
-export function isCurrentGeneration(currentToken: string, token: string): boolean {
-    return token !== '' && token === currentToken
+export function billingCsvHeader(): string[] {
+    return ['period', ...CSV_COLUMNS.map((column) => column.field)]
+}
+
+/** A Billing line's row in the CSV export of `period` (its YYYY-MM month). */
+export function billingCsvRow(period: string, line: StoredBillingLine): Array<string | number> {
+    return [period, ...CSV_COLUMNS.map((column) => (column.type === 'reference' ? line.display(column.field) : storedValue(line, column)))]
+}
+
+/** A Billing line as the pull API gives it. */
+export function billingLineJson(id: string, line: StoredBillingLine): { [key: string]: string | number } {
+    const json: { [key: string]: string | number } = { id }
+    for (const column of COLUMNS) {
+        if (column.json) json[column.json] = storedValue(line, column)
+        if (column.jsonDisplay) json[column.jsonDisplay] = line.display(column.field)
+    }
+    return json
 }
 
 /** A Billing period's lines and their amount in one currency. */

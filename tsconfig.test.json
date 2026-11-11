@@ -9,6 +9,7 @@
     "include": [
         "src/server/**/*.ts",
         "src/client/**/*.test.ts",
+        "src/client/global.d.ts",
         "vitest.config.ts"
     ],
     "exclude": [

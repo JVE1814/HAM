@@ -1,71 +1,71 @@
 import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
+import { messageOf } from '../domain/errors.ts'
+import {
+    ABANDONED_AFTER_MINUTES,
+    attemptUnderLock,
+    LOCK_TRIES,
+    type HeldLock,
+    type LockAttempt,
+    type LockPorts,
+    type TryAgain,
+} from '../domain/job-lock.ts'
 import { deleteWhere, exists, refusal, str } from './records.ts'
 
 /** Job locks (ADR 0013): a row per lock held, behind a unique index, so taking a lock is one insert only one holder wins. */
-const LOCK = 'x_daas_ham_job_lock'
+const LOCK_TABLE = 'x_daas_ham_job_lock'
+
+const LOCK_ROWS: LockPorts = {
+    take,
+    release,
+    held: (lockId) => new GlideRecord(LOCK_TABLE).get(lockId),
+    log: (level, message) => (level === 'error' ? gs.error(`[x_daas_ham] ${message}`) : gs.warn(`[x_daas_ham] ${message}`)),
+}
+
+/** What became of work to run under a lock: it ran and returned `value`, or other holders kept the lock. */
+export type LockRun<T> = { ran: true; value: T } | { ran: false }
+
+/** What a holder does under its lock (domain/job-lock `attemptUnderLock` says when it returns TRY_AGAIN). */
+type Work<T> = (lock: HeldLock) => T | TryAgain
 
 /**
- * A lock held this long is taken as abandoned (its holder's transaction died) and cleared by the next taker. A holder
- * still running is not stopped, so one whose writes must not overlap the next holder's checks `held()` after each write
- * and when one throws.
+ * Run `work` holding the lock `name` (domain/lock-names `LOCK`) and give what it returned, or `ran: false` at once when
+ * another holder has the lock. Throws when the lock cannot be taken for another reason (the insert is refused while no
+ * lock row exists); `work`'s own errors escape. Not reentrant: a lock is one row, not a count of takes, so a nested
+ * take of `name` (inside `work`, or anywhere in the same transaction while it is held) finds it held and does not run.
  */
-const ABANDONED_AFTER_MINUTES = 10
-
-/** A lock being held: `held()` says whether it still is (a holder past the abandonment time may have lost it). */
-export interface HeldLock {
-    held(): boolean
+export function withLock<T>(name: string, work: Work<T>): LockRun<T> {
+    return withLockTries(name, work, 1)
 }
 
 /**
- * Run `work` holding the lock `name` and return true, or return false at once when another holder has it.
- * Throws when the lock cannot be taken for another reason (the insert is refused while no lock row exists).
- * Not reentrant: a lock is one row, not a count of takes, so a nested take of `name` (inside `work`, or anywhere in
- * the same transaction while it is held) finds it held and returns false without running.
+ * `withLock` tried up to `tries` times, back to back, while other holders have the lock: `ran: false` when it was held
+ * through every try. A take that throws is tried again too, and its error escapes only when no try found the lock held.
  */
-export function withLock(name: string, work: (lock: HeldLock) => void): boolean {
-    const lockId = take(name)
-    if (!lockId) return false
-    try {
-        work({ held: () => new GlideRecord(LOCK).get(lockId) })
-    } finally {
-        release(lockId)
-    }
-    return true
+export function withLockTries<T>(name: string, work: Work<T>, tries = LOCK_TRIES): LockRun<T> {
+    const attempt = attemptLock(name, work, tries)
+    if (!attempt.ran && !attempt.held) throw attempt.error
+    return attempt
 }
 
 /**
- * `withLock` tried up to `tries` times, back to back, while other holders have the lock `name`: true once `work` ran,
- * false when the lock was held through every try. A take that throws (see `withLock`) is tried again too, and its error
- * escapes only when every try threw; `work`'s own errors escape at once. `work` runs once, unless it returns false to
- * give its try up, having lost the lock before its result could be used (ADR 0013): that try counts as held, and the
- * next runs `work` again. Only `work` that may safely run twice returns false.
+ * `withLockTries` for a caller that reports a lock that could not be taken instead of throwing: `held: false` with
+ * what the take threw. `work`'s own errors still escape.
  */
-export function withLockTries(name: string, tries: number, work: (lock: HeldLock) => boolean | void): boolean {
-    let held = false
-    let takeError: unknown = null
-    for (let attempt = 0; attempt < tries; attempt++) {
-        // Set inside the lock.
-        let started = false as boolean
-        let gaveUp = false as boolean
-        try {
-            const taken = withLock(name, (lock) => {
-                started = true
-                gaveUp = work(lock) === false
-            })
-            if (taken && !gaveUp) return true
-            held = true
-        } catch (error) {
-            if (started) throw error
-            takeError = error
-        }
-    }
-    if (!held && takeError) throw takeError
-    return false
+export function attemptLock<T>(name: string, work: Work<T>, tries = LOCK_TRIES): LockAttempt<T> {
+    return attemptUnderLock(LOCK_ROWS, name, tries, work)
+}
+
+/**
+ * Why an attempt that did not run did not, for its caller to log or tell: `held` (who has the lock, in the caller's
+ * words) when other holders kept it through every try, else what taking it threw.
+ */
+export function whyNotRun(attempt: Exclude<LockAttempt<unknown>, { ran: true }>, held: string): string {
+    return attempt.held ? held : messageOf(attempt.error)
 }
 
 /** Whether a holder has the lock `name` now: a cheap probe only, since taking the lock is what decides. */
 export function isLocked(name: string): boolean {
-    return exists(LOCK, `name=${name}`)
+    return exists(LOCK_TABLE, `name=${name}`)
 }
 
 function take(name: string): string | null {
@@ -84,7 +84,7 @@ function take(name: string): string | null {
 
 /** The new lock row's sys_id, or none (and why) when the insert is refused: by the unique index while the lock is held. */
 function insertLock(name: string): { id: string | null; error: string } {
-    const lock = new GlideRecord(LOCK)
+    const lock = new GlideRecord(LOCK_TABLE)
     lock.initialize()
     lock.setValue('name', name)
     const id = lock.insert()
@@ -95,7 +95,7 @@ function insertLock(name: string): { id: string | null; error: string } {
 function clearAbandoned(name: string): void {
     const cutoff = new GlideDateTime()
     cutoff.addSeconds(-ABANDONED_AFTER_MINUTES * 60)
-    if (deleteWhere(LOCK, `name=${name}^sys_created_on<${cutoff.getValue()}`)) return
+    if (deleteWhere(LOCK_TABLE, `name=${name}^sys_created_on<${cutoff.getValue()}`)) return
     gs.warn(`[x_daas_ham] Abandoned job lock ${name} not cleared (its delete was refused): every take finds it held until it is removed`)
 }
 
@@ -105,7 +105,7 @@ function clearAbandoned(name: string): void {
  * was taken).
  */
 function release(lockId: string): void {
-    const lock = new GlideRecord(LOCK)
+    const lock = new GlideRecord(LOCK_TABLE)
     if (!lock.get(lockId) || lock.deleteRecord()) return
     const held = `held until taken as abandoned, ${ABANDONED_AFTER_MINUTES} minutes after it was taken`
     gs.warn(`[x_daas_ham] Job lock ${str(lock, 'name')} not released: ${refusal(lock, 'the delete was refused')}; ${held}`)

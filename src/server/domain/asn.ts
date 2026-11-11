@@ -1,3 +1,5 @@
+import { normalizeSerial } from './serials.ts'
+
 /** ASN rows: a distributor's list of serials in transit against a purchase order. */
 
 export interface AsnRow {
@@ -7,19 +9,6 @@ export interface AsnRow {
 }
 
 export type AsnRowCheck = { row: number; ok: true } | { row: number; ok: false; reason: string }
-
-export function normalizeSerial(serial: string): string {
-    return serial.trim().toUpperCase()
-}
-
-/**
- * The job lock (ADR 0013) the Asset of a serial not yet known is created under, by a first scan without an ASN and by
- * an ASN row alike, so the two create one Asset. A serial too long for a lock name (100 characters) shares its lock
- * with those it starts like.
- */
-export function receiveSerialLockName(serial: string): string {
-    return `receive_serial_${normalizeSerial(serial)}`.slice(0, 100)
-}
 
 /** Check each row; `knownSerials` holds normalized serials that already exist as Assets. */
 export function validateAsnRows(rows: readonly AsnRow[], knownSerials: ReadonlySet<string>): AsnRowCheck[] {

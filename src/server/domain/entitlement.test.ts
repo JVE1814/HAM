@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-    agreementUsageLockName,
     assessOrder,
     deployedUsageQuery,
     inFlightLinesQuery,
-    OPEN_LINE_STAGES,
     ownershipFindings,
     raiserRefusal,
     readsUsage,
@@ -13,9 +11,10 @@ import {
     type Orderer,
     type OrderParties,
 } from './entitlement'
-import { lineStageFor } from './fulfilment'
-import { DEPLOYED_STAGES } from './lifecycle'
-import { orderLineLockName, sourcingLockName } from './sourcing'
+import { lineStageFor, OPEN_LINE_STAGES } from './fulfilment'
+import { ALL_STAGES, type Stage } from './lifecycle'
+import { recordMatches as matches } from '../test-support/encoded-query'
+import { assetIn, type SampleRecord } from '../test-support/stored-asset'
 
 const context: EntitlementContext = {
     catalog: [
@@ -124,19 +123,6 @@ describe('readsUsage', () => {
         const request = { lines: [replacing, { ...replacing, modelId: 'old-switch' }] }
         const crowded = { ...context, usage: [{ deviceClass: 'switch', modelId: 'c9300', count: 1000 }, { deviceClass: 'ap', modelId: 'mr46', count: 1000 }] }
         expect(assessOrder(request, crowded)).toEqual(assessOrder(request, { ...context, usage: [] }))
-    })
-})
-
-describe('agreementUsageLockName', () => {
-    const sysId = (c: string) => c.repeat(32)
-
-    it('locks each Agreement on its own, apart from the sourcing locks, within the job lock name length', () => {
-        const names = [sysId('a'), sysId('b')].map(agreementUsageLockName)
-        expect(new Set(names).size).toBe(2)
-        expect(names[0]).toBe(`agreement_usage_${sysId('a')}`)
-        expect(names[0]).not.toBe(sourcingLockName(sysId('a')))
-        expect(names[0]).not.toBe(orderLineLockName(sysId('a')))
-        for (const name of names) expect(name.length).toBeLessThanOrEqual(100)
     })
 })
 
@@ -250,17 +236,35 @@ describe('siteTemplateOffered', () => {
 })
 
 describe('usage queries', () => {
-    const open = 'new,awaiting_stock,sourced,staging,ready_to_ship'
+    const OPEN_STAGES = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship'] as const
+    const SENT_STAGES = ['shipped', 'installed', 'in_service', 'cancelled'] as const
+    const LINE_STAGE = 'x_daas_ham_order_line.line_stage'
+    /** A fleet asset of Agreement a1 on no Order line, in `stage`. */
+    const deployed = (stage: Stage, fields: SampleRecord = {}) => assetIn(stage, { x_daas_ham_fleet: 'true', x_daas_ham_agreement: 'a1', x_daas_ham_order_line: '', ...fields })
+    const countedIn = (fields: SampleRecord = {}) => ALL_STAGES.filter((stage) => matches(deployedUsageQuery('a1'), deployed(stage, fields)))
 
-    it("counts the Agreement's deployed fleet assets except those on an open Order line, in every stage clause", () => {
-        const clauses = deployedUsageQuery('a1').split('^NQ')
-        const base = `^x_daas_ham_agreement=a1^x_daas_ham_order_lineISEMPTY^ORx_daas_ham_order_line.line_stageNOT IN${open}^x_daas_ham_fleet=true`
-        expect(clauses).toHaveLength(DEPLOYED_STAGES.length)
-        for (const clause of clauses) expect(clause.endsWith(base)).toBe(true)
+    it("counts the Agreement's fleet assets at a Site or on the way there or back, and no other Agreement's or the Provider IT's", () => {
+        expect(countedIn()).toEqual(['shipped', 'pending_in_service', 'in_service', 'temporary_deployment', 'pending_return'])
+        expect(countedIn({ x_daas_ham_agreement: 'a2' })).toEqual([])
+        expect(countedIn({ x_daas_ham_agreement: '' })).toEqual([])
+        expect(countedIn({ x_daas_ham_fleet: 'false' })).toEqual([])
+        expect(countedIn({ x_daas_ham_fleet: '' })).toEqual([])
+    })
+
+    it('leaves out a deployed unit still on an open Order line, in every stage: the line counts it in flight', () => {
+        for (const lineStage of OPEN_STAGES) expect(countedIn({ x_daas_ham_order_line: 'line1', [LINE_STAGE]: lineStage }), lineStage).toEqual([])
+        for (const lineStage of SENT_STAGES) expect(countedIn({ x_daas_ham_order_line: 'line1', [LINE_STAGE]: lineStage }), lineStage).toHaveLength(5)
     })
 
     it('counts in flight the open lines of the Agreement on other live Orders', () => {
-        expect(inFlightLinesQuery('a1', 'o1')).toBe(`order.agreement=a1^order!=o1^order.stageNOT INdraft,rejected,cancelled^line_stageIN${open}`)
+        const query = inFlightLinesQuery('a1', 'o1')
+        const line = (fields: SampleRecord = {}) => ({ 'order.agreement': 'a1', order: 'o2', 'order.stage': 'sourcing', line_stage: 'new', ...fields })
+        for (const lineStage of OPEN_STAGES) expect(matches(query, line({ line_stage: lineStage })), lineStage).toBe(true)
+        for (const lineStage of SENT_STAGES) expect(matches(query, line({ line_stage: lineStage })), lineStage).toBe(false)
+        for (const stage of ['awaiting_approval', 'sourcing', 'preparing', 'delivering', 'installing', 'complete']) expect(matches(query, line({ 'order.stage': stage })), stage).toBe(true)
+        for (const stage of ['draft', 'rejected', 'cancelled']) expect(matches(query, line({ 'order.stage': stage })), stage).toBe(false)
+        expect(matches(query, line({ order: 'o1' }))).toBe(false)
+        expect(matches(query, line({ 'order.agreement': 'a2' }))).toBe(false)
     })
 
     it('keeps a partly shipped line open, so its shipped units count once, through its quantity', () => {

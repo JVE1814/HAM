@@ -4,10 +4,20 @@ import { beyondVisibility } from './beyond-visibility.ts'
 
 /** Small Glide helpers shared by repositories and gateways. Keep this module free of business rules. */
 
-export function findById(table: string, sysId: string): GlideRecord | null {
+/** How a read treats the app's before-query visibility rules (ADR 0005). */
+export interface ReadOptions {
+    /**
+     * Read past the app's visibility rules (platform/beyond-visibility), for server logic that must find the record
+     * whoever set it off. A record found this way is saved with every rule.
+     */
+    beyondVisibility?: boolean
+}
+
+export function findById(table: string, sysId: string, options: ReadOptions = {}): GlideRecord | null {
     if (!sysId) return null
     const gr = new GlideRecord(table)
-    return gr.get(sysId) ? gr : null
+    const found = options.beyondVisibility ? beyondVisibility(gr, () => gr.get(sysId)) : gr.get(sysId)
+    return found ? gr : null
 }
 
 /** Values of one field for every record matching an encoded query (bounded by `limit`). */
@@ -45,17 +55,24 @@ export function addAnyOf(gr: GlideRecord, field: string, values: readonly string
 }
 
 /**
- * Delete every record matching an encoded query with one set-based delete (business rules run unless `businessRules`
- * is false), and return whether none is left. deleteMultiple reports nothing and a rule can keep a record, so a
- * caller that must not go on past one checks this. It looks past before-query rules, so a record hidden from the user
- * still counts as left: past every rule on an app table, and past the app's visibility rules on a table of another
- * scope, where the platform refuses setWorkflow from this scope (platform/beyond-visibility).
+ * Delete every record matching an encoded query with one set-based delete (business rules run), and return whether
+ * none is left (`noneLeft`). deleteMultiple reports nothing and a rule can keep a record, so a caller that must not go
+ * on past one checks this.
  */
-export function deleteWhere(table: string, encodedQuery: string, options: { businessRules?: boolean } = {}): boolean {
+export function deleteWhere(table: string, encodedQuery: string): boolean {
     const gr = new GlideRecord(table)
     gr.addEncodedQuery(encodedQuery)
-    if (options.businessRules === false) gr.setWorkflow(false)
     gr.deleteMultiple()
+    return noneLeft(table, encodedQuery)
+}
+
+/**
+ * Whether no record matches an encoded query any more, after a set-based delete. It looks past before-query rules, so
+ * a record hidden from the user still counts as left: past every rule on an app table, and past the app's visibility
+ * rules on a table of another scope, where the platform refuses setWorkflow from this scope
+ * (platform/beyond-visibility).
+ */
+export function noneLeft(table: string, encodedQuery: string): boolean {
     const left = new GlideRecord(table)
     left.addEncodedQuery(encodedQuery)
     left.setWorkflow(false)
@@ -66,11 +83,12 @@ export function deleteWhere(table: string, encodedQuery: string, options: { busi
 }
 
 /** Whether any record matches an encoded query (stops at the first). */
-export function exists(table: string, encodedQuery: string): boolean {
+export function exists(table: string, encodedQuery: string, options: ReadOptions = {}): boolean {
     const gr = new GlideRecord(table)
     gr.addEncodedQuery(encodedQuery)
     gr.setLimit(1)
-    gr.query()
+    if (options.beyondVisibility) beyondVisibility(gr, () => gr.query())
+    else gr.query()
     return gr.hasNext()
 }
 
@@ -83,9 +101,50 @@ export function count(table: string, encodedQuery: string): number {
     return ga.next() ? Number(ga.getAggregate('COUNT', '')) : 0
 }
 
+/** How many records match an encoded query for each value of `field` (one aggregate query); values with none are left out. */
+export function countBy(table: string, encodedQuery: string, field: string): Map<string, number> {
+    const ga = new GlideAggregate(table)
+    ga.addEncodedQuery(encodedQuery)
+    ga.addAggregate('COUNT', '')
+    ga.groupBy(field)
+    ga.query()
+    const counts = new Map<string, number>()
+    while (ga.next()) counts.set(String(ga.getValue(field) ?? ''), Number(ga.getAggregate('COUNT', '')))
+    return counts
+}
+
+/**
+ * A record of a table of another scope (alm_hardware, wm_order, a platform table) as a business rule there is handed
+ * it. From this scope the platform refuses setAbortAction and setWorkflow on such a record and goes on as if neither
+ * was called: the save is written, the rules run (rule-api `abortWith`, platform/beyond-visibility). The type leaves
+ * both out, so a rule there, and every helper it hands its record to, fails to compile when it calls one. Any
+ * GlideRecord is one. (Spelled out key by key: `Omit` on a GlideRecord keeps its field index only, and no method.)
+ */
+export type ForeignRecord = {
+    [Key in keyof GlideRecord as string extends Key ? never : number extends Key ? never : Key extends 'setAbortAction' | 'setWorkflow' ? never : Key]: GlideRecord[Key]
+}
+
 /** Why the platform refused to save (or delete) `record`: its last error message, or `fallback` when it gave none. */
 export function refusal(record: GlideRecord, fallback = 'the save was refused'): string {
     return record.getLastErrorMessage() || fallback
+}
+
+/**
+ * Log that the platform refused to save (or delete) `record`, naming what that leaves `undone`: a refused save throws
+ * nothing, so unlogged it leaves no trace. Gives why it was refused, for a caller that also tells the user.
+ */
+export function warnRefused(record: GlideRecord, undone: string): string {
+    const reason = refusal(record)
+    gs.warn(`[x_daas_ham] ${undone}: ${reason}`)
+    return reason
+}
+
+/**
+ * `warnRefused` for work that must stop at a refused save rather than go on without the record (a pass of a Billing
+ * period, ADR 0013): throws what is `undone` and why, for the pass to record where it stopped.
+ */
+export function throwRefused(record: GlideRecord, undone: string): never {
+    throw new Error(`${undone}: ${refusal(record)}`)
 }
 
 /**
@@ -94,13 +153,13 @@ export function refusal(record: GlideRecord, fallback = 'the save was refused'):
  * crosses an empty reference (and which is null itself for an unknown field). Not for a GlideAggregate: scoped scripts
  * may not call its getElement, and its getValue does give a dotted group-by.
  */
-function valueOf(gr: GlideRecord, field: string): string | null {
+function valueOf(gr: ForeignRecord, field: string): string | null {
     if (!field.includes('.')) return gr.getValue(field)
     const element: GlideElement | null = gr.getElement(field)
     return element ? element.getValue() : null
 }
 
-export function str(gr: GlideRecord, field: string): string {
+export function str(gr: ForeignRecord, field: string): string {
     const value = valueOf(gr, field)
     return value === null || value === undefined ? '' : String(value)
 }
@@ -110,7 +169,7 @@ export function str(gr: GlideRecord, field: string): string {
  * text field) reads as 0 too, which would bill or cost nothing without a word, so it is logged as a warning naming the
  * record, the field and the value.
  */
-export function num(gr: GlideRecord, field: string): number {
+export function num(gr: ForeignRecord, field: string): number {
     const raw = valueOf(gr, field)
     if (raw === null || raw === undefined) return 0
     const value = Number(raw)
@@ -120,17 +179,25 @@ export function num(gr: GlideRecord, field: string): number {
 }
 
 /**
- * The value of choice field `field` when it is one of `allowed` (domain/exhaustive `oneOf`), else `fallback`, or undefined
- * when none is given: a value the app does not know, such as a choice an administrator added, a corrupt row or a blank
- * not in `allowed`, is never read as one it does, as a cast (`str(...) as T`) would.
+ * The value of a choice `field`.
+ *
+ * With the list's values (`allowed`) it is checked (domain/exhaustive `oneOf`): the value when it is one of them, else
+ * `fallback`, or undefined when none is given. A value the app does not know, such as a choice an administrator added, a
+ * corrupt row or a blank not in `allowed`, is never read as one it does, as a cast (`str(...) as T`) would.
+ *
+ * Without `allowed` it is the value as its list's type (domain/vocabulary; '' when blank), so that comparing it with a
+ * value the list does not have fails to compile. That form checks nothing: a value stored past the list reads as it is.
  */
-export function choice<T extends string>(gr: GlideRecord, field: string, allowed: readonly T[]): T | undefined
-export function choice<T extends string>(gr: GlideRecord, field: string, allowed: readonly T[], fallback: T): T
-export function choice<T extends string>(gr: GlideRecord, field: string, allowed: readonly T[], fallback?: T): T | undefined {
-    return oneOf(str(gr, field), allowed) ?? fallback
+export function choice<T extends string>(gr: ForeignRecord, field: string): T | ''
+export function choice<T extends string>(gr: ForeignRecord, field: string, allowed: readonly T[]): T | undefined
+export function choice<T extends string>(gr: ForeignRecord, field: string, allowed: readonly T[], fallback: T): T
+export function choice<T extends string>(gr: ForeignRecord, field: string, allowed?: readonly T[], fallback?: T): T | '' | undefined {
+    const value = str(gr, field)
+    if (!allowed) return value as T | ''
+    return oneOf(value, allowed) ?? fallback
 }
 
-export function bool(gr: GlideRecord, field: string): boolean {
+export function bool(gr: ForeignRecord, field: string): boolean {
     const value = valueOf(gr, field)
     return value === '1' || value === 'true' || value === (true as unknown)
 }

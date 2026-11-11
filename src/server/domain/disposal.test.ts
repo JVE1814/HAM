@@ -4,19 +4,10 @@ import {
     disposalCustomerFindings,
     disposalLineBlockers,
     disposalScopeRefusal,
-    disposalStage,
     type DisposalLine,
 } from './disposal'
-
-describe('disposalStage', () => {
-    it('maps each disposal method to the retired stage', () => {
-        expect(disposalStage('broker_resale')).toBe('sold')
-        expect(disposalStage('oem_takeback')).toBe('returned_to_oem')
-        expect(disposalStage('itad_recycle')).toBe('disposed')
-        expect(disposalStage('return_to_customer')).toBe('returned_to_customer')
-        expect(disposalStage('return_to_lessor')).toBe('returned_to_lessor')
-    })
-})
+import { checkTransition, disposalStage } from './lifecycle'
+import { DISPOSAL_METHOD_CHOICES, LEGAL_OWNER_CHOICES, type DisposalMethod, type LegalOwner } from './vocabulary'
 
 describe('disposalLineBlockers', () => {
     const ready: DisposalLine = {
@@ -50,6 +41,46 @@ describe('disposalLineBlockers', () => {
         const refused = ["asset does not belong to the order's customer"]
         expect(disposalLineBlockers({ ...returned, customerId: 'acme', orderCustomerId: 'globex' })).toEqual(refused)
         expect(disposalLineBlockers({ ...returned, customerId: '', orderCustomerId: '' })).toEqual(refused)
+    })
+})
+
+describe('how an Asset may leave, by its legal owner', () => {
+    const OPEN_TO: Record<LegalOwner, readonly DisposalMethod[]> = {
+        provider: ['broker_resale', 'oem_takeback', 'itad_recycle'],
+        customer: ['return_to_customer'],
+        lessor: ['return_to_lessor'],
+    }
+    const owners = Object.keys(LEGAL_OWNER_CHOICES) as LegalOwner[]
+    const methods = Object.keys(DISPOSAL_METHOD_CHOICES) as DisposalMethod[]
+    const pairs = owners.flatMap((owner) => methods.map((method) => ({ owner, method, open: OPEN_TO[owner].includes(method) })))
+    const line = (legalOwner: LegalOwner | '', method: DisposalMethod): DisposalLine => ({
+        fleet: true,
+        legalOwner,
+        method,
+        wipeComplete: true,
+        stage: 'pending_disposal',
+        customerId: 'acme',
+        orderCustomerId: 'acme',
+    })
+    const retire = (legalOwner: LegalOwner | '', method: DisposalMethod) =>
+        checkTransition('pending_disposal', disposalStage(method), { hasSite: false, hasAgreement: false, legalOwner, wipeEvidenceComplete: true })
+
+    it.each(pairs.filter((pair) => pair.open))('lets a $owner-owned asset leave by $method: the line completes and the move is allowed', ({ owner, method }) => {
+        expect(disposalLineBlockers(line(owner, method))).toEqual([])
+        expect(retire(owner, method)).toEqual({ allowed: true })
+    })
+
+    it.each(pairs.filter((pair) => !pair.open))('refuses a $owner-owned asset leaving by $method: the line is blocked and the move refused', ({ owner, method }) => {
+        const allowed = OPEN_TO[owner].map((m) => m.replace(/_/g, ' ')).join(' or ')
+        expect(disposalLineBlockers(line(owner, method))).toEqual([`a ${owner}-owned asset can only be ${allowed}`])
+        expect(retire(owner, method).allowed).toBe(false)
+    })
+
+    it("treats an asset with no legal owner as the Provider's", () => {
+        for (const method of methods) {
+            expect(disposalLineBlockers(line('', method))).toEqual(disposalLineBlockers(line('provider', method)))
+            expect(retire('', method)).toEqual(retire('provider', method))
+        }
     })
 })
 

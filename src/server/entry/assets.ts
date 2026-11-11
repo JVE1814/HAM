@@ -1,16 +1,13 @@
-import { gs, type GlideRecord } from '@servicenow/glide'
-import { billingChange, stageAfterTransfer, stageChangeRefusal, voidsWipeEvidence } from '../domain/lifecycle.ts'
-import { clearWipeEvidence, moveAsset, readStage, transitionFacts } from '../platform/assets.ts'
+import { gs } from '@servicenow/glide'
+import { billingChange, stageChangeRefusal, voidsWipeEvidence } from '../domain/lifecycle.ts'
+import { clearWipeEvidence, readStage, transitionFacts } from '../platform/assets.ts'
 import { glideToIsoDate, todayIso } from '../platform/clock.ts'
 import { onLineAssetMoved } from '../platform/fulfilment.ts'
-import { str } from '../platform/records.ts'
+import { str, type ForeignRecord } from '../platform/records.ts'
 import { closeServiceIntervals, openServiceInterval } from '../platform/service-intervals.ts'
-import { fellShortOfStagingCentre, onTransferOrderLine, transferContext } from '../platform/transfers.ts'
+import { putBackUntransferred } from '../platform/sourcing.ts'
+import { fellShortOfStagingCentre, onTransferOrderLine, takeBackStageAfterTransfer } from '../platform/transfers.ts'
 import { ROLE } from '../domain/visibility.ts'
-import { putBackUntransferred, resourceOrder } from './orders.ts'
-
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 
 /**
  * Why a save that changes the stage breaks the lifecycle (domain/lifecycle `stageChangeRefusal`), or null when it may
@@ -21,7 +18,7 @@ import { putBackUntransferred, resourceOrder } from './orders.ts'
  * a rule of its own (clearVoidedWipeEvidence), and only a move out of the Provider reads that evidence, never one into
  * staging.
  */
-function lifecycleRefusal(current: GlideRecord, previous: GlideRecord): string | null {
+function lifecycleRefusal(current: ForeignRecord, previous: ForeignRecord): string | null {
     if (!gs.isInteractive() || gs.hasRole(ROLE.admin)) return null
     const facts = { ...transitionFacts(current), onTransferOrderLine: onTransferOrderLine(current) }
     return stageChangeRefusal(readStage(previous), readStage(current), facts)
@@ -33,35 +30,24 @@ function lifecycleRefusal(current: GlideRecord, previous: GlideRecord): string |
  * platform refuses from a scoped app on a record of a global table and saves anyway (as for racks.ts
  * refusesRackPlacement).
  */
-export function refusesLifecycleChange(current: GlideRecord, previous: GlideRecord): boolean {
+export function refusesLifecycleChange(current: ForeignRecord, previous: ForeignRecord): boolean {
     return lifecycleRefusal(current, previous) !== null
 }
 
 /** Script of that rule, run only when its condition refuses the save: why, as the error message. */
-export function explainLifecycleRefusal(current: GlideRecord, previous: GlideRecord): void {
+export function explainLifecycleRefusal(current: ForeignRecord, previous: ForeignRecord): void {
     gs.addErrorMessage(lifecycleRefusal(current, previous) ?? 'This stage change is refused')
 }
 
 /**
  * Before-update rule on alm_hardware once Inventory's *Active transfer order* flag changes (br_asset_transfer_released),
- * ahead of the lifecycle rule. When Inventory lets the Asset go from its transfer order line, it clears the flag and
- * saves it In stock: Available (Reserved for a line requested for a user) in the transfer order's to-stockroom once
- * received, Available where it was when the line is cancelled or deleted (external-contracts N38, N39). The Asset takes
- * back the stage it left instead (domain/lifecycle `stageAfterTransfer`), in the same save, so the lifecycle rule
- * checks that move and the after rules see it; the stockroom Inventory set is kept. A unit whose transfer to the
- * staging centre fell through is reserved again here and put back by the after rule (`onAllocatedAssetStageChange`).
- * Any other save is left as it is: one putting the Asset onto a line, or one leaving it in transfer with the flag
- * cleared (its line received after its last task was closed skipped), for its stage to be set by hand.
+ * ahead of the lifecycle rule: an Asset Inventory lets go from its transfer order line takes back the stage it left
+ * (platform/transfers `takeBackStageAfterTransfer`), in the same save, so the lifecycle rule checks that move and the
+ * after rules see it. A unit whose transfer to the staging centre fell through is reserved again there and put back by
+ * the after rule (`onAllocatedAssetStageChange`).
  */
-export function onTransferReleased(current: GlideRecord, previous: GlideRecord): void {
-    const now = readStage(current)
-    const released = readStage(previous) === 'in_transfer' && now !== 'in_transfer' && !onTransferOrderLine(current)
-    if (!released) return
-    const stage = stageAfterTransfer(transferContext(current))
-    // From the stock Inventory made it: each stage it can take back is a move the matrix allows from there.
-    const verdict = moveAsset(current, stage)
-    if (verdict.allowed) return
-    gs.warn(`[x_daas_ham] ${str(current, 'serial_number')} left its transfer as ${now}, not ${stage}: ${verdict.reason}`)
+export function onTransferReleased(current: ForeignRecord, previous: ForeignRecord): void {
+    takeBackStageAfterTransfer(current, previous)
 }
 
 /**
@@ -69,32 +55,24 @@ export function onTransferReleased(current: GlideRecord, previous: GlideRecord):
  * (administrators and background processes too): one that sets the stage without moveAsset stages the Asset all the
  * same. A save the lifecycle rule refuses is not written, so neither is this.
  */
-export function clearVoidedWipeEvidence(current: GlideRecord, previous: GlideRecord): void {
+export function clearVoidedWipeEvidence(current: ForeignRecord, previous: ForeignRecord): void {
     const to = readStage(current)
     if (to !== null && voidsWipeEvidence(readStage(previous), to)) clearWipeEvidence(current)
 }
 
-/**
- * After-update rule on alm_hardware: an allocated Asset changed stage, so its Order line may advance. A unit that left
- * the line in transit is taken off it and the line goes back to awaiting stock (platform/fulfilment
- * `onLineAssetMoved`): its Order is then sourced again, queued as after a failed staging, so this save takes no
- * sourcing lock. So is the Order of a unit whose transfer to the staging centre fell through, once it is put back
- * (entry/orders `putBackUntransferred`).
- */
-export function onAllocatedAssetStageChange(current: GlideRecord, previous: GlideRecord): void {
+export function onAllocatedAssetStageChange(current: ForeignRecord, previous: ForeignRecord): void {
     const lineId = str(current, 'x_daas_ham_order_line')
     if (!lineId) return
     const from = readStage(previous)
     if (from === 'in_transfer' && fellShortOfStagingCentre(current)) return void putBackUntransferred(current, lineId)
-    const orderId = onLineAssetMoved(current, lineId, from, readStage(current))
-    if (orderId) resourceOrder(orderId)
+    onLineAssetMoved(current, lineId, from, readStage(current))
 }
 
 /**
  * After-update rule on alm_hardware stage changes: billing (the Service interval) starts when an Asset
  * enters service and stops when it leaves, on the day billingChange gives (Q52, ADR 0009).
  */
-export function onAssetServiceChange(current: GlideRecord, previous: GlideRecord): void {
+export function onAssetServiceChange(current: ForeignRecord, previous: ForeignRecord): void {
     const change = billingChange(readStage(previous), readStage(current), {
         inServiceDate: glideToIsoDate(str(current, 'x_daas_ham_in_service_date')),
         today: todayIso(),
