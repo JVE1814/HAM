@@ -48,12 +48,12 @@ import {
 import { onCaseFailedAsset } from './entry/breakfix'
 import { explainWorkWindowRefusal, onWorkOrderClosed, refusesWorkWindow } from './entry/delivery'
 import { onDisposalApprovalDecision } from './entry/disposal'
-import { onAssetLeaseChanged } from './entry/leases'
 import { onModelLifecycleChanged } from './entry/models'
 import { onOrderApprovalDecision } from './entry/orders'
 import { explainRackRefusal, recheckRackPlacement, refusesKeptPlacement, refusesRackPlacement } from './entry/racks'
 import { scopeRecords } from './entry/visibility'
 import { EVENT } from './domain/events'
+import { giveToLessor } from './platform/leases'
 import { oemContext } from './platform/oem-http'
 import { PROPERTY, type PropertyOf } from './domain/properties'
 import type { ForeignRecord } from './platform/records'
@@ -333,11 +333,11 @@ const ON_FOREIGN_TABLES = {
     'entry/breakfix.ts': { onCaseFailedAsset },
     'entry/delivery.ts': { explainWorkWindowRefusal, onWorkOrderClosed, refusesWorkWindow },
     'entry/disposal.ts': { onDisposalApprovalDecision },
-    'entry/leases.ts': { onAssetLeaseChanged },
     'entry/models.ts': { onModelLifecycleChanged },
     'entry/orders.ts': { onOrderApprovalDecision },
     'entry/racks.ts': { explainRackRefusal, recheckRackPlacement, refusesKeptPlacement, refusesRackPlacement },
     'entry/visibility.ts': { scopeRecords },
+    'platform/leases.ts': { giveToLessor },
 } satisfies Record<string, Record<string, (current: ForeignRecord, previous: ForeignRecord) => unknown>>
 
 describe('business rule conditions', () => {

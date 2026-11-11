@@ -42,11 +42,14 @@ const LEASE = 'x_daas_ham_lease_schedule'
 const DECISION_CLOSED = TASK_STATE.closedComplete
 
 /**
- * An Asset on a Lease schedule is owned by that schedule's Lessor (the lease's Vendor, which the Asset reaches through
- * its Lease schedule): set its Legal owner (the caller saves). One on no lease is left as it is.
+ * Before rule on alm_hardware (br_asset_lease), wired here: a fleet asset on a lease schedule is owned by that
+ * schedule's Lessor (the lease's Vendor), whether its lease is set or it joins the fleet with one already set (adoption
+ * and the warehouse receipt set a blank Legal owner to the Provider, which this replaces in the same save). The rule's
+ * condition runs it on a fleet asset only, once its Lease schedule or its Fleet flag changes: one of the Provider IT's
+ * is left as it is (ADR 0016). `current` is the rule's, saved by the platform; one on no lease is left as it is.
  */
-export function giveToLessor(asset: ForeignRecord): void {
-    if (findById(LEASE, str(asset, 'x_daas_ham_lease'))) asset.setValue('x_daas_ham_legal_owner', LEGAL_OWNER.lessor)
+export function giveToLessor(current: ForeignRecord): void {
+    if (findById(LEASE, str(current, 'x_daas_ham_lease'))) current.setValue('x_daas_ham_legal_owner', LEGAL_OWNER.lessor)
 }
 
 /**

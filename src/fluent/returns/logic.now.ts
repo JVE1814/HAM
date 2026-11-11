@@ -1,6 +1,8 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, EmailNotification, Property, Record, ScheduledScript } from '@servicenow/sdk/core'
-import { chaseOverdueReturns, onReturnEvaluated, raiseScheduledReturns } from '../../server/entry/returns'
+import { onReturnEvaluated } from '../../server/entry/returns'
+import { chaseOverdue } from '../../server/platform/returns'
+import { raiseDueReturns } from '../../server/platform/scheduled-returns'
 import { RETURN_LINE_STATUS } from '../../server/domain/vocabulary'
 import { EVENT } from '../../server/domain/events'
 import { PROPERTY } from '../../server/domain/properties'
@@ -54,7 +56,7 @@ ScheduledScript({
     frequency: 'daily',
     executionTime: { hours: 5, minutes: 20, seconds: 0 },
     timeZone: 'UTC',
-    script: chaseOverdueReturns,
+    script: chaseOverdue,
 })
 
 ScheduledScript({
@@ -64,7 +66,7 @@ ScheduledScript({
     frequency: 'daily',
     executionTime: { hours: 4, minutes: 45, seconds: 0 },
     timeZone: 'UTC',
-    script: raiseScheduledReturns,
+    script: raiseDueReturns,
 })
 
 Property({
