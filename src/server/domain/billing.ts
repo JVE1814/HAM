@@ -299,6 +299,17 @@ export function billingLineJson(id: string, line: StoredBillingLine): { [key: st
     return json
 }
 
+/** The pages of the billing pull API: how many periods or lines one gives unless asked for fewer or more, and at most. */
+export const PULL_PAGE = {
+    periods: { size: 24, most: 120 },
+    lines: { size: 1000, most: 5000 },
+} as const
+
+/** The page size a pull request asks for, from 1 to the page's most. */
+export function pullPageSize(requested: number, page: { most: number }): number {
+    return Math.min(Math.max(requested, 1), page.most)
+}
+
 /** A Billing period's lines and their amount in one currency. */
 export interface CurrencyTotal {
     /** As stored on the lines (currencyCode); '' for lines without one. */

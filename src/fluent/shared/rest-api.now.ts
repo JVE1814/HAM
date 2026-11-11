@@ -6,6 +6,7 @@ import { scanAudit } from '../../server/entry/assurance'
 import { getRack, listRacks, listSites } from '../../server/entry/racks'
 import { answerAttestation, confirmInstalled, customerOverview, reportFault, requestCustomerReturn } from '../../server/entry/customer'
 import { getBillingLines, listBillingPeriods } from '../../server/entry/billing'
+import { PULL_PAGE } from '../../server/domain/billing'
 import { postTrackingUpdate } from '../../server/entry/shipping'
 import { customerRestAcl } from './rest-acls.now'
 
@@ -199,7 +200,7 @@ RestApi({
             name: 'billing_lines',
             method: 'GET',
             path: '/billing_periods/{id}/lines',
-            shortDescription: 'One page of a billing period\'s lines (?offset=0&limit=1000); final once the period is closed.',
+            shortDescription: `One page of a billing period's lines (?offset=0&limit=${PULL_PAGE.lines.size}); final once the period is closed.`,
             authentication: true,
             script: getBillingLines,
         },

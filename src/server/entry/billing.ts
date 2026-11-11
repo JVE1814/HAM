@@ -2,7 +2,7 @@
 // response) because the SDK's generated wrapper passes them by name.
 import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { agreementCurrencyProblem, billingMonthProblem, monthChangedError } from '../domain/billing.ts'
+import { agreementCurrencyProblem, billingMonthProblem, monthChangedError, PULL_PAGE, pullPageSize } from '../domain/billing.ts'
 import { currencyCode, monthBounds, previousMonth } from '../domain/money.ts'
 import { EVENT } from '../domain/events.ts'
 import { ROLE } from '../domain/roles.ts'
@@ -110,13 +110,13 @@ function canPull(response: RESTAPIResponse): boolean {
 
 export function listBillingPeriods(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!canPull(response)) return
-    reply(response, 200, recentPeriods(Math.min(Math.max(queryInt(request, 'limit', 24), 1), 120)))
+    reply(response, 200, recentPeriods(pullPageSize(queryInt(request, 'limit', PULL_PAGE.periods.size), PULL_PAGE.periods)))
 }
 
 export function getBillingLines(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!canPull(response)) return
     const offset = queryInt(request, 'offset', 0)
-    const limit = Math.min(Math.max(queryInt(request, 'limit', 1000), 1), 5000)
+    const limit = pullPageSize(queryInt(request, 'limit', PULL_PAGE.lines.size), PULL_PAGE.lines)
     const page = linesPage(pathParam(request, 'id'), offset, limit)
     if (!page) return reply(response, 404, { error: 'Unknown billing period' })
     reply(response, 200, page)

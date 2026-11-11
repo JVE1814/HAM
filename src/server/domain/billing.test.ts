@@ -14,6 +14,8 @@ import {
     ON_ENDED_LINE,
     intervalEnd,
     prorate,
+    PULL_PAGE,
+    pullPageSize,
     resetGenerationError,
     restartInterval,
     singleCurrencyTotal,
@@ -522,5 +524,14 @@ describe('a Billing line as exported', () => {
 
     it('reads a number column that is empty or unreadable as 0', () => {
         expect(billingLineJson('l3', storedLine({ units: 'n/a' }, {}))).toMatchObject({ units: 0, monthlyRate: 0, amount: 0 })
+    })
+})
+
+describe('pullPageSize', () => {
+    it("gives the page size asked for, at least one and at most the page's most", () => {
+        expect(pullPageSize(50, PULL_PAGE.lines)).toBe(50)
+        expect(pullPageSize(0, PULL_PAGE.lines)).toBe(1)
+        expect(pullPageSize(PULL_PAGE.lines.most + 1, PULL_PAGE.lines)).toBe(PULL_PAGE.lines.most)
+        expect(pullPageSize(PULL_PAGE.periods.most + 1, PULL_PAGE.periods)).toBe(PULL_PAGE.periods.most)
     })
 })
