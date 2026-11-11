@@ -7,12 +7,6 @@ import { str } from './records.ts'
 import { currentSession } from './session.ts'
 
 /**
- * The records the visibility scripts (entry/visibility) are handed, as domain/visibility judges them: which scoping a
- * table takes, and a record's scoping fields, read past the app's rules where a rule would hide the record that holds
- * them. And the queries the app's own logic runs as the signed-in user, kept to what they may see.
- */
-
-/**
  * `query` on `table` kept to what the signed-in user may see: their visibility filter is ANDed into each of its `^NQ`
  * clauses. The table's before-query rule appends the same filter, which an `^NQ` binds to the last clause only, and a
  * server read meets no read ACL to remove the rest (ADR 0005), so a query with `^NQ` clauses that must stay within the
@@ -107,7 +101,6 @@ function transferOrderRow(current: GlideRecord): ScopedRow {
     }
 }
 
-/** `current`, a record of a table placed with `scoping`, as its row check reads it. */
 export function rowOf(current: GlideRecord, scoping: TableScoping | null): ScopedRow {
     return scoping === TRANSFER_ORDER ? transferOrderRow(current) : scopedRow(current)
 }

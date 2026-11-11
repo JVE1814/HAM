@@ -10,8 +10,6 @@ import { attemptLock, whyNotRun } from './locks.ts'
 import { log } from './log.ts'
 import { exists, str, warnRefused, type ForeignRecord } from './records.ts'
 
-/** Service intervals: the days each Asset delivered a Subscription line (plan §13 Billing export). */
-
 /**
  * Start billing an Asset on a Subscription line from `startIso`, unless an interval is already open for
  * it; one it closed on that day or later at the same line and Site is reopened instead (restartInterval).
@@ -58,7 +56,6 @@ function openHolding(lock: HeldLock, asset: ForeignRecord, lineId: string, start
     closeHolding(lock, asset.getUniqueValue(), todayIso())
 }
 
-/** Open the interval (see openHolding); false when it is not saved or the lock was lost before saving it. */
 function openInterval(lock: HeldLock, asset: ForeignRecord, lineId: string, startIso: string): boolean {
     const assetId = asset.getUniqueValue()
     const place = { lineId, siteId: str(asset, 'x_daas_ham_site') }
@@ -151,7 +148,6 @@ function closeHolding(lock: HeldLock, assetId: string, endIso: string): void {
             closed = serial
             continue
         }
-        // Left open, the interval goes on billing an Asset that has left service.
         warnRefused(interval, `${serial} left service on ${endIso}, its Service interval did not close`)
     }
     // The save that took a lost lock over may have put the Asset back in service and found the interval still open.

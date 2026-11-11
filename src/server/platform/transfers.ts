@@ -58,7 +58,6 @@ function handOver(asset: GlideRecord): string | null {
     return refused ? `${str(asset, 'serial_number')} could not be handed over: ${refused}` : null
 }
 
-/** Insert the Asset's line on the transfer order; why not, or null once inserted. */
 function addLine(transferId: string, modelId: string, asset: GlideRecord): string | null {
     const line = new GlideRecord('alm_transfer_order_line')
     line.initialize()
@@ -81,7 +80,6 @@ function noTransfer(fromStockroomId: string, reason: string): TransferResult {
  */
 const withdrawn = createMarks<string>()
 
-/** Run `remove` with every one of `assets` marked as withdrawn by sourcing; what it returns. */
 function withdrawing<R>(assets: readonly GlideRecord[], remove: () => R): R {
     const [first, ...rest] = assets
     return first === undefined ? remove() : withdrawn.during(String(first.getUniqueValue()), () => withdrawing(rest, remove))

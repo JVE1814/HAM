@@ -7,11 +7,6 @@ import { findById } from './records.ts'
 import { runSourcingPass } from './sourcing.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
-/*
- * A sourcing pass run against the in-memory stand-in for the platform, job locks included (ADR 0013): an Order with
- * one line of two units and no stock to fill it from, so the pass has the whole line to buy.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const ORDERS = 'x_daas_ham_order'

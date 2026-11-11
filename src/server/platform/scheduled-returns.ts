@@ -10,14 +10,12 @@ import { exists, findById, str, warnRefused } from './records.ts'
 import { raiseReturn, RETURN } from './returns.ts'
 
 /**
- * The Returns a date brings: an Agreement past its end and a temporary deployment about to end bring their equipment
- * back (P2.4). Each is raised once, which a mark on the Agreement (`end_return_raised`) and on the temporary Order
- * (`return_raised`) records; both marks are read and written here only.
+ * Each is raised once, which a mark on the Agreement (`end_return_raised`) and on the temporary Order (`return_raised`)
+ * records; both marks are read and written here only.
  */
 
 const END_RETURN_RAISED = 'end_return_raised'
 
-/** Raise the Returns due today (the daily job): see `recoverEndedAgreements` and `returnTemporaryDeployments`. */
 export function raiseDueReturns(): void {
     const today = todayIso()
     recoverEndedAgreements(today)
@@ -32,7 +30,6 @@ export function recoverAgainAtEnd(agreement: GlideRecord): void {
     agreement.setValue(END_RETURN_RAISED, false)
 }
 
-/** Agreements past their end date bring all their equipment back, once. */
 function recoverEndedAgreements(today: string): void {
     const agreement = new GlideRecord('x_daas_ham_agreement')
     agreement.addQuery('ends', '<', today)
@@ -73,7 +70,6 @@ function recoverEndedAgreements(today: string): void {
     }
 }
 
-/** Temporary deployments ending within the lead time bring their equipment back, once. */
 function returnTemporaryDeployments(today: string): void {
     const leadDays = intProperty(PROPERTY.temporaryReturnLeadDays)
     const horizon = addDays(today, leadDays)
@@ -107,7 +103,6 @@ function returnTemporaryDeployments(today: string): void {
                 sourceOrderId: orderId,
                 description: `Temporary deployment ${str(order, 'number')} ends ${str(order, 'end_date')}`,
             })
-            // Refused: raised on the next run.
             if (!raised) continue
         }
         order.setValue('return_raised', true)

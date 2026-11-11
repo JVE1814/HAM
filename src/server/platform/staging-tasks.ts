@@ -25,12 +25,6 @@ import { stringProperty } from './properties.ts'
 import { bool, deleteWhere, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { leaveOrderLine } from './stock.ts'
 
-/**
- * Staging tasks with their checklist steps: opening them, starting the staging, and skipping those no longer needed.
- * A task's steps are created (and removed with a task that could not be opened) here; what an automated step goes
- * through afterwards is platform/claim-steps'.
- */
-
 /** The staging centre's stockroom: where purchased units ship to, Assets are staged and shipments leave from ('' while none is set). */
 export function stagingStockroom(): string {
     return stringProperty(PROPERTY.stagingStockroom)
@@ -127,7 +121,6 @@ function closingAsset(asset: GlideRecord): ClosingAsset {
     return { serial: str(asset, 'serial_number'), stage: readStage(asset), lineId: str(asset, 'x_daas_ham_order_line'), lineOpen: lineStillOpen(line) }
 }
 
-/** A newer open Staging task of the task's Asset ('' for none; domain/staging `newerTask`). */
 function newerTaskThan(current: GlideRecord): string {
     const other = new GlideRecord('x_daas_ham_staging_task')
     other.addQuery('asset', str(current, 'asset'))
@@ -165,7 +158,6 @@ export function completeStaging(assetId: string, task: ClosedStagingTask): strin
     }
     if (task.failed) return failStaging(asset, task.number)
     if (moveAndSave(asset, 'staged', `staging ${task.number}`)) return null
-    // Refused, the unit stays in staging and its line waits on it.
     return `${serial} not moved to staged (see the system log): it stays in staging; reopen ${task.number} and close it again`
 }
 
