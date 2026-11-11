@@ -33,7 +33,7 @@ const {
     writesAssetCommercialField,
 } = await import('./visibility.ts')
 const { beyondVisibility } = await import('../platform/beyond-visibility.ts')
-const { conditionsOf, platform, recordOf } = await import('../test-support/fake-glide.ts')
+const { platform, recordOf } = await import('../test-support/fake-glide.ts')
 
 type Reader = 'staff' | 'tech' | 'admin' | 'contact' | 'service desk'
 const ROLES: Record<Reader, string[]> = {
@@ -78,10 +78,14 @@ function record(table: string, row: Row, saved = true) {
     return recordOf<InstanceType<typeof GlideRecord>>(table, { sys_id: saved ? `${table}-row` : '', ...withReferencesStored(table, row) }, { fresh: !saved })
 }
 
-function filterOf(table: string): string[] {
+/** The rows of `table` a query finds once the table's before-query rule has run on it. */
+function found(table: string, run: (current: InstanceType<typeof GlideRecord>) => void = scopeRecords): string[] {
     const current = new GlideRecord(table)
-    scopeRecords(current)
-    return conditionsOf(current)
+    run(current)
+    current.query()
+    const ids: string[] = []
+    while (current.next()) ids.push(current.getUniqueValue())
+    return ids
 }
 
 beforeEach(() => {
@@ -91,24 +95,50 @@ beforeEach(() => {
 
 describe('scopeRecords', () => {
     it('narrows a query by the scoping of its table', () => {
+        platform.references['x_daas_ham_order_line.order'] = 'x_daas_ham_order'
+        const seed = () => {
+            platform.tables.x_daas_ham_audit = [
+                { sys_id: 'audit-mine', stockroom: 'sr1' },
+                { sys_id: 'audit-theirs', stockroom: 'sr9' },
+            ]
+            platform.tables.alm_stockroom.push({ sys_id: 'it-untyped', x_daas_ham_stockroom_type: '' }, { sys_id: 'it-store', x_daas_ham_stockroom_type: 'it_store' })
+            platform.tables.x_daas_ham_order = [
+                { sys_id: 'order-here', customer: 'cust1', site: 'site1' },
+                { sys_id: 'order-elsewhere', customer: 'cust1', site: 'site9' },
+                { sys_id: 'order-theirs', customer: 'cust9', site: 'site1' },
+            ]
+            platform.tables.x_daas_ham_order_line = [
+                { sys_id: 'line-here', order: 'order-here' },
+                { sys_id: 'line-elsewhere', order: 'order-elsewhere' },
+            ]
+            platform.tables.x_daas_ham_agreement = [{ sys_id: 'agreement1', customer: 'cust1' }]
+        }
+        const everyOrder = ['order-here', 'order-elsewhere', 'order-theirs']
         signIn('tech')
-        expect(filterOf('x_daas_ham_audit')).toEqual(['stockroomINsr1'])
-        expect(filterOf('alm_stockroom')).toEqual(['x_daas_ham_stockroom_typeNOT INcentral_depot,staging_centre,customer_site^ORx_daas_ham_stockroom_typeISEMPTY^ORsys_idINsr1'])
-        expect(filterOf('x_daas_ham_order')).toEqual([])
+        seed()
+        expect(found('x_daas_ham_audit')).toEqual(['audit-mine'])
+        expect(found('alm_stockroom')).toEqual(['sr1', 'it-untyped', 'it-store'])
+        expect(found('x_daas_ham_order')).toEqual(everyOrder)
         signIn('contact')
-        expect(filterOf('x_daas_ham_order')).toEqual(['customer=cust1^siteINsite1'])
-        expect(filterOf('x_daas_ham_order_line')).toEqual(['order.customer=cust1^order.siteINsite1'])
-        expect(filterOf('x_daas_ham_agreement')).toEqual(['sys_id=-1'])
+        seed()
+        expect(found('x_daas_ham_order')).toEqual(['order-here'])
+        expect(found('x_daas_ham_order_line')).toEqual(['line-here'])
+        expect(found('x_daas_ham_agreement')).toEqual([])
         signIn('staff')
-        expect(filterOf('x_daas_ham_order')).toEqual([])
+        expect(found('x_daas_ham_order')).toEqual(everyOrder)
         expect(platform.warnings).toEqual([])
     })
 
     it("narrows a query of a table that extends a scoped one as its parent's rule does, which runs for it too", () => {
         platform.parents.u_lab_hardware = ['alm_hardware', 'alm_asset']
+        platform.parents.alm_hardware = ['alm_asset']
+        platform.tables.alm_asset = [
+            { sys_id: 'lab-ours', sys_class_name: 'u_lab_hardware', company: 'cust1' },
+            { sys_id: 'lab-theirs', sys_class_name: 'u_lab_hardware', company: 'cust9' },
+        ]
         signIn('admin')
-        expect(filterOf('u_lab_hardware')).toEqual(filterOf('alm_hardware'))
-        expect(filterOf('u_lab_hardware')).toEqual(['company=cust1'])
+        expect(found('u_lab_hardware')).toEqual(['lab-ours'])
+        expect(found('alm_hardware')).toEqual(['lab-ours'])
         expect(platform.warnings).toEqual([])
     })
 
@@ -117,32 +147,41 @@ describe('scopeRecords', () => {
         platform.hierarchy.u_refused_audit = () => {
             throw new Error('not allowed')
         }
+        const audits = [
+            { sys_id: 'audit-mine', stockroom: 'sr1' },
+            { sys_id: 'audit-theirs', stockroom: 'sr9' },
+        ]
+        platform.tables.u_listed_audit = audits
+        platform.tables.u_refused_audit = audits
         signIn('tech')
-        expect(filterOf('u_listed_audit')).toEqual(['stockroomINsr1'])
+        expect(found('u_listed_audit')).toEqual(['audit-mine'])
         expect(platform.warnings).toEqual([])
-        expect(filterOf('u_refused_audit')).toEqual(['sys_id=-1'])
+        expect(found('u_refused_audit')).toEqual([])
         expect(platform.warnings).toHaveLength(1)
     })
 
     it('leaves a query the app runs past the rules as it is', () => {
+        platform.tables.alm_hardware = [
+            { sys_id: 'ours', company: 'cust1' },
+            { sys_id: 'theirs', company: 'cust9' },
+        ]
         signIn('admin')
-        const current = new GlideRecord('alm_hardware')
-        beyondVisibility(current, () => scopeRecords(current))
-        expect(conditionsOf(current)).toEqual([])
+        expect(found('alm_hardware', (current) => beyondVisibility(current, () => scopeRecords(current)))).toEqual(['ours', 'theirs'])
     })
 
     it('shows a narrowed reader nothing of a table with no scoping, which only a wiring mistake can reach, and logs it', () => {
         platform.parents.u_unplaced = ['task']
+        platform.tables.task = [{ sys_id: 'unplaced1', sys_class_name: 'u_unplaced', stockroom: 'sr1', company: 'cust1' }]
         for (const reader of ['tech', 'admin', 'contact'] as const) {
             signIn(reader)
-            expect(filterOf('u_unplaced'), reader).toEqual(['sys_id=-1'])
+            expect(found('u_unplaced'), reader).toEqual([])
         }
         expect(platform.warnings.length).toBeGreaterThan(0)
         expect(platform.warnings.every((warning) => warning.includes('u_unplaced'))).toBe(true)
         signIn('staff')
-        expect(filterOf('u_unplaced')).toEqual([])
+        expect(found('u_unplaced')).toEqual(['unplaced1'])
         signIn('service desk')
-        expect(filterOf('u_unplaced')).toEqual([])
+        expect(found('u_unplaced')).toEqual(['unplaced1'])
     })
 })
 
@@ -357,19 +396,13 @@ describe('grantsCustomerRecord', () => {
         signIn('admin')
         expect(grantsCustomerRecord(new GlideRecord('x_daas_ham_order'))).toBe(false)
         expect(grantsCustomerRecord(record('x_daas_ham_order', { customer: 'cust1' }, false))).toBe(true)
+        expect(grantsCustomerRecord(record('x_daas_ham_order', { customer: 'cust9' }, false))).toBe(false)
         expect(grantsCustomerRecord(record('u_unplaced_grant', { customer: 'cust1' }))).toBe(false)
         expect(platform.warnings).toHaveLength(1)
     })
 })
 
 describe("the customer admins' create ACLs", () => {
-    it('grant an Order of their own Customer only, and none that names no Customer', () => {
-        signIn('admin')
-        expect(grantsCustomerRecord(record('x_daas_ham_order', { customer: 'cust1' }, false))).toBe(true)
-        expect(grantsCustomerRecord(record('x_daas_ham_order', { customer: 'cust9' }, false))).toBe(false)
-        expect(grantsCustomerRecord(new GlideRecord('x_daas_ham_order'))).toBe(false)
-    })
-
     it('grant a Return of their own Customer, or one that names none yet', () => {
         signIn('admin')
         expect(createsCustomerReturn(record('x_daas_ham_return_order', { customer: 'cust1' }, false))).toBe(true)
