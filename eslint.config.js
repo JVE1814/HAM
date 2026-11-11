@@ -3,6 +3,11 @@ import tseslint from 'typescript-eslint'
 import globals from 'globals'
 import nowConfig from './now.config.json' with { type: 'json' }
 
+/**
+ * The instance stores each server module as a sys_module whose path ends in ".ts" and resolves an import by that exact
+ * path, so a relative import without the extension builds and passes every unit test, then fails on the instance the
+ * first time its module loads. Each layer block below names it; a server file outside the layers already fails.
+ */
 const EXTENSIONLESS = {
     regex: '^\\.{1,2}/.*(?<!\\.ts|\\.json)$',
     message: 'Name the .ts file: the instance resolves a server module import by its exact path.',
@@ -47,14 +52,6 @@ export default tseslint.config(
                 { patterns: [{ regex: '/server/(?!domain/)', message: 'A page imports server code from server/domain only.' }] },
             ],
         },
-    },
-    // The instance stores each server module as a sys_module whose path ends in ".ts" and resolves an import by that
-    // exact path, so a relative import without the extension builds and passes every unit test, then fails on the
-    // instance the first time its module loads.
-    {
-        files: ['src/server/**/*.ts'],
-        ignores: TEST_CODE,
-        rules: { 'no-restricted-imports': ['error', { patterns: [EXTENSIONLESS] }] },
     },
     // ADR 0003: the layer rules below see only static imports, and only of modules in a layer's folder.
     {
