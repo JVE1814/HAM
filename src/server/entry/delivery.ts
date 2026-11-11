@@ -1,6 +1,6 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { confirmerFor, type InstallRefusal } from '../domain/install-confirmation.ts'
-import { completeInstallOfWork, confirmInstall, shipOrder } from '../platform/delivery.ts'
+import { confirmInstall, shipOrder } from '../platform/delivery.ts'
 import { workWindowRefusal } from '../platform/field-work.ts'
 import type { ForeignRecord } from '../platform/records.ts'
 import { currentSession } from '../platform/session.ts'
@@ -31,10 +31,6 @@ export function uiConfirmInstalled(current: GlideRecord): void {
     if (outcome.confirmed) {
         if (outcome.refused > 0) gs.addErrorMessage(`${outcome.refused} unit(s) not confirmed installed (see the system log): try again`)
     } else if (outcome.why !== 'unsaved') gs.addErrorMessage(INSTALL_REFUSAL[outcome.why])
-}
-
-export function onWorkOrderClosed(current: ForeignRecord): void {
-    completeInstallOfWork(current)
 }
 
 /**

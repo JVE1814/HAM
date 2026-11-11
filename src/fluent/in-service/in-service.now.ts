@@ -15,7 +15,8 @@ import {
 } from '@servicenow/sdk/core'
 import { DEVICE_EVENT_KIND_CHOICES, DEVICE_EVENT_SOURCE_CHOICES } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION } from '../../server/domain/fleet'
-import { evaluatePendingInService, purgeDeviceEvents } from '../../server/entry/in-service'
+import { purgeDeviceEvents } from '../../server/entry/in-service'
+import { detectPendingInService } from '../../server/platform/in-service'
 import { PROPERTY } from '../../server/domain/properties'
 import { admin, assetManager, broadStaff, integration } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
@@ -58,7 +59,7 @@ ScheduledScript({
     executionInterval: { minutes: 15 },
     executionStart: '2026-01-01 00:00:00',
     timeZone: 'UTC',
-    script: evaluatePendingInService,
+    script: detectPendingInService,
 })
 
 ScheduledScript({

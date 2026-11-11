@@ -1,6 +1,7 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, Property, Record, RestMessage, ScriptAction, UiAction } from '@servicenow/sdk/core'
-import { explainWorkWindowRefusal, onWorkOrderClosed } from '../../server/entry/delivery'
+import { explainWorkWindowRefusal } from '../../server/entry/delivery'
+import { completeInstallOfWork } from '../../server/platform/delivery'
 import { RETURN_METHOD, SHIPMENT_DIRECTION, SHIPMENT_STATUS, TASK_STATE } from '../../server/domain/vocabulary'
 import { REST_MESSAGE } from '../../server/domain/rest-message-names'
 import { retryTrackingUpdate, uiCreateReturnLabel, uiMarkLabelVoided } from '../../server/entry/shipping'
@@ -42,7 +43,7 @@ BusinessRule({
     action: ['update'],
     order: 200,
     condition: `current.state.changes() && current.state == ${TASK_STATE.closedComplete} && current.initiated_from.sys_class_name == 'x_daas_ham_order'`,
-    script: onWorkOrderClosed,
+    script: completeInstallOfWork,
 })
 
 /*

@@ -4,7 +4,7 @@ import { PROPERTY } from '../domain/properties.ts'
 import { ROLE } from '../domain/roles.ts'
 import { findAssetByIdentifier } from '../platform/assets.ts'
 import { nowMs } from '../platform/clock.ts'
-import { applyDeviceEvent, detectPendingInService, purgeDeviceEventsOlderThan } from '../platform/in-service.ts'
+import { applyDeviceEvent, purgeDeviceEventsOlderThan } from '../platform/in-service.ts'
 import { lifecycleReaders } from '../platform/lifecycle-dates.ts'
 import { intProperty } from '../platform/properties.ts'
 import { reply, requireRole } from '../platform/rest-api.ts'
@@ -39,13 +39,6 @@ export function postDeviceEvents(request: RESTAPIRequest, response: RESTAPIRespo
         busy_identifiers: busy,
         rejected: parsed.rejected,
     })
-}
-
-/**
- * Scheduled job: pick up Discovery / connector sightings of pending fleet assets (ADR 0016) and put them in service.
- */
-export function evaluatePendingInService(): void {
-    detectPendingInService()
 }
 
 export function purgeDeviceEvents(): void {

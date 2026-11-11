@@ -219,9 +219,9 @@ function completeInstall(order: GlideRecord): number {
  * A work order was closed complete: when it is the on-site work of the NaaS Order it was initiated from (domain/delivery
  * `installsOrder`; a de-install or audit job is not), that Order's install is complete.
  */
-export function completeInstallOfWork(workOrder: ForeignRecord): void {
-    const order = findById('x_daas_ham_order', str(workOrder, 'initiated_from'))
-    if (order && installsOrder(str(workOrder, 'x_daas_ham_purpose'))) completeInstall(order)
+export function completeInstallOfWork(current: ForeignRecord): void {
+    const order = findById('x_daas_ham_order', str(current, 'initiated_from'))
+    if (order && installsOrder(str(current, 'x_daas_ham_purpose'))) completeInstall(order)
 }
 
 /**

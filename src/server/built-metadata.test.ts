@@ -46,7 +46,8 @@ import {
     refusesLifecycleChange,
 } from './entry/assets'
 import { onCaseFailedAsset } from './entry/breakfix'
-import { explainWorkWindowRefusal, onWorkOrderClosed, refusesWorkWindow } from './entry/delivery'
+import { explainWorkWindowRefusal, refusesWorkWindow } from './entry/delivery'
+import { completeInstallOfWork } from './platform/delivery'
 import { onDisposalApprovalDecision } from './entry/disposal'
 import { onAssetLeaseChanged } from './entry/leases'
 import { onModelLifecycleChanged } from './entry/models'
@@ -331,13 +332,14 @@ const ON_FOREIGN_TABLES = {
         refusesLifecycleChange,
     },
     'entry/breakfix.ts': { onCaseFailedAsset },
-    'entry/delivery.ts': { explainWorkWindowRefusal, onWorkOrderClosed, refusesWorkWindow },
+    'entry/delivery.ts': { explainWorkWindowRefusal, refusesWorkWindow },
     'entry/disposal.ts': { onDisposalApprovalDecision },
     'entry/leases.ts': { onAssetLeaseChanged },
     'entry/models.ts': { onModelLifecycleChanged },
     'entry/orders.ts': { onOrderApprovalDecision },
     'entry/racks.ts': { explainRackRefusal, recheckRackPlacement, refusesKeptPlacement, refusesRackPlacement },
     'entry/visibility.ts': { scopeRecords },
+    'platform/delivery.ts': { completeInstallOfWork },
 } satisfies Record<string, Record<string, (current: ForeignRecord, previous: ForeignRecord) => unknown>>
 
 describe('business rule conditions', () => {
