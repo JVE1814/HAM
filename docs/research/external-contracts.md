@@ -10,38 +10,28 @@ documentation, and the official ServiceNow SDK packages in `node_modules` (`@ser
 `sdk-build-plugins` and `sdk-build-core` 4.14.0; `@servicenow/glide` 27.0.5). Where the primary
 reference needs a login, a vendor knowledge-base article or a third-party SDK is cited and labelled
 as such, and the item is marked accordingly. No repository file other than this note was changed.
-Line numbers refer to the repository as it stood on the research date. The short names are of that
-date too: since the entry modules became adapters (ADR 0003), the code cited from `oem-sync.ts`,
-`margin.ts`, `leases.ts`, `billing.ts`, `delivery.ts` and `in-service.ts` is in
-`src/server/platform/` under the same name, that of `assurance.ts` in `platform/audits.ts`,
-`attestations.ts` and `reconciliation.ts`, of `warehouse.ts` in `platform/receiving.ts`, of
-`spare-pool.ts` in `platform/spare-pools.ts`; `STAGE_FIELDS` is in `domain/vocabulary.ts`; and
-`substatus-choices.test.ts` gave way to `src/server/built-metadata.test.ts`.
+The note names a file of the app, not a line in it: a line number goes stale with the next edit.
+Each file is named by the path it has now, so the code a row cites is found by the names the row
+quotes. The only line numbers left are in the SDK packages, at the versions named above.
+
+The findings are of the research date. "Changes needed in the app" quotes the code as it stood then,
+and those changes have since been applied (see the status below), so a line it quotes may read
+differently now.
 
 Verdicts: **matches** (the app agrees with the source), **partially** (the core contract agrees,
 but a limit, edge case or secondary field does not), **differs** (the app contradicts the source),
 **unverifiable** (no reachable primary source settles it).
 
-Short file names used below:
+How the paths below are shortened:
 
-| Short name | Path |
+| Path as written | Under |
 |---|---|
-| `adapters.ts`, `adapters.test.ts` | `src/server/domain/oem/` |
-| `claims.ts`, `claims.test.ts` | `src/server/domain/oem/` |
-| `oem-messages.now.ts`, `oem-claims.now.ts`, `shipping.now.ts`, `rest.now.ts`, `rules.now.ts` | `src/fluent/logic/` then; see below |
-| `oem.now.ts`, `staging.now.ts`, `substatus-choices.now.ts` | `src/fluent/data/` then; see below |
-| `oem-sync.ts`, `entry/oem-claims.ts`, `entry/shipping.ts`, `margin.ts`, `leases.ts`, `billing.ts`, `delivery.ts`, `in-service.ts`, `assurance.ts`, `warehouse.ts`, `spare-pool.ts`, `demo-seed.ts` | `src/server/entry/` |
-| `rest-port.ts`, `properties.ts`, `procurement.ts`, `field-work.ts`, `assets.ts`, `rest-api.ts` | `src/server/platform/` |
-| `http.ts`, `json.ts`, `domain/shipping.ts`, `shipping.test.ts`, `lifecycle.ts`, `model-lifecycle.ts`, `substatus-choices.test.ts` | `src/server/domain/` |
-| `keys.ts` | `src/fluent/generated/` |
+| `domain/...`, `platform/...`, `entry/...` | `src/server/` |
+| `oem/...`, `delivery/...`, `fleet/...`, `racks/...`, `break-fix/...`, `shared/...` | `src/fluent/` |
+| `alm_asset.now.ts`, `choice-set-plugin.ts`, `choice-set-utils.ts`, `RestMessage.d.ts` | the SDK packages in `node_modules` |
 
-`src/fluent` has since been grouped by feature, so the `.now.ts` files named here are those of the
-research date. Their records are now in `oem/rest-messages.now.ts` (`oem-messages.now.ts`),
-`oem/logic.now.ts` (`oem-claims.now.ts`), `delivery/logic.now.ts` (`shipping.now.ts`),
-`shared/rest-api.now.ts` (`rest.now.ts`), the `logic.now.ts` of `fleet/`, `staging/`, `delivery/`
-and `orders/` (`rules.now.ts`), `oem/tables.now.ts` and `break-fix/break-fix.now.ts` (`oem.now.ts`),
-`staging/tables.now.ts` and `oem/tables.now.ts` (`staging.now.ts`), and `fleet/tables.now.ts`
-(`substatus-choices.now.ts`).
+The vendor sync adapters are in `domain/oem/sync-adapters.ts` and the vendor claim adapters in
+`domain/oem/claim-adapters.ts`. `domain/oem/adapters.ts` routes each vendor to its adapters.
 
 
 **Status (2026-11-07):** every change under "Changes needed in the app" has been applied, except the
@@ -54,18 +44,18 @@ check. What still needs an instance or a vendor login is listed in
 
 | Item | App assumes | Source says | Verdict | Source |
 |---|---|---|---|---|
-| EoX v5 by PID: host, method, path, encoding | `GET https://apix.cisco.com/supporttools/eox/rest/5/EOXByProductID/1/${pids}?responseencoding=json`, PIDs comma-joined (`oem-messages.now.ts:16,22-25`) | URI `.../EOXByProductID/{pageIndex}/{productID}`; sample request has the same form | matches | C1 |
-| EoX batching | 20 PIDs per call, page 1 only (`adapters.ts:35`) | 20 PIDs max, but `productID` is limited to 250 characters; 50 records per page | partially | C1 |
-| EoX response mapping | `EOXRecord`, skip on `EOXError`, `EOLProductID`, `EndOfSaleDate.value`, `LastDateOfSupport.value` for support and life, `LinkToProductBulletinURL` (`adapters.ts:37-49`) | All fields exist; dates are `{value, dateFormat}`; LDoS definition supports support = life | matches | C1 |
-| SN2INFO v2 coverage summary: path and doc status | `GET https://apix.cisco.com/sn2info/v2/coverage/summary/serial_numbers/${serials}` (`oem-messages.now.ts:27-31`) | Same path; the DevNet reference page now returns 404 | matches | C2, C3, C4, C5 |
-| SN2INFO batch size | 50 serials per call, page 1 only (`adapters.ts:59`) | Up to 75 serials (40 characters each); 50 records per page | matches | C2, C6 |
-| SN2INFO v2 summary response fields | `coverage_start_date`, `coverage_end_date` then `warranty_end_date` (`adapters.ts:61-70`) | v2 summary has no `coverage_start_date` or `coverage_end_date`; contract end is `covered_product_line_end_date` | differs | C2, C6 |
-| SN2INFO errors on HTTP 200 | Only non-2xx and non-JSON count as errors (`adapters.ts:19-28,60-61`) | `NO_RECORDS_FOUND` and `EXCEEDED_OUTPUT` arrive with HTTP 200; body shape undocumented | partially | C2 |
-| Service Order Return (RMA) v1.0 by RMA number | `GET https://apix.cisco.com/return/v1.0/returns/rma_numbers/${rma}`; reads `returns.RmaRecord[]` (`oem-messages.now.ts:33-37`, `adapters.ts:80-85`) | Same path; one RMA per call; `status` is open, booked, hold, cancelled or closed | matches | C7 |
+| EoX v5 by PID: host, method, path, encoding | `GET https://apix.cisco.com/supporttools/eox/rest/5/EOXByProductID/1/${pids}?responseencoding=json`, PIDs comma-joined (`oem/rest-messages.now.ts`) | URI `.../EOXByProductID/{pageIndex}/{productID}`; sample request has the same form | matches | C1 |
+| EoX batching | 20 PIDs per call, page 1 only (`domain/oem/sync-adapters.ts`) | 20 PIDs max, but `productID` is limited to 250 characters; 50 records per page | partially | C1 |
+| EoX response mapping | `EOXRecord`, skip on `EOXError`, `EOLProductID`, `EndOfSaleDate.value`, `LastDateOfSupport.value` for support and life, `LinkToProductBulletinURL` (`domain/oem/sync-adapters.ts`) | All fields exist; dates are `{value, dateFormat}`; LDoS definition supports support = life | matches | C1 |
+| SN2INFO v2 coverage summary: path and doc status | `GET https://apix.cisco.com/sn2info/v2/coverage/summary/serial_numbers/${serials}` (`oem/rest-messages.now.ts`) | Same path; the DevNet reference page now returns 404 | matches | C2, C3, C4, C5 |
+| SN2INFO batch size | 50 serials per call, page 1 only (`domain/oem/sync-adapters.ts`) | Up to 75 serials (40 characters each); 50 records per page | matches | C2, C6 |
+| SN2INFO v2 summary response fields | `coverage_start_date`, `coverage_end_date` then `warranty_end_date` (`domain/oem/sync-adapters.ts`) | v2 summary has no `coverage_start_date` or `coverage_end_date`; contract end is `covered_product_line_end_date` | differs | C2, C6 |
+| SN2INFO errors on HTTP 200 | Only non-2xx and non-JSON count as errors (`domain/oem/sync-adapters.ts`) | `NO_RECORDS_FOUND` and `EXCEEDED_OUTPUT` arrive with HTTP 200; body shape undocumented | partially | C2 |
+| Service Order Return (RMA) v1.0 by RMA number | `GET https://apix.cisco.com/return/v1.0/returns/rma_numbers/${rma}`; reads `returns.RmaRecord[]` (`oem/rest-messages.now.ts`, `domain/oem/sync-adapters.ts`) | Same path; one RMA per call; `status` is open, booked, hold, cancelled or closed | matches | C7 |
 | OAuth 2.0 client credentials | `oauth2` with a profile attached on the instance (id.cisco.com); no `oauthProfile` in code | Token from `https://id.cisco.com/oauth2/default/v1/token`, client credentials grant, 1-hour tokens | matches | C8, C9, C5, C10, C11 |
-| SNTC/PSS entitlement | Required (`oem-messages.now.ts:17`, `docs/spec/p2-oem.md:22`) | APIs are available only to SNTC customers and PSS partners | matches | C12, C9, C2 |
+| SNTC/PSS entitlement | Required (`oem/rest-messages.now.ts`, `docs/spec/p2-oem.md`) | APIs are available only to SNTC customers and PSS partners | matches | C12, C9, C2 |
 | Rate limits and quotas | No throttling in the Cisco adapters | No numeric limit published; quotas visible only in the API Console | unverifiable | C9, C1, C7 |
-| Meraki coverage via SN2INFO | Meraki serials go to SN2INFO (`adapters.ts:195,210`) | SN2INFO reference does not mention Meraki | unverifiable | C2 |
+| Meraki coverage via SN2INFO | Meraki serials go to SN2INFO (`domain/oem/adapters.ts`) | SN2INFO reference does not mention Meraki | unverifiable | C2 |
 
 Notes:
 
@@ -74,13 +64,13 @@ Notes:
   commas"). Wildcards are allowed with at least 3 characters. `responseencoding` is optional, `xml`
   or `json`. The sample request is exactly
   `GET https://apix.cisco.com/supporttools/eox/rest/5/EOXByProductID/1/WIC-1T=?responseencoding=json`.
-  `rest-port.ts:27` URL-encodes each value and puts the commas back.
+  `platform/rest-messages.ts` URL-encodes each value and puts the commas back.
 - **EoX batching.** The 20-PID limit is confirmed by error `SSA_ERR_009` ("The number of product IDs
   exceeds 20."). The app does not enforce the 250-character limit: twenty typical PIDs such as
   `WS-C3850-48P-L` (14 characters) plus commas come to about 299 characters.
   `PaginationResponseRecord` (`PageIndex`, `LastIndex`, `TotalRecords`, `PageRecords`) is never read.
   "You can receive multiple EoX records for the same PID if that product includes multiple migration
-  paths", so 20 PIDs can exceed one page. `docs/spec/p2-oem.md:7` says "EoX v5 by PID, 20 per call".
+  paths", so 20 PIDs can exceed one page. `docs/spec/p2-oem.md` says "EoX v5 by PID, 20 per call".
 - **EoX response.** Top-level keys are `PaginationResponseRecord` and `EOXRecord`. The method sample
   shows `EOXRecord` as an array and the `EOXRecordType` sample as a single object; `asArray` handles
   both. `EOXRecordType` contains `EOLProductID` (string 48), `LinkToProductBulletinURL`,
@@ -115,7 +105,7 @@ Notes:
   `page_index`, `page_records`, `self_link`, `title`, `total_records`). With 50 serials and one
   record per serial, everything fits on page 1. If a serial ever returned more than one record,
   page 2 would be ignored, because the app does not check `last_index`. The v1.0 PDF has the same
-  limits. `docs/spec/p2-oem.md:7` says "SN2INFO v2, 50 per call".
+  limits. `docs/spec/p2-oem.md` says "SN2INFO v2, 50 per call".
 - **SN2INFO summary fields.** The v2 summary response parameters are `base_pid`,
   `contract_site_address1`, `contract_site_city`, `contract_site_country`,
   `contract_site_customer_name`, `contract_site_state_province`, `covered_product_line_end_date`
@@ -125,30 +115,31 @@ Notes:
   `service_contract_number` (string 200), `service_line_descr` (e.g. "SMARTnet Premium 24x7x4"),
   `sr_no`, `title`, `total_records`, `warranty_end_date` (YYYY-MM-DD), `warranty_type` and
   `warranty_type_description`. `coverage_end_date` belongs to the v1.0 summary and to the v2
-  `coverage/status` and `owner_status` methods; neither version has `coverage_start_date`. Against v2
-  the app never reads the contract end date, always falls back to `warranty_end_date`, and
-  `startDate` is always undefined. The test fixture at `adapters.test.ts:49` uses `coverage_end_date`.
+  `coverage/status` and `owner_status` methods; neither version has `coverage_start_date`. Against
+  v2 the app never reads the contract end date, always falls back to `warranty_end_date`, and
+  `startDate` is always undefined. The test fixture at `domain/oem/adapters.test.ts` uses
+  `coverage_end_date`.
 - **SN2INFO error table.** `200 NO_RECORDS_FOUND` ("No records found."), `200 EXCEEDED_OUTPUT`
   ("Server error; too many results."), `400 API_MISSING_PARAMETERS`, `API_INVALID_INPUT`,
   `EXCEEDED_INPUTS`, `403 API_NOTAUTHORIZED`, `500 API_ERROR_01`. Today a 2xx body without
-  `serial_numbers` yields no facts and no errors, and `oem-sync.ts:93-100` then stamps every serial in
-  the batch as checked.
+  `serial_numbers` yields no facts and no errors, and `platform/coverage.ts` then stamps every
+  serial in the batch as checked.
 - **RMA.** Sample request `GET https://apix.cisco.com/return/v1.0/returns/rma_numbers/84894022` with
   `Authorization: Bearer ...`. `rma_numbers` is required, int, length 10: "Currently, only one RMA
-  Number is required and accepted." Response: `{APIPagination{...}, returns{RmaRecord:[{rmaNo,
-  status, orderDate, caseId, ..., contractId, serviceLevel, customerRefInfo, shipToInfo, billToInfo,
-  replacementParts, returnLines, laborDetails, notes}]}}`. Status casing varies between samples
-  ("Booked", "BOOKED", "HOLD"); the app stores the raw string in `x_daas_ham_oem_rma.status`
-  (StringColumn, 100 characters; `oem-sync.ts:195`, `oem.now.ts:57`). `rmaNo` is typed string but the
-  sample returns a JSON number; `text()` handles numbers. The parameter table calls `returns` an
-  "array", but this doc uses "array" loosely for objects and the sample shows an object. "If a space
-  is encountered in a mandatory input parameter, Error 403 is thrown." Error codes:
-  `API_RMA_FORMAT_ERROR`, `API_DATEFORMAT_ERROR`, `SVO_NO_RECORDS`.
-- **RMA, optional hardening (verdict matches).** (1) `adapters.ts:82`: use
-  `asArray(field(json, 'returns')).flatMap((r) => asArray(field(r, 'RmaRecord')))` so `returns` as an
-  array is tolerated. (2) `adapters.ts:83`: key the fact by the requested number
-  (`const rmaNumber = rma`), so the lookup at `oem-sync.ts:194` (`records.get(fact.rmaNumber)`) cannot
-  miss when a numeric `rmaNo` serializes differently. (3) `oem-sync.ts:189`: use
+  Number is required and accepted." Response:
+  `{APIPagination{...}, returns{RmaRecord:[{rmaNo, status, orderDate, caseId, ..., contractId, serviceLevel, customerRefInfo, shipToInfo, billToInfo, replacementParts, returnLines, laborDetails, notes}]}}`.
+  Status casing varies between samples ("Booked", "BOOKED", "HOLD"); the app stores the raw string
+  in `x_daas_ham_oem_rma.status` (StringColumn, 100 characters; `platform/oem-rma.ts`,
+  `break-fix/break-fix.now.ts`). `rmaNo` is typed string but the sample returns a JSON number;
+  `text()` handles numbers. The parameter table calls `returns` an "array", but this doc uses
+  "array" loosely for objects and the sample shows an object. "If a space is encountered in a
+  mandatory input parameter, Error 403 is thrown." Error codes: `API_RMA_FORMAT_ERROR`,
+  `API_DATEFORMAT_ERROR`, `SVO_NO_RECORDS`.
+- **RMA, optional hardening (verdict matches).** (1) `domain/oem/sync-adapters.ts`: use
+  `asArray(field(json, 'returns')).flatMap((r) => asArray(field(r, 'RmaRecord')))` so `returns` as
+  an array is tolerated. (2) `domain/oem/sync-adapters.ts`: key the fact by the requested number
+  (`const rmaNumber = rma`), so the lookup at `platform/oem-rma.ts` (`records.get(fact.rmaNumber)`)
+  cannot miss when a numeric `rmaNo` serializes differently. (3) `platform/oem-rma.ts`: use
   `str(rma, 'rma_number').trim()` as the key, because a space makes Cisco return 403.
 - **OAuth.** Cisco: "the application must first make a request to the Cisco Common Identity SSO
   endpoint at https://id.cisco.com/oauth2/default/v1/token". POST, `Content-Type:
@@ -172,11 +163,12 @@ Notes:
   for SN2INFO, "If no connection is found between the user, contract, and device", the summary returns
   only `base_pid_list`, `is_covered`, `orderable_pid_list`, `sr_no` and `warranty_end_date`, so
   contract fields come back empty for devices outside the API user's contracts.
-- **Rate limits.** The app sends one lifecycle call per 20 PIDs daily (`adapters.ts:35`), one
-  coverage call per 50 serials time-boxed by `x_daas_ham.job.budget_seconds` (`oem-sync.ts:77-79`),
-  and one RMA call per open RMA hourly, up to 200 (`oem-sync.ts:186`). No numeric limit appears on the
-  EoX, SN2INFO, RMA, authentication or registration pages; the API Console "Keys" view shows "API
-  usage and request quota reports" after login.
+- **Rate limits.** The app sends one lifecycle call per 20 PIDs daily
+  (`domain/oem/sync-adapters.ts`), one coverage call per 50 serials time-boxed by
+  `x_daas_ham.job.budget_seconds` (`platform/oem-sync.ts`), and one RMA call per open RMA hourly, up
+  to 200 (`platform/oem-rma.ts`). No numeric limit appears on the EoX, SN2INFO, RMA, authentication
+  or registration pages; the API Console "Keys" view shows "API usage and request quota reports"
+  after login.
 - **Meraki via SN2INFO.** Meraki serials (`Q2xx-xxxx-xxxx`) fit the 40-character limit, but no primary
   source confirms that Meraki devices are in the SN2INFO install base or contract data.
 
@@ -210,19 +202,19 @@ Sources:
 
 | Item | App assumes | Source says | Verdict | Source |
 |---|---|---|---|---|
-| Meraki inventory devices: path, `models[]`, `-HW`, paging | `GET https://api.meraki.com/api/v1/organizations/${org_id}/inventory/devices?models[]=${model}`; `-HW` stripped; first page; first device with `eox` (`oem-messages.now.ts:52`, `adapters.ts:94-104`) | Path and `models` array filter match; official SDK sends `models[]`; example `MR34` / sku `MR34-HW`; paging via `Link` header | matches | M1, M2, M3 |
-| Meraki EoX field names | `eox.endOfSaleAt`, `eox.endOfSupportAt` (`adapters.ts:109-110`) | `eox {status, endOfSaleAt, endOfSupportAt}`, date-time strings; no `eoxStatus` field | matches | M1, M2 |
-| Meraki API key header | `Authorization: Bearer ${api_key}` (`oem-messages.now.ts:53,65`) | v1 supports Bearer; `X-Cisco-Meraki-API-Key` is the v0 header | matches | M4, M5, M1, M6 |
-| Meraki claim into inventory | `POST .../inventory/claim` `{"serials":[...]}`, 50 per call; empty response `serials` means all done (`claims.ts:119-126`) | Body and response field names match; response `serials` lists the serials actually claimed; no per-call maximum | partially | M1, M7, M8, M3 |
-| Meraki claim rate limit | 10 calls per 5 minutes; budget 8 per 5-minute run (`oem-claims.now.ts:19-26`) | "up to ten times within a single five minute window"; scope and window type not stated | matches | M7, M1, M9, M8 |
-| Meraki API base host | `https://api.meraki.com/api/v1` hard-coded (`oem-messages.now.ts:45,52,63`) | Right "in most parts of the world"; Canada, China, India and FedRAMP use other hosts | partially | M5, M10 |
-| Mist JSI inventory: path, filters, paging | `GET https://api.mist.com/api/v1/orgs/${org_id}/jsi/inventory?model=` or `?serial=`; page 1 (`oem-messages.now.ts:112,123`) | Same path; `model`, `serial`, `limit` (default 100), `page`; 200 body is a JSON array | matches | H1, H2 |
-| Mist JSI lifecycle fields | `eos_time` = end of sale, `eol_time` = end of life (`adapters.ts:164,168`) | `end_of_sale_time` = end of sale; `eos_time` = end of support; no `eol_time` | differs | H1 |
-| Mist JSI warranty and contract fields | `warranty_start_time`, `warranty_end_time`, `contract_start_time`, `contract_end_time` (`adapters.ts:181-187`) | None exist; fields are `warranty_start`, `warranty_end`, `contract_start_date`, `contract_end_date` | differs | H1 |
-| Mist claim into inventory | `POST .../orgs/${org_id}/inventory`, bare array of codes, 100 per call; non-2xx fails batch; reasons by position (`claims.ts:140-152`) | Body and field names match; a 400 carries the same per-code result; `reason[]` not documented as parallel to `error[]` | partially | H1 |
-| Mist auth header | `Authorization: Token ${api_token}` (`oem-messages.now.ts:113,124,136`) | Same format | matches | H1, H3 |
+| Meraki inventory devices: path, `models[]`, `-HW`, paging | `GET https://api.meraki.com/api/v1/organizations/${org_id}/inventory/devices?models[]=${model}`; `-HW` stripped; first page; first device with `eox` (`oem/rest-messages.now.ts`, `domain/oem/sync-adapters.ts`) | Path and `models` array filter match; official SDK sends `models[]`; example `MR34` / sku `MR34-HW`; paging via `Link` header | matches | M1, M2, M3 |
+| Meraki EoX field names | `eox.endOfSaleAt`, `eox.endOfSupportAt` (`domain/oem/sync-adapters.ts`) | `eox {status, endOfSaleAt, endOfSupportAt}`, date-time strings; no `eoxStatus` field | matches | M1, M2 |
+| Meraki API key header | `Authorization: Bearer ${api_key}` (`oem/rest-messages.now.ts`) | v1 supports Bearer; `X-Cisco-Meraki-API-Key` is the v0 header | matches | M4, M5, M1, M6 |
+| Meraki claim into inventory | `POST .../inventory/claim` `{"serials":[...]}`, 50 per call; empty response `serials` means all done (`domain/oem/claim-adapters.ts`) | Body and response field names match; response `serials` lists the serials actually claimed; no per-call maximum | partially | M1, M7, M8, M3 |
+| Meraki claim rate limit | 10 calls per 5 minutes; budget 8 per 5-minute run (`oem/logic.now.ts`) | "up to ten times within a single five minute window"; scope and window type not stated | matches | M7, M1, M9, M8 |
+| Meraki API base host | `https://api.meraki.com/api/v1` hard-coded (`oem/rest-messages.now.ts`) | Right "in most parts of the world"; Canada, China, India and FedRAMP use other hosts | partially | M5, M10 |
+| Mist JSI inventory: path, filters, paging | `GET https://api.mist.com/api/v1/orgs/${org_id}/jsi/inventory?model=` or `?serial=`; page 1 (`oem/rest-messages.now.ts`) | Same path; `model`, `serial`, `limit` (default 100), `page`; 200 body is a JSON array | matches | H1, H2 |
+| Mist JSI lifecycle fields | `eos_time` = end of sale, `eol_time` = end of life (`domain/oem/sync-adapters.ts`) | `end_of_sale_time` = end of sale; `eos_time` = end of support; no `eol_time` | differs | H1 |
+| Mist JSI warranty and contract fields | `warranty_start_time`, `warranty_end_time`, `contract_start_time`, `contract_end_time` (`domain/oem/sync-adapters.ts`) | None exist; fields are `warranty_start`, `warranty_end`, `contract_start_date`, `contract_end_date` | differs | H1 |
+| Mist claim into inventory | `POST .../orgs/${org_id}/inventory`, bare array of codes, 100 per call; non-2xx fails batch; reasons by position (`domain/oem/claim-adapters.ts`) | Body and field names match; a 400 carries the same per-code result; `reason[]` not documented as parallel to `error[]` | partially | H1 |
+| Mist auth header | `Authorization: Token ${api_token}` (`oem/rest-messages.now.ts`) | Same format | matches | H1, H3 |
 | Mist rate limits | No explicit assumption; claims about 96 calls per hour | 5,000 calls per hour per token | matches | H3, H1, H4 |
-| Mist API host | `https://api.mist.com` for every org (`oem-messages.now.ts:105,112,123,134`) | Global 01 only; 11 other regional hosts | differs | H5, H1 |
+| Mist API host | `https://api.mist.com` for every org (`oem/rest-messages.now.ts`) | Global 01 only; 11 other regional hosts | differs | H5, H1 |
 
 Notes:
 
@@ -234,45 +226,47 @@ Notes:
   Python SDK sends array parameters with a `[]` suffix (`params['models[]']`). The spec does not say
   whether `eox` is left out for devices without EoX data; `eox.status` is nullable. Reading only the
   first page is fine for a model lookup (up to 1000 rows by default).
-- **Meraki inventory, optional hardening (verdict matches).** In `adapters.ts:104`, replace
-  `asArray(json).find((d) => field(d, 'eox'))` with
+- **Meraki inventory, optional hardening (verdict matches).** In `domain/oem/sync-adapters.ts`,
+  replace `asArray(json).find((d) => field(d, 'eox'))` with
   `asArray(json).find((d) => field(d, 'eox', 'endOfSaleAt') || field(d, 'eox', 'endOfSupportAt'))`.
   Otherwise an `eox` object with a null status and no dates is recorded as a fact with no dates, and
-  the `break` at line 114 stops the search in the remaining orgs. Optionally append `&perPage=3` (the
-  documented minimum) at `oem-messages.now.ts:52`. Done: `adapters.ts` `hasEoxDates`.
+  the `break` after it stops the search in the remaining orgs. Optionally append `&perPage=3` (the
+  documented minimum) at `oem/rest-messages.now.ts`. Done: `domain/oem/sync-adapters.ts`
+  `hasEoxDates`.
 - **Meraki EoX fields.** `status` is a nullable string with enum `endOfSale`, `endOfSupport`,
   `nearEndOfSupport`. `endOfSaleAt` ("End of sale date for the device product") and `endOfSupportAt`
   are date-time strings. Example: `"eox": {"status":"endOfSale","endOfSaleAt":"2031-07-29T02:00:00Z",
   "endOfSupportAt":"2032-07-29T02:00:00Z"}`. The filter query parameter is `eoxStatuses` (array;
   `endOfSale`, `endOfSupport`, `nearEndOfSupport` or `null`). A separate
   `GET /organizations/{organizationId}/inventory/devices/eox/overview` returns counts only. The test
-  fixture (`adapters.test.ts:75`) uses the same shape.
+  fixture (`domain/oem/adapters.test.ts`) uses the same shape.
 - **Meraki auth.** Authorization page: "Dashboard API v1 supports Bearer Auth using the standard
   Authorization header parameter", example `Authorization: Bearer {API_KEY}`; it calls
   `X-Cisco-Meraki-API-Key` "v0's" header. Getting Started: "requires a bearer token". The v1 OpenAPI
   still lists both schemes (`meraki_api_key` and `bearerAuth`). The official SDK sends
   `'Authorization: Bearer ' + api_key`. The key comes from the password2 property
-  `x_daas_ham.meraki.api_key` (`rest-port.ts:15,28`).
+  `x_daas_ham.meraki.api_key` (`platform/rest-messages.ts`).
 - **Meraki claim.** operationId `claimIntoOrganizationInventory`. The request body is optional, with
   `orders` (string[]), `serials` (string[], "The serials of the devices that should be claimed") and
   `licenses` (`[{key (required), mode addDevices or renew}]`). The 200 response has `orders`,
   `serials` ("The serials of the devices claimed") and `licenses`. Error body format is
   `{"errors": ["..."]}`, so `errorText`'s `errors[0]` matches. OAuth scope, if OAuth is used:
-  `dashboard:licensing:config:write`. The 50-serial batch size (`MERAKI_CLAIM_BATCH`, `claims.ts:50`)
-  is not documented.
+  `dashboard:licensing:config:write`. The 50-serial batch size (`MERAKI_CLAIM_BATCH`,
+  `domain/oem/claim-adapters.ts`) is not documented.
 - **Meraki rate limits.** The Rate Limit page gives up to 10 requests per second per organization
   (burst of 10 more in the first second; shared by all apps using the org) and up to 100 requests per
   second per source IP; over the limit the API returns 429 with `Retry-After`. The Errors page:
   429 means "Too many requests... We recommend an exponential backoff". The docs do not say whether
   the claim window is per IP, per org or per key, or whether it is fixed or sliding, so the "per IP"
-  scope should not be stated. A 429 today fails the batch and uses one of its `MAX_CLAIM_ATTEMPTS = 5`
-  (`claims.ts:120-122`).
-- **Meraki claim, recommended (not a contract mismatch).** (1) In `claims.ts` `merakiClaim`, and in
-  `mistClaim` the same way, add `if (response.status === 429) break` before the `!isSuccess` branch
-  (line 120), so the batch is left for the next run instead of using an attempt. (2) Two adjacent
-  5-minute runs can fall in one sliding window (8 + 8 > 10). To guarantee the documented limit, cap
-  Meraki at 5 per run, e.g. `Math.min(maxCalls, 5)` in `runVendorClaims` when `vendor === 'meraki'`
-  (`max_calls` is shared by all vendors), or change `oem-claims.now.ts:23` `value: 8` to `value: 5`.
+  scope should not be stated. A 429 today fails the batch and uses one of its `MAX_CLAIM_ATTEMPTS`
+  (`domain/oem/claims.ts`).
+- **Meraki claim, recommended (not a contract mismatch).** (1) In `domain/oem/claim-adapters.ts`
+  `merakiClaim`, and in `mistClaim` the same way, add `if (response.status === 429) break` before
+  the `!isSuccess` branch, so the batch is left for the next run instead of using an attempt. (2)
+  Two adjacent 5-minute runs can fall in one sliding window (8 + 8 > 10). To guarantee the
+  documented limit, cap Meraki at 5 per run, e.g. `Math.min(maxCalls, 5)` in `runVendorClaims` when
+  `vendor === 'meraki'` (`max_calls` is shared by all vendors), or change `oem/logic.now.ts`
+  `value: 8` to `value: 5`.
 - **Meraki hosts.** Getting Started: "In most parts of the world" the base URI is
   `https://api.meraki.com/api/v1`. Other dashboards: Canada `https://api.meraki.ca/api/v1`, China
   `https://api.meraki.cn/api/v1`, India `https://api.meraki.in/api/v1`, United States FedRAMP
@@ -283,7 +277,7 @@ Notes:
   `{"detail":"no juniper account linked"}`, 401, 403, 404, 429 `{detail}`. A richer
   `GET .../jsi/inventory/search` also exists, with a `sku` filter, comma-separated serials and model,
   and `search_after` paging. The app tries each configured org until one returns items
-  (`adapters.ts:152-158`) and sends the raw PID as `model` (`adapters.ts:164`).
+  (`domain/oem/sync-adapters.ts`) and sends the raw PID as `model` (`domain/oem/sync-adapters.ts`).
 - **Mist JSI, operational caveats (verdict matches).** JSI needs a Juniper support account linked to
   the Mist org; otherwise the call returns 400 "no juniper account linked", which shows as
   "HTTP 400" in the errors list. The `model` filter matches the JSI `model` value (e.g.
@@ -291,13 +285,13 @@ Notes:
   `/jsi/inventory/search` has a `sku` filter if needed.
 - **Mist lifecycle fields.** `js_inventory_item`: `end_of_sale_time` (integer, "End of sale epoch
   timestamp"), `eos_time` (integer, "End of support time"), `end_of_service_time` (integer, "End of
-  service epoch timestamp"), `version_eos_time` (software), `eol_psn` (product support notice for the
-  end-of-life milestone). `eol_time` has 0 occurrences in the spec. Example: `end_of_sale_time`
+  service epoch timestamp"), `version_eos_time` (software), `eol_psn` (product support notice for
+  the end-of-life milestone). `eol_time` has 0 occurrences in the spec. Example: `end_of_sale_time`
   1561507200, `end_of_service_time` 1661507200, `eos_time` 1672012800. The meaning of
   `end_of_service_time` is not defined, and in the example it is earlier than `eos_time`. Today Mist
   lifecycle records the wrong date as end of sale and never records end of support, so
-  refresh-by-support (`model-lifecycle.ts` uses `endOfSupport`) gets no Mist data. The test fixture
-  (`adapters.test.ts:117,121-122`) and `docs/spec/p2-oem.md:10` carry the same names.
+  refresh-by-support (`domain/model-lifecycle.ts` uses `endOfSupport`) gets no Mist data. The test
+  fixture (`domain/oem/adapters.test.ts`) and `docs/spec/p2-oem.md` carry the same names.
 - **Mist warranty and contract fields.** `warranty_start` (string, "only returned for onboarded
   (claimed) devices", e.g. `2022-09-01`), `warranty_end` (string, e.g. `2042-11-28`), `warranty_time`
   (integer, "Timestamp when warranty needs to be renewed"), `warranty_type` (e.g. "Enhanced Hardware
@@ -322,10 +316,11 @@ Notes:
   use an org API token, and note that it is removed after 90 days unused.
 - **Mist rate limits.** HPE/Juniper overview: "HPE Mist limits API calls to 5,000 per hour"; more on
   request via support ticket; the login API is rate-limited after three failures. OpenAPI 429: "The
-  API Token used for the request reached the 5000 API Calls per hour threshold". "Rate limiting is done
-  on an individual token basis". Older mist.com page (2018): "reset at the hourly boundary".
-  Recommended: treat 429 as "stop this run" (`if (response.status === 429) break` in `mistClaim` before
-  `claims.ts:141`). Optional: batch serials and models comma-separated to cut lookup calls.
+  API Token used for the request reached the 5000 API Calls per hour threshold". "Rate limiting is
+  done on an individual token basis". Older mist.com page (2018): "reset at the hourly boundary".
+  Recommended: treat 429 as "stop this run" (`if (response.status === 429) break` in `mistClaim`
+  before `domain/oem/claim-adapters.ts`). Optional: batch serials and models comma-separated to cut
+  lookup calls.
 - **Mist hosts.** Global 01 `api.mist.com`, Global 02 `api.gc1.mist.com`, Global 03
   `api.ac2.mist.com`, Global 04 `api.gc2.mist.com`, Global 05 `api.gc4.mist.com`, EMEA 01
   `api.eu.mist.com`, EMEA 02 `api.gc3.mist.com`, EMEA 03 `api.ac6.mist.com`, EMEA 04
@@ -370,20 +365,20 @@ Sources:
 
 | Item | App assumes | Source says | Verdict | Source |
 |---|---|---|---|---|
-| GreenLake base URL and API version | `https://global.api.greenlake.hpe.com`, `/devices/v1/...` (`oem-messages.now.ts:156,164,168,174`) | Same host; v1 is stable; v1beta1 stopped working 2025-05-05; v2beta1 is beta | matches | G1, G2, G3 |
-| GreenLake add devices | `POST /devices/v1/devices`, 25 per call, `{"network":[...]}` only (`claims.ts:54,165`) | Max 5 devices per request; `compute`, `network` and `storage` all required | differs | G2, G1, G3 |
-| GreenLake add and update are asynchronous | Any 2xx = done; response headers not exposed (`claims.ts:167,187`, `http.ts:12-15`, `rest-port.ts:63`) | 202 means input validated; progress at the `Location` URL (`/devices/v1/async-operations/{id}`) | partially | G2, G1 |
-| GreenLake find device | `GET .../devices/v1/devices?filter=serialNumber eq '${serial}'`, reads `items[0].id` (`oem-messages.now.ts:168`, `claims.ts:180`) | Same filter syntax and response fields | matches | G2, G1 |
-| GreenLake assign subscription | `PATCH .../devices/v1/devices?id=${device_id}`, `{"subscription":[{"id"}]}`, inherits `Content-Type: application/json` (`oem-messages.now.ts:161,171-176`) | Request body accepts only `application/merge-patch+json` | differs | G2, G3, G4 |
-| GreenLake authentication | `oauth2` with a profile attached on the instance (`oem-messages.now.ts:148-149,158`) | Client credentials grant; per-workspace token URL; tokens valid 15 minutes | matches | G5, G6, G7 |
-| FortiCloud Asset Management v3: base URL, products/list | `POST https://support.fortinet.com/ES/api/registration/v3/products/list` `{"serialNumber"}`, one call per serial (`oem-messages.now.ts:79,87-93`) | Same base and resource; `serialNumber` or `expireBefore` required in the body | matches | F1, F2 |
-| FortiCloud products/list response | `assets[].entitlements[]`, `asset.contractNumber`; API `status` ignored (`adapters.ts:127-143`) | `contractNumber` sits under `assets[].contracts[]`; `status` 0 means success | partially | F1, F3 |
-| FortiCloud rate limits vs coverage sync | 200 serials per batch, one call each, looping up to 120 s (`oem-sync.ts:83-85`) | 100 calls per minute, 1000 per hour, 10 errors per hour | differs | F1 |
-| FortiCloud products/register | 10 per batch, `{"registrationUnits":[{serialNumber, description, isGovernment}]}`, no `accountId` (`claims.ts:58,200-206`) | 10 per batch confirmed; request schema only on FNDN (login) | unverifiable | F1, F3, F4, F2 |
-| FortiCloud OAuth | `oauth2` profile; IAM API user with client_id `assetmanagement` (`oem-messages.now.ts:5-7,81`) | Password grant at `customerapiauth.fortinet.com`, JSON body; client_id matches; no client secret issued | partially | F5, F1, G7 |
-| FortiZTP provision to FortiManager | `PUT https://fortiztp.forticloud.com/public/api/v1/devices/${serial}`, `fortiManagerOid` as a string, no `deviceSN` (`oem-messages.now.ts:183,191-196`, `claims.ts:217`) | Primary reference needs login; third-party SDKs suggest a v1/v2 mix | unverifiable | F6, F7, F8, F9, F10 |
-| FortiZTP client_id | Not stated in code or docs (`oem-messages.now.ts:147-149,185`) | From the credentials ZIP; official examples omit FortiZTP; SDKs use `fortiztp` | unverifiable | F5, F9, F10 |
-| FortiZTP and FortiCloud error body | `errorText` reads `errors[0]`, `message`, `detail` (`http.ts:25-29`) | `{"error", "error_description"}` | partially | F9, F5 |
+| GreenLake base URL and API version | `https://global.api.greenlake.hpe.com`, `/devices/v1/...` (`oem/rest-messages.now.ts`) | Same host; v1 is stable; v1beta1 stopped working 2025-05-05; v2beta1 is beta | matches | G1, G2, G3 |
+| GreenLake add devices | `POST /devices/v1/devices`, 25 per call, `{"network":[...]}` only (`domain/oem/claim-adapters.ts`) | Max 5 devices per request; `compute`, `network` and `storage` all required | differs | G2, G1, G3 |
+| GreenLake add and update are asynchronous | Any 2xx = done; response headers not exposed (`domain/oem/claim-adapters.ts`, `domain/http.ts`, `platform/rest-messages.ts`) | 202 means input validated; progress at the `Location` URL (`/devices/v1/async-operations/{id}`) | partially | G2, G1 |
+| GreenLake find device | `GET .../devices/v1/devices?filter=serialNumber eq '${serial}'`, reads `items[0].id` (`oem/rest-messages.now.ts`, `domain/oem/claim-adapters.ts`) | Same filter syntax and response fields | matches | G2, G1 |
+| GreenLake assign subscription | `PATCH .../devices/v1/devices?id=${device_id}`, `{"subscription":[{"id"}]}`, inherits `Content-Type: application/json` (`oem/rest-messages.now.ts`) | Request body accepts only `application/merge-patch+json` | differs | G2, G3, G4 |
+| GreenLake authentication | `oauth2` with a profile attached on the instance (`oem/rest-messages.now.ts`) | Client credentials grant; per-workspace token URL; tokens valid 15 minutes | matches | G5, G6, G7 |
+| FortiCloud Asset Management v3: base URL, products/list | `POST https://support.fortinet.com/ES/api/registration/v3/products/list` `{"serialNumber"}`, one call per serial (`oem/rest-messages.now.ts`) | Same base and resource; `serialNumber` or `expireBefore` required in the body | matches | F1, F2 |
+| FortiCloud products/list response | `assets[].entitlements[]`, `asset.contractNumber`; API `status` ignored (`domain/oem/sync-adapters.ts`) | `contractNumber` sits under `assets[].contracts[]`; `status` 0 means success | partially | F1, F3 |
+| FortiCloud rate limits vs coverage sync | 200 serials per batch, one call each, looping up to 120 s (`platform/oem-sync.ts`) | 100 calls per minute, 1000 per hour, 10 errors per hour | differs | F1 |
+| FortiCloud products/register | 10 per batch, `{"registrationUnits":[{serialNumber, description, isGovernment}]}`, no `accountId` (`domain/oem/claim-adapters.ts`) | 10 per batch confirmed; request schema only on FNDN (login) | unverifiable | F1, F3, F4, F2 |
+| FortiCloud OAuth | `oauth2` profile; IAM API user with client_id `assetmanagement` (`oem/rest-messages.now.ts`) | Password grant at `customerapiauth.fortinet.com`, JSON body; client_id matches; no client secret issued | partially | F5, F1, G7 |
+| FortiZTP provision to FortiManager | `PUT https://fortiztp.forticloud.com/public/api/v1/devices/${serial}`, `fortiManagerOid` as a string, no `deviceSN` (`oem/rest-messages.now.ts`, `domain/oem/claim-adapters.ts`) | Primary reference needs login; third-party SDKs suggest a v1/v2 mix | unverifiable | F6, F7, F8, F9, F10 |
+| FortiZTP client_id | Not stated in code or docs (`oem/rest-messages.now.ts`) | From the credentials ZIP; official examples omit FortiZTP; SDKs use `fortiztp` | unverifiable | F5, F9, F10 |
+| FortiZTP and FortiCloud error body | `errorText` reads `errors[0]`, `message`, `detail` (`domain/http.ts`) | `{"error", "error_description"}` | partially | F9, F5 |
 
 Notes:
 
@@ -404,7 +399,7 @@ Notes:
   "Accepts a maximum of five devices per request, combining the count of network, compute, and storage
   devices." Needs `ccs.device-management.edit`. Rate limit 50 requests per minute per workspace, 429
   above it (changelog 2026-June). Optional query parameter `dry-run`. The app requires a MAC
-  (`claims.ts:160`).
+  (`domain/oem/claim-adapters.ts`).
 - **GreenLake async operations.** POST and PATCH "provide an asynchronous response and will always
   return 202 Accepted if basic input validations are successful. The location header in the response
   provides the URI to be invoked for fetching the progress". The 202 response has a `Location` header
@@ -421,9 +416,9 @@ Notes:
   `key`, `tier` and more. Rate limit 160 requests per minute per workspace; needs
   `ccs.device-management.view`. The guide says reserved characters in string literals must be
   percent-encoded.
-- **GreenLake find device, optional hardening (verdict matches, unverified without an instance).** The
-  endpoint holds raw spaces and quotes, which RFC 3986 requires to be percent-encoded. If RESTMessageV2
-  rejects or mangles the URL, change `oem-messages.now.ts:168` to
+- **GreenLake find device, optional hardening (verdict matches, unverified without an instance).**
+  The endpoint holds raw spaces and quotes, which RFC 3986 requires to be percent-encoded. If
+  RESTMessageV2 rejects or mangles the URL, change `oem/rest-messages.now.ts` to
   `"https://global.api.greenlake.hpe.com/devices/v1/devices?filter=serialNumber%20eq%20%27${serial}%27"`.
 - **GreenLake assign subscription.** operationId `patchDevicesV1`; query parameter `id` (required;
   array of uuid, style form, explode true; "Maximum five devices per request"). Body schema:
@@ -432,7 +427,7 @@ Notes:
   `subscription` array removes the subscription. Async 202 + `Location`. Rate limit 40 requests per
   minute per workspace. Needs `ccs.device-management.edit`. In GET responses, `subscription[].id` is a
   uuid, distinct from `subscription[].key` (e.g. `SIEIAASTEST018ID`), so the account value must be the
-  subscription's UUID, not its key (account label `staging.now.ts:154`: "HPE GreenLake (subscription
+  subscription's UUID, not its key (account label `domain/vocabulary.ts`: "HPE GreenLake (subscription
   id)"). ServiceNow: "the value defined for the HTTP method overrides the value from the parent REST
   message" when both set the same header.
 - **GreenLake auth.** Create a personal API client (service "GreenLake Cloud Platform"), up to 7 per
@@ -441,32 +436,30 @@ Notes:
   `Content-Type: application/x-www-form-urlencoded`, at
   `https://global.api.greenlake.hpe.com/authorization/v2/oauth2/<workspace id>/token` (workspace id as
   hex without hyphens). ServiceNow's third-party OAuth provider supports the Client Credentials grant.
-  Optional comment for `oem-messages.now.ts:147-151`: "GreenLake: Client Credentials grant, token URL
+  Optional comment for `oem/rest-messages.now.ts`: "GreenLake: Client Credentials grant, token URL
   https://global.api.greenlake.hpe.com/authorization/v2/oauth2/<workspaceId>/token, API client user
   needs Devices and Subscription edit permission."
 - **FortiCloud products/list.** KB: "FortiCare Registration API v3 Resource Base:
   /ES/api/registration/v3/" on support.fortinet.com; resources `products/list`, `products/register`,
   `products/details`, `products/description`, `products/location`, `licenses/register`,
-  `licenses/download`. Example `curl --request POST
-  'https://support.fortinet.com/ES/api/registration/v3/products/list'` with Bearer auth and JSON.
-  "serialNumber or expireBefore must be used in the POST body." For Organization scope the body must
-  also carry `accountId`: if the Provider's IAM API user is Organization-scoped, `products_list` content
-  must include `"accountId": <number>` (`oem-messages.now.ts:91`).
-- **FortiCloud response.** KB sample: `{"build":"1.0.0","error":null,"message":"Request processed
-  successfully","status":0,"token":...,"version":"3.0","assets":[{"description","entitlements":
-  [{"endDate","level","levelDesc","startDate","type","typeDesc"}],"isDecommissioned","productModel",
-  "registrationDate","serialNumber","warrantySupports","assetGroups","contracts":[{"contractNumber",
-  "sku","terms":[{"endDate","startDate","supportType"}]}],"productModelEoR","productModelEoS"}]}`.
+  `licenses/download`. Example
+  `curl --request POST 'https://support.fortinet.com/ES/api/registration/v3/products/list'` with
+  Bearer auth and JSON. "serialNumber or expireBefore must be used in the POST body." For
+  Organization scope the body must also carry `accountId`: if the Provider's IAM API user is
+  Organization-scoped, `products_list` content must include `"accountId": <number>`
+  (`oem/rest-messages.now.ts`).
+- **FortiCloud response.** KB sample:
+  `{"build":"1.0.0","error":null,"message":"Request processed successfully","status":0,"token":...,"version":"3.0","assets":[{"description","entitlements": [{"endDate","level","levelDesc","startDate","type","typeDesc"}],"isDecommissioned","productModel", "registrationDate","serialNumber","warrantySupports","assetGroups","contracts":[{"contractNumber", "sku","terms":[{"endDate","startDate","supportType"}]}],"productModelEoR","productModelEoS"}]}`.
   The entitlement fields `levelDesc`, `typeDesc`, `startDate` and `endDate` match. The third-party
-  hfortix-forticare SDK corroborates "status: API call status code, 0 means success". Today HTTP status
-  alone decides success (`adapters.ts:19-28`), so an HTTP-200 API error can stamp serials as checked
-  with no coverage.
+  hfortix-forticare SDK corroborates "status: API call status code, 0 means success". Today HTTP
+  status alone decides success (`domain/oem/sync-adapters.ts`), so an HTTP-200 API error can stamp
+  serials as checked with no coverage.
 - **FortiCloud limits.** KB "Limits and Quotas": maximum 100 calls per minute, 1000 calls per hour,
   10 errors per hour; maximum 10 units per batch registration; maximum 5 errors per batch
   registration. Coverage loads 200 stale serials at a time and calls `products_list` once per serial
-  (`adapters.ts:125-126`) until `x_daas_ham.job.budget_seconds` (default 120 s), every 4 hours. The
-  claims budget (`x_daas_ham.oem.claim.max_calls`, default 8 per vendor per 5-minute run,
-  `entry/oem-claims.ts:15`; about 96 per hour) is within the limits.
+  (`domain/oem/sync-adapters.ts`) until `x_daas_ham.job.budget_seconds` (default 120 s), every 4
+  hours. The claims budget (`x_daas_ham.oem.claim.max_calls`, default 8 per vendor per 5-minute run,
+  `platform/claim-steps.ts`; about 96 per hour) is within the limits.
 - **FortiCloud register.** The response envelope (KB sample) has `status` (0 = success), `message`,
   `error`, `build`, `version`, `token`. Third-party hfortix-forticare gives the top-level body as
   `{accountId (int; "Optional for API user with Local scope, mandatory for Org scope"),
@@ -489,10 +482,10 @@ Notes:
 - **FortiZTP.** Administration Guide (26.1.0 / 26.1.a, "API" page): "There is an API available for
   FortiZTP ... supported API calls at the FortiZTP REST API documentation" (an FNDN link that needs
   login). "The API usage limit is 2 000 calls per hour." "You can do a single API call on multiple
-  devices by entering multiple device serial numbers." "The FortiZTP v2.0 API is available." In the UI,
-  FortiManagers are added under Settings > FortiGate > Provision Target (serial number and IP/FQDN)
-  before provisioning. The app's 8 calls per 5 minutes (about 96 per hour) is within 2000 per hour.
-  Account label `staging.now.ts:155`: "FortiZTP (FortiManager OID)".
+  devices by entering multiple device serial numbers." "The FortiZTP v2.0 API is available." In the
+  UI, FortiManagers are added under Settings > FortiGate > Provision Target (serial number and
+  IP/FQDN) before provisioning. The app's 8 calls per 5 minutes (about 96 per hour) is within 2000
+  per hour. Account label `domain/vocabulary.ts`: "FortiZTP (FortiManager OID)".
 - **FortiZTP, third-party only.** pyfortiztp 1.0.1 (v1): host
   `https://fortiztp.forticloud.com/public/api/v1`, `PUT /devices` (collection) with an array body
   `[{deviceSN, deviceType, provisionStatus:'provisioned', provisionTarget:'FortiManager',
@@ -508,14 +501,15 @@ Notes:
   `externalControllerSn`/`Ip` instead.
 - **FortiZTP client_id.** The token endpoint and password grant are the same as for FortiCloud. The
   third-party pyfortiztp (client_id default `fortiztp`) and hfortix-fortiztp
-  (`DEFAULT_CLIENT_ID = 'fortiztp'`) both use `fortiztp`. The same ServiceNow ROPC client-secret caveat
-  as FortiCare applies. Suggested comment for `oem-messages.now.ts:147-151`: "FortiZTP: FortiCloud IAM
-  API user, password grant at https://customerapiauth.fortinet.com/api/v1/oauth/token/, client_id from
-  the credentials ZIP (normally "fortiztp")".
+  (`DEFAULT_CLIENT_ID = 'fortiztp'`) both use `fortiztp`. The same ServiceNow ROPC client-secret
+  caveat as FortiCare applies. Suggested comment for `oem/rest-messages.now.ts`: "FortiZTP:
+  FortiCloud IAM API user, password grant at
+  https://customerapiauth.fortinet.com/api/v1/oauth/token/, client_id from the credentials ZIP
+  (normally "fortiztp")".
 - **FortiZTP errors.** pyfortiztp README ("Error messages are provided as is, from the FortiZTP API"):
   `{"error":"invalid_request","error_description":"Device testSN doesn't exist in this account"}`;
   success 204 No Content. The official IAM page shows the same `{error, error_description}` shape for
-  the token endpoint. Success handling (any 2xx, `claims.ts:213-220`) matches.
+  the token endpoint. Success handling (any 2xx, `domain/oem/claim-adapters.ts`) matches.
 
 Sources:
 
@@ -557,21 +551,21 @@ Sources:
 
 | Item | App assumes | Source says | Verdict | Source |
 |---|---|---|---|---|
-| Zero Touch base URL and path | `POST https://zerotouch.checkpoint.com/api/v1/gateways`, once per device (`oem-messages.now.ts:203,210-215`, `claims.ts:222-226`) | Every command is `POST https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/<command>`; no `/api/v1/gateways` | differs | K1, K2, K3, K4 |
-| Zero Touch authentication | `X-API-Key: ${api_key}` from one password2 property (`oem-messages.now.ts:214`, `rest-port.ts:17`) | `login` with `api-client-id` and `api-key` returns a `sid`, sent as `X-chkp-sid`; no `X-API-Key` | differs | K5, K6, K7 |
-| Zero Touch claim body | `{serialNumber, template}`; requires serial (`claims.ts:223-226`) | `claim-gateway` takes `object-name`, `account-id` (int), `template-id` (int), `mac`; no serial | differs | K1, K8, K2, K9 |
-| ShipEngine base URL, auth header, labels path | `POST https://api.shipengine.com/v1/labels`, header `API-Key: ${api_key}` (`shipping.now.ts:15,22-27`) | Same | matches | S1, S2, S3, S4 |
-| ShipEngine `shipment.carrier_id` | Not sent; `service_code` from a property (`domain/shipping.ts:87-95`) | `carrier_id` is required | differs | S1, S4 |
-| ShipEngine `ship_to` / `ship_from` | Field names as spec; empty optionals sent as `''` (`domain/shipping.ts:58-76`) | Names match; `ship_from.phone` and `state_province` required with minLength 1 | partially | S1 |
-| ShipEngine packages and label format | `weight {value, unit:'kilogram'}`, `label_messages.reference1`, `label_format:'pdf'` (`domain/shipping.ts:92-94`) | Same | matches | S1, S4 |
-| ShipEngine label response | `label_id`, `tracking_number`, `carrier_code`, `label_download.pdf`/`href`, `shipment_cost` (`domain/shipping.ts:105-117`) | Same; sample currency lowercase; label URL valid 90 days | matches | S1, S4 |
-| ShipEngine track webhook payload | `data.tracking_number`, `status_code`, descriptions, dates, `events[]` (`domain/shipping.ts:182-200`) | Same fields | matches | S5, S6, S1 |
-| ShipEngine `status_code` values | 8 codes mapped (`domain/shipping.ts:120-129`) | Enum UN, AC, IT, DE, EX, AT, NY, SP | matches | S1, S7, S6 |
-| ShipEngine webhook URL auth | `?token=` in the URL (`entry/shipping.ts:146-147`, `rest.now.ts:178-186`) | Query strings not documented; custom headers and RSA-SHA256 signatures documented | partially | S1, S5, S8 |
+| Zero Touch base URL and path | `POST https://zerotouch.checkpoint.com/api/v1/gateways`, once per device (`oem/rest-messages.now.ts`, `domain/oem/claim-adapters.ts`) | Every command is `POST https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2/<command>`; no `/api/v1/gateways` | differs | K1, K2, K3, K4 |
+| Zero Touch authentication | `X-API-Key: ${api_key}` from one password2 property (`oem/rest-messages.now.ts`, `platform/rest-messages.ts`) | `login` with `api-client-id` and `api-key` returns a `sid`, sent as `X-chkp-sid`; no `X-API-Key` | differs | K5, K6, K7 |
+| Zero Touch claim body | `{serialNumber, template}`; requires serial (`domain/oem/claim-adapters.ts`) | `claim-gateway` takes `object-name`, `account-id` (int), `template-id` (int), `mac`; no serial | differs | K1, K8, K2, K9 |
+| ShipEngine base URL, auth header, labels path | `POST https://api.shipengine.com/v1/labels`, header `API-Key: ${api_key}` (`delivery/logic.now.ts`) | Same | matches | S1, S2, S3, S4 |
+| ShipEngine `shipment.carrier_id` | Not sent; `service_code` from a property (`domain/shipping.ts`) | `carrier_id` is required | differs | S1, S4 |
+| ShipEngine `ship_to` / `ship_from` | Field names as spec; empty optionals sent as `''` (`domain/shipping.ts`) | Names match; `ship_from.phone` and `state_province` required with minLength 1 | partially | S1 |
+| ShipEngine packages and label format | `weight {value, unit:'kilogram'}`, `label_messages.reference1`, `label_format:'pdf'` (`domain/shipping.ts`) | Same | matches | S1, S4 |
+| ShipEngine label response | `label_id`, `tracking_number`, `carrier_code`, `label_download.pdf`/`href`, `shipment_cost` (`domain/shipping.ts`) | Same; sample currency lowercase; label URL valid 90 days | matches | S1, S4 |
+| ShipEngine track webhook payload | `data.tracking_number`, `status_code`, descriptions, dates, `events[]` (`domain/shipping.ts`) | Same fields | matches | S5, S6, S1 |
+| ShipEngine `status_code` values | 8 codes mapped (`domain/shipping.ts`) | Enum UN, AC, IT, DE, EX, AT, NY, SP | matches | S1, S7, S6 |
+| ShipEngine webhook URL auth | `?token=` in the URL (`entry/shipping.ts`, `shared/rest-api.now.ts`) | Query strings not documented; custom headers and RSA-SHA256 signatures documented | partially | S1, S5, S8 |
 | ShipEngine webhook delivery and retries | A delivery held off by the Shipment's tracking lock is answered 503 for the aggregator to send again (`entry/shipping.ts` `postTrackingUpdate`, commit e197f67) | 10 s to answer 2xx; then at most two more attempts, typically 30 minutes apart, and the event is dropped | differs | S9, S10 |
-| EasyPost Event envelope | Any body with `result.tracking_code` is a tracking update (`domain/shipping.ts:201-203`) | `result` can be another object type, e.g. Insurance, which also has `tracking_code` | partially | E1, E2, E3 |
-| EasyPost Tracker fields and status values | `tracking_code`, `status`, `status_detail`, `est_delivery_date`; 10 statuses (`domain/shipping.ts:131-142,202-212`) | Same | matches | E4 |
-| EasyPost `tracking_details[]` | Field names; last element is the latest scan (`domain/shipping.ts:205-218`) | Field names match; order not documented | partially | E4 |
+| EasyPost Event envelope | Any body with `result.tracking_code` is a tracking update (`domain/shipping.ts`) | `result` can be another object type, e.g. Insurance, which also has `tracking_code` | partially | E1, E2, E3 |
+| EasyPost Tracker fields and status values | `tracking_code`, `status`, `status_detail`, `est_delivery_date`; 10 statuses (`domain/shipping.ts`) | Same | matches | E4 |
+| EasyPost `tracking_details[]` | Field names; last element is the latest scan (`domain/shipping.ts`) | Field names match; order not documented | partially | E4 |
 | EasyPost webhook URL auth | `?token=` in the URL | HMAC signature, Basic auth in URL, up to 3 custom headers; query strings not mentioned | partially | E5, E3 |
 
 Notes:
@@ -582,39 +576,40 @@ Notes:
   `set-template`, `claim-gateway`, `show-claimed-gateway`, `show-claimed-gateway-status` and
   `unclaim-gateway`. Gaia gateways use the same set with a `gaia-` prefix (`claim-gaia-gateway` etc.).
   Success is HTTP 200; failure is 400, 401 or 500 with `{message, messages[], code}`. No rate limits
-  are stated. The comment at `oem-messages.now.ts:150` says the endpoint is still to be confirmed.
+  are stated. The comment at `oem/rest-messages.now.ts` says the endpoint is still to be confirmed.
 - **Zero Touch auth.** `POST .../ZeroTouch/web_api/v2/login`, `Content-Type: application/json`, body
   `{"api-client-id": string (mandatory), "api-key": string (mandatory)}`, both generated in the Zero
   Touch Web Portal. The 200 response carries `sid`, `user`, `url` and `last-login-was-at`. `X-chkp-sid`
   is "mandatory in all API calls except the login API". `POST .../logout` with `X-chkp-sid` ends the
   session (`{"code":"17999","message":"Logout succeeded"}`). Admin Guide: keys are generated under
   Options > Manage API Key, one key per user, validity 1-180 days (default 90), shown only once.
-- **Zero Touch claim.** `claim-gateway` ("Claims a Small Office Gateway with a template-id"), headers
-  `Content-Type: application/json` and `X-chkp-sid`. Mandatory: `object-name` (string, the gateway's
-  name), `account-id` (int, the User Center account that owns gateways and templates), `template-id`
-  (int), `mac` (string, e.g. `xx:xx:xx:7A:B3:4E`). Optional: `under-construction` (boolean, default
-  false). The 200 response is an array with `gateway-configuration` (`template-name` ...),
-  `creation-time`, `last-modify-time` and `gateway-status` (`status-value` "set", `display-status`
-  "Ready to deploy"). Template ids come from `show-all-templates`. Gaia appliances use
-  `claim-gaia-gateway` with the same four mandatory fields. Today the customer account is one string in
-  `x_daas_ham_cloud_account.account_id`, labelled "Check Point Zero Touch (template)"
-  (`staging.now.ts:156`); success means any 2xx; test at `claims.test.ts:151-157`. The demo model in
-  `demo-seed.ts:84` is `CPAP-SG3600` (Quantum 3600); the researcher's unverified understanding is that
-  it is a Gaia appliance, which would need `claim-gaia-gateway`.
+- **Zero Touch claim.** `claim-gateway` ("Claims a Small Office Gateway with a template-id"),
+  headers `Content-Type: application/json` and `X-chkp-sid`. Mandatory: `object-name` (string, the
+  gateway's name), `account-id` (int, the User Center account that owns gateways and templates),
+  `template-id` (int), `mac` (string, e.g. `xx:xx:xx:7A:B3:4E`). Optional: `under-construction`
+  (boolean, default false). The 200 response is an array with `gateway-configuration`
+  (`template-name` ...), `creation-time`, `last-modify-time` and `gateway-status` (`status-value`
+  "set", `display-status` "Ready to deploy"). Template ids come from `show-all-templates`. Gaia
+  appliances use `claim-gaia-gateway` with the same four mandatory fields. Today the customer
+  account is one string in `x_daas_ham_cloud_account.account_id`, labelled "Check Point Zero Touch
+  (template)" (`domain/vocabulary.ts`); success means any 2xx; test at `domain/oem/claims.test.ts`.
+  The demo model in `entry/demo-seed.ts` is `CPAP-SG3600` (Quantum 3600); the researcher's
+  unverified understanding is that it is a Gaia appliance, which would need `claim-gaia-gateway`.
 - **ShipEngine basics.** OpenAPI "ShipEngine API" 1.1.202604070904: servers
   `[https://api.shipengine.com]`, `/v1/labels` POST, operationId `create_label` ("Purchase Label");
   security scheme `api_key` (apiKey, header `API-Key`). Missing or invalid key gives 401. Sandbox keys
   start with `TEST_`. Rate limit 200 requests per minute by default (sandbox 20), 429 with
   `Retry-After` above it. Error body `{request_id, errors:[{error_source, error_type, error_code,
-  message, ...}]}`, which `errorText` (`http.ts:25-29`, `errors[0].message`) already reads. The key
-  comes from `x_daas_ham.shipping.api_key` (`rest-port.ts:18`).
-- **ShipEngine carrier_id.** `shipment_request` has `required: ["carrier_id", "service_code",
-  "ship_to", "packages"]`. `carrier_id` is an se_id string (pattern `^se(-[a-z0-9]+)+$`, e.g.
-  `se-28529731`), "The carrier account that is billed for the shipping charges". "Either ship_from or
-  warehouse_id must be set". The docs example sends `"carrier_id": "se-123456", "service_code":
-  "ups_ground"` and says to "use the standard label creation endpoint (POST /v1/labels) with explicit
-  carrier_id and service_code". Rate shopper and `shipping_rule_id` are the alternatives. The app's
-  service code defaults to `ups_standard` (`x_daas_ham.shipping.service_code`, `shipping.now.ts:72-79`).
+  message, ...}]}`, which `errorText` (`domain/http.ts`, `errors[0].message`) already reads. The key
+  comes from `x_daas_ham.shipping.api_key` (`platform/rest-messages.ts`).
+- **ShipEngine carrier_id.** `shipment_request` has
+  `required: ["carrier_id", "service_code", "ship_to", "packages"]`. `carrier_id` is an se_id string
+  (pattern `^se(-[a-z0-9]+)+$`, e.g. `se-28529731`), "The carrier account that is billed for the
+  shipping charges". "Either ship_from or warehouse_id must be set". The docs example sends
+  `"carrier_id": "se-123456", "service_code": "ups_ground"` and says to "use the standard label
+  creation endpoint (POST /v1/labels) with explicit carrier_id and service_code". Rate shopper and
+  `shipping_rule_id` are the alternatives. The app's service code defaults to `ups_standard`
+  (`x_daas_ham.shipping.service_code`, `delivery/logic.now.ts`).
 - **ShipEngine addresses.** Spec field names: `name`, `phone`, `email`, `company_name`,
   `address_line1`, `address_line2`, `address_line3`, `city_locality`, `state_province`,
   `postal_code`, `country_code`, `address_residential_indicator` (unknown, yes, no), `instructions`.
@@ -623,7 +618,7 @@ Notes:
   `city_locality`, `state_province`, `postal_code`, `country_code`. `phone` and `state_province` have
   minLength 1; `company_name` and `address_line2` are nullable. `state_province`: "For some countries
   (including the U.S.) only abbreviations are allowed." On return labels `ship_from` is the Site
-  (`cmn_location.phone`). The app's `addressProblem` (`domain/shipping.ts:58-62`) requires only name,
+  (`cmn_location.phone`). The app's `addressProblem` (`domain/shipping.ts`) requires only name,
   line1, city, postal code and country.
 - **ShipEngine packages.** `packages[].weight` is required: `{value (number), unit (pound, ounce, gram,
   kilogram)}`. `label_messages` (`reference1`-`reference3`) is listed as required but nullable with
@@ -655,7 +650,7 @@ Notes:
   table lists only UN, AC, IT, DE, EX, AT, NY. GET tracking also has `status_detail_code` (e.g.
   `OUT_FOR_DELIVERY`, `RETURN_TO_SENDER`), which the webhook schema does not list. Semantic choice to
   review (not a contract error): SP maps to `delivered`, while EasyPost `available_for_pickup` maps to
-  `out_for_delivery` (`domain/shipping.ts:136`); pick one meaning for both. ShipEngine cannot produce
+  `out_for_delivery` (`domain/shipping.ts`); pick one meaning for both. ShipEngine cannot produce
   `returned` or `out_for_delivery` from `status_code` alone.
 - **ShipEngine webhooks.** Create webhook: `POST /v1/environment/webhooks` with `event` (batch,
   carrier_connected, order_source_refresh_complete, rate, report_complete, sales_orders_imported,
@@ -687,7 +682,7 @@ Notes:
   Insurance object carries `tracking_code` and `status` new, pending, purchased, failed or cancelled.
   Requests include an `X-Easypost-Event-Type` header. An `insurance.cancelled` Event would today be
   parsed as a tracking update and move a matching shipment to `exception`. The test at
-  `shipping.test.ts:134-150` uses `{object:'Event', description:'tracker.updated', result:{...}}`.
+  `domain/shipping.test.ts` uses `{object:'Event', description:'tracker.updated', result:{...}}`.
 - **EasyPost Tracker.** `id` (`trk_...`), `object` "Tracker", `mode`, `tracking_code`, `status`
   (unknown, pre_transit, in_transit, out_for_delivery, delivered, available_for_pickup,
   return_to_sender, failure, cancelled, error), `status_detail` (e.g. label_created,
@@ -754,25 +749,25 @@ Sources:
 
 | Item | App assumes | Source says | Verdict | Source |
 |---|---|---|---|---|
-| `alm_asset.substatus` choices shipped by the app | 12 separate `sys_choice` Records each ship (`substatus-choices.now.ts:10-188`, ADR 0002) | All share one update name; the built XML holds only `returned_to_lessor` | differs | N1, N2, N3, N4, N5 |
-| Added substatus values vs out-of-box | Out-of-box values are not listed; adds `pending_evaluation`, `pending_return`, `returned_to_lessor` (`lifecycle.ts:57-73`) | Out-of-box In stock already has Pending return and Pending evaluation; Retired has Lease return and RMA | differs | N6, N7 |
-| `alm_asset.install_status` values | 1 in use, 2 on order, 3 in maintenance, 6 in stock, 7 retired, 8 missing, 9 in transit (`lifecycle.ts:17-25`) | Same values; also Build (11) | matches | N7, N8 |
-| Out-of-box substatus values (`STAGE_FIELDS`) | `available`, `reserved`, `pending_disposal`, `lost`, `disposed`, `sold`, `vendor_credit` (`lifecycle.ts:27-50`) | Labels match; only `available` confirmed as a stored value | partially | N6, N7, N8 |
-| `alm_asset.cost` and `purchase_date` | `getValue('cost')`; `setValue('cost', number)` (`margin.ts:86-87`, `leases.ts:225`) | Currency field; `getValue()` and a plain number use the session currency | partially | N9, N10, N8 |
-| `proc_po` fields and status | `short_description`, `status='requested'`, `ship_to` only if supplied (`procurement.ts:13-18`) | Ship to is documented as required; status labels only | partially | N11, N12 |
-| `proc_po_item` and open quantity | Excludes lines only by PO status (`procurement.ts:20-40`) | Line items can be canceled one at a time | partially | N13, N14 |
-| `wm_order` state 3 = Closed Complete | `current.state == 3` (`rules.now.ts:105`, `delivery.ts:115-119`) | Docs list state labels only; the number 3 appears only in community posts | unverifiable | N15, N16, N17, N18, N19 |
+| `alm_asset.substatus` choices shipped by the app | 12 separate `sys_choice` Records each ship (`fleet/tables.now.ts`, ADR 0002) | All share one update name; the built XML holds only `returned_to_lessor` | differs | N1, N2, N3, N4, N5 |
+| Added substatus values vs out-of-box | Out-of-box values are not listed; adds `pending_evaluation`, `pending_return`, `returned_to_lessor` (`domain/vocabulary.ts`) | Out-of-box In stock already has Pending return and Pending evaluation; Retired has Lease return and RMA | differs | N6, N7 |
+| `alm_asset.install_status` values | 1 in use, 2 on order, 3 in maintenance, 6 in stock, 7 retired, 8 missing, 9 in transit (`domain/vocabulary.ts`) | Same values; also Build (11) | matches | N7, N8 |
+| Out-of-box substatus values (`STAGE_FIELDS`) | `available`, `reserved`, `pending_disposal`, `lost`, `disposed`, `sold`, `vendor_credit` (`domain/vocabulary.ts`) | Labels match; only `available` confirmed as a stored value | partially | N6, N7, N8 |
+| `alm_asset.cost` and `purchase_date` | `getValue('cost')`; `setValue('cost', number)` (`platform/margin.ts`, `platform/leases.ts`) | Currency field; `getValue()` and a plain number use the session currency | partially | N9, N10, N8 |
+| `proc_po` fields and status | `short_description`, `status='requested'`, `ship_to` only if supplied (`platform/procurement.ts`) | Ship to is documented as required; status labels only | partially | N11, N12 |
+| `proc_po_item` and open quantity | Excludes lines only by PO status (`platform/procurement.ts`) | Line items can be canceled one at a time | partially | N13, N14 |
+| `wm_order` state 3 = Closed Complete | `current.state == 3` (`delivery/logic.now.ts`, `platform/delivery.ts`) | Docs list state labels only; the number 3 appears only in community posts | unverifiable | N15, N16, N17, N18, N19 |
 | `wm_order` fields | `closed_at`, `expected_start`, `estimated_end`, `company`, `location`, `parent`, `short_description`, `work_notes` | task has `closed_at`, `expected_start`, `parent`, `company`, `location`; no source for `estimated_end` or that `wm_order` extends task | partially | N20, N21, N22 |
-| `cmdb_ci.last_discovered`, `discovery_source` | `discovery_source === 'ServiceNow'` means ServiceNow Discovery (`in-service.ts:116-118`, `assurance.ts:282`) | Both fields exist; examples pass `ServiceNow`; no page says Discovery writes it | partially | N23, N24 |
-| `GlideSysAttachment.write()` and `deleteAttachment()` | As used (`billing.ts:243,255-258`) | Same signatures | matches | N25, N26 |
-| `sys_attachment` fields | `table_name`, `table_sys_id`, `file_name` (`billing.ts:268`) | Documented | matches | N27, N28 |
-| Scripted REST `request.queryParams` | Each parameter is an array (`rest-api.ts:12`) | Type Array; examples are arrays | matches | N29 |
+| `cmdb_ci.last_discovered`, `discovery_source` | `discovery_source === 'ServiceNow'` means ServiceNow Discovery (`domain/in-service.ts` `seenSourceOf`) | Both fields exist; examples pass `ServiceNow`; no page says Discovery writes it | partially | N23, N24 |
+| `GlideSysAttachment.write()` and `deleteAttachment()` | As used (`platform/billing.ts`) | Same signatures | matches | N25, N26 |
+| `sys_attachment` fields | `table_name`, `table_sys_id`, `file_name` (`platform/billing.ts`) | Documented | matches | N27, N28 |
+| Scripted REST `request.queryParams` | Each parameter is an array (`platform/rest-api.ts`) | Type Array; examples are arrays | matches | N29 |
 | `GlideRecord.updateMultiple()` and clearing a field | Clears `billing_period` record by record (`platform/billing.ts` takeOffPeriod) | `updateMultiple` does not clear values unless set to `'NULL'` | matches | N30 |
-| `RESTMessageV2(name, methodName)`, `setStringParameterNoEscape` | As used; app URL-encodes values itself (`rest-port.ts:8,26-28`) | Constructor documented; neither method URL-encodes | matches | N31, N32, N33 |
+| `RESTMessageV2(name, methodName)`, `setStringParameterNoEscape` | As used; app URL-encodes values itself (`platform/rest-messages.ts`) | Constructor documented; neither method URL-encodes | matches | N31, N32, N33 |
 | `GlideAggregate.groupBy` on date fields | Grouped `start_date`/`end_date` read as `YYYY-MM-DD` (`platform/billing.ts` intervalsByLine) | Format of a grouped `glide_date` key not documented | unverifiable | N34 |
 | `setWorkflow(false)` on a global table from the scoped app | No longer relied on there: a read past the visibility rules on `alm_hardware` marks its GlideRecord while its query runs and the app's before-query rules skip a marked record (`platform/beyond-visibility.ts`, `entry/visibility.ts` `scopeRecords`); `setWorkflow(false)` stays on `x_daas_ham_*` tables | "This method can't be set for cross-scoped applications"; refused on the instance, so the rules still run. Module state reaches the rules the query sets off, within that transaction only | matches | N30, N35, N37 |
 | `current.setAbortAction(true)` in a before rule on a global table | No longer used there: the rules on `alm_hardware` and `wm_order` refuse with their Abort action (`entry/assets.ts` refusesLifecycleChange, `entry/delivery.ts` refusesWorkWindow, `entry/racks.ts` refusesRackPlacement); the rules on `x_daas_ham_*` tables keep it | Refused on the instance: the save goes through. The rule's own Abort action refuses it, whoever saves, and its script still runs | matches | N35, N36 |
-| Business rule condition and filter | The check is the condition, behind a change test in the condition itself (`rules.now.ts`, `assurance.now.ts`) | The condition runs on every save the rule's table and action match, even when the filter does not; the rule fires only when both hold | matches | N36 |
+| Business rule condition and filter | The check is the condition, behind a change test in the condition itself (`delivery/logic.now.ts`, `racks/racks.now.ts`) | The condition runs on every save the rule's table and action match, even when the filter does not; the rule fires only when both hold | matches | N36 |
 | Out-of-box transfer order line logic and the Asset | Inventory works the transfer orders sourcing raises, each unit handed over *In stock / Available* just before its line is inserted (`platform/transfers.ts` requestTransfer). Both combinations Inventory sets are one stage, *In transfer*, entered only while `active_to` is set and left only once it is cleared (`domain/lifecycle.ts`, `entry/assets.ts` refusesLifecycleChange); an Asset Inventory lets go takes back the stage it left (`platform/transfers.ts` takeBackStageAfterTransfer) | *Push Status to Asset/Consumable* sets *In stock / Pending transfer* or *In transit / Reserved* with `active_to` set, and *In stock / Available* in the to-stockroom with it cleared at Received; *Release Asset on TOL cancel/delete* sets *In stock / Available* where the Asset is and clears it; *Validate TOL and check availibility* takes onto a line only an Asset *In stock / Available* with `active_to` clear. Each saves through `alm_asset` in the user's transaction, and the app's `alm_hardware` rules run on that save | matches | N38, N39 |
 | The platform's Model lifecycle table | A Model's manufacturer milestones are rows of `cmdb_model_lifecycle`, written as `cmdb_hardware_model_lifecycle` with lifecycle type `publisher`, source `internal`, the milestone as `lifecycle_phase` and its date as `start_date`; a write updates the active row of one Model, type, phase and source and never deletes; asset managers hold `model_manager` (`platform/model-lifecycle.ts`, ADR 0017) | Both tables are Model Management's (`com.snc.model`), with those columns and phase values; before rules refuse an insert without a start date, a second active row for one Model, type, phase and source, and a hardware lifecycle row for a Model that is not a hardware Model; this scope may read, create and update, not delete; create and write need `model_manager`, read `snc_internal` | matches (the app's use was not run on the instance) | N40 |
 | Platform fields the app uses in place of its own | An inventory tech's Stockrooms from `alm_stockroom.assignment_group` and `sys_user_grmember` (`platform/session.ts`); a Model's typical power from `cmdb_model.power_consumption` (`platform/racks.ts`); a lease's Lessor and schedule number in `ast_contract.vendor` and `vendor_contract`; on-site work linked through `wm_order.initiated_from` and `change_request.parent` (`platform/field-work.ts`, the rules on `wm_order`); ADR 0018 | The columns exist with those types; `sys_user_group` lets other scopes read only, `sys_user_grmember` read, create and update; no platform rule reads a contract's vendor fields, a work order's *Initiated from* or (beyond running the parent's workflows) a task's *Parent* | matches (the app's use was not run on the instance) | N41 |
@@ -782,28 +777,28 @@ Sources:
 
 Notes:
 
-- **Substatus choices.** SDK 4.14.0 `choice-set-plugin.ts:129-136` refuses `ChoiceSet` on a table the
-  project does not define ("Only tables defined in your scope are allowed"). Every `sys_choice` record
-  gets the same update name, `choice-set-utils.ts:25-27` `sys_choice_${name}_${element}`, so all 12
-  Records write to one update file. `dist/app/update/sys_choice_alm_asset_substatus.xml` (built
-  2026-11-07 03:13, newer than the source file) holds exactly one `<sys_choice>`:
-  `returned_to_lessor`. This was reproduced with `now-sdk build` in a scratch copy; the build succeeds
-  with no warning. `lifecycle.ts:60-73` (`ADDED_SUBSTATUSES`) and `substatus-choices.test.ts` only
-  check that the source file and the module agree. The SDK config schema
-  (`now.config.schema.json:545-548`) says `legacyChoices` defaults to true; in that mode the choice-set
-  XML is "v3 destructive delete-all-then-insert". With `legacyChoices` false it is "v4 additive merge
-  with removed_choices tracking, supported on Brazil+, Australia P4+, Zurich P11+", and older instances
-  skip it. ServiceNow's application-access docs say nothing about one scope adding choices to another
-  scope's field.
-- **Substatus collisions.** Xanadu "Set asset states and substates": In stock includes "Pending return"
-  and "Pending evaluation"; Retired includes "Lease return" and "RMA". The infocard (2024-01-16) also
-  lists "Pending evaluation" under In stock (6). Neither source gives the stored value. The app adds
-  `pending_evaluation` (In stock, 6; `lifecycle.ts:68`, `substatus-choices.now.ts:115-128`),
-  `pending_return` (In use, 1) and `returned_to_lessor` (Retired, 7).
+- **Substatus choices.** SDK 4.14.0 `choice-set-plugin.ts:129-136` refuses `ChoiceSet` on a table
+  the project does not define ("Only tables defined in your scope are allowed"). Every `sys_choice`
+  record gets the same update name, `choice-set-utils.ts:25-27` `sys_choice_${name}_${element}`, so
+  all 12 Records write to one update file. `dist/app/update/sys_choice_alm_asset_substatus.xml`
+  (built 2026-11-07 03:13, newer than the source file) holds exactly one `<sys_choice>`:
+  `returned_to_lessor`. This was reproduced with `now-sdk build` in a scratch copy; the build
+  succeeds with no warning. `domain/vocabulary.ts` (`ADDED_SUBSTATUSES` then, now the `choice`
+  entries of `STAGE_FIELDS`) and its test only checked that the source file and the module agree.
+  The SDK config schema (`now.config.schema.json`) says `legacyChoices` defaults to true; in that
+  mode the choice-set XML is "v3 destructive delete-all-then-insert". With `legacyChoices` false it
+  is "v4 additive merge with removed_choices tracking, supported on Brazil+, Australia P4+, Zurich
+  P11+", and older instances skip it. ServiceNow's application-access docs say nothing about one
+  scope adding choices to another scope's field.
+- **Substatus collisions.** Xanadu "Set asset states and substates": In stock includes "Pending
+  return" and "Pending evaluation"; Retired includes "Lease return" and "RMA". The infocard
+  (2024-01-16) also lists "Pending evaluation" under In stock (6). Neither source gives the stored
+  value. The app adds `pending_evaluation` (In stock, 6; `domain/vocabulary.ts`,
+  `fleet/tables.now.ts`), `pending_return` (In use, 1) and `returned_to_lessor` (Retired, 7).
 - **install_status.** The infocard "OOTB Asset - CI State" labels On order (2), In stock (6), Retired
   (7), Missing (8), Build (11), In transit (9), In use (1), In maintenance (3). The SDK
   (`alm_asset.now.ts:950-961`) has `install_status` as an IntegerColumn, default `'1'`, label "State".
-  The values are also used at `oem-sync.ts:114` (`!= 7`) and `warehouse.ts:151` (`=== '6'`).
+  The app names the values once, in `domain/vocabulary.ts` `INSTALL_STATUS`.
 - **Out-of-box substatus values.** In stock has Available, Reserved and Pending disposal; Missing has
   Lost and Stolen; Retired has Disposed, Sold and Vendor credit; In use has "None". The infocard shows
   `--none--` under On order, In transit and In use. The SDK `alm_asset.substatus`
@@ -817,28 +812,30 @@ Notes:
   "use a plain number"; for other currencies, "An unformatted number prefixed by a 3-letter currency
   code separated by a semicolon". Asset record fields: Cost is "The price at which the asset was
   purchased." Billing amounts are Decimal fields in their Agreement's currency.
-- **Procurement.** Brazil "Create a purchase order" lists Number, Due by, Vendor, Ship to ("This field is
-  required"), PO date, Status (Canceled, Ordered, Received, Requested, Suspended), Short description and
-  others; Vendor is not marked required. The status page: Requested when created, then Ordered, Pending
-  delivery, Received or Canceled. Line items: Purchase order, Product Model, Ordered quantity, Received
-  quantity, Remaining quantity, Cost, Total cost, Status (Canceled, Ordered, Pending Delivery, Received,
-  Requested). Zurich "Cancel a purchase order": unreceived lines are canceled with the PO, and line items
-  can also be canceled one at a time. Column names and stored values are not public. The app never sets
-  `vendor`; `spare-pool.ts:54` can pass `''` as ship-to when the staging stockroom property is empty;
-  `openPurchaseQuantity` (`procurement.ts:31-40`) excludes only POs whose `purchase_order.status` is in
-  `received,canceled,cancelled`. Optionally set item `cost` so Total cost and received asset cost are
-  not 0.
-- **Work orders.** Xanadu and Zurich "Work order states" list Draft, Awaiting Qualification, Qualified,
-  Ready for Dispatch, Assigned, Accepted, Work in Progress, Closed Complete, Closed Incomplete and
-  Canceled, without numbers; the Work Order Management API lists text labels only. `task.state` in the
-  SDK is an IntegerColumn with default `'1'`. Closing child tasks closes the parent work order, and the
-  `wm_task` rule "Rollup changes" updates the work order's state. For fields: the SDK task definition
-  has `closed_at` (DateTime), `expected_start` (DateTime), `parent` (reference to task), `company`
-  (reference to core_company) and `location`; Table API examples show these names on task-derived
-  records. FSM "Create a work order" labels: Company, Location, State, "Initiated from", Scheduled start
-  ("when the earliest task is scheduled to start") and Estimated end ("when all tasks will be
-  completed"). App usage: `field-work.ts:31-40` writes, `delivery.ts:123-129` reads, `margin.ts:143`
-  filters on `closed_at`, `rules.now.ts:94` watches `expected_start` and `estimated_end`.
+- **Procurement.** Brazil "Create a purchase order" lists Number, Due by, Vendor, Ship to ("This
+  field is required"), PO date, Status (Canceled, Ordered, Received, Requested, Suspended), Short
+  description and others; Vendor is not marked required. The status page: Requested when created,
+  then Ordered, Pending delivery, Received or Canceled. Line items: Purchase order, Product Model,
+  Ordered quantity, Received quantity, Remaining quantity, Cost, Total cost, Status (Canceled,
+  Ordered, Pending Delivery, Received, Requested). Zurich "Cancel a purchase order": unreceived
+  lines are canceled with the PO, and line items can also be canceled one at a time. Column names
+  and stored values are not public. The app never sets `vendor`; `platform/spare-pools.ts` can pass
+  `''` as ship-to when the staging stockroom property is empty; `openSparePurchaseQuantity`
+  (`platform/procurement.ts`) excludes only POs whose `purchase_order.status` is in
+  `received,canceled,cancelled`. Optionally set item `cost` so Total cost and received asset cost
+  are not 0.
+- **Work orders.** Xanadu and Zurich "Work order states" list Draft, Awaiting Qualification,
+  Qualified, Ready for Dispatch, Assigned, Accepted, Work in Progress, Closed Complete, Closed
+  Incomplete and Canceled, without numbers; the Work Order Management API lists text labels only.
+  `task.state` in the SDK is an IntegerColumn with default `'1'`. Closing child tasks closes the
+  parent work order, and the `wm_task` rule "Rollup changes" updates the work order's state. For
+  fields: the SDK task definition has `closed_at` (DateTime), `expected_start` (DateTime), `parent`
+  (reference to task), `company` (reference to core_company) and `location`; Table API examples show
+  these names on task-derived records. FSM "Create a work order" labels: Company, Location, State,
+  "Initiated from", Scheduled start ("when the earliest task is scheduled to start") and Estimated
+  end ("when all tasks will be completed"). App usage: `platform/field-work.ts` writes and reads,
+  `platform/margin.ts` filters on `closed_at`, `delivery/logic.now.ts` watches `expected_start` and
+  `estimated_end`.
 - **CMDB.** SDK `cmdb_ci`: `last_discovered` is a DateTimeColumn "Most recent discovery";
   `discovery_source` is a StringColumn dropdown "Discovery source". IdentificationEngine
   `createOrUpdateCI` source "must be one of the choice values defined for the discovery_source field of
@@ -857,23 +854,24 @@ Notes:
   setLimit() methods when working with large tables." The docs example calls `addQuery`, `setValue`,
   `updateMultiple`, with no `query()`. Optional simplification in `platform/billing.ts` takeOffPeriod:
   `fee.setValue('billing_period', 'NULL'); fee.updateMultiple()`; the current loop is also correct.
-- **RESTMessageV2.** Scoped and global, `sn_ws` namespace: `RESTMessageV2(String name, String
-  methodName)`; name is "The name of the REST message record in the REST Message [sys_rest_message]
-  table"; methodName is "The name of the HTTP method to use, such as GET/get or PUT/put - case
-  insensitive". Example `new sn_ws.RESTMessageV2("Yahoo Finance", "get")` with the comment "Might throw
-  exception if message doesn't exist or not visible due to scope." `setStringParameterNoEscape` is
-  "equivalent to setStringParameter but does not escape XML reserved characters". The built
-  `sys_rest_message` is named "NaaS Cisco Support" with access `package_private`, and its
-  `sys_rest_message_fn` has `function_name` `eox_by_pid`. The app casts around typings that declare a
-  Rhino constructor. `rest-port.ts` also URL-encodes parameters substituted into JSON body templates
-  (e.g. FortiCare `products_list`); this is harmless for alphanumeric serials.
+- **RESTMessageV2.** Scoped and global, `sn_ws` namespace:
+  `RESTMessageV2(String name, String methodName)`; name is "The name of the REST message record in
+  the REST Message [sys_rest_message] table"; methodName is "The name of the HTTP method to use,
+  such as GET/get or PUT/put - case insensitive". Example
+  `new sn_ws.RESTMessageV2("Yahoo Finance", "get")` with the comment "Might throw exception if
+  message doesn't exist or not visible due to scope." `setStringParameterNoEscape` is "equivalent to
+  setStringParameter but does not escape XML reserved characters". The built `sys_rest_message` is
+  named "NaaS Cisco Support" with access `package_private`, and its `sys_rest_message_fn` has
+  `function_name` `eox_by_pid`. The app casts around typings that declare a Rhino constructor.
+  `platform/rest-messages.ts` also URL-encodes parameters substituted into JSON body templates (e.g.
+  FortiCare `products_list`); this is harmless for alphanumeric serials.
 - **GlideAggregate.** `groupBy(String name)`: "May be called numerous times to set multiple group
   fields." No notes on date fields. Time bucketing uses `addTrend(fieldName, timeInterval, numUnits)`.
   Aggregates on currency or price fields use the reference currency; the app aggregates Decimal fields
   only. The table is `x_daas_ham_service_interval`; the code reads `getAggregate('COUNT','')`.
 - **setWorkflow.** "This method can't be set for cross-scoped applications" (KB0820691). It is also
-  ignored when `deleteMultiple()` cascades. The `billing.ts:183` call on the app's own billing-line
-  table is harmless; its comment already explains that the guard has nothing to block.
+  ignored when `deleteMultiple()` cascades. The `platform/billing.ts` call on the app's own
+  billing-line table is harmless; its comment already explains that the guard has nothing to block.
 
 Sources:
 
@@ -957,20 +955,20 @@ Sources:
 - N37: Brazil instance, 2026-11-09, probes in scope `x_daas_ham` (background scripts through
   `sys.scripts.do` in one session, and temporary before-query rules of `x_daas_ham` on
   `alm_hardware`, deleted after with their update records) that saved nothing. A property set on an
-  object exported by an installed module (`domain/visibility.ts` `ROLE`) is seen by a second
-  `require()` in the script, by the before-query rule its query sets off, and by a second rule a
-  query in the first rule's script sets off; it is gone in the next transaction, even in the same
-  session, where the session's client data (`putClientData`) is still set. A module's import gives
-  the instance the script's `require()` gives (`domain/returns.ts` read the `DEPLOYED_STAGES` of
+  object exported by an installed module (`domain/roles.ts` `ROLE`) is seen by a second `require()`
+  in the script, by the before-query rule its query sets off, and by a second rule a query in the
+  first rule's script sets off; it is gone in the next transaction, even in the same session, where
+  the session's client data (`putClientData`) is still set. A module's import gives the instance the
+  script's `require()` gives (`domain/returns.ts` read the `DEPLOYED_STAGES` of
   `domain/lifecycle.ts` as the script had changed it). A rule's `current` is the GlideRecord whose
-  `query()` or `get()` set it off (`===`), also one made and returned by module code (`records.ts`
-  findById); another GlideRecord queried meanwhile is not. A property set on the GlideRecord itself,
-  and a global variable of the script, reach the rule too. A rule is not run again for a query made
-  in its own script. From global, `require()` of the app's module fails: "Module ... not found".
-  `setWorkflow(false)` on `sys_user` and `alm_transfer_order_line` is refused like on `alm_hardware`
-  (`isWorkflow()` stays true); on `x_daas_ham_order_line` it applies. Only the app may add a
-  before-query rule to an app table: the platform's *Reject before-Q for out-of-scope tables*
-  refused one saved from global on a table of the app.
+  `query()` or `get()` set it off (`===`), also one made and returned by module code
+  (`platform/records.ts` findById); another GlideRecord queried meanwhile is not. A property set on
+  the GlideRecord itself, and a global variable of the script, reach the rule too. A rule is not run
+  again for a query made in its own script. From global, `require()` of the app's module fails:
+  "Module ... not found". `setWorkflow(false)` on `sys_user` and `alm_transfer_order_line` is
+  refused like on `alm_hardware` (`isWorkflow()` stays true); on `x_daas_ham_order_line` it applies.
+  Only the app may add a before-query rule to an app table: the platform's *Reject before-Q for
+  out-of-scope tables* refused one saved from global on a table of the app.
 - N38: Brazil instance, 2026-11-09. Read on the instance: the before rule *Push Status to
   Asset/Consumable* on `alm_transfer_order_line` (global, order 500, insert and update, condition
   `!current.isActionAborted() && (current.stage.changes() || current.asset.changes() ||
@@ -1103,31 +1101,32 @@ recommended hardening are described in the notes of their area.
 
 ### Cisco
 
-- **EoX batching (partially).** `adapters.ts:35`: replace `for (const batch of chunks(pids, 20)) {`
-  with `for (const batch of eoxBatches(pids)) {` and add a helper that caps both the count and the
-  joined length:
+- **EoX batching (partially).** `domain/oem/sync-adapters.ts`: replace
+  `for (const batch of chunks(pids, 20)) {` with `for (const batch of eoxBatches(pids)) {` and add a
+  helper that caps both the count and the joined length:
   `function eoxBatches(pids: readonly string[]): string[][] { const out: string[][] = []; let batch: string[] = []; for (const pid of pids) { if (batch.length === 20 || (batch.length > 0 && [...batch, pid].join(',').length > 250)) { out.push(batch); batch = [] } batch.push(pid) } if (batch.length) out.push(batch); return out }`.
-  Optional pagination: change the endpoint at `oem-messages.now.ts:24` from `/EOXByProductID/1/${pids}`
-  to `/EOXByProductID/${page}/${pids}`, add a variable `{ name: 'page' }`, and in `adapters.ts` request
-  page 1, then repeat while
+  Optional pagination: change the endpoint at `oem/rest-messages.now.ts` from
+  `/EOXByProductID/1/${pids}` to `/EOXByProductID/${page}/${pids}`, add a variable
+  `{ name: 'page' }`, and in `domain/oem/sync-adapters.ts` request page 1, then repeat while
   `Number(field(json,'PaginationResponseRecord','PageIndex')) < Number(field(json,'PaginationResponseRecord','LastIndex'))`.
-  The `adapters.test.ts:18-43` expectation of 2 calls for 21 PIDs still holds when the PIDs are short.
-- **SN2INFO v2 summary fields (differs).** `adapters.ts:69-70`: change
+  The `domain/oem/adapters.test.ts` expectation of 2 calls for 21 PIDs still holds when the PIDs are
+  short.
+- **SN2INFO v2 summary fields (differs).** `domain/oem/sync-adapters.ts`: change
   `startDate: isoDate(field(record, 'coverage_start_date')),` to
   `startDate: undefined, // SN2INFO v2 summary has no coverage start date`, and change
   `endDate: isoDate(field(record, 'coverage_end_date')) ?? isoDate(field(record, 'warranty_end_date')),`
   to
   `endDate: isoDate(field(record, 'covered_product_line_end_date')) ?? isoDate(field(record, 'coverage_end_date')) ?? isoDate(field(record, 'warranty_end_date')),`.
-  `adapters.test.ts:49`: rename the fixture key `coverage_end_date: '2027-06-30'` to
-  `covered_product_line_end_date: '2027-06-30'`; the expected output at line 56 stays the same.
-- **SN2INFO errors on HTTP 200 (partially; optional, error body shape unverified).** In `ciscoCoverage`
-  (`adapters.ts:60-61`), after `const json = call(...)`, add
+  `domain/oem/adapters.test.ts`: rename the fixture key `coverage_end_date: '2027-06-30'` to
+  `covered_product_line_end_date: '2027-06-30'`; the expected output stays the same.
+- **SN2INFO errors on HTTP 200 (partially; optional, error body shape unverified).** In
+  `ciscoCoverage` (`domain/oem/sync-adapters.ts`), after `const json = call(...)`, add
   `if (json !== undefined && !Array.isArray(field(json, 'serial_numbers')) && JSON.stringify(json).includes('EXCEEDED_OUTPUT')) errors.push('coverage_by_serial: EXCEEDED_OUTPUT')`,
   so an `EXCEEDED_OUTPUT` batch stays stale instead of being stamped checked with no coverage.
 
 ### Meraki and HPE Mist
 
-- **Meraki claim response (partially).** `claims.ts:124-126`: replace
+- **Meraki claim response (partially).** `domain/oem/claim-adapters.ts`: replace
   `const claimed = new Set(asArray(field(parseJson(response.body), 'serials')).map((s) => text(s).toUpperCase()))`
   and `const done = claimed.size === 0 || claimed.has(t.serial.toUpperCase())` with
   `const returned = field(parseJson(response.body), 'serials')`,
@@ -1135,76 +1134,91 @@ recommended hardening are described in the notes of their area.
   `const done = !Array.isArray(returned) || claimed.has(t.serial.toUpperCase())`. Only a missing
   `serials` field then counts as unknown/done; an explicit `[]` counts as nothing claimed.
 - **Meraki base host (partially).** Add a variable `${meraki_host}` to each function endpoint at
-  `oem-messages.now.ts:52` and `:63` (e.g.
+  `oem/rest-messages.now.ts` and `:63` (e.g.
   `'https://${meraki_host}/api/v1/organizations/${org_id}/inventory/claim'`), add a string property
-  `x_daas_ham.meraki.api_host` defaulting to `api.meraki.com`, and substitute it in `rest-port.ts` with
-  `gs.getProperty` (not `getPropertySecured`). Whether RESTMessageV2 substitutes a variable inside the
-  host part needs checking on an instance; `rest.setEndpoint()` is the fallback.
-- **Mist JSI lifecycle fields (differs).** `adapters.ts:164`: change
+  `x_daas_ham.meraki.api_host` defaulting to `api.meraki.com`, and substitute it in
+  `platform/rest-messages.ts` with `gs.getProperty` (not `getPropertySecured`). Whether
+  RESTMessageV2 substitutes a variable inside the host part needs checking on an instance;
+  `rest.setEndpoint()` is the fallback.
+- **Mist JSI lifecycle fields (differs).** `domain/oem/sync-adapters.ts`: change
   `.find((i) => field(i, 'eos_time') || field(i, 'eol_time'))` to
-  `.find((i) => field(i, 'end_of_sale_time') || field(i, 'eos_time'))`. `adapters.ts:168`: change
+  `.find((i) => field(i, 'end_of_sale_time') || field(i, 'eos_time'))`.
+  `domain/oem/sync-adapters.ts`: change
   `dates: { endOfSale: isoDate(field(item, 'eos_time')), endOfLife: isoDate(field(item, 'eol_time')) }`
   to
   `dates: { endOfSale: isoDate(field(item, 'end_of_sale_time')), endOfSupport: isoDate(field(item, 'eos_time')) }`.
-  Do not map `end_of_service_time` to `endOfLife`. Update the fixture at `adapters.test.ts:117` to
+  Do not map `end_of_service_time` to `endOfLife`. Update the fixture at
+  `domain/oem/adapters.test.ts` to
   `{ model: 'AP45', end_of_sale_time: 1782777600, eos_time: 1940544000 }` with the expected
-  `dates: { endOfSale: '2026-06-30', endOfSupport: '2031-06-30' }` (line 122), and
-  `docs/spec/p2-oem.md:10` to "`end_of_sale_time` -> end of sale, `eos_time` -> end of support".
-- **Mist JSI warranty and contract fields (differs).** `adapters.ts:181`: change
+  `dates: { endOfSale: '2026-06-30', endOfSupport: '2031-06-30' }`, and `docs/spec/p2-oem.md` to
+  "`end_of_sale_time` -> end of sale, `eos_time` -> end of support".
+- **Mist JSI warranty and contract fields (differs).** `domain/oem/sync-adapters.ts`: change
   `const end = isoDate(field(item, 'warranty_end_time')) ?? isoDate(field(item, 'contract_end_time'))`
-  to `const end = isoDate(field(item, 'warranty_end')) ?? isoDate(field(item, 'contract_end_date'))`.
-  `adapters.ts:187`: change
+  to
+  `const end = isoDate(field(item, 'warranty_end')) ?? isoDate(field(item, 'contract_end_date'))`.
+  `domain/oem/sync-adapters.ts`: change
   `startDate: isoDate(field(item, 'warranty_start_time')) ?? isoDate(field(item, 'contract_start_time'))`
-  to `startDate: isoDate(field(item, 'warranty_start')) ?? isoDate(field(item, 'contract_start_date'))`.
-  `isoDate` already handles `YYYY-MM-DD`. Optional: line 184 `covered: !!end` to
+  to
+  `startDate: isoDate(field(item, 'warranty_start')) ?? isoDate(field(item, 'contract_start_date'))`.
+  `isoDate` already handles `YYYY-MM-DD`. Optional: `covered: !!end` to
   `covered: field(item, 'has_support') === true || !!end`. Update the fixture at
-  `adapters.test.ts:118` to
+  `domain/oem/adapters.test.ts` to
   `{ serial: 'A1', warranty_type: 'Standard', warranty_start: '2024-01-01', warranty_end: '2028-01-01' }`.
   Product decision, not required by the spec: Cisco coverage prefers the contract end over the
-  warranty end (`adapters.ts:70`); consider `contract_end_date ?? warranty_end` here for consistency.
-- **Mist claim (partially).** `claims.ts:141-148`: replace
+  warranty end (`domain/oem/sync-adapters.ts`); consider `contract_end_date ?? warranty_end` here
+  for consistency.
+- **Mist claim (partially).** `domain/oem/claim-adapters.ts`: replace
   `if (!isSuccess(response.status)) { outcomes.push(...fail(batch, errorText(response.status, response.body))); continue }`
   / `const json = parseJson(response.body)` with `const json = parseJson(response.body)`,
-  `const hasResult = ['added', 'duplicated', 'error'].some((k) => Array.isArray(field(json, k)))` and
+  `const hasResult = ['added', 'duplicated', 'error'].some((k) => Array.isArray(field(json, k)))`
+  and
   `if (!isSuccess(response.status) && !(response.status === 400 && hasResult)) { outcomes.push(...fail(batch, errorText(response.status, response.body))); continue }`.
-  At line 152 use
-  `reasons.length === errors.length ? reasons[errors.indexOf(code)] : reasons.join('; ')` (followed by
-  `|| 'claim code not accepted'`). Optional: compare codes after stripping separators
+  For the reason of a refused code use
+  `reasons.length === errors.length ? reasons[errors.indexOf(code)] : reasons.join('; ')` (followed
+  by `|| 'claim code not accepted'`). Optional: compare codes after stripping separators
   (`c.replace(/[^A-Z0-9]/gi, '').toUpperCase()`), since `magic` has no dashes.
-- **Mist API host (differs).** In `oem-messages.now.ts`, change each Mist function endpoint from
-  `https://api.mist.com/api/v1/...` to `https://${mist_host}/api/v1/...` (lines 112, 123, 134) and add
-  a variable `{ $id: Now.ID['rm_mist_host_<m|s|claim>'], name: 'mist_host' }` to each function; line
-  105 can stay as the documentation default. Add a string property `x_daas_ham.mist.api_host` (default
-  `api.mist.com`, with the 12 documented hosts as choices) and substitute it in `rest-port.ts` with
-  `gs.getProperty('x_daas_ham.mist.api_host', 'api.mist.com')` through a non-secret mapping next to
-  `SECRETS` (`rest-port.ts:14-19,28`). Confirm on an instance that RESTMessageV2 substitutes `${}` in
-  the host part (fallback `rest.setEndpoint()`). With a single host property all configured Mist orgs
-  must be on the same cloud; otherwise store the host per org.
+- **Mist API host (differs).** In `oem/rest-messages.now.ts`, change each Mist function endpoint
+  from `https://api.mist.com/api/v1/...` to `https://${mist_host}/api/v1/...` and add a variable
+  `{ $id: Now.ID['rm_mist_host_<m|s|claim>'], name: 'mist_host' }` to each function; line 105 can
+  stay as the documentation default. Add a string property `x_daas_ham.mist.api_host` (default
+  `api.mist.com`, with the 12 documented hosts as choices) and substitute it in
+  `platform/rest-messages.ts` with `gs.getProperty('x_daas_ham.mist.api_host', 'api.mist.com')`
+  through a non-secret mapping next to `SECRETS` (`platform/rest-messages.ts`). Confirm on an
+  instance that RESTMessageV2 substitutes `${}` in the host part (fallback `rest.setEndpoint()`).
+  With a single host property all configured Mist orgs must be on the same cloud; otherwise store
+  the host per org.
 
 ### HPE GreenLake and Fortinet
 
-- **GreenLake add devices (differs).** `claims.ts:54`: `const GREENLAKE_ADD_BATCH = 25` to
-  `const GREENLAKE_ADD_BATCH = 5` (`perCall` at line 233 follows). `claims.ts:165`: change
-  `JSON.stringify({ network: batch.map((t) => ({ serialNumber: t.serial, macAddress: t.mac })) })` to
+- **GreenLake add devices (differs).** `domain/oem/claim-adapters.ts`:
+  `const GREENLAKE_ADD_BATCH = 25` to `const GREENLAKE_ADD_BATCH = 5` (the route's `perCall`
+  follows). `domain/oem/claim-adapters.ts`: change
+  `JSON.stringify({ network: batch.map((t) => ({ serialNumber: t.serial, macAddress: t.mac })) })`
+  to
   `JSON.stringify({ network: batch.map((t) => ({ serialNumber: t.serial, macAddress: t.mac })), compute: [], storage: [] })`.
-  Update the comment at `claims.ts:158` and the `claims.test.ts:94` expectation.
+  Update the comment at `domain/oem/claim-adapters.ts` and the `domain/oem/claims.test.ts`
+  expectation.
 - **GreenLake async operations (partially).** Option A: add `headers?: Record<string,string>` to
-  `HttpResponse` (`http.ts:12`), fill it in `rest-port.ts:63` from `response.getAllHeaders()`, add a
-  REST function `async_status` (`GET https://global.api.greenlake.hpe.com/devices/v1/async-operations/${op_id}`),
-  and mark done only on status `SUCCEEDED`. Option B (smaller): in `greenLakeSubscribe`
-  (`claims.ts:180`), treat
+  `HttpResponse` (`domain/http.ts`), fill it in `platform/rest-messages.ts` from
+  `response.getAllHeaders()`, add a REST function `async_status`
+  (`GET https://global.api.greenlake.hpe.com/devices/v1/async-operations/${op_id}`), and mark done
+  only on status `SUCCEEDED`. Option B (smaller): in `greenLakeSubscribe`
+  (`domain/oem/claim-adapters.ts`), treat
   `asArray(field(item, 'subscription')).some((s) => text(field(s, 'id')) === t.account)` from the
   `find_device` result as done without PATCHing, so a re-run confirms the assignment.
-- **GreenLake assign subscription Content-Type (differs).** `oem-messages.now.ts:171-176`: add to
+- **GreenLake assign subscription Content-Type (differs).** `oem/rest-messages.now.ts`: add to
   `assign_subscription`
   `headers: [{ $id: Now.ID['rm_greenlake_patch_ct'], name: 'Content-Type', value: 'application/merge-patch+json' }],`
-  and regenerate `keys.ts`. The account value must be the subscription's UUID `id`, not its key.
-- **FortiCloud products/list response (partially).** `adapters.ts:140`: change
+  and regenerate `src/fluent/generated/keys.ts`. The account value must be the subscription's UUID
+  `id`, not its key.
+- **FortiCloud products/list response (partially).** `domain/oem/sync-adapters.ts`: change
   `contractNumber: text(field(asset, 'contractNumber')),` to
-  `contractNumber: text(field(asArray(field(asset, 'contracts'))[0], 'contractNumber')),` (or pick the
-  contract whose `terms[].endDate` equals `latest.end`). After `adapters.ts:126` add
-  ``if (json !== undefined && Number(field(json, 'status') ?? 0) !== 0) { errors.push(`products_list ${serial}: ${text(field(json, 'message')) || text(field(json, 'error'))}`); continue }``.
-- **FortiCloud rate limits (differs).** `oem-sync.ts:84`: change
+  `contractNumber: text(field(asArray(field(asset, 'contracts'))[0], 'contractNumber')),` (or pick
+  the contract whose `terms[].endDate` equals `latest.end`). After `domain/oem/sync-adapters.ts` add
+  ``if (json !== undefined && Number(field(json, 'status') ?? 0) !== 0) {
+  errors.push(`products_list ${serial}: ${text(field(json, 'message')) || text(field(json, 'error'))}`);
+  continue }``.
+- **FortiCloud rate limits (differs).** `platform/oem-sync.ts`: change
   `const assets = staleAssets(vendor, staleBefore.getValue(), 200)` to
   `const assets = staleAssets(vendor, staleBefore.getValue(), vendor === 'fortinet' ? 90 : 200)` and,
   after processing a Fortinet batch, add `if (vendor === 'fortinet') break` (one batch of at most 90
@@ -1212,78 +1226,84 @@ recommended hardening are described in the notes of their area.
   `{expireBefore: <far future>, pageNumber}` bulk listing.
 - **FortiCloud OAuth (partially).** Test a ServiceNow ROPC OAuth profile on an instance. If it fails
   (ServiceNow requires a Client Secret, which Fortinet does not issue, and Fortinet documents only a
-  JSON token body), add a token REST function (`POST https://customerapiauth.fortinet.com/api/v1/oauth/token/`
-  with JSON content) and pass `Authorization: Bearer ${access_token}` as a function header variable, as
-  the Meraki and Mist messages do. Optional comment at `oem-messages.now.ts:7`: "grant_type=password
-  (Resource owner password credentials), token URL
-  https://customerapiauth.fortinet.com/api/v1/oauth/token/ (trailing slash)".
-- **FortiZTP error body (partially).** `http.ts:28`: change `... || text(field(json, 'detail'))` to
+  JSON token body), add a token REST function
+  (`POST https://customerapiauth.fortinet.com/api/v1/oauth/token/` with JSON content) and pass
+  `Authorization: Bearer ${access_token}` as a function header variable, as the Meraki and Mist
+  messages do. Optional comment at `oem/rest-messages.now.ts`: "grant_type=password (Resource owner
+  password credentials), token URL https://customerapiauth.fortinet.com/api/v1/oauth/token/
+  (trailing slash)".
+- **FortiZTP error body (partially).** `domain/http.ts`: change `... || text(field(json, 'detail'))`
+  to
   `... || text(field(json, 'detail')) || text(field(json, 'error_description')) || text(field(json, 'error'))`.
 
 ### Check Point Zero Touch, ShipEngine and EasyPost
 
-- **Zero Touch base URL and path (differs).** `oem-messages.now.ts:203`: endpoint
-  `https://zerotouch.checkpoint.com/api/v1` to `https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2`.
-  Replace function `assign_gateway` (`:209-215`) with: (1) `login`: `POST .../ZeroTouch/web_api/v2/login`,
-  content `'{"api-client-id":"${api_client_id}","api-key":"${api_key}"}'`, variables `api_client_id`
-  and `api_key`, no auth header; (2) `claim_gateway`: `POST .../web_api/v2/claim-gateway`, header
+- **Zero Touch base URL and path (differs).** `oem/rest-messages.now.ts`: endpoint
+  `https://zerotouch.checkpoint.com/api/v1` to
+  `https://zerotouch.checkpoint.com/ZeroTouch/web_api/v2`. Replace function `assign_gateway`
+  (`:209-215`) with: (1) `login`: `POST .../ZeroTouch/web_api/v2/login`, content
+  `'{"api-client-id":"${api_client_id}","api-key":"${api_key}"}'`, variables `api_client_id` and
+  `api_key`, no auth header; (2) `claim_gateway`: `POST .../web_api/v2/claim-gateway`, header
   `{name:'X-chkp-sid', value:'${sid}'}`, variable `sid`; (3) optionally `claim_gaia_gateway`:
   `POST .../web_api/v2/claim-gaia-gateway`, same header; (4) `logout`: `POST .../web_api/v2/logout`,
   header `X-chkp-sid: ${sid}`, no body. The Fluent RestMessage function type has `content?: string`
   (`node_modules/@servicenow/sdk-core/dist/rest/RestMessage.d.ts:90`); send `login` without
-  `request.body` so the content template, with the secrets substituted, is the body. Delete the comment
-  at `oem-messages.now.ts:150`.
-- **Zero Touch authentication (differs).** `rest-port.ts:17`: change
+  `request.body` so the content template, with the secrets substituted, is the body. Delete the
+  comment at `oem/rest-messages.now.ts`.
+- **Zero Touch authentication (differs).** `platform/rest-messages.ts`: change
   `[{ variable: 'api_key', property: 'x_daas_ham.checkpoint.api_key' }]` to
   `[{ variable: 'api_client_id', property: 'x_daas_ham.checkpoint.api_client_id' }, { variable: 'api_key', property: 'x_daas_ham.checkpoint.api_key' }]`.
-  In `oem-claims.now.ts` add a password2 property `x_daas_ham.checkpoint.api_client_id` ("Check Point
-  Zero Touch API Client ID") and reword `prop_checkpoint_key`'s description to "Check Point Zero Touch
-  API Key (expires after 1-180 days; regenerate in Zero Touch portal > Manage API Key)". Remove the
-  `X-API-Key` header (`oem-messages.now.ts:214`) and send `X-chkp-sid: ${sid}` from the login response.
-- **Zero Touch claim body (differs).** `claims.ts:222-226`: replace the `perDevice` adapter with a
-  session adapter that runs `unusable(targets,'mac')`; returns calls 0 when `maxCalls < 3`; calls
-  `login = http({fn:'login', params:{}})` and reads `sid = text(field(parseJson(login.body),'sid'))`;
-  if `sid` is empty, fails the usable targets with `errorText(login.status, login.body)`; otherwise,
-  while `calls < maxCalls - 1`, parses `[accountId, templateId] = t.account.split('/')` (refusing
-  non-numeric values) and calls
+  In `oem/logic.now.ts` add a password2 property `x_daas_ham.checkpoint.api_client_id` ("Check Point
+  Zero Touch API Client ID") and reword `prop_checkpoint_key`'s description to "Check Point Zero
+  Touch API Key (expires after 1-180 days; regenerate in Zero Touch portal > Manage API Key)".
+  Remove the `X-API-Key` header (`oem/rest-messages.now.ts`) and send `X-chkp-sid: ${sid}` from the
+  login response.
+- **Zero Touch claim body (differs).** `domain/oem/claim-adapters.ts`: replace the `perDevice`
+  adapter with a session adapter that runs `unusable(targets,'mac')`; returns calls 0 when
+  `maxCalls < 3`; calls `login = http({fn:'login', params:{}})` and reads
+  `sid = text(field(parseJson(login.body),'sid'))`; if `sid` is empty, fails the usable targets with
+  `errorText(login.status, login.body)`; otherwise, while `calls < maxCalls - 1`, parses
+  `[accountId, templateId] = t.account.split('/')` (refusing non-numeric values) and calls
   `http({ fn: 'claim_gateway', params: { sid }, body: JSON.stringify({ 'object-name': t.serial, 'account-id': Number(accountId), 'template-id': Number(templateId), mac: t.mac }) })`
   with ``outcome(..., `claimed with Zero Touch template ${templateId}`)``; ends with
-  `http({ fn: 'logout', params: { sid } })`, counting login and logout in `calls`. `staging.now.ts:156`:
-  label "Check Point Zero Touch (template)" to "Check Point Zero Touch (User Center account id/template
-  id)". Update `claims.test.ts:151-157`. If `CPAP-SG3600` (`demo-seed.ts:84`) is a Gaia appliance, it
-  needs `claim-gaia-gateway`, so pick the command by model family.
-- **ShipEngine carrier_id (differs).** `domain/shipping.ts:24-31`: add `carrierId: string` to
-  `LabelInput`. `domain/shipping.ts:88-89`: `shipment: { service_code: input.serviceCode,` to
-  `shipment: { carrier_id: input.carrierId, service_code: input.serviceCode,`. `shipping.now.ts`: add
-  property `x_daas_ham.shipping.carrier_id` (string, value `''`, description "ShipEngine carrier account
-  id (se-...) billed for labels"). `properties.ts`: add
-  `shippingCarrierId: 'x_daas_ham.shipping.carrier_id'`. `entry/shipping.ts:80-87`: pass
-  `carrierId: stringProperty(PROPERTY.shippingCarrierId)` to `buyLabel` and refuse with a clear error
-  when it is empty. Update `shipping.test.ts`.
-- **ShipEngine addresses (partially).** `domain/shipping.ts:64-76`: drop empty values instead of
+  `http({ fn: 'logout', params: { sid } })`, counting login and logout in `calls`.
+  `domain/vocabulary.ts`: label "Check Point Zero Touch (template)" to "Check Point Zero Touch (User
+  Center account id/template id)". Update `domain/oem/claims.test.ts`. If `CPAP-SG3600`
+  (`entry/demo-seed.ts`) is a Gaia appliance, it needs `claim-gaia-gateway`, so pick the command by
+  model family.
+- **ShipEngine carrier_id (differs).** `domain/shipping.ts`: add `carrierId: string` to
+  `LabelInput`. `domain/shipping.ts`: `shipment: { service_code: input.serviceCode,` to
+  `shipment: { carrier_id: input.carrierId, service_code: input.serviceCode,`.
+  `delivery/logic.now.ts`: add property `x_daas_ham.shipping.carrier_id` (string, value `''`,
+  description "ShipEngine carrier account id (se-...) billed for labels"). `domain/properties.ts`:
+  add `shippingCarrierId: 'x_daas_ham.shipping.carrier_id'`. `entry/shipping.ts`: pass
+  `carrierId: stringProperty(PROPERTY.shippingCarrierId)` to `buyLabel` and refuse with a clear
+  error when it is empty. Update `domain/shipping.test.ts`.
+- **ShipEngine addresses (partially).** `domain/shipping.ts`: drop empty values instead of
   sending `''` (e.g. `return Object.fromEntries(Object.entries({...}).filter(([, v]) => v !== ''))`).
-  `domain/shipping.ts:99-103` `buyLabel`: require the from-side phone, e.g.
+  `domain/shipping.ts` `buyLabel`: require the from-side phone, e.g.
   `if (!input.from.phone) return { ok: false, error: 'from address missing phone' }`. Consider
   requiring state for US and CA addresses.
-- **ShipEngine webhook auth (partially).** `entry/shipping.ts:146`: change
+- **ShipEngine webhook auth (partially).** `entry/shipping.ts`: change
   `const token = queryParam(request, 'token')` to
   `const token = request.getHeader('x-naas-webhook-token') || queryParam(request, 'token')`
-  (`RESTAPIRequest.getHeader` is in `node_modules/@servicenow/glide/src/sn_ws_int/RESTAPIRequest.d.ts:12`).
-  Register the ShipEngine webhook with `headers: [{ key: 'X-NaaS-Webhook-Token', value: <token> }]` and
-  update the comments at `shipping.now.ts:9` and `rest.now.ts:182`. Keep `?token=` only as a fallback.
+  (`RESTAPIRequest.getHeader` is in
+  `node_modules/@servicenow/glide/src/sn_ws_int/RESTAPIRequest.d.ts:12`). Register the ShipEngine
+  webhook with `headers: [{ key: 'X-NaaS-Webhook-Token', value: <token> }]` and update the comments
+  at `delivery/logic.now.ts` and `shared/rest-api.now.ts`. Keep `?token=` only as a fallback.
   Optionally verify the RSA-SHA256 signature against `request.body.dataString`.
-- **EasyPost Event envelope (partially).** `domain/shipping.ts:201-203`: after
-  `const easyPost = field(body, 'result')`, add
-  ``const kind = text(field(easyPost, 'object')); if (kind && kind !== 'Tracker') return { error: `not a tracking update (${kind})` }``.
-  Equivalently, require `text(field(body,'description')).startsWith('tracker.')` when `description` is
-  present. Existing tests without `object`/`description` still pass.
-- **EasyPost tracking_details order (partially).** `domain/shipping.ts:206`: replace
+- **EasyPost Event envelope (partially).** `domain/shipping.ts`: after
+  `const easyPost = field(body, 'result')`, add ``const kind = text(field(easyPost, 'object')); if
+  (kind && kind !== 'Tracker') return { error: `not a tracking update (${kind})` }``. Equivalently,
+  require `text(field(body,'description')).startsWith('tracker.')` when `description` is present.
+  Existing tests without `object`/`description` still pass.
+- **EasyPost tracking_details order (partially).** `domain/shipping.ts`: replace
   `const last = details[details.length - 1]` with a pick of the detail with the greatest
   `Date.parse(text(field(d,'datetime')))`; datetimes can carry a local offset.
-- **EasyPost webhook auth (partially).** Same header fallback as ShipEngine at `entry/shipping.ts:146`.
-  Register the EasyPost webhook with `custom_headers: [{ name: 'X-NaaS-Webhook-Token', value: <token> }]`
-  (not `X-EasyPost-*`). Optionally verify `X-Hmac-Signature` with `webhook_secret` against
-  `request.body.dataString`.
+- **EasyPost webhook auth (partially).** Same header fallback as ShipEngine at `entry/shipping.ts`.
+  Register the EasyPost webhook with
+  `custom_headers: [{ name: 'X-NaaS-Webhook-Token', value: <token> }]` (not `X-EasyPost-*`).
+  Optionally verify `X-Hmac-Signature` with `webhook_secret` against `request.body.dataString`.
 - **ShipEngine webhook delivery and retries (differs).** `entry/shipping.ts` `postTrackingUpdate`: when
   the Shipment's tracking lock stays held, answer 2xx at once and apply the update in the background
   (an event whose script action takes the same lock and queues itself again a minute later, a bounded
@@ -1293,76 +1313,77 @@ recommended hardening are described in the notes of their area.
 ### ServiceNow platform
 
 - **Substatus choices shipped (differs).** Both changes are needed: (1) `now.config.json`: add
-  `"legacyChoices": false`; (2) `substatus-choices.now.ts`: add one parent record
+  `"legacyChoices": false`; (2) `fleet/tables.now.ts`: add one parent record
   `Record({ $id: Now.ID['substatus_choice_set'], table: 'sys_choice_set', data: { name: 'alm_asset', element: 'substatus' } })`.
-  A scratch build with both changes produced one `author_elective_update/sys_choice_alm_asset_substatus.xml`
-  with a `sys_choice_v2 version="4"` wrapper, all 12 choices, and a `delete_multiple` that only matches
-  those 12 (name, element, value, language, dependent_value) identities. Do not add the parent while
-  `legacyChoices` is true: the v3 output would wipe the out-of-box substatus choices. Requires Brazil,
-  Australia P4+ or Zurich P11+. Then add a check that the built XML contains every `ADDED_SUBSTATUSES`
-  value.
+  A scratch build with both changes produced one
+  `author_elective_update/sys_choice_alm_asset_substatus.xml` with a `sys_choice_v2 version="4"`
+  wrapper, all 12 choices, and a `delete_multiple` that only matches those 12 (name, element, value,
+  language, dependent_value) identities. Do not add the parent while `legacyChoices` is true: the v3
+  output would wipe the out-of-box substatus choices. Requires Brazil, Australia P4+ or Zurich P11+.
+  Then add a check that the built XML contains every `ADDED_SUBSTATUSES` value.
 - **Substatus collisions (differs).** On the instance, query `sys_choice`
   `name=alm_asset^element=substatus^dependent_value=6`. If the out-of-box value is
-  `pending_evaluation`, delete it from `ADDED_SUBSTATUSES` (`lifecycle.ts:68`) and its Record
-  (`substatus-choices.now.ts:115-128`); the `STAGE_FIELDS` mapping can stay. If the value differs, set
-  `STAGE_FIELDS.pending_evaluation.substatus` (`lifecycle.ts:40`) to it and drop the added choice.
-  Optional: map `returned_to_lessor` (`lifecycle.ts:49`) to the out-of-box "Lease return" value once
-  that value is confirmed.
-  **Done (Brazil instance, 2026-11-09):** `sys_choice` holds `pending_evaluation` (In stock, 6) and
-  `lease_return` (Retired, 7), so the app no longer ships either choice; `STAGE_FIELDS` maps the
-  `pending_evaluation` stage to the first and `returned_to_lessor` to the second.
+  `pending_evaluation`, delete it from `ADDED_SUBSTATUSES` (`domain/vocabulary.ts`) and its Record
+  (`fleet/tables.now.ts`); the `STAGE_FIELDS` mapping can stay. If the value differs, set
+  `STAGE_FIELDS.pending_evaluation.substatus` (`domain/vocabulary.ts`) to it and drop the added
+  choice. Optional: map `returned_to_lessor` (`domain/vocabulary.ts`) to the out-of-box "Lease
+  return" value once that value is confirmed. **Done (Brazil instance, 2026-11-09):** `sys_choice`
+  holds `pending_evaluation` (In stock, 6) and `lease_return` (Retired, 7), so the app no longer
+  ships either choice; `STAGE_FIELDS` maps the `pending_evaluation` stage to the first and
+  `returned_to_lessor` to the second.
 - **Out-of-box substatus values (partially).** No code change proposed; confirm the stored values
   other than `available` on an instance.
 - **`alm_asset.cost` currency (partially).** Only needed if the session currency can differ from the
-  billing currency. `leases.ts:225`: `asset.setValue('cost', share)` to
-  ``asset.setValue('cost', `${currencyCode};${share}`)`` using the lease's currency. `margin.ts:86`:
-  `purchaseCost: num(asset, 'cost')` to
+  billing currency. `platform/leases.ts`: `asset.setValue('cost', share)` to
+  ``asset.setValue('cost', `${currencyCode};${share}`)`` using the lease's currency.
+  `platform/margin.ts`: `purchaseCost: num(asset, 'cost')` to
   `purchaseCost: Number(asset.getElement('cost').getReferenceValue()) || 0`, or `getCurrencyValue()`
   with `getCurrencyCode()`.
-- **`proc_po` (partially).** `procurement.ts:17`: replace
+- **`proc_po` (partially).** `platform/procurement.ts`: replace
   `if (input.shipToStockroomId) po.setValue('ship_to', ...)` with an early
   `if (!input.shipToStockroomId) { gs.warn('[x_daas_ham] No staging stockroom: purchase not requested'); return '' }`
   followed by an unconditional `setValue`. Confirm the column names (`status`, `ship_to`,
   `short_description`) and the `requested` value on the instance.
-- **`proc_po_item` open quantity (partially).** `procurement.ts:35`: add
-  `item.addQuery('status', 'NOT IN', 'received,canceled,cancelled')` beside the `purchase_order.status`
-  filter, so a line canceled on its own under an open PO no longer counts as open. Confirm the stored
-  choice values on the instance.
+- **`proc_po_item` open quantity (partially).** `platform/procurement.ts`: add
+  `item.addQuery('status', 'NOT IN', 'received,canceled,cancelled')` beside the
+  `purchase_order.status` filter, so a line canceled on its own under an open PO no longer counts as
+  open. Confirm the stored choice values on the instance.
 - **`wm_order` fields (partially).** No code change proposed; confirm the column names behind
   "Scheduled start" and "Estimated end" on an instance.
 - **`cmdb_ci.discovery_source` (partially).** No code change proposed; confirm that ServiceNow
   Discovery writes `ServiceNow` on an instance.
 - **Refusing a save, or skipping the rules, on a global table (differs).** From `x_daas_ham` the
   platform ignores `current.setAbortAction` and `setWorkflow` on a table of another scope (N35). A
-  before rule on such a table refuses with its Abort action: its check is the condition and its script
-  only adds the message; the platform runs a condition whatever the filter (N36), so the condition
-  starts with the change test that keeps the module unloaded on other saves. **Done** for the rack
-  placement rule (`assurance.now.ts`, `entry/racks.ts` refusesRackPlacement), `NaaS - enforce asset
-  lifecycle` (`alm_hardware`, `entry/assets.ts` refusesLifecycleChange; the wipe evidence a save
-  into staging voids is cleared by a rule of its own, `entry/assets.ts` clearVoidedWipeEvidence) and
-  `NaaS - work inside the change window` (`wm_order`, `entry/delivery.ts` refusesWorkWindow). No
-  other rule refuses a save on another scope's table: the before rule on `sn_customerservice_case`
-  (`platform/breakfix.ts` takeFailedAssetTerms) and the lease rule and transfer release rule on
-  `alm_hardware` (`platform/leases.ts` giveToLessor, `platform/transfers.ts` takeBackStageAfterTransfer) only
-  set fields, and the rest that refuse run on `x_daas_ham_*` tables, where `setAbortAction` works
-  (`built-metadata.test.ts` keeps it that way). With the lifecycle rule's refusal holding, it also
-  checks the Asset saves Inventory's transfer order logic makes for an inventory tech working a line
-  (N38); the next item models them.
+  before rule on such a table refuses with its Abort action: its check is the condition and its
+  script only adds the message; the platform runs a condition whatever the filter (N36), so the
+  condition starts with the change test that keeps the module unloaded on other saves. **Done** for
+  the rack placement rule (`racks/racks.now.ts`, `entry/racks.ts` refusesRackPlacement),
+  `NaaS - enforce asset lifecycle` (`alm_hardware`, `entry/assets.ts` refusesLifecycleChange; the
+  wipe evidence a save into staging voids is cleared by a rule of its own, `entry/assets.ts`
+  clearVoidedWipeEvidence) and `NaaS - work inside the change window` (`wm_order`,
+  `entry/delivery.ts` refusesWorkWindow). No other rule refuses a save on another scope's table: the
+  before rule on `sn_customerservice_case` (`platform/breakfix.ts` takeFailedAssetTerms) and the
+  lease rule and transfer release rule on `alm_hardware` (`platform/leases.ts` giveToLessor,
+  `platform/transfers.ts` takeBackStageAfterTransfer) only set fields, and the rest that refuse run
+  on `x_daas_ham_*` tables, where `setAbortAction` works (`built-metadata.test.ts` keeps it that
+  way). With the lifecycle rule's refusal holding, it also checks the Asset saves Inventory's
+  transfer order logic makes for an inventory tech working a line (N38); the next item models them.
   The reads ADR 0005 runs past the visibility rules on `alm_hardware` no longer call `setWorkflow`:
   each marks its GlideRecord while its query runs (`platform/beyond-visibility.ts`) and the app's
   before-query rules leave a marked record's query as it is (N37). **Done** for `platform/racks.ts`
-  slotsIn, `platform/assets.ts` findAssetByIdentifier (`beyondVisibility`) and findAnyAsset (a
-  receipt's look-up and the serial check of an ASN row), `platform/records.ts` findById with
-  `beyondVisibility` (the sighting's and the receipt's fresh read), `platform/fulfilment.ts`
-  assetStages, `platform/service-intervals.ts` inServiceNow, `platform/delivery.ts` shippable and
-  Ship's re-read, `platform/subscriptions.ts` endSitePackageIfEmpty, `platform/session.ts`,
-  `platform/staging-tasks.ts`, `platform/tags.ts` and the survivor check of `platform/records.ts`
-  deleteWhere. The mark skips only the app's rules: on `alm_asset`, Customer Service's and the
-  platform's query rules still run, for users with Customer Service roles, which the app does not
-  grant. `platform/approvals.ts` isActiveUser reads `sys_user`, where the app has no rule and the
-  platform's *user query* rule only hides inactive users, which it asks for anyway. No app logic
-  saves a record of another scope's table with the rules off: each read above that is saved runs
-  every rule on the save, as it did when `setWorkflow(true)` came before it.
+  slotsIn, `platform/asset-identifiers.ts` findAssetByIdentifier (`beyondVisibility`) and
+  findAnyAssetBySerial (a receipt's look-up and the serial check of an ASN row),
+  `platform/records.ts` findById with `beyondVisibility` (the sighting's and the receipt's fresh
+  read), `platform/fulfilment.ts` assetStages, `platform/service-intervals.ts` inServiceNow,
+  `platform/delivery.ts` shippable and Ship's re-read, `platform/subscriptions.ts`
+  endSitePackageIfEmpty, `platform/session.ts`, `platform/staging-tasks.ts`, `platform/tags.ts` and
+  the survivor check of `platform/records.ts` deleteWhere. The mark skips only the app's rules: on
+  `alm_asset`, Customer Service's and the platform's query rules still run, for users with Customer
+  Service roles, which the app does not grant. `platform/approvals.ts` isActiveUser reads
+  `sys_user`, where the app has no rule and the platform's *user query* rule only hides inactive
+  users, which it asks for anyway. No app logic saves a record of another scope's table with the
+  rules off: each read above that is saved runs every rule on the save, as it did when
+  `setWorkflow(true)` came before it.
 - **Out-of-box transfer order line logic and the Asset (differs).** The lifecycle rule refused, for
   an inventory tech, the combinations Inventory sets on a line's Asset (N38), and Inventory takes
   onto a line only an Asset *In stock / Available* (N39), which the reserved units sourcing
@@ -1385,17 +1406,19 @@ Items with verdict unverifiable:
 - **Meraki coverage via SN2INFO.** No primary source confirms that Meraki devices are in the SN2INFO
   install base or contract data.
 - **FortiCloud products/register request schema.** Only on FNDN (login). The per-unit `description`
-  field is unconfirmed. If the API user is Org-scoped, add `accountId` at `claims.ts:200`:
+  field is unconfirmed. If the API user is Org-scoped, add `accountId` at
+  `domain/oem/claim-adapters.ts`:
   `JSON.stringify({ accountId: Number(<provider FortiCloud account id property>), registrationUnits: ... })`.
   Check the schema on FNDN before enabling.
 - **FortiZTP provision.** Only on FNDN (login). Suggested change, to confirm there first:
-  `oem-messages.now.ts:183` `https://fortiztp.forticloud.com/public/api/v1` to
-  `https://fortiztp.forticloud.com/public/api/v2`; `oem-messages.now.ts:194`
+  `oem/rest-messages.now.ts` `https://fortiztp.forticloud.com/public/api/v1` to
+  `https://fortiztp.forticloud.com/public/api/v2`; `oem/rest-messages.now.ts`
   `.../public/api/v1/devices/${serial}` to
-  `https://fortiztp.forticloud.com/public/api/v2/devices/${serial}`; `claims.ts:217` body to
+  `https://fortiztp.forticloud.com/public/api/v2/devices/${serial}`; `domain/oem/claim-adapters.ts`
+  body to
   `{ deviceSN: t.serial, deviceType: 'FortiGate', provisionStatus: 'provisioned', provisionTarget: 'FortiManager', fortiManagerOid: Number(t.account) }`,
   settling a non-integer account as failed ("FortiManager OID must be a number"); change the
-  `claims.test.ts:130-136` fixture account `FMG-1` to a numeric OID.
+  `domain/oem/claims.test.ts` fixture account `FMG-1` to a numeric OID.
 - **FortiZTP client_id.** Read it from the API user's credentials ZIP (normally `fortiztp` per the
   third-party SDKs).
 - **`wm_order` state 3 = Closed Complete.** Only community posts give the number.
@@ -1405,7 +1428,7 @@ Items with verdict unverifiable:
   N39). Working a transfer order sourcing raised through its tasks as an inventory tech, and
   cancelling one, are checked in [verify-on-instance.md](../verify-on-instance.md#transfer-orders).
 - Cisco: how Cisco's path parsing handles PIDs containing `/` (e.g. `CISCO2901/K9`), which
-  `rest-port.ts:27` sends as `%2F`; some servers reject encoded slashes.
+  `platform/rest-messages.ts` sends as `%2F`; some servers reject encoded slashes.
 - Cisco: whether SN2INFO `service_contract_number` can hold several comma-separated numbers (the field
   description's example reads "1234567, 2345678, 3456789"; every sample shows one number).
 - Cisco: the JSON shape of SN2INFO error bodies returned with HTTP 200.
