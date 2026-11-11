@@ -25,6 +25,10 @@ import { log } from './log.ts'
 
 /** Resolving raw manufacturer/model strings to canonical Models (domain/normalization). */
 
+const ALIAS_TABLE = 'x_daas_ham_manufacturer_alias'
+const RULE_TABLE = 'x_daas_ham_model_match_rule'
+const EXCEPTION_TABLE = 'x_daas_ham_norm_exception'
+
 export interface NormalizationData {
     aliases: ManufacturerAlias[]
     rules: ModelMatchRule[]
@@ -33,12 +37,12 @@ export interface NormalizationData {
 /** Load aliases and active rules once per job run or transaction. */
 export function loadNormalizationData(): NormalizationData {
     const aliases: ManufacturerAlias[] = []
-    const alias = new GlideRecord('x_daas_ham_manufacturer_alias')
+    const alias = new GlideRecord(ALIAS_TABLE)
     alias.query()
     while (alias.next()) aliases.push({ alias: str(alias, 'alias'), manufacturerId: str(alias, 'manufacturer') })
 
     const rules: ModelMatchRule[] = []
-    const rule = new GlideRecord('x_daas_ham_model_match_rule')
+    const rule = new GlideRecord(RULE_TABLE)
     rule.addQuery('active', true)
     rule.query()
     while (rule.next()) {
@@ -88,7 +92,7 @@ export function recordNormalizationException(
     source: { table: string; id: string },
 ): boolean {
     const rawPair = `${raw.manufacturer} / ${raw.model}`
-    const exception = new GlideRecord('x_daas_ham_norm_exception')
+    const exception = new GlideRecord(EXCEPTION_TABLE)
     exception.addQuery('raw_manufacturer', raw.manufacturer)
     exception.addQuery('raw_model', raw.model)
     exception.addQuery('status', NORM_EXCEPTION_STATUS.open)
@@ -182,10 +186,10 @@ function repointModel(rawModelId: string, canonicalModelId: string): void {
  * `not_naas`. One the platform refuses to close is logged and stays open for the next run.
  */
 function closeNonNaasExceptions(naasRawModelIds: readonly string[]): void {
-    const query = notNaasRawModelsQuery(pluck('x_daas_ham_norm_exception', RAW_MODEL_EXCEPTIONS_QUERY, 'source_record'), naasRawModelIds)
+    const query = notNaasRawModelsQuery(pluck(EXCEPTION_TABLE, RAW_MODEL_EXCEPTIONS_QUERY, 'source_record'), naasRawModelIds)
     const notNaas = query ? pluck(RAW_MODEL_TABLE, query, 'sys_id') : []
     if (notNaas.length === 0) return
-    const exception = new GlideRecord('x_daas_ham_norm_exception')
+    const exception = new GlideRecord(EXCEPTION_TABLE)
     exception.addEncodedQuery(RAW_MODEL_EXCEPTIONS_QUERY)
     exception.addQuery('source_record', 'IN', notNaas.join(','))
     exception.query()
@@ -213,13 +217,13 @@ function learnFromResolution(exception: GlideRecord, data: NormalizationData): b
     const rawManufacturer = str(exception, 'raw_manufacturer')
     const rawPair = `${rawManufacturer} / ${str(exception, 'raw_model')}`
     if (shouldLearnAlias(rawManufacturer, data.aliases)) {
-        const alias = new GlideRecord('x_daas_ham_manufacturer_alias')
+        const alias = new GlideRecord(ALIAS_TABLE)
         alias.initialize()
         alias.setValue('alias', rawManufacturer)
         alias.setValue('manufacturer', manufacturerId)
         if (!learned(alias, 'alias', rawPair)) return false
     }
-    const rule = new GlideRecord('x_daas_ham_model_match_rule')
+    const rule = new GlideRecord(RULE_TABLE)
     rule.initialize()
     rule.setValue('order', LEARNED_RULE.order)
     rule.setValue('manufacturer', aliasedManufacturer(rawManufacturer, data.aliases) ?? manufacturerId)
