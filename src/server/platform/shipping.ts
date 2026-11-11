@@ -68,8 +68,9 @@ function siteContact(site: GlideRecord): { name: string; phone: string } {
     return contact ? { name: str(contact, 'name'), phone: str(contact, 'phone') || str(contact, 'mobile_phone') } : { name: '', phone: '' }
 }
 
+/** Read past the user's rules (ADR 0005): an inventory tech who ships need not be assigned to the depot. */
 function depot(): GlideRecord | null {
-    return findById('alm_stockroom', stagingStockroom())
+    return findById('alm_stockroom', stagingStockroom(), { beyondVisibility: true })
 }
 
 /**
