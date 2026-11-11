@@ -103,10 +103,10 @@ export function createOrder(header: NewOrder, lines: readonly NewLine[]): OrderC
 
 /**
  * What came of submitting an Order. It went ahead (to approval or sourcing): `already` says so, for the user, when
- * another submission of it had taken it ahead. Or it did not, with why as the user is told: as information (`info`)
- * rather than an error when the Order is saved and is submitted again without them (`submitLater`).
+ * another submission of it had taken it ahead. Or it did not, with why as the user is told; `queued` when the Order is
+ * saved and is submitted again without them (`submitLater`), which a trigger may word as it fits its user.
  */
-export type Submission = { submitted: true; already?: string } | { submitted: false; message: string; info?: true }
+export type Submission = { submitted: true; already?: string } | { submitted: false; message: string; queued?: true }
 
 function notSubmitted(message: string): Submission {
     return { submitted: false, message }
@@ -138,7 +138,7 @@ export function submitProducedOrder(order: GlideRecord, devices: readonly NewLin
         log.warn(`${number}: the devices asked for could not be read, so it has no line for them: ${devicesUnread}`)
         missing.push('The devices asked for could not be read (see the system log): add them as order lines')
     }
-    return submitAsRaised(order, parties, raiser, missing, { via: 'producer', tries: 0 })
+    return submitAsRaised(order, parties, raiser, missing, 0)
 }
 
 /** The Site template's non-optional items, as lines. */
@@ -179,30 +179,20 @@ function orderParties(order: GlideRecord): OrderParties {
 }
 
 /**
- * How a submission came, which says who is told its outcome: the record producer (its raiser, often a Customer admin,
- * has no Submit action), a submission queued again (`submitLater`, run as the system), or any other (Submit, Raise
- * replacement, the refresh run); and how many times it was queued again.
- */
-interface SubmissionSource {
-    via: 'submit' | 'producer' | 'queued'
-    tries: number
-}
-
-/**
  * Submit a draft Order (the form's Submit, a break-fix or refresh Order just raised): it goes ahead, to approval or
  * sourcing, also when another submission of it took it ahead; otherwise it stays a draft.
  */
 export function submitOrder(order: GlideRecord): Submission {
-    return submitAsRaised(order, orderParties(order), orderingUser(order), [], { via: 'submit', tries: 0 })
+    return submitAsRaised(order, orderParties(order), orderingUser(order), [], 0)
 }
 
 /**
- * Submit the Order unless it cannot go ahead as raised (domain/entitlement `ownershipFindings`, or the `unsaved`
- * lines); then it stays a draft and the reasons are noted on it.
+ * Submit the Order, queued again `tries` times before (`submitLater`), unless it cannot go ahead as raised
+ * (domain/entitlement `ownershipFindings`, or the `unsaved` lines); then it stays a draft and the reasons are noted on it.
  */
-function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Orderer, unsaved: string[], source: SubmissionSource): Submission {
+function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Orderer, unsaved: string[], tries: number): Submission {
     const findings = [...ownershipFindings(parties, raiser), ...unsaved]
-    if (findings.length === 0) return submitAccepted(order, source)
+    if (findings.length === 0) return submitAccepted(order, tries)
     order.setValue('work_notes', `Not submitted:\n${findings.join('\n')}`)
     // A refresh Order the daily job raised has only this note to say why it is a draft.
     if (!order.update()) warnRefused(order, `${str(order, 'number')} not submitted (${findings.join('; ')}), and its note not saved`)
@@ -219,13 +209,13 @@ function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Order
  * (`submitLater`). Taking the lock throws only when an insert is refused with no lock row (platform/locks): that error
  * escapes.
  */
-function submitAccepted(order: GlideRecord, source: SubmissionSource): Submission {
+function submitAccepted(order: GlideRecord, tries: number): Submission {
     const lines = requestedLines(order.getUniqueValue())
     if (lines.length === 0) return notSubmitted('Add at least one order line before submitting')
     if (!readsUsage(lines)) return submitUnderOrderLock(null, order)
     const usageLock = LOCK.agreementUsage(str(order, 'agreement'))
     const underUsage = withLockTries(usageLock, (lock) => submitUnderOrderLock(lock, order), LONG_HOLD_LOCK_TRIES)
-    return underUsage.ran ? underUsage.value : submitLater(order, source)
+    return underUsage.ran ? underUsage.value : submitLater(order, tries)
 }
 
 /**
@@ -301,27 +291,24 @@ function warnIfUsageLockLost(usageLock: HeldLock | null, order: GlideRecord): vo
  * A submission that found its Agreement's usage lock held through every try. Unless another submission of this same
  * Order took it ahead (then it went ahead), the Order stays a draft for now, noted, and is submitted again a minute
  * later from the event queue, as often as a sourcing request is queued again (domain/job-lock `REQUEUE`), then left
- * for staff to submit (logged). Each is told in words that fit them: the record producer's raiser has no Submit action,
- * so is told, as information, not to raise it again.
+ * for staff to submit (logged).
  */
-function submitLater(order: GlideRecord, source: SubmissionSource): Submission {
+function submitLater(order: GlideRecord, tries: number): Submission {
     const fresh = findById('x_daas_ham_order', order.getUniqueValue())
     if (!fresh) return notSubmitted('Order not submitted: it can no longer be read')
     if (str(fresh, 'stage') !== ORDER_STAGE.draft) return alreadySubmitted(fresh)
     const number = str(order, 'number')
     const lockName = LOCK.agreementUsage(str(order, 'agreement'))
-    if (!queueSubmissionAgain(order, source.tries)) {
-        log.warn(`${number} left a draft: ${lockName} stayed held through ${source.tries} submissions queued again; submit it`)
+    if (!queueSubmissionAgain(order, tries)) {
+        log.warn(`${number} left a draft: ${lockName} stayed held through ${tries} submissions queued again; submit it`)
         const kept = 'other Orders of its Agreement kept being submitted at the same time. Submit it'
         noteDraft(order, `Not submitted: ${kept}`)
         return notSubmitted(`Order not submitted: ${kept}`)
     }
     const busy = 'another Order of its Agreement was being submitted at the same time. It is submitted again automatically'
-    if (source.tries === 0) noteDraft(order, `Not submitted yet: ${busy}`)
+    if (tries === 0) noteDraft(order, `Not submitted yet: ${busy}`)
     log.info(`${number} submitted again in ${REQUEUE.delaySeconds} s: another submission holds ${lockName}`)
-    if (source.via !== 'producer') return notSubmitted(`Order not submitted yet: ${busy} in a minute`)
-    const saved = `Order ${number} is saved and is submitted within a few minutes: another order of the same agreement was being submitted at that moment`
-    return { submitted: false, message: `${saved}. There is no need to raise it again`, info: true }
+    return { submitted: false, message: `Order not submitted yet: ${busy} in a minute`, queued: true }
 }
 
 /** Note on a draft why it is one; a refused note is logged. */
@@ -338,7 +325,7 @@ function noteDraft(order: GlideRecord, note: string): void {
 export function submitQueuedOrder(orderId: string, tries: number): void {
     const order = findById('x_daas_ham_order', orderId)
     if (!order || str(order, 'stage') !== ORDER_STAGE.draft) return
-    submitAsRaised(order, orderParties(order), orderingUser(order), [], { via: 'queued', tries })
+    submitAsRaised(order, orderParties(order), orderingUser(order), [], tries)
 }
 
 function requestedLines(orderId: string): RequestedLine[] {

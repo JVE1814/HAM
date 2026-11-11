@@ -38,7 +38,12 @@ export function afterOrderProduced(producer: Record<string, unknown>, current: u
     for (const row of asked.rows) {
         if (row.model) devices.push({ modelId: String(row.model), quantity: Math.max(1, Number(row.quantity) || 1), fromSiteTemplate: false })
     }
-    tellSubmission(submitProducedOrder(current as GlideRecord, devices, asked.unread))
+    const order = current as GlideRecord
+    const submission = submitProducedOrder(order, devices, asked.unread)
+    if (submission.submitted || !submission.queued) return tellSubmission(submission)
+    // Its raiser, often a Customer admin, has no Submit action to try again with.
+    const saved = `Order ${str(order, 'number')} is saved and is submitted within a few minutes: another order of the same agreement was being submitted at that moment`
+    gs.addInfoMessage(`${saved}. There is no need to raise it again`)
 }
 
 /**
@@ -61,8 +66,7 @@ function deviceRows(value: unknown): { rows: DeviceRow[]; unread: string } {
 function tellSubmission(submission: Submission): void {
     if (submission.submitted) {
         if (submission.already) gs.addInfoMessage(submission.already)
-    } else if (submission.info) gs.addInfoMessage(submission.message)
-    else gs.addErrorMessage(submission.message)
+    } else gs.addErrorMessage(submission.message)
 }
 
 export function uiSubmitOrder(current: GlideRecord): void {

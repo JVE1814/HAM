@@ -91,7 +91,7 @@ describe('submitting an Order that adds a unit', () => {
     it('stays a draft, noted, and is queued to be submitted again while another submission of its Agreement holds the lock', () => {
         const theirs = holdUsageLock()
 
-        expect(submitOrder(order())).toEqual({ submitted: false, message: `Order not submitted yet: ${BUSY} in a minute` })
+        expect(submitOrder(order())).toEqual({ submitted: false, message: `Order not submitted yet: ${BUSY} in a minute`, queued: true })
 
         expect(storedOrder()).toMatchObject({ stage: 'draft', work_notes: `Not submitted yet: ${BUSY}` })
         expect(storedOrder().entitlement_verdict ?? '').toBe('')
@@ -99,16 +99,15 @@ describe('submitting an Order that adds a unit', () => {
         expect(rows(LOCKS)).toEqual([theirs])
     })
 
-    it('tells the raiser of a record producer, who may have no Submit, that it is saved and not to raise it again', () => {
+    it('queues an Order the record producer raised to be submitted again, as Submit does', () => {
         holdUsageLock()
         // The producer adds the lines itself.
         rows(LINES).pop()
 
         expect(submitProducedOrder(order(), [{ modelId: 'model1', quantity: 1 }], '')).toEqual({
             submitted: false,
-            message:
-                'Order ORD0001 is saved and is submitted within a few minutes: another order of the same agreement was being submitted at that moment. There is no need to raise it again',
-            info: true,
+            message: `Order not submitted yet: ${BUSY} in a minute`,
+            queued: true,
         })
 
         expect(storedOrder().stage).toBe('draft')
