@@ -97,7 +97,7 @@ export function evenShare(amount: number, count: number): number {
     return count > 0 ? amount / count : 0
 }
 
-export interface EvenSplit {
+interface EvenSplit {
     share: number
     extra: number
 }
@@ -107,7 +107,7 @@ export interface EvenSplit {
  * the cents left over after an equal split go one each to the first Assets, so the shares add up to the amount
  * (10000.00 over 3 is 3333.34, 3333.33 and 3333.33).
  */
-export function evenSplit(amount: number, count: number): EvenSplit {
+function evenSplit(amount: number, count: number): EvenSplit {
     const total = toCents(amount)
     if (count <= 0 || total <= 0) return { share: 0, extra: 0 }
     const base = Math.floor(total / count)
@@ -126,7 +126,7 @@ export interface BuyoutSplit {
  * when the buyout is decided: the left-over cents go to the first Assets in sys_id order, the order the buyout's
  * transfer runs in, so the Assets' costs add up to the price whichever chunk transfers each.
  */
-export function buyoutSplit(price: number, assetIds: readonly string[]): BuyoutSplit {
+function buyoutSplit(price: number, assetIds: readonly string[]): BuyoutSplit {
     const sorted = [...new Set(assetIds)].sort()
     const split = evenSplit(price, sorted.length)
     return { share: split.share, extraThrough: split.extra > 0 ? sorted[split.extra - 1] : '' }
