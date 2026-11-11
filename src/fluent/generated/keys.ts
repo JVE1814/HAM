@@ -3333,6 +3333,7 @@ declare global {
                     'src_server_domain_customer-page_ts': {
                         table: 'sys_module'
                         id: '2b3b4b7974894a42846bbd63648c184d'
+                        deleted: true
                     }
                     'src_server_domain_customer-parties_ts': {
                         table: 'sys_module'

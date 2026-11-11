@@ -135,8 +135,8 @@ across levels. The app's own logic saves through GlideRecord, which no ACL check
 - The ACL records that sat on `alm_hardware` keep their keys, so an install moves them to `alm_asset` rather than
   leaving them in place.
 - A server script's GlideRecord is not checked by ACLs. A read the app makes for a restricted user and returns to them,
-  if it has `^NQ` clauses, carries the user's filter in each clause itself: the customer page's equipment
-  (`customerEquipmentQuery` ANDs the reader's `visibilityFilter` into each stage's clause).
+  if it has `^NQ` clauses, carries the user's filter in each clause itself: it runs through `platform/visibility`
+  `visibleQuery`, which ANDs the reader's `visibilityFilter` into each clause (the customer page's equipment).
 - What only an instance can confirm (a Deny-Unless ACL with no role and a module function as its script, on a parent
   table, applying to its child table's records; *Applies To* on `alm_asset`; the row check on a New form; the field
   ACLs on `alm_asset` applying to an `alm_asset` list's hardware rows; a create rule's script seeing the posted values

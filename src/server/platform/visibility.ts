@@ -1,14 +1,28 @@
 import { GlideRecord, GlideTableHierarchy, gs } from '@servicenow/glide'
+import { andEachClause } from '../domain/encoded-query.ts'
 import { memoized } from '../domain/memo.ts'
-import { SCOPED_TABLES, scopingOf, type ScopedRow, type TableScoping } from '../domain/visibility.ts'
+import { SCOPED_TABLES, scopingOf, visibilityFilter, type ScopedRow, type ScopedTable, type TableScoping } from '../domain/visibility.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { str } from './records.ts'
+import { currentSession } from './session.ts'
 
 /**
  * The records the visibility scripts (entry/visibility) are handed, as domain/visibility judges them: which scoping a
  * table takes, and a record's scoping fields, read past the app's rules where a rule would hide the record that holds
- * them.
+ * them. And the queries the app's own logic runs as the signed-in user, kept to what they may see.
  */
+
+/**
+ * `query` on `table` kept to what the signed-in user may see: their visibility filter is ANDed into each of its `^NQ`
+ * clauses. The table's before-query rule appends the same filter, which an `^NQ` binds to the last clause only, and a
+ * server read meets no read ACL to remove the rest (ADR 0005), so a query with `^NQ` clauses that must stay within the
+ * reader's view runs through this.
+ */
+export function visibleQuery(table: ScopedTable, query: string): string {
+    const session = currentSession()
+    const filter = visibilityFilter(session.scope, SCOPED_TABLES[table], session)
+    return filter ? andEachClause(query, filter) : query
+}
 
 const ASSET_TABLE = 'alm_asset'
 const HARDWARE = SCOPED_TABLES.alm_hardware

@@ -53,7 +53,7 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
     reply(response, 200, {
         customer: customerName(session.customerId),
         isCustomerAdmin: isCustomerAdmin(),
-        assets: customerEquipment(session),
+        assets: customerEquipment(),
         orders: ordersUnderWay(),
         returns: openReturns(),
         attestations: openAttestations(),
