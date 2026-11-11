@@ -1,14 +1,7 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, Record, ScheduledScript, ScriptAction } from '@servicenow/sdk/core'
-import {
-    normalizeRawModels,
-    onAgreementTermsChanged,
-    onModelLifecycleChanged,
-    onNormalizationResolved,
-    refreshAgreementAssets,
-    refreshModelAssets,
-    rollLifecyclePhases,
-} from '../../server/entry/models'
+import { onAgreementTermsChanged, refreshAgreementAssets } from '../../server/entry/agreements'
+import { normalizeRawModels, onModelLifecycleChanged, onNormalizationResolved, refreshModelAssets, rollLifecyclePhases } from '../../server/entry/models'
 import { NORM_EXCEPTION_STATUS } from '../../server/domain/vocabulary'
 import { processLifecycleRow } from '../../server/entry/imports'
 import { EVENT } from '../../server/domain/events'

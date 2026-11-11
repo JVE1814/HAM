@@ -1,6 +1,6 @@
 import { GlideRecord } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
-import { LONG_HOLD_LOCK_TRIES, REQUEUE, type HeldLock } from '../domain/job-lock.ts'
+import { REQUEUE, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { advanceReplacementRma } from '../domain/oem-rma.ts'
 import {
@@ -14,23 +14,21 @@ import {
     sourcingPurpose,
     stillToBuy,
     type ShortfallRoute,
-    type Source,
     type SourcingRequest,
     type UnmovedStock,
 } from '../domain/sourcing.ts'
+import { putBackUnit, type Source } from '../domain/stock.ts'
 import type { OrderType } from '../domain/vocabulary.ts'
-import { moveAndSave } from './assets.ts'
 import { todayIso } from './clock.ts'
-import { requeueCounted } from './events.ts'
-import { EVENT } from '../domain/events.ts'
 import { lineLostUnit, recomputeLine, recomputeOrder, unitsOnLine } from './fulfilment.ts'
-import { withLock, withLockTries, type LockRun } from './locks.ts'
-import { saveLineSourcing } from './order-lines.ts'
+import { withLock } from './locks.ts'
+import { saveLineSourcing, withOrderLineLock } from './order-lines.ts'
 import { openOemRma, openRmaCount, openRmasFor, reuseOemRma } from './oem-rma.ts'
 import { requestPurchase } from './procurement.ts'
 import { findById, num, str, warnRefused, type ForeignRecord } from './records.ts'
 import { openStagingTask, skipOpenStagingTasks, stagingStockroom, startStaging } from './staging-tasks.ts'
-import { linkHotSpare, releaseToProviderStock, reserveAsset, stockCandidates, takeOffOrderLine } from './stock.ts'
+import { leaveOrderLine, linkHotSpare, reserveAsset, stockCandidates } from './stock.ts'
+import { queuePassAgain } from './sourcing-requests.ts'
 import { requestTransfer } from './transfers.ts'
 import { log } from './log.ts'
 
@@ -77,30 +75,18 @@ export function runSourcingPass(order: GlideRecord, queuedAgain: number): void {
     const again = pass.ran ? pass.value : null
     if (!pass.ran || again) {
         const why = again ? AGAIN_BECAUSE[again] : 'another pass or a cancel holds its lock'
-        queuePassAgain(order, queuedAgain, why)
+        runAgainLater(order, queuedAgain, why)
     }
     if (pass.ran) recomputeOrder(orderId)
 }
 
 /** Queue the request to source `order` again a minute later, unless it was already queued again `tries` times. */
-function queuePassAgain(order: GlideRecord, tries: number, why: string): void {
+function runAgainLater(order: GlideRecord, tries: number, why: string): void {
     const number = str(order, 'number')
-    if (!requeueCounted(EVENT.sourceOrder, order, '', tries)) {
+    if (!queuePassAgain(order, tries)) {
         return void log.warn(`${number} not sourced again after ${tries} tries (${why}): check its lines`)
     }
     log.info(`${number} sourced again in ${REQUEUE.delaySeconds} s: ${why}`)
-}
-
-/**
- * Run `work` holding the Order line's lock and give what it returned, or `ran: false` when other holders kept it through
- * every try: a holder keeps it for a receipt (the Asset, the line, the reservation and the move into staging saved),
- * for sourcing's read of the line or its purchase and save, or for a cancel or rejection of its Order (platform/orders
- * `withOrderLineLocks`). Taking the lock throws only when an insert is refused with no lock row
- * (platform/locks `withLockTries` tries again, and that error escapes only when every try threw), as does an error
- * from `work`.
- */
-export function withOrderLineLock<T>(lineId: string, work: (lock: HeldLock) => T): LockRun<T> {
-    return withLockTries(LOCK.orderLine(lineId), work, LONG_HOLD_LOCK_TRIES)
 }
 
 /** What sourcing found and did for a line outside its lock: what `settleHolding` routes, buys and saves. */
@@ -172,7 +158,7 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
         for (const { asset, source } of picked) {
             // As Inventory left it once its line was removed (platform/transfers `requestTransfer`).
             const fresh = findById('alm_hardware', asset.getUniqueValue())
-            if (fresh && unreserve(fresh, source)) putBack++
+            if (fresh && leaveOrderLine(fresh, putBackUnit(source), 'no transfer order')) putBack++
         }
     }
     // An Asset whose Staging task could not be opened stays reserved for the line rather than staging with no task to
@@ -320,20 +306,6 @@ function leftUnsaved(line: GlideRecord, why: keyof typeof AGAIN_BECAUSE, transfe
 }
 
 /**
- * Put back stock reserved for a line but never moved to staging: Spare-pool stock to the pool, still its Customer's,
- * the rest to the Provider's free stock. False when the platform refuses (logged with `why`): the Asset stays on the
- * line.
- */
-function unreserve(asset: GlideRecord, source: Source, why = 'no transfer order'): boolean {
-    if (source === 'spare_pool') {
-        takeOffOrderLine(asset)
-        return moveAndSave(asset, 'spare_pool', why)
-    }
-    releaseToProviderStock(asset)
-    return moveAndSave(asset, 'available', why)
-}
-
-/**
  * A unit's transfer to the staging centre fell through (`current` as its after-update rule sees it, entry/assets
  * `onAllocatedAssetStageChange`): Inventory let it go short of the staging centre, its transfer order line cancelled
  * or deleted, and it was reserved for its line again where it was, which nothing moves it on from (domain/lifecycle
@@ -350,7 +322,7 @@ export function putBackUntransferred(current: ForeignRecord, lineId: string): vo
     // twice, and an inventory tech of the staging centre who cancelled the line does not see a unit stored elsewhere.
     const asset = findById('alm_hardware', current.getUniqueValue(), { beyondVisibility: true })
     if (!asset) return
-    if (!unreserve(asset, 'central_stock', `${what}, so it is put back`)) return
+    if (!leaveOrderLine(asset, putBackUnit('central_stock'), `${what}, so it is put back`)) return
     skipOpenStagingTasks(asset.getUniqueValue(), 'Transfer to the staging centre fell through')
     lineLostUnit(lineId)
     log.warn(`${what}: put back as free stock, its line sourced again`)

@@ -1,20 +1,48 @@
 import { GlideRecord } from '@servicenow/glide'
-import { LINE_STAGE, type LineStage } from '../domain/vocabulary.ts'
+import { LONG_HOLD_LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
+import { LOCK } from '../domain/lock-names.ts'
+import type { LineStage } from '../domain/vocabulary.ts'
+import { withLockTries, type LockRun } from './locks.ts'
 import { num, refusal, str } from './records.ts'
 
 /**
  * Order lines (x_daas_ham_order_line). Every write of a line is made here: its insert, its stage (cancelled, as
  * sourcing left it, derived from its Assets), its on-order count, and the purchase and transfer orders it lists. Each
- * write says whether the platform took it and logs nothing: the caller holds the locks it needs (ADR 0013) and answers
- * a refusal.
+ * write says whether the platform took it and logs nothing: the caller holds the locks it needs (ADR 0013, the line's
+ * own through `withOrderLineLock`) and answers a refusal.
  */
+
+/**
+ * Run `work` holding the Order line's lock and give what it returned, or `ran: false` when other holders kept it through
+ * every try: a holder keeps it for a receipt (the Asset, the line, the reservation and the move into staging saved),
+ * for sourcing's read of the line or its purchase and save, or for a cancel or rejection of its Order
+ * (`withOrderLineLocks`). Taking the lock throws only when an insert is refused with no lock row (platform/locks
+ * `withLockTries` tries again, and that error escapes only when every try threw), as does an error from `work`.
+ */
+export function withOrderLineLock<T>(lineId: string, work: (lock: HeldLock) => T): LockRun<T> {
+    return withLockTries(LOCK.orderLine(lineId), work, LONG_HOLD_LOCK_TRIES)
+}
+
+/**
+ * Run `work` holding the lock of every line in `lineIds`, taken one under another in sys_id order (ADR 0013), and give
+ * what it returned, or `ran: false`, with nothing run, when one stayed held through its tries.
+ */
+export function withOrderLineLocks<T>(lineIds: readonly string[], work: (locks: HeldLock[]) => T): LockRun<T> {
+    const ids = [...lineIds].sort()
+    const holdFrom = (next: number, held: HeldLock[]): LockRun<T> => {
+        if (next === ids.length) return { ran: true, value: work(held) }
+        const under = withOrderLineLock(ids[next], (lock) => holdFrom(next + 1, [...held, lock]))
+        return under.ran ? under.value : { ran: false }
+    }
+    return holdFrom(0, [])
+}
 
 /** A line to add to an Order. */
 export interface NewLine {
     modelId: string
     quantity: number
-    /** It came from the Order's Site template; left unset, the column's default (false) stands. */
-    fromSiteTemplate?: boolean
+    /** It came from the Order's Site template; otherwise the column's default (false) stands. */
+    fromSiteTemplate?: true
     /** The Asset it replaces like-for-like (break-fix, refresh). */
     replacesAssetId?: string
 }
@@ -34,19 +62,14 @@ export function addOrderLines(order: GlideRecord, lines: readonly NewLine[]): Re
         record.setValue('order', order.getUniqueValue())
         record.setValue('model', line.modelId)
         record.setValue('quantity', line.quantity)
-        if (line.fromSiteTemplate !== undefined) record.setValue('from_site_template', line.fromSiteTemplate)
+        if (line.fromSiteTemplate) record.setValue('from_site_template', true)
         if (line.replacesAssetId) record.setValue('replaces_asset', line.replacesAssetId)
         if (!record.insert()) refused.push({ line, reason: refusal(record) })
     }
     return refused
 }
 
-/** Cancel the line; false when the platform refuses the save. */
-export function cancelLine(line: GlideRecord): boolean {
-    return saveLineStage(line, LINE_STAGE.cancelled)
-}
-
-/** Save the line at the `stage` derived from its Assets (platform/fulfilment); false when the platform refuses. */
+/** Save the line at `stage`, cancelled or derived from its Assets (platform/fulfilment); false when the platform refuses. */
 export function saveLineStage(line: GlideRecord, stage: LineStage): boolean {
     line.setValue('line_stage', stage)
     return !!line.update()

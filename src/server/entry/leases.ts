@@ -8,7 +8,7 @@ import { jobEvent } from '../platform/events.ts'
 import { applyLeaseDecision, giveToLessor, runLeaseReview, transferToProvider } from '../platform/leases.ts'
 import { queueRefresh, runRefreshPass } from '../platform/lifecycle-dates.ts'
 import type { ForeignRecord } from '../platform/records.ts'
-import { rearmForNewEnd, renewAgreement, warnAgreementRenewals } from '../platform/renewals.ts'
+import { warnAgreementRenewals } from '../platform/renewals.ts'
 
 /** Leases, end-of-lease decisions and renewals (plan §13 Leases, Renewals): platform/leases, platform/renewals. */
 
@@ -49,14 +49,4 @@ export function warnRenewals(): void {
     const today = todayIso()
     warnAgreementRenewals(today)
     warnExpiringCoverage(today)
-}
-
-export function onAgreementEndChanged(current: GlideRecord): void {
-    rearmForNewEnd(current)
-}
-
-export function uiRenewAgreement(current: GlideRecord): void {
-    const renewal = renewAgreement(current)
-    if (renewal.renewed) gs.addInfoMessage(`Agreement renewed until ${renewal.until}`)
-    else if (renewal.why) gs.addErrorMessage(renewal.why)
 }

@@ -1,15 +1,18 @@
 import { GlideRecord } from '@servicenow/glide'
 import {
-    APPROVAL_REQUESTED,
+    APPROVAL,
+    approversToAsk,
     groupDecisions,
     rollupApprovals,
     type ApprovalDecision,
     type ApprovalOutcome,
     type ApprovalState,
+    type StandIn,
 } from '../domain/approvals.ts'
 import type { Approver } from '../domain/approvals.ts'
 import { ROLE } from '../domain/roles.ts'
 import { exists, pluck, str, warnRefused } from './records.ts'
+import { assetManagerIds } from './users.ts'
 
 /**
  * Approval of app tasks through sysapproval_approver records (ADR 0004), one flow for every task that is approved: the
@@ -36,11 +39,6 @@ export function customerAdminIds(customerId: string): string[] {
     )
 }
 
-/** The asset managers (active users, at most 20): who decides and is warned for the Provider where no one person is named. */
-export function assetManagerIds(): string[] {
-    return pluck('sys_user_has_role', `role.name=${ROLE.assetManager}^user.active=true^state=active`, 'user', 20)
-}
-
 /**
  * Provider-side approvers: the account manager, or the asset managers when there is none. Only active users: a
  * request to an inactive one saves but is never decided, so an inactive account manager counts as none.
@@ -61,13 +59,12 @@ function isActiveUser(userId: string): boolean {
 }
 
 export interface ApprovalRequest {
-    /** The value of the task's `stage` while it awaits approval, as its own stage list names it (its flow's). */
-    awaitingStage: string
-    approverIds: readonly string[]
     /** The groups that must each approve (domain/approvals `rollupApprovals`). */
     required: readonly Approver[]
     /** The Customer admins of the task's Customer, who decide for the customer-admin group (`CUSTOMER_ADMINS_ASKED`). */
     customerAdmins: readonly string[]
+    /** Who decides for the Provider (the account-manager group), and stands in for absent admins as the flow says. */
+    providerApprovers: readonly string[]
     /** Why the task cannot be approved when nobody could be asked. */
     noApprover: string
 }
@@ -79,11 +76,12 @@ export interface ApprovalRequest {
  */
 export type ApprovalStart = { awaiting: true } | { awaiting: false; step: 'request' | 'save'; reason: string }
 
-export function putToApproval(task: GlideRecord, request: ApprovalRequest): ApprovalStart {
-    const unasked = requestApprovals(task, request)
+/** Ask the approvers `flow` chooses for `request` (domain/approvals `approversToAsk`) and save the task as awaiting them. */
+export function putToApproval(task: GlideRecord, flow: ApprovalFlow, request: ApprovalRequest): ApprovalStart {
+    const unasked = requestApprovals(task, flow.standIn, request)
     if (unasked) return { awaiting: false, step: 'request', reason: unasked }
-    task.setValue('stage', request.awaitingStage)
-    task.setValue('approval', 'requested')
+    task.setValue('stage', flow.awaitingStage)
+    task.setValue('approval', APPROVAL.requested)
     task.setValue(CUSTOMER_ADMINS_ASKED, request.customerAdmins.join(','))
     if (task.update()) return { awaiting: true }
     const reason = warnRefused(task, `${str(task, 'number')} not saved as awaiting approval, its requests cancelled`)
@@ -94,6 +92,8 @@ export function putToApproval(task: GlideRecord, request: ApprovalRequest): Appr
 export interface ApprovalFlow {
     /** The value of the task's `stage` while it awaits approval, as its own stage list names it. */
     awaitingStage: string
+    /** Who decides for the admins of a Customer that has none. */
+    standIn: StandIn
     /** The groups that must each approve `task`: read only for a task found awaiting approval. */
     required(task: GlideRecord): readonly Approver[]
     /**
@@ -122,7 +122,7 @@ export function rollUpApprovals(task: GlideRecord, flow: ApprovalFlow): Approval
     if (str(task, 'stage') !== flow.awaitingStage) return null
     const required = flow.required(task)
     const asked = str(task, CUSTOMER_ADMINS_ASKED).split(',').filter(Boolean)
-    const decisions = groupDecisions(approvalsOf(task.getUniqueValue()), asked)
+    const decisions = groupDecisions(approvalsOf(task.getUniqueValue()), asked, flow.standIn)
     const outcome = rollupApprovals(required, decisions)
     if (outcome === 'requested') return { outcome, refused: '', required, decisions }
     const refused = flow.decide(task, outcome)
@@ -130,11 +130,12 @@ export function rollUpApprovals(task: GlideRecord, flow: ApprovalFlow): Approval
     return { outcome, refused, required, decisions }
 }
 
-function requestApprovals(task: GlideRecord, { approverIds, required, customerAdmins, noApprover }: ApprovalRequest): string {
+function requestApprovals(task: GlideRecord, standIn: StandIn, { required, customerAdmins, providerApprovers, noApprover }: ApprovalRequest): string {
+    const approverIds = approversToAsk(required, customerAdmins, providerApprovers, standIn)
     const refusals = approverIds.map((approverId) => requestApproval(task, approverId))
     const saved = approverIds.filter((_, i) => !refusals[i])
-    const allApproved = saved.map((approverId) => ({ approverId, state: 'approved' as const }))
-    if (rollupApprovals(required, groupDecisions(allApproved, customerAdmins)) === 'approved') return ''
+    const allApproved = saved.map((approverId) => ({ approverId, state: APPROVAL.approved }))
+    if (rollupApprovals(required, groupDecisions(allApproved, customerAdmins, standIn)) === 'approved') return ''
     if (saved.length > 0) cancelPendingApprovals(task.getUniqueValue())
     const refused = refusals.find(Boolean)
     return refused ? `an approval request was refused: ${refused}` : noApprover
@@ -147,7 +148,7 @@ function requestApproval(task: GlideRecord, approverId: string): string {
     approval.setValue('source_table', task.getTableName())
     approval.setValue('document_id', task.getUniqueValue())
     approval.setValue('approver', approverId)
-    approval.setValue('state', APPROVAL_REQUESTED)
+    approval.setValue('state', APPROVAL.requested)
     if (approval.insert()) return ''
     return warnRefused(approval, `No approval request for ${str(task, 'number')} to ${approverId}`)
 }
@@ -169,10 +170,10 @@ function approvalsOf(taskId: string): Array<{ approverId: string; state: Approva
 export function cancelPendingApprovals(taskId: string): void {
     const approval = new GlideRecord('sysapproval_approver')
     approval.addQuery('sysapproval', taskId)
-    approval.addQuery('state', APPROVAL_REQUESTED)
+    approval.addQuery('state', APPROVAL.requested)
     approval.query()
     while (approval.next()) {
-        approval.setValue('state', 'cancelled')
+        approval.setValue('state', APPROVAL.cancelled)
         if (approval.update()) continue
         // Left waiting, it still counts in the rollup if a draft task is submitted again (a rejection rejects it).
         warnRefused(approval, `Approval request ${approval.getUniqueValue()} left requested, cancel it`)

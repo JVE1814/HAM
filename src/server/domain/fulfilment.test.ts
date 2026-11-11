@@ -6,7 +6,6 @@ import {
     ENDED_ORDER_STAGES,
     followsLines,
     leftInTransit,
-    LINE_STAGES,
     lineStageFor,
     OPEN_ORDERS_QUERY,
     orderStageFor,
@@ -134,7 +133,7 @@ describe('orderStageFor', () => {
     })
 
     it('derives every live line stage to a stage of its own, complete only from in service', () => {
-        const live = LINE_STAGES.filter((stage) => stage !== 'cancelled')
+        const live = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped', 'installed', 'in_service'] as const
         expect(live.map((stage) => orderStageFor([stage]))).toEqual([
             'sourcing',
             'preparing',

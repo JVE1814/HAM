@@ -10,7 +10,6 @@ import { disposalStage } from '../domain/lifecycle.ts'
 import { DISPOSAL_STAGE, type DisposalLineStatus, type DisposalMethod, type LegalOwner, TASK_STATE } from '../domain/vocabulary.ts'
 import {
     customerAdminIds,
-    assetManagerIds,
     putToApproval,
     rollUpApprovals,
     type ApprovalFlow,
@@ -18,6 +17,7 @@ import {
 } from './approvals.ts'
 import { isFleetAsset, moveRefusal, readStage, transitionFacts } from './assets.ts'
 import { choice, findById, refusal, str, warnRefused } from './records.ts'
+import { assetManagerIds } from './users.ts'
 
 /**
  * Disposal orders: approve, then retire each wiped Asset by its method (P2.5, Q61). None of it tells the user anything:
@@ -62,8 +62,7 @@ export type DisposalSubmission = { submitted: true } | { submitted: false; why: 
 
 /**
  * Put a draft Disposal order to approval (platform/approvals `putToApproval`): the provider-side approvers (the asset
- * managers), and the admins of the order's Customer when a customer-owned Asset is on it. Nobody stands in for a
- * Customer without admins: the order then stays a draft.
+ * managers), and the admins of the order's Customer when a customer-owned Asset is on it.
  */
 export function submitDisposal(order: GlideRecord): DisposalSubmission {
     const assets = assetsOf(order.getUniqueValue())
@@ -71,16 +70,10 @@ export function submitDisposal(order: GlideRecord): DisposalSubmission {
     const findings = disposalCustomerFindings(str(order, 'customer'), assets)
     if (findings.length > 0) return { submitted: false, why: findings.join('. ') }
     const required = disposalApprovers(assets.map((asset) => asset.legalOwner))
-    const customerAdmins = customerAdminIds(str(order, 'customer'))
-    const approvers = new Set<string>()
-    for (const group of required) {
-        for (const id of group === 'customer_admin' ? customerAdmins : assetManagerIds()) approvers.add(id)
-    }
-    const asked = putToApproval(order, {
-        awaitingStage: DISPOSAL_APPROVAL.awaitingStage,
-        approverIds: [...approvers],
+    const asked = putToApproval(order, DISPOSAL_APPROVAL, {
         required,
-        customerAdmins,
+        customerAdmins: customerAdminIds(str(order, 'customer')),
+        providerApprovers: assetManagerIds(),
         noApprover: 'no asset manager to approve it',
     })
     if (asked.awaiting) return { submitted: true }
@@ -90,6 +83,7 @@ export function submitDisposal(order: GlideRecord): DisposalSubmission {
 /** How a Disposal order's approvals are decided (platform/approvals): by its Assets' owners, approved or rejected and closed. */
 const DISPOSAL_APPROVAL: ApprovalFlow = {
     awaitingStage: DISPOSAL_STAGE.awaiting_approval,
+    standIn: 'provider',
     required: (order) => disposalApprovers(ownersOf(order.getUniqueValue())),
     decide: (order, outcome) => {
         order.setValue('approval', outcome)

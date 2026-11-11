@@ -123,7 +123,7 @@ export const addToFleetTest = Test(
  * ATF: the daily job "NaaS - spare pool top-up" (entry/spare-pool `topUpSparePools`; suite "NaaS - P1"), run on a
  * fixture by its entry function in a server-side script step, in the session of whoever runs the test: one Spare pool
  * per Customer and Model, sized from all their deployed fleet units of it across their Agreements, each Agreement's
- * ratio on its own units, rounded up once (owner decision; domain/sourcing `sparePools`). Here 2 units at 0.2 and 2 at
+ * ratio on its own units, rounded up once (owner decision; domain/spare-pools `sparePools`). Here 2 units at 0.2 and 2 at
  * 0.3 make a pool of ceil(1.0) = 1; rounding per Agreement would make it ceil(0.4) + ceil(0.6) = 2. The job runs over
  * every Customer's pools on the instance, as its daily run does; ATF rolls its changes back with the test's. A script
  * cannot read an earlier step's output, so it finds the fixtures by their serial numbers. Fixtures setting the Fleet

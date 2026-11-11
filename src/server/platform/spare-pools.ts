@@ -5,15 +5,13 @@ import type { HeldLock } from '../domain/job-lock.ts'
 import { DEPLOYED_STAGES } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import {
-    freeStockOf,
-    pickForSparePool,
     reservedSparesQuery,
     sparePoolLead,
     sparePools,
     sparePoolShortfall,
     type DeployedShare,
     type SparePool,
-} from '../domain/sourcing.ts'
+} from '../domain/spare-pools.ts'
 import { ACTIVE_AGREEMENTS } from './agreements.ts'
 import { runTableJob } from './chunked.ts'
 import { withLockTries } from './locks.ts'
@@ -22,12 +20,12 @@ import { boolProperty } from './properties.ts'
 import { stagingStockroom } from './staging-tasks.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { countBy, num, str } from './records.ts'
-import { moveToSparePool, stockCandidates } from './stock.ts'
+import { freeStock, moveToSparePool } from './stock.ts'
 import { log } from './log.ts'
 
 /**
  * Keeping each Customer's Spare pool of each Model at the size their Agreements' spare-pool ratios give (P1.4,
- * domain/sourcing `sparePools`), counting and moving fleet assets only (ADR 0016): the pool, the deployed units it is
+ * domain/spare-pools `sparePools`), counting and moving fleet assets only (ADR 0016): the pool, the deployed units it is
  * sized by, and the free stock it is filled from.
  */
 
@@ -59,10 +57,6 @@ function sparePurchasesEnabled(): boolean {
     if (stagingStockroom()) return true
     log.warn(`Spare-pool top-up buys no spares: set ${PROPERTY.stagingStockroom.name}`)
     return false
-}
-
-function countByModel(query: string): Map<string, number> {
-    return countBy('alm_hardware', query, 'model')
 }
 
 /** The Customer's Agreements the top-up runs over, with their spare-pool ratios. */
@@ -105,7 +99,7 @@ function topUpCustomerPools(customerId: string, agreementId: string, autoPurchas
     if (!customerId) return
     const ratios = poolAgreements(customerId)
     if (sparePoolLead([...ratios.keys()]) !== agreementId) return
-    const reserved = countByModel(reservedSparesQuery(customerId))
+    const reserved = countBy('alm_hardware', reservedSparesQuery(customerId), 'model')
     for (const pool of sparePools(deployedShares(ratios))) {
         // A pool these counts show full is left without its lock: another run's top-up meanwhile only fills it.
         if (sparePoolShortfall(pool.size, reserved.get(pool.modelId) ?? 0) === 0) continue
@@ -122,10 +116,10 @@ function topUpCustomerPools(customerId: string, agreementId: string, autoPurchas
  */
 function topUpPool(customerId: string, pool: SparePool, autoPurchase: boolean, lock: HeldLock): void {
     const { modelId } = pool
-    const reserved = countByModel(andEachClause(reservedSparesQuery(customerId), `model=${modelId}`)).get(modelId) ?? 0
+    const reserved = countBy('alm_hardware', andEachClause(reservedSparesQuery(customerId), `model=${modelId}`), 'model').get(modelId) ?? 0
     const shortfall = sparePoolShortfall(pool.size, reserved)
     if (shortfall === 0) return
-    const picked = pickForSparePool(stockCandidates(freeStockOf(modelId), shortfall), modelId, shortfall)
+    const picked = freeStock(modelId, shortfall)
     // A unit sourcing claimed in the meantime (or whose save was refused) is not moved and stays in the shortfall.
     const moved = picked.filter((assetId) => moveToSparePool(assetId, customerId, pool.agreementId)).length
     if (!autoPurchase) return
