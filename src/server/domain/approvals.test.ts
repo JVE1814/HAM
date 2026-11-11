@@ -97,20 +97,22 @@ describe('approversToAsk', () => {
 })
 
 describe('approvalAwaited', () => {
+    const names = { customer_admin: 'a Customer admin', account_manager: 'the account manager' }
+
     it('names the group still asked to decide', () => {
         const decisions = [
             { group: 'customer_admin', state: 'approved' },
             { group: 'account_manager', state: 'requested' },
         ] as const
-        expect(approvalAwaited(['customer_admin', 'account_manager'], decisions)).toBe(
-            'waiting for the account manager (or the asset managers) to decide',
+        expect(approvalAwaited(['customer_admin', 'account_manager'], decisions, names)).toBe(
+            'waiting for the account manager to decide',
         )
     })
 
     it('says no approval is still requested from the groups missing one', () => {
         const decisions = [{ group: 'customer_admin', state: 'cancelled' }] as const
-        expect(approvalAwaited(['customer_admin', 'account_manager'], decisions)).toBe(
-            'no approval from a Customer admin and the account manager (or the asset managers) and none still requested',
+        expect(approvalAwaited(['customer_admin', 'account_manager'], decisions, names)).toBe(
+            'no approval from a Customer admin and the account manager and none still requested',
         )
     })
 })

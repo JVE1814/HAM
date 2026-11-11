@@ -65,19 +65,18 @@ export function approversToAsk(
     return [...ids]
 }
 
-const APPROVER_NAMES: Record<Approver, string> = {
-    customer_admin: 'a Customer admin',
-    account_manager: 'the account manager (or the asset managers)',
-}
-
 /**
- * Why approvals that roll up to neither outcome (`rollupApprovals` gives requested) keep an Order awaiting approval, as
- * Re-check approvals tells the user: whose approval is missing, and whether a request to them is still waiting.
+ * Why approvals that roll up to neither outcome (`rollupApprovals` gives requested) keep a task awaiting approval:
+ * whose approval is missing, each group as its flow `names` it, and whether a request to them is still waiting.
  */
-export function approvalAwaited(required: readonly Approver[], decisions: readonly ApprovalDecision[]): string {
+export function approvalAwaited(
+    required: readonly Approver[],
+    decisions: readonly ApprovalDecision[],
+    names: Readonly<Record<Approver, string>>,
+): string {
     const approved = new Set(decisions.filter((d) => d.state === APPROVAL.approved).map((d) => d.group))
     const missing = required.filter((group) => !approved.has(group))
-    const who = missing.map((group) => APPROVER_NAMES[group]).join(' and ')
+    const who = missing.map((group) => names[group]).join(' and ')
     const waiting = decisions.some((d) => d.state === APPROVAL.requested && missing.includes(d.group))
     return waiting ? `waiting for ${who} to decide` : `no approval from ${who} and none still requested`
 }

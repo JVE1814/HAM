@@ -1,5 +1,5 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { approvalAwaited } from '../domain/approvals.ts'
+import { approvalAwaited, type Approver } from '../domain/approvals.ts'
 import { messageOf } from '../domain/errors.ts'
 import type { NewLine } from '../platform/order-lines.ts'
 import {
@@ -76,6 +76,12 @@ export function onOrderApprovalDecision(current: ForeignRecord): void {
     rollUpOrderApprovals(str(current, 'document_id'))
 }
 
+/** An Order's approver groups as Re-check approvals names them: its provider side asks the account manager first. */
+const ORDER_APPROVER_NAMES: Readonly<Record<Approver, string>> = {
+    customer_admin: 'a Customer admin',
+    account_manager: 'the account manager (or the asset managers)',
+}
+
 /**
  * UI action "Re-check approvals": roll an Order's approvals up again, as a decision does, for one whose last decision
  * could not be saved and that no request is left to move on; the user is told the outcome, or why there is none yet.
@@ -87,7 +93,7 @@ export function uiRecheckApprovals(current: GlideRecord): void {
     const rollup = rollUpOrderApprovals(current.getUniqueValue())
     if (!rollup) return void gs.addErrorMessage('The Order is no longer awaiting approval')
     if (rollup.outcome === 'requested') {
-        const why = approvalAwaited(rollup.required, rollup.decisions)
+        const why = approvalAwaited(rollup.required, rollup.decisions, ORDER_APPROVER_NAMES)
         return void gs.addErrorMessage(`Order still awaiting approval: ${why}`)
     }
     if (rollup.refused) return void gs.addErrorMessage(`Order not saved as ${rollup.outcome}: ${rollup.refused}`)
