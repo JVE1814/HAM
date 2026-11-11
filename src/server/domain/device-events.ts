@@ -6,6 +6,9 @@ import { DEVICE_EVENT_KIND_CHOICES, DEVICE_EVENT_SOURCE_CHOICES, type DeviceEven
 /** Who posts Seen signals to the device-events route, and so creates device events: the Provider NMS, and asset managers. */
 export const DEVICE_EVENT_SENDERS = [ROLE.integration, ROLE.assetManager]
 
+/** The source of an event that names none: the NMS, which posts them. */
+export const DEFAULT_DEVICE_EVENT_SOURCE: DeviceEventSource = 'nms'
+
 export interface DeviceEvent {
     /** Serial number, Provider tag or Customer tag of the Asset. */
     identifier: string
@@ -51,7 +54,7 @@ export function parseDeviceEvents(body: unknown, maxBatch: number, now: number):
         const identifier = typeof item?.identifier === 'string' ? item.identifier.trim() : ''
         const event = item?.event as DeviceEventKind
         const observedAt = typeof item?.observed_at === 'string' ? parseTimestamp(item.observed_at) : NaN
-        const source = (item?.source ?? 'nms') as DeviceEventSource
+        const source = (item?.source ?? DEFAULT_DEVICE_EVENT_SOURCE) as DeviceEventSource
         if (!identifier) return void rejected.push({ index, reason: 'identifier is required' })
         if (!KINDS.includes(event)) return void rejected.push({ index, reason: 'event must be one of seen, down, up' })
         if (Number.isNaN(observedAt)) return void rejected.push({ index, reason: OBSERVED_AT_FORMAT })

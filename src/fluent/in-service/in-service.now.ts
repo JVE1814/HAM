@@ -18,7 +18,7 @@ import { FLEET_CONDITION } from '../../server/domain/fleet'
 import { purgeDeviceEvents } from '../../server/entry/in-service'
 import { detectPendingInService } from '../../server/platform/in-service'
 import { PROPERTY } from '../../server/domain/properties'
-import { DEVICE_EVENT_SENDERS } from '../../server/domain/device-events'
+import { DEFAULT_DEVICE_EVENT_SOURCE, DEVICE_EVENT_SENDERS } from '../../server/domain/device-events'
 import { admin, broadStaff } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
@@ -41,7 +41,7 @@ export const x_daas_ham_device_event = Table({
             label: 'Source',
             choices: DEVICE_EVENT_SOURCE_CHOICES,
             mandatory: true,
-            default: 'nms',
+            default: DEFAULT_DEVICE_EVENT_SOURCE,
             dropdown: 'dropdown_without_none',
         }),
         observed_at: DateTimeColumn({ label: 'Observed at', mandatory: true }),

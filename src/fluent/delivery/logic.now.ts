@@ -57,6 +57,8 @@ UiAction({
  * after its change test.
  */
 
+const NAAS_ORDER_WORK = "current.initiated_from.sys_class_name == 'x_daas_ham_order'"
+
 BusinessRule({
     $id: Now.ID['br_work_order_window'],
     name: 'NaaS - work inside the change window',
@@ -65,7 +67,7 @@ BusinessRule({
     action: ['insert', 'update'],
     order: 100,
     condition:
-        `(current.expected_start.changes() || current.estimated_end.changes()) && current.initiated_from.sys_class_name == 'x_daas_ham_order' && require('${ENTRY_MODULES}/delivery.ts').refusesWorkWindow(current)`,
+        `(current.expected_start.changes() || current.estimated_end.changes()) && ${NAAS_ORDER_WORK} && require('${ENTRY_MODULES}/delivery.ts').refusesWorkWindow(current)`,
     abortAction: true,
     script: explainWorkWindowRefusal,
 })
@@ -77,7 +79,7 @@ BusinessRule({
     when: 'after',
     action: ['update'],
     order: 200,
-    condition: `current.state.changes() && current.state == ${TASK_STATE.closedComplete} && current.initiated_from.sys_class_name == 'x_daas_ham_order'`,
+    condition: `current.state.changes() && current.state == ${TASK_STATE.closedComplete} && ${NAAS_ORDER_WORK}`,
     script: completeInstallOfWork,
 })
 
