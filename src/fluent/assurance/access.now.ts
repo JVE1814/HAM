@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
 import { grantsCustomerRecord } from '../../server/entry/visibility'
-import { admin, assetManager, broadStaff, commercialEditors, customerRoles, noc, providerStaff, scanners } from '../shared/roles.now'
+import { admin, assetManager, attestationEditors, broadStaff, customerRoles, noc, providerStaff, scanners } from '../shared/roles.now'
 
 Acl({
     $id: Now.ID['acl_audit_read'],
@@ -129,7 +129,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_attestation',
     operation: 'write',
-    roles: commercialEditors,
+    roles: attestationEditors,
 })
 
 Acl({
