@@ -14,13 +14,7 @@ import { ROLE } from '../domain/roles.ts'
 import { exists, pluck, str, warnRefused } from './records.ts'
 import { assetManagerIds } from './users.ts'
 
-/**
- * Approval of app tasks through sysapproval_approver records (ADR 0004), one flow for every task that is approved: the
- * approvers are asked and the task waits (`putToApproval`), each decision rolls the approvals up and the outcome is
- * saved (`rollUpApprovals`), and the requests still waiting are then cancelled (`cancelPendingApprovals`). The task
- * carries `stage`, `approval`, `customer` and `approval_customer_admins`, as Orders and Disposal orders do; each kind of
- * task names the value of its own stage list in which it awaits approval (`awaitingStage`).
- */
+/** Approval of app tasks through sysapproval_approver records (ADR 0004). */
 
 /**
  * The Customer admins a task was put to approval with, saved on it then: its approvals are counted by these
@@ -49,7 +43,7 @@ export function providerApproverIds(accountManagerId: string): string[] {
 }
 
 /**
- * Whether the user is active. sys_user is a table of another scope, so its rules run (the platform refuses setWorkflow
+ * sys_user is a table of another scope, so its rules run (the platform refuses setWorkflow
  * from this scope) and the app has none there: the platform's *user query* rule hides inactive users from an
  * interactive user without admin or user_admin, and this query asks for an active one anyway, so a customer admin
  * raising an Order still finds an active account manager.
@@ -59,7 +53,7 @@ function isActiveUser(userId: string): boolean {
 }
 
 export interface ApprovalRequest {
-    /** The groups that must each approve (domain/approvals `rollupApprovals`). */
+    /** The groups that must each approve. */
     required: readonly Approver[]
     /** The Customer admins of the task's Customer, who decide for the customer-admin group (`CUSTOMER_ADMINS_ASKED`). */
     customerAdmins: readonly string[]
@@ -76,7 +70,6 @@ export interface ApprovalRequest {
  */
 export type ApprovalStart = { awaiting: true } | { awaiting: false; step: 'request' | 'save'; reason: string }
 
-/** Ask the approvers `flow` chooses for `request` (domain/approvals `approversToAsk`) and save the task as awaiting them. */
 export function putToApproval(task: GlideRecord, flow: ApprovalFlow, request: ApprovalRequest): ApprovalStart {
     const unasked = requestApprovals(task, flow.standIn, request)
     if (unasked) return { awaiting: false, step: 'request', reason: unasked }

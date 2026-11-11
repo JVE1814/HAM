@@ -7,11 +7,10 @@ export function fire(event: string, record: GlideRecord, parm1 = '', parm2 = '')
 }
 
 /**
- * An event of an event job (platform/chunked `runEventTableJob`) as its script action receives it. Every such event
+ * An event of an event job as its script action receives it. Every such event
  * names the job's subject in parm1 (the sys_id its records are selected by: a Model, a Lease schedule, a Billing
  * period) and carries where its pass got to in parm2: the key of the last record finished ('' on a pass's first
- * event), behind the pass's token where the job's passes replace each other (domain/chunked-job `passParm`).
- * `queueJob` and `queueJobAt` write such an event, `jobEvent` reads it.
+ * event), behind the pass's token where the job's passes replace each other.
  */
 export interface JobEvent {
     name: string
@@ -39,15 +38,13 @@ export function queueJob(name: string, subject: GlideRecord): void {
     fire(name, subject, subject.getUniqueValue(), '')
 }
 
-/** Queue the event of `queued`'s job that carries on from `position`: at once, or after the wait of a `requeue`. */
 export function queueJobAt(queued: JobEvent, position: string, when: 'now' | 'later' = 'now'): void {
     if (when === 'later') requeue(queued.name, queued.record, queued.subject, position)
     else fire(queued.name, queued.record, queued.subject, position)
 }
 
 /**
- * Queue `event` on `record` again, to run a minute from now: a request that could not run under its lock
- * (domain/job-lock `REQUEUE`).
+ * Queue `event` on `record` again, to run a minute from now: a request that could not run under its lock.
  */
 function requeue(event: string, record: GlideRecord, parm1: string, parm2: string): void {
     const when = new GlideDateTime()
@@ -57,7 +54,7 @@ function requeue(event: string, record: GlideRecord, parm1: string, parm2: strin
 
 /**
  * A counted request: an event whose parm2 carries how often it was queued again (none or 0 as first queued), so that
- * one a lock keeps holding off is given up in the end. `timesRequeued` reads the count for the event's script action.
+ * one a lock keeps holding off is given up in the end.
  */
 export function timesRequeued(event: GlideRecord): number {
     return Number(str(event, 'parm2')) || 0
@@ -65,7 +62,7 @@ export function timesRequeued(event: GlideRecord): number {
 
 /**
  * Queue the counted request `event` (with its `parm1`) on `record` again, a minute later, unless it was already queued
- * again `tries` times (domain/job-lock `REQUEUE.times`): false when it is given up instead, for the caller to say so.
+ * again `tries` times: false when it is given up instead, for the caller to say so.
  */
 export function requeueCounted(event: string, record: GlideRecord, parm1: string, tries: number): boolean {
     if (tries >= REQUEUE.times) return false

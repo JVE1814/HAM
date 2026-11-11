@@ -17,7 +17,6 @@ import { attachToSubscription } from './subscriptions.ts'
 
 /** In-service detection: Seen signals in, billing start out (P1.8), and the device events they are kept as. */
 
-/** Record that an Asset was seen at `at` (only moves last_seen forward). */
 function recordSeen(asset: GlideRecord, at: number, source: SeenSource): void {
     const previous = glideToMs(str(asset, 'x_daas_ham_last_seen'))
     if (previous !== undefined && previous >= at) return
@@ -61,9 +60,9 @@ function goLiveIfSeen(lock: HeldLock, asset: GlideRecord, readers: LifecycleRead
  * save refused. Two NMS batches, or a batch and the detection job, can see one Asset at once; each reading it before
  * the other saved, the later save would put back an older last_seen and in-service date, or move an Asset the other had
  * put in service (and since moved on) into service again. Taken before any other lock, by the sightings below only: a
- * go-live starts its Subscription line under the line's lock (platform/subscriptions) and its save's rule takes the
- * Asset's interval lock (platform/service-intervals), and a second take of a lock is refused. A holder keeps it for one
- * event and, on a go-live, the Asset's save and its rules. A lock that cannot be taken throws (platform/locks); that
+ * go-live starts its Subscription line under the line's lock and its save's rule takes the
+ * Asset's interval lock, and a second take of a lock is refused. A holder keeps it for one
+ * event and, on a go-live, the Asset's save and its rules. A lock that cannot be taken throws; that
  * error escapes.
  */
 function underSeenLock(assetId: string, see: (lock: HeldLock, asset: GlideRecord) => boolean): boolean {
@@ -96,9 +95,9 @@ function applyDeviceEvent(assetId: string, event: DeviceEvent, readers: Lifecycl
 }
 
 /**
- * Apply a batch of NMS events, each to the fleet asset its identifier names (platform/asset-identifiers
- * `findAssetByIdentifier`, ADR 0016). The identifiers no fleet asset carries, the Provider IT's included, are `unknown`
- * and stored as no event; those `busy` were not wholly applied (`applyDeviceEvent`), for the NMS to send again.
+ * Apply a batch of NMS events, each to the fleet asset its identifier names (ADR 0016).
+ * The identifiers no fleet asset carries, the Provider IT's included, are `unknown`
+ * and stored as no event; those `busy` were not wholly applied, for the NMS to send again.
  */
 export function applyDeviceEvents(events: readonly DeviceEvent[]): { unknown: string[]; busy: string[] } {
     const readers = lifecycleReaders()
@@ -150,7 +149,6 @@ function lastEventKind(assetId: string): string {
     return gr.next() ? str(gr, 'event') : ''
 }
 
-/** Store the event; false when the platform refuses it (logged as an error). */
 function storeEvent(assetId: string, event: DeviceEvent): boolean {
     const gr = new GlideRecord('x_daas_ham_device_event')
     gr.initialize()
@@ -164,7 +162,6 @@ function storeEvent(assetId: string, event: DeviceEvent): boolean {
     return false
 }
 
-/** Drop the device events stored more than `retentionDays` ago. */
 export function purgeDeviceEventsOlderThan(retentionDays: number): void {
     // What is left (deleteWhere says whether any is) is not checked: tomorrow's purge takes it.
     deleteWhere('x_daas_ham_device_event', `sys_created_on<${daysAgoGlide(retentionDays)}`)

@@ -29,7 +29,7 @@ export type LockRun<T> = { ran: true; value: T } | { ran: false }
 type Work<T> = (lock: HeldLock) => T | TryAgain
 
 /**
- * Run `work` holding the lock `name` (domain/lock-names `LOCK`) and give what it returned, or `ran: false` at once when
+ * Run `work` holding the lock `name` and give what it returned, or `ran: false` at once when
  * another holder has the lock. Throws when the lock cannot be taken for another reason (the insert is refused while no
  * lock row exists); `work`'s own errors escape. Not reentrant: a lock is one row, not a count of takes, so a nested
  * take of `name` (inside `work`, or anywhere in the same transaction while it is held) finds it held and does not run.
@@ -105,7 +105,6 @@ function clearAbandoned(name: string): void {
     log.warn(`Abandoned job lock ${name} not cleared (its delete was refused): every take finds it held until it is removed`)
 }
 
-/** The time a lock taken before it is abandoned (ABANDONED_AFTER_MINUTES ago). */
 function abandonedBefore(): string {
     const cutoff = new GlideDateTime()
     cutoff.addSeconds(-ABANDONED_AFTER_MINUTES * 60)

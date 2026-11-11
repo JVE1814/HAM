@@ -16,7 +16,6 @@ function signIn(roles: string[]): void {
     platform.tables.cmn_location = [{ sys_id: 'site1', company: 'cust1', x_daas_ham_site_contacts: `someone,${userId}` }]
 }
 
-/** One Asset in each stage, with `fields`: the stages of those the page lists. */
 function listedStages(fields: Record<string, string>): Stage[] {
     platform.tables.alm_hardware = ALL_STAGES.map((stage) => ({ sys_id: stage, ...assetIn(stage, fields) }))
     return customerEquipment().map((asset) => asset.stage as Stage)

@@ -108,7 +108,7 @@ type EventJob<T, R = T> = TableSourceFields<T, R> &
 
 /** An event job whose passes replace each other: each event carries its pass's token, and only the current pass writes. */
 type PassJob<T, R> = EventJob<T, R> & {
-    /** The job, whose cursor row (platform/job-cursor) names the current pass. */
+    /** The job, whose cursor row names the current pass. */
     job: string
 }
 
@@ -323,7 +323,6 @@ function fetchBatch<T, R>(spec: TableSource<T, R>, after: string, size: number):
     const ids = visitPage(spec.table, spec.query, after, size, (record) => rows.push(spec.read(record)))
     let items: T[]
     try {
-        // Without `prepare` the rows are the items (T defaults to R).
         items = spec.prepare ? spec.prepare(rows) : (rows as unknown[] as T[])
     } catch (error) {
         // Thrown from here, outside the runner's per-record handling, it would stop the chunk with no cursor saved.

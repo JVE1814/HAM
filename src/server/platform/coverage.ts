@@ -27,7 +27,7 @@ import { addAnyOf, bool, num, refusal, rowError, str, type RowOutcome } from './
  * about is set (`markExpiryWarned`) and cleared (`setCoverage`, when its end date moves) here too.
  */
 
-/** Up to `limit` of `vendor`'s fleet assets whose coverage is stale (domain/coverage `staleCoverageQuery`), longest unchecked first, by normalized serial (a serial can be shared by duplicate records). */
+/** Up to `limit` of `vendor`'s fleet assets whose coverage is stale, longest unchecked first, by normalized serial (a serial can be shared by duplicate records). */
 export function staleAssets(vendor: OemVendor, staleBefore: string, limit: number): Map<string, string[]> {
     const asset = new GlideRecord('alm_hardware')
     asset.addEncodedQuery(staleCoverageQuery(vendor, staleBefore))
@@ -49,9 +49,7 @@ export interface SerialWrite {
 }
 
 /**
- * Write each serial's answer onto its coverage (writeCoverage), pointing its contracts at the last of its Assets, and
- * summarise it onto all of them (refreshAssetCoverage), with one check time; shared by the API sync and the CSV
- * import. Serials match after normalisation. Returns the saves the platform refused: a serial whose coverage is refused
+ * Serials match after normalisation. Returns the saves the platform refused: a serial whose coverage is refused
  * leaves its Assets unsummarised and unchecked, so it is asked again rather than summarised from contracts that were
  * not stored.
  */
@@ -148,14 +146,13 @@ function setCoverage(coverage: GlideRecord, vendor: OemVendor, source: CoverageS
 /**
  * Mark the contract as warned about (platform/coverage-warnings sends the warning once per contract) and save it;
  * false when the platform refuses, so it is counted again at the next run. `setCoverage` clears the mark when the
- * contract's end date moves (domain/coverage `mergeCoverage`), so the new end is warned about too.
+ * contract's end date moves, so the new end is warned about too.
  */
 export function markExpiryWarned(coverage: GlideRecord): boolean {
     coverage.setValue('expiry_notified', true)
     return !!coverage.update()
 }
 
-/** Stamp each Asset checked, with its coverage summarised onto it where it has one (undefined: only stamped). */
 function refreshAssetCoverage(coverageOf: ReadonlyMap<string, AssetCoverage | undefined>, checkedAt: string): string[] {
     const refused: string[] = []
     if (coverageOf.size === 0) return refused

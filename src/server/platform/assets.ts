@@ -39,7 +39,7 @@ export function transitionFacts(asset: ForeignRecord): TransitionFacts {
 
 /**
  * Move an Asset to `to` if the lifecycle allows it (set its fields; the caller saves the record). A move into staging
- * also clears the wipe evidence (domain/lifecycle `voidsWipeEvidence`); a save that sets the stage some other way has
+ * also clears the wipe evidence; a save that sets the stage some other way has
  * it cleared by a before-update rule (entry/assets `clearVoidedWipeEvidence`).
  */
 export function moveAsset(asset: ForeignRecord, to: Stage): TransitionVerdict {
@@ -77,7 +77,7 @@ export function moveRefusal(asset: GlideRecord, to: Stage): string {
 }
 
 /**
- * Move and save (`moveRefusal`); false (and a warning, not a throw) when the lifecycle or the platform refuses, so the
+ * False (and a warning, not a throw) when the lifecycle or the platform refuses, so the
  * caller stops before work that needs the move.
  */
 export function moveAndSave(asset: GlideRecord, to: Stage, context: string): boolean {
@@ -108,7 +108,6 @@ export function newAsset(modelId: string, stage: Stage): GlideRecord {
     return asset
 }
 
-/** Whether the Asset is a fleet asset (ADR 0016). */
 export function isFleetAsset(asset: ForeignRecord): boolean {
     return bool(asset, FLEET_FIELD)
 }

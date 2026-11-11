@@ -23,8 +23,6 @@ import { countBy, num, pluck, str, warnRefused } from './records.ts'
 import { NORM_EXCEPTION_STATUS } from '../domain/vocabulary.ts'
 import { log } from './log.ts'
 
-/** Resolving raw manufacturer/model strings to canonical Models (domain/normalization). */
-
 const ALIAS_TABLE = 'x_daas_ham_manufacturer_alias'
 const RULE_TABLE = 'x_daas_ham_model_match_rule'
 const EXCEPTION_TABLE = 'x_daas_ham_norm_exception'
@@ -58,7 +56,6 @@ export function loadNormalizationData(): NormalizationData {
     return { aliases, rules }
 }
 
-/** A canonical Model with exactly this OEM PID. */
 function modelByPid(pid: string): string {
     if (!pid.trim()) return ''
     const model = new GlideRecord(MODEL_TABLE)
@@ -70,7 +67,6 @@ function modelByPid(pid: string): string {
 
 type Resolution = { modelId: string } | { modelId: ''; reason: string }
 
-/** PID first, then aliases + match rules. */
 export function resolveModel(raw: { manufacturer: string; model: string }, data: NormalizationData): Resolution {
     const byPid = modelByPid(raw.model)
     if (byPid) return { modelId: byPid }
@@ -176,7 +172,7 @@ function repointModel(rawModelId: string, canonicalModelId: string): void {
 
 /**
  * Close the open exceptions the hourly normalization raised for raw models that are not NaaS's to map: unmapped and
- * none of `naasRawModelIds` (domain/normalization `notNaasRawModelsQuery`). Each is resolved with no Model, its reason
+ * none of `naasRawModelIds`. Each is resolved with no Model, its reason
  * `not_naas`. One the platform refuses to close is logged and stays open for the next run.
  */
 function closeNonNaasExceptions(naasRawModelIds: readonly string[]): void {
@@ -242,7 +238,7 @@ function learned(record: GlideRecord, what: string, rawPair: string): boolean {
 export type NormalizationResolution = { learned: false } | { learned: true; unresolved?: string }
 
 /**
- * A normalization exception was given its resolved Model: learn a rule from it (learnFromResolution) and resolve it.
+ * A normalization exception was given its resolved Model: learn a rule from it and resolve it.
  * When no rule was learned the exception stays open, as nothing maps its raw pair yet. One learned whose resolution
  * the platform refuses stays open too (logged): the user sets it resolved by hand, which learns nothing twice, as the
  * rule runs only on a new resolved model.

@@ -15,17 +15,16 @@ import { exists, findById, num, str, warnRefused } from './records.ts'
 
 const FEE = 'x_daas_ham_fee_event'
 
-/** The Agreement field that holds what a Fee event of each type is charged. */
 const AGREEMENT_FEE: Record<FeeType, string> = { lost: 'lost_asset_fee', damaged: 'damage_fee', late_return: 'late_return_fee' }
 
 /**
- * Charge a Fee event of `type` for the Asset on the Return order, once (domain/fees `chargedFeeQuery`): a step
+ * Charge a Fee event of `type` for the Asset on the Return order, once: a step
  * retried after a refused save (an evaluation chosen again, a line declared missing again) does not charge it twice.
  * Two runs may also charge it at the same time (two users saving one line's evaluation, overlapping overdue runs; two
  * scans of one unit already take turns under its receive lock, platform/receiving). A unique index on the fee's
  * identity would also refuse a fee charged after a waived one, so the check and the insert are made under a lock on the
  * fee, re-checking there (as platform/exceptions `openException`). A run that finds the lock held through every try
- * (LOCK.fee) leaves the fee to the holder, which is charging it unless it is billing one charged already. A fee that is
+ * leaves the fee to the holder, which is charging it unless it is billing one charged already. A fee that is
  * refused, that the holder has still not charged when this run gives up, or whose lock cannot be taken is logged, not
  * thrown.
  */

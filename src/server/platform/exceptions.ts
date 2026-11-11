@@ -11,10 +11,8 @@ import { EXCEPTION_STATUS, type ExceptionType } from '../domain/vocabulary.ts'
 
 const TABLE = 'x_daas_ham_recon_exception'
 
-/** What an exception is about: an Asset, or a CI such as a rack. */
 type ExceptionSubject = { assetId: string } | { ciId: string }
 
-/** The subject as the exception's field and its sys_id. */
 function fieldOf(subject: ExceptionSubject): { field: 'asset' | 'ci'; id: string } {
     return 'assetId' in subject ? { field: 'asset', id: subject.assetId } : { field: 'ci', id: subject.ciId }
 }
@@ -24,7 +22,6 @@ interface ExceptionFacts {
     detail: string
 }
 
-/** One exception a check found: its type and what to say of it. */
 interface FoundException {
     type: ExceptionType
     detail: string
@@ -101,7 +98,7 @@ export function resolveExceptions(subject: ExceptionSubject, types: readonly Exc
 }
 
 /**
- * Resolve the open exceptions an encoded query matches (domain/reconciliation builds it), such as those on Assets the
+ * Resolve the open exceptions an encoded query matches, such as those on Assets the
  * reconciliation no longer checks. A blank query would resolve every exception, so it resolves nothing. One the
  * platform refuses to resolve stays open and is logged.
  */

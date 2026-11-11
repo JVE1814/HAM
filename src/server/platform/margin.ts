@@ -53,7 +53,6 @@ export function computeMarginChunk(queued: JobEvent): void {
     }
 }
 
-/** One chunk of a margin pass over the period's Service intervals after the event's cursor; the pass's completion adds field labour and writes Margin. */
 function costServiceIntervals(period: GlideRecord, queued: JobEvent): void {
     const periodId = period.getUniqueValue()
     const bounds = monthBounds(str(period, 'period'))
@@ -110,10 +109,6 @@ function costServiceIntervals(period: GlideRecord, queued: JobEvent): void {
     })
 }
 
-/**
- * Count Service intervals a chunk of the margin pass failed to cost on its Billing period, with the last error (and the
- * work orders and shipments its completion failed to cost).
- */
 function addMarginFailures(periodId: string, failed: number, lastError: string): void {
     const period = findById('x_daas_ham_billing_period', periodId)
     if (!period) return
@@ -138,7 +133,6 @@ function clearRows(table: string, periodId: string, what: string): void {
     if (!deleteWhere(table, `billing_period=${periodId}`)) throw new Error(`old ${what} not all removed`)
 }
 
-/** A Service interval as stored, with its Asset's and its Subscription line's sys_ids. */
 interface IntervalRow {
     customerId: string
     siteId: string
@@ -148,13 +142,11 @@ interface IntervalRow {
     lineId: string
 }
 
-/** The Agreement of a Subscription line, for its currency (a chunk reads each line once); null when the line is gone. */
 function lineAgreementOf(lineId: string): AgreementCurrency | null {
     const line = findById('x_daas_ham_subscription_line', lineId)
     return line && agreementCurrencyOf(line, 'agreement')
 }
 
-/** An Asset's cost fields as stored, with its Lease schedule's sys_id. */
 type AssetFields = Omit<AssetCostFacts, 'lease'> & { leaseId: string }
 
 /**
@@ -177,7 +169,6 @@ function withAssets(intervals: readonly IntervalRow[]): Array<IntervalRow & { as
     return intervals.map((interval) => ({ ...interval, asset: found.get(interval.assetId) ?? null }))
 }
 
-/** A Lease schedule's terms for Margin; null when it is not found. */
 function leaseTermsOf(leaseId: string): LeaseTerms | null {
     const lease = findById('x_daas_ham_lease_schedule', leaseId)
     return lease && {
@@ -191,8 +182,7 @@ function leaseTermsOf(leaseId: string): LeaseTerms | null {
 
 /**
  * Add a batch's totals by costFactKey (as CostLedger.drain hands them over; this uses them up) to
- * the period's Cost facts, reading the ones they add to with one query. A refused save throws (platform/records
- * `throwRefused`), so that the pass stops and records why on the period (ADR 0013) instead of completing with that cost
+ * the period's Cost facts, reading the ones they add to with one query. A refused save throws, so that the pass stops and records why on the period (ADR 0013) instead of completing with that cost
  * left out.
  */
 function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void {
@@ -224,7 +214,6 @@ function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void
     }
 }
 
-/** How many records a step of the pass's completion failed to cost, and the last one's error. */
 interface Failed {
     failed: number
     lastError: string
@@ -270,8 +259,8 @@ function workOrderAgreement(workOrder: GlideRecord): AgreementCurrency | null {
 }
 
 /**
- * Shipments whose label was bought in the month, as Cost facts of their Customer and Site in the carrier's currency
- * (domain/shipping `buyLabel`), never converted. A voided label is refunded, so it is left out; one with a cost but no
+ * Shipments whose label was bought in the month, as Cost facts of their Customer and Site in the carrier's currency,
+ * never converted. A voided label is refunded, so it is left out; one with a cost but no
  * currency or no Customer (a Cost fact needs both) is left out and counted.
  */
 function addShippingCosts(periodId: string, bounds: MonthBounds): Failed {
@@ -299,7 +288,7 @@ function addShippingCosts(periodId: string, bounds: MonthBounds): Failed {
 
 /**
  * The amounts of a table's records matching an encoded query, summed per Customer, Site and currency. The currency is
- * read as Billing period totals read it (domain/money `currencyKey`): a line edited during review to 'eur' is set
+ * read as Billing period totals read it: a line edited during review to 'eur' is set
  * against the 'EUR' costs of its Customer and Site (marginRows merges the rows of one key).
  */
 function sumsBy(table: string, encodedQuery: string): Amount[] {

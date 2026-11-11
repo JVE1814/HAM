@@ -35,13 +35,11 @@ export const JOB_STATUS = {
 export interface JobCursorValues {
     cursor?: string
     status?: string
-    /** The records the run handled. */
     processed?: number
     /** The records of the pass that failed so far, over all its runs. */
     failed?: number
     /** The last error of the pass, '' when no record failed (kept up to the column's length). */
     lastError?: string
-    /** Set the row's last run to now. */
     ranNow?: boolean
 }
 
@@ -105,7 +103,7 @@ function rowOf(record: GlideRecord): JobCursor {
 
 /*
  * Passes that replace each other. A job's row names its current pass by a token (the pass's start time), which every
- * event of the pass carries (domain/chunked-job `passParm`): starting a pass makes any other pass of the job a stale
+ * event of the pass carries: starting a pass makes any other pass of the job a stale
  * one, whose queued chunks find they are no longer current and write nothing.
  */
 
