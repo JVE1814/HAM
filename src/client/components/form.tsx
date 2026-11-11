@@ -1,8 +1,9 @@
 import { createFormHook, createFormHookContexts } from '@tanstack/react-form'
-import type { ComponentProps } from 'react'
+import { useId, type ComponentProps } from 'react'
 import { Button } from '@/components/ui/button'
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
@@ -94,13 +95,35 @@ function SelectField({ label, description, options, placeholder }: FieldProps & 
     )
 }
 
+function RadioField({ label, description, options }: FieldProps & { options: readonly Option[] }) {
+    const { field, errors, invalid } = useFieldState<string>()
+    const id = useId()
+    return (
+        <FieldSet data-invalid={invalid || undefined}>
+            <FieldLegend variant="label">{label}</FieldLegend>
+            {description && <FieldDescription>{description}</FieldDescription>}
+            <RadioGroup name={field.name} value={field.state.value || null} onValueChange={(value) => field.handleChange(String(value ?? ''))} className="flex flex-wrap gap-x-4">
+                {options.map((option) => (
+                    <Field key={option.value} orientation="horizontal" className="w-auto">
+                        <RadioGroupItem id={`${id}-${option.value}`} value={option.value} aria-invalid={invalid || undefined} />
+                        <FieldLabel htmlFor={`${id}-${option.value}`} className="font-normal">
+                            {option.label}
+                        </FieldLabel>
+                    </Field>
+                ))}
+            </RadioGroup>
+            <FieldError errors={errors} />
+        </FieldSet>
+    )
+}
+
 /** The form's submit button: disabled while the form cannot submit, with a spinner while it submits. */
-function SubmitButton({ children, ...button }: Omit<ComponentProps<typeof Button>, 'type'>) {
+function SubmitButton({ children, disabled, ...button }: Omit<ComponentProps<typeof Button>, 'type'>) {
     const form = useFormContext()
     return (
         <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting] as const}>
             {([canSubmit, isSubmitting]) => (
-                <Button type="submit" disabled={!canSubmit || isSubmitting || button.disabled} {...button}>
+                <Button type="submit" disabled={!canSubmit || isSubmitting || disabled} {...button}>
                     {isSubmitting && <Spinner />}
                     {children}
                 </Button>
@@ -112,7 +135,7 @@ function SubmitButton({ children, ...button }: Omit<ComponentProps<typeof Button
 export const { useAppForm } = createFormHook({
     fieldContext,
     formContext,
-    fieldComponents: { TextField, TextareaField, SelectField },
+    fieldComponents: { TextField, TextareaField, SelectField, RadioField },
     formComponents: { SubmitButton },
 })
 
