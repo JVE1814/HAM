@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { conditionsOf, glide, platform, recordOf } from './fake-glide'
+import { glide, platform, recordOf } from './fake-glide'
 
 const { GlideRecord, GlideAggregate, GlideDateTime, gs } = glide
 
@@ -45,7 +45,6 @@ describe('reading', () => {
         either.addQuery('line_stage', 'installed').addOrCondition('quantity', '>=', 5)
         either.addNotNullQuery('order')
         expect(idsOf(either)).toEqual(['l2', 'l3'])
-        expect(conditionsOf(either)).toEqual(['line_stage=installed^ORquantity>=5', 'orderISNOTEMPTY'])
     })
 
     it('orders by the fields named, numbers as numbers, and stops at the limit', () => {

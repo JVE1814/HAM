@@ -373,14 +373,6 @@ class GlideRecord extends Conditions {
     deleteMultiple(): void {
         for (const row of this.matching()) new GlideRecord(this.table).hold(row, false).deleteRecord()
     }
-    updateMultiple(): void {
-        const values = { ...this.row }
-        for (const row of this.matching()) {
-            const each = new GlideRecord(this.table).hold(row, false)
-            for (const [field, value] of Object.entries(values)) each.setValue(field, value)
-            each.update()
-        }
-    }
 }
 
 const AGGREGATES: Record<string, (values: string[]) => string> = {
@@ -493,9 +485,4 @@ export const glide = { GlideRecord, GlideAggregate, GlideDateTime, GlideTableHie
  */
 export function recordOf<Record = unknown>(table: string, row: Row, options: { fresh?: boolean } = {}): Record {
     return new GlideRecord(table).hold(row, options.fresh === true) as Record
-}
-
-/** The conditions added to a query so far, one entry per addQuery or addEncodedQuery call: what a before-query rule added. */
-export function conditionsOf(record: unknown): string[] {
-    return [...(record as unknown as { conditions: string[] }).conditions]
 }
