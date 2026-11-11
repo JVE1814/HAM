@@ -19,21 +19,15 @@ import { intProperty } from './properties.ts'
 import { str } from './records.ts'
 
 /**
- * OEM lifecycle, coverage and RMA-status synchronisation (P2.1, ADR 0008), of NaaS Models and the serials of fleet
- * assets only (ADR 0016): the Provider IT's equipment is never sent to an OEM. Each sync takes the vendors whose
- * route may run in turn (domain/oem/adapters `enabledRoutes`), asks the vendor, and logs what it could not get or save.
+ * OEM synchronisation of NaaS Models and the serials of fleet assets only (ADR 0016): the Provider IT's equipment is
+ * never sent to an OEM.
  */
 
-/** Assets per coverage batch. */
 const COVERAGE_BATCH = 200
 
-/**
- * The most errors of one job and run that are logged: a vendor that is down fails every key the same way. The rest
- * are counted in one more line.
- */
+/** A vendor that is down fails every key the same way. */
 const ERRORS_LOGGED = 20
 
-/** Log a job's errors of one run, each naming its vendor: the first ERRORS_LOGGED, and a line counting the rest. */
 function report(job: string, errors: readonly string[]): void {
     for (const error of errors.slice(0, ERRORS_LOGGED)) log.warn(`${job}: ${error}`)
     const more = errors.length - ERRORS_LOGGED
@@ -44,10 +38,6 @@ function ofVendor(vendor: OemVendor, errors: readonly string[]): string[] {
     return errors.map((error) => `${vendor}: ${error}`)
 }
 
-/**
- * `vendor`'s NaaS Models (those with an OEM PID), by PID as an OEM's answer is matched to them (domain/oem/sync-adapters
- * `pidKey`): the PID to ask for each key, as the first of its Models stores it (trimmed), and the Models with it.
- */
 function naasModelsByPid(vendor: OemVendor): { asked: Map<string, string>; models: Map<string, string[]> } {
     const asked = new Map<string, string>()
     const models = new Map<string, string[]>()
@@ -129,11 +119,6 @@ function syncCoverageHolding(lock: HeldLock): void {
     }
 }
 
-/**
- * One batch of `vendor`'s stale Assets, adding what it could not get or save to the run's `errors`; returns whether
- * the vendor gets another batch this run. A batch reads and writes its serials' stored coverage with one query, and
- * updates its Assets from another.
- */
 function syncCoverageBatch(vendor: OemVendor, route: CoverageRoute, staleBefore: string, errors: string[]): boolean {
     const assets = staleAssets(vendor, staleBefore, route.maxKeysPerRun ?? COVERAGE_BATCH)
     if (assets.size === 0) return false
@@ -153,9 +138,8 @@ function syncCoverageBatch(vendor: OemVendor, route: CoverageRoute, staleBefore:
 }
 
 /**
- * Status of the open OEM RMAs of each vendor with an RMA lookup API (platform/oem-rma `rmasToAskAbout`). Every RMA
- * asked is stamped synced, answered or not, so the whole set rotates; one the platform refuses is logged, as it keeps
- * its place at the front and would take a turn of the others unseen.
+ * Every RMA asked is stamped synced, answered or not, so the whole set rotates; one the platform refuses is logged, as
+ * it keeps its place at the front and would take a turn of the others unseen.
  */
 export function syncRmaStatus(): void {
     const errors: string[] = []

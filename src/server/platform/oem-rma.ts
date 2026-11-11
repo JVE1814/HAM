@@ -8,14 +8,12 @@ import { nowGlide, todayIso } from './clock.ts'
 import { log } from './log.ts'
 import { count, findById, refusal, str, warnRefused } from './records.ts'
 
-/** OEM RMA records (opening the RMA with the vendor is manual, ADR 0008). */
+/** Opening the RMA with the vendor is manual (ADR 0008). */
 
 const RMA = 'x_daas_ham_oem_rma'
 
-/** The vendor an RMA is opened with when the defective Asset's Model names no OEM source. */
 const DEFAULT_RMA_VENDOR: OemVendor = 'cisco'
 
-/** How many days after its RMA is opened the defective unit is due back at the OEM. */
 const SHIP_BACK_DAYS = 10
 
 /** Open an OEM RMA for an advance replacement: its sys_id, or '' (logged) when the platform refuses it. */
@@ -35,7 +33,7 @@ export function openOemRma(input: { defectiveAsset: GlideRecord; orderLineId: st
     return ''
 }
 
-/** The RMAs still open for a defective Asset (domain/oem-rma `RMA_OPEN`), oldest first, with the line each serves. */
+/** The RMAs still open for a defective Asset, oldest first, with the line each serves. */
 export function openRmasFor(defectiveAssetId: string): OpenRma[] {
     const rma = new GlideRecord(RMA)
     rma.addQuery('defective_asset', defectiveAssetId)
@@ -50,7 +48,6 @@ export function openRmasFor(defectiveAssetId: string): OpenRma[] {
             rmaNumber: str(rma, 'rma_number'),
             state: str(rma, 'state') as RmaState,
             lineId: str(rma, 'order_line'),
-            // With no line both stages read '', which is no open line.
             lineOpen: lineStillOpen(line),
         })
     }
@@ -88,12 +85,10 @@ export function markReplacementReceived(rmaId: string, replacementSerial: string
     if (!rma.update()) warnRefused(rma, `RMA ${str(rma, 'rma_number')} not marked replacement received`)
 }
 
-/** OEM advance replacements still expected for an Order line. */
 export function openRmaCount(orderLineId: string): number {
     return count(RMA, `order_line=${orderLineId}^stateIN${RMA_AWAITED.join(',')}`)
 }
 
-/** The Order line waiting for the OEM replacement announced under this RMA number. */
 export function lineAwaitingRma(rmaNumber: string, modelId: string): { lineId: string; rmaId: string } | null {
     if (!rmaNumber) return null
     const rma = new GlideRecord(RMA)
@@ -106,7 +101,6 @@ export function lineAwaitingRma(rmaNumber: string, modelId: string): { lineId: s
 }
 
 
-/** The most RMAs of one vendor a status sync asks about. */
 const RMAS_PER_SYNC = 200
 
 /**

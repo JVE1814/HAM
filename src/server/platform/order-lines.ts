@@ -6,10 +6,8 @@ import { withLockTries, type LockRun } from './locks.ts'
 import { num, refusal, str } from './records.ts'
 
 /**
- * Order lines (x_daas_ham_order_line). Every write of a line is made here: its insert, its stage (cancelled, as
- * sourcing left it, derived from its Assets), its on-order count, and the purchase and transfer orders it lists. Each
- * write says whether the platform took it and logs nothing: the caller holds the locks it needs (ADR 0013, the line's
- * own through `withOrderLineLock`) and answers a refusal.
+ * Each write says whether the platform took it and logs nothing: the caller holds the locks it needs (ADR 0013, the
+ * line's own through `withOrderLineLock`) and answers a refusal.
  */
 
 /**
@@ -37,23 +35,18 @@ export function withOrderLineLocks<T>(lineIds: readonly string[], work: (locks: 
     return holdFrom(0, [])
 }
 
-/** A line to add to an Order. */
 export interface NewLine {
     modelId: string
     quantity: number
-    /** It came from the Order's Site template; otherwise the column's default (false) stands. */
     fromSiteTemplate?: true
-    /** The Asset it replaces like-for-like (break-fix, refresh). */
     replacesAssetId?: string
 }
 
-/** A line the platform refused to save, and why. */
 export interface RefusedLine {
     line: NewLine
     reason: string
 }
 
-/** Add `lines` to `order`, in order; those the platform refused (for the caller to report). */
 export function addOrderLines(order: GlideRecord, lines: readonly NewLine[]): RefusedLine[] {
     const refused: RefusedLine[] = []
     for (const line of lines) {
@@ -69,21 +62,15 @@ export function addOrderLines(order: GlideRecord, lines: readonly NewLine[]): Re
     return refused
 }
 
-/** Save the line at `stage`, cancelled or derived from its Assets (platform/fulfilment); false when the platform refuses. */
 export function saveLineStage(line: GlideRecord, stage: LineStage): boolean {
     line.setValue('line_stage', stage)
     return !!line.update()
 }
 
-/** How a sourcing pass left a line (platform/sourcing `settleHolding`). */
 export interface LineSourcing {
-    /** The transfer orders the pass requested for it, added to those it lists. */
     transfers: readonly string[]
-    /** The purchase order the pass raised for it, added to those it lists. */
     purchaseOrder?: string
-    /** The units on the line, counted again by the pass. */
     allocated: number
-    /** The units the pass bought, added to its on-order count. */
     purchased: number
     summary: string
     stage: LineStage
@@ -109,7 +96,6 @@ export function saveLineSourcing(line: GlideRecord, sourcing: LineSourcing): boo
     return !!line.update()
 }
 
-/** Take one received unit off the line's on-order count; false when the platform refuses the save. */
 export function takeUnitOffOrder(line: GlideRecord): boolean {
     line.setValue('quantity_to_purchase', Math.max(0, num(line, 'quantity_to_purchase') - 1))
     return !!line.update()

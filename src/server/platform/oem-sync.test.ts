@@ -6,11 +6,6 @@ import { withLock } from './locks.ts'
 import { syncCoverage } from './oem-sync.ts'
 import { platform } from '../test-support/fake-glide.ts'
 
-/*
- * The coverage job run against the in-memory stand-in for the platform, job locks included (ADR 0013), with each
- * vendor's coverage route stood in by one that records the serials it is asked about and fails every call.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const asked: Array<{ vendor: OemVendor; serials: string[] }> = []
