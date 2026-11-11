@@ -66,24 +66,14 @@ export function runClaims(): void {
 function runHolding(lock: HeldLock): void {
     const maxCalls = intProperty(PROPERTY.claimMaxCalls)
     releaseStranded()
-    const store = whileHeld(lock, glideClaimStore())
+    const store = glideClaimStore()
     for (const vendor of CLAIM_VENDORS) {
         const claims = OEM_ADAPTERS[vendor].claims
-        if (claims && boolProperty(claims.enabled)) runVendorClaims(vendor, claims.routes, store, restMessagePort, maxCalls, () => lock.held())
-    }
-}
-
-function whileHeld(lock: HeldLock, store: ClaimStore): ClaimStore {
-    let lost = false
-    return {
-        due: (vendor, action, limit) => {
-            if (!lost && !lock.held()) {
-                lost = true
-                log.warn(`OEM claim run stopped: job lock lost while sending, to the run that took it over`)
-            }
-            return lost ? [] : store.due(vendor, action, limit)
-        },
-        settle: store.settle,
+        if (!claims || !boolProperty(claims.enabled)) continue
+        if (runVendorClaims(vendor, claims.routes, store, restMessagePort, maxCalls, () => lock.held()).lockLost) {
+            log.warn(`OEM claim run stopped: job lock lost while sending, to the run that took it over`)
+            return
+        }
     }
 }
 

@@ -4,7 +4,7 @@ import { failureText, isSuccess, type HttpResponse } from '../http.ts'
 import { asArray, field, parseJson, text } from '../json.ts'
 import { fortiCloudError } from './forticloud.ts'
 import { REST_MESSAGE } from '../rest-message-names.ts'
-import type { ClaimAdapter, ClaimOutcome, ClaimRoute, ClaimTarget } from './claims.ts'
+import { LOCK_LOST, type ClaimAdapter, type ClaimOutcome, type ClaimRoute, type ClaimTarget } from './claims.ts'
 
 /**
  * The OEM claim adapters (plan §13 OEM claim adapters, Q70), one per vendor action: each takes a batch of steps, makes
@@ -60,9 +60,11 @@ function unusable(
 /** Meraki Dashboard: POST /organizations/{org}/inventory/claim { serials } (10 calls per 5 minutes). */
 const merakiClaim: ClaimAdapter = (targets, http, maxCalls) => {
     const { usable, outcomes } = unusable(targets, 'serial')
-    const sent = batches(usable, MERAKI_CLAIM_BATCH).slice(0, Math.max(0, maxCalls))
-    for (const batch of sent) {
+    let calls = 0
+    for (const batch of batches(usable, MERAKI_CLAIM_BATCH).slice(0, Math.max(0, maxCalls))) {
         const response = http({ fn: REST_MESSAGE.meraki.fn.claimInventory, params: { org_id: batch[0].account }, body: JSON.stringify({ serials: batch.map((t) => t.serial) }) })
+        if (response === LOCK_LOST) break
+        calls++
         if (!isSuccess(response.status)) {
             outcomes.push(...fail(batch, failureText(response)))
             continue
@@ -82,7 +84,7 @@ const merakiClaim: ClaimAdapter = (targets, http, maxCalls) => {
             outcomes.push({ stepId: t.stepId, ok: done, message: done ? `claimed into Meraki org ${t.account}` : 'not in the claimed serials' })
         }
     }
-    return { outcomes, calls: sent.length }
+    return { outcomes, calls }
 }
 
 /** A Mist claim code without separators, upper case (inventory `magic` values carry no dashes). */
@@ -96,9 +98,11 @@ function claimCodeKey(code: unknown): string {
  */
 const mistClaim: ClaimAdapter = (targets, http, maxCalls) => {
     const { usable, outcomes } = unusable(targets, 'claimCode')
-    const sent = batches(usable, MIST_CLAIM_BATCH).slice(0, Math.max(0, maxCalls))
-    for (const batch of sent) {
+    let calls = 0
+    for (const batch of batches(usable, MIST_CLAIM_BATCH).slice(0, Math.max(0, maxCalls))) {
         const response = http({ fn: REST_MESSAGE.mist.fn.claimInventory, params: { org_id: batch[0].account }, body: JSON.stringify(batch.map((t) => t.claimCode)) })
+        if (response === LOCK_LOST) break
+        calls++
         const json = parseJson(response.body)
         const hasResult = ['added', 'duplicated', 'error'].some((k) => Array.isArray(field(json, k)))
         if (!isSuccess(response.status) && !(response.status === 400 && hasResult)) {
@@ -117,19 +121,21 @@ const mistClaim: ClaimAdapter = (targets, http, maxCalls) => {
             else outcomes.push({ stepId: t.stepId, ok: false, message: reason || 'claim code not accepted' })
         }
     }
-    return { outcomes, calls: sent.length }
+    return { outcomes, calls }
 }
 
 /** HPE GreenLake: POST /devices/v1/devices { network: [{ serialNumber, macAddress }], compute: [], storage: [] } into the Provider's workspace (202), five devices per call. */
 const greenLakeAdd: ClaimAdapter = (targets, http, maxCalls) => {
     const { usable, outcomes } = unusable(targets, 'mac', false)
-    const sent = batches(usable, GREENLAKE_ADD_BATCH).slice(0, Math.max(0, maxCalls))
-    for (const batch of sent) {
+    let calls = 0
+    for (const batch of batches(usable, GREENLAKE_ADD_BATCH).slice(0, Math.max(0, maxCalls))) {
         const body = JSON.stringify({ network: batch.map((t) => ({ serialNumber: t.serial, macAddress: t.mac })), compute: [], storage: [] })
         const response = http({ fn: REST_MESSAGE.greenLake.fn.addDevices, params: {}, body })
+        if (response === LOCK_LOST) break
+        calls++
         outcomes.push(...batch.map((t) => outcome(t, response, 'added to the GreenLake workspace')))
     }
-    return { outcomes, calls: sent.length }
+    return { outcomes, calls }
 }
 
 /**
@@ -142,8 +148,9 @@ const greenLakeSubscribe: ClaimAdapter = (targets, http, maxCalls) => {
     let calls = 0
     for (const t of usable) {
         if (calls + GREENLAKE_SUBSCRIBE_CALLS > maxCalls) break
-        calls++
         const found = http({ fn: REST_MESSAGE.greenLake.fn.findDevice, params: { serial: t.serial } })
+        if (found === LOCK_LOST) break
+        calls++
         const device = isSuccess(found.status) ? asArray(field(parseJson(found.body), 'items'))[0] : undefined
         const deviceId = text(field(device, 'id'))
         if (!deviceId) {
@@ -154,8 +161,9 @@ const greenLakeSubscribe: ClaimAdapter = (targets, http, maxCalls) => {
             outcomes.push({ stepId: t.stepId, ok: true, message: `subscription ${t.account} assigned` })
             continue
         }
-        calls++
         const assigned = http({ fn: REST_MESSAGE.greenLake.fn.assignSubscription, params: { device_id: deviceId }, body: JSON.stringify({ subscription: [{ id: t.account }] }) })
+        if (assigned === LOCK_LOST) break
+        calls++
         outcomes.push(outcome(t, assigned, `subscription ${t.account} assigned`))
     }
     return { outcomes, calls }
@@ -165,27 +173,32 @@ const greenLakeSubscribe: ClaimAdapter = (targets, http, maxCalls) => {
 const fortiRegister: ClaimAdapter = (targets, http, maxCalls) => {
     // Registration goes to the Provider's own FortiCloud account: no per-customer account needed.
     const { usable, outcomes } = unusable(targets, 'serial', false)
-    const sent = chunks(usable, FORTICLOUD_REGISTER_BATCH).slice(0, Math.max(0, maxCalls))
-    for (const batch of sent) {
+    let calls = 0
+    for (const batch of chunks(usable, FORTICLOUD_REGISTER_BATCH).slice(0, Math.max(0, maxCalls))) {
         const body = JSON.stringify({ registrationUnits: batch.map((t) => ({ serialNumber: t.serial, description: 'NaaS staging', isGovernment: false })) })
         const response = http({ fn: REST_MESSAGE.fortiCare.fn.registerProducts, params: {}, body })
+        if (response === LOCK_LOST) break
+        calls++
         const json = parseJson(response.body)
         const error = isSuccess(response.status) ? fortiCloudError(json) : failureText(response)
         if (error === null) outcomes.push(...batch.map((t) => ({ stepId: t.stepId, ok: true, message: 'registered in FortiCloud' })))
         else outcomes.push(...fail(batch, error))
     }
-    return { outcomes, calls: sent.length }
+    return { outcomes, calls }
 }
 
 /** FortiZTP: PUT devices/{serial} provisioned to the customer's FortiManager. */
 const fortiZtp: ClaimAdapter = (targets, http, maxCalls) => {
     const { usable, outcomes } = unusable(targets, 'serial')
-    const sent = usable.slice(0, Math.max(0, maxCalls))
-    for (const t of sent) {
+    let calls = 0
+    for (const t of usable.slice(0, Math.max(0, maxCalls))) {
         const body = JSON.stringify({ deviceType: 'FortiGate', provisionStatus: 'provisioned', provisionTarget: 'FortiManager', fortiManagerOid: t.account })
-        outcomes.push(outcome(t, http({ fn: REST_MESSAGE.fortiZtp.fn.provisionDevice, params: { serial: t.serial }, body }), `provisioned to FortiManager ${t.account}`))
+        const response = http({ fn: REST_MESSAGE.fortiZtp.fn.provisionDevice, params: { serial: t.serial }, body })
+        if (response === LOCK_LOST) break
+        calls++
+        outcomes.push(outcome(t, response, `provisioned to FortiManager ${t.account}`))
     }
-    return { outcomes, calls: sent.length }
+    return { outcomes, calls }
 }
 
 /** A Zero Touch cloud account "<User Center account id>/<template id>" as numbers; undefined when it is not. */
@@ -210,6 +223,7 @@ const checkPointZeroTouch: ClaimAdapter = (targets, http, maxCalls) => {
     const reachable = claims.slice(0, Math.max(0, maxCalls - ZERO_TOUCH_SESSION_CALLS))
     if (reachable.length === 0) return { outcomes, calls: 0 }
     const login = http({ fn: REST_MESSAGE.checkPoint.fn.login, params: {} })
+    if (login === LOCK_LOST) return { outcomes, calls: 0 }
     const sid = isSuccess(login.status) ? text(field(parseJson(login.body), 'sid')) : ''
     if (!sid) {
         const reason = isSuccess(login.status) ? 'no session id returned' : failureText(login)
@@ -217,12 +231,16 @@ const checkPointZeroTouch: ClaimAdapter = (targets, http, maxCalls) => {
         return { outcomes, calls: 1 }
     }
     const headers = { 'X-chkp-sid': sid }
+    let calls = 1
     for (const { target, accountId, templateId } of reachable) {
         const body = JSON.stringify({ 'object-name': target.serial, 'account-id': accountId, 'template-id': templateId, mac: target.mac })
-        outcomes.push(outcome(target, http({ fn: REST_MESSAGE.checkPoint.fn.claimGateway, params: {}, headers, body }), `claimed with Zero Touch template ${templateId}`))
+        const response = http({ fn: REST_MESSAGE.checkPoint.fn.claimGateway, params: {}, headers, body })
+        if (response === LOCK_LOST) break
+        calls++
+        outcomes.push(outcome(target, response, `claimed with Zero Touch template ${templateId}`))
     }
-    http({ fn: REST_MESSAGE.checkPoint.fn.logout, params: {}, headers })
-    return { outcomes, calls: reachable.length + ZERO_TOUCH_SESSION_CALLS }
+    if (http({ fn: REST_MESSAGE.checkPoint.fn.logout, params: {}, headers }) !== LOCK_LOST) calls++
+    return { outcomes, calls }
 }
 
 export const MERAKI_CLAIM: ClaimRoute = { message: REST_MESSAGE.meraki.name, run: merakiClaim, perCall: MERAKI_CLAIM_BATCH }

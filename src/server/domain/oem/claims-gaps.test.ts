@@ -166,7 +166,7 @@ describe('a vendor run whose calls fail', () => {
 
     it('settles the failed steps with the reason and spends the calls it made', () => {
         const { claimStore, settled } = store({ oem_claim: [target('A'), target('B')] })
-        const calls = runVendorClaims('meraki', claimRoutes('meraki'), claimStore, () => fake([timedOut]).http, 10)
+        const calls = runVendorClaims('meraki', claimRoutes('meraki'), claimStore, () => fake([timedOut]).http, 10, () => true).calls
         expect(calls).toBe(1)
         expect(settled).toEqual([failedAll(['A', 'B'], 'no response: Read timed out')])
     })
@@ -174,7 +174,7 @@ describe('a vendor run whose calls fail', () => {
     it('still runs the later actions of the budget after a failed one', () => {
         const { claimStore, settled } = store({ oem_claim: [target('A', { account: '' })], oem_ztp: [target('Z', { account: 'FMG-1' })] })
         const transport = (message: string) => fake([message === 'NaaS FortiCare' ? unavailable : { status: 200, body: '{}' }]).http
-        expect(runVendorClaims('fortinet', claimRoutes('fortinet'), claimStore, transport, 10)).toBe(2)
+        expect(runVendorClaims('fortinet', claimRoutes('fortinet'), claimStore, transport, 10, () => true).calls).toBe(2)
         expect(settled).toEqual([failedAll(['A'], 'HTTP 503'), [{ stepId: 'Z', ok: true, message: 'provisioned to FortiManager FMG-1' }]])
     })
 })
