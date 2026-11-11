@@ -41,6 +41,11 @@ const queued = () => platform.events.map(({ name, record, parm1 }) => ({ name, r
 
 const MODEL = 'model1'
 
+/** The after rule on the table (entry/models `onModelLifecycleChanged`), which platform code may not import (ADR 0003). */
+function lifecycleRule(row: Row): void {
+    if (!writingModelLifecycle(row.model ?? '')) queueModelRefresh(row.model ?? '')
+}
+
 function stored(row: Row): void {
     const sysId = `row${rows().length + 1}`
     rows().push({
@@ -86,12 +91,14 @@ describe('writeModelLifecycle', () => {
         expect(readModelLifecycle(MODEL)).toEqual({ endOfSale: '2028-10-31', endOfSupport: '2033-10-31' })
     })
 
-    it('queues the recomputation once for all the milestones it saves, and marks the Model while it saves them', () => {
-        const marked: boolean[] = []
-        platform.onSave = () => marked.push(writingModelLifecycle(MODEL))
+    it('queues the recomputation once for all the milestones it saves, though the rule on the table runs on each save', () => {
+        platform.onSave = (_table, row) => lifecycleRule(row)
         writeModelLifecycle(MODEL, { endOfSale: '2028-10-31', endOfSupport: '2033-10-31', endOfLife: '2035-10-31' }, { source: 'csv' })
-        expect(marked).toEqual([true, true, true])
-        expect(writingModelLifecycle(MODEL)).toBe(false)
+        expect(queued()).toEqual([{ name: EVENT.lifecycleChanged, row: MODEL, parm1: MODEL }])
+
+        platform.events = []
+        stored({ lifecycle_phase: 'end_of_life', start_date: '2036-01-31', source: 'service_now' })
+        lifecycleRule(rows().at(-1)!)
         expect(queued()).toEqual([{ name: EVENT.lifecycleChanged, row: MODEL, parm1: MODEL }])
     })
 
