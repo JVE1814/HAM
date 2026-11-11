@@ -50,6 +50,8 @@ import { oemContext } from './platform/oem-http'
 import { PROPERTY, type PropertyOf } from './platform/properties'
 import type { ForeignRecord } from './platform/records'
 import { restMessagePort } from './platform/rest-messages'
+import { AUDIENCE, CATEGORIES } from '../client/workspace/catalog'
+import { DASHBOARD } from '../client/workspace/dashboard'
 
 // The registries the metadata imports from platform modules are plain constants; Glide itself is not needed to read
 // them. A property reads as its declared value.
@@ -390,17 +392,10 @@ interface SharedQuery {
     query: string | undefined
 }
 
+const WORKSPACE_LISTS = CATEGORIES.flatMap((category) => category.lists)
+
 function dashboardSources(): SharedQuery[] {
-    return records('par_dashboard_widget').flatMap((widget) => {
-        const props = JSON.parse(widget.component_props || '{}') as {
-            dataSources?: Array<{ id?: string; tableOrViewName?: string; filterQuery?: string }>
-        }
-        return (props.dataSources ?? []).map((source) => ({
-            what: `dashboard source ${source.id}`,
-            table: source.tableOrViewName ?? '',
-            query: source.filterQuery,
-        }))
-    })
+    return DASHBOARD.flatMap((tab) => tab.widgets.map((widget) => ({ what: `dashboard widget ${widget.id}`, table: widget.source.table, query: widget.source.filter })))
 }
 
 /**
@@ -461,7 +456,7 @@ describe('what the metadata reads of the tables shared with the Provider IT', ()
     it('lists fleet assets, NaaS Models and NaaS stockrooms only, in the navigator and the workspace', () => {
         // A module's `name` is the table it opens: one on a shared table with no filter would open it whole.
         const modules = records('sys_app_module').map((module) => ({ what: `module ${module.title}`, table: module.name ?? '', query: module.filter }))
-        const lists = records('sys_ux_list').map((list) => ({ what: `workspace list ${list.title}`, table: list.table ?? '', query: list.condition }))
+        const lists = WORKSPACE_LISTS.map((list) => ({ what: `workspace list ${list.id}`, table: list.table, query: list.filter }))
         expect(onShared(modules).length).toBeGreaterThanOrEqual(4)
         expect(onShared(lists).length).toBeGreaterThanOrEqual(10)
         expect(outside([...modules, ...lists])).toEqual([])
@@ -586,9 +581,7 @@ describe('fields the forms, lists and record producers name', () => {
             return type ? [] : [{ where: `form ${table}`, table, field: element }]
         })
         const onLists = elementsOf('sys_ui_list_', 'sys_ui_list_element').map(({ table, element }) => ({ where: `list ${table}`, table, field: element }))
-        const onWorkspaceLists = records('sys_ux_list').flatMap((list) =>
-            (list.columns ?? '').split(',').map((field) => ({ where: `workspace list ${list.title}`, table: list.table ?? '', field })),
-        )
+        const onWorkspaceLists = WORKSPACE_LISTS.flatMap((list) => list.columns.map((field) => ({ where: `workspace list ${list.id}`, table: list.table, field })))
         // A record producer's variable writes the column it maps to.
         const mappedByVariables = records('item_option_new')
             .filter((variable) => variable.map_to_field === 'true')
@@ -649,22 +642,6 @@ describe('UI action conditions that restate a rule of the server code', () => {
             })
         }
         expect(statuses.filter((status) => holds(condition, { direction: '', status }))).toEqual([])
-    })
-})
-
-/*
- * The platform serves a custom scoped app's workspace under x/<vendor>/<path> and names its route ACLs
- * x.<vendor>.<path>.<route>, the vendor being the second part of the scope (x_daas_ham: daas). The SDK's workspace
- * guide says now/<path>: a now/ link is "Page not found", and a now. route ACL guards nothing.
- */
-describe('NaaS Asset Workspace URL', () => {
-    const scope = (JSON.parse(readFileSync(join(ROOT, 'now.config.json'), 'utf8')) as { scope: string }).scope
-    const vendor = /^x_([a-z0-9]+)_/.exec(scope)?.[1]
-    const path = () => records('sys_ux_page_registry').find((registry) => registry.title === 'NaaS Asset Workspace')?.path
-
-    it("names the route ACL after the workspace's routes", () => {
-        expect(path()).toBeTruthy()
-        expect(records('sys_security_acl').map((acl) => acl.name)).toContain(`x.${vendor}.${path()}.*`)
     })
 })
 
@@ -1014,46 +991,28 @@ describe('the rules and ACLs that scope what a reader sees', () => {
     })
 })
 
-/*
- * A role group is one list of names (shared/roles.now.ts). A workspace audience stores role ids, so it is built from
- * the same roles as records: each audience must name the roles of its group.
- */
-describe('workspace audiences', () => {
-    const roleNames = () => new Map(records('sys_user_role').map((role) => [role.sys_id ?? '', role.name ?? '']))
-    const audience = (name: string) =>
-        (records('sys_ux_applicability').find((found) => found.name === name)?.roles ?? '').split(',').map((id) => roleNames().get(id) ?? id)
-    const grantedOn = (table: string, operation: string) =>
-        recordAcls()
-            .filter((acl) => acl.table === table && acl.operation === operation && !acl.deny)
-            .flatMap((acl) => acl.roles)
-
-    it('are the role groups the navigator and the ACLs name', () => {
-        const workspaceModule = records('sys_app_module').find((module) => module.title === 'NaaS Asset Workspace')
-        expect(audience('NaaS provider staff')).toEqual(workspaceModule?.roles?.split(','))
-        expect(audience('NaaS provider staff')).toEqual(PROVIDER_STAFF_IN_ORDER)
-        expect(audience('NaaS provider staff except inventory techs')).toEqual(BROAD_STAFF)
-        expect(audience('NaaS billing and margin readers').sort()).toEqual(grantedOn('x_daas_ham_margin', 'read').sort())
-    })
-})
-
-describe('the NaaS dashboard', () => {
+describe('the NaaS Asset Workspace', () => {
+    const PAGE = 'x_daas_ham_workspace'
     const readsOf = (table: string) => recordAcls().filter((acl) => acl.records === table && acl.operation === 'read' && !acl.deny)
+    const workspaceModule = () => records('sys_app_module').find((module) => module.title === 'NaaS Asset Workspace')
 
-    it("is read by the workspace's roles, so the NOC and the techs keep its Operations, Billing and Lifecycle tabs", () => {
-        const path = records('sys_ux_page_registry').find((registry) => registry.title === 'NaaS Asset Workspace')?.path
-        const route = records('sys_security_acl').filter((acl) => (acl.name ?? '').endsWith(`.${path}.*`))
-        const permissions = records('par_dashboard_permission')
+    it('is a page provider staff read, which the navigator module opens for them', () => {
+        expect(records('sys_ui_page').map((page) => page.endpoint)).toContain(`${PAGE}.do`)
+        const page = records('sys_security_acl').filter((acl) => acl.type === 'ui_page' && acl.name === PAGE)
         expect(PROVIDER_STAFF).toHaveLength(6)
-        expect(route.map((acl) => [...(aclRoles().get(acl.sys_id ?? '') ?? [])].sort())).toEqual([PROVIDER_STAFF])
-        expect(permissions.map((permission) => permission['role.name']).sort()).toEqual(PROVIDER_STAFF)
-        for (const permission of permissions) {
-            expect([permission.can_read, permission.can_write, permission.can_share, permission.owner], permission['role.name']).toEqual([
-                'true',
-                'false',
-                'false',
-                'false',
-            ])
-        }
+        expect(page.map((acl) => [...(aclRoles().get(acl.sys_id ?? '') ?? [])].sort())).toEqual([PROVIDER_STAFF])
+        expect([workspaceModule()?.link_type, workspaceModule()?.query]).toEqual(['DIRECT', `${PAGE}.do`])
+    })
+
+    it('offers its lists and tabs to the role groups the navigator and the ACLs name', () => {
+        expect(AUDIENCE.staff).toEqual(workspaceModule()?.roles?.split(','))
+        expect(AUDIENCE.staff).toEqual(PROVIDER_STAFF_IN_ORDER)
+        expect(AUDIENCE.broadStaff).toEqual(BROAD_STAFF)
+        expect([...AUDIENCE.money].sort()).toEqual(readsOf('x_daas_ham_margin').flatMap((acl) => acl.roles).sort())
+    })
+
+    it('offers the Operations, Billing and Lifecycle tabs to every provider-staff role, so the NOC and the techs keep them', () => {
+        expect(DASHBOARD.filter((tab) => tab.id !== 'margin').map((tab) => tab.audience)).toEqual(['staff', 'staff', 'staff'])
     })
 
     it("leaves each widget's data to its table's read ACL: the Margin tab's to the money readers", () => {
@@ -1062,6 +1021,21 @@ describe('the NaaS dashboard', () => {
         for (const table of tables) expect(readsOf(table).length, table).toBeGreaterThan(0)
         for (const table of ['x_daas_ham_margin', 'x_daas_ham_cost_fact']) {
             expect(readsOf(table).map((acl) => [...acl.roles].sort()), table).toEqual([MONEY_READERS])
+        }
+    })
+
+    it('offers a list or a tab on a money table to the money readers only', () => {
+        const readTables = [...new Set(recordAcls().map((acl) => acl.records))]
+        const moneyTables = readTables.filter((table) => {
+            const reads = readsOf(table)
+            return reads.length > 0 && reads.every((acl) => [...acl.roles].sort().join() === MONEY_READERS.join())
+        })
+        expect(moneyTables).toEqual(expect.arrayContaining(['x_daas_ham_margin', 'x_daas_ham_cost_fact', 'x_daas_ham_billing_period']))
+        const lists = WORKSPACE_LISTS.filter((list) => moneyTables.includes(list.table))
+        expect(lists.length).toBeGreaterThanOrEqual(4)
+        for (const list of lists) expect(list.audience, list.id).toBe('money')
+        for (const tab of DASHBOARD.filter((found) => found.widgets.some((widget) => moneyTables.includes(widget.source.table)))) {
+            expect(tab.audience, tab.id).toBe('money')
         }
     })
 })

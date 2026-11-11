@@ -114,7 +114,7 @@ export const returnWorkers = [ROLE.assetManager, ROLE.inventoryTech, ROLE.noc]
 /** Who writes Lease schedules and their decisions. */
 export const leaseEditors = [ROLE.assetManager, ROLE.finance]
 
-/** Roles that read the money tables (service intervals, billing, cost facts and margin), the NaaS dashboard's Margin tab among them. */
+/** Roles that read the money tables (service intervals, billing, cost facts and margin), the workspace dashboard's Margin tab among them. */
 export const moneyReaders = MONEY_READERS
 
 /** Every person the app serves, provider staff and Customer contacts: the rack elevations are open to them all. */
@@ -128,11 +128,3 @@ export const staffAndCustomers = [
     ROLE.customerAdmin,
     ROLE.siteContact,
 ]
-
-/*
- * Three of the groups again as role records, for the workspace's audiences: an Applicability stores role ids, which a
- * name does not give it. built-metadata.test.ts holds each audience to its group of names.
- */
-export const providerStaffRecords = [assetManager, inventoryTech, fieldTech, noc, accountManager, finance]
-export const broadStaffRecords = [assetManager, fieldTech, noc, accountManager, finance]
-export const moneyReaderRecords = [finance, accountManager, assetManager]
