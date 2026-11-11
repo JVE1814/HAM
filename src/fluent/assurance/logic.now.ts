@@ -1,9 +1,10 @@
 import '@servicenow/sdk/global'
-import { ScheduledScript, UiAction } from '@servicenow/sdk/core'
+import { Property, ScheduledScript, UiAction } from '@servicenow/sdk/core'
 import { reconcileInstalledBaseAndRacks, uiCloseAudit, uiStartSiteAudit, uiStartStockroomAudit } from '../../server/entry/assurance'
 import { raiseDueAttestations } from '../../server/platform/attestations'
 import { CURRENT_IS_NAAS_STOCKROOM, SITE_FIELD } from '../../server/domain/fleet'
-import { assetManager, fieldTech, scanners, stockroomWorkers } from '../shared/roles.now'
+import { PROPERTY } from '../../server/domain/properties'
+import { admin, assetManager, fieldTech, scanners, stockroomWorkers } from '../shared/roles.now'
 
 /* Audits, attestations and reconciliation (P2.7): actions and jobs. */
 
@@ -54,6 +55,15 @@ ScheduledScript({
     executionTime: { hours: 2, minutes: 5, seconds: 0 },
     timeZone: 'UTC',
     script: reconcileInstalledBaseAndRacks,
+})
+
+Property({
+    $id: Now.ID['prop_unseen_days'],
+    name: PROPERTY.unseenDays.name,
+    type: 'integer',
+    value: PROPERTY.unseenDays.default,
+    description: 'Days without a Seen signal before a deployed asset is reported as unseen.',
+    roles: { read: [admin], write: [admin] },
 })
 
 ScheduledScript({
