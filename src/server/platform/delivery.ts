@@ -10,7 +10,6 @@ import {
 import type { HeldLock } from '../domain/job-lock.ts'
 import { isDeployed, stagesQuery } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { collectionMethod, swapReturnTrigger } from '../domain/returns.ts'
 import type { InstallMode, OrderStage, OrderType } from '../domain/vocabulary.ts'
 import { moveAndSave, moveAsset, readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
@@ -18,8 +17,8 @@ import { nowGlide } from './clock.ts'
 import { openFieldWork, type WorkContext } from './field-work.ts'
 import { lineAssetStages, recomputeOrder } from './fulfilment.ts'
 import { withLock } from './locks.ts'
-import { choice, findById, num, refusal, str, type ForeignRecord } from './records.ts'
-import { raiseReturn } from './returns.ts'
+import { findById, num, refusal, str, type ForeignRecord } from './records.ts'
+import { returnSwappedAssets } from './returns.ts'
 import { labelOrder, orderLabelBought, shippingEnabled } from './shipping.ts'
 
 /**
@@ -227,7 +226,9 @@ export function completeInstallOfWork(current: ForeignRecord): void {
 /**
  * The Assets an Order replaced (break-fix, refresh) come out of service and go back on a Return order, each once its
  * own line's replacement is installed: retired beside a replacement still shipped, the Site would lose the device.
- * The line's units are read past the user's before-query rules, as when its stage is derived (ADR 0005).
+ * The line's units are read past the user's before-query rules, as when its stage is derived (ADR 0005). When the
+ * platform refuses the Return (logged) the units stay in service and billed, and completing the install again raises
+ * it, as they are not yet pending return.
  */
 function retireReplacedAssets(order: GlideRecord): void {
     const line = new GlideRecord('x_daas_ham_order_line')
@@ -243,27 +244,5 @@ function retireReplacedAssets(order: GlideRecord): void {
         // Already pending return: an earlier completion (UI action, then work order close) raised it.
         if (asset && isDeployed(stage) && stage !== 'pending_return') replaced.push(asset.getUniqueValue())
     }
-    returnReplacedAssets(order, replaced)
-}
-
-/**
- * The Assets an install replaced (refresh swap-back, defective unit) go back on a Return, which opens no de-install
- * work: the swap work order already collects the old unit (domain/returns `opensDeinstallWork`). When the platform
- * refuses it (platform/returns `raiseReturn` logs why) the units stay in service and billed, and completing the install
- * again raises it, as they are not yet pending return.
- */
-function returnReplacedAssets(order: GlideRecord, assetIds: readonly string[]): void {
-    if (assetIds.length === 0) return
-    const orderType = choice<OrderType>(order, 'order_type')
-    const refresh = orderType === 'refresh'
-    raiseReturn({
-        trigger: swapReturnTrigger(orderType),
-        customerId: str(order, 'customer'),
-        siteId: str(order, 'site'),
-        agreementId: str(order, 'agreement'),
-        method: collectionMethod(str(order, 'install_mode') as InstallMode),
-        assetIds,
-        sourceOrderId: order.getUniqueValue(),
-        description: `${refresh ? 'Refresh swap-back' : 'Defective unit'} from ${str(order, 'number')}`,
-    })
+    if (replaced.length > 0) returnSwappedAssets(order, replaced)
 }

@@ -5,6 +5,7 @@ import { checkTransition, isDeployed, type Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import {
     AWAITED,
+    collectionMethod,
     evaluationTarget,
     isSiteRecovery,
     KEEPS_RETURN_OPEN,
@@ -15,13 +16,16 @@ import {
     returnDueDate,
     returnRequestFindings,
     SETTLED_BY_RECEIPT,
+    swapReturnTrigger,
     type RequestedReturn,
     type ReturnRequester,
 } from '../domain/returns.ts'
 import {
     type EvaluationOutcome,
+    type InstallMode,
     type LeaseEndAction,
     type LegalOwner,
+    type OrderType,
     RETURN_LINE_STATUS,
     RETURN_TRIGGER,
     type ReturnCondition,
@@ -45,7 +49,7 @@ import { intProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { bool, choice, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { creatorOf } from './session.ts'
-import { releaseToProviderStock } from './stock.ts'
+import { moveAlongPath } from './stock.ts'
 import { endSitePackageIfEmpty } from './subscriptions.ts'
 import { SITE_FIELD } from '../domain/fleet.ts'
 import { log } from './log.ts'
@@ -96,6 +100,25 @@ export function raiseReturn(request: ReturnRequest): RaisedReturn | null {
         return null
     }
     return fillReturn(order, request)
+}
+
+/**
+ * Bring back the Assets an install of `order` replaced (refresh swap-back, defective unit) on a Return that opens no
+ * de-install work: the swap work order already collects the old unit (domain/returns `opensDeinstallWork`). Null when
+ * the platform refuses it (`raiseReturn`).
+ */
+export function returnSwappedAssets(order: GlideRecord, assetIds: readonly string[]): RaisedReturn | null {
+    const orderType = choice<OrderType>(order, 'order_type')
+    return raiseReturn({
+        trigger: swapReturnTrigger(orderType),
+        customerId: str(order, 'customer'),
+        siteId: str(order, 'site'),
+        agreementId: str(order, 'agreement'),
+        method: collectionMethod(str(order, 'install_mode') as InstallMode),
+        assetIds,
+        sourceOrderId: order.getUniqueValue(),
+        description: `${orderType === 'refresh' ? 'Refresh swap-back' : 'Defective unit'} from ${str(order, 'number')}`,
+    })
 }
 
 /**
@@ -431,9 +454,8 @@ export function evaluateReturnLine(line: GlideRecord): Evaluation {
     })
     // Charged before refurbishing hands the unit back to the Provider; choosing the evaluation again charges it once.
     if (choice<ReturnCondition>(line, 'condition') === 'damaged') recordFee('damaged', asset, str(line, 'return_order'))
-    if (target === 'available') releaseToProviderStock(asset)
-    const refused = moveRefusal(asset, target)
-    if (refused) return notEvaluated(`The asset was not moved to ${target}: ${refused}`)
+    const stopped = moveAlongPath(asset, target)
+    if (stopped) return notEvaluated(`The asset was not moved to ${target}: ${stopped.why}`)
     line.setValue('status', RETURN_LINE_STATUS.evaluated)
     if (!line.update()) {
         return notEvaluated(`The asset went to ${target}, but its return line was not marked evaluated: ${refusal(line)}`)

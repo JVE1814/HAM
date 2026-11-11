@@ -1,7 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { messageOf } from '../domain/errors.ts'
 import { LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
-import type { Stage } from '../domain/lifecycle.ts'
+import { pathTo, type Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { candidateLimit, stockQueries, type SourcingScope } from '../domain/sourcing.ts'
 import {
@@ -84,33 +84,51 @@ export function moveToSparePool(assetId: string, customerId: string, agreementId
 
 /**
  * Take `asset` off its Order line and save it where `exit` sends it. False when the platform refuses the move or the
- * save (logged with `context`): the Asset stays on the line.
+ * save (logged with `context`): the Asset stays on the line. Every unit that leaves a line leaves it here, one that
+ * stays its Customer's (a hot spare, a unit that failed staging or left in transit) as much as one given back.
  */
 export function leaveOrderLine(asset: GlideRecord, exit: LineExit, context: string): boolean {
     if (exit.keeps === 'provider') releaseToProviderStock(asset)
-    else takeOffOrderLine(asset)
+    else asset.setValue('x_daas_ham_order_line', '')
     if (exit.to) return moveAndSave(asset, exit.to, context)
     if (asset.update()) return true
     warnRefused(asset, context)
     return false
 }
 
+/** Where `moveAlongPath` stopped short: the move it did not make, and why. */
+export interface StoppedShort {
+    to: Stage
+    why: string
+}
+
 /**
- * Take a unit off its Order line and no more (the caller saves): one that stays its Customer's (a hot spare, a unit
- * that failed staging or left in transit). Every unit that leaves a line is taken off it here, by
- * `releaseToProviderStock` or by `leaveOrderLine`.
+ * Move the Asset to `to` through the stages between (domain/lifecycle `pathTo`), saving each move with `save`: why it
+ * was not saved, '' once it was. On its way to available it is given back to Provider stock (`releaseToProviderStock`),
+ * as a unit that is free stock again always is. Null once at `to`, else where it stopped and why, not logged: the
+ * caller puts the reason where it belongs. The moves made before that stay saved.
  */
-export function takeOffOrderLine(asset: GlideRecord): void {
-    asset.setValue('x_daas_ham_order_line', '')
+export function moveAlongPath(
+    asset: GlideRecord,
+    to: Stage,
+    save: (to: Stage) => string = (step) => (asset.update() ? '' : refusal(asset, `the asset could not be saved as ${step}`)),
+): StoppedShort | null {
+    for (const step of pathTo(readStage(asset), to)) {
+        if (step === 'available') releaseToProviderStock(asset)
+        const verdict = moveAsset(asset, step)
+        if (!verdict.allowed) return { to: step, why: verdict.reason }
+        const why = save(step)
+        if (why) return { to: step, why }
+    }
+    return null
 }
 
 /**
  * Give a unit back to Provider stock, the inverse of a reservation (domain/stock `reservationValues`): it is the Provider's own again
- * (its company, ADR 0006), under no Agreement and on no Order line. Sets the fields only: the caller moves the Asset to
- * the stage it goes back to and saves it, each with its own answer to a refusal.
+ * (its company, ADR 0006), under no Agreement and on no Order line. Sets the fields only: its caller moves and saves it.
  */
-export function releaseToProviderStock(asset: GlideRecord): void {
-    takeOffOrderLine(asset)
+function releaseToProviderStock(asset: GlideRecord): void {
+    asset.setValue('x_daas_ham_order_line', '')
     asset.setValue('company', stringProperty(PROPERTY.providerCompany))
     asset.setValue('x_daas_ham_agreement', '')
 }

@@ -151,6 +151,34 @@ export function checkTransition(from: Stage | null, to: Stage, facts: Transition
 }
 
 /**
+ * The moves, one save each, by which an Asset gets from `from` to `to` in the fewest the matrix allows: the lifecycle
+ * rule checks every save as one move, so a unit going further walks the stages between (a Spare pool unit to pending
+ * wipe through available, a pending-wipe one to a retired stage through pending disposal). It passes only through
+ * stages In stock, where a move books the unit and nothing happens to it: an installed unit is never returned on the
+ * way. Empty when it is there already. With no path there it is `to` alone, so the move is refused with
+ * `checkTransition`'s reason.
+ */
+export function pathTo(from: Stage | null, to: Stage): readonly Stage[] {
+    if (from === to) return []
+    if (from === null) return [to]
+    const seen = new Set<Stage>([from])
+    let paths: Stage[][] = [[]]
+    while (paths.length > 0) {
+        const longer: Stage[][] = []
+        for (const path of paths) {
+            for (const next of ALLOWED_MOVES[path.length > 0 ? path[path.length - 1] : from]) {
+                if (next === to) return [...path, to]
+                if (seen.has(next) || STAGE_FIELDS[next].installStatus !== INSTALL_STATUS.inStock) continue
+                seen.add(next)
+                longer.push([...path, next])
+            }
+        }
+        paths = longer
+    }
+    return [to]
+}
+
+/**
  * Why a save that sets an Asset's stage by hand (from `from` to `to`, null for a combination the app does not model)
  * breaks the lifecycle, or null when it follows it: a save into or out of a combination the app does not model is
  * refused.

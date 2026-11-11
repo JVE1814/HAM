@@ -108,8 +108,8 @@ export function createOrder(header: NewOrder, lines: readonly NewLine[]): OrderC
  */
 export type Submission = { submitted: true; already?: string } | { submitted: false; message: string; queued?: true }
 
-function notSubmitted(message: string): Submission {
-    return { submitted: false, message }
+function notSubmitted(why: string): Submission {
+    return { submitted: false, message: `Order not submitted: ${why}` }
 }
 
 /**
@@ -128,7 +128,7 @@ export function submitProducedOrder(order: GlideRecord, devices: readonly NewLin
     if (mayNot) {
         const kept = removeOrder(order)
         if (kept) warnRefused(order, `${number} not removed (${mayNot}), cancel it`)
-        return notSubmitted(`Order not raised. ${mayNot}.`)
+        return { submitted: false, message: `Order not raised. ${mayNot}.` }
     }
     const fromTemplate = parties.siteTemplate && siteTemplateOffered(parties) ? siteTemplateLines(parties.siteTemplate.id) : []
     const refused = addOrderLines(order, [...fromTemplate, ...devices])
@@ -196,7 +196,7 @@ function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Order
     order.setValue('work_notes', `Not submitted:\n${findings.join('\n')}`)
     // A refresh Order the daily job raised has only this note to say why it is a draft.
     if (!order.update()) warnRefused(order, `${str(order, 'number')} not submitted (${findings.join('; ')}), and its note not saved`)
-    return notSubmitted(`Order not submitted. ${findings.join('. ')}.`)
+    return { submitted: false, message: `Order not submitted. ${findings.join('. ')}.` }
 }
 
 /**
@@ -211,7 +211,7 @@ function submitAsRaised(order: GlideRecord, parties: OrderParties, raiser: Order
  */
 function submitAccepted(order: GlideRecord, tries: number): Submission {
     const lines = requestedLines(order.getUniqueValue())
-    if (lines.length === 0) return notSubmitted('Add at least one order line before submitting')
+    if (lines.length === 0) return { submitted: false, message: 'Add at least one order line before submitting' }
     if (!readsUsage(lines)) return submitUnderOrderLock(null, order)
     const usageLock = LOCK.agreementUsage(str(order, 'agreement'))
     const underUsage = withLockTries(usageLock, (lock) => submitUnderOrderLock(lock, order), LONG_HOLD_LOCK_TRIES)
@@ -226,7 +226,7 @@ function submitAccepted(order: GlideRecord, tries: number): Submission {
  */
 function submitUnderOrderLock(usageLock: HeldLock | null, order: GlideRecord): Submission {
     const underOrder = withLockTries(LOCK.sourceOrder(order.getUniqueValue()), () => submitHolding(usageLock, order), LONG_HOLD_LOCK_TRIES)
-    return underOrder.ran ? underOrder.value : notSubmitted('Order not submitted: it is being cancelled. Try again shortly')
+    return underOrder.ran ? underOrder.value : notSubmitted('it is being cancelled. Try again shortly')
 }
 
 /**
@@ -237,14 +237,14 @@ function submitUnderOrderLock(usageLock: HeldLock | null, order: GlideRecord): S
  */
 function submitHolding(usageLock: HeldLock | null, order: GlideRecord): Submission {
     const fresh = findById('x_daas_ham_order', order.getUniqueValue())
-    if (!fresh) return notSubmitted('Order not submitted: it can no longer be read')
+    if (!fresh) return notSubmitted('it can no longer be read')
     if (str(fresh, 'stage') !== ORDER_STAGE.draft) return alreadySubmitted(fresh)
     if (str(fresh, 'agreement') !== str(order, 'agreement') || str(fresh, 'customer') !== str(order, 'customer')) {
-        return notSubmitted('Order not submitted: its Customer or Agreement changed while it was submitted. Submit it again')
+        return notSubmitted('its Customer or Agreement changed while it was submitted. Submit it again')
     }
     const lines = requestedLines(order.getUniqueValue())
-    if (lines.length === 0) return notSubmitted('Order not submitted: add at least one order line first')
-    if (!usageLock && readsUsage(lines)) return notSubmitted('Order not submitted: a line was added while it was submitted. Submit it again')
+    if (lines.length === 0) return notSubmitted('add at least one order line first')
+    if (!usageLock && readsUsage(lines)) return notSubmitted('a line was added while it was submitted. Submit it again')
     const assessment = assessOrder(
         { siteTemplateId: str(order, 'site_template') || undefined, lines },
         entitlementContext(str(order, 'customer'), str(order, 'agreement'), order.getUniqueValue()),
@@ -254,7 +254,7 @@ function submitHolding(usageLock: HeldLock | null, order: GlideRecord): Submissi
 
     if (assessment.approvers.length === 0) {
         const refused = startSourcing(order)
-        if (refused) return notSubmitted(`Order not submitted: ${refused}`)
+        if (refused) return notSubmitted(refused)
         warnIfUsageLockLost(usageLock, order)
         return { submitted: true }
     }
@@ -269,16 +269,16 @@ function submitHolding(usageLock: HeldLock | null, order: GlideRecord): Submissi
         warnIfUsageLockLost(usageLock, order)
         return { submitted: true }
     }
-    if (asked.step === 'save') return notSubmitted(`Order not submitted: ${asked.reason}`)
+    if (asked.step === 'save') return notSubmitted(asked.reason)
     order.setValue('work_notes', `Not submitted: ${asked.reason}`)
     if (!order.update()) warnRefused(order, `${str(order, 'number')} not submitted (${asked.reason}), and its note not saved`)
-    return notSubmitted(`Order not submitted: ${asked.reason}.`)
+    return notSubmitted(`${asked.reason}.`)
 }
 
 /** An Order a submission finds out of draft: gone ahead, through another submission of it (submitted), or ended (not). */
 function alreadySubmitted(fresh: GlideRecord): Submission {
     const stage = fresh.getDisplayValue('stage')
-    if (endedUnfulfilled(str(fresh, 'stage'))) return notSubmitted(`Order not submitted: it is ${stage}`)
+    if (endedUnfulfilled(str(fresh, 'stage'))) return notSubmitted(`it is ${stage}`)
     return { submitted: true, already: `Order ${str(fresh, 'number')} was already submitted (${stage})` }
 }
 
@@ -295,7 +295,7 @@ function warnIfUsageLockLost(usageLock: HeldLock | null, order: GlideRecord): vo
  */
 function submitLater(order: GlideRecord, tries: number): Submission {
     const fresh = findById('x_daas_ham_order', order.getUniqueValue())
-    if (!fresh) return notSubmitted('Order not submitted: it can no longer be read')
+    if (!fresh) return notSubmitted('it can no longer be read')
     if (str(fresh, 'stage') !== ORDER_STAGE.draft) return alreadySubmitted(fresh)
     const number = str(order, 'number')
     const lockName = LOCK.agreementUsage(str(order, 'agreement'))
@@ -303,7 +303,7 @@ function submitLater(order: GlideRecord, tries: number): Submission {
         log.warn(`${number} left a draft: ${lockName} stayed held through ${tries} submissions queued again; submit it`)
         const kept = 'other Orders of its Agreement kept being submitted at the same time. Submit it'
         noteDraft(order, `Not submitted: ${kept}`)
-        return notSubmitted(`Order not submitted: ${kept}`)
+        return notSubmitted(kept)
     }
     const busy = 'another Order of its Agreement was being submitted at the same time. It is submitted again automatically'
     if (tries === 0) noteDraft(order, `Not submitted yet: ${busy}`)

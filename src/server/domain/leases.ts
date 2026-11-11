@@ -1,7 +1,7 @@
 import { fromCents, toCents } from './money.ts'
 import { addDays } from './calendar.ts'
 import { inFleet } from './fleet.ts'
-import { notRetiredCondition, type Stage } from './lifecycle.ts'
+import { notRetiredCondition } from './lifecycle.ts'
 import type { LeaseEndAction } from './vocabulary.ts'
 
 /** Lease schedules and end-of-lease decisions (plan §13 Leases). */
@@ -154,13 +154,3 @@ export function buyoutPurchase(buyoutShare: number, buyoutDay: string): { cost: 
     return buyoutShare > 0 ? { cost: buyoutShare, date: buyoutDay } : undefined
 }
 
-/**
- * The moves, one save each, that take a returned lease's stock out of circulation: to pending wipe, where its
- * return-to-lessor disposal starts and sourcing and the spare-pool top-up no longer find it. Spare-pool stock leaves
- * its pool through available (the lifecycle has no direct move); anything else is not stock and has none.
- */
-export function stockReturnMoves(stage: Stage | null): readonly Stage[] {
-    if (stage === 'available') return ['pending_wipe']
-    if (stage === 'spare_pool') return ['available', 'pending_wipe']
-    return []
-}

@@ -16,8 +16,9 @@ import {
     type ApprovalFlow,
     type ApprovalRollup,
 } from './approvals.ts'
-import { isFleetAsset, moveRefusal, readStage, transitionFacts } from './assets.ts'
+import { isFleetAsset, readStage, transitionFacts } from './assets.ts'
 import { choice, findById, refusal, str, warnRefused } from './records.ts'
+import { moveAlongPath } from './stock.ts'
 import { assetManagerIds } from './users.ts'
 
 /**
@@ -144,8 +145,8 @@ export function completeDisposal(order: GlideRecord): DisposalCompletion {
 
 /**
  * Retire a line's Asset by its method; why it was not (empty when it was). An Asset the user cannot read (outside
- * their Stockrooms, ADR 0005) blocks its line rather than being skipped. The lifecycle rule checks each saved move,
- * so a pending-wipe Asset is saved as pending disposal first, and the line is done only once the retiring save holds.
+ * their Stockrooms, ADR 0005) blocks its line rather than being skipped. The line is done only once the retiring save
+ * holds.
  */
 function retire(line: GlideRecord, order: GlideRecord): string {
     const asset = findById('alm_hardware', str(line, 'asset'))
@@ -163,12 +164,8 @@ function retire(line: GlideRecord, order: GlideRecord): string {
         orderCustomerId: str(order, 'customer'),
     })
     if (blockers.length > 0) return blockers.join('; ')
-    if (stage === 'pending_wipe') {
-        const refused = moveRefusal(asset, 'pending_disposal')
-        if (refused) return refused
-    }
     // Not logged: a refusal goes on the line as what blocks it.
-    return moveRefusal(asset, disposalStage(method))
+    return moveAlongPath(asset, disposalStage(method))?.why ?? ''
 }
 
 /**

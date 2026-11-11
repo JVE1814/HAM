@@ -23,7 +23,7 @@ import { lineLostUnit } from './fulfilment.ts'
 import { log } from './log.ts'
 import { stringProperty } from './properties.ts'
 import { bool, deleteWhere, exists, findById, num, refusal, str, warnRefused } from './records.ts'
-import { takeOffOrderLine } from './stock.ts'
+import { leaveOrderLine } from './stock.ts'
 
 /**
  * Staging tasks with their checklist steps: opening them, starting the staging, and skipping those no longer needed.
@@ -179,8 +179,7 @@ export function completeStaging(assetId: string, task: ClosedStagingTask): strin
  */
 function failStaging(asset: GlideRecord, number: string): string | null {
     const lineId = str(asset, 'x_daas_ham_order_line')
-    takeOffOrderLine(asset)
-    if (moveAndSave(asset, 'pending_evaluation', `staging ${number} failed`)) {
+    if (leaveOrderLine(asset, { keeps: 'customer', to: 'pending_evaluation' }, `staging ${number} failed`)) {
         if (lineId) lineLostUnit(lineId)
         return null
     }
@@ -197,10 +196,7 @@ function failStaging(asset: GlideRecord, number: string): string | null {
 function leaveLine(assetId: string, lineId: string, number: string): boolean {
     const asset = findById('alm_hardware', assetId)
     if (!asset || str(asset, 'x_daas_ham_order_line') !== lineId) return true
-    takeOffOrderLine(asset)
-    if (asset.update()) return true
-    warnRefused(asset, `staging ${number} failed: ${str(asset, 'serial_number')} not taken off its order line`)
-    return false
+    return leaveOrderLine(asset, { keeps: 'customer', to: null }, `staging ${number} failed: ${str(asset, 'serial_number')} not taken off its order line`)
 }
 
 /**
