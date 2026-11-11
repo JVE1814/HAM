@@ -63,8 +63,9 @@
 Each installed Asset is checked for:
 - **unseen**: no Seen signal for `x_daas_ham.reconciliation.unseen_days`, or never seen;
 - **serial mismatch** with its CI;
-- **site mismatch** with its CI's location: the CI's location, or the location two levels up
-  (room → building → site), must be the Asset's Site.
+- **site mismatch** with its CI's location: the CI's location, or a location above it
+  (room → building → site, `CI_SITE_LOCATIONS` in `domain/reconciliation.ts`), must be the Asset's
+  Site.
 
 Exceptions open once per type and Asset (or CI; a rack's overlap and power exceptions once per
 rack), also when two runs raise the same one at once: the check and the insert are made under a lock
@@ -103,11 +104,12 @@ rack exception are re-checked as well (see Racks), and their rack exceptions ope
   counted (ADR 0016). The elevation page and its power figure still show only what the viewer may
   see.
 - The **rack elevation** page (`x_daas_ham_racks.do`) shows the front and rear of the racks in a
-  Site's rooms. A device links to its Asset form for provider staff only (the six NaaS staff roles,
+  Site's rooms. A device links to its Asset form for provider staff only (the NaaS staff roles,
+  `PROVIDER_STAFF` in `domain/roles.ts`,
   and administrators); Customer contacts, external users the platform UI does not open for, see its
   tag and Model as plain text. Colours are by stage, customer, or risk:
   - *high*: past end of support, or no current coverage;
-  - *medium*: end of sale, or refresh due within 180 days.
+  - *medium*: end of sale, or refresh due soon (`REFRESH_NEAR_DAYS` in `domain/support-risk.ts`).
 - The page and its endpoints show Customer contacts only the racks at Sites they can see (their
   Customer's; a Site contact's own Sites of their Customer). Other Sites and racks answer *not
   found*. Staff see every Site. A rack is shown only at a Site or in a Room of one (a location whose

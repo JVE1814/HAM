@@ -11,9 +11,11 @@ writes nothing.
 
 `GlideMutex` is not available to scoped applications, so the lock is a row in `x_daas_ham_job_lock`
 behind a unique index: taking it is one insert that only one holder wins, and releasing it deletes the
-row. A chunk that finds the lock held writes nothing and runs again a minute later from the same
+row. A chunk that finds the lock held writes nothing and runs again later (`REQUEUE.delaySeconds` in
+`src/server/domain/job-lock.ts`, which owns every number of this ADR) from the same
 pass and cursor, so nothing is lost or written twice; that holds because a superseding job's `handle`
-only accumulates in memory and every write happens under the lock. A lock held for over ten minutes is
+only accumulates in memory and every write happens under the lock. A lock held for longer than
+`ABANDONED_AFTER_MINUTES` is
 taken as abandoned (its holder's transaction died) and cleared by the next taker, so a crash delays
 recomputes instead of stalling them. A holder that is in fact still running is not stopped, and what it
 writes then sits beside the pass that took over. So after each write under the lock (the start, each
@@ -21,7 +23,7 @@ flush and the completion), and when one throws, the holder checks that it still 
 that lost it writes nothing more, throws nothing, logs *job lock lost while writing* and at once queues
 another fresh pass, which supersedes the one that took over, clears the period and recomputes it. Until
 that pass completes, the Margin can be wrong (the pass that took over may complete first and count the
-lost holder's Cost facts), and a write that keeps outlasting the ten minutes restarts the recompute
+lost holder's Cost facts), and a write that keeps outlasting that time restarts the recompute
 again each time. Both need a single write to run that long, so they are accepted. Renewing the lock as
 it is held (a heartbeat) would not close the gap: it can only be renewed between writes, not during the
 write that overruns, and no write can be tied to the lock in a transaction.
@@ -34,7 +36,8 @@ the check, tries the insert once more. Only an insert refused while no lock row 
 of retrying forever.
 
 Order sourcing takes a lock of the same kind on each Order but does not supersede: a pass that finds
-it held is queued again about a minute later, at most 15 times, because a purchase already requested
+it held is queued again `REQUEUE.delaySeconds` seconds later, at most `REQUEUE.times` times, because
+a purchase already requested
 cannot be cleared the way a recompute clears its period. *Cancel order* takes the same lock, so a
 cancel and a pass take turns; a cancel that finds it held changes nothing and asks the user to try
 again. Under it, *Cancel order* also takes the Order's Ship lock (`ship_order_<Order sys_id>`), so a
@@ -42,7 +45,8 @@ Ship cannot run between its shipped check and its release of the lines; one that
 changes nothing and says a Ship of the Order is running, without retrying. It is the only holder of
 both, and Ship never takes `source_order_`, so `source_order` stays before `ship_order`. Under its
 Ship lock, *Cancel order* also takes the `order_line_<line sys_id>` lock of each of the Order's lines
-not yet shipped, 10 tries each, and saves the Order, releases each line's units and cancels the line
+not yet shipped, `LONG_HOLD_LOCK_TRIES` tries each, and saves the Order, releases each line's units
+and cancels the line
 only once it holds them all; one that finds a line's lock held changes nothing and asks the user to
 try again. A receipt for a waiting line saves its unit, takes it off order, reserves it and stages it
 (its Staging task opened, the move into staging saved) under that line's lock, and reads the line and
@@ -63,10 +67,13 @@ refresh run holds `refresh_orders`, a lock of the same kind, and, like *Cancel o
 retry: a run that finds its lock held raises nothing and leaves it to the run holding it. Short
 critical sections, such as an Order line, an Agreement's submissions, an ASN row's serial, the
 Provider tag counter, a stock change, a Service interval, a Subscription line's start, a sighting or a
-tracking update, take locks of the same kind and, finding one held, try again back to back a few
-times (`withLockTries` and `attemptLock` in `platform/locks.ts`) before they give up. A tracking update that gives up is not left to the
+tracking update, take locks of the same kind and, finding one held, try again back to back
+(`LOCK_TRIES` times, or `LONG_HOLD_LOCK_TRIES` where the holder keeps the lock through several saves;
+`withLockTries` and `attemptLock` in `platform/locks.ts`) before they give up. A tracking update
+that gives up is not left to the
 aggregator (ShipEngine resends it at most twice, typically 30 minutes apart, then drops it): it is
-queued as an event that tries the lock again, then a minute apart, at most 15 more times.
+queued as an event that tries the lock again, then `REQUEUE.delaySeconds` seconds apart, at most
+`REQUEUE.times` more times.
 
 Locks are not re-entrant: a holder that takes a lock it already holds is refused, as any other taker
 would be. A take never waits either: it tries and gives up. So locks are taken in one order, and a
@@ -99,17 +106,20 @@ producer, *Raise replacement* and a submission queued again take it holding no l
 lines all replace Assets (break-fix, refresh) is assessed the same whatever is in flight, and its
 lines going into flight beside a holder's read of usage read as if it had come first or last, so its
 submit takes no usage lock. Under the usage lock, or holding nothing for such an Order, a submission
-takes the Order's `source_order_`, 10 tries back to back, so a *Cancel order* saved after its read
+takes the Order's `source_order_`, `LONG_HOLD_LOCK_TRIES` tries back to back, so a *Cancel order*
+saved after its read
 of the draft is not overwritten by its save; one that finds it held submits nothing and says the
-Order is being cancelled. A submission that finds the lock held through 10 back-to-back tries leaves the
-Order a draft, noted, and queues it to be submitted again a minute later (the sourcing event with
-parm1 `submit`), at most 15 times, then logs it for staff to submit; the producer's raiser, who may
+Order is being cancelled. A submission that finds the lock held through those tries leaves the
+Order a draft, noted, and queues it to be submitted again `REQUEUE.delaySeconds` seconds later (the
+sourcing event with
+parm1 `submit`), at most `REQUEUE.times` times, then logs it for staff to submit; the producer's
+raiser, who may
 have no *Submit*, is told it is submitted within minutes and not to raise it again. Under the lock a
 submit only reads, requests approvals (and cancels them when it cannot go ahead, which runs the
 approval rollup rule: it finds the Order a draft and takes nothing), saves the Order (no rule of the
 app is on it) and queues its sourcing, which takes `source_order_` in its own transaction holding
-nothing, once the submission has let it go. A submit that outlasts the lock logs *<Order> submitted after its lock
-`agreement_usage_<sys_id>` was lost*.
+nothing, once the submission has let it go. A submit that outlasts the lock logs that the
+Order was submitted after its usage lock was lost.
 The lock orders submissions only: usage that changes without one (a line added to an Order already
 submitted, its Agreement changed, Assets adopted into the Agreement) is not assessed.
 The Asset rule that takes a unit lost in transit off its Order line takes no lock: it queues the
@@ -121,23 +131,25 @@ declaration clears a placement, which the lock order allows.
 (`x_daas_ham.shipment.track`) holding no other lock, and by *Mark label voided*: alone for a return
 label, and under `ship_order_<Order sys_id>` for an outbound one. A void that finds `ship_order_`
 held does not retry, like *Cancel order*: it changes nothing and asks the user to try again. Only
-its inner `track_shipment_` take is tried 5 times back to back. Nothing takes another lock while
+its inner `track_shipment_` take is tried `LOCK_TRIES` times back to back. Nothing takes another
+lock while
 holding `track_shipment_`: the Order's delivered note, its cleared tracking and the Return order's
 voided note are written after it is released. So it must stay after `ship_order`.
 The daily spare-pool top-up counts, fills and buys for each short Spare pool under
 `spare_pool_<Customer sys_id>_<Model sys_id>`, so a run and an *Execute now* at once never both buy
-for one shortfall. It holds no other lock when it takes it, tries 5 times back to back and leaves a
+for one shortfall. It holds no other lock when it takes it, tries `LOCK_TRIES` times back to back
+and leaves a
 pool held through them to the run holding it. Under it, it takes only the `reserve_asset_` lock of
 each unit it moves (and what that unit's save takes under it), so it comes just before
 `reserve_asset`.
-The 5-minute OEM claim run holds `oem_claim_run` for the whole run, so a run and an *Execute now* at
+The OEM claim run holds `oem_claim_run` for the whole run, so a run and an *Execute now* at
 once never send a step to its vendor twice: that would spend two runs' calls in one rate-limit window,
 and the second claim of a device already claimed fails, marking the step the first run ticked done
 failed. It holds no other lock when it takes it, does not retry, and sends nothing when it finds it
 held. Under it, it saves staging steps, whose rules take no lock. A run that outlasts it loads no
 more due steps once it has lost it, so it calls no vendor after that, and it saves what its calls so
 far returned. A step found done when a failure is saved is left done.
-The 4-hourly OEM coverage run holds `oem_coverage_run` for the whole run, so a run and an *Execute
+The OEM coverage run holds `oem_coverage_run` for the whole run, so a run and an *Execute
 now* at once never load the same stalest Assets and both insert a serial's new contract: the copy
 not updated afterwards would keep a stale coverage end. It holds no other lock when it takes it,
 does not retry, and checks nothing when it finds it held. Under it, it saves coverage records and
@@ -145,7 +157,8 @@ Assets, and every lock their rules take comes later in the order. A run that has
 A unit is put on a Return order under `return_asset_<Asset sys_id>`: the check that it awaits no other
 return and the insert of its line are one critical section, so two Returns raised at once (a request
 sent twice, the record producer beside the customer page or an Agreement's end) never both take it.
-No unique index could hold that, as an Asset is on any number of settled lines. It is tried 5 times
+No unique index could hold that, as an Asset is on any number of settled lines. It is tried
+`LOCK_TRIES` times
 back to back; a unit held through them is left to the Return holding it, which takes it. Under it,
 the unit's move to pending return is saved, with what that save takes (`service_interval_`). The
 customer page raises a Customer's return requests under `return_request_<Customer sys_id>`, holding
@@ -157,18 +170,21 @@ raised and each unit put on it under its `return_asset_` lock, so `return_reques
 A fee is charged under `fee_<type>_<Asset sys_id>_<Return order sys_id>`, and a billing generation
 bills it under the same lock: it reads the fee afresh there and adds its line and links it only
 while it is open and on no other period, so a month generating beside a *Regenerate* of another
-never bills one fee on both. The generation holds no other lock when it takes it, tries 5 times
+never bills one fee on both. The generation holds no other lock when it takes it, tries `LOCK_TRIES`
+times
 back to back, and counts a fee held through them as failed unless another period has it by then.
 Nothing is taken under it.
 *Close period* and *Regenerate* of a Billing period run under `billing_period_<period sys_id>`,
 holding no other lock, and each reads the period's status afresh there. So a Regenerate never
 deletes the lines of a period Close is locking, and Close never locks a period a Regenerate has
-emptied. Each tries 5 times back to back, and one that finds the lock held through them changes
+emptied. Each tries `LOCK_TRIES` times back to back, and one that finds the lock held through them
+changes
 nothing and asks the user to try again. Nothing is taken under it.
 
 An audit's scans and *Close audit* take turns under `audit_<audit sys_id>`, each holding no other
 lock when it takes it, so a scan lands wholly before the close reads the lines, or finds the audit
-closed when it reads it again under the lock and records nothing. Both try 5 times back to back: a
+closed when it reads it again under the lock and records nothing. Both try `LOCK_TRIES` times back
+to back: a
 scan held through them answers HTTP 503, to scan again, and a close changes nothing and asks the user
 to close again. Under it, the close raises each *missing in audit* exception under its
 `recon_exception_` lock, so `audit` comes just before `recon_exception`.

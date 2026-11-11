@@ -103,10 +103,13 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
   or a mandatory field is missing. A row whose Asset insert the platform refuses is marked error with
   its reason. The check that no Asset has the serial sees every Asset, past the importer's stockroom
   rule (ADR 0005).
-- Each row's Asset is created under the serial's job lock (`receive_serial_<serial>`), which a first
+- Each row's Asset is created under the serial's job lock (`LOCK.receiveSerial` in
+  `domain/lock-names.ts`), which a first
   scan without an ASN takes too, and the serial is checked again there. So a row and a scan of one
-  serial create one Asset. A row that finds the lock held through 5 tries, or cannot take it, is
-  marked error *serial <serial> not imported: ...; load this row again*. Loaded again, it imports, or
+  serial create one Asset. A row that finds the lock held through `LOCK_TRIES` tries
+  (`domain/job-lock.ts`), or cannot take it, is
+  marked error with the reason and told to load again (`platform/receiving.ts`). Loaded again, it
+  imports, or
   is refused as a serial that already exists.
 - **Warehouse app access**: Receive, Put away, Pick and the app's stockroom list are depot work, for
   inventory techs (asset managers and admins hold the role); anyone else gets HTTP 403 *Requires the
@@ -138,33 +141,34 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
 - If the line's *On order* count, or the OEM RMA a replacement unit arrives for (P2 after-sales spec),
   cannot be saved, a warning is logged and the unit is still reserved for its line.
 - **Provider tags** come from one counter, advanced under a job lock so that no two Assets share a tag.
-  A receipt that cannot take the lock after 5 tries is told to scan again (HTTP 503) and the unit is
+  A receipt that cannot take the lock after `LOCK_TRIES` tries is told to scan again (HTTP 503) and
+  the unit is
   not received; one without an ASN stays on order, so the rescan finds it by serial.
-- Receipts of one unit are made under a job lock on the Asset (`receive_asset_<sys_id>`), from a
+- Receipts of one unit are made under a job lock on the Asset (`LOCK.receiveAsset`), from a
   fresh read. A scan of a unit another scan is still receiving saves nothing and answers HTTP 503
   *Another scan is receiving this unit: scan again*. The rescan finds it received and answers HTTP 409
   *Not awaiting receipt* (a returned unit is then pending evaluation). The overdue job takes the same
   lock to declare a unit missing (P2 after-sales spec).
-- An unknown serial with a PID is created under a job lock on the serial (`receive_serial_<serial>`),
+- An unknown serial with a PID is created under a job lock on the serial (`LOCK.receiveSerial`),
   re-checked there, so two first scans create one Asset. ASN rows take the same lock (above), so a
   scan and an ASN row of one serial create one Asset too. A scan that finds the lock held is told to
   scan again (HTTP 503), and the rescan finds the Asset by serial.
 - A unit for a waiting line is saved, taken off its *On order* count (or its RMA marked received),
   reserved and staged (its Staging task opened and its move into staging saved) under the line's job
-  lock (`order_line_<sys_id>`, P1 ordering spec). So sourcing's count of the line (allocated, *On
+  lock (`LOCK.orderLine`, P1 ordering spec). So sourcing's count of the line (allocated, *On
   order*, OEM RMAs whose replacement is still to come) sees all of a receipt or none of it, and so
   does *Cancel order*, which holds the lock of each of its lines while it releases their units: a
   receipt lands wholly before the cancel, or finds the line cancelled. A receipt that cannot take the
-  lock after 10 tries saves nothing and answers HTTP 503 *Its order line is being sourced, received
+  lock after `LONG_HOLD_LOCK_TRIES` tries saves nothing and answers HTTP 503 *Its order line is
+  being sourced, received
   or cancelled: scan again*. Under the line's lock the line and its Order are read again. The unit is
   allocated only while the Order is neither cancelled nor rejected and the line is still awaiting
   stock with fewer Assets than its quantity. Otherwise it stays received as free stock (available),
-  the line's *On order* count and any OEM RMA are left as they are, and a warning *Received <serial>
-  left in stock, not given to <line>: ...* is logged, for example *...: its Order is cancelled*; for
-  an advance replacement it adds *RMA <number> left open, update it by hand*. A receipt that
-  outlasted the line's lock (ADR 0013) stages no further after it is lost, and logs *<line>:
-  <serial> reserved (or given a Staging task, or moved into staging) after its lock
-  order_line_<sys_id> was lost: check it is still on the line*.
+  the line's *On order* count and any OEM RMA are left as they are, and a warning is logged that
+  names the unit, the line and the reason (`platform/receiving.ts`); for
+  an advance replacement it adds that the RMA is left open, to update by hand. A receipt that
+  outlasted the line's lock (ADR 0013) stages no further after it is lost, and logs what it
+  did to the unit after the lock was lost, to check that the unit is still on the line.
 - **Put-away** records the stockroom an Asset now sits in (for an inventory tech, one of theirs):
   - available stock and returned units awaiting evaluation, wipe or disposal go into any stockroom;
   - a unit being staged (one received for a waiting PO line among them) goes only into a staging
@@ -172,9 +176,10 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
   - reserved, spare-pool and staged Assets, and anything not in stock, are refused.
 
   A put-away the platform refuses to save answers HTTP 422 with its reason. It is made under the
-  Asset's stock lock (`reserve_asset_<sys_id>`, P1 ordering spec), from a fresh read. So a unit a
+  Asset's stock lock (`LOCK.reserveAsset`, P1 ordering spec), from a fresh read. So a unit a
   sourcing run or the spare-pool top-up claims meanwhile is refused (HTTP 409), and a scan that finds
-  the lock held through 5 tries saves nothing and answers HTTP 503 *This unit is being reserved or
+  the lock held through `LOCK_TRIES` tries saves nothing and answers HTTP 503 *This unit is being
+  reserved or
   moved: scan again*.
 - **Pick** confirms an Asset is a staged Asset of the given Order.
 
@@ -232,7 +237,7 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
   uses a standard change; everything else uses a normal change.
 - If the tracking number, or the change and work order, cannot be saved on the Order, Ship still
   ships and says so; the Shipment, change (its *Parent*) and work order (its *Initiated from*) name the Order, to link them by hand.
-- Ship runs one at a time per Order, under a job lock on it (`ship_order_<sys_id>`), and reads the
+- Ship runs one at a time per Order, under a job lock on it (`LOCK.shipOrder`), and reads the
   Order's tracking number and work order afresh. A Ship pressed while another of the same Order is
   running ships, buys and opens nothing and says another Ship is running. A Ship after it finds the
   units shipped and the work opened, so it buys no second label and opens no second change and work
@@ -276,7 +281,8 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
 
 - Seen signals:
   - NMS events through `POST /api/x_daas_ham/naas/device_events`;
-  - the Asset's CI `last_discovered`, read every 15 minutes for pending Assets.
+  - the Asset's CI `last_discovered`, read for pending Assets by the detection job (its interval is
+    in `in-service/in-service.now.ts`).
 - An Asset is in service at the first sighting at or after its install completion. A temporary Order
   gives a temporary deployment instead.
 - At that moment:
@@ -286,14 +292,16 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
     is passed over, even when it is not set ended, and one already started is chosen before one that
     starts later;
   - a pending line becomes active with its start date under a job lock on the line
-    (`subscription_line_<sys_id>`), only while it is still pending when read again there. A line
+    (`LOCK.subscriptionLine`), only while it is still pending when read again there. A line
     another go-live started is joined with its start date kept. One ended meanwhile, or whose lock
-    another go-live holds through 5 tries, leaves the Asset pending in service (logged), and its
+    another go-live holds through `LOCK_TRIES` tries, leaves the Asset pending in service (logged),
+    and its
     next sighting chooses among the open lines;
   - the lifecycle phase and refresh due date are computed.
-- Sightings of one Asset are applied one at a time under a job lock on it (`seen_asset_<sys_id>`),
+- Sightings of one Asset are applied one at a time under a job lock on it (`LOCK.seenAsset`),
   from a fresh read: last_seen only moves forward and only a still-pending Asset goes live. An NMS
-  event that finds the lock held 10 times, or whose Asset save is refused (logged as an error), is
+  event that finds the lock held `LONG_HOLD_LOCK_TRIES` times, or whose Asset save is refused
+  (logged as an error), is
   not applied and is returned in `busy_identifiers`; the detection job leaves that Asset to its next
   run. A go-live whose save is refused after its Subscription line was started leaves the line
   active: the sighting applied again joins it, its start date kept.
