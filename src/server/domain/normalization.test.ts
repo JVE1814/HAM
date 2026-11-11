@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
     fleetOnRawModelQuery,
-    manufacturerKey,
     normalizeModel,
     notNaasRawModelsQuery,
     RAW_MODEL_EXCEPTIONS_QUERY,
@@ -37,14 +36,14 @@ describe('normalizeModel', () => {
     })
 
     it('treats any punctuation as a word break when matching manufacturer aliases', () => {
-        expect(manufacturerKey('Hewlett-Packard Enterprise')).toBe(manufacturerKey('Hewlett Packard Enterprise'))
-        expect(manufacturerKey('Hewlett Packard (Enterprise)')).toBe('hewlett packard enterprise')
-        expect(manufacturerKey('Hewlett/Packard_Enterprise')).toBe('hewlett packard enterprise')
-        expect(manufacturerKey('Hewlett\u2013Packard Enterprise\u2122')).toBe('hewlett packard enterprise')
-        expect(manufacturerKey('\u2018Dell\u2019 Technologies\u00ae')).toBe('dell technologies')
-        expect(manufacturerKey('Cisco Systems,Inc.')).toBe('cisco systems inc')
-        const result = normalizeModel({ manufacturer: 'Hewlett-Packard Enterprise', model: 'DL380' }, aliases, rules)
-        expect(result).toEqual({ matched: false, manufacturerId: 'hpe', reason: 'no_matching_rule' })
+        const withDell = [...aliases, { alias: 'Dell Technologies', manufacturerId: 'dell' }]
+        const manufacturerOf = (manufacturer: string) => normalizeModel({ manufacturer, model: 'DL380' }, withDell, rules)
+        expect(manufacturerOf('Hewlett-Packard Enterprise')).toEqual({ matched: false, manufacturerId: 'hpe', reason: 'no_matching_rule' })
+        for (const written of ['Hewlett Packard (Enterprise)', 'Hewlett/Packard_Enterprise', 'Hewlett–Packard Enterprise™']) {
+            expect(manufacturerOf(written), written).toMatchObject({ manufacturerId: 'hpe' })
+        }
+        expect(manufacturerOf('‘Dell’ Technologies®')).toMatchObject({ manufacturerId: 'dell' })
+        expect(manufacturerOf('Cisco Systems,Inc.')).toMatchObject({ manufacturerId: 'cisco' })
     })
 
     it('never matches a manufacturer that is only punctuation or blank', () => {
