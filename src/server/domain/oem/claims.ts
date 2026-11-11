@@ -1,5 +1,5 @@
 import { andEachClause } from '../encoded-query.ts'
-import { fleetCondition } from '../fleet.ts'
+import { fleetCondition, OEM_SOURCE_FIELD } from '../fleet.ts'
 import type { HttpPort, HttpRequest, HttpResponse } from '../http.ts'
 import type { RestMessageName } from '../rest-message-names.ts'
 import { CLAIM_ACTION_CHOICES, type AutomationStatus, type ClaimAction, type OemVendor } from '../vocabulary.ts'
@@ -181,7 +181,7 @@ export const OPEN_STEP = 'done=false^staging_task.active=true'
  */
 function openStepsQuery(vendor: OemVendor, action: ClaimAction): string {
     const asset = 'staging_task.asset.'
-    return `automation=${action}^${OPEN_STEP}^${asset}model.x_daas_ham_oem_source=${vendor}^${fleetCondition(asset)}`
+    return `automation=${action}^${OPEN_STEP}^${asset}model.${OEM_SOURCE_FIELD}=${vendor}^${fleetCondition(asset)}`
 }
 
 /**

@@ -1,7 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
 import { coverageDisposition, type CoverageAnswer } from '../domain/coverage.ts'
-import { naasModelCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
+import { naasModelCondition, OEM_PID_FIELD, OEM_SOURCE_FIELD } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { enabledRoutes, type CoverageRoute } from '../domain/oem/adapters.ts'
@@ -52,7 +52,7 @@ function naasModelsByPid(vendor: OemVendor): { asked: Map<string, string>; model
     const asked = new Map<string, string>()
     const models = new Map<string, string[]>()
     const model = new GlideRecord('cmdb_model')
-    model.addQuery('x_daas_ham_oem_source', vendor)
+    model.addQuery(OEM_SOURCE_FIELD, vendor)
     model.addEncodedQuery(naasModelCondition())
     model.query()
     while (model.next()) {
