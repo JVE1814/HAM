@@ -13174,6 +13174,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_dictionary'
+                        id: '272d2791b2054ea2ab1d15ee010960a7'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'approval_customer_admins'
+                        }
+                    },
+                    {
                         table: 'sys_atf_test_suite_test'
                         id: '2741ca2ec80047568619fd95d145c156'
                         key: {
@@ -13354,6 +13362,15 @@ declare global {
                         key: {
                             document_key: '9d4445354d214b1aa7c2dab46cf331bb'
                             variable: '9024a37f671003007ba405225685efe5'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '2856ed3bf55f4f23be7bdaf42c4ba659'
+                        key: {
+                            name: 'x_daas_ham_disposal_order'
+                            element: 'approval_customer_admins'
+                            language: 'en'
                         }
                     },
                     {
@@ -34884,6 +34901,15 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_documentation'
+                        id: '8a06d62b9ac04cfda93ecf5cd6dd0279'
+                        key: {
+                            name: 'x_daas_ham_order'
+                            element: 'approval_customer_admins'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: '8a0a80dd555047d0afc8fe7b67b80b81'
                         key: {
@@ -54317,6 +54343,14 @@ declare global {
                         key: {
                             document_key: '2b8bbfd464104d71bc6674e81cf306ed'
                             variable: 'b86c0427531000109e02ddeeff7b1227'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'e5e41dcb5ee04e188b3361ca2459e055'
+                        key: {
+                            name: 'x_daas_ham_order'
+                            element: 'approval_customer_admins'
                         }
                     },
                     {

@@ -164,6 +164,28 @@ describe('rollUpApprovals', () => {
         expect(requests()).toEqual({ ca: 'cancelled', am: 'rejected' })
     })
 
+    it('counts the provider approver asked in place of a Customer with no admins for both groups, also once an admin is onboarded', () => {
+        platform.tables.sys_user_has_role = []
+        const task = order('draft')
+        putToApproval(task, { ...request(['am'], ['customer_admin', 'account_manager']), customerAdmins: [] })
+        const orderFlow = flow(['customer_admin', 'account_manager'])
+        customerAdmin('ca')
+        decide('am', 'approved')
+
+        expect(rollUpApprovals(task, orderFlow)?.outcome).toBe('approved')
+    })
+
+    it("counts a Customer admin's decision for the admins only, also once their role is removed", () => {
+        const task = awaiting(['ca', 'am'], ['customer_admin', 'account_manager'])
+        const orderFlow = flow(['customer_admin', 'account_manager'])
+        platform.tables.sys_user_has_role = []
+        decide('ca', 'approved')
+
+        expect(rollUpApprovals(task, orderFlow)?.outcome).toBe('requested')
+
+        expect(orderFlow.decided).toEqual([])
+    })
+
     it('keeps the task awaiting approval with its requests when the outcome cannot be saved', () => {
         const task = awaiting(['ca', 'am'], ['customer_admin', 'account_manager'])
         const orderFlow = flow(['customer_admin', 'account_manager'])

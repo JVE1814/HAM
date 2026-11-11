@@ -56,6 +56,8 @@ export const x_daas_ham_order = Table({
         carrier: StringColumn({ label: 'Carrier', maxLength: 60 }),
         case: ReferenceColumn({ label: 'Case', referenceTable: 'sn_customerservice_case' }),
         return_raised: BooleanColumn({ label: 'Return raised', default: false, readOnly: true }),
+        /** Who decides for the Customer admins, as it was when the Order was put to approval (platform/approvals). */
+        approval_customer_admins: ListColumn({ label: 'Customer admins asked', referenceTable: 'sys_user', readOnly: true }),
     },
     autoNumber: { prefix: 'NORD', number: 1000, numberOfDigits: 7 },
     index: [

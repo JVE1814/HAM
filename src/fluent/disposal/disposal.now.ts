@@ -7,6 +7,7 @@ import {
     default_view,
     Form,
     List,
+    ListColumn,
     Record,
     ReferenceColumn,
     StringColumn,
@@ -38,6 +39,8 @@ export const x_daas_ham_disposal_order = Table({
             readOnly: true,
             dropdown: 'dropdown_without_none',
         }),
+        /** Who decides for the Customer admins, as it was when the order was put to approval (platform/approvals). */
+        approval_customer_admins: ListColumn({ label: 'Customer admins asked', referenceTable: 'sys_user', readOnly: true }),
     },
     autoNumber: { prefix: 'NDSP', number: 1000, numberOfDigits: 7 },
 })

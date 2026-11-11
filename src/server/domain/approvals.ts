@@ -23,10 +23,10 @@ export function rollupApprovals(required: readonly Approver[], decisions: readon
 }
 
 /**
- * Tag raw approvals with their group: Customer admins of the Customer decide for the customer-admin
+ * Tag raw approvals with their group: the Customer admins asked decide for the customer-admin
  * group; everyone else (the account manager or the asset managers standing in for them) for the
- * account-manager group. A Customer without Customer admins has its customer-admin approval given by
- * the provider-side approvers.
+ * account-manager group. With no Customer admin asked, the customer-admin approval is given by the
+ * provider-side approvers.
  */
 export function groupDecisions(
     approvals: ReadonlyArray<{ approverId: string; state: ApprovalState }>,

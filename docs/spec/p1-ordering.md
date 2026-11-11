@@ -86,6 +86,10 @@
 - Provider-side approvers are the Agreement's account manager or, if it has none, the asset managers.
   They are active users only: an inactive account manager counts as none, so the asset managers
   approve. If the Customer has no Customer admins, the provider-side approvers stand in for them.
+  Who decides for which group is fixed when the Order is put to approval: the Order keeps the
+  Customer admins it asked (*Customer admins asked*). An admin onboarded meanwhile is not asked, and
+  the provider-side approvers still decide for both groups; an admin whose role is removed meanwhile
+  still decides for the Customer admins only.
 - If there is no approver, or the requests the platform saved could not approve it, the saved
   requests are cancelled again and the Order stays a draft; the user is told why and it goes in its
   work notes. An Order the platform will not save as approved (within agreement) or awaiting approval
