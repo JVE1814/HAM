@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { inCurrentPass, queuePass, runEventTableJob, runTableJob, visitInKeyOrder, type PassJob } from './chunked.ts'
+import { inCurrentPass, queuePass, runEventTableJob, runSupersedingChunk, runTableJob, runTriggeredChunk, visitInKeyOrder } from './chunked.ts'
 import type { JobEvent } from './events.ts'
 import { completePass, findJobCursor, isCurrentPass, JOB_STATUS, openJobCursor, retirePass, startPass } from './job-cursor.ts'
 import { withLock } from './locks.ts'
@@ -33,11 +33,11 @@ function queued(position: string): JobEvent {
 }
 
 /** A job over the items that notes what it handled and flushed, and the hooks called under its lock. */
-function job(pass?: PassJob, failOn: string[] = []) {
+function job<P extends object = object>(pass: P = {} as P, failOn: string[] = []) {
     const handled: string[] = []
     const flushed: Array<{ failed: number }> = []
     const spec = {
-        pass,
+        ...pass,
         table: ITEMS,
         query: '',
         read: (item: JobEvent['record']) => String(item.getValue('name')),
@@ -52,16 +52,14 @@ function job(pass?: PassJob, failOn: string[] = []) {
 
 function lockedPass(jobName: string, onStart: () => void = () => undefined) {
     const calls: string[] = []
-    const pass: PassJob = {
+    const pass = {
         job: jobName,
-        underLock: {
-            onStart: () => {
-                calls.push('start')
-                onStart()
-            },
-            complete: () => void calls.push('complete'),
-            stopped: (error) => void calls.push(`stopped: ${error}`),
+        onStart: () => {
+            calls.push('start')
+            onStart()
         },
+        complete: () => void calls.push('complete'),
+        stopped: (error: string) => void calls.push(`stopped: ${error}`),
     }
     return { pass, calls }
 }
@@ -255,12 +253,12 @@ describe('an event job', () => {
 })
 
 describe('an event job whose passes are started where they are triggered', () => {
-    const PASS: PassJob = { job: 'generate_p1' }
+    const PASS = { job: 'generate_p1' }
 
     function oneChunk(position: string, failOn: string[] = []) {
         platform.properties['x_daas_ham.job.budget_seconds'] = '0'
         const run = job(PASS, failOn)
-        return { ...run, result: runEventTableJob(queued(position), run.spec) }
+        return { ...run, result: runTriggeredChunk(queued(position), run.spec) }
     }
 
     /** Queue a pass and give its token: the job's cursor row holds the current pass's. */
@@ -294,7 +292,7 @@ describe('an event job whose passes are started where they are triggered', () =>
 
         platform.properties['x_daas_ham.job.budget_seconds'] = '120'
         const last = job(PASS)
-        expect(runEventTableJob(queued(platform.events[1]?.parm2 ?? ''), last.spec)).toMatchObject({ done: true, superseded: false })
+        expect(runTriggeredChunk(queued(platform.events[1]?.parm2 ?? ''), last.spec)).toMatchObject({ done: true, superseded: false })
         expect(last.handled).toEqual(['b'])
         expect(platform.events).toHaveLength(2)
         // Nothing marks the row as the pass ends: the caller completes it.
@@ -328,7 +326,7 @@ describe('an event job whose passes are started where they are triggered', () =>
                 if (row) retirePass(row)
             },
         }
-        expect(runEventTableJob(queued(`${token}:`), retiring)).toMatchObject({ superseded: true, done: false })
+        expect(runTriggeredChunk(queued(`${token}:`), retiring)).toMatchObject({ superseded: true, done: false })
         expect(run.flushed).toEqual([])
         expect(platform.events).toHaveLength(1)
     })
@@ -347,7 +345,7 @@ describe('an event job whose passes are started where they are triggered', () =>
         const token = queueNewPass()
         const run = job(PASS)
         const failing = { ...run.spec, flush: () => { throw new Error('count refused') } }
-        expect(() => runEventTableJob(queued(`${token}:`), failing)).toThrow('count refused')
+        expect(() => runTriggeredChunk(queued(`${token}:`), failing)).toThrow('count refused')
         expect(inCurrentPass(queued(`${token}:`), PASS.job)).toBe(true)
         expect(platform.events).toHaveLength(1)
     })
@@ -361,7 +359,7 @@ describe('an event job whose passes supersede each other under its lock (ADR 001
         platform.properties['x_daas_ham.job.budget_seconds'] = '0'
         const { pass, calls } = lockedPass(JOB, () => expect(platform.tables[LOCKS]).toEqual([expect.objectContaining({ name: JOB })]))
         const run = job(pass)
-        expect(runEventTableJob(queued(''), run.spec)).toMatchObject({ done: false, superseded: false })
+        expect(runSupersedingChunk(queued(''), run.spec)).toMatchObject({ done: false, superseded: false })
         expect(calls).toEqual(['start'])
         expect(run.handled).toEqual(['a'])
         expect(run.flushed).toEqual([{ failed: 0 }])
@@ -377,7 +375,7 @@ describe('an event job whose passes supersede each other under its lock (ADR 001
         const token = startPass(JOB, JOB_STATUS.running)
         const { pass, calls } = lockedPass(JOB)
         const run = job(pass)
-        expect(runEventTableJob(queued(`${token}:a`), run.spec)).toMatchObject({ done: true, superseded: false })
+        expect(runSupersedingChunk(queued(`${token}:a`), run.spec)).toMatchObject({ done: true, superseded: false })
         expect(run.handled).toEqual(['b'])
         expect(calls).toEqual(['complete'])
         expect(cursorRow(JOB)).toMatchObject({ cursor: token, last_status: 'complete' })
@@ -391,7 +389,7 @@ describe('an event job whose passes supersede each other under its lock (ADR 001
         startPass(JOB, JOB_STATUS.running)
         const { pass, calls } = lockedPass(JOB)
         const run = job(pass)
-        expect(runEventTableJob(queued(`${stale}:`), run.spec)).toMatchObject({ superseded: true, done: false })
+        expect(runSupersedingChunk(queued(`${stale}:`), run.spec)).toMatchObject({ superseded: true, done: false })
         expect(run.handled).toEqual([])
         expect(run.flushed).toEqual([])
         expect(calls).toEqual([])
@@ -410,7 +408,7 @@ describe('an event job whose passes supersede each other under its lock (ADR 001
                 startPass(JOB, JOB_STATUS.running)
             },
         }
-        expect(runEventTableJob(queued(`${token}:`), superseded)).toMatchObject({ superseded: true })
+        expect(runSupersedingChunk(queued(`${token}:`), superseded)).toMatchObject({ superseded: true })
         expect(run.flushed).toEqual([])
         expect(calls).toEqual([])
         expect(platform.events).toEqual([])
@@ -422,7 +420,7 @@ describe('an event job whose passes supersede each other under its lock (ADR 001
         platform.tables[LOCKS] = [{ sys_id: 'held', name: JOB, sys_created_on: '2025-11-09 11:59:00' }]
         const { pass } = lockedPass(JOB)
         const run = job(pass)
-        expect(runEventTableJob(queued(`${token}:a`), run.spec)).toMatchObject({ done: false, superseded: false, lastError: 'job locked: retried later' })
+        expect(runSupersedingChunk(queued(`${token}:a`), run.spec)).toMatchObject({ done: false, superseded: false, lastError: 'job locked: retried later' })
         expect(run.handled).toEqual([])
         expect(platform.events).toEqual([{ name: EVENT_NAME, record: 'rec1', parm1: SUBJECT, parm2: `${token}:a`, delayed: true }])
     })
@@ -433,7 +431,7 @@ describe('an event job whose passes supersede each other under its lock (ADR 001
         platform.tables[LOCKS] = [{ sys_id: 'dead', name: JOB, sys_created_on: '2025-11-09 10:00:00' }]
         const { pass, calls } = lockedPass(JOB)
         const run = job(pass)
-        expect(runEventTableJob(queued(`${token}:`), run.spec)).toMatchObject({ done: true, superseded: false, lastError: '' })
+        expect(runSupersedingChunk(queued(`${token}:`), run.spec)).toMatchObject({ done: true, superseded: false, lastError: '' })
         expect(run.handled).toEqual(['a', 'b'])
         expect(calls).toEqual(['complete'])
         expect(platform.tables[LOCKS]).toEqual([])
@@ -443,7 +441,7 @@ describe('an event job whose passes supersede each other under its lock (ADR 001
         items('a')
         platform.tables[LOCKS] = [{ sys_id: 'held', name: JOB, sys_created_on: '2025-11-09 11:59:00' }]
         const { pass, calls } = lockedPass(JOB)
-        runEventTableJob(queued(''), job(pass).spec)
+        runSupersedingChunk(queued(''), job(pass).spec)
         expect(calls).toEqual([])
         expect(findJobCursor(JOB)).toBeNull()
         expect(platform.events).toEqual([{ name: EVENT_NAME, record: 'rec1', parm1: SUBJECT, parm2: '', delayed: true }])
@@ -455,7 +453,7 @@ describe('an event job whose passes supersede each other under its lock (ADR 001
         const { pass, calls } = lockedPass(JOB)
         const run = job(pass)
         const failing = { ...run.spec, flush: () => { throw new Error('cost fact refused') } }
-        expect(() => runEventTableJob(queued(`${token}:`), failing)).toThrow('cost fact refused')
+        expect(() => runSupersedingChunk(queued(`${token}:`), failing)).toThrow('cost fact refused')
         expect(calls).toEqual(['stopped: cost fact refused'])
         expect(platform.events).toEqual([])
         expect(platform.tables[LOCKS]).toEqual([])
@@ -466,7 +464,7 @@ describe('an event job whose passes supersede each other under its lock (ADR 001
         platform.refuses = (table) => (table === CURSORS ? 'no rights' : '')
         const { pass, calls } = lockedPass(JOB)
         const run = job(pass)
-        expect(() => runEventTableJob(queued(''), run.spec)).toThrow('job cursor margin_p1 could not be created: no rights')
+        expect(() => runSupersedingChunk(queued(''), run.spec)).toThrow('job cursor margin_p1 could not be created: no rights')
         expect(calls).toEqual([])
         expect(run.handled).toEqual([])
     })
@@ -478,7 +476,7 @@ describe('an event job whose passes supersede each other under its lock (ADR 001
         const run = job(pass)
         // A taker that judged the lock abandoned clears it while the flush runs.
         const overrun = { ...run.spec, flush: () => void (platform.tables[LOCKS] = []) }
-        expect(runEventTableJob(queued(`${token}:`), overrun)).toMatchObject({ done: false, lastError: 'job lock lost: pass restarted' })
+        expect(runSupersedingChunk(queued(`${token}:`), overrun)).toMatchObject({ done: false, lastError: 'job lock lost: pass restarted' })
         expect(calls).toEqual([])
         expect(platform.events).toEqual([{ name: EVENT_NAME, record: 'rec1', parm1: SUBJECT, parm2: '', delayed: false }])
     })

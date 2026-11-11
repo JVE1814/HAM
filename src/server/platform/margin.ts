@@ -17,7 +17,7 @@ import { memoized } from '../domain/memo.ts'
 import { BILLING_PERIOD_STATUS, SHIPMENT_STATUS, type LegalOwner } from '../domain/vocabulary.ts'
 import { agreementCurrencyOf, customerCurrencies } from './agreements.ts'
 import { recordMarginOutcome } from './closed-period.ts'
-import { runEventTableJob } from './chunked.ts'
+import { runSupersedingChunk } from './chunked.ts'
 import { queueJob, type JobEvent } from './events.ts'
 import { EVENT } from '../domain/events.ts'
 import { intProperty } from './properties.ts'
@@ -62,29 +62,25 @@ function costServiceIntervals(period: GlideRecord, queued: JobEvent): void {
     const leases = memoized(leaseTermsOf)
     const currencies = memoized(customerCurrencies)
     const lineAgreements = memoized(lineAgreementOf)
-    runEventTableJob(queued, {
-        pass: {
-            job: `margin_${periodId}`,
-            underLock: {
-                onStart: () => {
-                    // The status first: if the period refuses it, the pass stops before its Margin is cleared.
-                    recordMarginOutcome(period, 0, '')
-                    clearPeriod(periodId)
-                },
-                complete: () => {
-                    const labour = addFieldLabour(periodId, bounds)
-                    const shipping = addShippingCosts(periodId, bounds)
-                    // Left out of Margin, as failed Service intervals are, and counted on the period with them.
-                    const failed = labour.failed + shipping.failed
-                    if (failed > 0) addMarginFailures(periodId, failed, shipping.lastError || labour.lastError)
-                    writeMargin(periodId)
-                },
-                // A chunk that throws queues no next one: the pass stops, and the period must not read as complete.
-                stopped: (error) => {
-                    const fresh = findById('x_daas_ham_billing_period', periodId)
-                    if (fresh) recordMarginOutcome(fresh, num(fresh, 'margin_failed'), `stopped: ${error}`)
-                },
-            },
+    runSupersedingChunk(queued, {
+        job: `margin_${periodId}`,
+        onStart: () => {
+            // The status first: if the period refuses it, the pass stops before its Margin is cleared.
+            recordMarginOutcome(period, 0, '')
+            clearPeriod(periodId)
+        },
+        complete: () => {
+            const labour = addFieldLabour(periodId, bounds)
+            const shipping = addShippingCosts(periodId, bounds)
+            // Left out of Margin, as failed Service intervals are, and counted on the period with them.
+            const failed = labour.failed + shipping.failed
+            if (failed > 0) addMarginFailures(periodId, failed, shipping.lastError || labour.lastError)
+            writeMargin(periodId)
+        },
+        // A chunk that throws queues no next one: the pass stops, and the period must not read as complete.
+        stopped: (error) => {
+            const fresh = findById('x_daas_ham_billing_period', periodId)
+            if (fresh) recordMarginOutcome(fresh, num(fresh, 'margin_failed'), `stopped: ${error}`)
         },
         table: 'x_daas_ham_service_interval',
         query: overlapsMonth(bounds),
