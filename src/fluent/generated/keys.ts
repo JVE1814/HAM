@@ -3598,6 +3598,7 @@ declare global {
                     'src_server_entry_oem-claims_ts': {
                         table: 'sys_module'
                         id: 'd93ffacd56a849a190cb8f4bf30e6794'
+                        deleted: true
                     }
                     'src_server_entry_oem-sync_ts': {
                         table: 'sys_module'

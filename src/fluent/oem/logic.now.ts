@@ -1,9 +1,10 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, EmailNotification, Property, Record, ScheduledScript } from '@servicenow/sdk/core'
-import { processCoverageRow, syncOemCoverage, syncOemLifecycle, syncOemRmaStatus } from '../../server/entry/oem-sync'
+import { processCoverageRow } from '../../server/entry/oem-sync'
+import { syncCoverage, syncLifecycle, syncRmaStatus } from '../../server/platform/oem-sync'
+import { runClaims } from '../../server/platform/claim-steps'
 import { EVENT } from '../../server/domain/events'
 import { PROPERTY } from '../../server/domain/properties'
-import { runOemClaims } from '../../server/entry/oem-claims'
 import { REST_MESSAGE } from '../../server/domain/rest-message-names'
 import { admin } from '../shared/roles.now'
 
@@ -62,7 +63,7 @@ ScheduledScript({
     frequency: 'daily',
     executionTime: { hours: 1, minutes: 35, seconds: 0 },
     timeZone: 'UTC',
-    script: syncOemLifecycle,
+    script: syncLifecycle,
 })
 
 ScheduledScript({
@@ -73,7 +74,7 @@ ScheduledScript({
     executionInterval: { hours: 4 },
     executionStart: '2026-01-01 00:50:00',
     timeZone: 'UTC',
-    script: syncOemCoverage,
+    script: syncCoverage,
 })
 
 ScheduledScript({
@@ -84,7 +85,7 @@ ScheduledScript({
     executionInterval: { hours: 1 },
     executionStart: '2026-01-01 00:05:00',
     timeZone: 'UTC',
-    script: syncOemRmaStatus,
+    script: syncRmaStatus,
 })
 
 /* OEM claim and provisioning of staging steps (plan §13 OEM claim adapters, Q70). Every vendor is off until enabled. */
@@ -97,7 +98,7 @@ ScheduledScript({
     executionInterval: { minutes: 5 },
     executionStart: '2026-01-01 00:02:00',
     timeZone: 'UTC',
-    script: runOemClaims,
+    script: runClaims,
 })
 
 Property({
