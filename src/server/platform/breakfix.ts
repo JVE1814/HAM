@@ -4,7 +4,7 @@ import { ORDER_STAGE, type OrderStage } from '../domain/vocabulary.ts'
 import { isFleetAsset, readStage } from './assets.ts'
 import { log } from './log.ts'
 import { createOrder, submitOrder } from './orders.ts'
-import { bool, findById, refusal, str, warnRefused } from './records.ts'
+import { bool, findById, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
 
 /**
  * Break-fix replacements (P2.3, Q58): the device-replace Order a CSM case raises for its failed Asset. It tells the
@@ -24,6 +24,18 @@ export type Replacement =
     | { outcome: 'already_raised'; number: string; stageLabel: string }
     | { outcome: 'draft'; number: string; why: string }
     | { outcome: 'not_raised'; why: string }
+
+/**
+ * Before insert/update rule on cases naming a failed Asset (br_case_failed_asset), wired here: the case takes its
+ * customer and service level from the Asset. A failed asset outside the fleet (ADR 0016), set by a script past the
+ * field's reference qualifier, gives the case nothing. `current` is the rule's case, which the platform saves.
+ */
+export function takeFailedAssetTerms(current: ForeignRecord): void {
+    const asset = findById('alm_hardware', str(current, 'x_daas_ham_failed_asset'))
+    if (!asset || !isFleetAsset(asset)) return
+    current.setValue('x_daas_ham_replacement_tier', str(asset, 'x_daas_ham_agreement.replacement_tier'))
+    if (!str(current, 'account')) current.setValue('account', str(asset, 'company'))
+}
 
 function notRaised(why: string): Replacement {
     return { outcome: 'not_raised', why }

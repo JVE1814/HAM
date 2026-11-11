@@ -19,7 +19,8 @@ import {
 } from '@servicenow/sdk/core'
 import { OEM_VENDOR_CHOICES, ORDER_STAGE, REPLACEMENT_TIER, RMA_STATE, RMA_STATE_CHOICES } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION } from '../../server/domain/fleet'
-import { onCaseFailedAsset, uiDefectiveReturnedToOem, uiRaiseReplacement } from '../../server/entry/breakfix'
+import { uiDefectiveReturnedToOem, uiRaiseReplacement } from '../../server/entry/breakfix'
+import { takeFailedAssetTerms } from '../../server/platform/breakfix'
 import { PLATFORM_ROLE } from '../../server/domain/roles'
 import { EVENT } from '../../server/domain/events'
 import { onReplacementComplete } from '../../server/entry/replacements'
@@ -71,7 +72,7 @@ BusinessRule({
     action: ['insert', 'update'],
     order: 100,
     condition: "current.x_daas_ham_failed_asset.changes() && current.x_daas_ham_failed_asset != ''",
-    script: onCaseFailedAsset,
+    script: takeFailedAssetTerms,
 })
 
 UiAction({
