@@ -94,11 +94,10 @@ function scanned(identified: AssetIdentified): Scan | null {
     return identified
 }
 
-/** A unit scanned for receipt: its code, and the PID (and manufacturer) scanned with it when no ASN announced it. */
+/** A unit scanned for receipt: its code, and the PID scanned with it when no ASN announced it. */
 export interface ScannedUnit {
     code: string
     pid?: string
-    manufacturer?: string
 }
 
 /**
@@ -132,7 +131,7 @@ export function receive(unit: ScannedUnit, stockroomId: string): Scan {
     let found = scanned(identifyAnyAsset(unit.code))
     if (!found) {
         if (!unit.pid) return { reason: 'unknown', why: 'Unknown serial: scan the PID too to receive without an ASN' }
-        found = createReceivedAsset(unit.code, unit.pid, unit.manufacturer ?? '')
+        found = createReceivedAsset(unit.code, unit.pid)
     }
     if ('reason' in found) return found
     const assetId = found.asset.getUniqueValue()
@@ -205,8 +204,8 @@ function saveReceipt(lock: HeldLock, asset: GlideRecord): ScanRefusal | null {
  * first scans of one unit, or a scan and its ASN row, create it once; a scan that finds the lock held is told to scan
  * again, and the rescan finds the Asset by serial.
  */
-function createReceivedAsset(code: string, pid: string, manufacturer: string): Scan {
-    const resolution = resolveModel({ manufacturer, model: pid }, loadNormalizationData())
+function createReceivedAsset(code: string, pid: string): Scan {
+    const resolution = resolveModel({ manufacturer: '', model: pid }, loadNormalizationData())
     const modelId = resolution.modelId
     if (!modelId) return { reason: 'refused', why: `PID ${pid} does not map to a model` }
     const serial = normalizeSerial(code)
@@ -371,7 +370,7 @@ export function pick(code: string, orderNumber: string): Scan {
     if ('reason' in found) return found
     const asset = found.asset
     const ownOrder = str(asset, 'x_daas_ham_order_line.order.number')
-    if (ownOrder !== orderNumber) {
+    if (!ownOrder || ownOrder !== orderNumber) {
         return { reason: 'conflict', why: ownOrder ? `Belongs to ${ownOrder}` : 'Not allocated to an order' }
     }
     if (readStage(asset) !== 'staged') return { reason: 'conflict', why: `Not ready to ship (${readStage(asset)})` }

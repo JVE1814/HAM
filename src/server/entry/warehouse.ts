@@ -1,5 +1,5 @@
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import type { StockroomList } from '../domain/rest-contracts.ts'
+import type { PickRequest, PutAwayRequest, ReceiveRequest, StockroomList } from '../domain/rest-contracts.ts'
 import { ROLE } from '../domain/roles.ts'
 import { assetSummary, lookUp, pick, putAway, receive, receivingStockrooms, type Scan, type ScanRefusal } from '../platform/receiving.ts'
 import { pathParam, reply, requireRole, requireScanner, textBodyOf } from '../platform/rest-api.ts'
@@ -35,21 +35,21 @@ export function lookupAsset(request: RESTAPIRequest, response: RESTAPIResponse):
 
 export function receiveAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    const input = textBodyOf(request)
+    const input: Partial<ReceiveRequest> = textBodyOf(request)
     if (!input.code || !input.stockroom) return reply(response, 400, { error: 'code and stockroom are required' })
-    answer(response, receive({ code: input.code, pid: input.pid, manufacturer: input.manufacturer }, input.stockroom))
+    answer(response, receive({ code: input.code, pid: input.pid }, input.stockroom))
 }
 
 export function putAwayAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    const input = textBodyOf(request)
+    const input: Partial<PutAwayRequest> = textBodyOf(request)
     answer(response, putAway(input.code ?? '', input.stockroom ?? ''))
 }
 
 export function pickAsset(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
-    const input = textBodyOf(request)
-    answer(response, pick(input.code ?? '', input.order))
+    const input: Partial<PickRequest> = textBodyOf(request)
+    answer(response, pick(input.code ?? '', input.order ?? ''))
 }
 
 export function listStockrooms(request: RESTAPIRequest, response: RESTAPIResponse): void {
