@@ -56,7 +56,7 @@ function assetsOf(orderId: string): DisposalAsset[] {
 export type DisposalSubmission = { submitted: true } | { submitted: false; why: string }
 
 /**
- * Put a draft Disposal order to approval (platform/approvals `putToApproval`): the provider-side approvers (the asset
+ * Put a draft Disposal order to approval: the provider-side approvers (the asset
  * managers), and the admins of the order's Customer when a customer-owned Asset is on it. Saves the order, the record of
  * the form it was submitted from, first: a refused save asks nobody, as the order is not what the approvers would decide.
  */
@@ -77,7 +77,6 @@ export function submitDisposal(order: GlideRecord): DisposalSubmission {
     return { submitted: false, why: asked.step === 'request' ? `Not submitted: ${asked.reason}` : '' }
 }
 
-/** How a Disposal order's approvals are decided (platform/approvals): by its Assets' owners, approved or rejected and closed. */
 const DISPOSAL_APPROVAL: ApprovalFlow = {
     awaitingStage: DISPOSAL_STAGE.awaiting_approval,
     standIn: 'provider',
@@ -92,8 +91,7 @@ const DISPOSAL_APPROVAL: ApprovalFlow = {
 }
 
 /**
- * Roll the approvals of the Disposal order up and save the outcome (platform/approvals `rollUpApprovals`): what a
- * decision on one of its requests does. Null when the order is gone or not awaiting approval.
+ * What a decision on one of its requests does. Null when the order is gone or not awaiting approval.
  */
 export function rollUpDisposalApprovals(orderId: string): ApprovalRollup | null {
     const order = findById('x_daas_ham_disposal_order', orderId)

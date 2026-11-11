@@ -181,7 +181,7 @@ export function queueModelsReachingMilestone(day: string): void {
 }
 
 /**
- * Import a lifecycle row: store its milestones on its Model (`writeModelLifecycle`, source CSV). A milestone the
+ * Import a lifecycle row: store its milestones on its Model. A milestone the
  * row leaves blank keeps what is stored, so a row whose milestones go backwards counted with those is refused whole. A
  * row with a milestone the platform refuses is marked error with why, to load again once the cause is fixed: the
  * milestones saved meanwhile are then found as given.

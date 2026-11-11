@@ -13,7 +13,7 @@ import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 
 /*
  * The repository run against the in-memory stand-in for the platform, whose Model lifecycle table applies the
- * platform's own rules as read on the instance (module comment): a start date is required, and one Model has one
+ * platform's own rules as read on the instance: a start date is required, and one Model has one
  * active row per lifecycle type, phase and source.
  */
 
@@ -35,15 +35,12 @@ function models(pids: Record<string, string>): void {
     platform.tables.cmdb_model = Object.entries(pids).map(([sysId, pid]) => ({ sys_id: sysId, x_daas_ham_oem_pid: pid }))
 }
 
-/** The Model lifecycle rows of either class. */
 const rows = (): Row[] => (platform.tables[TABLE] ??= [])
 
-/** The events queued: on which record, and its first parameter. */
 const queued = () => platform.events.map(({ name, record, parm1 }) => ({ name, row: record, parm1 }))
 
 const MODEL = 'model1'
 
-/** A row another source keeps: active, a manufacturer's milestone of ServiceNow's content service unless said otherwise. */
 function stored(row: Row): void {
     const sysId = `row${rows().length + 1}`
     rows().push({
@@ -203,7 +200,6 @@ describe('queueModelRefresh', () => {
     })
 })
 
-/** A row of the lifecycle CSV's import set, which the import matches to a Model by OEM PID. */
 function lifecycleRow(row: Row): GlideRecord {
     return recordOf<GlideRecord>('x_daas_ham_eox_import', { sys_id: 'row1', manufacturer: 'Cisco', ...row })
 }

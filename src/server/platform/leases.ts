@@ -105,7 +105,6 @@ function openDecision(leaseId: string): boolean {
     return exists('x_daas_ham_lease_decision', `lease=${leaseId}^active=true`)
 }
 
-/** The fleet assets the lease covers (those in `stages`, when given). */
 function countAssets(leaseId: string, stages?: readonly Stage[]): number {
     const ofLease = `x_daas_ham_lease=${leaseId}`
     return count('alm_hardware', stages ? fleetStagesQuery(stages, ofLease) : stillCovered(ofLease))
@@ -150,7 +149,7 @@ function notApplied(problem?: string): DecisionOutcome {
  * - extend: the lease runs to the new end date;
  * - return: stock leaves circulation onto a draft return-to-lessor disposal, and Assets at Sites get a
  *   Refresh due date no later than the lease end so automatic refresh swaps them out in time.
- * A lease being bought out or returned takes no further decision (domain/leases `leaseDecisionProblem`). The decision
+ * A lease being bought out or returned takes no further decision. The decision
  * is closed before the lease changes, and a closed one is not applied, so it never stays open over a lease it already
  * decided: applied again, an extension would extend once more (any new end date after the extended one passes), and
  * while it is open the daily review raises no decision before the new end (`openDecision`).
@@ -170,7 +169,6 @@ export function applyLeaseDecision(decisionRecord: GlideRecord): DecisionOutcome
     if (problem || !decision) return notApplied(problem ?? undefined)
     const openState = str(decisionRecord, 'state')
     decisionRecord.setValue('state', TASK_STATE.closedComplete)
-    // Closed first: a refused form save (the platform says why) leaves the lease as it was and the decision open.
     if (!decisionRecord.update()) return notApplied()
 
     const decided = decidedLease(decision, str(decisionRecord, 'new_end_date'))
@@ -225,7 +223,6 @@ function reopenDecision(decision: GlideRecord, openState: string, why: string): 
     return `${why}. The decision stays closed (see the system log); the daily lease review raises a new one`
 }
 
-/** What a return did with the lease's stock. */
 interface StockReturn {
     /** Its draft disposal's number; null without one. */
     disposal: string | null
@@ -239,7 +236,7 @@ interface StockReturn {
  * Take the lease's stock out of circulation onto a draft return-to-lessor disposal: each unit is saved at pending
  * wipe, so sourcing and the spare-pool top-up can no longer claim it, and only then gets its line. A hot spare already
  * linked to an Order line is left to that line; once at a Site, its Refresh due date is the lease end like the rest.
- * Each unit is withdrawn under the lock stock claims take, from a fresh read (`withdrawFromStock`), so one reserved
+ * Each unit is withdrawn under the lock stock claims take, from a fresh read, so one reserved
  * since the query keeps its reservation. A unit whose line, or the disposal itself, is refused stays at pending wipe on
  * no disposal and is counted as unlisted, to be put on one by hand.
  */
@@ -266,8 +263,7 @@ function disposeStockToLessor(lease: GlideRecord): StockReturn {
 }
 
 /**
- * Withdraw a unit the query found, under the lock stock claims take and from a fresh read (platform/stock
- * `changeStock`): a claim whose own fresh read came before the return was saved may still be saving it. A unit gone,
+ * Withdraw a unit the query found, under the lock stock claims take and from a fresh read: a claim whose own fresh read came before the return was saved may still be saving it. A unit gone,
  * or no longer free stock on no Order line, is left to whoever took it ('taken'). The Asset at pending wipe, or
  * 'refused' (logged) when a move is refused or the lock cannot be taken.
  */
@@ -301,7 +297,7 @@ function moveOutOfStock(lock: HeldLock, asset: GlideRecord): boolean {
 
 /**
  * The Provider owns the Assets the bought-out `lease` covers, each costing its share of the buyout price to the cent
- * (domain/leases `buyoutCost`, for Margin), a chunk at a time: the job of `EVENT.leaseBuyout`. Retired
+ * (for Margin), a chunk at a time: the job of `EVENT.leaseBuyout`. Retired
  * units, which the Lessor or the OEM holds, keep their lease link and are not transferred.
  *
  * Every transferred Asset leaves the query set. The cursor (sys_id > last handled) still holds:
@@ -313,10 +309,8 @@ function moveOutOfStock(lock: HeldLock, asset: GlideRecord): boolean {
  */
 export function transferToProvider(queued: JobEvent, lease: GlideRecord): void {
     const leaseId = queued.subject
-    // Each Asset's cost is its share of the price to the cent, fixed when the buyout was decided (domain/leases
-    // `buyoutCost`); a share stored before shares were split to the cent is rounded, with no cent left over to place.
+    // Each Asset's cost is its share of the price to the cent, fixed when the buyout was decided; a share stored before shares were split to the cent is rounded, with no cent left over to place.
     const split = { share: num(lease, 'buyout_share'), extraThrough: str(lease, 'buyout_extra_through') }
-    // Every Asset the chunk transfers is bought today.
     const today = todayIso()
     runEventTableJob(queued, {
         table: 'alm_hardware',
@@ -340,7 +334,6 @@ export function transferToProvider(queued: JobEvent, lease: GlideRecord): void {
     })
 }
 
-/** A draft return-to-lessor Disposal order for the stock of a returned lease; null when the platform refuses it (logged). */
 function draftLessorDisposal(lease: GlideRecord): GlideRecord | null {
     const order = new GlideRecord('x_daas_ham_disposal_order')
     order.initialize()
@@ -353,7 +346,6 @@ function draftLessorDisposal(lease: GlideRecord): GlideRecord | null {
     return null
 }
 
-/** Put a returned lease's Asset on its draft Disposal order; false (logged) when the platform refuses the line. */
 function addDisposalLine(order: GlideRecord, asset: GlideRecord): boolean {
     const line = new GlideRecord('x_daas_ham_disposal_line')
     line.initialize()

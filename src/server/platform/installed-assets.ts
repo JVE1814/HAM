@@ -6,15 +6,13 @@ import type { ReturnTrigger } from '../domain/vocabulary.ts'
 import { str } from './records.ts'
 import { INSTALLED_STAGES } from '../domain/lifecycle.ts'
 
-/** The fleet assets installed at Sites, as returns, audits and attestations list them. */
-
 interface InstalledFilter {
     agreementId?: string
     siteId?: string
     orderId?: string
     /**
-     * The trigger of the Return the units are listed for: a whole-Site recovery also takes those still shipped there
-     * (domain/returns `stagesTakenBack`). None for a list that is no Return's.
+     * The trigger of the Return the units are listed for: a whole-Site recovery also takes those still shipped there.
+     * None for a list that is no Return's.
      */
     returning?: ReturnTrigger
 }

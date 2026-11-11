@@ -24,7 +24,7 @@ import { queueSourcing } from './sourcing-requests.ts'
 import { leaveOrderLine } from './stock.ts'
 
 /**
- * Keeps Order-line and Order stages in step with their Assets (derived, see domain/fulfilment), and has a line that
+ * Keeps Order-line and Order stages in step with their Assets, and has a line that
  * lost a unit filled again.
  */
 
@@ -51,8 +51,8 @@ export function orderShipment(orderId: string): OrderShipment {
 
 /**
  * The stage of each of the Order's lines: the one read of them, for what the Order has shipped and for the stage it
- * derives from them. Read past the user's before-query rules, the way the Assets on the lines are
- * (platform/beyond-visibility). The rules scope a line by its Order's Customer and Site (domain/visibility), so
+ * derives from them. Read past the user's before-query rules, the way the Assets on the lines are.
+ * The rules scope a line by its Order's Customer and Site, so
  * whoever sees the Order sees each of its lines anyway: a stage is never derived from some of them.
  */
 function lineStagesOf(orderId: string): LineStage[] {
@@ -81,7 +81,7 @@ export function recomputeLine(lineId: string): void {
 /**
  * A unit left the Order line, already taken off it (a failed staging, a transfer to the staging centre fallen
  * through): the line's stage is derived again, back to awaiting stock while it is short, and its Order is sourced
- * again, queued (platform/sourcing-requests `queueSourcing`). The one sequence for a unit that leaves its line; one lost in transit differs
+ * again, queued. The one sequence for a unit that leaves its line; one lost in transit differs
  * only in how the line is derived (`onLineAssetMoved`).
  */
 export function lineLostUnit(lineId: string): void {
@@ -93,9 +93,9 @@ export function lineLostUnit(lineId: string): void {
 
 /**
  * An Asset on `lineId` moved `from` -> `to` (the after-update rule on alm_hardware): the line's stage is derived again.
- * A unit that left it in transit while still owed to it (domain/fulfilment `leftInTransit`, `refillsLine`) is first
+ * A unit that left it in transit while still owed to it is first
  * taken off it, and the line is derived as filled again, back to awaiting stock: its Order is then sourced again,
- * queued (platform/sourcing-requests `queueSourcing`).
+ * queued.
  *
  * No lock is taken. The unit comes off the line before the line is saved as awaiting stock, so a sourcing pass or a
  * receipt counting the reopened line never counts it (each counts only a line awaiting stock). The sourcing is queued,
@@ -133,7 +133,7 @@ function takeOffLine(assetId: string, line: GlideRecord, to: Stage): boolean {
  *
  * A cancel or rejection saves its Order before it cancels the lines, under their locks, but a derive takes no lock: one
  * that read the line before the cancel could save its stage after, reopening the line. So a line read afresh as
- * cancelled, or on an Order that ended unfulfilled (domain/fulfilment `endedUnfulfilled`), is not moved on, and one
+ * cancelled, or on an Order that ended unfulfilled, is not moved on, and one
  * whose Order ended while its stage was saved is cancelled again: either the cancel's save came after this one, or the
  * Order was cancelled before this save and the line with it.
  */
@@ -157,7 +157,6 @@ function deriveLine(line: GlideRecord, refill: boolean): LineStage | null {
     return next
 }
 
-/** Whether the line, read afresh past the user's rules, is cancelled or on an Order cancelled or rejected. */
 function closedNow(line: GlideRecord): boolean {
     const fresh = findById('x_daas_ham_order_line', line.getUniqueValue(), { beyondVisibility: true })
     return !!fresh && (str(fresh, 'line_stage') === LINE_STAGE.cancelled || endedUnfulfilled(str(fresh, 'order.stage')))

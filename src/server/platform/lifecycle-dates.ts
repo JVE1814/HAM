@@ -15,12 +15,11 @@ import { choice, findById, num, str, throwRefused } from './records.ts'
 /**
  * Lifecycle phase and Refresh due date of an Asset, from its Model lifecycle, Agreement and Lease schedule: the stamp
  * itself, and the three background passes that recompute it for the fleet assets of a Model, an Agreement or a Lease
- * schedule once what it is worked out from changes (`REFRESH_PASS`: each pass's event and the Assets it covers).
+ * schedule once what it is worked out from changes.
  */
 
 /** What an Asset's lifecycle dates are worked out from besides the Asset itself, each looked up by sys_id. */
 export interface LifecycleReaders {
-    /** A Model's lifecycle milestones. */
     models: (modelId: string) => LifecycleDates
     /** An Agreement's refresh terms (no basis and no cycle without one). */
     agreements: (agreementId: string) => AgreementRefreshTerms
@@ -51,7 +50,6 @@ export function lifecycleReaders(): LifecycleReaders {
     return { models: memoized(readModelLifecycle), agreements: memoized(agreementRefreshTerms), leases: memoized(leaseTerms) }
 }
 
-/** The Asset fields its lifecycle stamp is worked out from, with the stamp it carries now. */
 interface StampInputs {
     model: string
     agreement: string
@@ -91,7 +89,7 @@ export function applyLifecycleDates(asset: GlideRecord, readers: LifecycleReader
 }
 
 /**
- * The refresh passes, each an event job (platform/chunked) named after what its Assets share: the event that carries
+ * The refresh passes, each an event job named after what its Assets share: the event that carries
  * it, queued on that record, and the Assets it recomputes, as an encoded query on alm_hardware given the record's
  * sys_id.
  * - `model`: a Model's milestones changed, or one is crossed today: its Assets not retired. Queued by
@@ -117,10 +115,8 @@ export function queueRefresh(pass: Exclude<RefreshPass, 'model'>, subject: Glide
 }
 
 /**
- * Run one chunk of a refresh `pass`, for the script action of its event (`event` and `current` are the platform's):
- * recompute the Lifecycle phase and Refresh due date of each fleet asset the pass covers (saving only those that
- * changed), reading each Model lifecycle, Agreement and Lease schedule once per chunk; the event is queued again until
- * the pass is complete. The Provider IT's units of a NaaS Model are left alone (ADR 0016): every clause of the pass's
+ * Run one chunk of a refresh `pass`, for the script action of its event (`event` and `current` are the platform's).
+ * The Provider IT's units of a NaaS Model are left alone (ADR 0016): every clause of the pass's
  * query carries the Fleet flag.
  */
 export function runRefreshPass(pass: RefreshPass, event: GlideRecord, current: GlideRecord): void {

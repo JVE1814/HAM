@@ -3,11 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadNormalizationData, resolveModel, resolveNormalizationException } from './normalization.ts'
 import { platform } from '../test-support/fake-glide.ts'
 
-/*
- * Resolving a normalization exception against in-memory tables: the alias and rule it learns must map its raw pair on
- * the next run.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const EXCEPTIONS = 'x_daas_ham_norm_exception'

@@ -10,7 +10,6 @@ import { findById, str, warnRefused, type ForeignRecord } from './records.ts'
  * planned fits its windows. Routine jobs use a standard change; the change type is decided by the caller.
  */
 
-/** What the work is for: the Customer, Site and the app record that asked for it. */
 export interface WorkContext {
     customerId: string
     siteId: string
@@ -22,14 +21,8 @@ export interface WorkContext {
     sourceId: string
 }
 
-/**
- * The job: the change type it runs under, what it is for and whether a subcontractor does it. The on-site work an Order
- * plans (domain/delivery `OnSiteWork`) is one, and a job of any other purpose (a de-install, a site audit) has its
- * shape.
- */
 type FieldJob = Omit<OnSiteWork, 'purpose'> & { purpose: FieldPurpose }
 
-/** The saved change and the work order that runs under it. */
 export interface FieldWork {
     changeId: string
     workOrderId: string
@@ -62,7 +55,6 @@ export function openFieldWork(context: WorkContext, job: FieldJob): FieldWork | 
     return { changeId, workOrderId }
 }
 
-/** A new change or work order with the context's description, Customer and Site (the caller links and saves it). */
 function workRecord(table: 'change_request' | 'wm_order', context: WorkContext): GlideRecord {
     const record = new GlideRecord(table)
     record.initialize()
@@ -74,7 +66,7 @@ function workRecord(table: 'change_request' | 'wm_order', context: WorkContext):
 
 /**
  * Why the on-site work a NaaS Order's work order plans does not fit its change window and the Site's maintenance
- * window (domain/scheduling `checkJobWindow`), or null when it fits. Only interactive saves are checked (background
+ * window, or null when it fits. Only interactive saves are checked (background
  * processes are not), and only once the work has a planned start. Only reads.
  */
 export function workWindowRefusal(workOrder: ForeignRecord): string | null {

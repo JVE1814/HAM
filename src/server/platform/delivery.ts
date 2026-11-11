@@ -35,7 +35,7 @@ function orderAssets(orderId: string): GlideRecord {
 }
 
 /**
- * What the install confirmation rules read of `order` (domain/install-confirmation). Its shipped units are counted at
+ * What the install confirmation rules read of `order`. Its shipped units are counted at
  * most once, and as `completeInstall` finds them for the same user, so a confirmation offered has units to move.
  */
 export function installState(order: GlideRecord): InstallState {
@@ -70,13 +70,13 @@ function notShipped(problem: string): ShipOutcome {
 
 /**
  * Ship an Order: send every staged Asset the lifecycle lets ship to the Site (buying the label for those when the
- * aggregator is on, platform/shipping, rather than ask for a tracking number entered by hand) and open the on-site work. Hot spares already at the Site are handed over as shipped, without a
+ * aggregator is on, rather than ask for a tracking number entered by hand) and open the on-site work. Hot spares already at the Site are handed over as shipped, without a
  * package. Which Assets may ship is checked before a label is bought.
  *
  * Two users pressing Ship while the first label purchase is in flight would both find the Order unshipped, and both
  * buy a label and open a change and work order. So Ship runs under a lock on the Order, from the Order read again
  * there; one that finds the lock held ships nothing and says another Ship is running. Taking the lock throws only
- * when an insert is refused with no lock row (platform/locks); that error escapes.
+ * when an insert is refused with no lock row; that error escapes.
  */
 export function shipOrder(orderId: string): ShipOutcome {
     const ship = withLock(LOCK.shipOrder(orderId), (lock) => {
@@ -180,7 +180,7 @@ function openOnSiteWork(order: GlideRecord, work: OnSiteWork): string | null {
 export type InstallConfirmation = { confirmed: true; refused: number } | { confirmed: false; why: InstallRefusal | 'unsaved' }
 
 /**
- * Record `order` as installed for `confirmer`, when domain/install-confirmation `installRefusal` lets them. The units
+ * The units
  * take the Order's Site as `order` holds it, so `saveForm` first saves the values a user typed on its form (`unsaved`
  * when the platform refused that save, and said why).
  */
@@ -196,7 +196,7 @@ export function confirmInstall(order: GlideRecord, confirmer: InstallConfirmer, 
  * line stay where they were, and so does the Asset their line replaces, so confirming again retries only them and then
  * retires it.
  *
- * Only shipped units move (domain/install-confirmation `awaitsInstall`): on an Order held back by a line filled again
+ * Only shipped units move: on an Order held back by a line filled again
  * after a unit was lost in transit, that line's new units, a hot spare allocated to it included, wait for Ship.
  */
 function completeInstall(order: GlideRecord): number {
@@ -215,8 +215,8 @@ function completeInstall(order: GlideRecord): number {
 }
 
 /**
- * A work order was closed complete: when it is the on-site work of the NaaS Order it was initiated from (domain/delivery
- * `installsOrder`; a de-install or audit job is not), that Order's install is complete.
+ * A work order was closed complete: when it is the on-site work of the NaaS Order it was initiated from (a
+ * de-install or audit job is not), that Order's install is complete.
  */
 export function completeInstallOfWork(current: ForeignRecord): void {
     const order = findById('x_daas_ham_order', str(current, 'initiated_from'))
