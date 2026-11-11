@@ -2,18 +2,14 @@ import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
 import { createsCustomerReturn, grantsCustomerRecord } from '../../server/entry/visibility'
 import {
-    accountManager,
     admin,
-    assetManager,
     broadStaff,
     customerAdmin,
     customerRoles,
     feeEditors,
-    fieldTech,
-    inventoryTech,
-    noc,
     orderRaisers,
     providerStaff,
+    returnEditors,
     returnWorkers,
     serviceDesk,
     stockroomWorkers,
@@ -98,7 +94,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_return_order',
     operation: 'write',
-    roles: [assetManager, accountManager, noc, inventoryTech, fieldTech],
+    roles: returnEditors,
 })
 
 Acl({

@@ -102,6 +102,9 @@ export const orderRaisers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, P
 /** Who changes an Order as it is fulfilled. */
 export const orderWorkers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, ROLE.inventoryTech, ROLE.fieldTech, PLATFORM_ROLE.serviceDeskAgent]
 
+/** Who changes a Return as it is worked: the Order workers but the service desk, which raises Returns and works none. */
+export const returnEditors = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, ROLE.inventoryTech, ROLE.fieldTech]
+
 /** Who changes an Attestation from the provider side: its Customer admin answers it through the customer page instead. */
 export const attestationEditors = [ROLE.accountManager, ROLE.assetManager]
 

@@ -782,6 +782,20 @@ const PROVIDER_STAFF = [...PROVIDER_STAFF_IN_ORDER].sort()
 /** The roles that read the money tables (domain/roles MONEY_READERS), sorted. */
 const MONEY_READERS = [...MONEY_READERS_IN_ORDER].sort()
 
+describe('the Return write ACL', () => {
+    const writers = (table: string) =>
+        recordAcls()
+            .filter((acl) => acl.table === table && acl.operation === 'write')
+            .map((acl) => [...acl.roles].sort())
+
+    it('grants the Order workers but the service desk, which raises Returns and works none', () => {
+        expect(writers('x_daas_ham_order')).toHaveLength(1)
+        const [orderWorkers = []] = writers('x_daas_ham_order')
+        expect(orderWorkers).toContain(PLATFORM_ROLE.serviceDeskAgent)
+        expect(writers('x_daas_ham_return_order')).toEqual([orderWorkers.filter((role) => role !== PLATFORM_ROLE.serviceDeskAgent)])
+    })
+})
+
 describe('the rules and ACLs that scope what a reader sees', () => {
     const SCOPINGS: Readonly<Record<string, TableScoping>> = SCOPED_TABLES
     const scopedTables = Object.keys(SCOPINGS)
