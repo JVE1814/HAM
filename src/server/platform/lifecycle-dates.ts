@@ -3,6 +3,7 @@ import { inFleet } from '../domain/fleet.ts'
 import { DEPLOYED_STAGES, notRetiredCondition, SERVING_STAGES, stagesQuery } from '../domain/lifecycle.ts'
 import { assetLifecycleStamp, type AssetLifecycleFacts, type LifecycleDates } from '../domain/model-lifecycle.ts'
 import { memoized } from '../domain/memo.ts'
+import { REFRESH_DUE_FIELD } from '../domain/refresh.ts'
 import type { LeaseEndAction, RefreshBasis } from '../domain/vocabulary.ts'
 import { runEventTableJob } from './chunked.ts'
 import { glideToIsoDate, todayIso } from './clock.ts'
@@ -67,7 +68,7 @@ function stampInputs(asset: GlideRecord): StampInputs {
         lease: str(asset, 'x_daas_ham_lease'),
         inService: str(asset, 'x_daas_ham_in_service_date'),
         phase: str(asset, 'x_daas_ham_lifecycle_phase'),
-        refreshDue: str(asset, 'x_daas_ham_refresh_due'),
+        refreshDue: str(asset, REFRESH_DUE_FIELD),
     }
 }
 
@@ -85,7 +86,7 @@ export function applyLifecycleDates(asset: GlideRecord, readers: LifecycleReader
     const inputs = stampInputs(asset)
     const { phase, refreshDue } = stampOf(inputs, readers)
     asset.setValue('x_daas_ham_lifecycle_phase', phase)
-    asset.setValue('x_daas_ham_refresh_due', refreshDue)
+    asset.setValue(REFRESH_DUE_FIELD, refreshDue)
     return inputs.phase !== phase || inputs.refreshDue !== refreshDue
 }
 
@@ -108,7 +109,7 @@ const REFRESH_PASS = {
     lease: { event: EVENT.leaseAssets, assets: (leaseId: string) => stagesQuery(SERVING_STAGES, `x_daas_ham_lease=${leaseId}`) },
 } as const
 
-export type RefreshPass = keyof typeof REFRESH_PASS
+type RefreshPass = keyof typeof REFRESH_PASS
 
 /** Queue the `pass` of `subject` (an Agreement or a Lease schedule): its Assets are recomputed in the background. */
 export function queueRefresh(pass: Exclude<RefreshPass, 'model'>, subject: GlideRecord): void {

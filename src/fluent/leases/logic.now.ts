@@ -1,13 +1,7 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, EmailNotification, Property, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
-import {
-    onAssetLeaseChanged,
-    onReturnedLeaseEndChanged,
-    refreshLeaseAssets,
-    reviewLeases,
-    transferLeaseAssets,
-    uiApplyLeaseDecision,
-} from '../../server/entry/leases'
+import { onReturnedLeaseEndChanged, refreshLeaseAssets, transferLeaseAssets, uiApplyLeaseDecision } from '../../server/entry/leases'
+import { giveToLessor, runLeaseReview } from '../../server/platform/leases'
 import { CURRENT_IS_FLEET, FLEET_FIELD } from '../../server/domain/fleet'
 import { LEASE_END_ACTION } from '../../server/domain/vocabulary'
 import { EVENT } from '../../server/domain/events'
@@ -28,7 +22,7 @@ BusinessRule({
     order: 90,
     condition:
         `(current.x_daas_ham_lease.changes() || current.${FLEET_FIELD}.changes()) && ${CURRENT_IS_FLEET} && current.x_daas_ham_lease != ''`,
-    script: onAssetLeaseChanged,
+    script: giveToLessor,
 })
 
 UiAction({
@@ -62,7 +56,7 @@ ScheduledScript({
     frequency: 'daily',
     executionTime: { hours: 5, minutes: 35, seconds: 0 },
     timeZone: 'UTC',
-    script: reviewLeases,
+    script: runLeaseReview,
 })
 
 Record({

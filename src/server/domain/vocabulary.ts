@@ -612,6 +612,11 @@ export const DISPOSAL_LINE_STATUS_CHOICES = {
     blocked: { label: 'Blocked', sequence: 2 },
 } as const
 export type DisposalLineStatus = keyof typeof DISPOSAL_LINE_STATUS_CHOICES
+export const DISPOSAL_LINE_STATUS = {
+    pending: 'pending',
+    done: 'done',
+    blocked: 'blocked',
+} as const satisfies Named<DisposalLineStatus>
 
 /* Lease schedules */
 

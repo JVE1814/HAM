@@ -1,3 +1,4 @@
+import { firstBest } from './collections.ts'
 import { andEachClause } from './encoded-query.ts'
 import type { LifecycleDates } from './model-lifecycle.ts'
 
@@ -96,9 +97,7 @@ export function replacementModel(
     }
     if (catalog.some((c) => c.modelId === current.modelId) && sellable(current.modelId)) return current.modelId
     const endOfSupport = (modelId: string) => lifecycle.get(modelId)?.endOfSupport ?? ''
-    // Latest end of support first; '' (unknown) sorts after every date. The sort is stable, so ties keep catalog order.
-    const options = catalog
-        .filter((c) => c.deviceClass === current.deviceClass && sellable(c.modelId))
-        .sort((a, b) => endOfSupport(b.modelId).localeCompare(endOfSupport(a.modelId)))
-    return options[0]?.modelId ?? null
+    // Latest end of support; '' (unknown) ranks below every date, and ties keep catalog order.
+    const options = catalog.filter((c) => c.deviceClass === current.deviceClass && sellable(c.modelId))
+    return firstBest(options, (a, b) => endOfSupport(a.modelId).localeCompare(endOfSupport(b.modelId)))?.modelId ?? null
 }

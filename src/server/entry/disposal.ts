@@ -1,5 +1,4 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { ROLE } from '../domain/roles.ts'
 import {
     completeDisposal,
     lineChangeRefusal,
@@ -13,8 +12,6 @@ import { abortWith } from '../platform/rule-api.ts'
 /** Disposal orders: approve, then retire each wiped Asset by its method (P2.5, Q61): platform/disposal. */
 
 export function uiSubmitDisposal(current: GlideRecord): void {
-    // A refused form save (the platform says why) asks nobody: the order is not what the approvers would decide.
-    if (!current.update()) return
     const submission = submitDisposal(current)
     if (!submission.submitted && submission.why) gs.addErrorMessage(submission.why)
 }
@@ -24,22 +21,14 @@ export function onDisposalApprovalDecision(current: ForeignRecord): void {
 }
 
 export function uiCompleteDisposal(current: GlideRecord): void {
-    // A refused form save (a method or Customer changed after submit) leaves the refused values on `current`.
-    if (!current.update()) return
     const { blocked, unsaved, refused } = completeDisposal(current)
     if (blocked > 0) gs.addErrorMessage(`${blocked} line(s) are blocked; see "Blocked by" on the lines`)
     if (unsaved > 0) gs.addErrorMessage(`${unsaved} line(s) could not be saved (see the system log)`)
     if (refused) gs.addErrorMessage(`Every line is done, but ${str(current, 'number')} was not saved as completed: ${refused}; complete it again`)
 }
 
-/**
- * Before insert/update/delete rule on disposal lines: once the order leaves draft, what it retires is fixed
- * (platform/disposal `lineChangeRefusal`). Removing a line retires nothing, so administrators (the only role the ACLs
- * let delete) still may: otherwise a line whose Asset can never be retired keeps its order approved for good, and
- * deleting an order could not take its lines with it.
- */
+/** Before insert/update/delete rule on disposal lines: once the order leaves draft, what it retires is fixed. */
 export function guardDisposalLine(current: GlideRecord, previous: GlideRecord): void {
-    if (current.operation() === 'delete' && gs.hasRole(ROLE.admin)) return
     abortWith(current, lineChangeRefusal(current, previous))
 }
 

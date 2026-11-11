@@ -11,11 +11,12 @@ import {
     type LegalOwner,
     ORDER_STAGE,
     type OrderStage,
+    type OrderType,
     type ReturnLineStatus,
     type ReturnMethod,
+    RETURN_LINE_STATUS,
     RETURN_TRIGGER,
     type ReturnTrigger,
-    TASK_STATE,
 } from './vocabulary.ts'
 
 /** Returns, depot evaluation and Fee events (P2.4). */
@@ -39,7 +40,7 @@ const REQUESTING_RETURNS: ActWording = { act: 'request returns', actForOwn: 'req
  * `actorRefusal`, as for an Order): only those the Return create rule lets in ask for returns, a customer admin only
  * for their own Customer.
  */
-export function returnRequesterRefusal(customerId: string, requester: ReturnRequester): string | null {
+function returnRequesterRefusal(customerId: string, requester: ReturnRequester): string | null {
     return actorRefusal(customerId, { ...requester, permitted: requester.mayRequest }, REQUESTING_RETURNS)
 }
 
@@ -60,12 +61,6 @@ export function returnRequestFindings(request: RequestedReturn, requester: Retur
     return misplaced ? [{ about: 'site', message: misplaced }] : []
 }
 
-/**
- * The platform's task states a Return order takes: Work in Progress while units are awaited or evaluated, Closed
- * Complete once every line is settled (or it has none).
- */
-export const RETURN_TASK_STATE = { inProgress: TASK_STATE.workInProgress, closed: TASK_STATE.closedComplete } as const
-
 /** The stages of a temporary deployment whose end date is watched: its equipment is being installed or is installed. */
 export const TEMPORARY_RETURN_STAGES: readonly OrderStage[] = [ORDER_STAGE.installing, ORDER_STAGE.complete]
 
@@ -73,7 +68,7 @@ export const TEMPORARY_RETURN_STAGES: readonly OrderStage[] = [ORDER_STAGE.insta
 export const OPEN_FEES_QUERY = `status=${FEE_STATUS.open}`
 
 /** The status of a Return line whose unit is still expected back: not at the depot yet, nor declared missing. */
-export const AWAITED: ReturnLineStatus = 'awaiting'
+export const AWAITED: ReturnLineStatus = RETURN_LINE_STATUS.awaiting
 
 /** The lines an arriving unit settles: awaited, or declared missing and now turning up late. */
 export const SETTLED_BY_RECEIPT: readonly ReturnLineStatus[] = ['awaiting', 'missing']
@@ -81,8 +76,13 @@ export const SETTLED_BY_RECEIPT: readonly ReturnLineStatus[] = ['awaiting', 'mis
 /** The lines that keep their Return order open: every other is evaluated or declared missing. */
 export const KEEPS_RETURN_OPEN: readonly ReturnLineStatus[] = ['awaiting', 'received']
 
-/** Returns whose unit the swap's own work order collects, so they open no de-install work of their own. */
-const COLLECTED_BY_SWAP: readonly ReturnTrigger[] = ['refresh_swap_back', 'defective_return']
+/** The Return an install that swaps units raises for the ones it replaced: a refresh's swap-back, else a defective unit. */
+export function swapReturnTrigger(orderType: OrderType | ''): ReturnTrigger {
+    return orderType === 'refresh' ? RETURN_TRIGGER.refresh_swap_back : RETURN_TRIGGER.defective_return
+}
+
+/** Returns whose unit the swap's own work order collects (`swapReturnTrigger`), so they open no de-install work of their own. */
+const COLLECTED_BY_SWAP: readonly ReturnTrigger[] = [swapReturnTrigger('refresh'), swapReturnTrigger('')]
 
 /** Whether a Return opens a de-install change and work order: a field de-install no swap work order already covers. */
 export function opensDeinstallWork(trigger: ReturnTrigger, method: ReturnMethod): boolean {
@@ -110,8 +110,8 @@ export function returnDueDate(raisedOn: string, allowanceDays: number): string {
 export type OverdueStep = 'none' | 'escalate' | 'declare_missing'
 
 /** What to do about an unreturned Asset today: escalate once after the due date, declare it missing after the grace period. */
-export function overdueStep(input: { dueDate: string; today: string; graceDays: number; received: boolean; escalated: boolean }): OverdueStep {
-    if (input.received || input.today <= input.dueDate) return 'none'
+export function overdueStep(input: { dueDate: string; today: string; graceDays: number; escalated: boolean }): OverdueStep {
+    if (input.today <= input.dueDate) return 'none'
     if (input.today > addDays(input.dueDate, input.graceDays)) return 'declare_missing'
     return input.escalated ? 'none' : 'escalate'
 }
@@ -153,19 +153,13 @@ export function deploymentEndLineQuery(assetId: string): string {
 }
 
 /**
- * What a whole-Site recovery (agreement end, site decommission) takes back: every unit serving the Site, including
- * those still shipped there, which the lifecycle lets go straight to pending return. Left off, a shipped unit would
- * miss the agreement-end Return, raised only once, and hold the site package open for good (`sitePackageHoldersQuery`).
- */
-export const SITE_RECOVERY_STAGES: readonly Stage[] = SERVING_STAGES
-
-/**
- * The stages of the units a Return with this trigger takes back: one that ends their deployment those still shipped
- * too, any other the installed ones. A temporary Order's units still shipped once its end date has passed would
- * otherwise stay deployed, and billed, with no Return raised again.
+ * The stages of the units a Return with this trigger takes back: one that ends their deployment every unit serving the
+ * Site, those still shipped there too (the lifecycle lets them go straight to pending return), any other the installed
+ * ones. Left off, a shipped unit would miss the agreement-end Return, raised only once, and hold the site package open
+ * for good (`sitePackageHoldersQuery`); a temporary Order's would stay deployed, and billed, with no Return raised again.
  */
 export function stagesTakenBack(trigger: ReturnTrigger): readonly Stage[] {
-    return DEPLOYMENT_END_TRIGGERS.includes(trigger) ? SITE_RECOVERY_STAGES : INSTALLED_STAGES
+    return DEPLOYMENT_END_TRIGGERS.includes(trigger) ? SERVING_STAGES : INSTALLED_STAGES
 }
 
 /** Who an evaluated Asset belongs to: its Legal owner and the end action of its lease ('' without one). */

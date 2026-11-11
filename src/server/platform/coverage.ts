@@ -4,6 +4,7 @@ import {
     answersByContract,
     contractKey,
     COVERAGE_CHECKED_FIELD,
+    COVERAGE_END_FIELD,
     coverageBySerial,
     mergeCoverage,
     staleCoverageQuery,
@@ -145,7 +146,7 @@ function refreshAssetCoverage(answered: ReadonlyMap<string, string>, coverageOf:
         const serial = answered.get(asset.getUniqueValue())
         const coverage = serial === undefined ? undefined : coverageOf.get(serial)
         if (coverage) {
-            asset.setValue('x_daas_ham_coverage_end', coverage.coverageEnd)
+            asset.setValue(COVERAGE_END_FIELD, coverage.coverageEnd)
             asset.setValue('x_daas_ham_coverage_level', coverage.serviceLevel)
             asset.setValue('x_daas_ham_support_cost', coverage.supportCost)
         }

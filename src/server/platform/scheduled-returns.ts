@@ -7,7 +7,7 @@ import { todayIso } from './clock.ts'
 import { installedAssetIds, installedAssetIdsBySite } from './installed-assets.ts'
 import { intProperty } from './properties.ts'
 import { exists, findById, str, warnRefused } from './records.ts'
-import { raiseReturn } from './returns.ts'
+import { raiseReturn, RETURN } from './returns.ts'
 
 /**
  * The Returns a date brings: an Agreement past its end and a temporary deployment about to end bring their equipment
@@ -16,7 +16,6 @@ import { raiseReturn } from './returns.ts'
  */
 
 const END_RETURN_RAISED = 'end_return_raised'
-const RETURN = 'x_daas_ham_return_order'
 
 /** Raise the Returns due today (the daily job): see `recoverEndedAgreements` and `returnTemporaryDeployments`. */
 export function raiseDueReturns(): void {
@@ -45,7 +44,7 @@ function recoverEndedAgreements(today: string): void {
         const agreementId = agreement.getUniqueValue()
         const recover = `Agreement ${str(agreement, 'number')} ended ${str(agreement, 'ends')}: recover all equipment`
         // One Return per Site, each a field de-install with its own change and work order there. Units still shipped
-        // there go too (domain/returns `SITE_RECOVERY_STAGES`): once all are raised, the job leaves this Agreement.
+        // there go too (domain/returns `stagesTakenBack`): once all are raised, the job leaves this Agreement.
         const bySite = installedAssetIdsBySite({ agreementId, returning: 'agreement_end' })
         // The Returns this end raised: after the end date, so not those of an end before a renewal.
         const raisedForEnd = `trigger=${RETURN_TRIGGER.agreement_end}^agreement=${agreementId}^sys_created_on>=${str(agreement, 'ends')} 00:00:00`

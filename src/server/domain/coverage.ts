@@ -1,4 +1,4 @@
-import { appendTo } from './collections.ts'
+import { appendTo, firstBest } from './collections.ts'
 import { FLEET_CONDITION, fleetCondition, INSTALLED_CONDITION, OEM_SOURCE_FIELD } from './fleet.ts'
 import { notRetiredCondition } from './lifecycle.ts'
 import type { CoverageFact, CoverageFetched } from './oem/types.ts'
@@ -37,7 +37,7 @@ export function coverageSummary(contracts: readonly CoverageView[], today: strin
         const end = coveredUntil(contract)
         return end === null ? [] : [{ end, serviceLevel: contract.serviceLevel }]
     })
-    const latest = covering.sort((a, b) => b.end.localeCompare(a.end))[0]
+    const latest = firstBest(covering, (a, b) => a.end.localeCompare(b.end))
     if (!latest) return { coveredToday: false, coverageEnd: '', serviceLevel: '' }
     return { coveredToday: latest.end >= today, coverageEnd: latest.end, serviceLevel: latest.serviceLevel }
 }
@@ -156,6 +156,7 @@ export function groupExpiringCoverage(rows: readonly ExpiringCoverage[]): Map<st
 }
 
 export const COVERAGE_CHECKED_FIELD = 'x_daas_ham_coverage_checked'
+export const COVERAGE_END_FIELD = 'x_daas_ham_coverage_end'
 
 /**
  * Encoded alm_hardware query: `vendor`'s fleet assets (ADR 0016: the Provider IT's serials are never sent to an OEM)
@@ -175,4 +176,4 @@ export function withoutCoverage(coverageEnd: string, today: string): boolean {
  * Encoded query on alm_hardware: the installed fleet assets (ADR 0016) without OEM coverage (`withoutCoverage`), as the
  * workspace lists and counts them.
  */
-export const INSTALLED_WITHOUT_COVERAGE = `${INSTALLED_CONDITION}^x_daas_ham_coverage_endISEMPTY^ORx_daas_ham_coverage_end<javascript:gs.beginningOfToday()^${FLEET_CONDITION}`
+export const INSTALLED_WITHOUT_COVERAGE = `${INSTALLED_CONDITION}^${COVERAGE_END_FIELD}ISEMPTY^OR${COVERAGE_END_FIELD}<javascript:gs.beginningOfToday()^${FLEET_CONDITION}`

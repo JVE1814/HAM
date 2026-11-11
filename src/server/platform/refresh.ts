@@ -14,11 +14,13 @@ import {
     type RefreshCandidate,
     type RefreshWave,
 } from '../domain/refresh.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { catalogModels } from './agreements.ts'
 import { nowMs, todayIso } from './clock.ts'
 import { readModelLifecycle } from './model-lifecycle.ts'
 import type { NewLine } from './order-lines.ts'
 import { createOrder, submitOrder } from './orders.ts'
+import { withLock } from './locks.ts'
 import { intProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { pluck, str, warnRefused } from './records.ts'
@@ -31,11 +33,23 @@ import { log } from './log.ts'
 const CANDIDATES_PER_RUN = 2000
 
 /**
+ * Daily job: the refresh Orders due. Two runs at once (the scheduled job and an *Execute now*) would both read an Asset
+ * as on no open replacing line and raise it twice, so a run holds a job lock (ADR 0013) from its read of the Assets due
+ * to its last Order; one that finds it held raises nothing and logs so. Taking the lock throws only when an insert is
+ * refused with no lock row (platform/locks): that error escapes.
+ */
+export function raiseRefreshOrders(): void {
+    const lockName = LOCK.refreshOrders()
+    if (withLock(lockName, raiseDueHolding).ran) return
+    log.info(`Refresh Orders not raised: another run holds the ${lockName} lock and raises them`)
+}
+
+/**
  * Raise the refresh Orders due, a wave at a time, holding the run's `lock`. A run that outlasts it (ADR 0013) stops
  * after the wave it lost it in: the run that took it over read what is on order afresh and raises the rest, but may
  * have read that wave's Assets before their lines were saved.
  */
-export function raiseDueRefreshOrders(lock: HeldLock): void {
+function raiseDueHolding(lock: HeldLock): void {
     for (const wave of refreshWaves(dueCandidates())) {
         const number = raiseWave(wave)
         if (lock.held()) continue

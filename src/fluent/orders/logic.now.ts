@@ -3,7 +3,7 @@ import { BusinessRule, Property, Record, ScheduledScript, ScriptAction, UiAction
 import { onOrderApprovalDecision, sourceOrder, uiCancelOrder, uiRecheckApprovals, uiSubmitOrder } from '../../server/entry/orders'
 import { ORDER_STAGE } from '../../server/domain/vocabulary'
 import { APPROVAL } from '../../server/domain/approvals'
-import { raiseRefreshOrders } from '../../server/entry/refresh'
+import { raiseRefreshOrders } from '../../server/platform/refresh'
 import { EVENT } from '../../server/domain/events'
 import { PROPERTY } from '../../server/domain/properties'
 import { accountManager, admin, assetManager, commercialEditors, orderRaisers } from '../shared/roles.now'

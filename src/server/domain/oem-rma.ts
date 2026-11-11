@@ -1,3 +1,4 @@
+import { firstBest } from './collections.ts'
 import { RMA_STATE, type RmaState } from './vocabulary.ts'
 
 /** OEM RMAs: the states an RMA is open in, and which open RMA a break-fix line's advance replacement goes under (P2.3). */
@@ -48,12 +49,8 @@ export interface RmaReuse {
  */
 export function advanceReplacementRma(lineId: string, rmas: readonly OpenRma[]): RmaReuse | null {
     const rank = (rma: OpenRma) => (rma.lineId === lineId ? 0 : 2) + (RMA_AWAITED.includes(rma.state) ? 0 : 1)
-    // A scan, not a sort: the platform's Array sort need not keep equals in the order given.
-    let best: OpenRma | null = null
-    for (const rma of rmas) {
-        const reusable = RMA_OPEN.includes(rma.state) && (rma.lineId === lineId || !rma.lineOpen)
-        if (reusable && (!best || rank(rma) < rank(best))) best = rma
-    }
+    const reusable = rmas.filter((rma) => RMA_OPEN.includes(rma.state) && (rma.lineId === lineId || !rma.lineOpen))
+    const best = firstBest(reusable, (a, b) => rank(b) - rank(a))
     if (!best) return null
     const askAgain = !RMA_AWAITED.includes(best.state)
     return { rma: best, state: askAgain ? 'open' : best.state, askAgain }

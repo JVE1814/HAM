@@ -19,10 +19,10 @@ import {
 } from '@servicenow/sdk/core'
 import { OEM_VENDOR_CHOICES, ORDER_STAGE, REPLACEMENT_TIER, RMA_STATE, RMA_STATE_CHOICES } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION } from '../../server/domain/fleet'
-import { onCaseFailedAsset, uiDefectiveReturnedToOem, uiRaiseReplacement } from '../../server/entry/breakfix'
+import { onReplacementComplete, uiDefectiveReturnedToOem, uiRaiseReplacement } from '../../server/entry/breakfix'
+import { takeFailedAssetTerms } from '../../server/platform/breakfix'
 import { PLATFORM_ROLE } from '../../server/domain/roles'
 import { EVENT } from '../../server/domain/events'
-import { onReplacementComplete } from '../../server/entry/replacements'
 import { admin, assetManager, noc, providerStaff, returnWorkers, stockroomWorkers } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
@@ -54,7 +54,7 @@ export const x_daas_ham_oem_rma = Table({
         state: ChoiceColumn({
             label: 'State',
             choices: RMA_STATE_CHOICES,
-            default: 'to_open',
+            default: RMA_STATE.to_open,
             dropdown: 'dropdown_without_none',
         }),
         ship_back_due: DateColumn({ label: 'Return defective by' }),
@@ -71,7 +71,7 @@ BusinessRule({
     action: ['insert', 'update'],
     order: 100,
     condition: "current.x_daas_ham_failed_asset.changes() && current.x_daas_ham_failed_asset != ''",
-    script: onCaseFailedAsset,
+    script: takeFailedAssetTerms,
 })
 
 UiAction({

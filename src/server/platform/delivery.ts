@@ -10,7 +10,7 @@ import {
 import type { HeldLock } from '../domain/job-lock.ts'
 import { isDeployed, stagesQuery } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { collectionMethod } from '../domain/returns.ts'
+import { collectionMethod, swapReturnTrigger } from '../domain/returns.ts'
 import type { InstallMode, OrderStage, OrderType } from '../domain/vocabulary.ts'
 import { moveAndSave, moveAsset, readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
@@ -254,9 +254,10 @@ function retireReplacedAssets(order: GlideRecord): void {
  */
 function returnReplacedAssets(order: GlideRecord, assetIds: readonly string[]): void {
     if (assetIds.length === 0) return
-    const refresh = choice<OrderType>(order, 'order_type') === 'refresh'
+    const orderType = choice<OrderType>(order, 'order_type')
+    const refresh = orderType === 'refresh'
     raiseReturn({
-        trigger: refresh ? 'refresh_swap_back' : 'defective_return',
+        trigger: swapReturnTrigger(orderType),
         customerId: str(order, 'customer'),
         siteId: str(order, 'site'),
         agreementId: str(order, 'agreement'),

@@ -3644,10 +3644,12 @@ declare global {
                     src_server_entry_refresh_ts: {
                         table: 'sys_module'
                         id: '1103f50a93384eb2afc4a3119bbd23e8'
+                        deleted: true
                     }
                     src_server_entry_replacements_ts: {
                         table: 'sys_module'
                         id: '5db7011938264dba8bcedc5c375ee2ed'
+                        deleted: true
                     }
                     src_server_entry_returns_ts: {
                         table: 'sys_module'
