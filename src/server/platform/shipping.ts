@@ -510,7 +510,7 @@ function trackAgain(shipment: GlideRecord, param: string, tries: number, why: st
  * update (`newestAt`: when its newest event happened, '' when none is dated) overtaken by one applied before it, a
  * webhook resent late or one queued while another was applied (domain/shipping `statusOvertaken`), adds only its
  * events, so its older status cannot move the Shipment back. A holder does not check that it still holds the lock:
- * its few writes take a moment, far inside the lock's ten minutes.
+ * its few writes take a moment, far inside domain/job-lock `ABANDONED_AFTER_MINUTES`.
  */
 function track(shipment: GlideRecord, update: TrackingUpdate, newestAt: string): Saved | { error: true } {
     const shipmentId = shipment.getUniqueValue()

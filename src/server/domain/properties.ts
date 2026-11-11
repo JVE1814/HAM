@@ -16,6 +16,11 @@ export const PROPERTY = {
     providerCompany: { name: 'x_daas_ham.provider_company', default: '' },
     tagPrefix: { name: 'x_daas_ham.tag.prefix', default: 'NAAS' },
     tagDigits: { name: 'x_daas_ham.tag.digits', default: 7 },
+    /**
+     * The staging centre's stockroom, which is also the Provider's one depot: purchases and spare-pool buys ship to it,
+     * sourcing stages and transfers stock there, and Shipment labels name it as the sender (platform/staging-tasks
+     * `stagingStockroom`).
+     */
     stagingStockroom: { name: 'x_daas_ham.staging.default_stockroom', default: '' },
     eventsMaxBatch: { name: 'x_daas_ham.events.max_batch', default: 500 },
     eventsRetentionDays: { name: 'x_daas_ham.events.retention_days', default: 90 },
