@@ -7,21 +7,15 @@ import { getRack, listRacks, listSites } from '../../server/entry/racks'
 import { answerAttestation, confirmInstalled, customerOverview, reportFault, requestCustomerReturn } from '../../server/entry/customer'
 import { getBillingLines, listBillingPeriods } from '../../server/entry/billing'
 import { postTrackingUpdate } from '../../server/entry/shipping'
-import { customerRestAcl } from './rest-acls.now'
+import { staffOrCustomer } from './rest-acls.now'
 
 /*
  * Scripted REST API: /api/x_daas_ham/naas/... A route that sets nothing requires the snc_internal role and enforces
- * the platform's "Scripted REST External Default" ACL, which admits internal users only: the staff and integration
- * routes. The routes built for customer users too (sites, racks, customer/...) turn the snc_internal requirement off and
- * enforce that ACL or the app's customer one (rest-acls.now.ts); a user passes either. The shipping webhook
- * runs unauthenticated (as guest, who holds no role) and checks its token itself. Each handler checks the caller's role.
+ * the platform's default ACL, which admits internal users only: the staff and integration routes. The routes built for
+ * customer users too (sites, racks, customer/...) turn the snc_internal requirement off and enforce `staffOrCustomer`
+ * (rest-acls.now.ts). The shipping webhook runs unauthenticated (as guest, who holds no role) and checks its token
+ * itself. Each handler checks the caller's role.
  */
-
-/** The platform's "Scripted REST External Default" ACL (global): role snc_internal and no snc_external. */
-const SCRIPTED_REST_EXTERNAL_DEFAULT = 'cf9d01d3e73003009d6247e603f6a990'
-
-/** Staff pass the platform's default ACL, customer admins and site contacts the app's. */
-const staffOrCustomer = [SCRIPTED_REST_EXTERNAL_DEFAULT, customerRestAcl]
 
 RestApi({
     $id: Now.ID['rest_naas'],
