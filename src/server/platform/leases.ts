@@ -15,12 +15,11 @@ import {
 } from '../domain/leases.ts'
 import { isRetired, SERVING_STAGES, type Stage, STOCK_STAGES } from '../domain/lifecycle.ts'
 import { isFree } from '../domain/sourcing.ts'
-import { LEASE_END_ACTION, type LeaseEndAction, LEGAL_OWNER, TASK_STATE } from '../domain/vocabulary.ts'
+import { type DisposalMethod, LEASE_END_ACTION, type LeaseEndAction, LEGAL_OWNER, TASK_STATE } from '../domain/vocabulary.ts'
 import { assetManagerIds } from './approvals.ts'
 import { moveAsset, readStage } from './assets.ts'
 import { runEventTableJob } from './chunked.ts'
 import { todayIso } from './clock.ts'
-import { addDisposalLine, draftLessorDisposal } from './disposal.ts'
 import { fire, queueJob, type JobEvent } from './events.ts'
 import { EVENT } from '../domain/events.ts'
 import { queueRefresh } from './lifecycle-dates.ts'
@@ -356,4 +355,28 @@ export function transferToProvider(queued: JobEvent, lease: GlideRecord): void {
             warnRefused(asset, `Buyout of ${str(lease, 'number')}: ${serial} not transferred`)
         },
     })
+}
+
+/** A draft return-to-lessor Disposal order for the stock of a returned lease; null when the platform refuses it (logged). */
+function draftLessorDisposal(lease: GlideRecord): GlideRecord | null {
+    const order = new GlideRecord('x_daas_ham_disposal_order')
+    order.initialize()
+    const method: DisposalMethod = 'return_to_lessor'
+    order.setValue('method', method)
+    order.setValue('disposal_vendor', str(lease, 'vendor'))
+    order.setValue('short_description', `Return stock to the lessor at the end of lease ${str(lease, 'number')}`)
+    if (order.insert()) return order
+    warnRefused(order, `Lease return: no disposal order for ${str(lease, 'number')}`)
+    return null
+}
+
+/** Put a returned lease's Asset on its draft Disposal order; false (logged) when the platform refuses the line. */
+function addDisposalLine(order: GlideRecord, asset: GlideRecord): boolean {
+    const line = new GlideRecord('x_daas_ham_disposal_line')
+    line.initialize()
+    line.setValue('disposal_order', order.getUniqueValue())
+    line.setValue('asset', asset.getUniqueValue())
+    if (line.insert()) return true
+    warnRefused(line, `Lease return: ${str(asset, 'serial_number')} left off ${str(order, 'number')}`)
+    return false
 }
