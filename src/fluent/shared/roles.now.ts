@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Role } from '@servicenow/sdk/core'
-import { BROAD_STAFF, PLATFORM_ROLE, PROVIDER_STAFF, ROLE } from '../../server/domain/visibility'
+import { BROAD_STAFF, MONEY_READERS, PLATFORM_ROLE, PROVIDER_STAFF, ROLE } from '../../server/domain/visibility'
 
 /*
  * The base-platform roles contained below must exist on the instance, as must the service desk's, which the ACLs grant
@@ -115,7 +115,7 @@ export const returnWorkers = [ROLE.assetManager, ROLE.inventoryTech, ROLE.noc]
 export const leaseEditors = [ROLE.assetManager, ROLE.finance]
 
 /** Roles that read the money tables (service intervals, billing, cost facts and margin), the NaaS dashboard's Margin tab among them. */
-export const moneyReaders = [ROLE.finance, ROLE.accountManager, ROLE.assetManager]
+export const moneyReaders = MONEY_READERS
 
 /** Every person the app serves, provider staff and Customer contacts: the rack elevations are open to them all. */
 export const staffAndCustomers = [

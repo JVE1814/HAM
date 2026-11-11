@@ -3,6 +3,9 @@ import type { LifecycleDates } from './model-lifecycle.ts'
 
 /** Hardware refresh (P2.2, Q48): which Assets go together and what replaces them. */
 
+/** The days ahead the refresh job plans by default (property x_daas_ham.refresh.horizon_days). */
+export const REFRESH_HORIZON_DAYS = 90
+
 export interface RefreshCandidate {
     assetId: string
     agreementId: string

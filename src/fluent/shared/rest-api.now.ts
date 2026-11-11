@@ -7,6 +7,7 @@ import { getRack, listRacks, listSites } from '../../server/entry/racks'
 import { answerAttestation, confirmInstalled, customerOverview, reportFault, requestCustomerReturn } from '../../server/entry/customer'
 import { getBillingLines, listBillingPeriods } from '../../server/entry/billing'
 import { postTrackingUpdate } from '../../server/entry/shipping'
+import { sessionRoles } from '../../server/entry/session'
 import { customerRestAcl } from './rest-acls.now'
 
 /*
@@ -41,6 +42,15 @@ RestApi({
             authentication: true,
             authorization: true,
             script: postDeviceEvents,
+        },
+        {
+            $id: Now.ID['rest_naas_me'],
+            name: 'me',
+            method: 'GET',
+            path: '/me',
+            shortDescription: "The app's roles the signed-in user holds.",
+            authentication: true,
+            script: sessionRoles,
         },
         {
             $id: Now.ID['rest_naas_lookup'],

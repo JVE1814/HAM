@@ -21,6 +21,8 @@ export const ROLE = {
     integration: 'x_daas_ham.integration',
 } as const
 
+export type AppRole = (typeof ROLE)[keyof typeof ROLE]
+
 /**
  * The roles of other applications the app's roles contain or its metadata names. They must exist on the instance
  * (README "Required plugins"), which the preflight check reports (domain/preflight).
@@ -50,6 +52,9 @@ export const BROAD_STAFF = [ROLE.assetManager, ROLE.fieldTech, ROLE.noc, ROLE.ac
  * navigator's modules store it.
  */
 export const PROVIDER_STAFF = [ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance]
+
+/** The roles that read the money tables: service intervals, billing, cost facts and margin. */
+export const MONEY_READERS = [ROLE.finance, ROLE.accountManager, ROLE.assetManager]
 
 const BROAD_STAFF_ROLES = [ROLE.admin, ...BROAD_STAFF]
 

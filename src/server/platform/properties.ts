@@ -1,4 +1,5 @@
 import { gs } from '@servicenow/glide'
+import { REFRESH_HORIZON_DAYS } from '../domain/refresh.ts'
 
 /** A system property the app declares: its name, and the value it ships with, which a reader also falls back to. */
 export interface PropertyOf<Value extends string | number | boolean> {
@@ -25,7 +26,7 @@ export const PROPERTY = {
     unseenDays: { name: 'x_daas_ham.reconciliation.unseen_days', default: 7 },
     returnGraceDays: { name: 'x_daas_ham.returns.grace_days', default: 14 },
     temporaryReturnLeadDays: { name: 'x_daas_ham.returns.temporary_lead_days', default: 7 },
-    refreshHorizonDays: { name: 'x_daas_ham.refresh.horizon_days', default: 90 },
+    refreshHorizonDays: { name: 'x_daas_ham.refresh.horizon_days', default: REFRESH_HORIZON_DAYS },
     leaseDecisionGroup: { name: 'x_daas_ham.leases.decision_group', default: '' },
     amortisationMonths: { name: 'x_daas_ham.margin.amortisation_months', default: 60 },
     visitCost: { name: 'x_daas_ham.margin.visit_cost', default: 250 },

@@ -1,6 +1,7 @@
 import type { Stage } from './lifecycle.ts'
 import type { PowerBudget } from './rack.ts'
 import type { AttestationResponse, LifecyclePhase, RackFace, ReturnMethod } from './vocabulary.ts'
+import type { AppRole } from './visibility.ts'
 
 /**
  * What the REST resources of the three pages take and answer (src/fluent/shared/rest-api.now.ts): each shape is declared
@@ -196,4 +197,9 @@ export interface ReturnRequestBody {
 /** POST /customer/returns: the number of the Return order raised. */
 export interface ReturnRequestReceipt {
     returnOrder: string
+}
+
+/** GET /me: the app's roles the signed-in user holds, as gs.hasRole counts them (admin holds every one). */
+export interface SessionRoles {
+    roles: AppRole[]
 }
