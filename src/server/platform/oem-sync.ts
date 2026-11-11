@@ -30,10 +30,15 @@ const COVERAGE_BATCH = 200
  */
 const ERRORS_LOGGED = 20
 
+/** Log a job's errors of one run, each naming its vendor: the first ERRORS_LOGGED, and a line counting the rest. */
 function report(job: string, errors: readonly string[]): void {
     for (const error of errors.slice(0, ERRORS_LOGGED)) gs.warn(`[x_daas_ham] ${job}: ${error}`)
     const more = errors.length - ERRORS_LOGGED
     if (more > 0) gs.warn(`[x_daas_ham] ${job}: and ${more} more error(s) not logged`)
+}
+
+function ofVendor(vendor: OemVendor, errors: readonly string[]): string[] {
+    return errors.map((error) => `${vendor}: ${error}`)
 }
 
 /**
@@ -62,6 +67,7 @@ function naasModelsByPid(vendor: OemVendor): { asked: Map<string, string>; model
  * each get them; one asked once. An answer for a PID no Model has is logged.
  */
 export function syncLifecycle(): void {
+    const runErrors: string[] = []
     for (const { vendor, route } of enabledRoutes('lifecycle', oemEnabled)) {
         const { asked, models } = naasModelsByPid(vendor)
         if (asked.size === 0) continue
@@ -77,8 +83,9 @@ export function syncLifecycle(): void {
                 errors.push(...written.refused.map((why) => `lifecycle of PID ${fact.pid} (Model ${modelId}) not saved: ${why}`))
             }
         }
-        report(`lifecycle ${vendor}`, errors)
+        runErrors.push(...ofVendor(vendor, errors))
     }
+    report('lifecycle', runErrors)
 }
 
 /**
@@ -102,27 +109,33 @@ function syncCoverageHolding(lock: HeldLock): void {
     const started = nowMs()
     const budgetMs = intProperty(PROPERTY.jobBudgetSeconds) * 1000
     const staleBefore = daysAgoGlide(intProperty(PROPERTY.coverageRefreshDays))
+    const errors: string[] = []
     let due = enabledRoutes('coverage', oemEnabled)
-    for (let round = 0; due.length > 0; round++) {
-        const behind: typeof due = []
-        for (const turn of due) {
-            if (round > 0 && nowMs() - started > budgetMs) return
-            if (!lock.held()) return
-            if (syncCoverageBatch(turn.vendor, turn.route, staleBefore)) behind.push(turn)
+    try {
+        for (let round = 0; due.length > 0; round++) {
+            const behind: typeof due = []
+            for (const turn of due) {
+                if (round > 0 && nowMs() - started > budgetMs) return
+                if (!lock.held()) return
+                if (syncCoverageBatch(turn.vendor, turn.route, staleBefore, errors)) behind.push(turn)
+            }
+            due = behind
         }
-        due = behind
+    } finally {
+        report('coverage', errors)
     }
 }
 
 /**
- * One batch of `vendor`'s stale Assets; returns whether the vendor gets another batch this run. A batch reads
- * and writes its serials' stored coverage with one query, and updates its Assets from another.
+ * One batch of `vendor`'s stale Assets, adding what it could not get or save to the run's `errors`; returns whether
+ * the vendor gets another batch this run. A batch reads and writes its serials' stored coverage with one query, and
+ * updates its Assets from another.
  */
-function syncCoverageBatch(vendor: OemVendor, route: CoverageRoute, staleBefore: string): boolean {
+function syncCoverageBatch(vendor: OemVendor, route: CoverageRoute, staleBefore: string, errors: string[]): boolean {
     const assets = staleAssets(vendor, staleBefore, route.maxKeysPerRun ?? COVERAGE_BATCH)
     if (assets.size === 0) return false
     const result = route.run([...assets.keys()], oemContext(route.via))
-    report(`coverage ${vendor}`, result.errors)
+    errors.push(...ofVendor(vendor, result.errors))
     const dispositionOf = coverageDisposition(result)
     const answered = new Map<string, string>()
     const answers: CoverageAnswer[] = []
@@ -137,7 +150,7 @@ function syncCoverageBatch(vendor: OemVendor, route: CoverageRoute, staleBefore:
         for (const fact of disposition.facts) answers.push({ assetId: lastAsset, fact })
     }
     const refused = applyCoverage(vendor, 'api', answered, answers, stamped)
-    report(`coverage ${vendor}`, refused)
+    errors.push(...ofVendor(vendor, refused))
     // A batch with errors ends the vendor's run, as does one with refused saves (its Assets, still stale, would come
     // straight back); a rate-limited vendor (maxKeysPerRun) gets one batch per run.
     return result.errors.length === 0 && refused.length === 0 && route.maxKeysPerRun === undefined
@@ -149,12 +162,13 @@ function syncCoverageBatch(vendor: OemVendor, route: CoverageRoute, staleBefore:
  * its place at the front and would take a turn of the others unseen.
  */
 export function syncRmaStatus(): void {
+    const errors: string[] = []
     for (const { vendor, route } of enabledRoutes('rmaStatus', oemEnabled)) {
         const asked = rmasToAskAbout(vendor)
         if (asked.ids.length === 0) continue
         const result = route.run(asked.rmaNumbers, oemContext(route.via))
-        report(`rma ${vendor}`, result.errors)
         const statusOf = new Map(result.facts.map((fact) => [fact.rmaNumber, fact.status]))
-        report(`rma ${vendor}`, recordRmaStatuses(asked.ids, statusOf))
+        errors.push(...ofVendor(vendor, [...result.errors, ...recordRmaStatuses(asked.ids, statusOf)]))
     }
+    report('rma', errors)
 }

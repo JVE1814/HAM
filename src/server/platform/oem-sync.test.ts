@@ -66,6 +66,19 @@ describe('the coverage job', () => {
         expect(platform.tables[LOCKS] ?? []).toEqual([])
     })
 
+    it('logs its first 20 errors of the run, whichever vendor they are of, and counts the rest in one line', () => {
+        routeVendors = ['cisco', 'mist']
+        for (let i = 2; i <= 15; i++) staleAsset(`foc${i}`, 'cisco')
+        for (let i = 1; i <= 15; i++) staleAsset(`mist${i}`, 'mist')
+
+        syncCoverage()
+
+        expect(asked.map(({ vendor, serials }) => `${vendor} ${serials.length}`)).toEqual(['cisco 15', 'mist 15'])
+        expect(platform.warnings).toHaveLength(21)
+        expect(platform.warnings.slice(0, 20)).toEqual(expect.arrayContaining([expect.stringMatching(/coverage: cisco: FOC\d+: HTTP 500/), expect.stringMatching(/coverage: mist: MIST\d+: HTTP 500/)]))
+        expect(platform.warnings[20]).toBe('[x_daas_ham] coverage: and 10 more error(s) not logged')
+    })
+
     it('asks nothing while another run holds its lock, and says so', () => {
         const other = withLock(LOCK.oemCoverageRun(), () => syncCoverage())
 
