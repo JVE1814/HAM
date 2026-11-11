@@ -3438,6 +3438,10 @@ declare global {
                         table: 'sys_module'
                         id: '3e742f506a82462580d00cec26db4db6'
                     }
+                    'src_server_domain_oem_claim-adapters_ts': {
+                        table: 'sys_module'
+                        id: 'ec31974267114ff4a63aecbb6fb92563'
+                    }
                     src_server_domain_oem_claims_ts: {
                         table: 'sys_module'
                         id: '56f7a0a317d2447bbb3e28c63281cd56'

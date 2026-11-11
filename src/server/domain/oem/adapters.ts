@@ -1,10 +1,12 @@
 import { chunks } from '../collections.ts'
 import { failureText, isSuccess, type HttpPort } from '../http.ts'
 import { asArray, field, isoDate, parseJson, text } from '../json.ts'
-import type { OemVendor } from '../vocabulary.ts'
+import type { ClaimAction, OemVendor } from '../vocabulary.ts'
 import type { CoverageFact, CoverageFetched, Fetched, LifecycleFact, RmaFact } from './types.ts'
 import { fortiCloudError } from './forticloud.ts'
 import { REST_MESSAGE, type RestFunction } from '../rest-message-names.ts'
+import type { VendorClaimRoutes } from './claims.ts'
+import { FORTICLOUD_REGISTER, FORTIZTP_PROVISION, GREENLAKE_ADD, GREENLAKE_SUBSCRIBE, MERAKI_CLAIM, MIST_CLAIM, ZERO_TOUCH_CLAIM } from './claim-adapters.ts'
 
 /*
  * Vendor adapters (ADR 0008). Response shapes follow the vendors' public API documentation; mappers
@@ -396,3 +398,24 @@ export function enabledRoutes<K extends keyof VendorRoutes>(capability: K, enabl
         return route ? [{ vendor, route }] : []
     })
 }
+
+/** Which vendor can do which staging step, through which claim adapter. Cisco PnP has no public API. */
+const CLAIM_ROUTES: Partial<Record<OemVendor, VendorClaimRoutes>> = {
+    meraki: { oem_claim: MERAKI_CLAIM },
+    mist: { oem_claim: MIST_CLAIM },
+    aruba: { oem_claim: GREENLAKE_ADD, oem_licence: GREENLAKE_SUBSCRIBE },
+    fortinet: { oem_claim: FORTICLOUD_REGISTER, oem_ztp: FORTIZTP_PROVISION },
+    checkpoint: { oem_ztp: ZERO_TOUCH_CLAIM },
+}
+
+export function claimRoutes(vendor: OemVendor): VendorClaimRoutes {
+    return CLAIM_ROUTES[vendor] ?? {}
+}
+
+/** Whether a run can send `vendor` an `action` step: a template's step it cannot is copied as one done by hand. */
+export function claimRouted(vendor: string, action: string): boolean {
+    return Boolean(claimRoutes(vendor as OemVendor)[action as ClaimAction])
+}
+
+/** Vendors with at least one automated step (Cisco has none). */
+export const CLAIM_VENDORS: readonly OemVendor[] = Object.keys(CLAIM_ROUTES) as OemVendor[]

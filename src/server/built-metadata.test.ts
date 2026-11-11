@@ -13,8 +13,7 @@ import {
 import { replacementStep } from './domain/breakfix'
 import { CANCELLABLE_ORDER_STAGES } from './domain/fulfilment'
 import { LOCK_NAME_LENGTH } from './domain/lock-names'
-import { OEM_ADAPTERS } from './domain/oem/adapters'
-import { CLAIM_ROUTES } from './domain/oem/claims'
+import { claimRoutes, CLAIM_VENDORS, OEM_ADAPTERS } from './domain/oem/adapters'
 import { REST_MESSAGE } from './domain/rest-message-names'
 import { RMA_AT_OEM } from './domain/oem-rma'
 import { buyLabel, labelVoidable } from './domain/shipping'
@@ -1214,8 +1213,8 @@ describe('REST messages', () => {
         }
         // Check Point's Zero Touch takes an account of the form <account id>/<template id>; to the others it is any text.
         const target = { stepId: 'step', serial: 'SERIAL', mac: '00:11:22:33:44:55', claimCode: 'CODE', account: '1/2' }
-        for (const routes of Object.values(CLAIM_ROUTES)) {
-            for (const route of Object.values(routes)) route.run([target], restMessagePort(route.message), 10)
+        for (const vendor of CLAIM_VENDORS) {
+            for (const route of Object.values(claimRoutes(vendor))) route.run([target], restMessagePort(route.message), 10)
         }
         const address = { name: 'Depot', phone: '+31 20 000 0000', line1: 'Street 1', city: 'Amsterdam', postalCode: '1000 AA', country: 'NL' }
         buyLabel(restMessagePort(REST_MESSAGE.shipping.name), { carrierId: 'se-1', serviceCode: 'standard', from: address, to: address, packages: 1, weightKg: 1, reference: 'R' })

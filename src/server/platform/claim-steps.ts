@@ -1,9 +1,9 @@
 import { GlideRecord } from '@servicenow/glide'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
+import { claimRoutes, CLAIM_VENDORS } from '../domain/oem/adapters.ts'
 import {
     CLAIM_PREREQUISITE,
-    CLAIM_VENDORS,
     dependentActions,
     dueStepsQuery,
     runVendorClaims,
@@ -71,7 +71,7 @@ function runHolding(lock: HeldLock): void {
     const store = whileHeld(lock, glideClaimStore())
     for (const vendor of CLAIM_VENDORS) {
         const enabled = CLAIM_ENABLED[vendor]
-        if (enabled && boolProperty(enabled)) runVendorClaims(vendor, store, restMessagePort, maxCalls, () => lock.held())
+        if (enabled && boolProperty(enabled)) runVendorClaims(vendor, claimRoutes(vendor), store, restMessagePort, maxCalls, () => lock.held())
     }
 }
 

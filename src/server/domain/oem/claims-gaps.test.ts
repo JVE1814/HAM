@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { HttpRequest, HttpResponse } from '../http'
-import { CLAIM_ROUTES, runVendorClaims, type ClaimOutcome, type ClaimStore, type ClaimTarget } from './claims'
+import { claimRoutes } from './adapters'
+import { FORTICLOUD_REGISTER, FORTIZTP_PROVISION, GREENLAKE_ADD, GREENLAKE_SUBSCRIBE, MERAKI_CLAIM, MIST_CLAIM, ZERO_TOUCH_CLAIM } from './claim-adapters'
+import { runVendorClaims, type ClaimOutcome, type ClaimStore, type ClaimTarget } from './claims'
 
 /*
  * The claim adapters' HTTP-failure branches: a call that gets no answer (status 0, the transport's reason) or a non-2xx
@@ -33,7 +35,7 @@ const unavailable: HttpResponse = { status: 503, body: '<html>Service Unavailabl
 const failedAll = (stepIds: string[], message: string): ClaimOutcome[] => stepIds.map((stepId) => ({ stepId, ok: false, message }))
 
 describe('Mist claim', () => {
-    const run = CLAIM_ROUTES.mist!.oem_claim!.run
+    const run = MIST_CLAIM.run
 
     it("fails a batch that got no answer with the transport's reason", () => {
         const { http, calls } = fake([timedOut])
@@ -50,13 +52,13 @@ describe('Mist claim', () => {
 describe('Meraki claim', () => {
     it('fails a batch on a server error whose body is not JSON', () => {
         const { http } = fake([unavailable])
-        expect(CLAIM_ROUTES.meraki!.oem_claim!.run([target('A'), target('B')], http, 5).outcomes).toEqual(failedAll(['A', 'B'], 'HTTP 503'))
+        expect(MERAKI_CLAIM.run([target('A'), target('B')], http, 5).outcomes).toEqual(failedAll(['A', 'B'], 'HTTP 503'))
     })
 })
 
 describe('GreenLake', () => {
-    const add = CLAIM_ROUTES.aruba!.oem_claim!.run
-    const subscribe = CLAIM_ROUTES.aruba!.oem_licence!.run
+    const add = GREENLAKE_ADD.run
+    const subscribe = GREENLAKE_SUBSCRIBE.run
     const device = { status: 200, body: JSON.stringify({ items: [{ id: 'dev-1', serialNumber: 'Q2XX-A', subscription: [] }] }) }
 
     it("fails every device of an add that got no answer with the transport's reason", () => {
@@ -98,22 +100,22 @@ describe('GreenLake', () => {
 describe('Fortinet', () => {
     it('fails a registration batch refused over HTTP with the API error', () => {
         const { http } = fake([{ status: 401, body: JSON.stringify({ error: 'invalid_token', error_description: 'Token expired' }) }])
-        expect(CLAIM_ROUTES.fortinet!.oem_claim!.run([target('A'), target('B')], http, 5).outcomes).toEqual(failedAll(['A', 'B'], 'HTTP 401: Token expired'))
+        expect(FORTICLOUD_REGISTER.run([target('A'), target('B')], http, 5).outcomes).toEqual(failedAll(['A', 'B'], 'HTTP 401: Token expired'))
     })
 
     it("fails a registration batch that got no answer with the transport's reason", () => {
         const { http } = fake([timedOut])
-        expect(CLAIM_ROUTES.fortinet!.oem_claim!.run([target('A')], http, 5).outcomes).toEqual(failedAll(['A'], 'no response: Read timed out'))
+        expect(FORTICLOUD_REGISTER.run([target('A')], http, 5).outcomes).toEqual(failedAll(['A'], 'no response: Read timed out'))
     })
 
     it('fails a registration whose 2xx body is not a JSON object, rather than tick it', () => {
         const { http } = fake([{ status: 200, body: '' }])
-        expect(CLAIM_ROUTES.fortinet!.oem_claim!.run([target('A')], http, 5).outcomes).toEqual(failedAll(['A'], 'response is not a JSON object'))
+        expect(FORTICLOUD_REGISTER.run([target('A')], http, 5).outcomes).toEqual(failedAll(['A'], 'response is not a JSON object'))
     })
 
     it('fails each FortiZTP device refused or unanswered on its own, and provisions the others', () => {
         const { http, calls } = fake([{ status: 404, body: JSON.stringify({ error: 'device not found' }) }, timedOut, { status: 200, body: '{}' }])
-        const result = CLAIM_ROUTES.fortinet!.oem_ztp!.run([target('A', { account: 'FMG-1' }), target('B', { account: 'FMG-1' }), target('C', { account: 'FMG-1' })], http, 5)
+        const result = FORTIZTP_PROVISION.run([target('A', { account: 'FMG-1' }), target('B', { account: 'FMG-1' }), target('C', { account: 'FMG-1' })], http, 5)
         expect(calls).toHaveLength(3)
         expect(result.outcomes).toEqual([
             { stepId: 'A', ok: false, message: 'HTTP 404: device not found' },
@@ -124,7 +126,7 @@ describe('Fortinet', () => {
 })
 
 describe('Check Point Zero Touch', () => {
-    const run = CLAIM_ROUTES.checkpoint!.oem_ztp!.run
+    const run = ZERO_TOUCH_CLAIM.run
     const loggedIn = { status: 200, body: JSON.stringify({ sid: 'sid-1' }) }
 
     it("fails the gateways when the login got no answer, with the transport's reason, and does not log out", () => {
@@ -164,7 +166,7 @@ describe('a vendor run whose calls fail', () => {
 
     it('settles the failed steps with the reason and spends the calls it made', () => {
         const { claimStore, settled } = store({ oem_claim: [target('A'), target('B')] })
-        const calls = runVendorClaims('meraki', claimStore, () => fake([timedOut]).http, 10)
+        const calls = runVendorClaims('meraki', claimRoutes('meraki'), claimStore, () => fake([timedOut]).http, 10)
         expect(calls).toBe(1)
         expect(settled).toEqual([failedAll(['A', 'B'], 'no response: Read timed out')])
     })
@@ -172,7 +174,7 @@ describe('a vendor run whose calls fail', () => {
     it('still runs the later actions of the budget after a failed one', () => {
         const { claimStore, settled } = store({ oem_claim: [target('A', { account: '' })], oem_ztp: [target('Z', { account: 'FMG-1' })] })
         const transport = (message: string) => fake([message === 'NaaS FortiCare' ? unavailable : { status: 200, body: '{}' }]).http
-        expect(runVendorClaims('fortinet', claimStore, transport, 10)).toBe(2)
+        expect(runVendorClaims('fortinet', claimRoutes('fortinet'), claimStore, transport, 10)).toBe(2)
         expect(settled).toEqual([failedAll(['A'], 'HTTP 503'), [{ stepId: 'Z', ok: true, message: 'provisioned to FortiManager FMG-1' }]])
     })
 })
