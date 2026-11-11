@@ -13,7 +13,6 @@ import {
 import {
     dependentActions,
     dueStepsQuery,
-    settledStatus,
     initialAutomationStatus,
     runVendorClaims,
     type ClaimOutcome,
@@ -596,14 +595,5 @@ describe('initialAutomationStatus', () => {
 
     it('makes the claim step, which waits for nothing, pending', () => {
         expect(initialAutomationStatus('oem_claim', ['oem_claim', 'oem_licence', 'oem_ztp'])).toBe('pending')
-    })
-})
-
-describe('settledStatus', () => {
-    it('ticks a step whose call succeeded and fails the others, which are due again later', () => {
-        expect(settledStatus({ stepId: 's1', ok: true, message: '' })).toBe('done')
-        expect(settledStatus({ stepId: 's1', ok: false, message: 'no' })).toBe('failed')
-        expect(due(failedStep({ automation_status: settledStatus({ stepId: 's1', ok: false, message: 'no' }) }))).toBe(true)
-        expect(due(failedStep({ automation_status: settledStatus({ stepId: 's1', ok: true, message: '' }) }))).toBe(false)
     })
 })

@@ -6,8 +6,8 @@ import {
     CLAIM_PREREQUISITE,
     dependentActions,
     dueStepsQuery,
+    OPEN_STEP,
     runVendorClaims,
-    settledStatus,
     STEP_STATUS,
     type ClaimOutcome,
     type ClaimStore,
@@ -27,7 +27,7 @@ import { log } from './log.ts'
 /**
  * The automated steps of a Staging task (x_daas_ham_staging_step rows with an `automation`) and the OEM claims they
  * stand for. Of a step's state (domain/oem/claims `STEP_STATUS`), this module owns what follows its creation: a step
- * waiting on another is released once that one is ticked (`releaseStepsWaitingOn`: waiting to due), or by the next
+ * waiting on another is released once that one is ticked (`releaseStepsWaitingOn`: waiting to pending), or by the next
  * claim run when that release was refused (`releaseStranded`), and the claim run settles each step it sent (`settle`:
  * done and ticked, or failed with one more attempt and the vendor's message).
  * The rest is platform/staging-tasks': it creates a task's steps, each automated one in its
@@ -160,7 +160,7 @@ function releaseStranded(): void {
 
 function waitingSteps(after: string): Array<{ stepId: string; taskId: string; prerequisite: string }> {
     const waiting = new GlideRecord(STEP)
-    waiting.addEncodedQuery(`automation_status=${STEP_STATUS.waiting}^done=false^staging_task.active=true`)
+    waiting.addEncodedQuery(`automation_status=${STEP_STATUS.waiting}^${OPEN_STEP}`)
     if (after) waiting.addQuery('sys_id', '>', after)
     waiting.orderBy('sys_id')
     waiting.setLimit(STRANDED_LOAD)
@@ -194,7 +194,7 @@ function saveStrandedCursor(cursor: JobCursor, next: string): void {
  * react only to done changing.
  */
 function release(step: GlideRecord): void {
-    step.setValue('automation_status', STEP_STATUS.due)
+    step.setValue('automation_status', STEP_STATUS.pending)
     if (!step.update()) warnRefused(step, `OEM step "${str(step, 'label')}" of ${step.getDisplayValue('staging_task')} still waiting, not released`)
 }
 
@@ -218,7 +218,7 @@ function settle(outcomes: readonly ClaimOutcome[]): void {
     while (step.next()) {
         const outcome = byStep.get(step.getUniqueValue())
         if (!outcome || (!outcome.ok && bool(step, 'done'))) continue
-        const status = settledStatus(outcome)
+        const status = outcome.ok ? STEP_STATUS.done : STEP_STATUS.failed
         step.setValue('automation_message', outcome.message)
         step.setValue('automation_status', status)
         if (outcome.ok) step.setValue('done', true)
