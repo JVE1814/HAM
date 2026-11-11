@@ -767,7 +767,7 @@ Sources:
 | `GlideSysAttachment.write()` and `deleteAttachment()` | As used (`billing.ts:243,255-258`) | Same signatures | matches | N25, N26 |
 | `sys_attachment` fields | `table_name`, `table_sys_id`, `file_name` (`billing.ts:268`) | Documented | matches | N27, N28 |
 | Scripted REST `request.queryParams` | Each parameter is an array (`rest-api.ts:12`) | Type Array; examples are arrays | matches | N29 |
-| `GlideRecord.updateMultiple()` and clearing a field | Clears `billing_period` record by record (`platform/fees.ts` takeOffPeriod) | `updateMultiple` does not clear values unless set to `'NULL'` | matches | N30 |
+| `GlideRecord.updateMultiple()` and clearing a field | Clears `billing_period` record by record (`platform/billing.ts` takeOffPeriod) | `updateMultiple` does not clear values unless set to `'NULL'` | matches | N30 |
 | `RESTMessageV2(name, methodName)`, `setStringParameterNoEscape` | As used; app URL-encodes values itself (`rest-port.ts:8,26-28`) | Constructor documented; neither method URL-encodes | matches | N31, N32, N33 |
 | `GlideAggregate.groupBy` on date fields | Grouped `start_date`/`end_date` read as `YYYY-MM-DD` (`platform/billing.ts` intervalsByLine) | Format of a grouped `glide_date` key not documented | unverifiable | N34 |
 | `setWorkflow(false)` on a global table from the scoped app | No longer relied on there: a read past the visibility rules on `alm_hardware` marks its GlideRecord while its query runs and the app's before-query rules skip a marked record (`platform/beyond-visibility.ts`, `entry/visibility.ts` `scopeRecords`); `setWorkflow(false)` stays on `x_daas_ham_*` tables | "This method can't be set for cross-scoped applications"; refused on the instance, so the rules still run. Module state reaches the rules the query sets off, within that transaction only | matches | N30, N35, N37 |
@@ -855,7 +855,7 @@ Notes:
   existing value, use the setValue() method and set the field to 'NULL'." Also "use the setValue()
   method instead of direct assignments" and "Do not use this method with the chooseWindow() or
   setLimit() methods when working with large tables." The docs example calls `addQuery`, `setValue`,
-  `updateMultiple`, with no `query()`. Optional simplification in `platform/fees.ts` takeOffPeriod:
+  `updateMultiple`, with no `query()`. Optional simplification in `platform/billing.ts` takeOffPeriod:
   `fee.setValue('billing_period', 'NULL'); fee.updateMultiple()`; the current loop is also correct.
 - **RESTMessageV2.** Scoped and global, `sn_ws` namespace: `RESTMessageV2(String name, String
   methodName)`; name is "The name of the REST message record in the REST Message [sys_rest_message]

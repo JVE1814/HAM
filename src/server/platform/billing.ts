@@ -21,24 +21,25 @@ import {
 import { chooseCurrency, currencyOrThrow, monthBounds, overlapsMonth, type AgreementCurrency, type MonthBounds } from '../domain/money.ts'
 import { appendTo } from '../domain/collections.ts'
 import { messageOf } from '../domain/errors.ts'
+import type { FeeIdentity } from '../domain/fees.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { memoized } from '../domain/memo.ts'
 import { agreementCurrencyOf, customerCurrencies } from './agreements.ts'
-import { inCurrentPass, queuePass, runEventTableJob, type EventJobResult } from './chunked.ts'
+import { inCurrentPass, queuePass, runEventTableJob, visitInKeyOrder, type EventJobResult } from './chunked.ts'
 import { glideToMs, nowGlide, nowMs } from './clock.ts'
 import { queueJob, type JobEvent } from './events.ts'
 import { EVENT } from '../domain/events.ts'
-import { billableFees, billOnPeriod, markBilled, takeOffPeriod, visitOpenFees, visitWaivedFees, type FeeBilling } from './fees.ts'
 import { findJobCursor, retirePass } from './job-cursor.ts'
 import { attemptLock, whyNotRun } from './locks.ts'
 import { deleteWhere, exists, findById, noneLeft, num, refusal, str, throwRefused } from './records.ts'
-import { BILLING_PERIOD_STATUS, type BillingLineKind, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
+import { BILLING_PERIOD_STATUS, FEE_STATUS, type BillingLineKind, type FeeType, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
 import { log } from './log.ts'
 
 /** Billing periods: generate, review, close (lock) and export (plan §13 Billing export, Q66). */
 
 const PERIOD = 'x_daas_ham_billing_period'
 const LINE = 'x_daas_ham_billing_line'
+const FEE = 'x_daas_ham_fee_event'
 
 const LINE_KIND = { subscription: 'subscription', fee: 'fee' } as const satisfies { [Kind in BillingLineKind]: Kind }
 
@@ -362,6 +363,96 @@ function feeLabel(fee: GlideRecord): string {
     return `${fee.getDisplayValue('fee_type')} fee: ${fee.getDisplayValue('asset')} (${str(fee, 'occurred_on')})`
 }
 
+/*
+ * The Fee events a period bills: put on it by its generation, taken off it when waived or no longer billed, and marked
+ * billed as it closes. Charging and waiving them is the returns process's (platform/fees).
+ */
+
+/**
+ * The open fees a Billing period bills, as a query to walk: those charged up to `lastDay` and on no period yet, or
+ * already on this one by a generation its Regenerate rebuilds.
+ */
+function billableFees(periodId: string, lastDay: string): GlideRecord {
+    const fee = new GlideRecord(FEE)
+    fee.addQuery('status', FEE_STATUS.open)
+    fee.addEncodedQuery(`billing_periodISEMPTY^ORbilling_period=${periodId}`)
+    fee.addQuery('occurred_on', '<=', lastDay)
+    fee.query()
+    return fee
+}
+
+/** What became of a fee a Billing period's generation found billable: billed on it, left to another period, or failed. */
+type FeeBilling = 'billed' | 'left' | { failed: string }
+
+/**
+ * Bill a fee `billableFees` found on the period `periodId`: `addLine` adds its billing line (what it throws escapes),
+ * and the fee is put on the period. Two generations at once (one month generating as another is regenerated) both find
+ * an unlinked fee billable, so the fee is read afresh and billed under its lock, as it is charged: only while it is
+ * still open and on no other period, else it is left. A fee whose lock is held through every try (LOCK.fee) is left
+ * when another period has it by then, else it fails.
+ */
+function billOnPeriod(fee: GlideRecord, periodId: string, addLine: (fee: GlideRecord) => void): FeeBilling {
+    const identity: FeeIdentity = { type: str(fee, 'fee_type') as FeeType, assetId: str(fee, 'asset'), returnOrderId: str(fee, 'return_order') }
+    const attempt = attemptLock(LOCK.fee(identity), (): FeeBilling => {
+        const current = findById(FEE, fee.getUniqueValue())
+        if (!current || !billableOn(current, periodId)) return 'left'
+        addLine(current)
+        const unlinked = putOnPeriod(current, periodId)
+        return unlinked ? { failed: `fee not linked to the period: ${unlinked}` } : 'billed'
+    })
+    if (attempt.ran) return attempt.value
+    const now = findById(FEE, fee.getUniqueValue())
+    if (!now || !billableOn(now, periodId)) return 'left'
+    return { failed: whyNotRun(attempt, 'another run held its lock through every try') }
+}
+
+function billableOn(fee: GlideRecord, periodId: string): boolean {
+    const on = str(fee, 'billing_period')
+    return str(fee, 'status') === FEE_STATUS.open && (!on || on === periodId)
+}
+
+/** Put a fee on the Billing period that bills it; why the platform refused ('' once saved). */
+function putOnPeriod(fee: GlideRecord, periodId: string): string {
+    fee.setValue('billing_period', periodId)
+    return fee.update() ? '' : refusal(fee)
+}
+
+/**
+ * Visit each fee of a Billing period waived since the period was generated, in sys_id order; a fee `takeOffPeriod`
+ * takes off is still visited once.
+ */
+function visitWaivedFees(periodId: string, visit: (fee: GlideRecord) => void): void {
+    visitInKeyOrder(FEE, `billing_period=${periodId}^status=${FEE_STATUS.waived}`, visit)
+}
+
+/** Visit each open fee on a Billing period, in sys_id order; a fee `takeOffPeriod` takes off is still visited once. */
+function visitOpenFees(periodId: string, visit: (fee: GlideRecord) => void): void {
+    visitInKeyOrder(FEE, `billing_period=${periodId}^status=${FEE_STATUS.open}`, visit)
+}
+
+/** Take a fee off its Billing period; why the platform refused ('' once saved). */
+function takeOffPeriod(fee: GlideRecord): string {
+    // Per record: updateMultiple does not reliably clear a reference to empty.
+    fee.setValue('billing_period', '')
+    return fee.update() ? '' : refusal(fee)
+}
+
+/**
+ * Mark the open fees of a Billing period billed, as it closes, saving each and checking it. A fee the platform refuses
+ * is handed to `refused` with why: left open, it stays on its closed period and is billed by no later one
+ * (`billableFees`).
+ */
+function markBilled(periodId: string, refused: (fee: GlideRecord, why: string) => void): void {
+    const fee = new GlideRecord(FEE)
+    fee.addQuery('billing_period', periodId)
+    fee.addQuery('status', FEE_STATUS.open)
+    fee.query()
+    while (fee.next()) {
+        fee.setValue('status', FEE_STATUS.billed)
+        if (!fee.update()) refused(fee, refusal(fee))
+    }
+}
+
 /**
  * Run a Close or Regenerate of `period` under the period's lock, with the period as stored there, so the two take
  * turns: `period` was read before the action ran, and a Regenerate that deleted the lines meanwhile would leave Close to
@@ -500,7 +591,7 @@ function closeReady(period: GlideRecord, stored: GlideRecord): PeriodOutcome {
 }
 
 /**
- * Mark the closed period's open fees billed (platform/fees `markBilled`). A fee the platform refuses stays open but
+ * Mark the closed period's open fees billed (`markBilled`). A fee the platform refuses stays open but
  * linked to the closed period, which no later generation bills (it bills unlinked fees) and Close cannot be run again
  * for: it is returned named with why, and logged, to set to Billed by hand.
  */
