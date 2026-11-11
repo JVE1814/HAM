@@ -10,6 +10,8 @@ export async function clientConfig({ rootDir, config, path, registerExplicitId }
         logLevel: 'warn',
         root: clientDir,
         resolve: { alias: { '@': clientDir } },
+        // The SDK compiles JSX with the automatic runtime only when building; the dev server needs the same.
+        esbuild: { jsx: 'automatic' },
         plugins: [
             tailwindcss(),
             ...(await servicenowVitePlugins({ scope: config.scope, rootDir: clientDir, registerExplicitId, enableCacheBusting: true })),
