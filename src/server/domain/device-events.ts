@@ -17,6 +17,9 @@ export type ParsedEvents =
 const KINDS = Object.keys(DEVICE_EVENT_KIND_CHOICES) as DeviceEventKind[]
 const SOURCES = Object.keys(DEVICE_EVENT_SOURCE_CHOICES) as DeviceEventSource[]
 
+/** The source of an event that names none: the Provider's NMS posts without one. */
+const DEFAULT_SOURCE: DeviceEventSource = 'nms'
+
 /** Monitoring clocks may run slightly ahead; anything further in the future is rejected. */
 const MAX_CLOCK_SKEW_MS = 5 * 60_000
 
@@ -47,12 +50,12 @@ export function parseDeviceEvents(body: unknown, maxBatch: number, now: number):
         const identifier = typeof item?.identifier === 'string' ? item.identifier.trim() : ''
         const event = item?.event as DeviceEventKind
         const observedAt = typeof item?.observed_at === 'string' ? parseTimestamp(item.observed_at) : NaN
-        const source = (item?.source ?? 'nms') as DeviceEventSource
+        const source = (item?.source ?? DEFAULT_SOURCE) as DeviceEventSource
         if (!identifier) return void rejected.push({ index, reason: 'identifier is required' })
-        if (!KINDS.includes(event)) return void rejected.push({ index, reason: 'event must be one of seen, down, up' })
+        if (!KINDS.includes(event)) return void rejected.push({ index, reason: `event must be one of ${KINDS.join(', ')}` })
         if (Number.isNaN(observedAt)) return void rejected.push({ index, reason: OBSERVED_AT_FORMAT })
         if (observedAt > now + MAX_CLOCK_SKEW_MS) return void rejected.push({ index, reason: 'observed_at is in the future' })
-        if (!SOURCES.includes(source)) return void rejected.push({ index, reason: 'source must be one of discovery, connector, nms' })
+        if (!SOURCES.includes(source)) return void rejected.push({ index, reason: `source must be one of ${SOURCES.join(', ')}` })
         accepted.push({ event: { identifier, event, observedAt, source }, index })
     })
     // The index breaks ties, so the order does not rest on the engine's sort being stable.
