@@ -385,9 +385,9 @@ up for renewal* and the Margin tiles (`javascript:gs.…` dates in the query) an
 (`assigned_toDYNAMIC`) show rows, and every list has its column labels (`/api/now/ui/meta`).
 
 **After an upgrade** from a version with the Next Experience workspace (`/x/daas/naas-assets/home`):
-the build marks its records' keys deleted but writes no delete for them. Check that the *NaaS Asset
-Workspace* experience, its list menu with its lists, categories and audiences, the *NaaS Asset
-Overview* dashboard and the `x.daas.naas-assets.*` route ACL are gone, and delete any that are left.
+the build carries a delete for each of its records (`dist/app/author_elective_update`). Check that
+the *NaaS Asset Workspace* experience, its list menu with its lists, categories and audiences, the
+*NaaS Asset Overview* dashboard and the `x.daas.naas-assets.*` route ACL are gone.
 
 ## Rules and form buttons
 
