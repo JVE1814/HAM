@@ -56,6 +56,9 @@ export function stillSeenWithoutFleetAssetQuery(ciIds: readonly string[]): strin
     return ids && `${ids}^${seenWithoutFleetAssetQuery()}`
 }
 
+/** The longest detail a reconciliation exception keeps: its column's length, so a longer one is cut rather than refused. */
+export const EXCEPTION_DETAIL_MAX_LENGTH = 255
+
 /** Encoded query on reconciliation exceptions: the open ones, which the navigator, the workspace and the dashboard list and count. */
 export const OPEN_EXCEPTIONS_QUERY = `status=${EXCEPTION_STATUS.open}`
 

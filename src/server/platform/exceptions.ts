@@ -1,7 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import { anyOf } from '../domain/encoded-query.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { OPEN_EXCEPTIONS_QUERY } from '../domain/reconciliation.ts'
+import { EXCEPTION_DETAIL_MAX_LENGTH, OPEN_EXCEPTIONS_QUERY } from '../domain/reconciliation.ts'
 import { nowGlide } from './clock.ts'
 import { withLockTries } from './locks.ts'
 import { exists, pluck, str, warnRefused } from './records.ts'
@@ -68,7 +68,7 @@ function insertException(type: ExceptionType, subject: ExceptionSubject, facts: 
     exception.setValue('asset', field === 'asset' ? id : '')
     exception.setValue('ci', field === 'ci' ? id : '')
     exception.setValue('customer', facts.customerId)
-    exception.setValue('detail', facts.detail.slice(0, 255))
+    exception.setValue('detail', facts.detail.slice(0, EXCEPTION_DETAIL_MAX_LENGTH))
     exception.setValue('detected_at', nowGlide())
     // An audit or attestation is closed once and does not raise it again, so a refused one is logged, not lost.
     if (exception.insert()) return true
