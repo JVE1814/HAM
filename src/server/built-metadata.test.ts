@@ -1443,7 +1443,6 @@ describe('ATF tests', () => {
     it('load in their scripts server modules by the path the build installs them under, and call what those export', () => {
         const modules = new Map(records('sys_module').map((module) => [module.path ?? '', module.content ?? '']))
         for (const { step, script } of stepScripts()) {
-            expect(loaded(script).length, step).toBeGreaterThan(0)
             expect([...script.matchAll(/\brequire\(/g)].length, `${step}: every require is read`).toBe(loaded(script).length)
             const code = script.replace(/'[^'\n]*'/g, "''")
             for (const { binding, path } of loaded(script)) {
@@ -1500,6 +1499,16 @@ describe('ATF tests', () => {
         }
     }
 
+    class StandInRest {
+        setEndpoint() {}
+        setHttpMethod() {}
+        setRequestHeader() {}
+        setRequestBody() {}
+        execute() {
+            return { getStatusCode: () => 599, getBody: () => '{"result":{"error":"stand-in"}}' }
+        }
+    }
+
     function standInModule(): unknown {
         return new Proxy(
             {},
@@ -1522,13 +1531,14 @@ describe('ATF tests', () => {
         const stepResult = { setOutputMessage: (text: string) => void (message = text) }
         const properties = new Map<string, string>()
         const gs = {
+            getProperty: (name: string, fallback = '') => (name === 'glide.servlet.uri' ? 'https://instance.example/' : fallback),
             getPropertySecured: (name: string, fallback: string) => properties.get(name) || fallback,
             setProperty: (name: string, value: string) => void properties.set(name, value),
             generateGUID: () => 'b'.repeat(32),
         }
         const body = script.replace(/^\(function/, 'return (function')
-        const step = new Function('outputs', 'steps', 'params', 'stepResult', 'assertEqual', 'require', 'GlideRecord', 'gs', body)
-        return { verdict: step({}, () => ({}), {}, stepResult, () => undefined, standInModule, FoundRecord, gs), message }
+        const step = new Function('outputs', 'steps', 'params', 'stepResult', 'assertEqual', 'require', 'GlideRecord', 'gs', 'sn_ws', body)
+        return { verdict: step({}, () => ({}), {}, stepResult, () => undefined, standInModule, FoundRecord, gs, { RESTMessageV2: StandInRest }), message }
     }
 
     // A step passes or fails by what its script returns. Run here, a script fails only on the reply it checks, which a

@@ -80,14 +80,18 @@ endsON2028-01-31@javascript:gs.dateGenerate('2028-01-31','start')@javascript:gs.
 
 ### ATF route tests
 
-Suites *NaaS - P1*, *P2* and *P3*. The tests of the customer returns, warehouse, audit scan and
-tracking webhook routes call each route's handler from a *Run Server Side Script* step, as the
+Suites *NaaS - P1*, *P2* and *P3*. The tests of the customer returns, warehouse and audit scan
+routes call each route's handler from a *Run Server Side Script* step, as the
 impersonated user, with `require('x_daas_ham/naas-ham/<version>/src/server/entry/<file>.ts')`.
 ATF's inbound REST step signs in through a basic auth profile, which the app's scope may not
 create. Confirm that these steps run (no *require is not defined* or *No module with path*).
 Confirm that *NaaS - the tracking webhook needs its token and records a delivery once* gets HTTP 401
-*bad token* from its unauthenticated REST step. Where `x_daas_ham.shipping.webhook_token` was empty
-before the run, confirm it is empty again after. `src/server/atf-scripts.test.ts` fails when the
+*bad token* from its unauthenticated REST step. Confirm that its script step's two unauthenticated
+posts with the token are each answered HTTP 200 *delivered*: the route runs as guest, so this shows
+that `gs.getPropertySecured` returns the password2 token to guest despite its admin read role. If
+they are answered 401 *bad token*, the read role is enforced, and *Ship* and *Create return
+label*, run by non-admins, send an empty `API-Key` too (external-contracts.md, `gs.getPropertySecured`). Where
+`x_daas_ham.shipping.webhook_token` was empty before the run, confirm it is empty again after. `src/server/atf-scripts.test.ts` fails when the
 version in `package.json` changes, until the scripts' module paths are updated to match.
 
 ### Model lifecycle

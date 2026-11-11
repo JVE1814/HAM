@@ -6,10 +6,11 @@ import { SHIPMENT_DIRECTION, SHIPMENT_STATUS } from '../../server/domain/vocabul
  * ATF: the shipping aggregator's tracking webhook, POST /api/x_daas_ham/naas/shipping/tracking (entry/shipping
  * `postTrackingUpdate`, plan §13 Shipping aggregator, ADR 0012; suite "NaaS - P3"). The route runs unauthenticated, so ATF's inbound REST step
  * sends it without signing in, as the aggregator does: without the X-NaaS-Webhook-Token header it is refused. The
- * delivery is then sent to the route's handler in-process with the token (a REST step cannot carry the secret): a
- * configured token is read and used as it is; with none configured (webhooks refused) the script sets a random one for
- * the call and clears it again however the call ends. The Shipment's fields are read-only on forms, so its fixture
- * inserts without security enforcement.
+ * delivery is then posted from a script, again without signing in, with the token in the header (a REST step cannot
+ * carry the secret). The route answers as guest, so the delivery being applied shows guest reads the password2 token
+ * despite its admin read role (docs/research/external-contracts.md). A configured token is read and used as it is; with
+ * none configured (webhooks refused) the script sets a random one for the calls and clears it again however they end.
+ * The Shipment's fields are read-only on forms, so its fixture inserts without security enforcement.
  */
 
 // The vocabulary's values the fixtures below are created with, each under a name: for a value, a Test takes a
@@ -22,7 +23,7 @@ export const trackingWebhookTest = Test(
         $id: Now.ID['atf_tracking_webhook'],
         name: 'NaaS - the tracking webhook needs its token and records a delivery once',
         description:
-            'Posts a ShipEngine "DE" update to the tracking webhook without the X-NaaS-Webhook-Token header (HTTP 401, the Shipment unchanged), then sends it twice to the handler with the token: each answers HTTP 200 delivered, the Shipment is delivered with its delivery time, and it holds one tracking event.',
+            'Posts a ShipEngine "DE" update to the tracking webhook without the X-NaaS-Webhook-Token header (HTTP 401, the Shipment unchanged), then posts it twice, still unauthenticated, with the token: each answers HTTP 200 delivered, the Shipment is delivered with its delivery time, and it holds one tracking event.',
         active: true,
         // The handler logs what it refuses; the assertions below check the outcome.
         failOnServerError: false,
@@ -73,7 +74,6 @@ export const trackingWebhookTest = Test(
         atf.server.runServerSideScript({
             $id: Now.ID['atf_twh_deliver_twice'],
             script: `(function (outputs, steps, params, stepResult, assertEqual) {
-    var shipping = require('x_daas_ham/naas-ham/0.1.0/src/server/entry/shipping.ts');
     var NAME = 'x_daas_ham.shipping.webhook_token';
     var update = {
         data: {
@@ -85,21 +85,17 @@ export const trackingWebhookTest = Test(
         }
     };
     function post(token) {
-        var reply = { status: 0, body: null };
-        var request = {
-            body: { data: update },
-            pathParams: {},
-            queryParams: {},
-            getHeader: function (name) { return String(name).toLowerCase() === 'x-naas-webhook-token' ? token : undefined; }
-        };
-        var response = {
-            setStatus: function (status) { reply.status = Number(status); },
-            setBody: function (body) { reply.body = body; },
-            setHeader: function () {},
-            setContentType: function () {}
-        };
-        shipping.postTrackingUpdate(request, response);
-        return reply;
+        var rest = new sn_ws.RESTMessageV2();
+        rest.setEndpoint(gs.getProperty('glide.servlet.uri') + 'api/x_daas_ham/naas/shipping/tracking');
+        rest.setHttpMethod('post');
+        rest.setRequestHeader('Content-Type', 'application/json');
+        rest.setRequestHeader('Accept', 'application/json');
+        rest.setRequestHeader('X-NaaS-Webhook-Token', token);
+        rest.setRequestBody(JSON.stringify(update));
+        var response = rest.execute();
+        var body = null;
+        try { body = JSON.parse(response.getBody()).result; } catch (e) { body = response.getBody(); }
+        return { status: response.getStatusCode(), body: body };
     }
     function expectDelivered(what, reply) {
         var got = 'HTTP ' + reply.status + ' ' + JSON.stringify(reply.body);
