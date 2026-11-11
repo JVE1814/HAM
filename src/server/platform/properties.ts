@@ -86,9 +86,13 @@ export function boolProperty(property: PropertyOf<boolean>): boolean {
     return gs.getProperty(property.name, String(property.default)) === 'true'
 }
 
-/** A password2 property, as stored. */
+/**
+ * A password2 property, as stored. Read with getProperty, which ignores the property's read roles: getPropertySecured
+ * checks them against the session user, so it gives the default to the guest webhook and to every non-admin
+ * (docs/research/external-contracts.md N45). The admin-only read role still keeps the record out of their UI.
+ */
 export function secretProperty(property: PropertyOf<string>): string {
-    return gs.getPropertySecured(property.name, property.default)
+    return gs.getProperty(property.name, property.default)
 }
 
 /** The staging centre's stockroom: where purchased units ship to, Assets are staged and shipments leave from ('' while none is set). */

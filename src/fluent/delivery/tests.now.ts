@@ -8,7 +8,7 @@ import { SHIPMENT_DIRECTION, SHIPMENT_STATUS } from '../../server/domain/vocabul
  * sends it without signing in, as the aggregator does: without the X-NaaS-Webhook-Token header it is refused. The
  * delivery is then posted from a script, again without signing in, with the token in the header (a REST step cannot
  * carry the secret). The route answers as guest, so the delivery being applied shows guest reads the password2 token
- * despite its admin read role (docs/research/external-contracts.md). A configured token is read and used as it is; with
+ * despite its admin read role (docs/research/external-contracts.md N45). A configured token is read and used as it is; with
  * none configured (webhooks refused) the script sets a random one for the calls and clears it again however they end.
  * The Shipment's fields are read-only on forms, so its fixture inserts without security enforcement.
  */
@@ -104,11 +104,11 @@ export const trackingWebhookTest = Test(
         }
         return what + ': ' + got;
     }
-    var configured = gs.getPropertySecured(NAME, '');
+    var configured = gs.getProperty(NAME, '');
     var token = configured || 'atf-' + gs.generateGUID();
     try {
         if (!configured) gs.setProperty(NAME, token);
-        if (gs.getPropertySecured(NAME, '') !== token) throw new Error('the webhook token could not be set for the test');
+        if (gs.getProperty(NAME, '') !== token) throw new Error('the webhook token could not be set for the test');
         var seen = [expectDelivered('The delivery', post(token)), expectDelivered('The same delivery sent again', post(token))];
         var shipment = new GlideRecord('x_daas_ham_shipment');
         if (!shipment.get('tracking_number', 'ATF1Z0000000001')) throw new Error('no Shipment ATF1Z0000000001');

@@ -476,6 +476,10 @@ const gs = {
     addErrorMessage: (message: string) => void platform.messages.push(`error ${message}`),
     addInfoMessage: (message: string) => void platform.messages.push(`info ${message}`),
     getProperty: (name: string, fallback?: string) => platform.properties[name] ?? fallback ?? null,
+    // As the platform answers for a property only admin may read, as every password2 property of the app is: the
+    // default to anyone else (docs/research/external-contracts.md N45).
+    getPropertySecured: (name: string, fallback?: string) =>
+        platform.user.roles.includes('admin') ? (platform.properties[name] ?? fallback ?? null) : (fallback ?? null),
     setProperty: (name: string, value: string) => void (platform.properties[name] = String(value)),
     getUserID: () => platform.user.id,
     getUserDisplayName: () => platform.user.name,

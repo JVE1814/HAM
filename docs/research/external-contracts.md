@@ -778,7 +778,7 @@ Sources:
 | Platform fields the app uses in place of its own | An inventory tech's Stockrooms from `alm_stockroom.assignment_group` and `sys_user_grmember` (`platform/session.ts`); a Model's typical power from `cmdb_model.power_consumption` (`platform/racks.ts`); a lease's Lessor and schedule number in `ast_contract.vendor` and `vendor_contract`; on-site work linked through `wm_order.initiated_from` and `change_request.parent` (`platform/field-work.ts`, the rules on `wm_order`); ADR 0018 | The columns exist with those types; `sys_user_group` lets other scopes read only, `sys_user_grmember` read, create and update; no platform rule reads a contract's vendor fields, a work order's *Initiated from* or (beyond running the parent's workflows) a task's *Parent* | matches (the app's use was not run on the instance) | N41 |
 | ATF *Record Validation* on a date field | The ATF tests check a date with the `ON` form, `endsON2028-01-31@javascript:gs.dateGenerate('2028-01-31','start')@javascript:gs.dateGenerate('2028-01-31','end')` (`src/fluent/leases/tests.now.ts`) | The step matches the record loaded in memory against the condition, not the database, and there a date `=` a literal day is shifted by the session time zone; `ON` matches the day in every time zone | matches | N42 |
 | A row inserted into an import-set table outside an import set | The app processes its import rows by business rule and ships no transform map (ADR 0018); an ATF test that inserts such a row does not fail on server errors and checks the outcome (`src/fluent/models/tests.now.ts`) | The platform transforms the row at once and, where the table has no transform map, logs the error *Transform map record not provided, transform stopped*; the insert is written and the app's rule runs | matches | N43 |
-| `gs.getPropertySecured` and a password2 property's read roles | Every secret is read with `gs.getPropertySecured` (`platform/properties.ts` secretProperty) and declares read and write roles `admin`; the tracking webhook reads its token as guest, and *Ship* and *Create return label* read the ShipEngine key as asset managers or inventory techs | Not documented: the typings give only the signature (`@servicenow/glide` `gs.d.ts:415`), and no docs or community page says whether it checks the property's read roles against the session user | unverifiable | N44 |
+| `gs.getPropertySecured` and a password2 property's read roles | Every secret is read with `gs.getProperty` (`platform/properties.ts` secretProperty), not `gs.getPropertySecured`; each declares read and write roles `admin`; the tracking webhook reads its token as guest, and *Ship* and *Create return label* read the ShipEngine key as asset managers or inventory techs | Not documented (only the signature in the typings). On an instance `getPropertySecured` checks the property's read roles against the session user and gives a non-admin the default; `getProperty` gives everyone the stored value | matches | N44, N45 |
 
 Notes:
 
@@ -1087,11 +1087,14 @@ Sources:
   row was inserted, the rule ran, and the steps that check the outcome held.
 - N44: `node_modules/@servicenow/glide/src/types/gs.d.ts:415` (SDK 4.14), `static getPropertySecured(key?: string, alt?: any): string`,
   with no description; searched 2026-11-11, neither the ServiceNow docs nor the community describe it.
-  If it enforces read roles, it returns the default `''` to guest and to non-admins: every webhook is
-  answered 401 and label purchases send an empty `API-Key`. *NaaS - the tracking webhook needs its
-  token and records a delivery once* posts the delivery unauthenticated with the token from a script
-  step, so it fails on an instance where guest cannot read the token
-  ([verify-on-instance.md](../verify-on-instance.md#atf-route-tests)).
+- N45: PDI, 2026-11-11, global background script, impersonated non-admin. A password2 `sys_properties`
+  record with read roles and write roles `admin` and value `S3CRET-PROBE`: as admin, `gs.getProperty`
+  and `gs.getPropertySecured` both returned `S3CRET-PROBE`; impersonating a user without admin
+  (`GlideImpersonate`), `gs.getProperty` returned `S3CRET-PROBE` and `gs.getPropertySecured` returned
+  the default `DEF`. The probe property was deleted afterwards. The probe ran in global scope, the
+  app's properties are in `x_daas_ham`: *NaaS - the tracking webhook needs its token and records a
+  delivery once* posts the delivery unauthenticated with the token, so it shows the scoped read as
+  guest ([verify-on-instance.md](../verify-on-instance.md#atf-route-tests)).
 
 ## Changes needed in the app
 
@@ -1398,12 +1401,6 @@ Items with verdict unverifiable:
 - **`wm_order` state 3 = Closed Complete.** Only community posts give the number.
 - **`GlideAggregate.groupBy` on date fields.** The format of a grouped `glide_date` key is not
   documented.
-- **`gs.getPropertySecured` and read roles.** Undocumented (N44). The tracking webhook ATF test
-  shows it: if its unauthenticated posts with the token are answered 401, read the secrets with
-  `gs.getProperty` or drop the `admin` read role from the password2 properties.
-
-Other open points raised in the findings:
-
 - Transfer orders: Inventory's rules were read on the instance, not run with the app installed (N38,
   N39). Working a transfer order sourcing raised through its tasks as an inventory tech, and
   cancelling one, are checked in [verify-on-instance.md](../verify-on-instance.md#transfer-orders).

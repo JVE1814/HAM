@@ -55,7 +55,7 @@ import { restMessagePort } from './platform/rest-messages'
 // The registries the metadata imports from platform modules are plain constants; Glide itself is not needed to read
 // them. A property reads as its declared value.
 vi.mock('@servicenow/glide', () => ({
-    gs: { getProperty: (_name: string, fallback = '') => fallback, getPropertySecured: (_name: string, fallback = '') => fallback, warn: () => undefined },
+    gs: { getProperty: (_name: string, fallback = '') => fallback, warn: () => undefined },
     GlideRecord: class {},
     GlideDateTime: class {},
 }))
@@ -1531,8 +1531,7 @@ describe('ATF tests', () => {
         const stepResult = { setOutputMessage: (text: string) => void (message = text) }
         const properties = new Map<string, string>()
         const gs = {
-            getProperty: (name: string, fallback = '') => (name === 'glide.servlet.uri' ? 'https://instance.example/' : fallback),
-            getPropertySecured: (name: string, fallback: string) => properties.get(name) || fallback,
+            getProperty: (name: string, fallback = '') => (name === 'glide.servlet.uri' ? 'https://instance.example/' : properties.get(name) || fallback),
             setProperty: (name: string, value: string) => void properties.set(name, value),
             generateGUID: () => 'b'.repeat(32),
         }

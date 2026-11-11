@@ -88,10 +88,9 @@ create. Confirm that these steps run (no *require is not defined* or *No module 
 Confirm that *NaaS - the tracking webhook needs its token and records a delivery once* gets HTTP 401
 *bad token* from its unauthenticated REST step. Confirm that its script step's two unauthenticated
 posts with the token are each answered HTTP 200 *delivered*: the route runs as guest, so this shows
-that `gs.getPropertySecured` returns the password2 token to guest despite its admin read role. If
-they are answered 401 *bad token*, the read role is enforced, and *Ship* and *Create return
-label*, run by non-admins, send an empty `API-Key` too (external-contracts.md, `gs.getPropertySecured`). Where
-`x_daas_ham.shipping.webhook_token` was empty before the run, confirm it is empty again after. `src/server/atf-scripts.test.ts` fails when the
+that `gs.getProperty` returns the scoped password2 token to guest despite its admin read role
+(external-contracts.md N45). Where `x_daas_ham.shipping.webhook_token` was empty before the run,
+confirm it is empty again after. `src/server/atf-scripts.test.ts` fails when the
 version in `package.json` changes, until the scripts' module paths are updated to match.
 
 ### Model lifecycle
