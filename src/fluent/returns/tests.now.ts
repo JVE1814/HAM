@@ -17,6 +17,8 @@ const CENTRAL_DEPOT = STOCKROOM_TYPE.central_depot
 const PROVIDER_OWNED = LEGAL_OWNER.provider
 const IN_USE = INSTALL_STATUS.inUse
 const SWITCH = DEVICE_CLASS.switch
+const AVAILABLE_FIELDS = `install_status=${STAGE_FIELDS.available.installStatus}^substatus=${STAGE_FIELDS.available.substatus}`
+const PENDING_RETURN_FIELDS = `install_status=${STAGE_FIELDS.pending_return.installStatus}^substatus=${STAGE_FIELDS.pending_return.substatus}`
 
 export const returnEvaluationTest = Test(
     {
@@ -100,7 +102,7 @@ export const returnEvaluationTest = Test(
             $id: Now.ID['atf_rev_validate_asset'],
             table: 'alm_hardware',
             recordId: asset.record_id,
-            fieldValues: 'install_status=6^substatus=available',
+            fieldValues: AVAILABLE_FIELDS,
             assert: 'record_validated',
         })
     },
@@ -317,14 +319,14 @@ export const customerReturnRequestTest = Test(
             $id: Now.ID['atf_crr_validate_listed'],
             table: 'alm_hardware',
             recordId: listed.record_id,
-            fieldValues: 'install_status=1^substatus=pending_return',
+            fieldValues: PENDING_RETURN_FIELDS,
             assert: 'record_validated',
         })
         atf.server.recordValidation({
             $id: Now.ID['atf_crr_validate_unlisted'],
             table: 'alm_hardware',
             recordId: unlisted.record_id,
-            fieldValues: 'install_status=1^substatus=pending_return',
+            fieldValues: PENDING_RETURN_FIELDS,
             assert: 'record_validated',
         })
         atf.server.recordQuery({
