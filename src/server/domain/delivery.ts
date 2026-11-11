@@ -6,7 +6,6 @@ import type { FieldPurpose, InstallMode, OrderType } from './vocabulary.ts'
  * install completion takes a replaced Asset out of service (P1.7).
  */
 
-/** What "Ship" needs to know about an Order. */
 export interface ShipFacts {
     orderType: OrderType
     installMode: InstallMode

@@ -52,20 +52,16 @@ interface ClaimRoute {
     perCall: number
 }
 
-/** Serials per Meraki claim call. */
 const MERAKI_CLAIM_BATCH = 50
-/** Claim codes per Mist claim call. */
 const MIST_CLAIM_BATCH = 100
 /** Devices per GreenLake add call (at most five, counting network, compute and storage devices together). */
 const GREENLAKE_ADD_BATCH = 5
 /** GreenLake subscription assignment: find the device, then PATCH it. */
 const GREENLAKE_SUBSCRIBE_CALLS = 2
-/** Registration units per FortiCloud register call. */
 const FORTICLOUD_REGISTER_BATCH = 10
 /** Check Point Zero Touch: the login and logout calls around a session's claim-gateway calls. */
 const ZERO_TOUCH_SESSION_CALLS = 2
 
-/** Group targets by account, then cut each group into chunks of `size`. */
 function batches(targets: readonly ClaimTarget[], size: number): ClaimTarget[][] {
     const byAccount = new Map<string, ClaimTarget[]>()
     for (const target of targets) {
@@ -80,14 +76,12 @@ function fail(targets: readonly ClaimTarget[], message: string): ClaimOutcome[] 
     return targets.map((t) => ({ stepId: t.stepId, ok: false, message }))
 }
 
-/** Done with `okMessage` on a 2xx response, otherwise failed with the API's error. */
 function outcome(target: ClaimTarget, response: HttpResponse, okMessage: string): ClaimOutcome {
     return isSuccess(response.status)
         ? { stepId: target.stepId, ok: true, message: okMessage }
         : { stepId: target.stepId, ok: false, message: failureText(response) }
 }
 
-/** Targets that cannot be sent at all (missing identifier, or missing account where the call needs one). */
 function unusable(
     targets: readonly ClaimTarget[],
     needs: 'serial' | 'claimCode' | 'mac',
@@ -103,7 +97,6 @@ function unusable(
     return { usable, outcomes }
 }
 
-/** An adapter that makes one call per device (serial and account required). */
 function perDevice(request: (target: ClaimTarget) => HttpRequest, okMessage: (target: ClaimTarget) => string): ClaimAdapter {
     return (targets, http, maxCalls) => {
         const { usable, outcomes } = unusable(targets, 'serial')
@@ -301,7 +294,6 @@ export const CLAIM_VENDORS: readonly OemVendor[] = Object.keys(CLAIM_ROUTES) as 
 /** Licensing and zero-touch need the device claimed first: on a staging task that also has a claim step, their step waits for it (initialAutomationStatus). */
 export const CLAIM_PREREQUISITE: Partial<Record<ClaimAction, ClaimAction>> = { oem_licence: 'oem_claim', oem_ztp: 'oem_claim' }
 
-/** The actions whose steps wait on an `action` step (CLAIM_PREREQUISITE). */
 export function dependentActions(action: string): ClaimAction[] {
     return CLAIM_ORDER.filter((dependent) => CLAIM_PREREQUISITE[dependent] === action)
 }
@@ -333,7 +325,6 @@ export function initialAutomationStatus(action: string, taskActions: readonly st
     return prerequisite && taskActions.includes(prerequisite) ? STEP_STATUS.waiting : STEP_STATUS.due
 }
 
-/** The automation status a run's outcome leaves its step in. */
 export function settledStatus(outcome: ClaimOutcome): Extract<AutomationStatus, 'done' | 'failed'> {
     return outcome.ok ? STEP_STATUS.done : STEP_STATUS.failed
 }
@@ -368,7 +359,6 @@ export interface ClaimStore {
 /** The transport's reason for a call a run makes after losing its job lock: the call is not sent, nor its step settled. */
 export const NOT_SENT = 'not sent: the claim run lost its job lock'
 
-/** Steps `remaining` calls of `route` can carry: at least one, at most MAX_STEPS_PER_LOAD. */
 function stepsFor(route: ClaimRoute, remaining: number): number {
     return Math.min(MAX_STEPS_PER_LOAD, Math.max(1, Math.ceil(remaining * route.perCall)))
 }

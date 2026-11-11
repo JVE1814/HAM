@@ -52,7 +52,6 @@ function isActiveUser(userId: string): boolean {
     return exists('sys_user', `sys_id=${userId}^active=true`)
 }
 
-/** Who is asked to approve a task and what their approvals must come to. */
 export interface ApprovalRequest {
     /** The value of the task's `stage` while it awaits approval, as its own stage list names it (its flow's). */
     awaitingStage: string
@@ -72,11 +71,6 @@ export interface ApprovalRequest {
  */
 export type ApprovalStart = { awaiting: true } | { awaiting: false; step: 'request' | 'save'; reason: string }
 
-/**
- * Ask the approvers and save `task` as awaiting approval. They are asked first: a task the requests saved could not
- * approve would wait for ever, so it is left as it was. One the platform will not save as awaiting has its requests
- * cancelled again: they would wait on a task whose decisions roll up to nothing.
- */
 export function putToApproval(task: GlideRecord, request: ApprovalRequest): ApprovalStart {
     const unasked = requestApprovals(task, request)
     if (unasked) return { awaiting: false, step: 'request', reason: unasked }
@@ -88,7 +82,6 @@ export function putToApproval(task: GlideRecord, request: ApprovalRequest): Appr
     return { awaiting: false, step: 'save', reason }
 }
 
-/** How a kind of task is decided: an Order by its entitlement verdict, a Disposal order by its Assets' owners. */
 export interface ApprovalFlow {
     /** The value of the task's `stage` while it awaits approval, as its own stage list names it. */
     awaitingStage: string
@@ -127,12 +120,6 @@ export function rollUpApprovals(task: GlideRecord, flow: ApprovalFlow): Approval
     return { outcome, refused, required, decisions }
 }
 
-/**
- * Ask `approverIds` to decide `task`; why it cannot wait for their decision ('' when it can): a refusal from the
- * platform, else `noApprover`. It can wait only if the requests saved could approve it, one for each `required` group
- * as the rollup groups them. Otherwise it could never be approved, so they are cancelled again and the callers keep it
- * out of awaiting approval.
- */
 function requestApprovals(task: GlideRecord, { approverIds, required, customerAdmins, noApprover }: ApprovalRequest): string {
     const refusals = approverIds.map((approverId) => requestApproval(task, approverId))
     const saved = approverIds.filter((_, i) => !refusals[i])
@@ -143,7 +130,6 @@ function requestApprovals(task: GlideRecord, { approverIds, required, customerAd
     return refused ? `an approval request was refused: ${refused}` : noApprover
 }
 
-/** Why the platform refused the request ('' once saved), also logged. */
 function requestApproval(task: GlideRecord, approverId: string): string {
     const approval = new GlideRecord('sysapproval_approver')
     approval.initialize()

@@ -94,7 +94,6 @@ export type LifecycleRow = { pid: string } & { [K in keyof LifecycleDates]?: str
 
 export type ParsedLifecycleRow = { ok: true; pid: string; dates: LifecycleDates } | { ok: false; reason: string }
 
-/** Validate one CSV row of manufacturer milestones. */
 export function parseLifecycleRow(row: LifecycleRow): ParsedLifecycleRow {
     const pid = row.pid.trim()
     if (!pid) return { ok: false, reason: 'PID is required' }
@@ -123,7 +122,6 @@ export function mergeLifecycle(existing: LifecycleDates, incoming: LifecycleDate
     return merged
 }
 
-/** The Lifecycle phases of a Model past its end of support. */
 export const PAST_SUPPORT_PHASES: readonly LifecyclePhase[] = [
     LIFECYCLE_PHASE.end_of_support,
     LIFECYCLE_PHASE.end_of_extended_support,

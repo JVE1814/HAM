@@ -60,7 +60,6 @@ vi.mock('@servicenow/glide', () => ({
     GlideDateTime: class {},
 }))
 
-/** What the server code hands RESTMessageV2, call by call: the message, the function and the variables it sets. */
 const sentToRest = vi.hoisted(() => ({ calls: [] as Array<{ message: string; fn: string; variables: string[] }> }))
 
 // Every call is answered 200 with a body each adapter finds what it goes on with in (a session id, a device).
@@ -101,7 +100,6 @@ function filesUnder(dir: string): string[] {
     })
 }
 
-/** What the metadata is built from: the Fluent sources, the server code they import, and the two files that name the package. */
 function sources(): string[] {
     const fluent = filesUnder(join(ROOT, 'src/fluent')).filter((path) => !path.includes('/generated/'))
     const server = filesUnder(join(ROOT, 'src/server')).filter(
@@ -110,7 +108,6 @@ function sources(): string[] {
     return [...fluent, ...server, join(ROOT, 'package.json'), join(ROOT, 'now.config.json')]
 }
 
-/** Why the built output cannot be trusted, or null when it is there and no source is newer than it. */
 function staleness(): string | null {
     const instruction = 'Run `npx now-sdk build` first (`npm run check` does)'
     if (!existsSync(UPDATES)) return `${instruction}: dist/app is missing.`
@@ -119,7 +116,6 @@ function staleness(): string | null {
     return newer ? `${instruction}: dist/app is older than ${relative(ROOT, newer)}.` : null
 }
 
-// A stale or missing build fails every test here instead of passing unseen.
 beforeAll(() => {
     const stale = staleness()
     if (stale) throw new Error(stale)
@@ -225,7 +221,6 @@ function wrapped(script: string): { fn: string; path: string; call: string } | n
     return { fn: header[1] ?? '', path: header[2] ?? '', call }
 }
 
-/** The terms a condition ANDs at its top level, outside parentheses and string literals, without spaces. */
 function andTerms(condition: string): string[] {
     const terms: string[] = []
     let depth = 0
@@ -285,7 +280,6 @@ describe('scripts wired to server modules', () => {
  * schedule runs, so the suites test a job too.
  */
 describe('ATF server-side scripts', () => {
-    /** What the built step scripts call on the modules they require, each as `<module path>#<function>`. */
     const called = () =>
         readdirSync(UPDATES)
             .filter((name) => name.startsWith('sys_atf_step_'))
@@ -423,7 +417,6 @@ const SHARED: Readonly<Record<string, string>> = {
 interface SharedQuery {
     what: string
     table: string
-    /** The encoded query read; undefined where there is none. */
     query: string | undefined
 }
 
@@ -452,7 +445,6 @@ function qualifierQuery(qualifier: string): string {
     return script[2] ? `${script[1]}<form value>` : (script[1] ?? '')
 }
 
-/** One column of the built dictionary: its attributes as the instance takes them, a missing one undefined. */
 interface BuiltColumn {
     table: string
     name: string
@@ -574,7 +566,6 @@ describe('fields the forms, lists and record producers name', () => {
 
     let builtDictionary: { columns: Map<string, Set<string>>; parents: Map<string, string> } | undefined
 
-    /** The columns each table is built with, and the table each of the app's tables extends. */
     function dictionary() {
         if (builtDictionary) return builtDictionary
         const columns = new Map<string, Set<string>>()
@@ -583,7 +574,6 @@ describe('fields the forms, lists and record producers name', () => {
         return (builtDictionary = { columns, parents })
     }
 
-    /** A platform table as the SDK defines it: its own columns and the table it extends; null where the SDK has none. */
     function sdkTable(table: string): { columns: Set<string>; parent: string } | null {
         const path = join(SDK_TABLES, `${table}.now.ts`)
         if (!existsSync(path)) return null
@@ -656,7 +646,6 @@ describe('UI action conditions that restate a rule of the server code', () => {
         expect(action?.condition, actionName).toBeTruthy()
         return action?.condition ?? ''
     }
-    /** Whether a script condition holds for `current`, a record with these field values. */
     const holds = (condition: string, current: Record<string, unknown>) => new Function('current', `return ${condition}`)(current) as boolean
     const orderStages = Object.keys(ORDER_STAGE_CHOICES) as OrderStage[]
 
@@ -719,21 +708,16 @@ describe('NaaS Asset Workspace URL', () => {
  */
 interface BuiltAcl {
     table: string
-    /** The field a field-level ACL secures; '' for a record ACL. */
     field: string
-    /** The table of its records: its own, or the one class an ACL on a parent table applies to. */
     records: string
     operation: string
     deny: boolean
-    /** The names of the roles it grants. */
     roles: string[]
     appliesTo: string
     condition: string
-    /** The entry function its script calls, `inline` for a script written in the ACL, '' for none. */
     script: string
 }
 
-/** The names of the roles each built ACL grants, by the ACL's id. */
 function aclRoles(): Map<string, string[]> {
     const rolesOf = new Map<string, string[]>()
     for (const grant of records('sys_security_acl_role')) {
@@ -858,7 +842,6 @@ describe('the rules and ACLs that scope what a reader sees', () => {
 
     describe('ACLs on the hardware the app shares with the Provider IT', () => {
         const hardware = () => recordAcls().filter((acl) => acl.records === 'alm_hardware')
-        /** The app's ACLs on alm_asset, the parent: record and field ACLs that apply to hardware alone. */
         const onParent = () => builtAcls().filter((acl) => acl.table === 'alm_asset')
         /** The scripts of entry/visibility that pass an Asset of another class first (entry/visibility.test.ts holds each to it). */
         const CLASS_CHECKED = ['readsRecord', 'grantsFleetAsset', 'writesAsset', 'deletesAsset', 'writesAssetCommercialField', 'readsAssetCost']
@@ -1027,7 +1010,6 @@ describe('the rules and ACLs that scope what a reader sees', () => {
             'x_daas_ham_disposal_order',
             'x_daas_ham_disposal_line',
         ]
-        /** What an inventory tech with no other role holds: the role itself and the roles it contains. */
         const heldByTech = () =>
             new Set([
                 ROLE.inventoryTech,
@@ -1141,7 +1123,6 @@ describe('events', () => {
 describe('system properties', () => {
     type Entry = PropertyOf<string | number | boolean>
     const isEntry = (value: object): value is Entry => 'name' in value && 'default' in value
-    /** Every entry of the registry, those of its per-vendor tables included. */
     const entries: Entry[] = Object.values(PROPERTY).flatMap((value) => (isEntry(value) ? [value] : Object.values(value)))
 
     it('are declared, each once, with the value the server code falls back to', () => {
@@ -1189,7 +1170,6 @@ describe('REST messages', () => {
     interface BuiltFunction {
         message: string
         fn: string
-        /** The variables its endpoint, headers and content name, with those of its message's headers. */
         used: string[]
         declared: string[]
     }
@@ -1219,7 +1199,6 @@ describe('REST messages', () => {
         for (const { message, fn, used, declared } of builtFunctions()) expect({ message, fn, declared }).toEqual({ message, fn, declared: used })
     })
 
-    /** Every function called once, the way the server code calls it: the adapters over the transport of platform/rest-messages. */
     function callEveryFunction(): typeof sentToRest.calls {
         sentToRest.calls.length = 0
         for (const routes of Object.values(OEM_ADAPTERS)) {
@@ -1258,7 +1237,6 @@ describe('the REST calls of the pages', () => {
     const CLIENT = join(ROOT, 'src/client')
     const clientSources = () => filesUnder(CLIENT).filter((path) => /\/api\.ts$/.test(path))
 
-    /** Each `get<T>('/path')` or `post<T>(path\`/path/${id}\`)` of the pages' API modules, a value in the path as `{}`, without its query. */
     function clientCalls(): Array<{ where: string; method: string; path: string }> {
         return clientSources().flatMap((source) =>
             [...readFileSync(source, 'utf8').matchAll(/\b(get|post)<[^(]*>\(\s*(?:path)?(['`])(.*?)\2/g)].map(([, method = '', , path = '']) => ({
@@ -1297,7 +1275,6 @@ describe('replacement SLAs', () => {
  * in the catalog item, where a value that is no choice of the column still builds, and is then stored on the record.
  */
 describe('choices of the record producers', () => {
-    /** The choice values of a column the app declares; undefined for a column without choices. */
     function columnChoices(table: string, column: string): string[] | undefined {
         const xml = readFileSync(join(BUILT, 'dictionary', `${table}.xml`), 'utf8')
         const choices = new RegExp(`<element name="${column}" [^>]*>\\s*<choice>([\\s\\S]*?)</choice>`).exec(xml)?.[1]
@@ -1335,16 +1312,13 @@ describe('built substatus choice set', () => {
     /** Where the build wrote each sys_choice on its own before the sys_choice_set parent existed. */
     const WITHOUT_PARENT = join(UPDATES, 'sys_choice_alm_asset_substatus.xml')
 
-    /** One per Lifecycle stage whose STAGE_FIELDS entry carries a `choice`. */
     const ADDED = Object.values(STAGE_FIELDS).flatMap((fields) =>
         'choice' in fields ? [{ value: fields.substatus, label: fields.choice.label, dependentValue: fields.installStatus }] : [],
     )
     const ADDED_VALUES = ADDED.map((choice) => choice.value).sort()
 
-    /** A choice the built set inserts, or the choice one clause of its delete query matches: each field as built. */
     type BuiltChoice = Record<string, string>
 
-    /** The set as built: its wrapper (tag, field, table, version), the choices it inserts and those its delete matches. */
     function choiceSet(): { wrapper: string[]; inserted: BuiltChoice[]; deleted: BuiltChoice[] } {
         const xml = readFileSync(SET, 'utf8')
         const wrapper = /<(sys_choice_v2|sys_choice_set) action="INSERT_OR_UPDATE" field="([^"]*)" table="([^"]*)" version="(\d+)"/.exec(xml)
@@ -1439,7 +1413,6 @@ describe('ATF tests', () => {
     })
 
     interface StepScript {
-        /** The step, as `<its test's name> step <its order>`. */
         step: string
         script: string
     }
@@ -1460,7 +1433,6 @@ describe('ATF tests', () => {
             })
     }
 
-    /** The modules a script loads, each with the name the script calls it by. */
     const loaded = (script: string) => [...script.matchAll(/\bvar\s+(\w+)\s*=\s*require\('([^']+)'\)/g)].map(([, binding = '', path = '']) => ({ binding, path }))
 
     it('have server-side scripts to read', () => {
@@ -1473,7 +1445,6 @@ describe('ATF tests', () => {
         for (const { step, script } of stepScripts()) {
             expect(loaded(script).length, step).toBeGreaterThan(0)
             expect([...script.matchAll(/\brequire\(/g)].length, `${step}: every require is read`).toBe(loaded(script).length)
-            // What the script calls, not the text of its strings (a module path, a message).
             const code = script.replace(/'[^'\n]*'/g, "''")
             for (const { binding, path } of loaded(script)) {
                 expect(modules.has(path), `${step}: ${path}`).toBe(true)
@@ -1499,7 +1470,6 @@ describe('ATF tests', () => {
         expect(stepScripts().filter(({ script }) => script.includes('{{')).map(({ step }) => step)).toEqual([])
     })
 
-    /** A GlideRecord that finds one record, whatever is asked. */
     class FoundRecord {
         private found = false
         addQuery() {
@@ -1530,7 +1500,6 @@ describe('ATF tests', () => {
         }
     }
 
-    /** A loaded module whose every function answers a REST request HTTP 599; its beyondVisibility runs the read. */
     function standInModule(): unknown {
         return new Proxy(
             {},
@@ -1548,7 +1517,6 @@ describe('ATF tests', () => {
         )
     }
 
-    /** A script run as its step runs it, against stand-ins for what it calls: what it returns and its output message. */
     function run(script: string): { verdict: unknown; message: string } {
         let message = ''
         const stepResult = { setOutputMessage: (text: string) => void (message = text) }

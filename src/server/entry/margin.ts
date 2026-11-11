@@ -7,13 +7,11 @@ import { str } from '../platform/records.ts'
 
 /** Cost facts and Margin per Customer and Site, computed when a Billing period closes (P3.28): platform/margin. */
 
-/** UI action "Recompute margin" on a closed period. */
 export function uiRecomputeMargin(current: GlideRecord): void {
     queueMarginCompute(current)
     gs.addInfoMessage(`Recomputing margin for ${str(current, 'period')}`)
 }
 
-/** Script action on x_daas_ham.margin.compute: one chunk of a margin pass for the period the event names. */
 export function computeMargin(event: GlideRecord, current: GlideRecord): void {
     computeMarginChunk(jobEvent(EVENT.marginCompute, event, current))
 }

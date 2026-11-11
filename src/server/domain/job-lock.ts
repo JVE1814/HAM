@@ -37,7 +37,6 @@ export interface LateSave {
 /** What became of a write made through a held lock: not made, the lock lost before it, or made, perhaps while losing it. */
 export type HeldWrite<T> = { written: false } | { written: true; value: T; lockLost: boolean }
 
-/** What became of a save made through a held lock (`HeldLock.save`). */
 export type LockedSave = 'saved' | 'refused' | 'lock lost'
 
 /**
@@ -45,7 +44,6 @@ export type LockedSave = 'saved' | 'refused' | 'lock lost'
  * overlaps what that taker saves; no write can be tied to the lock in a transaction, so a holder checks around its writes.
  */
 export interface HeldLock {
-    /** Whether the lock is still held. */
     held(): boolean
     /**
      * Make `write` only while the lock is still held, and say whether it was lost while `write` ran. For a holder with

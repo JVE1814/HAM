@@ -41,10 +41,6 @@ function opensAssetForms(): boolean {
     return user?.hasRoleFromList?.(STAFF_ROLES) ?? false
 }
 
-/**
- * Runs `load` for the latest selection only: a fetch the selection moved past is aborted and its answer or error
- * dropped, so a slow reply for the previous site or rack never overwrites the current one. Returns the effect cleanup.
- */
 function latest<T>(load: (signal: AbortSignal) => Promise<T>, apply: (value: T) => void, fail: (message: string) => void): () => void {
     const controller = new AbortController()
     load(controller.signal).then(
@@ -70,7 +66,6 @@ export default function App() {
     const today = new Date().toISOString().slice(0, 10)
 
     useEffect(() => latest(rackApi.sites, setSites, setError), [])
-    // A new choice clears the last failure: the message shown is always about what is on screen.
     useEffect(() => {
         setRacks([])
         setRackId('')

@@ -11,7 +11,6 @@ import { currentSession } from '../platform/session.ts'
  * is refused (the platform says why).
  */
 
-/** UI action "Ship" (platform/delivery `shipOrder`). */
 export function uiShipOrder(current: GlideRecord): void {
     // A refused form save (the platform says why) ships nothing: Ship reads the Order afresh, so a tracking number
     // typed but not saved would go unused.
@@ -21,11 +20,6 @@ export function uiShipOrder(current: GlideRecord): void {
     if (outcome.shipped) gs.addInfoMessage(`${outcome.shipped.units} asset(s) shipped to ${outcome.shipped.siteName}`)
 }
 
-/**
- * UI action "Confirm installed". It is also offered to Customer contacts, who may only confirm a self-install (as on
- * the customer page), and on an Order a line filled again holds back, for the units already shipped
- * (domain/install-confirmation).
- */
 export function uiConfirmInstalled(current: GlideRecord): void {
     const order = installState(current)
     if (!mayConfirmInstall(currentSession().scope, order)) {
@@ -40,7 +34,6 @@ export function uiConfirmInstalled(current: GlideRecord): void {
     if (refused > 0) gs.addErrorMessage(`${refused} unit(s) not confirmed installed (see the system log): try again`)
 }
 
-/** After-update rule on wm_order closed complete for a NaaS Order (platform/delivery `completeInstallOfWork`). */
 export function onWorkOrderClosed(current: ForeignRecord): void {
     completeInstallOfWork(current)
 }

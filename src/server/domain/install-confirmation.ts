@@ -7,7 +7,6 @@ import type { InstallMode, OrderStage } from './vocabulary.ts'
  * remote hands completes when its work order is closed; a self-install waits for the Customer to confirm it.
  */
 
-/** What these rules read of an Order. */
 export interface InstallState {
     stage: OrderStage
     installMode: InstallMode
@@ -38,7 +37,6 @@ export function beingInstalled(order: InstallState): boolean {
     return order.stage === 'installing' || (HELD_BACK.includes(order.stage) && order.shippedUnits() > 0)
 }
 
-/** Whether the Order waits for its Customer to confirm a self-install. */
 export function awaitsSelfInstallConfirmation(order: InstallState): boolean {
     return order.installMode === 'self_install' && beingInstalled(order)
 }

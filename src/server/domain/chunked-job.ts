@@ -34,7 +34,6 @@ export interface ChunkedJobResult {
     lastError: string
 }
 
-/** The batch size a job runs with: `configured`, or 1 when that is below 1 or no number. */
 export function usableBatchSize(configured: number): number {
     return Math.max(1, Math.floor(configured) || 1)
 }
@@ -77,7 +76,6 @@ export interface Failures {
     lastError: string
 }
 
-/** What a scheduled job's cursor says once a run of its pass saved it: the pass's failures so far, and its status. */
 export interface CursorReport extends Failures {
     status: string
 }
@@ -129,18 +127,14 @@ export interface LockLost {
     error: string
 }
 
-/** What became of a chunk's write under its job's lock. */
 export type ChunkWrite = { outcome: 'written' | 'superseded' } | LockLost
 
 /** What a chunk of a pass does as it writes, under its job's lock where the job has one (ADR 0013). */
 export interface LockedChunkPorts {
-    /** Whether the chunk's pass is still its job's current one. */
     isCurrent(): boolean
     /** Whether the chunk still holds the job's lock: a taker that judged it abandoned may have cleared it. Always true for a job without a lock. */
     held(): boolean
-    /** Write out what the chunk accumulated. */
     flush(): void
-    /** Queue the pass's next chunk. */
     queueNext(): void
     /** Complete the pass (after its last chunk only). */
     complete(): void

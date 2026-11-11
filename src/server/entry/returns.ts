@@ -17,18 +17,15 @@ export function afterReturnProduced(producer: Record<string, unknown>, current: 
     if (!outcome.raised) gs.addErrorMessage(`Return not raised. ${outcome.why}.`)
 }
 
-/** After-update rule on return lines whose evaluation was set: route the Asset onward (platform/returns `evaluateReturnLine`). */
 export function onReturnEvaluated(current: GlideRecord): void {
     const evaluation = evaluateReturnLine(current)
     if (!evaluation.evaluated) gs.addErrorMessage(evaluation.why)
 }
 
-/** Daily: escalate overdue returns once, then declare the Assets missing and charge the lost-asset fee. */
 export function chaseOverdueReturns(): void {
     chaseOverdue()
 }
 
-/** Daily: agreements past their end date and temporary deployments ending soon bring their equipment back. */
 export function raiseScheduledReturns(): void {
     raiseDueReturns()
 }

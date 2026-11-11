@@ -46,7 +46,6 @@ function allowed(response: RESTAPIResponse): boolean {
     return requireRole(response, [ROLE.customerAdmin, ROLE.siteContact, ROLE.assetManager], 'Requires a customer admin or site contact role')
 }
 
-/** GET /customer/overview: what the customer sees on their page (platform/customer-page). */
 export function customerOverview(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const session = currentSession()
@@ -60,7 +59,6 @@ export function customerOverview(request: RESTAPIRequest, response: RESTAPIRespo
     } satisfies CustomerOverview)
 }
 
-/** POST /customer/faults { asset, description }: report a faulty device as a CSM case. */
 export function reportFault(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const input = bodyOf(request)
@@ -70,17 +68,12 @@ export function reportFault(request: RESTAPIRequest, response: RESTAPIResponse):
     reply(response, 422, { error: 'Fault not reported: the platform refused it' })
 }
 
-/**
- * POST /customer/orders/{id}/installed: a site contact confirms a self-install, also the units already shipped while a
- * line filled again after a unit was lost in transit waits for its replacement (domain/install-confirmation).
- */
 export function confirmInstalled(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const order = findById('x_daas_ham_order', pathParam(request, 'id'))
     if (!order || !awaitsSelfInstallConfirmation(installState(order))) {
         return reply(response, 409, { error: 'This order is not waiting for a self-install confirmation' })
     }
-    // Refused units stay where they were, so the confirmation can be sent again.
     const refused = completeInstall(order)
     if (refused > 0) {
         return reply(response, 422, { error: `${refused} device(s) not confirmed: the platform refused them` })
@@ -88,7 +81,6 @@ export function confirmInstalled(request: RESTAPIRequest, response: RESTAPIRespo
     reply(response, 200, { order: str(order, 'number') } satisfies InstallConfirmation)
 }
 
-/** POST /customer/attestations/{id} { items: [{ id, response }], submit }: answer an attestation. */
 export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     if (!isCustomerAdmin()) return reply(response, 403, { error: 'Only customer admins attest equipment' })
@@ -96,11 +88,9 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
     if (!attestation) return reply(response, 404, { error: 'No open attestation' })
     const input = bodyOf(request)
     const refused = saveAttestationAnswers(attestation, Array.isArray(input.items) ? (input.items as AttestationAnswer[]) : [])
-    // Submitted, the attestation would complete on the earlier answer, or none.
     if (refused > 0) return reply(response, 422, { error: `${refused} answer(s) not saved: the platform refused them` })
     if (input.submit === true) {
         if (hasUnansweredItems(attestation)) return reply(response, 409, { error: 'Answer every device before submitting' })
-        // Refused: it stays open, so the answers can be submitted again.
         if (completeAttestation(attestation)) {
             return reply(response, 422, { error: 'Attestation not submitted: the platform refused it' })
         }
@@ -108,15 +98,6 @@ export function answerAttestation(request: RESTAPIRequest, response: RESTAPIResp
     reply(response, 200, { attestation: str(attestation, 'number') } satisfies AttestationReceipt)
 }
 
-/**
- * POST /customer/returns { site, assets: [ids], decommission, method }: request equipment to be taken back, under the
- * record producer's rule (platform/returns `requestReturn`) for the caller's own Customer: 403 when the Return create
- * rule leaves them out, 400 when the Site is not one of their Customer's Sites or the request names no device there.
- *
- * The Customer's requests are raised one at a time, and only for devices not already awaiting a return: a request sent
- * twice raises one Return order. One sent while another is being raised raises nothing (503), nor does one whose
- * devices all await a return already (409).
- */
 export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     if (!isCustomerAdmin()) return reply(response, 403, { error: 'Only customer admins can request returns' })
@@ -134,10 +115,8 @@ export function requestCustomerReturn(request: RESTAPIRequest, response: RESTAPI
         if (outcome.reason === 'busy') return reply(response, 503, { error: outcome.why })
         if (outcome.reason === 'awaited') return reply(response, 409, { error: outcome.why })
         if (outcome.reason !== 'refused') return reply(response, 400, { error: outcome.why })
-        // Refused: nothing was moved, so the request can be sent again.
         return reply(response, 422, { error: 'Return not raised: the platform refused it' })
     }
-    // A Return no device could be added to (each refused, logged, or already awaiting a return) is closed at once.
     if (outcome.lines === 0) {
         return reply(response, 422, { error: 'No device could be added: each is already on a return or was refused' })
     }

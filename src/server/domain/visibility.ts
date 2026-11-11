@@ -150,7 +150,6 @@ function columnsOf(stockroom: string | readonly string[]): readonly string[] {
     return typeof stockroom === 'string' ? [stockroom] : stockroom
 }
 
-/** The dot-walk from a record to each Stockroom its scoping names: none where the record is the Stockroom itself. */
 function stockroomPaths(scoping: TableScoping): string[] {
     return columnsOf(scoping.stockroom ?? []).map((column) => (column === 'sys_id' ? '' : `${column}.`))
 }
@@ -335,7 +334,6 @@ export function grantsNaasRecord(scope: VisibilityScope, scoping: TableScoping, 
     return !outsideNaas(scoping, row) && keeps(scope, scoping, row, ids)
 }
 
-/** The scopes a Customer contact reads their Customer's records by. */
 export type ContactScope = Extract<VisibilityScope, 'own_customer' | 'own_sites'>
 
 /**

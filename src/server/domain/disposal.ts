@@ -37,7 +37,6 @@ export function disposalLineBlockers(line: DisposalLine): string[] {
     return blockers
 }
 
-/** An Asset on a Disposal order at submit: its legal owner, the Customer it belongs to (its company), its name. */
 export interface DisposalAsset {
     legalOwner: LegalOwner | ''
     customerId: string

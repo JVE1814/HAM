@@ -21,7 +21,6 @@ import {
 
 /** Returns, depot evaluation and Fee events (P2.4). */
 
-/** The Customer a requested Return is for and the Site it names, with the Customer that Site belongs to. */
 export interface RequestedReturn {
     customerId: string
     site?: NamedSite
@@ -134,7 +133,6 @@ export function sitePackageHoldersQuery(line: { siteId: string; agreementId: str
  */
 const SITE_RECOVERY_TRIGGERS: readonly ReturnTrigger[] = [RETURN_TRIGGER.site_decommission, RETURN_TRIGGER.agreement_end]
 
-/** Whether a Return with this trigger is a whole-Site recovery. */
 export function isSiteRecovery(trigger: ReturnTrigger): boolean {
     return SITE_RECOVERY_TRIGGERS.includes(trigger)
 }

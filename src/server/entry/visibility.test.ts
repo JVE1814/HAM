@@ -6,12 +6,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * handed by its table, the hardware ACLs on alm_asset, and reading the record and the session.
  */
 
-/** A record's values as a test writes them: a reference is the sys_id of the row it points at, or that row itself. */
 type Row = Record<string, string | Record<string, string>>
 
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
-/** The references these tests dot-walk or fill with a row. */
 const REFERENCES = {
     'x_daas_ham_audit_line.audit': 'x_daas_ham_audit',
     'alm_transfer_order.from_stockroom': 'alm_stockroom',
@@ -64,7 +62,6 @@ function signIn(reader: Reader): void {
     platform.tables.alm_stockroom = [DEPOT, OTHER_DEPOT]
 }
 
-/** `row` with each row it holds in a reference stored in that reference's table (in place of one with its sys_id) and named by its sys_id. */
 function withReferencesStored(table: string, row: Row): Record<string, string> {
     return Object.fromEntries(
         Object.entries(row).map(([field, value]) => {
@@ -77,7 +74,6 @@ function withReferencesStored(table: string, row: Row): Record<string, string> {
     )
 }
 
-/** A saved record of `table`, as a rule or an ACL is handed it; with `saved` false, one not saved yet. */
 function record(table: string, row: Row, saved = true) {
     return recordOf<InstanceType<typeof GlideRecord>>(table, { sys_id: saved ? `${table}-row` : '', ...withReferencesStored(table, row) }, { fresh: !saved })
 }
@@ -206,7 +202,6 @@ describe('readsRecord', () => {
         expect(readsRecord(record('u_unplaced_row', { stockroom: 'sr1' }))).toBe(false)
         expect(platform.warnings).toHaveLength(1)
         expect(readsRecord(record('u_unplaced_row', { stockroom: 'sr9' }))).toBe(false)
-        // Logged once for a table in a transaction, not for every row.
         expect(platform.warnings).toHaveLength(1)
         signIn('staff')
         expect(readsRecord(record('u_unplaced_row', { stockroom: 'sr1' }))).toBe(true)

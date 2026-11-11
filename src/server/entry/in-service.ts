@@ -47,7 +47,6 @@ export function evaluatePendingInService(): void {
     detectPendingInService()
 }
 
-/** Daily job: drop device events older than the retention period. */
 export function purgeDeviceEvents(): void {
     purgeDeviceEventsOlderThan(intProperty(PROPERTY.eventsRetentionDays))
 }

@@ -1,8 +1,6 @@
 import type { Stage } from './lifecycle.ts'
 import { TASK_STATE, type StagingSource } from './vocabulary.ts'
 
-/** Staging: choosing the checklist for an Asset, telling when it is done, and when its task may be closed. */
-
 /** How an Asset is staged when nothing says otherwise: by the Provider, in house. */
 export const DEFAULT_STAGING_SOURCE: StagingSource = 'in_house'
 
@@ -50,7 +48,6 @@ export function stageOnClosure(failed: boolean): Stage {
     return failed ? 'pending_evaluation' : 'staged'
 }
 
-/** A Staging task being closed, as the closure rules read it. */
 export interface ClosingTask {
     number: string
     /** Closed Complete, which moves the Asset; or Closed Incomplete or Skipped, which move nothing (`stagingClosing`). */
@@ -62,10 +59,8 @@ export interface ClosingTask {
     newerTask: string
 }
 
-/** A Staging task just closed: its number, the Order line it stages for (none on one made by hand), whether it failed. */
 export type ClosedStagingTask = Pick<ClosingTask, 'number' | 'failed' | 'lineId'>
 
-/** The task's Asset, as read when the task is closed. */
 export interface ClosingAsset {
     serial: string
     stage: Stage | null

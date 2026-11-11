@@ -7,16 +7,10 @@ import { str, type ForeignRecord } from '../platform/records.ts'
 
 /** Model normalization and Lifecycle phase / Refresh due date upkeep (P1.2), for fleet assets only (ADR 0016). */
 
-/** Scheduled job: map the raw hardware models that are NaaS's onto canonical Models (platform/normalization). */
 export function normalizeRawModels(): void {
     normalizeNaasRawModels()
 }
 
-/**
- * After-update rule on normalization exceptions given a resolved model: learn a rule from it. One whose alias or rule
- * is refused stays open, as nothing maps its raw pair yet. One learned whose resolution the platform refuses stays open
- * too (platform/normalization `resolveNormalizationException`): the user sets it resolved by hand.
- */
 export function onNormalizationResolved(current: GlideRecord): void {
     const resolution = resolveNormalizationException(current)
     if (!resolution.learned) {
@@ -40,10 +34,6 @@ export function onModelLifecycleChanged(current: ForeignRecord, previous: Foreig
     }
 }
 
-/**
- * Script action on x_daas_ham.model.lifecycle (parm1 = model, parm2 = cursor): the Model's fleet assets not retired
- * (platform/lifecycle-dates keeps the pass to the fleet, so the Provider IT's units of the Model are not stamped).
- */
 export function refreshModelAssets(event: GlideRecord, current: GlideRecord): void {
     runRefreshPass('model', event, current)
 }
@@ -53,12 +43,10 @@ export function rollLifecyclePhases(): void {
     queueModelsReachingMilestone(todayIso())
 }
 
-/** After-update rule on Agreements whose refresh terms changed. */
 export function onAgreementTermsChanged(current: GlideRecord): void {
     queueRefresh('agreement', current)
 }
 
-/** Script action on x_daas_ham.agreement.terms (parm1 = agreement, parm2 = cursor): its deployed fleet assets. */
 export function refreshAgreementAssets(event: GlideRecord, current: GlideRecord): void {
     runRefreshPass('agreement', event, current)
 }

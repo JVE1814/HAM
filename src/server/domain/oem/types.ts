@@ -27,7 +27,6 @@ export interface Fetched<T> {
     errors: string[]
 }
 
-/** A coverage answer, which also says which of the asked serials were not answered. */
 export interface CoverageFetched extends Fetched<CoverageFact> {
     /** Serials whose call failed, so nothing is known about them; the others were answered. */
     failed: string[]

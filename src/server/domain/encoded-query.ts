@@ -1,5 +1,3 @@
-/** Helpers for ServiceNow encoded queries. */
-
 /**
  * Add `condition` to every top-level OR group of `query`. A condition appended after `^NQ` binds
  * only to the last group, so it has to be repeated in each one.

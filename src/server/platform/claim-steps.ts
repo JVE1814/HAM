@@ -35,7 +35,6 @@ import type { ClaimAction, OemVendor } from '../domain/vocabulary.ts'
 
 const STEP = 'x_daas_ham_staging_step'
 
-/** The fields of a step's Asset that a claim needs. */
 interface ClaimAsset {
     customerId: string
     serial: string
@@ -43,10 +42,8 @@ interface ClaimAsset {
     claimCode: string
 }
 
-/** A staging task or Asset not found reads as empty, as a dot-walk through a broken reference did. */
 const NO_ASSET: ClaimAsset = { customerId: '', serial: '', mac: '', claimCode: '' }
 
-/** The property that turns each vendor's claims on: a vendor without one is never claimed for. */
 const CLAIM_ENABLED: Partial<Record<OemVendor, PropertyOf<boolean>>> = PROPERTY.claimEnabled
 
 /**
@@ -76,7 +73,6 @@ function runHolding(lock: HeldLock): void {
     }
 }
 
-/** `store`, finding no step due once `lock` is lost (logged once), so the run calls no vendor after that. */
 function whileHeld(lock: HeldLock, store: ClaimStore): ClaimStore {
     let lost = false
     return {
@@ -91,7 +87,6 @@ function whileHeld(lock: HeldLock, store: ClaimStore): ClaimStore {
     }
 }
 
-/** Automated staging steps (x_daas_ham_staging_step) behind the claim run's ClaimStore port; caches OEM cloud accounts per run. */
 function glideClaimStore(): ClaimStore {
     const accounts = memoized(cloudAccount)
     return {
@@ -100,7 +95,6 @@ function glideClaimStore(): ClaimStore {
     }
 }
 
-/** Up to `limit` due steps (dueStepsQuery), fewest attempts first, then oldest; their staging tasks and Assets are read with one query each. */
 function dueTargets(vendor: OemVendor, action: ClaimAction, limit: number, accounts: (key: string) => string): ClaimTarget[] {
     const step = new GlideRecord(STEP)
     step.addEncodedQuery(dueStepsQuery(vendor, action))
@@ -128,7 +122,6 @@ function dueTargets(vendor: OemVendor, action: ClaimAction, limit: number, accou
     })
 }
 
-/** A step of `action` on staging task `taskId` was ticked done: release the task's open steps waiting on it (initialAutomationStatus). */
 export function releaseStepsWaitingOn(taskId: string, action: string): void {
     const dependents = dependentActions(action)
     if (!taskId || dependents.length === 0) return
@@ -144,7 +137,6 @@ export function releaseStepsWaitingOn(taskId: string, action: string): void {
 /** Waiting steps a claim run checks for a prerequisite no longer open, at most. */
 const STRANDED_LOAD = 200
 
-/** The job cursor (platform/job-cursor) holding the sys_id of the last waiting step a claim run checked. */
 const STRANDED_CURSOR = 'oem_claim_stranded'
 
 /**
@@ -158,9 +150,7 @@ function releaseStranded(): void {
     const cursor = strandedCursor()
     const after = cursor?.cursor ?? ''
     let steps = waitingSteps(after)
-    // None left after the cursor: the pass is over, and this run starts the next.
     if (steps.length === 0 && after) steps = waitingSteps('')
-    // A short page ends the pass, so the next run starts from the first step.
     if (cursor) saveStrandedCursor(cursor, steps.length === STRANDED_LOAD ? (steps[steps.length - 1]?.stepId ?? '') : '')
     if (steps.length === 0) return
     const open = new Set<string>()
@@ -178,7 +168,6 @@ function releaseStranded(): void {
     while (step.next()) release(step)
 }
 
-/** Up to STRANDED_LOAD waiting steps of active staging tasks, in sys_id order after `after` ('' for the first). */
 function waitingSteps(after: string): Array<{ stepId: string; taskId: string; prerequisite: string }> {
     const waiting = new GlideRecord(STEP)
     waiting.addEncodedQuery(`automation_status=${STEP_STATUS.waiting}^done=false^staging_task.active=true`)
@@ -194,10 +183,6 @@ function waitingSteps(after: string): Array<{ stepId: string; taskId: string; pr
     return steps
 }
 
-/**
- * The stranded-step cursor, created on the first run; null (logged) when it cannot be: each run then checks the first
- * STRANDED_LOAD waiting steps only.
- */
 function strandedCursor(): JobCursor | null {
     try {
         return openJobCursor(STRANDED_CURSOR)
@@ -207,7 +192,6 @@ function strandedCursor(): JobCursor | null {
     }
 }
 
-/** Save where the next run checks from; a refused save is logged, and the next run checks this run's steps again. */
 function saveStrandedCursor(cursor: JobCursor, next: string): void {
     if (cursor.cursor === next) return
     const refused = cursor.save({ cursor: next })
@@ -224,7 +208,6 @@ function release(step: GlideRecord): void {
     if (!step.update()) warnRefused(step, `OEM step "${str(step, 'label')}" of ${step.getDisplayValue('staging_task')} still waiting, not released`)
 }
 
-/** The Customer's OEM cloud account for `action`, looked up once per customer and action. */
 function cloudAccount(key: string): string {
     const [customerId, vendor, action] = key.split('|')
     return pluck('x_daas_ham_cloud_account', `customer=${customerId}^vendor=${vendor}^purpose=${action}`, 'account_id', 1)[0] ?? ''

@@ -15,7 +15,6 @@ import { INSTALL_STATUS, STAGE_FIELDS, STOCKROOM_TYPE, type StockroomType } from
  * the fleet condition out.
  */
 
-/** The alm_hardware boolean that marks a fleet asset. */
 export const FLEET_FIELD = 'x_daas_ham_fleet'
 
 /**
@@ -75,10 +74,8 @@ export const FLEET_IN_STAGE = {
  */
 export const INSTALLED_CONDITION = `install_status=${INSTALL_STATUS.inUse}`
 
-/** Fleet assets In use by install status: installed at a Site, whatever their substatus. */
 export const FLEET_INSTALLED = `${INSTALLED_CONDITION}^${FLEET_CONDITION}`
 
-/** The Stockroom field that holds its type (alm_stockroom.x_daas_ham_stockroom_type). */
 export const STOCKROOM_TYPE_FIELD = 'x_daas_ham_stockroom_type'
 
 /** The types of NaaS stockrooms: every type there is. A stockroom with no type (or another) is the Provider IT's, not NaaS. */
@@ -121,7 +118,6 @@ export function providerStockroomCondition(via = ''): string {
     return `${via}${STOCKROOM_TYPE_FIELD}IN${PROVIDER_STOCKROOM_TYPES.join(',')}`
 }
 
-/** The Model field that holds its OEM PID (cmdb_model.x_daas_ham_oem_pid). */
 export const OEM_PID_FIELD = 'x_daas_ham_oem_pid'
 
 /** Encoded condition matching NaaS Models, on cmdb_model itself. */
@@ -139,7 +135,6 @@ export const PUBLISHER_LIFECYCLE_TYPE = 'publisher'
  */
 export const NAAS_MODEL_MILESTONES = `model.${NAAS_MODEL_CONDITION}^lifecycle_type=${PUBLISHER_LIFECYCLE_TYPE}^ORDERBYmodel^ORDERBYstart_date`
 
-/** Whether a Model with this OEM PID is a NaaS Model: it has one. */
 export function isNaasModel(oemPid: string): boolean {
     return oemPid.trim() !== ''
 }

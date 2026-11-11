@@ -43,9 +43,7 @@ function withParents(table: string): string[] {
     }
 }
 
-/** Where the app's visibility places a table. */
 interface Placement {
-    /** Its scoping: its own entry or, for a table that extends a scoped one, its nearest parent's. Null for none. */
     scoping: TableScoping | null
     /** Whether it is alm_asset or one of its classes, the tables the app's ACLs on alm_asset are asked about. */
     asset: boolean
@@ -90,7 +88,6 @@ export function scopeRecords(current: ForeignRecord): void {
     if (filter) current.addEncodedQuery(filter)
 }
 
-/** `current` as domain/visibility reads a row: the record that holds the fields is loaded once, and only if one is read. */
 function scopedRow(current: GlideRecord, holder?: () => GlideRecord | null): ScopedRow {
     let loaded: GlideRecord | null | undefined
     const record = (): GlideRecord | null => {
@@ -175,20 +172,17 @@ export function grantsFleetAsset(current: GlideRecord): boolean {
 
 const hasRole = (role: string): boolean => gs.hasRole(role)
 
-/** Row check of the Deny-Unless write ACL on alm_asset: a fleet asset is saved only by an asset editor who sees it. */
 export function writesAsset(current: GlideRecord): boolean {
     if (otherAssetClass(current)) return true
     const session = currentSession()
     return writesFleetAsset(session.scope, hasRole, hardwareRow(current), session)
 }
 
-/** Check of the Deny-Unless delete ACL on alm_asset: a fleet asset is deleted only by an app administrator. */
 export function deletesAsset(current: GlideRecord): boolean {
     if (otherAssetClass(current)) return true
     return deletesFleetAsset(hasRole, hardwareRow(current))
 }
 
-/** Check of the Deny-Unless write ACLs on alm_asset.company and alm_asset.cost: an asset manager's, on a fleet asset. */
 export function writesAssetCommercialField(current: GlideRecord): boolean {
     if (otherAssetClass(current)) return true
     return writesFleetCommercialField(hasRole, hardwareRow(current))
@@ -220,10 +214,6 @@ export function grantsCustomerRecord(current: GlideRecord): boolean {
     return grantsContactRecord(session.contactScope(), scoping, scopedRow(current), session)
 }
 
-/**
- * Grant of the customer admins' create ACL on Returns (returns/access.now.ts): a Return of their own Customer, or one
- * that names none yet (domain/visibility `grantsReturnOfOwnCustomer`).
- */
 export function createsCustomerReturn(current: GlideRecord): boolean {
     return grantsReturnOfOwnCustomer(currentSession().customerId, str(current, SCOPED_TABLES.x_daas_ham_return_order.customer))
 }

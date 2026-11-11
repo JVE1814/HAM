@@ -3,7 +3,6 @@ import { messageOf } from '../domain/errors.ts'
 import { preflightReport } from '../domain/preflight.ts'
 import { openJobCursor } from '../platform/job-cursor.ts'
 
-/** On-demand job "NaaS - preflight check": verifies plugins/roles and records the result. */
 export function runPreflight(): void {
     const report = preflightReport({
         tableExists: (table) => new GlideRecord(table).isValid(),
@@ -20,7 +19,6 @@ export function runPreflight(): void {
     if (refused) gs.error(`[x_daas_ham] preflight: result not recorded on job cursor preflight: ${refused}`)
 }
 
-/** Keep the result on the check's row among the job cursors, as its status: null once saved, else why not. */
 function recordResult(result: string): string | null {
     try {
         return openJobCursor('preflight').save({ status: result, ranNow: true })

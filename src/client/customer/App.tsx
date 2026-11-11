@@ -19,7 +19,6 @@ export default function App() {
     }, [])
     useEffect(load, [load])
 
-    // One action at a time: a second click while one is on its way sends nothing (a return requested twice would raise two).
     const inFlight = useRef(false)
     const [busy, setBusy] = useState(false)
     const run: Runner = (action) => {
@@ -65,17 +64,14 @@ export default function App() {
     )
 }
 
-/** Starts an action unless one is on its way, then shows its outcome and reloads the page's data. */
 type Runner = (action: () => Promise<string>) => void
 
 interface ActionProps {
     overview: CustomerOverview
     run: Runner
-    /** An action is on its way: the buttons wait for it. */
     busy: boolean
 }
 
-/** A device already awaiting a return is not offered for another. */
 const returnable = (asset: CustomerAsset) => asset.stage !== 'pending_return'
 
 function Equipment({ overview, run, busy }: ActionProps) {

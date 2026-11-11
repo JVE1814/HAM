@@ -62,7 +62,6 @@ function ruleMatches(rule: ModelMatchRule, model: string): boolean {
     }
 }
 
-/** The regular expression of a regex rule's pattern, or null when the pattern is not one: the rule then matches nothing. */
 function regexOf(pattern: string): RegExp | null {
     try {
         return new RegExp(pattern, 'i')

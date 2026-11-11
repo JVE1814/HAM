@@ -3,7 +3,6 @@ import { restErrorMessage } from './rest-error'
 /** The app's scripted REST API (src/fluent/shared/rest-api.now.ts), which the three pages call. */
 const BASE = '/api/x_daas_ham/naas'
 
-/** A failed call, with its HTTP status. */
 export class ApiError extends Error {
     status: number
 
@@ -13,7 +12,6 @@ export class ApiError extends Error {
     }
 }
 
-/** A path with values in it, each URL-encoded: path`/assets/${code}`. */
 export function path(parts: TemplateStringsArray, ...values: string[]): string {
     return parts.reduce((text, part, i) => text + encodeURIComponent(values[i - 1]) + part)
 }
@@ -31,7 +29,6 @@ async function call<T>(method: 'GET' | 'POST', to: string, body?: object, signal
     return result as T
 }
 
-/** A GET of the API; `signal` aborts it when the view no longer wants its answer. */
 export function get<T>(to: string, signal?: AbortSignal): Promise<T> {
     return call<T>('GET', to, undefined, signal)
 }

@@ -135,7 +135,6 @@ export function buyLabel(http: HttpPort, input: LabelInput): LabelResult {
         if (problem) return { ok: false, error: `${side} address ${problem}` }
     }
     const response = http({ fn: REST_MESSAGE.shipping.fn.createLabel, params: {}, body: labelRequestBody(input) })
-    // An answer's status and message, or the transport's reason when none came (as the OEM adapters say it).
     if (!isSuccess(response.status)) return { ok: false, error: failureText(response) }
     const json = parseJson(response.body)
     const trackingNumber = text(field(json, 'tracking_number'))
@@ -205,7 +204,6 @@ function easyPostStatus(status: unknown): ShipmentStatus {
     return lookupStatus(EASYPOST_STATUS, text(status).toLowerCase())
 }
 
-/** "City, Country" from whichever parts the carrier sent. */
 function placeName(...parts: string[]): string {
     return parts.filter(Boolean).join(', ')
 }
@@ -317,7 +315,6 @@ export function returnLabelRefusal(trackingNumber: string, status: ShipmentStatu
     return `Return label ${trackingNumber} is still open and its status is unknown; check it with the carrier before buying another`
 }
 
-/** A label as an Order or a Shipment names it: its tracking number and carrier. */
 export interface LabelRef {
     trackingNumber: string
     carrier: string

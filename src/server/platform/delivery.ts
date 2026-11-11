@@ -82,7 +82,6 @@ export function shipOrder(orderId: string): ShipOutcome {
     return ship.ran ? ship.value : notShipped('Another Ship of this Order is running: reload the Order to see what it shipped')
 }
 
-/** Ship, holding the Order's `lock` (the label is bought only while it is held). */
 function shipHolding(lock: HeldLock, order: GlideRecord): ShipOutcome {
     const siteId = str(order, 'site')
     const found = shippable(order.getUniqueValue(), siteId)
@@ -136,7 +135,6 @@ function shipHolding(lock: HeldLock, order: GlideRecord): ShipOutcome {
  */
 function shippable(orderId: string, siteId: string): { staged: string[]; hotSpares: string[]; refused: number; reason: string } {
     const asset = new GlideRecord('alm_hardware')
-    // Only tried, never saved.
     asset.addEncodedQuery(stagesQuery(['staged', 'spare_pool'], `x_daas_ham_order_line.order=${orderId}`))
     beyondVisibility(asset, () => asset.query())
     const found = { staged: [] as string[], hotSpares: [] as string[], refused: 0, reason: '' }
@@ -153,13 +151,11 @@ function shippable(orderId: string, siteId: string): { staged: string[]; hotSpar
     return found
 }
 
-/** Put an Asset at the Order's Site (the caller saves). */
 function placeAtSite(asset: GlideRecord, siteId: string): void {
     asset.setValue('x_daas_ham_site', siteId)
     asset.setValue('location', siteId)
 }
 
-/** Open the Order's change and work order; when the platform refuses either, link neither. What went wrong, or null. */
 function openOnSiteWork(order: GlideRecord, work: OnSiteWork): string | null {
     const context: WorkContext = {
         customerId: str(order, 'customer'),

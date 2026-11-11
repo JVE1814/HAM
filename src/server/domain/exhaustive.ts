@@ -5,7 +5,6 @@
  * over a checked value ends in `assertNever`, which the compiler proves unreachable.
  */
 
-/** `value` when it is one of `allowed`, else undefined. */
 export function oneOf<T extends string>(value: string, allowed: readonly T[]): T | undefined {
     return (allowed as readonly string[]).includes(value) ? (value as T) : undefined
 }

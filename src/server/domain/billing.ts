@@ -12,7 +12,6 @@ export interface MonthBounds {
     days: number
 }
 
-/** A calendar month as YYYY-MM (what monthBounds takes). */
 export function isMonth(value: string): boolean {
     return /^\d{4}-(0[1-9]|1[0-2])$/.test(value)
 }
@@ -33,7 +32,6 @@ export function overlapsMonth(bounds: MonthBounds): string {
     return `start_date<=${bounds.last}^end_dateISEMPTY^ORend_date>=${bounds.first}`
 }
 
-/** The calendar month before the one `today` falls in. */
 export function previousMonth(today: string): string {
     return addMonths(`${today.slice(0, 7)}-01`, -1).slice(0, 7)
 }
@@ -70,12 +68,10 @@ export function toCents(amount: number): number {
     return (amount < 0 ? -rounded : rounded) || 0
 }
 
-/** Whole cents as an amount (what a Decimal field is given). */
 export function fromCents(cents: number): number {
     return cents / 100
 }
 
-/** An amount rounded to the cent, half away from zero (toCents). */
 export function roundToCent(amount: number): number {
     return fromCents(toCents(amount))
 }
@@ -150,7 +146,6 @@ export interface AgreementCurrency {
     currency: string
 }
 
-/** The currency an amount is kept in, or why it has none. */
 export type CurrencyChoice = { currency: string } | { problem: string }
 
 /**
@@ -218,14 +213,12 @@ export interface SubscriptionLineTerms {
     currency: string
     /** The package's Site ('' on a per-device line). */
     siteId: string
-    /** The Subscription line's own description. */
     description: string
     /** The line's own dates, end inclusive: a site package bills them, a per-device line its intervals within them. */
     start?: string
     end?: string
 }
 
-/** Whether a Subscription line is billed from its Service intervals (a per-device line). */
 export function billsFromIntervals(line: Pick<SubscriptionLineTerms, 'lineType'>): boolean {
     return line.lineType === 'device_class'
 }
@@ -249,7 +242,6 @@ export function withinLine(interval: DayRange, line: Partial<DayRange>): DayRang
     return end !== undefined && end < start ? null : { start, end }
 }
 
-/** An Asset is on no Subscription line. */
 export const NO_LINE = 'x_daas_ham_subscription_lineISEMPTY'
 
 /**
@@ -258,7 +250,6 @@ export const NO_LINE = 'x_daas_ham_subscription_lineISEMPTY'
  */
 export const IN_SERVICE_UNBILLED = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${NO_LINE}^${FLEET_CONDITION}`
 
-/** An Asset's Subscription line has ended: set ended, or past its end date. */
 export const ON_ENDED_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION_LINE_STATUS.ended}^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()`
 
 /**
@@ -308,7 +299,6 @@ export function subscriptionCharges(line: SubscriptionLineTerms, bounds: MonthBo
     })
 }
 
-/** The units the line bills per Site, in order of first appearance; Sites with none are left out. */
 function unitsBySite(line: SubscriptionLineTerms, bounds: MonthBounds, sources: ChargeSources): Map<string, number> {
     const bySite = new Map<string, number>()
     if (line.lineType === 'site_package') {
@@ -327,7 +317,6 @@ function unitsBySite(line: SubscriptionLineTerms, bounds: MonthBounds, sources: 
 /** How long a generating Billing period must show no activity before an admin may reset it (Reset generation). */
 export const RESET_AFTER_IDLE_MINUTES = 30
 
-/** Whether an admin may reset a period's generation by hand now, and how long it has shown no activity. */
 export type GenerationReset = { reset: true; idleMinutes: number } | { reset: false; why: string }
 
 /**
@@ -404,14 +393,12 @@ export type BillingLineValues = { readonly [field in BillingLineField]?: string 
 export interface StoredBillingLine {
     /** The field's stored value ('' when empty). */
     value(field: BillingLineField): string
-    /** A reference field's display value. */
     display(field: BillingLineField): string
 }
 
 const COLUMNS: ReadonlyArray<BillingLineColumn<BillingLineField>> = BILLING_LINE_COLUMNS
 const CSV_COLUMNS = COLUMNS.filter((column) => column.csv)
 
-/** The column's stored value: a number column's as a number, 0 when it is empty or unreadable. */
 function storedValue(line: StoredBillingLine, column: BillingLineColumn<BillingLineField>): string | number {
     const value = line.value(column.field)
     if (column.type !== 'number') return value
@@ -419,7 +406,6 @@ function storedValue(line: StoredBillingLine, column: BillingLineColumn<BillingL
     return Number.isFinite(number) ? number : 0
 }
 
-/** The CSV export's heading: the period, then each exported column. */
 export function billingCsvHeader(): string[] {
     return ['period', ...CSV_COLUMNS.map((column) => column.field)]
 }

@@ -26,7 +26,6 @@ export function beyondVisibility<T>(record: GlideRecord, read: () => T): T {
     return reading.during(record, read)
 }
 
-/** Whether `record`'s query is being run past the visibility rules: the before-query rules' check. */
 export function readsBeyondVisibility(record: object): boolean {
     return reading.has(record)
 }

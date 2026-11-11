@@ -142,7 +142,6 @@ export function adoptIntoFleet(asset: GlideRecord, name: string): string {
     return asset.update() ? '' : warnRefused(asset, `${name} not added to the fleet`)
 }
 
-/** The Asset as domain/fleet `adoptionProblem` and `receiptProblem` judge it. */
 export function fleetCandidate(asset: GlideRecord): FleetCandidate {
     const { hasSite, hasAgreement } = transitionFacts(asset)
     return {
@@ -158,13 +157,11 @@ export function fleetCandidate(asset: GlideRecord): FleetCandidate {
 /** What an identifier names (`identifyAsset`): the one Asset, none, or more than one (refused, saying why). */
 export type AssetIdentified = { asset: GlideRecord } | { ambiguous: string } | null
 
-/** How an identifier is looked up: among fleet assets only or the Provider IT's too, past the visibility rules or not. */
 interface IdentifierLookup {
     fleetOnly: boolean
     beyondVisibility: boolean
 }
 
-/** How a receipt looks a unit up: past the stockroom rule, the Provider IT's Assets too (see `identifyAnyAsset`). */
 const ARRIVING: IdentifierLookup = { fleetOnly: false, beyondVisibility: true }
 
 /**
@@ -228,17 +225,11 @@ function identify(identifier: string, lookup: IdentifierLookup): AssetIdentified
     return null
 }
 
-/** One Asset carrying an identifier: whether it is a fleet asset, and the record itself (null once it is gone). */
 interface Carrier {
     fleet: boolean
     record: () => GlideRecord | null
 }
 
-/**
- * The Assets (at most IDENTIFIER_READ_LIMIT) whose `field` is `value`: fleet assets only, or fleet ones first when the
- * Provider IT's are read too. The query's own record is handed back while it is still on the first one; only when a
- * second one is read past it is the first read again, by sys_id, the same way (past the visibility rules or not).
- */
 function assetsCarrying(field: string, value: string, lookup: IdentifierLookup): Carrier[] {
     const read = (record: GlideRecord, run: () => boolean | void) => (lookup.beyondVisibility ? beyondVisibility(record, run) : run())
     const asset = new GlideRecord('alm_hardware')

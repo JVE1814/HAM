@@ -56,13 +56,6 @@ export function applyCoverage(
     return [...[...refused].map(([serial, reason]) => `coverage of ${serial} not saved: ${reason}`), ...unstamped]
 }
 
-/**
- * Write the answered contracts of `serials` (normalised) onto their coverage records, found by serial and
- * contract number with one query (of duplicate stored records, the first found is updated) and created when
- * missing; answers for the same contract are set on its record one after the other and saved once. Returns
- * every stored contract of `serials` as it is after the write, which the Assets are summarised from, and why
- * each serial with a refused save was refused.
- */
 function writeCoverage(vendor: OemVendor, source: CoverageSource, serials: readonly string[], answers: readonly CoverageAnswer[], checkedAt: string): CoverageWrite {
     const contracts: SerialCoverage[] = []
     const refused = new Map<string, string>()
@@ -95,7 +88,6 @@ function writeCoverage(vendor: OemVendor, source: CoverageSource, serials: reado
     return { contracts, refused }
 }
 
-/** What writeCoverage stored: the contracts the Assets are summarised from, and why each refused serial was refused. */
 interface CoverageWrite {
     contracts: SerialCoverage[]
     refused: Map<string, string>
@@ -111,7 +103,6 @@ function contractOf(coverage: GlideRecord): SerialCoverage {
     }
 }
 
-/** Set one answered contract on its coverage record; an answer set after another merges onto the dates it set. */
 function setCoverage(coverage: GlideRecord, vendor: OemVendor, source: CoverageSource, answer: CoverageAnswer, checkedAt: string): void {
     const { fact } = answer
     const merged = mergeCoverage(
@@ -143,11 +134,6 @@ export function markExpiryWarned(coverage: GlideRecord): boolean {
     return !!coverage.update()
 }
 
-/**
- * Give each answered Asset (by sys_id, with its normalised serial) its serial's coverage, and stamp it and each
- * `stamped` Asset (the vendor answered with an error: its coverage is kept) checked, with one query for the Assets.
- * Returns why each Asset the platform refused was refused (it stays unchecked, so it is asked again).
- */
 function refreshAssetCoverage(answered: ReadonlyMap<string, string>, coverageOf: ReadonlyMap<string, AssetCoverage>, stamped: readonly string[], checkedAt: string): string[] {
     const refused: string[] = []
     const ids = [...answered.keys(), ...stamped]

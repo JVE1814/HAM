@@ -60,13 +60,6 @@ export function clearVoidedWipeEvidence(current: ForeignRecord, previous: Foreig
     if (to !== null && voidsWipeEvidence(readStage(previous), to)) clearWipeEvidence(current)
 }
 
-/**
- * After-update rule on alm_hardware: an allocated Asset changed stage, so its Order line may advance. A unit that left
- * the line in transit is taken off it and the line goes back to awaiting stock (platform/fulfilment
- * `onLineAssetMoved`): its Order is then sourced again, queued as after a failed staging, so this save takes no
- * sourcing lock. So is the Order of a unit whose transfer to the staging centre fell through, once it is put back
- * (platform/sourcing `putBackUntransferred`).
- */
 export function onAllocatedAssetStageChange(current: ForeignRecord, previous: ForeignRecord): void {
     const lineId = str(current, 'x_daas_ham_order_line')
     if (!lineId) return

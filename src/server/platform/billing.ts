@@ -41,7 +41,6 @@ import { BILLING_PERIOD_STATUS, type BillingLineKind, SUBSCRIPTION_LINE_STATUS }
 const PERIOD = 'x_daas_ham_billing_period'
 const LINE = 'x_daas_ham_billing_line'
 
-/** The kinds of Billing line, by name (the domain's line values carry `kind` as text). */
 const LINE_KIND = { subscription: 'subscription', fee: 'fee' } as const satisfies { [Kind in BillingLineKind]: Kind }
 
 /**
@@ -83,10 +82,6 @@ function generationJob(periodId: string): string {
     return `billing_generate_${periodId}`
 }
 
-/**
- * Start a new pass of the period's generation and queue its first chunk. The chunks still queued of any earlier pass
- * (one reset by hand) are dropped from then on. Returns why when the pass cannot be recorded, and so does not start.
- */
 function startGeneration(period: GlideRecord): string | null {
     const periodId = period.getUniqueValue()
     try {
@@ -116,7 +111,6 @@ export function generateNewPeriod(inserted: GlideRecord): void {
 export function generateChunk(queued: JobEvent): void {
     const period = findById(PERIOD, queued.subject)
     if (!period) {
-        // The period was deleted, or the event names none: nothing can be held for review, so this is all that tells.
         return void gs.warn(`[x_daas_ham] ${queued.name}: dropped a generation chunk, as there is no billing period '${queued.subject}'`)
     }
     if (str(period, 'status') !== BILLING_PERIOD_STATUS.generating) return
@@ -150,7 +144,6 @@ function dropChunk(period: GlideRecord): void {
     )
 }
 
-/** Bill the next chunk of the period's Subscription lines after the event's cursor. */
 function billLines(period: GlideRecord, bounds: MonthBounds, queued: JobEvent, job: string): EventJobResult {
     const siteName = memoized(siteNameOf)
     const currencies = memoized(customerCurrencies)
@@ -203,10 +196,6 @@ function billLines(period: GlideRecord, bounds: MonthBounds, queued: JobEvent, j
     })
 }
 
-/**
- * Hold a period whose generation stopped for review, recording why (saves it): Close period refuses until a
- * Regenerate completes.
- */
 function stopGeneration(period: GlideRecord, error: string): void {
     gs.error(`[x_daas_ham] Billing period ${str(period, 'period')}: generation stopped: ${error}`)
     period.setValue('last_error', error.slice(0, 255))
@@ -227,13 +216,11 @@ function holdForReview(period: GlideRecord): boolean {
     return Boolean(period.update())
 }
 
-/** A Site's name ('' without a Site); a generation chunk reads each once. */
 function siteNameOf(siteId: string): string {
     const site = findById('cmn_location', siteId)
     return site ? str(site, 'name') : ''
 }
 
-/** A Subscription line as read for billing: its terms, whom it bills, and its Agreement, whose currency it bills in. */
 interface LineRow {
     lineId: string
     terms: Omit<SubscriptionLineTerms, 'currency'>
@@ -242,17 +229,12 @@ interface LineRow {
     agreement: AgreementCurrency | null
 }
 
-/** A Subscription line ready to bill: its row, and its Service intervals in the month. */
 type BillableLine = LineRow & {
     intervals: readonly ServiceInterval[]
     /** Set when the line is billed from Service intervals that could not be read: it fails to bill with this error. */
     intervalsUnread?: { error: unknown }
 }
 
-/**
- * The batch's lines with their Service intervals in the month (none for a line not billed from them), read with
- * one aggregate for the whole batch. If that read fails, only the lines billed from intervals fail, so the others still bill.
- */
 function withIntervals(lines: readonly LineRow[], bounds: MonthBounds): BillableLine[] {
     try {
         const byLine = intervalsByLine(lines.filter((line) => billsFromIntervals(line.terms)).map((line) => line.lineId), bounds)
@@ -262,7 +244,6 @@ function withIntervals(lines: readonly LineRow[], bounds: MonthBounds): Billable
     }
 }
 
-/** The Service intervals in the month of each of these lines: one per Site and dates, with the number of Assets sharing them. */
 function intervalsByLine(lineIds: readonly string[], bounds: MonthBounds): Map<string, ServiceInterval[]> {
     const byLine = new Map<string, ServiceInterval[]>()
     if (lineIds.length === 0) return byLine
@@ -285,7 +266,6 @@ function intervalsByLine(lineIds: readonly string[], bounds: MonthBounds): Map<s
     return byLine
 }
 
-/** Insert a Billing line; throws when the platform refuses it, so the line counts as failed instead of vanishing. */
 function insertLine(period: GlideRecord, values: BillingLineValues): void {
     const line = new GlideRecord(LINE)
     line.initialize()
@@ -294,14 +274,12 @@ function insertLine(period: GlideRecord, values: BillingLineValues): void {
     if (!line.insert()) throwRefused(line, 'billing line not saved')
 }
 
-/** Count lines that failed to bill on the period (does not save): Close period refuses until a regeneration bills them. */
 function addFailedLines(period: GlideRecord, failed: number, lastError: string): void {
     gs.error(`[x_daas_ham] Billing period ${str(period, 'period')}: ${failed} line(s) failed: ${lastError}`)
     period.setValue('failed_lines', num(period, 'failed_lines') + failed)
     period.setValue('last_error', lastError.slice(0, 255))
 }
 
-/** Add the open Fee events up to the month end, then total the period for review. */
 function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
     const fee = billableFees(period.getUniqueValue(), bounds.last)
     let failed = 0
@@ -342,10 +320,6 @@ function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
     }
 }
 
-/**
- * Line count and totals of the period (does not save): Totals per currency, and Total only while every line is in one
- * currency (blank when they are in several), so no two currencies are added.
- */
 function setTotals(period: GlideRecord): void {
     const totals = totalsOf([period.getUniqueValue()]).get(period.getUniqueValue()) ?? []
     period.setValue('line_count', totals.reduce((lines, total) => lines + total.lines, 0))
@@ -353,7 +327,6 @@ function setTotals(period: GlideRecord): void {
     period.setValue('total_amount', singleCurrencyTotal(totals) ?? '')
 }
 
-/** Each period's lines counted and summed per currency (domain/billing `currencyTotals`), with one aggregate. */
 function totalsOf(periodIds: readonly string[]): Map<string, CurrencyTotal[]> {
     const groups = new Map<string, CurrencyTotal[]>()
     if (periodIds.length === 0) return groups
@@ -374,12 +347,10 @@ function totalsOf(periodIds: readonly string[]): Map<string, CurrencyTotal[]> {
     return new Map([...groups].map(([periodId, rows]) => [periodId, currencyTotals(rows)]))
 }
 
-/** How a Fee event reads on its billing line, and in the messages that name it. */
 function feeLabel(fee: GlideRecord): string {
     return `${fee.getDisplayValue('fee_type')} fee: ${fee.getDisplayValue('asset')} (${str(fee, 'occurred_on')})`
 }
 
-/** Regenerate a period ready for review: rebuild its lines from current data. */
 export function regeneratePeriod(period: GlideRecord): PeriodOutcome {
     if (str(period, 'status') !== BILLING_PERIOD_STATUS.ready) return notDone('Only a period ready for review can be regenerated')
     period.setValue('status', BILLING_PERIOD_STATUS.generating)
@@ -506,15 +477,10 @@ function markFeesBilled(period: GlideRecord): string[] {
     return refused
 }
 
-/** Queue the CSV export of a closed period (attached in the background by `attachExport`). */
 export function queueExport(period: GlideRecord): void {
     queueJob(EVENT.billingExport, period)
 }
 
-/**
- * Where a period's CSV export stands: only a closed period is exported, and only while its file is not attached. Asked
- * when an export is requested and again when it runs in the background, of the period as it is then.
- */
 type ExportState = { state: 'not_closed' } | { state: 'attached'; fileName: string } | { state: 'missing'; fileName: string }
 
 function exportState(period: GlideRecord): ExportState {
@@ -523,7 +489,6 @@ function exportState(period: GlideRecord): ExportState {
     return { state: exists('sys_attachment', exportQuery(period, fileName)) ? 'attached' : 'missing', fileName }
 }
 
-/** What came of asking for a period's CSV again: its export is queued, or why not (the file that is `attached` named). */
 export type ExportRequest = { queued: true } | { queued: false; why: 'not_closed' } | { queued: false; why: 'attached'; fileName: string }
 
 /** Re-export CSV: queue the export of a closed period whose file is missing (never saves the period). */
@@ -572,7 +537,6 @@ function exportQuery(period: GlideRecord, fileName: string): string {
     return `table_name=${PERIOD}^table_sys_id=${period.getUniqueValue()}^file_name=${fileName}`
 }
 
-/** The period's lines in the order every export gives them, by Customer: not yet queried. */
 function linesOf(periodId: string): GlideRecord {
     const line = new GlideRecord(LINE)
     line.addQuery('billing_period', periodId)
@@ -581,9 +545,7 @@ function linesOf(periodId: string): GlideRecord {
     return line
 }
 
-/** Reads Billing lines for an export (domain/billing `StoredBillingLine`), looking up each referenced record's display value once. */
 function lineReader(): (line: GlideRecord) => StoredBillingLine {
-    // Keyed by the referenced record; the first line seen for it supplies the display value.
     const cache = new Map<string, string>()
     return (line) => ({
         value: (field) => str(line, field),
@@ -612,7 +574,6 @@ export interface BillingLinesPage {
     status: string
     /** Whether the period is closed: its lines no longer change. */
     final: boolean
-    /** The period's totals, one per currency. */
     totals: CurrencyTotal[]
     offset: number
     lines: Array<ReturnType<typeof billingLineJson>>
@@ -620,7 +581,6 @@ export interface BillingLinesPage {
     nextOffset: number | null
 }
 
-/** The `limit` most recent periods, as the pull API lists them. */
 export function recentPeriods(limit: number): BillingPeriodList {
     const period = new GlideRecord(PERIOD)
     period.orderByDesc('period')

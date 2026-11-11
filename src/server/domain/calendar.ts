@@ -30,7 +30,6 @@ export function addMonths(date: string, months: number): string {
     return toIsoDate(Date.UTC(year, month, Math.min(d, lastDay)))
 }
 
-/** The last day of the month `date` falls in. */
 export function endOfMonth(date: string): string {
     const [y, m] = date.split('-').map(Number)
     // Day 0 of the next month (m is 1-based, Date.UTC's month 0-based) is this month's last day.

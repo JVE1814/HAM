@@ -61,11 +61,6 @@ function lastAttestedOn(siteId: string): string | undefined {
     return last.next() ? glideToIsoDate(str(last, 'attested_at')) : undefined
 }
 
-/**
- * Raise the Site's attestation, pending until every installed Asset is listed on it: submitted without one, it would
- * confirm the Site without that Asset. One whose item (or opening) the platform refuses is removed with its items, so
- * none is open and the next run raises it whole; one the platform keeps stays pending, never closed, to cancel.
- */
 function openAttestation(agreement: GlideRecord, siteId: string): void {
     const customerId = str(agreement, 'customer')
     const attestation = new GlideRecord(ATTESTATION)
@@ -77,7 +72,6 @@ function openAttestation(agreement: GlideRecord, siteId: string): void {
     attestation.setValue('short_description', 'Confirm the equipment installed at your site')
     attestation.setValue('state', ATTESTATION_STATE.pending)
     const attestationId = attestation.insert()
-    // Refused: none is open at the Site, so the next run raises it again.
     if (!attestationId) return void warnRefused(attestation, `No attestation for site ${siteId}`)
     let why = listAttested(attestationId, installedAssetIds({ siteId }))
     if (!why) {
@@ -89,7 +83,6 @@ function openAttestation(agreement: GlideRecord, siteId: string): void {
     gs.warn(`[x_daas_ham] No attestation for site ${siteId}: ${why}${kept}`)
 }
 
-/** List each Asset on the attestation; why the platform refused the first one it left off ('' when all are listed). */
 function listAttested(attestationId: string, assetIds: readonly string[]): string {
     for (const assetId of assetIds) {
         const item = new GlideRecord(ITEM)
@@ -134,7 +127,6 @@ export function saveAttestationAnswers(attestation: GlideRecord, answers: readon
     return refused
 }
 
-/** Whether an Asset on the attestation still has no answer: it is submitted only once every one has. */
 export function hasUnansweredItems(attestation: GlideRecord): boolean {
     return exists(ITEM, `attestation=${attestation.getUniqueValue()}^responseISEMPTY`)
 }

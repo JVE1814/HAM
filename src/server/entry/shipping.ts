@@ -9,7 +9,6 @@ import { labelReturn, retryTracking, trackShipment, voidLabel } from '../platfor
 
 /** Shipping aggregator: labels for ship-back returns, voided labels and tracking webhooks (P3.26, D73): platform/shipping. */
 
-/** UI action "Create return label" on a ship-back Return order: the Site contact prints it (platform/shipping `labelReturn`). */
 export function uiCreateReturnLabel(current: GlideRecord): void {
     const label = labelReturn(current)
     if (!label.bought) return void gs.addErrorMessage(label.why)
@@ -58,10 +57,6 @@ export function postTrackingUpdate(request: RESTAPIRequest, response: RESTAPIRes
     }
 }
 
-/**
- * Script action on x_daas_ham.shipment.track (parm1: a tracking update the webhook queued, parm2: how many times it
- * was queued again): apply it to the Shipment as the webhook does (platform/shipping `retryTracking`).
- */
 export function retryTrackingUpdate(event: GlideRecord, current: GlideRecord): void {
     // The Shipment is gone: nothing to apply.
     if (!current.getUniqueValue()) return

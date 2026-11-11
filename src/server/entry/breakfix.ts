@@ -17,10 +17,6 @@ export function onCaseFailedAsset(current: ForeignRecord): void {
     if (!str(current, 'account')) current.setValue('account', str(asset, 'company'))
 }
 
-/**
- * UI action "Raise replacement" on a case: an Order replacing the failed Asset like-for-like (platform/breakfix
- * `raiseReplacement`), and what came of it for the user.
- */
 export function uiRaiseReplacement(current: GlideRecord): void {
     // A refused form save (the platform says why) raises nothing: the failed asset and linked Order would be values the
     // case does not hold.
@@ -40,7 +36,6 @@ export function uiRaiseReplacement(current: GlideRecord): void {
     }
 }
 
-/** UI action on an OEM RMA: the defective unit went back to the manufacturer (platform/oem-rma `returnDefectiveToOem`). */
 export function uiDefectiveReturnedToOem(current: GlideRecord): void {
     const problem = returnDefectiveToOem(current)
     if (problem) gs.addErrorMessage(problem)

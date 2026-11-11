@@ -20,7 +20,6 @@ import { currentSession } from './session.ts'
 const AUDIT = 'x_daas_ham_audit'
 const LINE = 'x_daas_ham_audit_line'
 
-/** An audit that was started: its number, and how many Assets it expects and could not list. */
 interface StartedAudit {
     number: string
     /** The Assets listed, which close compares the scans with. */
@@ -37,10 +36,8 @@ interface StartedAudit {
 
 export type AuditStart = ({ started: true } & StartedAudit) | { started: false; reason: string }
 
-/** A Site audit that was started, and whether a work order sends an engineer to do it. */
 export type SiteAuditStart = ({ started: true; workOrderOpened: boolean } & StartedAudit) | { started: false; reason: string }
 
-/** A new audit in progress, not yet saved. */
 function newAudit(type: AuditType, shortDescription: string): GlideRecord {
     const audit = new GlideRecord(AUDIT)
     audit.initialize()
@@ -50,10 +47,6 @@ function newAudit(type: AuditType, shortDescription: string): GlideRecord {
     return audit
 }
 
-/**
- * List the Assets a saved audit expects, and set how many were listed on it (`saveStarted` saves that). Close compares
- * scans with the listed ones only, so a line the platform refuses is logged and left out of the count.
- */
 function listExpected(audit: GlideRecord, assetIds: readonly string[]): StartedAudit {
     const number = str(audit, 'number')
     let expected = 0
@@ -69,7 +62,6 @@ function listExpected(audit: GlideRecord, assetIds: readonly string[]): StartedA
     return { number, expected, leftOff: assetIds.length - expected }
 }
 
-/** Save what starting the audit set on it; a refused save is logged and told (`unsaved`), and the audit stays open without it. */
 function saveStarted(audit: GlideRecord, started: StartedAudit): StartedAudit {
     if (audit.update()) return started
     return { ...started, unsaved: warnRefused(audit, `Audit ${started.number} not given its expected count of ${started.expected}`) }
@@ -95,7 +87,6 @@ export function startStockroomAudit(stockroom: GlideRecord): AuditStart {
     return { started: true, ...saveStarted(audit, listExpected(audit, onTheShelf)) }
 }
 
-/** Start the audit of a Site: it expects the fleet assets installed there, and an FSM work order sends an engineer. */
 export function startSiteAudit(site: GlideRecord): SiteAuditStart {
     const siteId = site.getUniqueValue()
     const audit = newAudit('site', `Site audit of ${str(site, 'name')}`)
@@ -112,7 +103,6 @@ export function startSiteAudit(site: GlideRecord): SiteAuditStart {
     }
     const work = openFieldWork(context, { changeType: 'standard', purpose: 'site_audit', subcontracted: false })
     if (work) audit.setValue('work_order', work.workOrderId)
-    // Unsaved, the work order names the audit all the same (its source), so it is found from there.
     return { started: true, workOrderOpened: !!work, ...saveStarted(audit, started) }
 }
 
@@ -197,7 +187,6 @@ export function closeAudit(audit: GlideRecord): AuditClose {
         const result = closedLineResult({ assetId, scannedCode }, comparison)
         if (!result) continue
         line.setValue('result', result)
-        // The audit's counts still have it.
         if (!line.update()) {
             warnRefused(line, `Audit ${number}: ${scannedCode || assetId} not marked ${result}`)
             unsaved++

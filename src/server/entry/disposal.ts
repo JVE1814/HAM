@@ -12,7 +12,6 @@ import { abortWith } from '../platform/rule-api.ts'
 
 /** Disposal orders: approve, then retire each wiped Asset by its method (P2.5, D61): platform/disposal. */
 
-/** UI action "Submit for approval" on a draft disposal order. */
 export function uiSubmitDisposal(current: GlideRecord): void {
     // A refused form save (the platform says why) asks nobody: the order is not what the approvers would decide.
     if (!current.update()) return
@@ -20,12 +19,10 @@ export function uiSubmitDisposal(current: GlideRecord): void {
     if (!submission.submitted && submission.why) gs.addErrorMessage(submission.why)
 }
 
-/** After-update rule on sysapproval_approver for disposal orders: roll the decisions up to the order. */
 export function onDisposalApprovalDecision(current: ForeignRecord): void {
     rollUpDisposalApprovals(str(current, 'document_id'))
 }
 
-/** UI action "Complete disposal": retire every ready line; report what blocks the rest. */
 export function uiCompleteDisposal(current: GlideRecord): void {
     // A refused form save (a method or Customer changed after submit) leaves the refused values on `current`.
     if (!current.update()) return
@@ -46,7 +43,6 @@ export function guardDisposalLine(current: GlideRecord, previous: GlideRecord): 
     abortWith(current, lineChangeRefusal(current, previous))
 }
 
-/** Before-update rule on disposal orders whose method or Customer changes: both are fixed at submit, like the lines. */
 export function guardDisposalOrder(current: GlideRecord, previous: GlideRecord): void {
     abortWith(current, orderChangeRefusal(previous))
 }

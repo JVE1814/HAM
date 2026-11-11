@@ -44,7 +44,6 @@ type LiveLineStage = (typeof LINE_ORDER)[number]
 /** Every line stage, to read x_daas_ham_order_line.line_stage with (platform/records `choice`). */
 export const LINE_STAGES: readonly LineStage[] = [...LINE_ORDER, 'cancelled']
 
-/** How far along LINE_ORDER a line stage is; -1 for cancelled or a stage the app does not know. */
 function rank(stage: LineStage): number {
     return (LINE_ORDER as readonly LineStage[]).indexOf(stage)
 }
@@ -76,14 +75,11 @@ const BEFORE_SHIP: ReadonlySet<Stage> = new Set([
     'missing',
 ])
 
-/** Whether a unit on a line in `stage` was sent to the Site (and may have come back since). */
 function sent(stage: Stage | null): stage is Stage {
     return stage !== null && !BEFORE_SHIP.has(stage)
 }
 
-/** What a line's stage is derived from. */
 export interface LineFacts {
-    /** The stage the line is in now. */
     current: LineStage
     quantity: number
     assetStages: ReadonlyArray<Stage | null>

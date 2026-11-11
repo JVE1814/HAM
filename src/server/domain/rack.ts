@@ -56,7 +56,6 @@ export interface RackSpec {
     powerCapacityW: number
 }
 
-/** The alm_hardware fields that place an Asset in its rack: the rack, the lowest unit it takes, and the face it is on. */
 export const PLACEMENT_FIELDS = { rack: 'x_daas_ham_rack', ruStart: 'x_daas_ham_ru_start', face: 'x_daas_ham_rack_face' } as const
 
 /** The height taken for a rack that records none (cmdb_ci_rack.rack_units empty or 0): a full-height rack. */
@@ -82,7 +81,6 @@ export function placementProblem(rack: RackSpec, placements: readonly Placement[
         if (unit !== null) return `Rack unit ${unit} is taken by ${labelOf(other)}`
     }
     const budget = powerBudget(rack.powerCapacityW, [...others, candidate])
-    // The other devices draw the same before and after, so only the candidate's own draw can raise it.
     const raisesDraw = previousPowerW === undefined || drawW(candidate) > Math.max(0, previousPowerW)
     if (raisesDraw && budget.capacityW > 0 && budget.usedW > budget.capacityW) {
         return `The rack's power budget would be exceeded: ${budget.usedW} W of ${budget.capacityW} W`
@@ -98,12 +96,10 @@ function drawW(placement: Placement): number {
     return Math.max(0, placement.powerW ?? 0)
 }
 
-/** The highest unit a device occupies: one of no recorded height takes one unit. */
 function topUnit(placement: Placement): number {
     return placement.ruStart + Math.max(1, placement.height) - 1
 }
 
-/** The lowest unit two devices share, or null when they share none: on different faces, or one wholly above the other. */
 function sharedUnit(a: Placement, b: Placement): number | null {
     if (a.face !== b.face) return null
     const unit = Math.max(a.ruStart, b.ruStart)

@@ -12,8 +12,6 @@ import type { AgreementCurrency } from '../domain/billing.ts'
 import { todayIso } from './clock.ts'
 import { bool, num, str } from './records.ts'
 
-/** Read models of an Agreement and its Customer catalog, as the entitlement module needs them. */
-
 /**
  * The Agreements in force: an Agreement is a contract (it extends ast_contract), and this is the state the platform's
  * Contract Management gives one that is active. What the daily jobs that act for running Agreements select.
@@ -64,7 +62,6 @@ function catalogEntries(customerId: string): CatalogEntryView[] {
     return entries
 }
 
-/** Visit each entry of the Customer's catalog, current or not, with its record. */
 function eachCatalogEntry(customerId: string, visit: (entry: CatalogEntryView, record: GlideRecord) => void): void {
     const gr = new GlideRecord('x_daas_ham_catalog_entry')
     gr.addQuery('customer', customerId)
@@ -97,17 +94,14 @@ function contractedQuantities(agreementId: string): ContractedQuantity[] {
     return quantities
 }
 
-/** The Agreement's Assets at or on their way to a Site, but not those still on an open Order line (counted in flight). */
 function deployedUsage(agreementId: string): Usage[] {
     return usageByModel('alm_hardware', deployedUsageQuery(agreementId), 'COUNT', '')
 }
 
-/** Whole quantities on other open Order lines of the Agreement that have not shipped yet, partly shipped included. */
 function inFlightUsage(agreementId: string, excludeOrderId: string): Usage[] {
     return usageByModel('x_daas_ham_order_line', inFlightLinesQuery(agreementId, excludeOrderId), 'SUM', 'quantity')
 }
 
-/** One aggregate of the records `query` matches, for each Model and its Device class. */
 function usageByModel(table: string, query: string, aggregate: 'COUNT' | 'SUM', field: string): Usage[] {
     const ga = new GlideAggregate(table)
     ga.addEncodedQuery(query)

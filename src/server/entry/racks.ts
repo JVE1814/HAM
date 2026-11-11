@@ -49,10 +49,6 @@ export function recheckRackPlacement(current: ForeignRecord, previous: ForeignRe
     recheckRacksOf(current, previous)
 }
 
-/**
- * The daily reconciliation job: the installed base against monitoring (platform/reconciliation), then each rack with
- * an open rack exception (platform/racks `recheckFlaggedRacks`), even when the first part throws.
- */
 export function reconcileInstalledBaseAndRacks(): void {
     try {
         reconcileInstalledBase()
@@ -61,14 +57,12 @@ export function reconcileInstalledBaseAndRacks(): void {
     }
 }
 
-/** The rack endpoints are for users with a NaaS role, staff or Customer contact: anyone the visibility rules place. */
 function forbidden(response: RESTAPIResponse): boolean {
     if (currentSession().scope !== 'unscoped') return false
     reply(response, 403, { error: 'Requires a NaaS role' })
     return true
 }
 
-/** GET /racks?site={sys_id}: racks at the Site and in its rooms. */
 export function listRacks(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (forbidden(response)) return
     const racks = racksAtSite(queryParam(request, 'site'))
@@ -76,7 +70,6 @@ export function listRacks(request: RESTAPIRequest, response: RESTAPIResponse): v
     reply(response, 200, { racks } satisfies RackList)
 }
 
-/** GET /racks/{id}: the rack and the fleet assets placed in it (visibility rules apply to devices). */
 export function getRack(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (forbidden(response)) return
     const elevation = rackElevation(pathParam(request, 'id'))
@@ -84,7 +77,6 @@ export function getRack(request: RESTAPIRequest, response: RESTAPIResponse): voi
     reply(response, 200, elevation)
 }
 
-/** GET /sites: customer Sites the user may see (customers only their own, site contacts only theirs). */
 export function listSites(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (forbidden(response)) return
     reply(response, 200, { sites: visibleSites() } satisfies SiteList)

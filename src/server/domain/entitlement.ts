@@ -162,7 +162,6 @@ export function ownershipFindings(order: OrderParties, orderer: Orderer): string
     return findings
 }
 
-/** Who must approve an Order with this verdict. */
 export function approversFor(verdict: EntitlementVerdict | ''): Approver[] {
     switch (verdict) {
         case 'over_quota':

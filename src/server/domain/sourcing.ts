@@ -60,7 +60,6 @@ export function candidateLimit(shortfall: number): number {
     return shortfall * 5 + 50
 }
 
-/** An Order line as sourcing counts it. */
 export interface LineNeed {
     quantity: number
     /** Assets on the line, in any stage. */
@@ -71,7 +70,6 @@ export interface LineNeed {
     awaitedRmas: number
 }
 
-/** Units the line still needs: not allocated, on order or under an OEM RMA whose replacement is still to come. */
 export function lineShortfall(line: LineNeed): number {
     return line.quantity - line.allocated - line.onOrder - line.awaitedRmas
 }
@@ -102,7 +100,6 @@ export interface ReplacedUnit {
     coverageEnd: string
 }
 
-/** Where what a line still misses goes: nowhere (nothing is missing), to a purchase, or to the OEM for an advance replacement. */
 export type ShortfallRoute = 'none' | 'purchase' | 'oem_advance_replacement'
 
 /**
@@ -235,10 +232,8 @@ export function planSourcing(request: SourcingRequest, stock: readonly StockCand
     return { picks, toPurchase, summary: parts.join(', ') }
 }
 
-/** What came of requesting a purchase: the purchase order created, or why there is none. */
 export type PurchaseResult = { ok: true; poId: string } | { ok: false; reason: string }
 
-/** What came of requesting a transfer order to the staging centre: the one created, or why there is none. */
 export type TransferResult = { ok: true; transferId: string } | { ok: false; reason: string }
 
 /** Picked stock left where it was, and no longer reserved, because no transfer order to the staging centre came of it. */

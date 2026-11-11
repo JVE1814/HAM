@@ -22,10 +22,6 @@ interface Entry {
     message: string
 }
 
-/**
- * A scan and what it was made against (the Stockroom chosen, the Order or Audit number typed, the PID typed), which it
- * is sent with however long it waits in the queue.
- */
 interface Scan {
     mode: Mode
     code: string
@@ -35,7 +31,6 @@ interface Scan {
     pid: string
 }
 
-/** What a scan answered: the unit as it now stands, or, for an audit scan, which is blind, only that the code was counted. */
 type Scanned = { mode: Exclude<Mode, 'audit'>; asset: AssetSummary } | { mode: 'audit'; code: string }
 
 export default function App() {
@@ -43,7 +38,6 @@ export default function App() {
     const [stockrooms, setStockrooms] = useState<Stockroom[]>([])
     const [depotWork, setDepotWork] = useState(true)
     const [stockroom, setStockroom] = useState('')
-    // Pick takes an Order number and Audit an audit number: each mode keeps its own, so a switch sends neither as the other.
     const [orderNumber, setOrderNumber] = useState('')
     const [auditNumber, setAuditNumber] = useState('')
     const [pid, setPid] = useState('')
@@ -52,14 +46,12 @@ export default function App() {
     const [labels, setLabels] = useState<AssetSummary[]>([])
     const scanInput = useRef<HTMLInputElement>(null)
     const focusScan = () => scanInput.current?.focus()
-    /** Enter in a context field (Order, audit number, PID) hands the next scan to the scan field. */
     const enterToScan = (event: React.KeyboardEvent) => {
         if (event.key !== 'Enter') return
         event.preventDefault()
         focusScan()
     }
 
-    // Accepted scans wait in memory (scan-queue): leaving the page while any are unsent asks first.
     useEffect(() => {
         if (pending === 0) return
         const warn = (event: BeforeUnloadEvent) => event.preventDefault()
@@ -72,7 +64,6 @@ export default function App() {
             .stockrooms()
             .then((list) => {
                 if (!list) {
-                    // Not an inventory tech: only Audit and Look up are offered.
                     setDepotWork(false)
                     setMode((m) => (MODES.find((d) => d.id === m)?.depot ? 'audit' : m))
                     return

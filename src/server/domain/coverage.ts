@@ -27,7 +27,6 @@ export interface CoverageSummary {
  */
 export const OPEN_ENDED_COVERAGE_END = '9999-12-31'
 
-/** Until when a contract covers its Asset: its end date, OPEN_ENDED_COVERAGE_END when it has none, null when it does not cover. */
 function coveredUntil(contract: CoverageView): string | null {
     return contract.covered ? contract.endDate || OPEN_ENDED_COVERAGE_END : null
 }
@@ -115,7 +114,6 @@ export function answersByContract(answers: readonly CoverageAnswer[]): Map<strin
     return byContract
 }
 
-/** A stored coverage contract and the serial it covers. */
 export interface SerialCoverage extends CoverageView {
     serial: string
 }
@@ -142,13 +140,11 @@ export function coverageBySerial(serials: Iterable<string>, contracts: readonly 
     return coverage
 }
 
-/** A coverage contract about to end, and the Customer whose equipment it covers. */
 export interface ExpiringCoverage {
     customerId: string
     endDate: string
 }
 
-/** Expiring coverage per Customer: how many contracts, and the first one to end. */
 export function groupExpiringCoverage(rows: readonly ExpiringCoverage[]): Map<string, { count: number; firstEnd: string }> {
     const groups = new Map<string, { count: number; firstEnd: string }>()
     for (const row of rows) {
@@ -159,7 +155,6 @@ export function groupExpiringCoverage(rows: readonly ExpiringCoverage[]): Map<st
     return groups
 }
 
-/** The Asset field that holds when its OEM coverage was last checked. */
 export const COVERAGE_CHECKED_FIELD = 'x_daas_ham_coverage_checked'
 
 /**
@@ -172,7 +167,6 @@ export function staleCoverageQuery(vendor: OemVendor, staleBefore: string): stri
     return `${fleetCondition()}^model.x_daas_ham_oem_source=${vendor}^${notRetiredCondition()}^serial_numberISNOTEMPTY^${stale}`
 }
 
-/** Whether an Asset is without OEM coverage on `today`: it has no coverage end ('') or its coverage ended before today. */
 export function withoutCoverage(coverageEnd: string, today: string): boolean {
     return !coverageEnd || coverageEnd < today
 }

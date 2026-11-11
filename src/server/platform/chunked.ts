@@ -63,13 +63,11 @@ type TableSource<T, R> = TableSourceFields<T, R> & { prepare?: PrepareBatch<T, R
 
 type TableJob<T, R = T> = TableSourceFields<T, R> & Prepare<T, R> & { job: string }
 
-/** Log the records of a run or chunk that failed as an error (`where` names it): the pass has moved on past them. */
 function logFailures(where: string, failures: Failures): void {
     if (failures.failed === 0) return
     gs.error(`[x_daas_ham] ${where}: ${failures.failed} record(s) failed, the last: ${failures.lastError}`)
 }
 
-/** How the log names a chunk of an event job, for its failed records. */
 function chunkOf(queued: JobEvent): string {
     return `${queued.name} ${queued.subject}: in this chunk`
 }
@@ -85,16 +83,13 @@ export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
         gs.error(`[x_daas_ham] ${spec.job}: not run: ${reason}`)
         return { processed: 0, failed: 0, done: false, cursor: '', lastError: reason }
     }
-    // A run that starts from a saved cursor goes on with a pass that earlier runs began, and adds to their failures.
     const resumed = row.cursor !== ''
     return runOverTable(spec, {
         loadCursor: () => row.cursor,
         saveCursor: (cursor, processed, done, failures) => {
-            // The pass moves on past a failed record: the log and the cursor are where it shows.
             logFailures(`${spec.job}: in this run`, failures)
             const report = cursorReport({ failed: row.failed, lastError: row.lastError }, { ...failures, resumed, done })
             const refused = row.save({ cursor, processed, status: report.status, failed: report.failed, lastError: report.lastError, ranNow: true })
-            // The next run starts again from the cursor last saved, and would do so unseen.
             if (refused) gs.warn(`[x_daas_ham] ${spec.job}: cursor not saved, so the next run repeats this one: ${refused}`)
         },
     })
@@ -107,7 +102,6 @@ type EventJob<T, R = T> = TableSourceFields<T, R> &
          * The runner logs a chunk's failures either way; `flush` records them where the pass's outcome is kept.
          */
         flush?: (failures: Failures) => void
-        /** Make the job's passes replace each other (see runEventTableJob). */
         pass?: PassJob
     }
 
@@ -173,12 +167,10 @@ export function queuePass(name: string, record: GlideRecord, subject: string, jo
     queueJobAt({ name, record, subject, position: '' }, passParm({ token, cursor: '' }))
 }
 
-/** Whether the pass the event belongs to is still `job`'s current one. */
 export function inCurrentPass(queued: JobEvent, job: string): boolean {
     return isCurrentPass(job, readPassParm(queued.position).token)
 }
 
-/** The lock a job without one "holds": its writes are made as they come. */
 const NO_LOCK: Pick<HeldLock, 'held'> = { held: () => true }
 
 function runPassChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, pass: PassJob): EventJobResult {
@@ -210,7 +202,6 @@ function runPassChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, pass: PassJo
         }
         // A cheap probe first: a chunk only takes the lock at its end, and would throw its work away then.
         if (locked && isLocked(lockName)) return retryLater(queued, passParm({ token, cursor }))
-        // Set by saveCursor.
         let write = { outcome: 'written' } as ChunkWrite | { outcome: 'locked' }
         const result = runOverTable(spec, {
             loadCursor: () => cursor,
@@ -247,19 +238,16 @@ function runPassChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, pass: PassJo
     }
 }
 
-/** Tell the pass `token` that a chunk of it threw, under the job's lock and only while it is the current pass. */
 function recordStop(job: string, locked: NonNullable<PassJob['underLock']>, token: string, error: string): void {
     try {
         withLock(LOCK.job(job), () => {
             if (isCurrentPass(job, token)) locked.stopped?.(error)
         })
     } catch (unrecorded) {
-        // The original error is what the caller sees; this one (e.g. a refused save in `stopped`) is only logged.
         gs.warn(`[x_daas_ham] ${job}: why the pass stopped was not recorded: ${messageOf(unrecorded)}`)
     }
 }
 
-/** Queue the event again with `parm2` (the same pass and cursor, or '' to start one) to run once the job's lock is free. */
 function retryLater(queued: JobEvent, parm2: string): EventJobResult {
     gs.warn(`[x_daas_ham] ${queued.name} ${queued.subject}: job locked, running again in ${REQUEUE.delaySeconds} s`)
     queueJobAt(queued, parm2, 'later')
@@ -277,14 +265,12 @@ function restartPass(queued: JobEvent, error: string): EventJobResult {
     return { processed: 0, failed: 0, done: false, cursor: '', lastError: 'job lock lost: pass restarted', superseded: false }
 }
 
-/** A record of a batch as handled: its item, or the error `prepare` threw. */
 type BatchRecord<T> = { id: string; item: T } | { id: string; prepareError: unknown }
 
 function batchSize(): number {
     return usableBatchSize(intProperty(PROPERTY.jobBatchSize))
 }
 
-/** The runner over a table's records in sys_id order, with the batch size and time budget from properties. */
 function runOverTable<T, R>(spec: TableSource<T, R>, cursor: Pick<ChunkedJobPorts<unknown>, 'loadCursor' | 'saveCursor'>): ChunkedJobResult {
     return runChunked<BatchRecord<T>>(
         {
@@ -334,7 +320,6 @@ export function visitInKeyOrder(table: string, query: string, visit: (record: Gl
     }
 }
 
-/** Visit up to `size` records matching `query` with a sys_id after `after`, in sys_id order, and return their sys_ids. */
 function visitPage(table: string, query: string, after: string, size: number, visit: (record: GlideRecord) => void): string[] {
     const gr = new GlideRecord(table)
     gr.addEncodedQuery(after ? andEachClause(query, `sys_id>${after}`) : query)

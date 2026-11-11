@@ -59,10 +59,6 @@ function deviceRows(value: unknown): { rows: DeviceRow[]; unread: string } {
     }
 }
 
-/**
- * Tell the user what came of a submission, unless it simply went ahead: why it did not, or that another submission of
- * the Order had already taken it ahead. An Order saved to be submitted again without them is information, not an error.
- */
 function tellSubmission(submission: Submission): void {
     if (submission.submitted) {
         if (submission.already) gs.addInfoMessage(submission.already)
@@ -70,14 +66,12 @@ function tellSubmission(submission: Submission): void {
     else gs.addErrorMessage(submission.message)
 }
 
-/** UI action "Submit" on a draft Order. */
 export function uiSubmitOrder(current: GlideRecord): void {
     // Submit assesses the Order as the form holds it and may ask approvers to decide it: never on values not saved.
     if (!current.update()) return
     tellSubmission(submitOrder(current))
 }
 
-/** After-update rule on sysapproval_approver: roll the decisions up to the Order. */
 export function onOrderApprovalDecision(current: ForeignRecord): void {
     rollUpOrderApprovals(str(current, 'document_id'))
 }
@@ -100,17 +94,11 @@ export function uiRecheckApprovals(current: GlideRecord): void {
     gs.addInfoMessage(rollup.outcome === 'approved' ? 'Order approved: sourcing has started' : 'Order rejected')
 }
 
-/**
- * Script action on x_daas_ham.order.source (parm2: how many times this request was queued again): a sourcing pass
- * over the Order. With parm1 SUBMIT_AGAIN it carries a submission queued again instead (platform/orders
- * `submitQueuedOrder`), which it runs: one event serves both.
- */
 export function sourceOrder(event: GlideRecord, current: GlideRecord): void {
     if (str(event, 'parm1') === SUBMIT_AGAIN) return submitQueuedOrder(current.getUniqueValue(), timesRequeued(event))
     runSourcingPass(current, timesRequeued(event))
 }
 
-/** UI action "Cancel order" (platform/orders `cancelOrder`). */
 export function uiCancelOrder(current: GlideRecord): void {
     // Cancel saves this same record again: going on after a refused save could store the values just refused.
     if (!current.update()) return

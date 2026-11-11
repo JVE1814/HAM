@@ -196,7 +196,6 @@ const merakiLifecycle: Capability<Fetched<LifecycleFact>> = (pids, context) => {
 
 // --- Fortinet Asset Management API v3 --------------------------------------------------------
 
-/** The asset's contract that has a term ending on the given date, else its first contract. */
 function fortinetContract(asset: unknown, end: string | undefined): unknown {
     const contracts = asArray(field(asset, 'contracts'))
     const matching = contracts.find((c) => end !== undefined && asArray(field(c, 'terms')).some((t) => isoDate(field(t, 'endDate')) === end))
@@ -248,12 +247,12 @@ const fortinetCoverage: Capability<CoverageFetched> = (serials, context) => {
 
 // --- HPE Mist (JSI inventory) ----------------------------------------------------------------
 
+type MistLookup = typeof REST_MESSAGE.mist.fn.jsiByModel | typeof REST_MESSAGE.mist.fn.jsiBySerial
+
 /**
  * The first org's matching JSI items. `answered` is true when items were found, or every org answered
  * that it has none; if any org's call failed and nothing was found, the device may be in that org.
  */
-type MistLookup = typeof REST_MESSAGE.mist.fn.jsiByModel | typeof REST_MESSAGE.mist.fn.jsiBySerial
-
 function mistLookup(context: OemContext, fn: MistLookup, params: Record<string, string>, errors: string[]): { items: unknown[]; answered: boolean } {
     let anyFailed = false
     for (const orgId of context.orgIds) {
@@ -385,7 +384,6 @@ export function enabledRoute<K extends keyof VendorRoutes>(
     return route && enabled(vendor) && enabled(route.via) ? route : undefined
 }
 
-/** A vendor whose turn it is in a sync job, with the route the job runs for it. */
 export interface SyncTurn<K extends keyof VendorRoutes> {
     vendor: OemVendor
     route: NonNullable<VendorRoutes[K]>

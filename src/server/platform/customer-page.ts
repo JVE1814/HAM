@@ -25,7 +25,6 @@ export function customerName(customerId: string): string {
     return findById('core_company', customerId)?.getDisplayValue('name') ?? ''
 }
 
-/** The Customer's equipment: the fleet assets the signed-in user may see, by Site. */
 export function customerEquipment(session: SessionScope): CustomerAsset[] {
     const assets: CustomerAsset[] = []
     const asset = new GlideRecord('alm_hardware')
@@ -48,7 +47,6 @@ export function customerEquipment(session: SessionScope): CustomerAsset[] {
     return assets
 }
 
-/** The Orders still under way, newest first, each with whether its self-install can be confirmed now. */
 export function ordersUnderWay(): CustomerOrder[] {
     const orders: CustomerOrder[] = []
     const order = new GlideRecord('x_daas_ham_order')
@@ -94,7 +92,6 @@ export function openReturns(): CustomerReturn[] {
     })
 }
 
-/** The open attestations, each with the devices to attest and the answers given so far. */
 export function openAttestations(): Attestation[] {
     const attestations: Attestation[] = []
     const attestation = new GlideRecord('x_daas_ham_attestation')

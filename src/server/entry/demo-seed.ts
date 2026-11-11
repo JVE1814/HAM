@@ -19,7 +19,6 @@ import { PROPERTY, stringProperty } from '../platform/properties.ts'
 
 type Fields = { [field: string]: string | number | boolean }
 
-/** The record of `table` with `key`, created with `fields` when there is none: its sys_id, '' when the insert is refused (logged). */
 function ensure(table: string, key: Fields, fields: Fields = {}): string {
     const gr = new GlideRecord(table)
     for (const [field, value] of Object.entries(key)) gr.addQuery(field, value)
@@ -34,12 +33,10 @@ function ensure(table: string, key: Fields, fields: Fields = {}): string {
     return ''
 }
 
-/** Save a demo record; a refused save is logged. */
 function save(record: GlideRecord, what: string): void {
     if (!record.update()) gs.warn(`[x_daas_ham] Demo ${what} not saved: ${refusal(record)}`)
 }
 
-/** Point an app property at a demo record; one whose insert was refused ('') leaves the property as it is (logged). */
 function setDemoProperty(name: string, recordId: string): void {
     if (recordId) return void gs.setProperty(name, recordId)
     gs.warn(`[x_daas_ham] ${name} not set: its demo record was not created`)
@@ -311,7 +308,6 @@ export function loadDemoData(): void {
         x_daas_ham_rack_face: 'front', x_daas_ham_subscription_line: acmeHqPackage, x_daas_ham_in_service_date: '2026-02-01 09:00:00',
         x_daas_ham_install_completed: '2026-02-01 08:00:00', x_daas_ham_last_seen: '2026-11-06 23:00:00', x_daas_ham_seen_source: 'nms',
     })
-    /** Change each in-service demo switch, by serial number, and save it; a refused save is logged, naming `what` changed. */
     const eachLive = (what: string, change: (asset: GlideRecord) => void) => {
         const live = new GlideRecord('alm_hardware')
         live.addQuery('serial_number', 'STARTSWITH', 'DEMOLIVE')

@@ -28,7 +28,6 @@ const ALSO_STORED_AS: Partial<Record<Stage, readonly StageFields[]>> = {
     in_transfer: [{ installStatus: INSTALL_STATUS.inTransit, substatus: 'reserved' }],
 }
 
-/** Every combination `stage` is stored as, the one `fieldsOf` gives first. */
 function storedAs(stage: Stage): readonly StageFields[] {
     return [STAGE_FIELDS[stage], ...(ALSO_STORED_AS[stage] ?? [])]
 }
@@ -123,7 +122,6 @@ export function isRetired(stage: Stage | null): boolean {
     return stage !== null && RETIRED.has(stage)
 }
 
-/** Assets that count against an Agreement's contracted quantities: at a Site or on the way there. */
 export function isDeployed(stage: Stage | null): boolean {
     return stage !== null && DEPLOYED_STAGES.includes(stage)
 }
@@ -180,12 +178,10 @@ const EXIT: Record<DisposalMethod, { owner: LegalOwner; stage: Stage }> = {
     return_to_lessor: { owner: 'lessor', stage: 'returned_to_lessor' },
 }
 
-/** The stage a Disposal method retires an Asset in. */
 export function disposalStage(method: DisposalMethod): Stage {
     return EXIT[method].stage
 }
 
-/** The Disposal methods open to an Asset of this legal owner. */
 export function disposalMethodsFor(owner: LegalOwner): DisposalMethod[] {
     return (Object.keys(EXIT) as DisposalMethod[]).filter((method) => EXIT[method].owner === owner)
 }
@@ -271,7 +267,6 @@ export function stagesQuery(stages: readonly Stage[], base = '', via = ''): stri
     return base ? andEachClause(clauses, base) : clauses
 }
 
-/** Encoded condition matching Assets not retired, whatever their stage otherwise. */
 export function notRetiredCondition(): string {
     return `install_status!=${INSTALL_STATUS.retired}`
 }

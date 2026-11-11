@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
 
-/** Input types a user types text into; typing anywhere else on the page is a scan meant for the scan field. */
 const TEXT_INPUTS = new Set(['text', 'search', 'email', 'number', 'password', 'tel', 'url'])
 
 function takesText(target: EventTarget | null): boolean {
