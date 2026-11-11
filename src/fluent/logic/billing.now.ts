@@ -16,7 +16,7 @@ import {
 } from '../../server/entry/billing'
 import { admin, finance } from '../security/roles.now'
 
-/* Billing periods (P3.25, D66): monthly generation, review, close and lock, CSV export. */
+/* Billing periods (plan §13 Billing export, Q66): monthly generation, review, close and lock, CSV export. */
 
 ScheduledScript({
     $id: Now.ID['job_open_billing_period'],

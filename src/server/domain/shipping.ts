@@ -3,7 +3,7 @@ import { failureText, isSuccess, type HttpPort } from './http.ts'
 import { asArray, field, isoDate, parseJson, text } from './json.ts'
 
 /**
- * Shipping aggregator (P3.26, D73): one adapter buys labels and reads tracking webhooks. Requests
+ * Shipping aggregator (plan §13 Shipping aggregator, Q73): one adapter buys labels and reads tracking webhooks. Requests
  * follow the ShipEngine label shape; webhooks are read in both ShipEngine and EasyPost shapes so the
  * Provider can use either.
  */

@@ -30,7 +30,7 @@ import { intProperty, PROPERTY, stringProperty } from '../platform/properties.ts
 import { bool, count, exists, findById, num, pluck, refusal, str } from '../platform/records.ts'
 import { changeStock, stockUnit } from '../platform/stock.ts'
 
-/** Leases, end-of-lease decisions and renewals (P3.23–P3.24), over fleet assets only (ADR 0016). */
+/** Leases, end-of-lease decisions and renewals (plan §13 Leases, Renewals), over fleet assets only (ADR 0016). */
 
 /** Healthy stock that can go straight back to the Lessor. */
 const IN_STOCK: readonly Stage[] = ['available', 'spare_pool']

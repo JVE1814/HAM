@@ -716,7 +716,7 @@ currency*).
 
 ### Rack re-check
 
-D67. Two saves placing Assets into the same rack units at the same moment both pass the before
+Q67. Two saves placing Assets into the same rack units at the same moment both pass the before
 rule, and the after rule of the later one, reading the rack afresh, sees both and opens *Devices
 overlap in rack* (or *Rack over power budget*) on the rack. Moving one device away resolves it. A
 Model or rack capacity edit that clears it is resolved by the next daily reconciliation.

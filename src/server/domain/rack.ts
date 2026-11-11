@@ -1,5 +1,5 @@
 /**
- * Rack placement (P2.8) and power budget (P3.29): units are numbered from 1 at the bottom; a device
+ * Rack placement (P2.8) and power budget (plan §13 Rack power budget): units are numbered from 1 at the bottom; a device
  * occupies ruStart..ruStart+height-1.
  */
 
@@ -23,7 +23,7 @@ export interface Placement {
     ruStart: number
     height: number
     face: RackFace
-    /** The Model's typical power draw (P3.29); unknown counts as 0. */
+    /** The Model's typical power draw (plan §13 Rack power budget); unknown counts as 0. */
     powerW?: number
 }
 

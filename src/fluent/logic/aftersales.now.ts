@@ -5,7 +5,7 @@ import { onReplacementComplete } from '../../server/entry/replacements'
 import { chaseOverdueReturns, onReturnEvaluated, raiseScheduledReturns } from '../../server/entry/returns'
 import { assetManager, inventoryTech, noc } from '../security/roles.now'
 
-/* Break-fix (D58) and returns (D60): rules, actions, SLAs, jobs and notifications. */
+/* Break-fix (Q58) and returns (Q60): rules, actions, SLAs, jobs and notifications. */
 
 BusinessRule({
     $id: Now.ID['br_case_failed_asset'],

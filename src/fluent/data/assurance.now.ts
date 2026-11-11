@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DateTimeColumn, IntegerColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 
-/* Audits, attestations and reconciliation exceptions (P2.7, D63). */
+/* Audits, attestations and reconciliation exceptions (P2.7, Q63). */
 
 /** A check of what is physically present: a stockroom blind count or a site audit. */
 export const x_daas_ham_audit = Table({

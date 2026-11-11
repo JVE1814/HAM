@@ -39,7 +39,7 @@ import { EVENT, fire } from '../platform/events.ts'
 import { deleteWhere, exists, findById, num, refusal, str } from '../platform/records.ts'
 import { queryInt, reply } from '../platform/rest-api.ts'
 
-/** Billing periods: generate, review, close (lock) and export (P3.25, D66). */
+/** Billing periods: generate, review, close (lock) and export (plan §13 Billing export, Q66). */
 
 /**
  * Monthly (day 1): open last month's Billing period unless it exists. Its insert rules set its days and start its

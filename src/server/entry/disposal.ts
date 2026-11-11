@@ -23,7 +23,7 @@ import {
 import { isFleetAsset, moveAsset, readStage, transitionFacts } from '../platform/assets.ts'
 import { findById, refusal, str } from '../platform/records.ts'
 
-/** Disposal orders: approve, then retire each wiped Asset by its method (P2.5, D61). */
+/** Disposal orders: approve, then retire each wiped Asset by its method (P2.5, Q61). */
 
 /** Line fields that say what is retired and how; the rest (status, blockers, amounts) stays writable after submit. */
 const LINE_SCOPE = ['disposal_order', 'asset', 'method']

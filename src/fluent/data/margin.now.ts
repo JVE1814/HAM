@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DecimalColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 
-/* Cost facts and Margin per Customer, Site and currency (P3.28, D72). */
+/* Cost facts and Margin per Customer, Site and currency (plan §13 Margin / TCO, Q72). */
 
 /** A cost attributed to a Customer and Site, in one currency, for one Billing period. */
 export const x_daas_ham_cost_fact = Table({

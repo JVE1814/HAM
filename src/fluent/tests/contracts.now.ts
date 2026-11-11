@@ -4,7 +4,7 @@ import { assetManager, finance } from '../security/roles.now'
 import { trackingWebhookTest } from './tracking-webhook.now'
 
 /*
- * ATF: lessor ownership and lease extension (D65), billing period lock (D66), rack power budget (P3.29). The lease and
+ * ATF: lessor ownership and lease extension (Q65), billing period lock (Q66), rack power budget (plan §13 Rack power budget). The lease and
  * rack rules act on fleet assets only (ADR 0016), so the Assets here are fleet assets. Fixtures setting the Fleet flag
  * insert without security enforcement: the flag is read-only on forms, and the app's intake paths set it server-side.
  */

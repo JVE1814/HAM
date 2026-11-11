@@ -3,7 +3,7 @@ import { Acl } from '@servicenow/sdk/core'
 import { admin, assetManager, broadStaff, customerRoles, inventoryTech, providerStaff } from './roles.now'
 
 /*
- * Access controls for shipping (P3.26) and OEM cloud accounts (P3.27). Customer admins see their own Customer's shipments,
+ * Access controls for shipping (plan §13 Shipping aggregator) and OEM cloud accounts (plan §13 OEM claim adapters). Customer admins see their own Customer's shipments,
  * site contacts those of their Sites (the same check as the customer ACLs in acls.now.ts).
  */
 

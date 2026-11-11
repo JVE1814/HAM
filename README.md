@@ -9,7 +9,7 @@ Provider's own IT equipment (laptops, IT storerooms and their models), which the
 an Asset is in the fleet by its *Fleet* flag, a NaaS stockroom has a stockroom type and a NaaS Model
 an OEM PID ([ADR 0016](docs/adr/0016-fleet-assets.md)).
 
-- Plan of record: [`plan.md`](plan.md) (design decisions D1–D76 and phasing).
+- Plan of record: [`plan.md`](plan.md) (decision log Q1–Q76 and phasing).
 - Domain language: [`CONTEXT.md`](CONTEXT.md). Architecture decisions: [`docs/adr/`](docs/adr).
 - Behaviour per module: [`docs/spec/`](docs/spec).
 
@@ -49,7 +49,7 @@ an OEM PID ([ADR 0016](docs/adr/0016-fleet-assets.md)).
 | OEM claims | Staging steps done by the OEM cloud: Meraki and Mist claim, GreenLake device add and subscription, FortiCloud registration and FortiZTP, Check Point Zero Touch |
 | Racks | Power budget per rack from model typical power, with a *Rack over power budget* exception when simultaneous placements exceed it |
 
-See [`docs/spec`](docs/spec) for the behaviour of each module. AI assistance is deferred (plan D68).
+See [`docs/spec`](docs/spec) for the behaviour of each module. AI assistance is deferred (plan Q68).
 
 ## Required plugins
 

@@ -9,7 +9,7 @@ import {
     Table,
 } from '@servicenow/sdk/core'
 
-/** Checklist steps the manufacturer's cloud can do (P3.27); blank = by hand. */
+/** Checklist steps the manufacturer's cloud can do (plan §13 OEM claim adapters); blank = by hand. */
 const automationChoices = {
     oem_claim: { label: 'Claim / register in the OEM cloud', sequence: 0 },
     oem_licence: { label: 'Assign the OEM subscription', sequence: 1 },
@@ -141,7 +141,7 @@ export const x_daas_ham_staging_tmpl_item = Table({
     index: [{ name: 'x_daas_ham_sti_tmpl', unique: false, element: 'template' }],
 })
 
-/** A Customer's account in a manufacturer cloud that claimed devices go to (P3.27). */
+/** A Customer's account in a manufacturer cloud that claimed devices go to (plan §13 OEM claim adapters). */
 export const x_daas_ham_cloud_account = Table({
     name: 'x_daas_ham_cloud_account',
     label: 'OEM cloud account',

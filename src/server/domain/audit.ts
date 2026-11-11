@@ -1,6 +1,6 @@
 import { addMonths } from './calendar.ts'
 
-/** Audits (blind counts, site audits) and Attestations (P2.7, D63). */
+/** Audits (blind counts, site audits) and Attestations (P2.7, Q63). */
 
 export interface ExpectedAsset {
     assetId: string

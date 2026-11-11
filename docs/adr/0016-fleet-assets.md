@@ -57,7 +57,7 @@ the Legal owner; the demo data sets the others), and a blank Legal owner still c
   `domain/fleet`, so these are literals: `fleet-queries.test.ts` checks each against it, and fails on a reference or
   query added without one.
 - Adoption puts a racked unit's placement into its rack as the rack checks count it (they count fleet assets only), so
-  *Add to fleet* is checked as placing the unit there (D67): one that would overlap a fleet asset on its face, leave
+  *Add to fleet* is checked as placing the unit there (Q67): one that would overlap a fleet asset on its face, leave
   the rack or take it over its power budget is refused with the placement's reason, and stays outside the fleet.
 - A unit Procurement receives through its own receiving slips, never scanned in the warehouse app, stays outside the
   fleet until it is adopted.

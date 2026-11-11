@@ -7,7 +7,7 @@ import type { OemVendor } from './types.ts'
 import { fortiCloudError } from './forticloud.ts'
 
 /**
- * OEM claim and provisioning (P3.27, D70): staging checklist steps that the manufacturer's cloud can
+ * OEM claim and provisioning (plan §13 OEM claim adapters, Q70): staging checklist steps that the manufacturer's cloud can
  * do for us. Each adapter takes a batch of steps, makes at most `maxCalls` calls and reports an
  * outcome for every step it attempted; steps left out wait for the next run (rate limits).
  * runVendorClaims runs one vendor's adapters within its call budget against a ClaimStore.

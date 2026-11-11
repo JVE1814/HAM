@@ -1,7 +1,7 @@
 import type { Approver } from './entitlement.ts'
 import type { LegalOwner, Stage } from './lifecycle.ts'
 
-/** Disposal orders (P2.5, D61). */
+/** Disposal orders (P2.5, Q61). */
 
 export type DisposalMethod = 'broker_resale' | 'oem_takeback' | 'itad_recycle' | 'return_to_customer' | 'return_to_lessor'
 

@@ -2,7 +2,7 @@ import { addDays, addMonths, daysBetween } from './calendar.ts'
 import { fleetStagesQuery } from './fleet.ts'
 import { ALL_STAGES, isBillable, type Stage } from './lifecycle.ts'
 
-/** Billing periods: daily proration of Subscription lines and Fee events (P3.25, D52, D66). */
+/** Billing periods: daily proration of Subscription lines and Fee events (plan §13 Billing export, Q52, Q66). */
 
 export interface MonthBounds {
     /** YYYY-MM */

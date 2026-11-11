@@ -11,7 +11,7 @@ import {
 import { afterOrderProduced } from '../../server/entry/orders'
 
 /*
- * "Request network equipment": the one catalog entry point for Orders (D42/D50). The Agreement, Site and Site template
+ * "Request network equipment": the one catalog entry point for Orders (Q42/Q50). The Agreement, Site and Site template
  * choices follow the chosen Customer; submitting checks the same again (domain/entitlement ownershipFindings).
  */
 

@@ -1,6 +1,6 @@
-# Shipping aggregator and OEM claims (P3.26–P3.27)
+# Shipping aggregator and OEM claims (plan §13 Shipping aggregator, OEM claim adapters)
 
-## Shipping aggregator (D73)
+## Shipping aggregator (Q73)
 
 - Off by default (`x_daas_ham.shipping.enabled`). The REST message *NaaS Shipping aggregator* calls
   ShipEngine's one-call label API (`POST /v1/labels`) with the key in `x_daas_ham.shipping.api_key`,
@@ -104,7 +104,7 @@
 | return_to_sender | Returned to sender |
 | — (set by *Mark label voided* on a return or outbound label, never by tracking) | Voided |
 
-## OEM claims (D70)
+## OEM claims (Q70)
 
 - A staging template step can be **done by the OEM cloud**; its staging steps then start *pending*
   and are ticked automatically when the manufacturer confirms. Steps without automation stay manual,

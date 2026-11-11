@@ -5,7 +5,7 @@ import { customerReturnRequestTest } from './customer-returns.now'
 import { lostInTransitResourcingTest } from './order-lifecycle.now'
 
 /*
- * ATF: break-fix entitlement neutrality (D46) and depot evaluation routing (D60), on fleet assets: the app counts and
+ * ATF: break-fix entitlement neutrality (Q46) and depot evaluation routing (Q60), on fleet assets: the app counts and
  * moves those only (ADR 0016). Fixtures setting the Fleet flag insert without security enforcement: the flag is
  * read-only on forms, and the app's intake paths set it server-side.
  */

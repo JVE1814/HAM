@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DecimalColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 
-/* Disposal orders (P2.5, D61). */
+/* Disposal orders (P2.5, Q61). */
 
 const methodChoices = {
     broker_resale: { label: 'Broker resale', sequence: 0 },

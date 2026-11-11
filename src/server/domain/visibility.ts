@@ -89,7 +89,7 @@ export function resolveVisibility(hasRole: (role: string) => boolean): Visibilit
 }
 
 /**
- * Whether the user takes the Customer admin's part on the customer page (D49: request returns, answer attestations):
+ * Whether the user takes the Customer admin's part on the customer page (Q49: request returns, answer attestations):
  * a Customer admin who sees only their own Customer. Staff who see every Customer do not, even holding the role (as a
  * platform admin holds every role) or previewing the page: an attestation is the Customer's own word, and staff raise
  * returns through the record producer.
@@ -99,7 +99,7 @@ export function actsAsCustomerAdmin(hasRole: (role: string) => boolean): boolean
 }
 
 /**
- * The equipment the customer page lists (D49), as an encoded alm_hardware query: the fleet assets (ADR 0016) shipped to
+ * The equipment the customer page lists (Q49), as an encoded alm_hardware query: the fleet assets (ADR 0016) shipped to
  * a Site, serving there or awaiting return. The Fleet flag tells them from the Provider IT's hardware, laptops in use
  * included, whatever their Agreement: a deployed fleet unit missing its Agreement (a data gap) is still its Customer's
  * equipment. `visible` (the reader's `visibilityFilter` on alm_hardware, null for staff who see every Customer) is put

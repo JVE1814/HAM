@@ -4,7 +4,7 @@ import { evenShare } from './leases.ts'
 import type { LegalOwner } from './lifecycle.ts'
 
 /**
- * Cost facts and Margin per Customer and Site (P3.28, D72), each in one currency: costs take their Agreement's (a
+ * Cost facts and Margin per Customer and Site (plan §13 Margin / TCO, Q72), each in one currency: costs take their Agreement's (a
  * shipment's, its carrier's), and amounts of two currencies are never added (domain/billing `chooseCurrency`).
  */
 

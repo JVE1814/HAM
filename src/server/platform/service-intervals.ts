@@ -7,7 +7,7 @@ import { todayIso } from './clock.ts'
 import { withLockTries, type HeldLock } from './locks.ts'
 import { exists, refusal, str } from './records.ts'
 
-/** Service intervals: the days each Asset delivered a Subscription line (P3.25). */
+/** Service intervals: the days each Asset delivered a Subscription line (plan §13 Billing export). */
 
 /** Tries at taking an Asset's interval lock: a holder keeps it for a few reads and a save or two. */
 const LOCK_ATTEMPTS = 5

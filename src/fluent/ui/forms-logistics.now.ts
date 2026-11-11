@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { default_view, Form } from '@servicenow/sdk/core'
 
-/* Form layouts for shipping (P3.26). */
+/* Form layouts for shipping (plan §13 Shipping aggregator). */
 
 export const shipment_form = Form({
     table: 'x_daas_ham_shipment',

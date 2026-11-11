@@ -1,6 +1,6 @@
 # Audits, attestation, reconciliation, racks and customer self-service (P2.7–P2.9)
 
-## Audits (D63)
+## Audits (Q63)
 
 - **Start blind count** is offered only on NaaS stockrooms, those with a stockroom type: one with
   none is the Provider IT's (ADR 0016). Pressed on a form opened before its type was cleared, it is
@@ -71,7 +71,7 @@ is logged (an audit or attestation, closed once, does not raise it again).
 Network-gear CIs discovered recently with no Asset raise *seen without asset*. Racks with an open
 rack exception are re-checked as well (see Racks), and their rack exceptions open or resolve.
 
-## Racks (D67)
+## Racks (Q67)
 
 - Placement is the lowest rack unit plus the face; the height comes from the Model's rack units
   (minimum 1).
@@ -79,7 +79,7 @@ rack exception are re-checked as well (see Racks), and their rack exceptions ope
 - Adding a racked Asset to the fleet (*Add to fleet*) is checked as placing it, as a device new to
   the rack: one that does not fit, or would take the rack over its power budget, is refused with
   the reason and stays outside the fleet (ADR 0016).
-- **Power budget (P3.29)**: a rack with a *power capacity (W)* also refuses a placement that would
+- **Power budget (plan §13 Rack power budget)**: a rack with a *power capacity (W)* also refuses a placement that would
   take the typical power (the Models' *typical power (W)*) of all devices in it, both faces, over
   the capacity, when the change adds draw (a device new to the rack, or a different Model). Moves
   within the rack are always allowed. The elevation page shows used against available power.
@@ -109,7 +109,7 @@ rack exception are re-checked as well (see Racks), and their rack exceptions ope
   parent is the Site): a rack at any other location, such as the Provider IT's data-centre room or a
   room under a building of the Site, is not listed and answers *not found*, to staff too.
 
-## Customer self-service (D49)
+## Customer self-service (Q49)
 
 The page `x_daas_ham_customer.do` is for Customer admins and Site contacts; link it from the CSM
 portal menu. Asset managers can open it as a preview (navigator *Customer self-service (preview)*):

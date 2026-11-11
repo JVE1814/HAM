@@ -1,4 +1,4 @@
-/** Break-fix (P2.3, D58): what "Raise replacement" does on a case that may already link a replacement Order. */
+/** Break-fix (P2.3, Q58): what "Raise replacement" does on a case that may already link a replacement Order. */
 
 /**
  * - `raise`: no replacement goes ahead for the case, so a new Order is raised and linked;

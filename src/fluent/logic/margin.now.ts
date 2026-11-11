@@ -3,7 +3,7 @@ import { Property, Record, ScriptAction, UiAction } from '@servicenow/sdk/core'
 import { computeMargin, uiRecomputeMargin } from '../../server/entry/margin'
 import { admin, finance } from '../security/roles.now'
 
-/* Cost facts and Margin per Customer and Site (P3.28). */
+/* Cost facts and Margin per Customer and Site (plan §13 Margin / TCO). */
 
 export const marginComputeEvent = Record({
     $id: Now.ID['event_margin_compute'],

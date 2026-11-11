@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DateColumn, DateTimeColumn, DecimalColumn, IntegerColumn, ReferenceColumn, StringColumn, Table, UrlColumn } from '@servicenow/sdk/core'
 
-/* Shipments bought through the shipping aggregator and their tracking events (P3.26, D73). */
+/* Shipments bought through the shipping aggregator and their tracking events (plan §13 Shipping aggregator, Q73). */
 
 const statusChoices = {
     label_created: { label: 'Label created', sequence: 0 },

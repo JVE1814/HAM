@@ -2,7 +2,7 @@ import { GlideRecord, gs } from '@servicenow/glide'
 import { refusal, str } from './records.ts'
 
 /**
- * On-site work: an FSM work order (wm_order) and the change request it runs under (D57).
+ * On-site work: an FSM work order (wm_order) and the change request it runs under (Q57).
  * Routine jobs use a standard change; the change type is decided by the caller.
  */
 

@@ -3,7 +3,7 @@ import { CatalogItemRecordProducer, ListCollectorVariable, ReferenceVariable, Se
 import { afterReturnProduced } from '../../server/entry/returns'
 
 /*
- * "Return or decommission equipment": customer admins and the service desk raise returns (D60). The Site choices follow
+ * "Return or decommission equipment": customer admins and the service desk raise returns (Q60). The Site choices follow
  * the chosen Customer and the device choices the chosen Site; submitting checks the same again, and that the requester
  * may raise it (domain/returns returnRequestFindings).
  */

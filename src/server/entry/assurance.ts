@@ -23,7 +23,7 @@ import { bool, exists, num, pluck, refusal, str } from '../platform/records.ts'
 import { installedAssetIds } from '../platform/returns.ts'
 import { currentSession } from '../platform/session.ts'
 
-/** Audits, attestations and reconciliation (P2.7, D63). */
+/** Audits, attestations and reconciliation (P2.7, Q63). */
 
 /**
  * The stages of the units on a stockroom's shelves, which its blind count expects there. A unit in transfer is one of

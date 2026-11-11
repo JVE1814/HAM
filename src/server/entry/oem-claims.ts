@@ -7,7 +7,7 @@ import { withLock, type HeldLock } from '../platform/locks.ts'
 import { restMessagePort } from '../platform/rest-port.ts'
 import { boolProperty, intProperty, PROPERTY } from '../platform/properties.ts'
 
-/** OEM claim and provisioning: staging steps the manufacturer's cloud does (P3.27, D70). */
+/** OEM claim and provisioning: staging steps the manufacturer's cloud does (plan §13 OEM claim adapters, Q70). */
 
 /**
  * The job lock (ADR 0013) a claim run holds throughout. Two runs at once (the 5-minute job and an *Execute now*) would

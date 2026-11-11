@@ -14,7 +14,7 @@ import { choice, exists, findById, num, pluck, recordsById, str } from '../platf
 import { queryParam, reply } from '../platform/rest-api.ts'
 import { reconcileInstalledBase } from './assurance.ts'
 
-/** Rack placement and the rack elevation view (P2.8, D67). */
+/** Rack placement and the rack elevation view (P2.8, Q67). */
 
 /** Where an Asset sits in its rack, and its Model (whose name, size and draw are read separately). */
 interface Slot {

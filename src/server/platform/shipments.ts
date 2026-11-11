@@ -2,7 +2,7 @@ import { GlideRecord } from '@servicenow/glide'
 import { OPEN_SHIPMENTS } from '../domain/shipping.ts'
 import { str } from './records.ts'
 
-/** Reads of shipments (x_daas_ham_shipment) bought from the shipping aggregator (P3.26, D73). */
+/** Reads of shipments (x_daas_ham_shipment) bought from the shipping aggregator (plan §13 Shipping aggregator, Q73). */
 
 /** A prepaid return label the Site contact prints. */
 export interface ReturnLabel {

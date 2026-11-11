@@ -4,7 +4,7 @@ import { retryTrackingUpdate, uiCreateReturnLabel, uiMarkLabelVoided } from '../
 import { admin, assetManager, inventoryTech, noc } from '../security/roles.now'
 
 /*
- * Shipping aggregator (P3.26, D73). The message targets ShipEngine's label API; point the endpoint at
+ * Shipping aggregator (plan §13 Shipping aggregator, Q73). The message targets ShipEngine's label API; point the endpoint at
  * another aggregator with the same request shape if needed. Tracking webhooks are registered at
  * /api/x_daas_ham/naas/shipping/tracking with the custom header
  * X-NaaS-Webhook-Token: <x_daas_ham.shipping.webhook_token> (ShipEngine `headers: [{ key, value }]`,

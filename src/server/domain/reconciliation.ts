@@ -1,7 +1,7 @@
 import { outsideFleetCondition } from './fleet.ts'
 import { overlaps, powerBudget, type Placement, type RackSpec } from './rack.ts'
 
-/** Reconciliation exceptions between installed Assets and monitoring (P2.7), and in racks (D67). */
+/** Reconciliation exceptions between installed Assets and monitoring (P2.7), and in racks (Q67). */
 
 export type ExceptionType =
     | 'unseen'

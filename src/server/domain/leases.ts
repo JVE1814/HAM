@@ -3,7 +3,7 @@ import { addDays, addMonths, endOfMonth, isMonthEnd } from './calendar.ts'
 import { inFleet } from './fleet.ts'
 import { INSTALL_STATUS, type Stage } from './lifecycle.ts'
 
-/** Lease schedules, end-of-lease decisions and renewals (P3.23–P3.24). */
+/** Lease schedules, end-of-lease decisions and renewals (plan §13 Leases, Renewals). */
 
 export type LeaseEndAction = 'undecided' | 'buyout' | 'extend' | 'return'
 

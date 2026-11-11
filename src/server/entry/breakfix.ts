@@ -6,7 +6,7 @@ import { isFleetAsset, moveAsset, readStage } from '../platform/assets.ts'
 import { findById, refusal, str } from '../platform/records.ts'
 import { submitOrder } from './orders.ts'
 
-/** Break-fix: a CSM case about a failed Asset drives a device-replace Order (P2.3, D58). */
+/** Break-fix: a CSM case about a failed Asset drives a device-replace Order (P2.3, Q58). */
 
 /**
  * Before insert/update rule on cases naming a failed Asset: take the customer and service level from it. A failed

@@ -34,7 +34,7 @@ import { count, findById, refusal, str } from '../platform/records.ts'
 import { restMessagePort } from '../platform/rest-port.ts'
 import { queryParam, reply } from '../platform/rest-api.ts'
 
-/** Shipping aggregator: labels for Orders and ship-back returns, tracking webhooks (P3.26, D73). */
+/** Shipping aggregator: labels for Orders and ship-back returns, tracking webhooks (plan §13 Shipping aggregator, Q73). */
 
 export function shippingEnabled(): boolean {
     return boolProperty(PROPERTY.shippingEnabled, false)

@@ -63,7 +63,7 @@ export function overdueStep(input: { dueDate: string; today: string; graceDays: 
  * The Assets that keep a site package open, as an encoded alm_hardware query: the fleet assets (ADR 0016) at its Site
  * under its Agreement on their way there, serving there or on their way back. A unit received at the depot or declared
  * missing no longer counts. A swap's new units do, before monitoring first sees them and attaches them to the package,
- * so a swap-back that reaches the depot first does not end it (D60).
+ * so a swap-back that reaches the depot first does not end it (Q60).
  */
 export function sitePackageHoldersQuery(line: { siteId: string; agreementId: string }): string {
     return fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_site=${line.siteId}^x_daas_ham_agreement=${line.agreementId}`)

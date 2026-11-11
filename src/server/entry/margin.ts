@@ -24,7 +24,7 @@ import { count, deleteWhere, findById, num, recordsById, refusal, str } from '..
 import { agreementCurrencyOf, currencyOrThrow, customerCurrencies } from './billing.ts'
 
 /**
- * Cost facts and Margin per Customer, Site and currency, computed when a Billing period closes (P3.28). A cost is kept
+ * Cost facts and Margin per Customer, Site and currency, computed when a Billing period closes (plan §13 Margin / TCO). A cost is kept
  * in its Agreement's currency (a shipment's in its carrier's), and Margin sets revenue against cost per currency.
  */
 

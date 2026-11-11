@@ -10,7 +10,7 @@ import {
 import { raiseRefreshOrders } from '../../server/entry/refresh'
 import { assetManager, inventoryTech } from '../security/roles.now'
 
-/* Hardware refresh (D48) and disposal (D61). */
+/* Hardware refresh (Q48) and disposal (Q61). */
 
 ScheduledScript({
     $id: Now.ID['job_raise_refresh_orders'],

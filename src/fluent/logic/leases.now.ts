@@ -13,7 +13,7 @@ import {
 } from '../../server/entry/leases'
 import { accountManager, admin, assetManager, finance } from '../security/roles.now'
 
-/* Leases, end-of-lease decisions and renewals (P3.23–P3.24). */
+/* Leases, end-of-lease decisions and renewals (plan §13 Leases, Renewals). */
 
 // Fleet assets only (ADR 0016): the condition tests the Fleet flag right after its change test, as the rules.now.ts
 // header has it. A unit of the Provider IT's that joins the fleet with its Lease schedule already set (Add to fleet, a

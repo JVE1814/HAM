@@ -304,7 +304,7 @@ export function stagesQuery(stages: readonly Stage[], base = '', via = ''): stri
     return base ? andEachClause(clauses, base) : clauses
 }
 
-/** Stages in which an Asset delivers its Subscription line and is billed (D52). */
+/** Stages in which an Asset delivers its Subscription line and is billed (Q52). */
 const BILLABLE: ReadonlySet<Stage> = new Set(['in_service', 'temporary_deployment'])
 
 export function isBillable(stage: Stage | null): boolean {
@@ -324,7 +324,7 @@ export type BillingChange = { start: string } | { stop: string }
 /**
  * Whether a stage change starts or stops an Asset's billing, and on which day: it starts from the
  * in-service date on first go-live (from pending in service), else today (e.g. found after being
- * missing), and stops today, whatever moved it (D52, ADR 0009).
+ * missing), and stops today, whatever moved it (Q52, ADR 0009).
  */
 export function billingChange(before: Stage | null, after: Stage | null, dates: BillingDates): BillingChange | null {
     if (isBillable(before) === isBillable(after)) return null

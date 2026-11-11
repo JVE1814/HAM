@@ -9,7 +9,7 @@ import { transferStageTest } from './transfers.now'
 import { customerAdminVisibilityTest, inventoryTechVisibilityTest } from './visibility.now'
 import { warehouseScanRulesTest } from './warehouse.now'
 
-/* ATF: order entitlement routing (D35). */
+/* ATF: order entitlement routing (Q35). */
 
 export const withinAgreementOrderTest = Test(
     {

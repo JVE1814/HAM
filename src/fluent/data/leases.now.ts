@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { BooleanColumn, ChoiceColumn, DateColumn, DecimalColumn, IntegerColumn, OverrideColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 
-/* Lease schedules and end-of-lease decisions (P3.23, D65). */
+/* Lease schedules and end-of-lease decisions (plan §13 Leases, Q65). */
 
 const endActionChoices = {
     undecided: { label: 'Undecided', sequence: 0 },

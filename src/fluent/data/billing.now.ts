@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { ChoiceColumn, DateColumn, DateTimeColumn, DecimalColumn, IntegerColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
 
-/* Service intervals, billing periods and their lines (P3.25, D52, D66). */
+/* Service intervals, billing periods and their lines (plan §13 Billing export, Q52, Q66). */
 
 /** The days one Asset delivered a Subscription line: from in service to the day it goes on a Return order. */
 export const x_daas_ham_service_interval = Table({

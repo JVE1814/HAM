@@ -1,7 +1,7 @@
 import { andEachClause } from './encoded-query.ts'
 import type { LifecycleDates } from './model-lifecycle.ts'
 
-/** Hardware refresh (P2.2, D48): which Assets go together and what replaces them. */
+/** Hardware refresh (P2.2, Q48): which Assets go together and what replaces them. */
 
 export interface RefreshCandidate {
     assetId: string
