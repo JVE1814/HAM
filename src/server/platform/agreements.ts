@@ -8,7 +8,6 @@ import {
     type EntitlementContext,
     type Usage,
 } from '../domain/entitlement.ts'
-import type { AgreementCurrency } from '../domain/billing.ts'
 import { todayIso } from './clock.ts'
 import { bool, num, str } from './records.ts'
 
@@ -17,29 +16,6 @@ import { bool, num, str } from './records.ts'
  * Contract Management gives one that is active. What the daily jobs that act for running Agreements select.
  */
 export const ACTIVE_AGREEMENTS = 'state=active'
-
-/** The Agreement `field` names on `record`, with its Currency as stored (domain/billing `chooseCurrency`); null for none. */
-export function agreementCurrencyOf(record: GlideRecord, field: string): AgreementCurrency | null {
-    const agreementId = str(record, field)
-    if (!agreementId) return null
-    return { name: str(record, `${field}.number`) || agreementId, currency: str(record, `${field}.currency`) }
-}
-
-/**
- * The Currency of a Customer's Agreements as stored, one entry per value (an amount naming no Agreement takes theirs
- * when they share one); a job reads each Customer's once.
- */
-export function customerCurrencies(customerId: string): string[] {
-    if (!customerId) return []
-    const ga = new GlideAggregate('x_daas_ham_agreement')
-    ga.addQuery('customer', '=', customerId)
-    ga.addAggregate('COUNT', '')
-    ga.groupBy('currency')
-    ga.query()
-    const currencies: string[] = []
-    while (ga.next()) currencies.push(String(ga.getValue('currency') ?? ''))
-    return currencies
-}
 
 /**
  * What an Order is assessed against, read now. For an Order whose lines read usage (domain/entitlement `readsUsage`)

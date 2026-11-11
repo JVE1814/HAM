@@ -28,7 +28,6 @@ import { appendTo } from '../domain/collections.ts'
 import { messageOf } from '../domain/errors.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { memoized } from '../domain/memo.ts'
-import { agreementCurrencyOf, customerCurrencies } from './agreements.ts'
 import { inCurrentPass, queuePass, runEventTableJob, type EventJobResult } from './chunked.ts'
 import { glideToMs, nowGlide, nowMs } from './clock.ts'
 import { queueJob, type JobEvent } from './events.ts'
@@ -46,6 +45,29 @@ const PERIOD = 'x_daas_ham_billing_period'
 const LINE = 'x_daas_ham_billing_line'
 
 const LINE_KIND = { subscription: 'subscription', fee: 'fee' } as const satisfies { [Kind in BillingLineKind]: Kind }
+
+/** The Agreement `field` names on `record`, with its Currency as stored (domain/billing `chooseCurrency`); null for none. */
+export function agreementCurrencyOf(record: GlideRecord, field: string): AgreementCurrency | null {
+    const agreementId = str(record, field)
+    if (!agreementId) return null
+    return { name: str(record, `${field}.number`) || agreementId, currency: str(record, `${field}.currency`) }
+}
+
+/**
+ * The Currency of a Customer's Agreements as stored, one entry per value (an amount naming no Agreement takes theirs
+ * when they share one); a job reads each Customer's once.
+ */
+export function customerCurrencies(customerId: string): string[] {
+    if (!customerId) return []
+    const ga = new GlideAggregate('x_daas_ham_agreement')
+    ga.addQuery('customer', '=', customerId)
+    ga.addAggregate('COUNT', '')
+    ga.groupBy('currency')
+    ga.query()
+    const currencies: string[] = []
+    while (ga.next()) currencies.push(String(ga.getValue('currency') ?? ''))
+    return currencies
+}
 
 /**
  * What became of an action on a period: done, or not done and why. `why` is '' when the platform has told the user
