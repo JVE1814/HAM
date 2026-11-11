@@ -18,8 +18,7 @@ import { BILLING_PERIOD_STATUS, SHIPMENT_STATUS, type LegalOwner } from '../doma
 import { agreementCurrencyOf, customerCurrencies } from './agreements.ts'
 import { recordMarginOutcome } from './closed-period.ts'
 import { runSupersedingChunk } from './chunked.ts'
-import { queueJob, type JobEvent } from './events.ts'
-import { EVENT } from '../domain/events.ts'
+import { type JobEvent } from './events.ts'
 import { intProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { count, deleteWhere, findById, num, recordsById, str, throwRefused } from './records.ts'
@@ -29,11 +28,6 @@ import { log } from './log.ts'
  * Cost facts and Margin per Customer, Site and currency, computed when a Billing period closes (plan §13 Margin / TCO). A cost is kept
  * in its Agreement's currency (a shipment's in its carrier's), and Margin sets revenue against cost per currency.
  */
-
-/** Queue a fresh margin pass for a closed period: it supersedes one still in progress (ADR 0013). */
-export function queueMarginCompute(period: GlideRecord): void {
-    queueJob(EVENT.marginCompute, period)
-}
 
 /**
  * One chunk of a margin pass for the period the event names: Asset costs over the month's Service intervals, then

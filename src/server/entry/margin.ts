@@ -1,11 +1,11 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { EVENT } from '../domain/events.ts'
-import { jobEvent } from '../platform/events.ts'
-import { computeMarginChunk, queueMarginCompute } from '../platform/margin.ts'
+import { jobEvent, queueJob } from '../platform/events.ts'
+import { computeMarginChunk } from '../platform/margin.ts'
 import { str } from '../platform/records.ts'
 
 export function uiRecomputeMargin(current: GlideRecord): void {
-    queueMarginCompute(current)
+    queueJob(EVENT.marginCompute, current)
     gs.addInfoMessage(`Recomputing margin for ${str(current, 'period')}`)
 }
 

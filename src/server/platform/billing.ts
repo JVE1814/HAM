@@ -36,7 +36,6 @@ import { attemptLock, whyNotRun } from './locks.ts'
 import { deleteWhere, exists, findById, num, refusal, str, throwRefused } from './records.ts'
 import { BILLING_LINE_KIND, BILLING_PERIOD_STATUS, FEE_STATUS, type FeeType, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
 import { log } from './log.ts'
-import { queueMarginCompute } from './margin.ts'
 
 /** Billing periods: generate, review, close (lock) and export (plan §13 Billing export, Q66). */
 
@@ -550,7 +549,7 @@ export function closePeriod(period: GlideRecord): PeriodOutcome {
     const outcome = takingTurns(period, 'not closed', (stored) => closeReady(period, stored))
     if (outcome.done) {
         queueJob(EVENT.billingExport, period)
-        queueMarginCompute(period)
+        queueJob(EVENT.marginCompute, period)
     }
     return outcome
 }
