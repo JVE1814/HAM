@@ -1,6 +1,6 @@
 import { GlideRecord } from '@servicenow/glide'
 import {
-    APPROVAL_REQUESTED,
+    APPROVAL,
     groupDecisions,
     rollupApprovals,
     type ApprovalDecision,
@@ -79,7 +79,7 @@ export function putToApproval(task: GlideRecord, request: ApprovalRequest): Appr
     const unasked = requestApprovals(task, request)
     if (unasked) return { awaiting: false, step: 'request', reason: unasked }
     task.setValue('stage', request.awaitingStage)
-    task.setValue('approval', 'requested')
+    task.setValue('approval', APPROVAL.requested)
     task.setValue(CUSTOMER_ADMINS_ASKED, request.customerAdmins.join(','))
     if (task.update()) return { awaiting: true }
     const reason = warnRefused(task, `${str(task, 'number')} not saved as awaiting approval, its requests cancelled`)
@@ -129,7 +129,7 @@ export function rollUpApprovals(task: GlideRecord, flow: ApprovalFlow): Approval
 function requestApprovals(task: GlideRecord, { approverIds, required, customerAdmins, noApprover }: ApprovalRequest): string {
     const refusals = approverIds.map((approverId) => requestApproval(task, approverId))
     const saved = approverIds.filter((_, i) => !refusals[i])
-    const allApproved = saved.map((approverId) => ({ approverId, state: 'approved' as const }))
+    const allApproved = saved.map((approverId) => ({ approverId, state: APPROVAL.approved }))
     if (rollupApprovals(required, groupDecisions(allApproved, customerAdmins)) === 'approved') return ''
     if (saved.length > 0) cancelPendingApprovals(task.getUniqueValue())
     const refused = refusals.find(Boolean)
@@ -143,7 +143,7 @@ function requestApproval(task: GlideRecord, approverId: string): string {
     approval.setValue('source_table', task.getTableName())
     approval.setValue('document_id', task.getUniqueValue())
     approval.setValue('approver', approverId)
-    approval.setValue('state', APPROVAL_REQUESTED)
+    approval.setValue('state', APPROVAL.requested)
     if (approval.insert()) return ''
     return warnRefused(approval, `No approval request for ${str(task, 'number')} to ${approverId}`)
 }
@@ -165,10 +165,10 @@ function approvalsOf(taskId: string): Array<{ approverId: string; state: Approva
 export function cancelPendingApprovals(taskId: string): void {
     const approval = new GlideRecord('sysapproval_approver')
     approval.addQuery('sysapproval', taskId)
-    approval.addQuery('state', APPROVAL_REQUESTED)
+    approval.addQuery('state', APPROVAL.requested)
     approval.query()
     while (approval.next()) {
-        approval.setValue('state', 'cancelled')
+        approval.setValue('state', APPROVAL.cancelled)
         if (approval.update()) continue
         // Left waiting, it still counts in the rollup if a draft task is submitted again (a rejection rejects it).
         warnRefused(approval, `Approval request ${approval.getUniqueValue()} left requested, cancel it`)

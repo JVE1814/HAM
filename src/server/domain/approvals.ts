@@ -1,11 +1,11 @@
 /** Who decides on an Order or a Disposal order: the Customer's admins, or the Provider's account manager. */
 export type Approver = 'customer_admin' | 'account_manager'
 
-export type ApprovalState = 'requested' | 'approved' | 'rejected' | 'cancelled' | 'not_required' | 'not_yet_requested'
-export type ApprovalOutcome = 'requested' | 'approved' | 'rejected'
+/** The values the app stores in an approval request's `state` (sysapproval_approver) and an approved task's `approval`. */
+export const APPROVAL = { requested: 'requested', approved: 'approved', rejected: 'rejected', cancelled: 'cancelled' } as const
 
-/** The state of an approval request (sysapproval_approver.state) nobody has decided yet. */
-export const APPROVAL_REQUESTED = 'requested'
+export type ApprovalState = (typeof APPROVAL)[keyof typeof APPROVAL]
+export type ApprovalOutcome = Exclude<ApprovalState, 'cancelled'>
 
 export interface ApprovalDecision {
     group: Approver
@@ -17,9 +17,9 @@ export interface ApprovalDecision {
  * (any Customer admin; the account manager) has at least one approval.
  */
 export function rollupApprovals(required: readonly Approver[], decisions: readonly ApprovalDecision[]): ApprovalOutcome {
-    if (decisions.some((d) => d.state === 'rejected')) return 'rejected'
-    const approvedGroups = new Set(decisions.filter((d) => d.state === 'approved').map((d) => d.group))
-    return required.every((group) => approvedGroups.has(group)) ? 'approved' : 'requested'
+    if (decisions.some((d) => d.state === APPROVAL.rejected)) return APPROVAL.rejected
+    const approvedGroups = new Set(decisions.filter((d) => d.state === APPROVAL.approved).map((d) => d.group))
+    return required.every((group) => approvedGroups.has(group)) ? APPROVAL.approved : APPROVAL.requested
 }
 
 /**
@@ -67,9 +67,9 @@ const APPROVER_NAMES: Record<Approver, string> = {
  * Re-check approvals tells the user: whose approval is missing, and whether a request to them is still waiting.
  */
 export function approvalAwaited(required: readonly Approver[], decisions: readonly ApprovalDecision[]): string {
-    const approved = new Set(decisions.filter((d) => d.state === 'approved').map((d) => d.group))
+    const approved = new Set(decisions.filter((d) => d.state === APPROVAL.approved).map((d) => d.group))
     const missing = required.filter((group) => !approved.has(group))
     const who = missing.map((group) => APPROVER_NAMES[group]).join(' and ')
-    const waiting = decisions.some((d) => d.state === 'requested' && missing.includes(d.group))
+    const waiting = decisions.some((d) => d.state === APPROVAL.requested && missing.includes(d.group))
     return waiting ? `waiting for ${who} to decide` : `no approval from ${who} and none still requested`
 }

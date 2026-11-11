@@ -2,7 +2,7 @@ import '@servicenow/sdk/global'
 import { BusinessRule, Property, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
 import { onOrderApprovalDecision, sourceOrder, uiCancelOrder, uiRecheckApprovals, uiSubmitOrder } from '../../server/entry/orders'
 import { INSTALL_MODE, ORDER_STAGE, STAGE_FIELDS } from '../../server/domain/vocabulary'
-import { APPROVAL_REQUESTED } from '../../server/domain/approvals'
+import { APPROVAL } from '../../server/domain/approvals'
 import { uiConfirmInstalled, uiShipOrder } from '../../server/entry/delivery'
 import { PLATFORM_ROLE } from '../../server/domain/roles'
 import { raiseRefreshOrders } from '../../server/entry/refresh'
@@ -56,7 +56,7 @@ UiAction({
     // Only while no request is waiting: a waiting request's decision rolls the approvals up itself. The condition
     // column holds at most 254 characters (a longer one is cut off on the instance), hence the terse query.
     condition:
-        `current.stage == '${ORDER_STAGE.awaiting_approval}' && !(function (a) { a.addEncodedQuery('state=${APPROVAL_REQUESTED}^sysapproval=' + current.getUniqueValue()); a.setLimit(1); a.query(); return a.hasNext() })(new GlideRecord('sysapproval_approver'))`,
+        `current.stage == '${ORDER_STAGE.awaiting_approval}' && !(function (a) { a.addEncodedQuery('state=${APPROVAL.requested}^sysapproval=' + current.getUniqueValue()); a.setLimit(1); a.query(); return a.hasNext() })(new GlideRecord('sysapproval_approver'))`,
     roles: [assetManager, accountManager, admin],
     form: { showButton: true },
     showUpdate: true,

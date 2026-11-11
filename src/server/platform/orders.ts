@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { approversToAsk } from '../domain/approvals.ts'
+import { APPROVAL, approversToAsk } from '../domain/approvals.ts'
 import type { NamedRecord } from '../domain/customer-parties.ts'
 import {
     approversFor,
@@ -371,7 +371,7 @@ function requestedLines(orderId: string): RequestedLine[] {
 
 /** Approve the Order and source it; why the platform refused the save ('' once saved), when nothing is sourced. */
 function startSourcing(order: GlideRecord): string {
-    order.setValue('approval', 'approved')
+    order.setValue('approval', APPROVAL.approved)
     order.setValue('stage', ORDER_STAGE.sourcing)
     order.setValue('state', ORDER_TASK_STATE.inProgress)
     if (!order.update()) return warnRefused(order, `${str(order, 'number')} not saved as approved, not sourced`)
@@ -390,7 +390,7 @@ function rejectOrder(order: GlideRecord): string {
     const number = str(order, 'number')
     const lineIds = openLineIds(orderId)
     const underLines = withOrderLineLocks(lineIds, (locks) => {
-        order.setValue('approval', 'rejected')
+        order.setValue('approval', APPROVAL.rejected)
         order.setValue('stage', ORDER_STAGE.rejected)
         order.setValue('state', ORDER_TASK_STATE.rejected)
         if (!order.update()) return warnRefused(order, `${number} not saved as rejected`)
