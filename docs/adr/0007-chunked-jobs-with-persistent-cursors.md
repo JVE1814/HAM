@@ -4,7 +4,7 @@ With 100k–1M Assets, bulk passes over Assets and the records that follow them 
 chunked-job runner (`platform/chunked.ts` over `domain/chunked-job.ts`): keyset paging by sys_id, a
 time budget per run, and a persisted cursor so the next run resumes where the last stopped.
 Event-driven queues (only changed records) are preferred over scans wherever a trigger exists. The
-runner is used in two ways:
+runner (`platform/chunked.ts`) walks a table one chunk at a time and is used in four ways:
 
 - Scheduled, with the cursor in `x_daas_ham_job_cursor` (`runTableJob`): installed-base
   reconciliation (`reconcile_installed_base`), in-service detection (`in_service_detection`), raw
@@ -14,7 +14,11 @@ runner is used in two ways:
 - Event-driven, with the cursor in the event's `parm2` (`runEventTableJob`): the lifecycle phase
   and refresh date recalculation of a Model's, Agreement's or Lease's Assets (queued when the dates
   they are worked out from change, and by the daily lifecycle roll for the Models with a milestone
-  that day), the lease buyout transfer, billing generation and the margin recompute (ADR 0013).
+  that day) and the lease buyout transfer.
+- A triggered pass (`runTriggeredChunk`), with a pass token in the event so a newer pass outruns an
+  older one, and no lock: billing generation.
+- A superseding pass under a job lock (`runSupersedingChunk`), where a new pass supersedes the one
+  running: the margin recompute (ADR 0013).
 
 Other scheduled jobs do not use the runner. Each bounds its work its own way, or not at all:
 
