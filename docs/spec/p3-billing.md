@@ -60,6 +60,11 @@
 | Ready for review | Generation finished and totals are set, or generation stopped on an error (held for review) | *Regenerate* (rebuild from current data: the period is saved as *Generating* before its lines are deleted, so a refused save keeps it ready with its lines; if any old line is left after the delete, it goes back to *Ready for review* with the error recorded and nothing is generated, so no line is billed twice; if the platform refuses that save too, it stays *Generating* with nothing queued, which is logged and shown: once it has shown no activity for 30 minutes an admin uses *Reset generation*, then *Regenerate*); *Close period* |
 | Closed (locked) | *Close period* (finance) | Lines of fees waived since generation are dropped (a waived fee leaves the period only once its line is gone; if its line survives the delete or its unlink is refused, it stays on the period and Close refuses, naming the first three such fees, how many more there are, and why) and the totals redone; the period is saved closed before its fees become *billed*, so a refused save leaves them open. Each fee is then saved as *billed* and checked: one the platform refuses stays open but linked to the closed period, which no later period bills, so Close names the first three (and how many more) with why, logs them all, and they are set to *Billed* by hand. The period and its lines can no longer change or be deleted, and none of its lines can be moved to another period (nor a line moved into it). The CSV export is attached in the background shortly after closing; *Re-export CSV* attaches it again if it is missing |
 
+- *Close period* and *Regenerate* of one period take turns under a job lock on it
+  (`billing_period_<sys_id>`, ADR 0013). Each reads the period afresh there and acts only while it
+  is still *Ready for review*: a Close never locks a period a Regenerate has emptied, and judges the
+  period by its latest generation. One that finds the lock held through 5 tries changes nothing and
+  asks the user to try again.
 - A period's month is entered as YYYY-MM (e.g. 2026-10); a business rule refuses a period saved
   with any other month, or with a month that has not ended. The period's first and last day are set
   from its month whenever the month is saved.

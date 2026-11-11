@@ -28,6 +28,7 @@ function oneOfEach(id: string): string[] {
         LOCK.reconException('rack_overlap', id),
         LOCK.subscriptionLine(id),
         LOCK.serviceInterval(id),
+        LOCK.billingPeriod(id),
         LOCK.job(`margin_${id}`),
     ]
 }
@@ -58,6 +59,7 @@ describe('LOCK', () => {
         expect(LOCK.reconException('rack_overlap', '')).toBe('recon_exception_rack_overlap_')
         expect(LOCK.subscriptionLine(a)).toBe(`subscription_line_${a}`)
         expect(LOCK.serviceInterval(a)).toBe(`service_interval_${a}`)
+        expect(LOCK.billingPeriod(a)).toBe(`billing_period_${a}`)
         expect(LOCK.job(`margin_${a}`)).toBe(`margin_${a}`)
     })
 

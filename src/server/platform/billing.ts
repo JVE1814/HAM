@@ -26,6 +26,7 @@ import {
 } from '../domain/billing.ts'
 import { appendTo } from '../domain/collections.ts'
 import { messageOf } from '../domain/errors.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { memoized } from '../domain/memo.ts'
 import { agreementCurrencyOf, customerCurrencies } from './agreements.ts'
 import { inCurrentPass, queuePass, runEventTableJob, type EventJobResult } from './chunked.ts'
@@ -33,6 +34,7 @@ import { glideToMs, nowGlide, nowMs } from './clock.ts'
 import { EVENT, queueJob, type JobEvent } from './events.ts'
 import { billableFees, billOnPeriod, markBilled, takeOffPeriod, visitOpenFees, visitWaivedFees, type FeeBilling } from './fees.ts'
 import { findJobCursor, retirePass } from './job-cursor.ts'
+import { attemptLock, whyNotRun } from './locks.ts'
 import { deleteWhere, exists, findById, noneLeft, num, refusal, str, throwRefused } from './records.ts'
 import { BILLING_PERIOD_STATUS, type BillingLineKind, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
 
@@ -363,8 +365,29 @@ function feeLabel(fee: GlideRecord): string {
     return `${fee.getDisplayValue('fee_type')} fee: ${fee.getDisplayValue('asset')} (${str(fee, 'occurred_on')})`
 }
 
+/**
+ * Run a Close or Regenerate of `period` under the period's lock, with the period as stored there, so the two take
+ * turns: `period` was read before the action ran, and a Regenerate that deleted the lines meanwhile would leave Close to
+ * lock a period without them (the closed-period rule checks the status as `period` read it). A period held through every
+ * try is not acted on.
+ */
+function takingTurns(period: GlideRecord, undone: string, act: (stored: GlideRecord) => PeriodOutcome): PeriodOutcome {
+    const attempt = attemptLock(LOCK.billingPeriod(period.getUniqueValue()), () => {
+        const stored = findById(PERIOD, period.getUniqueValue())
+        return stored ? act(stored) : notDone(`${str(period, 'period')} ${undone}: the period is gone`)
+    })
+    if (attempt.ran) return attempt.value
+    return notDone(`${str(period, 'period')} ${undone}: ${whyNotRun(attempt, 'a Close or Regenerate of it is running; try again')}`)
+}
+
 export function regeneratePeriod(period: GlideRecord): PeriodOutcome {
-    if (str(period, 'status') !== BILLING_PERIOD_STATUS.ready) return notDone('Only a period ready for review can be regenerated')
+    return takingTurns(period, 'not regenerated', (stored) => {
+        if (str(stored, 'status') !== BILLING_PERIOD_STATUS.ready) return notDone('Only a period ready for review can be regenerated')
+        return regenerateReady(period)
+    })
+}
+
+function regenerateReady(period: GlideRecord): PeriodOutcome {
     period.setValue('status', BILLING_PERIOD_STATUS.generating)
     period.setValue('failed_lines', 0)
     period.setValue('last_error', '')
@@ -447,10 +470,15 @@ function dropWaivedFeeLines(period: GlideRecord): string[] {
  * A closed period whose fees were not all marked billed is done, with a warning that names them.
  */
 export function closePeriod(period: GlideRecord): PeriodOutcome {
-    if (str(period, 'status') !== BILLING_PERIOD_STATUS.ready) return notDone('Only a period ready for review can be closed')
+    return takingTurns(period, 'not closed', (stored) => closeReady(period, stored))
+}
+
+/** Close `period`, judged by how it is `stored` now: a Regenerate since `period` was read may have found lines failing. */
+function closeReady(period: GlideRecord, stored: GlideRecord): PeriodOutcome {
+    if (str(stored, 'status') !== BILLING_PERIOD_STATUS.ready) return notDone('Only a period ready for review can be closed')
     const name = str(period, 'period')
-    const failed = num(period, 'failed_lines')
-    const lastError = str(period, 'last_error')
+    const failed = num(stored, 'failed_lines')
+    const lastError = str(stored, 'last_error')
     if (failed > 0 || lastError) {
         return notDone(
             `${name} did not generate cleanly (${failed} line(s) failed to bill; last error: ${lastError || 'none'}); fix the cause and Regenerate before closing`,

@@ -75,6 +75,8 @@ export const LOCK = {
     subscriptionLine: (lineId: string) => named(`subscription_line_${lineId}`),
     /** The open and the close of an Asset's Service interval take turns under it. */
     serviceInterval: (assetId: string) => named(`service_interval_${assetId}`),
+    /** A Billing period's Close and Regenerate take turns under it, each reading its status afresh: nothing is taken under it. */
+    billingPeriod: (periodId: string) => named(`billing_period_${periodId}`),
     /** A superseding job's lock (the margin recompute's), named as its job cursor is. */
     job: (job: string) => named(job),
 } as const

@@ -81,8 +81,8 @@ the order under it, and two cancels of one Order exclude each other through `sou
 `refresh_orders` < `agreement_usage` < `oem_claim_run` < `seen_asset` < `receive_serial` <
 `receive_asset` < `source_order` < `ship_order` < `track_shipment` < `return_label` < `order_line` <
 `provider_tag_sequence` < `spare_pool` < `reserve_asset` < `return_request` < `return_asset` <
-`fee` < `audit` < `recon_exception` < `subscription_line` < `service_interval` < job locks (the
-margin recompute's).
+`fee` < `audit` < `recon_exception` < `subscription_line` < `service_interval` < `billing_period` < job
+locks (the margin recompute's).
 
 Only the device-events REST handler and the in-service detection job take `seen_asset_<sys_id>`, and
 they hold no other lock when they do. The go-live under it starts its pending Subscription line
@@ -161,6 +161,11 @@ while it is open and on no other period, so a month generating beside a *Regener
 never bills one fee on both. The generation holds no other lock when it takes it, tries 5 times
 back to back, and counts a fee held through them as failed unless another period has it by then.
 Nothing is taken under it.
+*Close period* and *Regenerate* of a Billing period run under `billing_period_<period sys_id>`,
+holding no other lock, and each reads the period's status afresh there. So a Regenerate never
+deletes the lines of a period Close is locking, and Close never locks a period a Regenerate has
+emptied. Each tries 5 times back to back, and one that finds the lock held through them changes
+nothing and asks the user to try again. Nothing is taken under it.
 
 An audit's scans and *Close audit* take turns under `audit_<audit sys_id>`, each holding no other
 lock when it takes it, so a scan lands wholly before the close reads the lines, or finds the audit

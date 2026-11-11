@@ -115,6 +115,48 @@ describe('two months generating at once', () => {
     })
 })
 
+describe('Close and Regenerate of one period at once', () => {
+    it('does not close a period a Regenerate has emptied since its form was read', () => {
+        generate('2026-09')
+        const closing = period('2026-09')
+        expect(regeneratePeriod(period('2026-09'))).toEqual({ done: true })
+
+        expect(closePeriod(closing)).toEqual({ done: false, why: 'Only a period ready for review can be closed' })
+        drainGeneration()
+        expect(periodRow('2026-09')).toMatchObject({ status: 'ready', line_count: '2' })
+        expect(fee('fee1')?.status).toBe('open')
+    })
+
+    it('does not regenerate a period closed since its form was read', () => {
+        generate('2026-09')
+        const regenerating = period('2026-09')
+        expect(closePeriod(period('2026-09'))).toEqual({ done: true })
+
+        expect(regeneratePeriod(regenerating)).toEqual({ done: false, why: 'Only a period ready for review can be regenerated' })
+        expect(periodRow('2026-09')?.status).toBe('closed')
+        expect(linesOf('2026-09')).toHaveLength(2)
+    })
+
+    it('does not close a period on a clean generation its Regenerate has since found failing', () => {
+        generate('2026-09')
+        const closing = period('2026-09')
+        platform.tables.x_daas_ham_agreement = [{ sys_id: 'ag1', number: 'NAG0001', currency: '' }]
+        expect(regeneratePeriod(period('2026-09'))).toEqual({ done: true })
+        drainGeneration()
+
+        expect(closePeriod(closing)).toEqual({ done: false, why: expect.stringContaining('2026-09 did not generate cleanly (2 line(s) failed') })
+    })
+
+    it('leaves the period to the one holding its lock', () => {
+        generate('2026-09')
+        platform.tables.x_daas_ham_job_lock = [{ sys_id: 'lock1', name: `billing_period_${periodRow('2026-09')?.sys_id}`, sys_created_on: '2026-11-11 12:00:00' }]
+
+        expect(closePeriod(period('2026-09'))).toEqual({ done: false, why: '2026-09 not closed: a Close or Regenerate of it is running; try again' })
+        expect(regeneratePeriod(period('2026-09'))).toEqual({ done: false, why: '2026-09 not regenerated: a Close or Regenerate of it is running; try again' })
+        expect(periodRow('2026-09')?.status).toBe('ready')
+    })
+})
+
 describe('a fee whose date is moved past its period during review', () => {
     it('leaves the period at its Regenerate, open for the month it now falls in', () => {
         generate('2026-09')
