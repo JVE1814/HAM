@@ -11,6 +11,7 @@ import {
     type LegalOwner,
     ORDER_STAGE,
     type OrderStage,
+    type OrderType,
     type ReturnLineStatus,
     type ReturnMethod,
     RETURN_LINE_STATUS,
@@ -75,8 +76,13 @@ export const SETTLED_BY_RECEIPT: readonly ReturnLineStatus[] = ['awaiting', 'mis
 /** The lines that keep their Return order open: every other is evaluated or declared missing. */
 export const KEEPS_RETURN_OPEN: readonly ReturnLineStatus[] = ['awaiting', 'received']
 
-/** Returns whose unit the swap's own work order collects, so they open no de-install work of their own. */
-const COLLECTED_BY_SWAP: readonly ReturnTrigger[] = ['refresh_swap_back', 'defective_return']
+/** The Return an install that swaps units raises for the ones it replaced: a refresh's swap-back, else a defective unit. */
+export function swapReturnTrigger(orderType: OrderType | ''): ReturnTrigger {
+    return orderType === 'refresh' ? RETURN_TRIGGER.refresh_swap_back : RETURN_TRIGGER.defective_return
+}
+
+/** Returns whose unit the swap's own work order collects (`swapReturnTrigger`), so they open no de-install work of their own. */
+const COLLECTED_BY_SWAP: readonly ReturnTrigger[] = [swapReturnTrigger('refresh'), swapReturnTrigger('')]
 
 /** Whether a Return opens a de-install change and work order: a field de-install no swap work order already covers. */
 export function opensDeinstallWork(trigger: ReturnTrigger, method: ReturnMethod): boolean {

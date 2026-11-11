@@ -13,6 +13,7 @@ import {
     sitePackageHoldersQuery,
     deploymentEndLineQuery,
     stagesTakenBack,
+    swapReturnTrigger,
     type RequestedReturn,
     type ReturnRequester,
 } from './returns'
@@ -92,6 +93,9 @@ describe('opensDeinstallWork', () => {
     it("opens none for a swapped-out unit, which the swap's own work order collects", () => {
         expect(opensDeinstallWork('refresh_swap_back', 'fsm_deinstall')).toBe(false)
         expect(opensDeinstallWork('defective_return', 'fsm_deinstall')).toBe(false)
+        for (const orderType of ['refresh', 'device_replace'] as const) {
+            expect(opensDeinstallWork(swapReturnTrigger(orderType), 'fsm_deinstall'), orderType).toBe(false)
+        }
     })
 })
 
