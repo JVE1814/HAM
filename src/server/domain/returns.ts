@@ -1,7 +1,6 @@
 import { addDays } from './calendar.ts'
 import { actorRefusal, CHOOSE_CUSTOMER, siteFinding, type ActWording, type NamedSite } from './customer-parties.ts'
-import { fleetStagesQuery } from './fleet.ts'
-import { DEPLOYED_STAGES, INSTALLED_STAGES, SERVING_STAGES, type Stage } from './lifecycle.ts'
+import { INSTALLED_STAGES, SERVING_STAGES, type Stage } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
 import {
     type EvaluationOutcome,
@@ -117,16 +116,6 @@ export function overdueStep(input: { dueDate: string; today: string; graceDays: 
 }
 
 /**
- * The Assets that keep a site package open, as an encoded alm_hardware query: the fleet assets (ADR 0016) at its Site
- * under its Agreement on their way there, serving there or on their way back. A unit received at the depot or declared
- * missing no longer counts. A swap's new units do, before monitoring first sees them and attaches them to the package,
- * so a swap-back that reaches the depot first does not end it (Q60).
- */
-export function sitePackageHoldersQuery(line: { siteId: string; agreementId: string }): string {
-    return fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_site=${line.siteId}^x_daas_ham_agreement=${line.agreementId}`)
-}
-
-/**
  * A whole-Site recovery: the Returns that bring back all of a Site, by their trigger. What makes a Return one, the
  * stages it takes units in and the lines that await them are all said here.
  */
@@ -156,7 +145,7 @@ export function deploymentEndLineQuery(assetId: string): string {
  * The stages of the units a Return with this trigger takes back: one that ends their deployment every unit serving the
  * Site, those still shipped there too (the lifecycle lets them go straight to pending return), any other the installed
  * ones. Left off, a shipped unit would miss the agreement-end Return, raised only once, and hold the site package open
- * for good (`sitePackageHoldersQuery`); a temporary Order's would stay deployed, and billed, with no Return raised again.
+ * for good (domain/billing `sitePackageHoldersQuery`); a temporary Order's would stay deployed, and billed, with no Return raised again.
  */
 export function stagesTakenBack(trigger: ReturnTrigger): readonly Stage[] {
     return DEPLOYMENT_END_TRIGGERS.includes(trigger) ? SERVING_STAGES : INSTALLED_STAGES

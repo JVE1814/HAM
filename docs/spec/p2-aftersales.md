@@ -128,7 +128,7 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
     monitoring first sees them, so a swap-back that reaches the depot first leaves the package open,
     and a new unit that leaves before it was seen still ends it. All units count, not only those the
     receiving tech can see. A pending package waiting for its rollout is not ended
-    (`domain/returns.ts` `sitePackageHoldersQuery`);
+    (`domain/billing.ts` `sitePackageHoldersQuery`);
   - a unit received after the due date incurs a **late-return fee**;
   - a unit declared missing that turns up settles its line again: the open lost-asset fee is
     waived, the late-return fee applies, and the Return order reopens for evaluation.

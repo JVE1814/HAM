@@ -14,6 +14,7 @@ import {
 } from '../domain/coverage.ts'
 import { FLEET_CONDITION } from '../domain/fleet.ts'
 import { parseCoverageRow } from '../domain/oem/adapters.ts'
+import type { CoverageFact } from '../domain/oem/types.ts'
 import { normalizeSerial } from '../domain/serials.ts'
 import type { CoverageSource, OemVendor } from '../domain/vocabulary.ts'
 import { nowGlide, todayIso } from './clock.ts'
@@ -38,24 +39,41 @@ export function staleAssets(vendor: OemVendor, staleBefore: string, limit: numbe
     return assets
 }
 
+/** What a serial's vendor said: its contracts (none: not covered), or an error of its own, which only stamps it checked. */
+export type SerialAnswer = { kind: 'apply'; facts: readonly CoverageFact[]; annualCost?: number } | { kind: 'stamp' }
+
+/** One serial's coverage to write: the Assets carrying it, in the order staleAssets gives them, and its vendor's answer. */
+export interface SerialWrite {
+    assetIds: readonly string[]
+    answer: SerialAnswer
+}
+
 /**
- * Write the answers onto the answered serials' coverage (writeCoverage) and summarise it onto the Assets
- * (refreshAssetCoverage), with one check time; shared by the API sync and the CSV import. Returns the saves the
- * platform refused: a serial whose coverage is refused leaves its Assets unsummarised and unchecked, so it is asked
- * again rather than summarised from contracts that were not stored.
+ * Write each serial's answer onto its coverage (writeCoverage), pointing its contracts at the last of its Assets, and
+ * summarise it onto all of them (refreshAssetCoverage), with one check time; shared by the API sync and the CSV
+ * import. Serials match after normalisation. Returns the saves the platform refused: a serial whose coverage is refused
+ * leaves its Assets unsummarised and unchecked, so it is asked again rather than summarised from contracts that were
+ * not stored.
  */
-export function applyCoverage(
-    vendor: OemVendor,
-    source: CoverageSource,
-    answered: ReadonlyMap<string, string>,
-    answers: readonly CoverageAnswer[],
-    stamped: readonly string[],
-): string[] {
+export function applyCoverage(vendor: OemVendor, source: CoverageSource, writes: ReadonlyMap<string, SerialWrite>): string[] {
     const checkedAt = nowGlide()
-    const serials = [...new Set(answered.values())]
+    const bySerial = new Map([...writes].map(([serial, write]) => [normalizeSerial(serial), write]))
+    const serials: string[] = []
+    const answers: CoverageAnswer[] = []
+    for (const [serial, { assetIds, answer }] of bySerial) {
+        if (answer.kind !== 'apply') continue
+        serials.push(serial)
+        const assetId = assetIds[assetIds.length - 1] ?? ''
+        for (const fact of answer.facts) answers.push({ assetId, fact, annualCost: answer.annualCost })
+    }
     const { contracts, refused } = writeCoverage(vendor, source, serials, answers, checkedAt)
-    const saved = new Map([...answered].filter(([, serial]) => !refused.has(serial)))
-    const unstamped = refreshAssetCoverage(saved, coverageBySerial(serials, contracts, todayIso()), stamped, checkedAt)
+    const coverageOf = coverageBySerial(serials, contracts, todayIso())
+    const assets = new Map<string, AssetCoverage | undefined>()
+    for (const [serial, { assetIds }] of bySerial) {
+        if (refused.has(serial)) continue
+        for (const assetId of assetIds) assets.set(assetId, coverageOf.get(serial))
+    }
+    const unstamped = refreshAssetCoverage(assets, checkedAt)
     return [...[...refused].map(([serial, reason]) => `coverage of ${serial} not saved: ${reason}`), ...unstamped]
 }
 
@@ -65,7 +83,7 @@ function writeCoverage(vendor: OemVendor, source: CoverageSource, serials: reado
     if (serials.length === 0) return { contracts, refused }
     const refuse = (coverage: GlideRecord) => {
         const contract = str(coverage, 'contract_number')
-        refused.set(str(coverage, 'serial_number'), `contract ${contract}: ${refusal(coverage)}`)
+        refused.set(normalizeSerial(str(coverage, 'serial_number')), `contract ${contract}: ${refusal(coverage)}`)
     }
     const pending = answersByContract(answers)
     const stored = new GlideRecord('x_daas_ham_oem_coverage')
@@ -137,16 +155,15 @@ export function markExpiryWarned(coverage: GlideRecord): boolean {
     return !!coverage.update()
 }
 
-function refreshAssetCoverage(answered: ReadonlyMap<string, string>, coverageOf: ReadonlyMap<string, AssetCoverage>, stamped: readonly string[], checkedAt: string): string[] {
+/** Stamp each Asset checked, with its coverage summarised onto it where it has one (undefined: only stamped). */
+function refreshAssetCoverage(coverageOf: ReadonlyMap<string, AssetCoverage | undefined>, checkedAt: string): string[] {
     const refused: string[] = []
-    const ids = [...answered.keys(), ...stamped]
-    if (ids.length === 0) return refused
+    if (coverageOf.size === 0) return refused
     const asset = new GlideRecord('alm_hardware')
-    asset.addQuery('sys_id', 'IN', ids.join(','))
+    asset.addQuery('sys_id', 'IN', [...coverageOf.keys()].join(','))
     asset.query()
     while (asset.next()) {
-        const serial = answered.get(asset.getUniqueValue())
-        const coverage = serial === undefined ? undefined : coverageOf.get(serial)
+        const coverage = coverageOf.get(asset.getUniqueValue())
         if (coverage) {
             asset.setValue(COVERAGE_END_FIELD, coverage.coverageEnd)
             asset.setValue('x_daas_ham_coverage_level', coverage.serviceLevel)
@@ -174,21 +191,22 @@ export function importCoverageRow(row: GlideRecord): RowOutcome {
     })
     if (!parsed.ok) return rowError(parsed.reason)
     const { serial } = parsed.fact
-    const asset = fleetAssetWithSerial(serial)
-    if (!asset) return rowError(`no fleet asset with serial ${serial}`)
-    const assetId = asset.getUniqueValue()
-    const answer: CoverageAnswer = { assetId, fact: parsed.fact, annualCost: parsed.annualCost }
-    const refused = applyCoverage(parsed.vendor, 'csv', new Map([[assetId, serial]]), [answer], [])
+    const assetIds = fleetAssetsWithSerial(serial)
+    if (assetIds.length === 0) return rowError(`no fleet asset with serial ${serial}`)
+    const answer: SerialAnswer = { kind: 'apply', facts: [parsed.fact], annualCost: parsed.annualCost }
+    const refused = applyCoverage(parsed.vendor, 'csv', new Map([[serial, { assetIds, answer }]]))
     if (refused.length > 0) return rowError(refused.join('; '))
     return { state: 'inserted', comment: `Coverage for ${serial}` }
 }
 
-/** The first fleet asset (ADR 0016) with this serial: one of the Provider IT's that carries it is not covered here. */
-function fleetAssetWithSerial(serial: string): GlideRecord | null {
+/** The fleet assets (ADR 0016) with this serial, in staleAssets' order: one of the Provider IT's that carries it is not covered here. */
+function fleetAssetsWithSerial(serial: string): string[] {
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery('serial_number', serial)
     asset.addEncodedQuery(FLEET_CONDITION)
-    asset.setLimit(1)
+    asset.orderBy(COVERAGE_CHECKED_FIELD)
     asset.query()
-    return asset.next() ? asset : null
+    const ids: string[] = []
+    while (asset.next()) ids.push(asset.getUniqueValue())
+    return ids
 }

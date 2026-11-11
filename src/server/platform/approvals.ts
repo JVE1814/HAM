@@ -63,7 +63,7 @@ export interface ApprovalRequest {
     required: readonly Approver[]
     /** The Customer admins of the task's Customer, who decide for the customer-admin group (`CUSTOMER_ADMINS_ASKED`). */
     customerAdmins: readonly string[]
-    /** Who decides for the Provider (the account-manager group), and stands in for absent admins as the flow says. */
+    /** Who decides for the Provider (its group, APPROVER.provider), and stands in for absent admins as the flow says. */
     providerApprovers: readonly string[]
     /** Why the task cannot be approved when nobody could be asked. */
     noApprover: string

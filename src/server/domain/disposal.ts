@@ -1,4 +1,4 @@
-import type { Approver } from './approvals.ts'
+import { APPROVER, type Approver } from './approvals.ts'
 import { disposalMethodsFor, legalOwnerOf, type Stage } from './lifecycle.ts'
 import type { DisposalMethod, LegalOwner } from './vocabulary.ts'
 
@@ -68,5 +68,5 @@ export function disposalScopeRefusal(orderStages: readonly string[]): string {
 
 /** The provider always approves; Customer admins too when a customer-owned Asset is involved. */
 export function disposalApprovers(owners: ReadonlyArray<LegalOwner | ''>): Approver[] {
-    return owners.includes('customer') ? ['account_manager', 'customer_admin'] : ['account_manager']
+    return owners.includes('customer') ? [APPROVER.provider, APPROVER.customerAdmin] : [APPROVER.provider]
 }

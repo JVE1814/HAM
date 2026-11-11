@@ -2,7 +2,8 @@ import { RESTMessageV2 } from '@servicenow/glide/sn_ws'
 import { messageOf } from '../domain/errors.ts'
 import type { HttpPort, HttpResponse } from '../domain/http.ts'
 import { PROPERTY, type PropertyOf } from '../domain/properties.ts'
-import { REST_MESSAGE, type RestMessageName } from '../domain/rest-message-names.ts'
+import { REST_MESSAGE, type OemMessageName } from '../domain/rest-message-names.ts'
+import { SHIPPING_MESSAGE } from '../domain/shipping.ts'
 import { log } from './log.ts'
 import { secretProperty, stringProperty } from './properties.ts'
 
@@ -40,6 +41,8 @@ interface MessageVariables {
 /** A message that authenticates with an OAuth 2.0 profile attached to it on the instance takes no secret at call time. */
 const OAUTH_PROFILE: MessageVariables = {}
 
+type RestMessageName = OemMessageName | typeof SHIPPING_MESSAGE.name
+
 /**
  * Secrets come from password2 properties. The API host variables sit in the host part of each function endpoint:
  * confirm on an instance that RESTMessageV2 substitutes ${} there, and fall back to rest.setEndpoint() with the host put
@@ -65,7 +68,7 @@ const VARIABLES: Record<RestMessageName, MessageVariables> = {
             { variable: 'api_key', property: PROPERTY.checkpointApiKey, inJson: true },
         ],
     },
-    [REST_MESSAGE.shipping.name]: { secrets: [{ variable: 'api_key', property: PROPERTY.shippingApiKey }] },
+    [SHIPPING_MESSAGE.name]: { secrets: [{ variable: 'api_key', property: PROPERTY.shippingApiKey }] },
 }
 
 /**

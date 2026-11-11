@@ -346,7 +346,8 @@ Conventions that the build or tests enforce:
   events (`domain/events.ts` `EVENT`),
   system properties with their shipped values (`domain/properties.ts` `PROPERTY`: a reader takes
   the entry and falls back to that value) and REST messages with their functions
-  (`domain/rest-message-names.ts` `REST_MESSAGE`). `built-metadata.test.ts` holds what was built to
+  (`domain/rest-message-names.ts` `REST_MESSAGE` for the OEMs, `domain/shipping.ts`
+  `SHIPPING_MESSAGE` for the shipping aggregator). `built-metadata.test.ts` holds what was built to
   each list.
 - The name of a business rule, UI action, script action, notification, SLA, REST message or REST
   route fits the instance's 40 characters, which cut a longer one off unseen
