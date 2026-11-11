@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { recordMatches as matches } from '../test-support/encoded-query'
-import { naasStockroomCondition, outsideNaasStockroomCondition } from './fleet'
+import { NAAS_STOCKROOM_CONDITION, outsideNaasStockroomCondition } from './fleet'
 import { ROLE } from './roles'
 import {
     actsAsCustomerAdmin,
@@ -334,7 +334,7 @@ describe('visibilityFilter on a table shared with the Provider IT', () => {
 
     it("narrows an inventory tech's NaaS stockrooms only, and transfer orders touching one", () => {
         const types = ['', 'central_depot', 'staging_centre', 'customer_site', 'it_storeroom']
-        const naas = (type: string) => matches(naasStockroomCondition(), { x_daas_ham_stockroom_type: type })
+        const naas = (type: string) => matches(NAAS_STOCKROOM_CONDITION, { x_daas_ham_stockroom_type: type })
         for (const type of types) {
             expect(matches(outsideNaasStockroomCondition(), { x_daas_ham_stockroom_type: type }), type).toBe(!naas(type))
         }

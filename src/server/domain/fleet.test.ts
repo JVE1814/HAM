@@ -15,7 +15,6 @@ import {
     NAAS_STOCKROOM_CONDITION,
     NAAS_STOCKROOM_TYPES,
     naasModelCondition,
-    naasStockroomCondition,
     naasStockroomType,
     outsideFleetCondition,
     outsideNaasStockroomCondition,
@@ -143,11 +142,6 @@ describe('NaaS stockrooms', () => {
     it('leave out a stockroom with no type (the Provider IT’s) or an unknown one', () => {
         expect(naasStockroomType('')).toBeNull()
         expect(naasStockroomType('it_storeroom')).toBeNull()
-    })
-
-    it('are found by their types through a reference, never by an empty type', () => {
-        expect(typesFound(naasStockroomCondition('stockroom.'), 'stockroom.')).toEqual(NAAS_STOCKROOM_TYPES)
-        expect(typesFound(naasStockroomCondition())).toEqual(NAAS_STOCKROOM_TYPES)
     })
 
     it('leave every other stockroom, one with no type included, to the condition for those outside NaaS', () => {
