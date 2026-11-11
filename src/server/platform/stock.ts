@@ -10,15 +10,16 @@ import {
     isClaimable,
     LEASE_END_ACTION,
     reservationValues,
+    type LineExit,
     type Reservation,
     type StockCandidate,
     type StockUnit,
 } from '../domain/stock.ts'
-import { moveAsset, readStage } from './assets.ts'
+import { moveAndSave, moveAsset, readStage } from './assets.ts'
 import { attemptLock, type LockRun } from './locks.ts'
 import { stringProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
-import { refusal, str } from './records.ts'
+import { refusal, str, warnRefused } from './records.ts'
 import { STOCK_STAGES } from '../domain/lifecycle.ts'
 import { log } from './log.ts'
 
@@ -82,9 +83,22 @@ export function moveToSparePool(assetId: string, customerId: string, agreementId
 }
 
 /**
+ * Take `asset` off its Order line and save it where `exit` sends it. False when the platform refuses the move or the
+ * save (logged with `context`): the Asset stays on the line.
+ */
+export function leaveOrderLine(asset: GlideRecord, exit: LineExit, context: string): boolean {
+    if (exit.keeps === 'provider') releaseToProviderStock(asset)
+    else takeOffOrderLine(asset)
+    if (exit.to) return moveAndSave(asset, exit.to, context)
+    if (asset.update()) return true
+    warnRefused(asset, context)
+    return false
+}
+
+/**
  * Take a unit off its Order line and no more (the caller saves): one that stays its Customer's (a hot spare, a unit
- * that failed staging or left in transit). Every unit that leaves a line is taken off it here or by
- * `releaseToProviderStock`.
+ * that failed staging or left in transit). Every unit that leaves a line is taken off it here, by
+ * `releaseToProviderStock` or by `leaveOrderLine`.
  */
 export function takeOffOrderLine(asset: GlideRecord): void {
     asset.setValue('x_daas_ham_order_line', '')

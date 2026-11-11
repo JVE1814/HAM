@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Stage } from './lifecycle'
-import { cancelledUnit, freeStockQuery, isClaimable, isFree, type StockUnit } from './stock'
+import { cancelledUnit, freeStockQuery, isClaimable, isFree, putBackUnit, type StockUnit } from './stock'
 import { recordMatches as matches } from '../test-support/encoded-query'
 import { assetIn, type SampleRecord } from '../test-support/stored-asset'
 
@@ -46,15 +46,22 @@ describe('freeStockQuery', () => {
 })
 
 describe('cancelledUnit', () => {
-    it('leaves a hot spare in its Spare pool', () => {
-        expect(cancelledUnit('spare_pool')).toBe('stays_spare')
+    it('leaves a hot spare in its Spare pool, still its Customer\'s', () => {
+        expect(cancelledUnit('spare_pool')).toEqual({ keeps: 'customer', to: null })
     })
 
-    it('leaves a unit in transfer where it is, to be free stock once Inventory lets it go', () => {
-        expect(cancelledUnit('in_transfer')).toBe('stays_in_transfer')
+    it('gives a unit in transfer back to the Provider where it is, to be free stock once Inventory lets it go', () => {
+        expect(cancelledUnit('in_transfer')).toEqual({ keeps: 'provider', to: null })
     })
 
     it('makes any other unit free stock', () => {
-        for (const stage of ['reserved', 'staging', 'staged', 'available', null] as const) expect(cancelledUnit(stage)).toBe('free_stock')
+        for (const stage of ['reserved', 'staging', 'staged', 'available', null] as const) expect(cancelledUnit(stage)).toEqual({ keeps: 'provider', to: 'available' })
+    })
+})
+
+describe('putBackUnit', () => {
+    it('puts a spare back in its Spare pool and any other stock back as free stock', () => {
+        expect(putBackUnit('spare_pool')).toEqual({ keeps: 'customer', to: 'spare_pool' })
+        for (const source of ['central_stock', 'customer_site_stock'] as const) expect(putBackUnit(source)).toEqual({ keeps: 'provider', to: 'available' })
     })
 })

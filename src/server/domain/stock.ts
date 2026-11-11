@@ -4,7 +4,7 @@ import { type LeaseEndAction, STOCKROOM_TYPE } from './vocabulary.ts'
 
 /**
  * Fleet stock (ADR 0016): which Source a unit in stock is stock of, which units may still be claimed, the fields a
- * claim for an Order line writes and the queries that read them, and what Cancel order does with a unit on a line.
+ * claim for an Order line writes and the queries that read them, and where a unit taken off its line goes.
  */
 
 export type Source = 'customer_site_stock' | 'spare_pool' | 'central_stock'
@@ -108,15 +108,25 @@ export function sourceQuery(source: Source, scope: StockScope): string {
 }
 
 /**
- * What Cancel order does with a unit it takes off its line, by the stage the unit is in:
- * - `stays_spare`: a hot spare stays in its Customer's Spare pool, only unlinked from the line;
- * - `stays_in_transfer`: a unit in transfer is the Provider's again but stays in transfer (domain/lifecycle
- *   `checkTransition`), free stock once Inventory lets it go;
- * - `free_stock`: any other unit becomes the Provider's free stock, available.
+ * Where a unit taken off its Order line goes: whose it is then (`keeps`: still its Customer's, or the Provider's own
+ * again, the inverse of a reservation, under no Agreement), and the stage it moves to (`to`; null keeps its stage).
  */
-export type CancelledUnit = 'stays_spare' | 'stays_in_transfer' | 'free_stock'
+export interface LineExit {
+    keeps: 'customer' | 'provider'
+    to: Stage | null
+}
 
-export function cancelledUnit(stage: Stage | null): CancelledUnit {
-    if (stage === 'spare_pool') return 'stays_spare'
-    return stage === 'in_transfer' ? 'stays_in_transfer' : 'free_stock'
+/**
+ * Where Cancel order sends a unit it takes off its line, by the stage the unit is in: a hot spare stays in its
+ * Customer's Spare pool, only unlinked from the line; a unit in transfer is the Provider's again but stays in transfer
+ * (domain/lifecycle `checkTransition`), free stock once Inventory lets it go; any other unit becomes free stock.
+ */
+export function cancelledUnit(stage: Stage | null): LineExit {
+    if (stage === 'spare_pool') return { keeps: 'customer', to: null }
+    return { keeps: 'provider', to: stage === 'in_transfer' ? null : 'available' }
+}
+
+/** Where stock reserved for a line but never moved to staging goes back to: the Spare pool it came from, else free stock. */
+export function putBackUnit(source: Source): LineExit {
+    return source === 'spare_pool' ? { keeps: 'customer', to: 'spare_pool' } : { keeps: 'provider', to: 'available' }
 }

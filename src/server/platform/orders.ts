@@ -15,7 +15,7 @@ import {
 import { anythingShipped, endedUnfulfilled, OPEN_LINE_STAGES, ORDER_TASK_STATE } from '../domain/fulfilment.ts'
 import { LONG_HOLD_LOCK_TRIES, REQUEUE, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { cancelledUnit } from '../domain/stock.ts'
+import { cancelledUnit, type LineExit } from '../domain/stock.ts'
 import { type EntitlementVerdict, type InstallMode, LINE_STAGE, ORDER_STAGE, type OrderType } from '../domain/vocabulary.ts'
 import { entitlementContext } from './agreements.ts'
 import {
@@ -27,7 +27,7 @@ import {
     type ApprovalFlow,
     type ApprovalRollup,
 } from './approvals.ts'
-import { moveAndSave, readStage } from './assets.ts'
+import { readStage } from './assets.ts'
 import { requeueCounted } from './events.ts'
 import { EVENT } from '../domain/events.ts'
 import { orderShipment, queueSourcing } from './fulfilment.ts'
@@ -36,7 +36,7 @@ import { addOrderLines, saveLineStage, withOrderLineLocks, type NewLine, type Re
 import { bool, findById, num, refusal, str, warnRefused } from './records.ts'
 import { creatorOf } from './session.ts'
 import { skipOpenStagingTasks } from './staging-tasks.ts'
-import { releaseToProviderStock, takeOffOrderLine } from './stock.ts'
+import { leaveOrderLine } from './stock.ts'
 import { SITE_FIELD } from '../domain/fleet.ts'
 import { log } from './log.ts'
 
@@ -426,33 +426,25 @@ export function rollUpOrderApprovals(orderId: string): ApprovalRollup | null {
 }
 
 /**
- * Give an allocated Asset back to stock (domain/stock `cancelledUnit`): hot spares stay in the Spare pool, the rest
- * become free stock. A unit in transfer stays in transfer (domain/lifecycle `checkTransition`): only its reservation
- * goes, and it is free stock once Inventory lets it go (entry/assets `onTransferReleased`). False when the platform
- * refuses that or the closing of its Staging tasks (logged).
+ * Give an allocated Asset back to stock (domain/stock `cancelledUnit`). A unit in transfer stays in transfer
+ * (domain/lifecycle `checkTransition`): only its reservation goes, and it is free stock once Inventory lets it go
+ * (entry/assets `onTransferReleased`). False when the platform refuses that or the closing of its Staging tasks
+ * (logged).
  */
 function releaseAsset(asset: GlideRecord): boolean {
     const closed = skipOpenStagingTasks(asset.getUniqueValue(), 'Order cancelled')
-    const serial = str(asset, 'serial_number')
-    const release = cancelledUnit(readStage(asset))
-    if (release === 'stays_spare') {
-        takeOffOrderLine(asset)
-        // Still linked to the line, the spare is never picked again.
-        return saveReleased(asset, `${serial} still linked to its line, unlink it`) && closed
-    }
-    releaseToProviderStock(asset)
-    // Left on the line, it would go into staging once received.
-    if (release === 'stays_in_transfer') {
-        return saveReleased(asset, `${serial} still on its line, release it once received`) && closed
-    }
-    return moveAndSave(asset, 'available', 'order cancelled') && closed
+    const exit = cancelledUnit(readStage(asset))
+    const context = exit.to ? 'order cancelled' : `order cancelled: ${str(asset, 'serial_number')} ${LEFT_AT_ITS_STAGE[exit.keeps]}`
+    return leaveOrderLine(asset, exit, context) && closed
 }
 
-/** Save an Asset Cancel order releases at its stage; false when the platform refuses (logged with what is `left`). */
-function saveReleased(asset: GlideRecord, left: string): boolean {
-    if (asset.update()) return true
-    warnRefused(asset, `order cancelled: ${left}`)
-    return false
+/**
+ * What to do by hand for a unit Cancel order could not save at its stage: a hot spare still linked to the line is
+ * never picked again, and a unit in transfer left on the line would go into staging once received.
+ */
+const LEFT_AT_ITS_STAGE: Record<LineExit['keeps'], string> = {
+    customer: 'still linked to its line, unlink it',
+    provider: 'still on its line, release it once received',
 }
 
 /** The Order's lines that have not shipped, queried. */
