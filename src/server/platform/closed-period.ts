@@ -1,4 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
+import { PERIOD_ERROR_LENGTH } from '../domain/billing.ts'
 import { BILLING_PERIOD_STATUS } from '../domain/vocabulary.ts'
 import { noneLeft, str, throwRefused } from './records.ts'
 
@@ -22,7 +23,7 @@ export function closedPeriodRefusal(current: GlideRecord, previous: GlideRecord 
  */
 export function recordMarginOutcome(period: GlideRecord, failed: number, error: string): void {
     period.setValue('margin_failed', failed)
-    period.setValue('margin_error', error.slice(0, 255))
+    period.setValue('margin_error', error.slice(0, PERIOD_ERROR_LENGTH))
     period.setWorkflow(false)
     if (!period.update()) throwRefused(period, 'Margin status not saved')
 }

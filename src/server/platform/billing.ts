@@ -6,6 +6,7 @@ import {
     billsFromIntervals,
     currencyTotals,
     decideGenerationReset,
+    PERIOD_ERROR_LENGTH,
     RESET_AFTER_IDLE_MINUTES,
     resetGenerationError,
     singleCurrencyTotal,
@@ -33,7 +34,7 @@ import { findJobCursor, retirePass } from './job-cursor.ts'
 import { dropLinesForRegeneration } from './closed-period.ts'
 import { attemptLock, whyNotRun } from './locks.ts'
 import { deleteWhere, exists, findById, num, refusal, str, throwRefused } from './records.ts'
-import { BILLING_PERIOD_STATUS, FEE_STATUS, type BillingLineKind, type FeeType, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
+import { BILLING_LINE_KIND, BILLING_PERIOD_STATUS, FEE_STATUS, type FeeType, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
 import { log } from './log.ts'
 import { queueMarginCompute } from './margin.ts'
 
@@ -42,8 +43,6 @@ import { queueMarginCompute } from './margin.ts'
 const PERIOD = 'x_daas_ham_billing_period'
 const LINE = 'x_daas_ham_billing_line'
 const FEE = 'x_daas_ham_fee_event'
-
-const LINE_KIND = { subscription: 'subscription', fee: 'fee' } as const satisfies { [Kind in BillingLineKind]: Kind }
 
 /**
  * What became of an action on a period: done, or not done and why. `why` is '' when the platform has told the user
@@ -182,7 +181,7 @@ function billLines(period: GlideRecord, bounds: MonthBounds, queued: JobEvent, j
             const terms = { ...line.terms, currency }
             for (const charge of subscriptionCharges(terms, bounds, { intervals: line.intervals, siteName })) {
                 insertLine(period, {
-                    kind: LINE_KIND.subscription,
+                    kind: BILLING_LINE_KIND.subscription,
                     customer: line.customerId,
                     agreement: line.agreementId,
                     subscription_line: lineId,
@@ -200,7 +199,7 @@ function billLines(period: GlideRecord, bounds: MonthBounds, queued: JobEvent, j
 
 function stopGeneration(period: GlideRecord, error: string): void {
     log.error(`Billing period ${str(period, 'period')}: generation stopped: ${error}`)
-    period.setValue('last_error', error.slice(0, 255))
+    period.setValue('last_error', error.slice(0, PERIOD_ERROR_LENGTH))
     // Refused, it stays generating with no chunk queued, which Close and Regenerate refuse: say why.
     if (!holdForReview(period)) {
         log.error(`Billing period ${str(period, 'period')} not held for review: ${refusal(period)}`)
@@ -279,7 +278,7 @@ function insertLine(period: GlideRecord, values: BillingLineValues): void {
 function addFailedLines(period: GlideRecord, failed: number, lastError: string): void {
     log.error(`Billing period ${str(period, 'period')}: ${failed} line(s) failed: ${lastError}`)
     period.setValue('failed_lines', num(period, 'failed_lines') + failed)
-    period.setValue('last_error', lastError.slice(0, 255))
+    period.setValue('last_error', lastError.slice(0, PERIOD_ERROR_LENGTH))
 }
 
 function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
@@ -296,7 +295,7 @@ function finishGeneration(period: GlideRecord, bounds: MonthBounds): void {
                 // Its Agreement's currency (the fee's own Currency field is not used): a fee without one fails to bill.
                 const currency = currencyOrThrow(chooseCurrency(agreementCurrencyOf(claimed, 'agreement'), () => currencies(customer)))
                 insertLine(period, {
-                    kind: LINE_KIND.fee,
+                    kind: BILLING_LINE_KIND.fee,
                     customer,
                     agreement: str(claimed, 'agreement'),
                     fee_event: claimed.getUniqueValue(),
@@ -506,7 +505,7 @@ function regenerateReady(period: GlideRecord): PeriodOutcome {
 /**
  * Reset a period stuck generating: hold it for review with the reset as its error, so Close period refuses until a
  * Regenerate bills it afresh. It deletes and bills nothing, and only resets a generation that has shown no activity
- * for 30 minutes (domain/billing `decideGenerationReset`): the period's own last save, or its pass's last chunk start
+ * for RESET_AFTER_IDLE_MINUTES (domain/billing `decideGenerationReset`): the period's own last save, or its pass's last chunk start
  * on the job cursor. The pass is retired first, so a chunk of it still queued is dropped, even once a Regenerate has
  * the period generating again. A chunk that starts as the pass is retired may have found it still current; the period
  * then stays generating, so nothing can be regenerated beside that chunk until it is done.
@@ -547,7 +546,7 @@ function dropWaivedFeeLines(period: GlideRecord): string[] {
         // Lines first, by the fee's id (a set-based delete is not relied on to follow a dot-walked condition).
         // A fee whose line survives stays on the period: unlinked, the closed period would keep a line it no
         // longer bills.
-        const lines = `billing_period=${periodId}^kind=${LINE_KIND.fee}^fee_event=${fee.getUniqueValue()}`
+        const lines = `billing_period=${periodId}^kind=${BILLING_LINE_KIND.fee}^fee_event=${fee.getUniqueValue()}`
         if (!deleteWhere(LINE, lines)) return void stuck.push(`${feeLabel(fee)}: its billing line could not be removed`)
         const kept = takeOffPeriod(fee)
         if (kept) stuck.push(`${feeLabel(fee)}: ${kept}`)

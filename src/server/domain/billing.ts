@@ -1,7 +1,7 @@
 import { addDays, addMonths } from './calendar.ts'
 import { activeDays, currencyCode, currencyKey, divideRounded, fromCents, isMonth, previousMonth, toCents, type MonthBounds } from './money.ts'
 import { FLEET_CONDITION } from './fleet.ts'
-import { STAGE_FIELDS, SUBSCRIPTION_LINE_STATUS } from './vocabulary.ts'
+import { STAGE_FIELDS, SUBSCRIPTION_LINE_STATUS, SUBSCRIPTION_LINE_TYPE } from './vocabulary.ts'
 
 /** Billing periods: daily proration of Subscription lines and Fee events (plan §13 Billing export, Q52, Q66). */
 
@@ -86,7 +86,7 @@ export interface SubscriptionLineTerms {
 }
 
 export function billsFromIntervals(line: Pick<SubscriptionLineTerms, 'lineType'>): boolean {
-    return line.lineType === 'device_class'
+    return line.lineType === SUBSCRIPTION_LINE_TYPE.device_class
 }
 
 /** A range of days, end inclusive; no end means still open. */
@@ -167,7 +167,7 @@ export function subscriptionCharges(line: SubscriptionLineTerms, bounds: MonthBo
 
 function unitsBySite(line: SubscriptionLineTerms, bounds: MonthBounds, sources: ChargeSources): Map<string, number> {
     const bySite = new Map<string, number>()
-    if (line.lineType === 'site_package') {
+    if (line.lineType === SUBSCRIPTION_LINE_TYPE.site_package) {
         const units = line.start ? activeDays(bounds, line.start, line.end) : 0
         if (units > 0) bySite.set(line.siteId, units)
     } else if (billsFromIntervals(line)) {
@@ -339,7 +339,7 @@ export function currencyTotals(groups: Iterable<CurrencyTotal>): CurrencyTotal[]
 }
 
 /** The most a period's Totals text holds (its field's length). */
-const TOTALS_TEXT_LENGTH = 255
+export const TOTALS_TEXT_LENGTH = 255
 
 /** A period's totals as its Totals field shows them, e.g. 'EUR 1234.56; USD 99.00' ('' without lines). */
 export function totalsText(totals: readonly CurrencyTotal[]): string {
