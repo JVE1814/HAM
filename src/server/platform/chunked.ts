@@ -14,13 +14,13 @@ import {
 } from '../domain/chunked-job.ts'
 import { andEachClause } from '../domain/encoded-query.ts'
 import { messageOf } from '../domain/errors.ts'
-import { REQUEUE, writeHoldingLock, type HeldLock } from '../domain/job-lock.ts'
+import { REQUEUE, writeHoldingLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { nowMs } from './clock.ts'
 import { queueJobAt, type JobEvent } from './events.ts'
 import { completePass, isCurrentPass, JOB_STATUS, openJobCursor, startPass, type JobCursor } from './job-cursor.ts'
-import { isLocked, withLock, type LockRun } from './locks.ts'
+import { isLocked, withLock } from './locks.ts'
 import { log } from './log.ts'
 import { intProperty } from './properties.ts'
 
@@ -28,8 +28,8 @@ import { intProperty } from './properties.ts'
  * The chunked-job runner over a table's records (ADR 0007), for a scheduled job (`runTableJob`, its cursor kept in
  * x_daas_ham_job_cursor) and for an event job (`runEventTableJob`, its cursor carried by its events).
  *
- * An event job whose passes replace each other (`PassJob`) runs in one of two modes, each with one user. Both exist
- * because the two jobs are kept from an old pass's writes in different ways:
+ * An event job whose passes replace each other (`PassJob`) runs on one of two pass runners over the same table walk,
+ * each with one user, because the two jobs are kept from an old pass's writes in different ways:
  * - the margin recompute runs under the job's lock (`underLock`, ADR 0013). A fresh recompute may start while one is
  *   running, and an old pass writing after it would leave its Cost facts beside the fresh pass's or replace the fresh
  *   Margin. So a pass's start, each flush and its completion check that the pass is still current and write in one
@@ -147,7 +147,8 @@ export interface EventJobResult extends ChunkedJobResult {
  * clears what both wrote. A superseded, retried or restarted chunk reports `done: false` and no counts.
  */
 export function runEventTableJob<R, T = R>(queued: JobEvent, spec: EventJob<T, R>): EventJobResult {
-    if (spec.pass) return runPassChunk(queued, spec, spec.pass)
+    if (spec.pass?.underLock) return runSupersedingChunk(queued, spec, spec.pass.job, spec.pass.underLock)
+    if (spec.pass) return runTriggeredChunk(queued, spec, spec.pass.job)
     const result = runOverTable(spec, {
         loadCursor: () => queued.position,
         saveCursor: (next, _processed, done, failures) => {
@@ -173,21 +174,37 @@ export function inCurrentPass(queued: JobEvent, job: string): boolean {
     return isCurrentPass(job, readPassParm(queued.position).token)
 }
 
-const NO_LOCK: Pick<HeldLock, 'held'> = { held: () => true }
+function superseded(cursor: string): EventJobResult {
+    return { processed: 0, failed: 0, done: false, cursor, lastError: '', superseded: true }
+}
 
-function runPassChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, pass: PassJob): EventJobResult {
-    const job = pass.job
-    const locked = pass.underLock
+function runTriggeredChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, job: string): EventJobResult {
+    const { token, cursor } = readPassParm(queued.position)
+    if (!isCurrentPass(job, token)) return superseded(cursor)
+    let current = true
+    const result = runOverTable(spec, {
+        loadCursor: () => cursor,
+        saveCursor: (next, _processed, done, failures) => {
+            current = isCurrentPass(job, token)
+            if (!current) return
+            logFailures(chunkOf(queued), failures)
+            spec.flush?.(failures)
+            if (!done) queueJobAt(queued, passParm({ token, cursor: next }))
+        },
+    })
+    return current ? { ...result, superseded: false } : superseded(cursor)
+}
+
+type SupersedingPass = NonNullable<PassJob['underLock']>
+
+function runSupersedingChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, job: string, locked: SupersedingPass): EventJobResult {
     const lockName = LOCK.job(job)
-    const underLock = <V>(work: (lock: Pick<HeldLock, 'held'>) => V): LockRun<V> =>
-        locked ? withLock<V>(lockName, work) : { ran: true, value: work(NO_LOCK) }
     const position = readPassParm(queued.position)
     const cursor = position.cursor
     let token = position.token
-    const idle = { processed: 0, failed: 0, done: false, cursor, lastError: '', superseded: true }
     try {
-        if (!token && locked) {
-            const start = underLock((lock) => {
+        if (!token) {
+            const start = withLock(lockName, (lock) => {
                 const started = writeHoldingLock(
                     () => lock.held(),
                     () => {
@@ -200,15 +217,15 @@ function runPassChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, pass: PassJo
             if (!start.ran) return retryLater(queued, '')
             if (start.value) return restartPass(queued, start.value.error)
         } else if (!isCurrentPass(job, token)) {
-            return idle
+            return superseded(cursor)
         }
         // A cheap probe first: a chunk only takes the lock at its end, and would throw its work away then.
-        if (locked && isLocked(lockName)) return retryLater(queued, passParm({ token, cursor }))
+        if (isLocked(lockName)) return retryLater(queued, passParm({ token, cursor }))
         let write = { outcome: 'written' } as ChunkWrite | { outcome: 'locked' }
         const result = runOverTable(spec, {
             loadCursor: () => cursor,
             saveCursor: (next, _processed, done, failures) => {
-                const chunk = underLock((lock) =>
+                const chunk = withLock(lockName, (lock) =>
                     writeChunkUnderLock(
                         {
                             isCurrent: () => isCurrentPass(job, token),
@@ -220,7 +237,6 @@ function runPassChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, pass: PassJo
                             },
                             queueNext: () => queueJobAt(queued, passParm({ token, cursor: next })),
                             complete: () => {
-                                if (!locked) return
                                 locked.complete?.()
                                 completePass(job)
                             },
@@ -233,14 +249,14 @@ function runPassChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, pass: PassJo
         })
         if (write.outcome === 'locked') return retryLater(queued, passParm({ token, cursor }))
         if (write.outcome === 'lost') return restartPass(queued, write.error)
-        return write.outcome === 'superseded' ? idle : { ...result, superseded: false }
+        return write.outcome === 'superseded' ? superseded(cursor) : { ...result, superseded: false }
     } catch (error) {
-        if (token && locked) recordStop(job, locked, token, messageOf(error))
+        if (token) recordStop(job, locked, token, messageOf(error))
         throw error
     }
 }
 
-function recordStop(job: string, locked: NonNullable<PassJob['underLock']>, token: string, error: string): void {
+function recordStop(job: string, locked: SupersedingPass, token: string, error: string): void {
     try {
         withLock(LOCK.job(job), () => {
             if (isCurrentPass(job, token)) locked.stopped?.(error)
