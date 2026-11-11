@@ -3,15 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { closeAudit, recordScan, startSiteAudit, startStockroomAudit } from './audits.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
-/*
- * Audits run against in-memory tables. What they must keep: an audit expects only the Assets the platform let it list,
- * closing gives every line its result from one comparison, raises one exception per missing Asset however often it is
- * closed, and an audit the user may not work on is left as it was.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
-/** What the services the audits call would give: the Assets installed at the Site, and the work order opened for the visit. */
 const visit = vi.hoisted(() => ({ installed: [] as string[], workOrder: 'wo1' as string | null }))
 
 vi.mock('./session.ts', () => ({ currentSession: () => ({ scope: 'everything', customerId: '', stockroomIds: () => [], siteIds: () => [] }) }))
@@ -32,7 +25,6 @@ function record(table: string, sysId: string): GlideRecord {
     return found
 }
 
-/** An open audit expecting Assets a1 (scanned by its tag), a2 (not scanned) and a3 (scanned by serial), with one scan that matches nothing. */
 function countedAudit(): GlideRecord {
     platform.tables.alm_hardware = [
         { sys_id: 'a1', serial_number: 'FOC111', asset_tag: 'NAAS-1', company: 'acme' },
@@ -76,7 +68,6 @@ describe('closeAudit', () => {
     it('closes the audit first: one refused marks no line and raises no exception, and is closed again in full', () => {
         platform.refuses = (table) => (table === AUDITS ? 'no' : '')
         expect(closeAudit(countedAudit())).toEqual({ outcome: 'not_saved', reason: 'no' })
-        // One warning, naming the audit and why the platform refused.
         expect(platform.warnings).toEqual([expect.stringMatching(/\bAUD1\b.*: no$/)])
         expect(resultOf('line-a2')).toBeUndefined()
         expect(rows(EXCEPTIONS)).toEqual([])
@@ -92,7 +83,6 @@ describe('closeAudit', () => {
         expect(rows(AUDITS)[0]).toMatchObject({ missing_count: '1', unexpected_count: '1', state: '3' })
         expect(resultOf('scan-XYZ')).toBe('found')
         expect(rows(EXCEPTIONS)).toEqual([])
-        // The exception refused where it is raised, the missing Asset left without one, and the line left as it was.
         expect(platform.warnings).toEqual([
             expect.stringMatching(/audit_missing.*\ba2\b.*: no$/),
             expect.stringMatching(/\bAUD1\b.*no missing in audit exception for a2\b.*raise it by hand$/),
@@ -128,17 +118,14 @@ describe('starting an audit', () => {
         platform.refuses = (table, row) => (table === LINES && row.asset === 'a2' ? 'no' : '')
         expect(startSiteAudit(site())).toEqual({ started: true, workOrderOpened: false, number: 'AUD1', expected: 1, leftOff: 1 })
         expect(rows(AUDITS)[0].expected_count).toBe('1')
-        // One warning, naming the Asset, the audit and why the platform refused.
         expect(platform.warnings).toEqual([expect.stringMatching(/\ba2\b.*\bAUD1\b.*: no$/)])
     })
 
     it('says why when what starting set on the audit is not saved: the audit stands', () => {
         visit.installed = ['a1']
-        // The audit is inserted; the save of its expected count and work order is refused.
         platform.refuses = (table, _row, operation) => (table === AUDITS && operation === 'update' ? 'read only' : '')
         expect(startSiteAudit(site())).toEqual({ started: true, workOrderOpened: true, number: 'AUD1', expected: 1, leftOff: 0, unsaved: 'read only' })
         expect(rows(AUDITS)[0].expected_count).toBeUndefined()
-        // One warning, naming the audit and why the platform refused.
         expect(platform.warnings).toEqual([expect.stringMatching(/\bAUD1\b.*: read only$/)])
     })
 
@@ -161,7 +148,7 @@ describe('recordScan', () => {
         expect(rows(LINES).at(-1)).toMatchObject({ audit: 'audit1', scanned_code: 'FOC222', result: 'found', scanned_at: '2026-11-09 10:00:00' })
         platform.refuses = (table) => (table === LINES ? 'full' : '')
         expect(recordScan(audit, 'FOC222')).toBe('refused')
-        // Logged, naming the code and the audit: the client is not sent why.
+        // The client is not sent why.
         expect(platform.warnings).toEqual([expect.stringMatching(/\bFOC222\b.*\bAUD1\b.*: full$/)])
     })
 

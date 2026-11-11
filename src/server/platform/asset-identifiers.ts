@@ -7,9 +7,7 @@ import { beyondVisibility } from './beyond-visibility.ts'
 import { log } from './log.ts'
 import type { ReadOptions } from './records.ts'
 
-/** The Asset a scanned or reported identifier names, read as domain/asset-identifier decides. */
-
-/** What an identifier names (`identifyAsset`): the one Asset, none, or more than one (refused, saying why). */
+/** What an identifier names: the one Asset, none, or more than one (refused, saying why). */
 export type AssetIdentified = { asset: GlideRecord } | { ambiguous: string } | null
 
 interface IdentifierLookup {
@@ -20,10 +18,10 @@ interface IdentifierLookup {
 const ARRIVING: IdentifierLookup = { fleetOnly: false, beyondVisibility: true }
 
 /**
- * The fleet asset (ADR 0016) this identifier names: by serial number, else Provider tag, else Customer tag (domain/
- * asset-identifier); `{ ambiguous }`, saying why, when two Assets carry it in the first of those fields that any does,
+ * The fleet asset (ADR 0016) this identifier names: by serial number, else Provider tag, else Customer tag;
+ * `{ ambiguous }`, saying why, when two Assets carry it in the first of those fields that any does,
  * as two Customers may give their switches one Customer tag; null when none carries it. `beyondVisibility` reads past
- * the app's before-query visibility rules (ADR 0005, platform/beyond-visibility): the device-events API must find any
+ * the app's before-query visibility rules (ADR 0005): the device-events API must find any
  * fleet asset (it reports another identifier unknown). Its later saves run every rule.
  */
 export function identifyAsset(identifier: string, options: ReadOptions = {}): AssetIdentified {
@@ -31,7 +29,7 @@ export function identifyAsset(identifier: string, options: ReadOptions = {}): As
 }
 
 /**
- * The fleet asset this identifier names (`identifyAsset`), or null when none does or it is ambiguous (logged), for a
+ * The fleet asset this identifier names, or null when none does or it is ambiguous (logged), for a
  * caller that reports both as an unknown identifier.
  */
 export function findAssetByIdentifier(identifier: string, options: ReadOptions = {}): GlideRecord | null {

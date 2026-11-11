@@ -69,7 +69,7 @@ export function openBillingPeriod(month: string): void {
 
 /*
  * Generation. A period's generation passes replace each other on its job cursor `billing_generate_<sys_id>`
- * (ADR 0007, platform/chunked `runTriggeredChunk`): the row names the current pass ('' once reset by hand), and its last run is
+ * (ADR 0007): the row names the current pass ('' once reset by hand), and its last run is
  * when that pass last started a chunk, its activity. No lock is taken: a pass starts where it is triggered.
  */
 
@@ -124,7 +124,7 @@ export function generateChunk(queued: JobEvent): void {
 }
 
 /**
- * As a chunk starts: record the activity of the job's pass. Recorded before the chunk's pass is checked, so a Reset
+ * Recorded before the chunk's pass is checked, so a Reset
  * generation that retires the pass meanwhile sees it and leaves the period generating. Throws when the activity is
  * refused: a pass that cannot show activity could be reset while it runs. A job without a row has no pass to show.
  */
@@ -358,11 +358,6 @@ function feeLabel(fee: GlideRecord): string {
     return `${fee.getDisplayValue('fee_type')} fee: ${fee.getDisplayValue('asset')} (${str(fee, 'occurred_on')})`
 }
 
-/*
- * The Fee events a period bills: put on it by its generation, taken off it when waived or no longer billed, and marked
- * billed as it closes. Charging and waiving them is the returns process's (platform/fees).
- */
-
 /**
  * The open fees a Billing period bills, as a query to walk: those charged up to `lastDay` and on no period yet, or
  * already on this one by a generation its Regenerate rebuilds.
@@ -406,7 +401,6 @@ function billableOn(fee: GlideRecord, periodId: string): boolean {
     return str(fee, 'status') === FEE_STATUS.open && (!on || on === periodId)
 }
 
-/** Put a fee on the Billing period that bills it; why the platform refused ('' once saved). */
 function putOnPeriod(fee: GlideRecord, periodId: string): string {
     fee.setValue('billing_period', periodId)
     return fee.update() ? '' : refusal(fee)
@@ -425,7 +419,6 @@ function visitOpenFees(periodId: string, visit: (fee: GlideRecord) => void): voi
     visitInKeyOrder(FEE, `billing_period=${periodId}^status=${FEE_STATUS.open}`, visit)
 }
 
-/** Take a fee off its Billing period; why the platform refused ('' once saved). */
 function takeOffPeriod(fee: GlideRecord): string {
     // Per record: updateMultiple does not reliably clear a reference to empty.
     fee.setValue('billing_period', '')
@@ -474,7 +467,6 @@ function regenerateReady(period: GlideRecord): PeriodOutcome {
     period.setValue('status', BILLING_PERIOD_STATUS.generating)
     period.setValue('failed_lines', 0)
     period.setValue('last_error', '')
-    // Saved first: a refused form save (the platform says why) keeps the period ready with its lines, not without them.
     if (!period.update()) return { done: false, refusedSave: true }
     // Lines the delete left would be billed twice by the new generation.
     if (!dropLinesForRegeneration(period)) {
@@ -500,7 +492,7 @@ function regenerateReady(period: GlideRecord): PeriodOutcome {
 /**
  * Reset a period stuck generating: hold it for review with the reset as its error, so Close period refuses until a
  * Regenerate bills it afresh. It deletes and bills nothing, and only resets a generation that has shown no activity
- * for RESET_AFTER_IDLE_MINUTES (domain/billing `decideGenerationReset`): the period's own last save, or its pass's last chunk start
+ * for RESET_AFTER_IDLE_MINUTES: the period's own last save, or its pass's last chunk start
  * on the job cursor. The pass is retired first, so a chunk of it still queued is dropped, even once a Regenerate has
  * the period generating again. A chunk that starts as the pass is retired may have found it still current; the period
  * then stays generating, so nothing can be regenerated beside that chunk until it is done.
@@ -551,8 +543,7 @@ function dropWaivedFeeLines(period: GlideRecord): string[] {
 }
 
 /**
- * Close a period ready for review: lock it, mark its fees billed, and queue its CSV export and its margin. A closed
- * period whose fees were not all marked billed is done, with a warning that names them.
+ * A closed period whose fees were not all marked billed is done, with a warning that names them.
  */
 export function closePeriod(period: GlideRecord): PeriodOutcome {
     const outcome = takingTurns(period, 'not closed', (stored) => closeReady(period, stored))
@@ -585,7 +576,6 @@ function closeReady(period: GlideRecord, stored: GlideRecord): PeriodOutcome {
     period.setValue('status', BILLING_PERIOD_STATUS.closed)
     period.setValue('closed_at', nowGlide())
     period.setValue('closed_by', gs.getUserID())
-    // Closed first: a refused form save (the platform says why) leaves its fees open, so a Regenerate still bills them.
     if (!period.update()) return { done: false, refusedSave: true }
     const unmarked = markFeesBilled(period)
     if (unmarked.length === 0) return { done: true }
@@ -594,7 +584,7 @@ function closeReady(period: GlideRecord, stored: GlideRecord): PeriodOutcome {
 }
 
 /**
- * Mark the closed period's open fees billed (`markBilled`). A fee the platform refuses stays open but
+ * A fee the platform refuses stays open but
  * linked to the closed period, which no later generation bills (it bills unlinked fees) and Close cannot be run again
  * for: it is returned named with why, and logged, to set to Billed by hand.
  */

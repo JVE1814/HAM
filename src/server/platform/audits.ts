@@ -16,9 +16,7 @@ import { currentSession } from './session.ts'
 import { log } from './log.ts'
 
 /**
- * Audits: a stockroom's blind count and a Site's audit (P2.7, Q63). An audit is started with the list of Assets it
- * expects, scans are recorded against it while it is open, and closing it compares the two. None of it tells the user
- * anything: each gives what came of it, for the trigger that asked to report.
+ * Audits: a stockroom's blind count and a Site's audit (P2.7, Q63). None of it tells the user anything: each gives what came of it, for the trigger that asked to report.
  */
 
 const AUDIT = 'x_daas_ham_audit'
@@ -72,8 +70,7 @@ function saveStarted(audit: GlideRecord, started: StartedAudit): StartedAudit {
 }
 
 /**
- * Start the blind count of a stockroom: the expected list is every fleet asset on its shelves (domain/audit
- * `onTheShelfQuery`), a unit on a transfer order line short of In Transit included. A stockroom with no NaaS stockroom
+ * Start the blind count of a stockroom: the expected list is every fleet asset on its shelves, a unit on a transfer order line short of In Transit included. A stockroom with no NaaS stockroom
  * type is the Provider IT's (ADR 0016), and is not counted.
  */
 export function startStockroomAudit(stockroom: GlideRecord): AuditStart {
@@ -167,9 +164,7 @@ type AuditClose =
     | { outcome: 'closed'; unsaved: number }
 
 /**
- * Close an audit: compare its scans with its expected list (domain/audit `compareAudit`), save the counts on the audit,
- * give each line its result and raise an exception for each Asset missing. The lines are read once to compare and once
- * to write. The audit is closed first: one the platform refuses to close stays open, to scan and close again, with no
+ * The audit is closed first: one the platform refuses to close stays open, to scan and close again, with no
  * line marked and no exception raised for a unit that may still be scanned. A line result or exception then refused is
  * logged and counted, to fix by hand: closing does not run again. It all runs under the audit's lock, so no scan is
  * recorded between the read of the lines and the close.
@@ -221,7 +216,7 @@ function closeHolding(audit: GlideRecord): AuditClose {
 }
 
 /**
- * Raise the *missing in audit* exception of the line's Asset (platform/exceptions `openException`); false, logged, when
+ * Raise the *missing in audit* exception of the line's Asset; false, logged, when
  * none is open afterwards, as the closed audit does not raise it again. A raise whose lock cannot be taken throws, and
  * is logged as one that left none open, so the other lines are still closed.
  */

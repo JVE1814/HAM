@@ -14,7 +14,7 @@ import { bool, findById, refusal, str, warnRefused, type ForeignRecord } from '.
 /**
  * What came of "Raise replacement" on a case:
  * - `raised`: the replacement Order went ahead, to approval or sourcing (`already` says so, for the user, when another
- *   submission of it had taken it ahead: platform/orders `Submission`);
+ *   submission of it had taken it ahead);
  * - `already_raised`: the Order the case links is going ahead, in the stage `stageLabel` names, and is kept;
  * - `draft`: the Order could not be submitted (`why`) and is left a draft, linked to the case, to correct and submit;
  * - `not_raised`: nothing was raised or submitted, and why ('' when the platform refused the case's save and said so).
@@ -42,13 +42,13 @@ function notRaised(why: string): Replacement {
 }
 
 /**
- * Raise an Order replacing the case's failed Asset like-for-like, link it to the case and submit it. Saves the case,
+ * Saves the case,
  * the record of the form it was asked from, first: a refused save raises nothing, as the failed asset and linked Order
  * would be values the case does not hold.
  * One that cannot be submitted as raised stays a draft, still linked to the case so a second one is not raised, for
  * the user to correct. "Raise replacement" is offered while the case links no Order or one rejected or cancelled, but
  * a form opened before then can still send it: then a linked draft is submitted again and a linked Order going ahead
- * is kept (domain/breakfix).
+ * is kept.
  */
 export function raiseReplacement(kase: GlideRecord): Replacement {
     if (!kase.update()) return notRaised('')

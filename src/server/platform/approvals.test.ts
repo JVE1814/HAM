@@ -3,12 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { putToApproval, rollUpApprovals, type ApprovalFlow, type ApprovalRequest } from './approvals.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
-/*
- * The approval flow run against in-memory tables: a task (an Order), its sysapproval_approver requests and the
- * Customer admins' roles. What it must keep: a task waits only on requests that could approve it, its outcome is saved
- * before the requests still waiting are cancelled, and a refused save leaves it waiting with them.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const ORDERS = 'x_daas_ham_order'
@@ -16,7 +10,6 @@ const APPROVALS = 'sysapproval_approver'
 
 let orders = 0
 
-/** A saved Order of Customer `acme`, read as a rule or a form button gets it. */
 function order(stage: string): GlideRecord {
     const sysId = `order-${++orders}`
     ;(platform.tables[ORDERS] ??= []).push({ sys_id: sysId, number: 'ORD0001', customer: 'acme', stage })
@@ -29,13 +22,11 @@ function stored(record: GlideRecord): Row {
     return (platform.tables[ORDERS] ?? []).find((row) => row.sys_id === record.getUniqueValue()) ?? {}
 }
 
-/** An active user of Customer `acme` who holds the Customer admin role. */
 function customerAdmin(userId: string): void {
     ;(platform.tables.sys_user ??= []).push({ sys_id: userId, company: 'acme', active: 'true' })
     ;(platform.tables.sys_user_has_role ??= []).push({ sys_id: `role-of-${userId}`, role: 'customer_admin_role', user: userId, state: 'active' })
 }
 
-/** The Order's approval requests as stored: approver -> state. */
 function requests(): Record<string, string> {
     return Object.fromEntries((platform.tables[APPROVALS] ?? []).map((row) => [row.approver, row.state]))
 }
@@ -45,7 +36,6 @@ function decide(approverId: string, state: 'approved' | 'rejected'): void {
     if (request) request.state = state
 }
 
-/** A request to the Customer admins `customerAdmins` and the provider approver `am` unless `providerApprovers` say otherwise. */
 const request = (required: ApprovalRequest['required'], asked: Partial<ApprovalRequest> = {}): ApprovalRequest => ({
     required,
     customerAdmins: ['ca'],
@@ -54,7 +44,6 @@ const request = (required: ApprovalRequest['required'], asked: Partial<ApprovalR
     ...asked,
 })
 
-/** A flow that records what it was asked to decide and saves the outcome as the task's stage. */
 function flow(required: ApprovalRequest['required']): ApprovalFlow & { decided: string[] } {
     const decided: string[] = []
     return {
@@ -70,7 +59,6 @@ function flow(required: ApprovalRequest['required']): ApprovalFlow & { decided: 
     }
 }
 
-/** Put `task` to approval for `required` as an Order flow does. */
 const put = (task: GlideRecord, required: ApprovalRequest['required'], asked: Partial<ApprovalRequest> = {}) =>
     putToApproval(task, flow(required), request(required, asked))
 

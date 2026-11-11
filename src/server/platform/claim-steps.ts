@@ -26,13 +26,7 @@ import { log } from './log.ts'
 
 /**
  * The automated steps of a Staging task (x_daas_ham_staging_step rows with an `automation`) and the OEM claims they
- * stand for. Of a step's state (domain/oem/claims `STEP_STATUS`), this module owns what follows its creation: a step
- * waiting on another is released once that one is ticked (`releaseStepsWaitingOn`: waiting to pending), or by the next
- * claim run when that release was refused (`releaseStranded`), and the claim run settles each step it sent (`settle`:
- * done and ticked, or failed with one more attempt and the vendor's message).
- * The rest is platform/staging-tasks': it creates a task's steps, each automated one in its
- * `initialAutomationStatus`, and removes them with a task that could not be opened. A person ticks the steps done by
- * hand; who and when is stamped by the before rule (entry/staging `stampStagingStep`).
+ * stand for.
  */
 
 const STEP = 'x_daas_ham_staging_step'
@@ -48,13 +42,13 @@ const NO_ASSET: ClaimAsset = { customerId: '', serial: '', mac: '', claimCode: '
 
 /**
  * For each enabled vendor, send its due automated staging steps (pending, and failed ones due a retry) through the
- * vendor's adapters, within `x_daas_ham.oem.claim.max_calls` calls a vendor (domain/oem/claims `runVendorClaims`),
- * holding the run's lock (domain/lock-names `oemClaimRun`, ADR 0013). Two runs at once (the 5-minute job and an *Execute
+ * vendor's adapters, within `x_daas_ham.oem.claim.max_calls` calls a vendor,
+ * holding the run's lock (ADR 0013). Two runs at once (the 5-minute job and an *Execute
  * now*) would load the same due steps and send each to its vendor twice, spending two runs' calls in one rate-limit
  * window (Meraki allows 10 calls in 5 minutes), and the second claim of a device already claimed fails, marking a step
  * the first run ticked done failed again. A run that finds the lock held sends nothing and leaves the steps to the run
- * holding it. A run that outlasts the lock sends nothing more once it has lost it, checked before every call
- * (runVendorClaims): it saves what its calls so far returned, leaves the steps it did not send to the run that took the
+ * holding it. A run that outlasts the lock sends nothing more once it has lost it, checked before every call:
+ * it saves what its calls so far returned, leaves the steps it did not send to the run that took the
  * lock over, and that run goes on.
  */
 export function runClaims(): void {

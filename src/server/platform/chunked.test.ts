@@ -5,11 +5,6 @@ import { completePass, findJobCursor, isCurrentPass, JOB_STATUS, openJobCursor, 
 import { withLock } from './locks.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
-/*
- * The job-cursor repository and the event runner run against the in-memory stand-in for the platform, with the unique
- * indexes the two job tables have (job cursor by job, job lock by name), an event queue and a clock.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const CURSORS = 'x_daas_ham_job_cursor'
@@ -20,19 +15,16 @@ const SUBJECT = 'subject1'
 
 const cursorRow = (job: string): Row | undefined => (platform.tables[CURSORS] ?? []).find((row) => row.job === job)
 
-/** Items a, b, c… with sys_ids in that order. */
 function items(...names: string[]): void {
     platform.tables[ITEMS] = names.map((name) => ({ sys_id: name, name }))
 }
 
-/** The record an event is queued on: only its sys_id matters here. */
 const record = { getUniqueValue: () => 'rec1' } as unknown as JobEvent['record']
 
 function queued(position: string): JobEvent {
     return { name: EVENT_NAME, record, subject: SUBJECT, position }
 }
 
-/** A job over the items that notes what it handled and flushed, and the hooks called under its lock. */
 function job<P extends object = object>(pass: P = {} as P, failOn: string[] = []) {
     const handled: string[] = []
     const flushed: Array<{ failed: number }> = []
@@ -212,7 +204,6 @@ describe('runTableJob', () => {
         const { spec, handled } = job()
         expect(runTableJob({ ...spec, job: 'scan' })).toMatchObject({ processed: 0, done: false, lastError: 'job cursor scan could not be created: no rights' })
         expect(handled).toEqual([])
-        // One error in the log, naming the job and why it did not run.
         expect(platform.logs).toEqual([expect.stringMatching(/^error .*\bscan\b.*no rights/)])
     })
 })
@@ -261,7 +252,6 @@ describe('an event job whose passes are started where they are triggered', () =>
         return { ...run, result: runTriggeredChunk(queued(position), run.spec) }
     }
 
-    /** Queue a pass and give its token: the job's cursor row holds the current pass's. */
     function queueNewPass(): string {
         queuePass(EVENT_NAME, record, SUBJECT, PASS.job)
         return cursorRow(PASS.job)?.cursor ?? ''
