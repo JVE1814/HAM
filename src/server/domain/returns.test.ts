@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ALL_STAGES, checkTransition, DEPLOYED_STAGES, INSTALLED_STAGES, type Stage } from './lifecycle'
 import {
-    chargedFeeQuery,
     collectionMethod,
     evaluationTarget,
     isSiteRecovery,
@@ -257,24 +256,5 @@ describe('evaluationTarget', () => {
         expect(evaluationTarget('oem_rma', lessor('return'))).toBe('pending_oem_rma')
         expect(evaluationTarget('scrap', provider)).toBe('pending_wipe')
         expect(evaluationTarget('return_to_owner', lessor(''))).toBe('pending_wipe')
-    })
-})
-
-describe('fee identity', () => {
-    const sysId = (c: string) => c.repeat(32)
-    const fee = { type: 'late_return' as const, assetId: sysId('a'), returnOrderId: sysId('r') }
-
-    const charge = (fields: SampleRecord = {}) => ({ fee_type: 'late_return', asset: sysId('a'), return_order: sysId('r'), status: 'open', ...fields })
-
-    it('counts every charge of the same type, Asset and Return order but a waived one', () => {
-        expect(matches(chargedFeeQuery(fee), charge())).toBe(true)
-        expect(matches(chargedFeeQuery(fee), charge({ status: 'billed' }))).toBe(true)
-        expect(matches(chargedFeeQuery(fee), charge({ status: 'waived' }))).toBe(false)
-    })
-
-    it('counts no charge of another type, Asset or Return order', () => {
-        expect(matches(chargedFeeQuery(fee), charge({ fee_type: 'lost' }))).toBe(false)
-        expect(matches(chargedFeeQuery(fee), charge({ asset: sysId('b') }))).toBe(false)
-        expect(matches(chargedFeeQuery(fee), charge({ return_order: sysId('s') }))).toBe(false)
     })
 })

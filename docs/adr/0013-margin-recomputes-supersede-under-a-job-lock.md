@@ -70,19 +70,13 @@ queued as an event that tries the lock again, then a minute apart, at most 15 mo
 
 Locks are not re-entrant: a holder that takes a lock it already holds is refused, as any other taker
 would be. A take never waits either: it tries and gives up. So locks are taken in one order, and a
-holder only takes locks later in it than those it holds (`domain/lock-names.ts` names every lock, in
-this order). A holder that takes several locks of one
-kind takes them one under another in sys_id order. Only *Cancel order* and an Order's rejection do,
+holder only takes locks later in it than those it holds. The order is the order `LOCK` declares the
+locks in (`src/server/domain/lock-names.ts`), and nowhere else. A holder that takes several locks of
+one kind takes them one under another in sys_id order. Only *Cancel order* and an Order's rejection do,
 holding the `order_line_` lock of each of the Order's open lines at once. A take never waits, so this
 cannot deadlock; the sys_id order only makes two such holders of one Order meet at the same line
 first. Every other holder of an `order_line_` lock holds one at a time and takes nothing earlier in
 the order under it, and two cancels of one Order exclude each other through `source_order_`.
-
-`refresh_orders` < `agreement_usage` < `oem_claim_run` < `oem_coverage_run` < `seen_asset` < `receive_serial` <
-`receive_asset` < `source_order` < `ship_order` < `track_shipment` < `return_label` < `order_line` <
-`provider_tag_sequence` < `spare_pool` < `reserve_asset` < `return_request` < `return_asset` <
-`fee` < `audit` < `recon_exception` < `subscription_line` < `service_interval` < `billing_period` < job
-locks (the margin recompute's).
 
 Only the device-events REST handler and the in-service detection job take `seen_asset_<sys_id>`, and
 they hold no other lock when they do. The go-live under it starts its pending Subscription line

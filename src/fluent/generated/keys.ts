@@ -3370,6 +3370,10 @@ declare global {
                         table: 'sys_module'
                         id: '3856fa292b1e4d828135c86590ba068b'
                     }
+                    src_server_domain_fees_ts: {
+                        table: 'sys_module'
+                        id: 'd61ba7e11c1c4946bc6ec8c4bcc84120'
+                    }
                     src_server_domain_fleet_ts: {
                         table: 'sys_module'
                         id: 'ec4a1353f8304437a353f3e3ec413fd0'

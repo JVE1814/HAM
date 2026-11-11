@@ -1,7 +1,7 @@
 import { GlideRecord, gs } from '@servicenow/glide'
+import { chargedFeeQuery, type FeeIdentity } from '../domain/fees.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { chargedFeeQuery, type FeeIdentity } from '../domain/returns.ts'
 import { FEE_STATUS, type FeeType } from '../domain/vocabulary.ts'
 import { visitInKeyOrder } from './chunked.ts'
 import { todayIso } from './clock.ts'
@@ -19,7 +19,7 @@ const FEE = 'x_daas_ham_fee_event'
 const AGREEMENT_FEE: Record<FeeType, string> = { lost: 'lost_asset_fee', damaged: 'damage_fee', late_return: 'late_return_fee' }
 
 /**
- * Charge a Fee event of `type` for the Asset on the Return order, once (domain/returns `chargedFeeQuery`): a step
+ * Charge a Fee event of `type` for the Asset on the Return order, once (domain/fees `chargedFeeQuery`): a step
  * retried after a refused save (an evaluation chosen again, a line declared missing again) does not charge it twice.
  * Two runs may also charge it at the same time (two users saving one line's evaluation, overlapping overdue runs; two
  * scans of one unit already take turns under its receive lock, platform/receiving). A unique index on the fee's

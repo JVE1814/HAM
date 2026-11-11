@@ -1,6 +1,6 @@
+import type { FeeIdentity } from './fees.ts'
 import { normalizeSerial } from './serials.ts'
 import type { ExceptionType } from './vocabulary.ts'
-import type { FeeIdentity } from './returns.ts'
 
 /** A job lock's name is the unique key of its row (x_daas_ham_job_lock.name): a longer one shares its lock with those it starts like. */
 export const LOCK_NAME_LENGTH = 100
