@@ -10,6 +10,9 @@ export async function clientConfig({ rootDir, config, path, registerExplicitId }
         logLevel: 'warn',
         root: clientDir,
         resolve: { alias: { '@': clientDir } },
+        // The dev server compiles JSX with esbuild; the build's SWC plugin uses the same automatic runtime.
+        esbuild: { jsx: 'automatic' },
+        optimizeDeps: { entries: ['*.html'] },
         plugins: [
             tailwindcss(),
             ...(await servicenowVitePlugins({ scope: config.scope, rootDir: clientDir, registerExplicitId, enableCacheBusting: true })),

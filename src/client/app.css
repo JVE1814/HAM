@@ -127,3 +127,9 @@
     @apply font-sans;
     }
 }
+/* Outside a layer, so it outranks the instance theme that sdk:now-ux-globals loads, which paints the page white. */
+html,
+body {
+    background-color: var(--background);
+    color: var(--foreground);
+}
