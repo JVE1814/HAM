@@ -19,7 +19,6 @@ import {
     identifyAsset,
     isFleetAsset,
     joinFleet,
-    moveAndSave,
     moveAsset,
     newAsset,
     readStage,
@@ -34,7 +33,7 @@ import { purchaseOrderId } from './procurement.ts'
 import { findById, num, refusal, str, warnRefused } from './records.ts'
 import { receiveReturnedAsset } from './returns.ts'
 import { withOrderLineLock } from './sourcing.ts'
-import { openStagingTask } from './staging-tasks.ts'
+import { startStaging } from './staging-tasks.ts'
 import { changeStock, reserveAsset } from './stock.ts'
 import { nextProviderTag } from './tags.ts'
 import { log } from './log.ts'
@@ -347,11 +346,9 @@ function stageReserved(lineLock: HeldLock, reserved: GlideRecord, line: GlideRec
     // it stages no further.
     const lost = (what: string): boolean =>
         lineLock.lostAfter(`${str(line, 'number')}: ${str(reserved, 'serial_number')} ${what}`, { check: 'check it is still on the line' })
-    // Without its Staging task the Asset stays reserved for the line, not staging with no task to finish. A refused
-    // move (logged) leaves it reserved too, with the unsaved move on the record, so it is read again for the caller.
-    if (lost('reserved') || !openStagingTask(reserved, line.getUniqueValue()) || lost('given a Staging task')) return reserved
-    if (moveAndSave(reserved, 'staging', 'receiving')) lost('moved into staging')
-    else reserved.get(reserved.getUniqueValue())
+    if (lost('reserved')) return reserved
+    // A refused move leaves its unsaved values on the record.
+    if (startStaging(reserved, line.getUniqueValue(), 'receiving', lost) === 'not_moved') reserved.get(reserved.getUniqueValue())
     return reserved
 }
 
