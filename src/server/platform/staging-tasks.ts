@@ -264,7 +264,7 @@ function copyTemplateSteps(templateId: string, taskId: string, vendor: string): 
     return null
 }
 
-export function stagingSteps(taskId: string): Array<{ mandatory: boolean; done: boolean }> {
+function stagingSteps(taskId: string): Array<{ mandatory: boolean; done: boolean }> {
     const step = new GlideRecord('x_daas_ham_staging_step')
     step.addQuery('staging_task', taskId)
     step.query()

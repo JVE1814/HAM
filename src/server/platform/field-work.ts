@@ -27,7 +27,7 @@ export interface WorkContext {
  * plans (domain/delivery `OnSiteWork`) is one, and a job of any other purpose (a de-install, a site audit) has its
  * shape.
  */
-export type FieldJob = Omit<OnSiteWork, 'purpose'> & { purpose: FieldPurpose }
+type FieldJob = Omit<OnSiteWork, 'purpose'> & { purpose: FieldPurpose }
 
 /** The saved change and the work order that runs under it. */
 export interface FieldWork {
