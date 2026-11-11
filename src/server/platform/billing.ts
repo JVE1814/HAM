@@ -35,6 +35,7 @@ import { attemptLock, whyNotRun } from './locks.ts'
 import { deleteWhere, exists, findById, num, refusal, str, throwRefused } from './records.ts'
 import { BILLING_PERIOD_STATUS, FEE_STATUS, type BillingLineKind, type FeeType, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
 import { log } from './log.ts'
+import { queueMarginCompute } from './margin.ts'
 
 /** Billing periods: generate, review, close (lock) and export (plan §13 Billing export, Q66). */
 
@@ -555,11 +556,16 @@ function dropWaivedFeeLines(period: GlideRecord): string[] {
 }
 
 /**
- * Close a period ready for review: lock it and mark its fees billed. Its export and margin are for the caller to queue.
- * A closed period whose fees were not all marked billed is done, with a warning that names them.
+ * Close a period ready for review: lock it, mark its fees billed, and queue its CSV export and its margin. A closed
+ * period whose fees were not all marked billed is done, with a warning that names them.
  */
 export function closePeriod(period: GlideRecord): PeriodOutcome {
-    return takingTurns(period, 'not closed', (stored) => closeReady(period, stored))
+    const outcome = takingTurns(period, 'not closed', (stored) => closeReady(period, stored))
+    if (outcome.done) {
+        queueJob(EVENT.billingExport, period)
+        queueMarginCompute(period)
+    }
+    return outcome
 }
 
 /** Close `period`, judged by how it is `stored` now: a Regenerate since `period` was read may have found lines failing. */
@@ -606,10 +612,6 @@ function markFeesBilled(period: GlideRecord): string[] {
     return refused
 }
 
-export function queueExport(period: GlideRecord): void {
-    queueJob(EVENT.billingExport, period)
-}
-
 type ExportState = { state: 'not_closed' } | { state: 'attached'; fileName: string } | { state: 'missing'; fileName: string }
 
 function exportState(period: GlideRecord): ExportState {
@@ -625,7 +627,7 @@ export function requestExport(period: GlideRecord): ExportRequest {
     const found = exportState(period)
     if (found.state === 'not_closed') return { queued: false, why: 'not_closed' }
     if (found.state === 'attached') return { queued: false, why: 'attached', fileName: found.fileName }
-    queueExport(period)
+    queueJob(EVENT.billingExport, period)
     return { queued: true }
 }
 

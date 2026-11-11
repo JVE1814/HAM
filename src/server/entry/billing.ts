@@ -13,7 +13,6 @@ import {
     generateNewPeriod,
     linesPage,
     openBillingPeriod,
-    queueExport,
     recentPeriods,
     regeneratePeriod,
     requestExport,
@@ -23,7 +22,6 @@ import {
 import { todayIso } from '../platform/clock.ts'
 import { closedLineRefusal, closedPeriodRefusal } from '../platform/closed-period.ts'
 import { jobEvent, subjectOf } from '../platform/events.ts'
-import { queueMarginCompute } from '../platform/margin.ts'
 import { str } from '../platform/records.ts'
 import { pathParam, queryInt, reply, requireRole } from '../platform/rest-api.ts'
 import { abortWith } from '../platform/rule-api.ts'
@@ -61,12 +59,7 @@ export function uiResetBillingGeneration(current: GlideRecord): void {
 }
 
 export function uiCloseBillingPeriod(current: GlideRecord): void {
-    const closed = closePeriod(current)
-    if (closed.done) {
-        queueExport(current)
-        queueMarginCompute(current)
-    }
-    report(closed, `${str(current, 'period')} closed and locked; the CSV export and margin are being prepared`)
+    report(closePeriod(current), `${str(current, 'period')} closed and locked; the CSV export and margin are being prepared`)
 }
 
 export function uiExportBillingPeriod(current: GlideRecord): void {

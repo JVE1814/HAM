@@ -14,7 +14,7 @@ import {
     type LeaseTerms,
 } from '../domain/margin.ts'
 import { memoized } from '../domain/memo.ts'
-import { SHIPMENT_STATUS, type LegalOwner } from '../domain/vocabulary.ts'
+import { BILLING_PERIOD_STATUS, SHIPMENT_STATUS, type LegalOwner } from '../domain/vocabulary.ts'
 import { agreementCurrencyOf, customerCurrencies } from './agreements.ts'
 import { recordMarginOutcome } from './closed-period.ts'
 import { runEventTableJob } from './chunked.ts'
@@ -37,11 +37,15 @@ export function queueMarginCompute(period: GlideRecord): void {
 
 /**
  * One chunk of a margin pass for the period the event names: Asset costs over the month's Service intervals, then
- * labour and margin. A pass that stops is logged (the runner records it on the period while the pass is current).
+ * labour and margin. Only a closed period has Margin: its lines no longer change. A pass that stops is logged (the
+ * runner records it on the period while the pass is current).
  */
 export function computeMarginChunk(queued: JobEvent): void {
     const period = findById('x_daas_ham_billing_period', queued.subject)
     if (!period) return
+    if (str(period, 'status') !== BILLING_PERIOD_STATUS.closed) {
+        return void log.warn(`${queued.name}: dropped a margin chunk, as billing period ${str(period, 'period')} is not closed`)
+    }
     try {
         costServiceIntervals(period, queued)
     } catch (error) {
