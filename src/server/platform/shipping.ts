@@ -382,7 +382,7 @@ export function trackShipment(update: TrackingUpdate): WebhookTracking {
  * Apply the tracking update `param` that `trackLater` queued for `shipment`, as the webhook does, under its tracking
  * lock; `tries` is how many times it was queued again. Updates applied while it waited may be newer: one of them having
  * stored a later event, its status is not taken, only its events (`track`). One held off again, or whose Shipment or
- * events the platform refused, is queued again a minute later, as often as sourcing's requests are (domain/job-lock
+ * events the platform refused, is queued again as far apart and as often as sourcing's requests are (domain/job-lock
  * `REQUEUE`: past the lock's abandonment, so a lock left by a dead holder does not drop it), then dropped with a
  * warning naming the Shipment; a retry repeats nothing, as stored events are skipped and a delivery is noted once.
  */

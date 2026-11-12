@@ -44,7 +44,7 @@ export function queueJobAt(queued: JobEvent, position: string, when: 'now' | 'la
 }
 
 /**
- * Queue `event` on `record` again, to run a minute from now: a request that could not run under its lock.
+ * Queue `event` on `record` again, to run `REQUEUE.delaySeconds` from now: a request that could not run under its lock.
  */
 function requeue(event: string, record: GlideRecord, parm1: string, parm2: string): void {
     const when = new GlideDateTime()
@@ -61,8 +61,8 @@ export function timesRequeued(event: GlideRecord): number {
 }
 
 /**
- * Queue the counted request `event` (with its `parm1`) on `record` again, a minute later, unless it was already queued
- * again `tries` times: false when it is given up instead, for the caller to say so.
+ * Queue the counted request `event` (with its `parm1`) on `record` again, `REQUEUE.delaySeconds` later, unless it was
+ * already queued again `tries` times: false when it is given up instead, for the caller to say so.
  */
 export function requeueCounted(event: string, record: GlideRecord, parm1: string, tries: number): boolean {
     if (tries >= REQUEUE.times) return false
