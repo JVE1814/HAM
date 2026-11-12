@@ -52,7 +52,8 @@ export function openException(type: ExceptionType, subject: ExceptionSubject, fa
     return hasOpenException(type, subject) ? 'open' : 'busy'
 }
 
-function hasOpenException(type: ExceptionType, subject: ExceptionSubject): boolean {
+/** Whether an exception of `type` is open for the subject: what a caller whose raise threw reads back. */
+export function hasOpenException(type: ExceptionType, subject: ExceptionSubject): boolean {
     const { field, id } = fieldOf(subject)
     return exists(TABLE, `exception_type=${type}^${OPEN_EXCEPTIONS_QUERY}^${field}=${id}`)
 }

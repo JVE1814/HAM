@@ -85,6 +85,20 @@ describe('closeAudit', () => {
         ])
     })
 
+    it('counts a missing Asset as raised when its raise throws but the exception stands, raised by another run', () => {
+        const audit = countedAudit()
+        const raiseLock = LOCK.reconException('audit_missing', 'a2')
+        platform.refuses = (table, row, operation) => {
+            if (table !== LOCKS || operation !== 'insert' || row.name !== raiseLock) return ''
+            if (rows(EXCEPTIONS).length === 0) {
+                platform.tables[EXCEPTIONS] = [{ sys_id: 'x1', exception_type: 'audit_missing', status: 'open', asset: 'a2', ci: '' }]
+            }
+            return 'Lock table is read-only'
+        }
+        expect(closeAudit(audit)).toEqual({ outcome: 'closed', unsaved: 0 })
+        expect(platform.warnings.filter((line) => line.includes('raise it by hand'))).toEqual([])
+    })
+
     it('leaves an audit that is not open as it was', () => {
         const audit = countedAudit()
         rows(AUDITS)[0].active = 'false'

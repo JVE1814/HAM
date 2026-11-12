@@ -7,7 +7,7 @@ import { LOCK } from '../domain/lock-names.ts'
 import { SCOPED_TABLES, visibilityFilter } from '../domain/visibility.ts'
 import type { AuditLineResult, AuditType } from '../domain/vocabulary.ts'
 import { nowGlide } from './clock.ts'
-import { openException } from './exceptions.ts'
+import { hasOpenException, openException } from './exceptions.ts'
 import { openFieldWork } from './field-work.ts'
 import { withLockTries } from './locks.ts'
 import { refusal, str, warnRefused } from './records.ts'
@@ -226,6 +226,8 @@ function raiseMissing(line: GlideRecord, number: string): boolean {
     try {
         if (openException('audit_missing', { assetId }, { customerId: str(line, 'asset.company'), detail: `Not found in ${number}` }) === 'open') return true
     } catch (error) {
+        // Another run may have raised it while this one failed to: the user is told to raise one only when none is open.
+        if (hasOpenException('audit_missing', { assetId })) return true
         why = messageOf(error)
     }
     log.warn(`Audit ${number}: no missing in audit exception for ${line.getDisplayValue('asset')}: ${why}; raise it by hand`)
