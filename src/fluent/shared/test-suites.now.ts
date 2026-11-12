@@ -24,6 +24,7 @@ import { trackingWebhookTest } from '../delivery/tests.now'
 import { leasedAssetOwnershipTest, leaseExtensionTest } from '../leases/tests.now'
 import { closedBillingPeriodLockedTest } from '../billing/tests.now'
 import { rackPowerBudgetTest } from '../racks/tests.now'
+import { jobLockTest } from '../operations/tests.now'
 
 export const phase1Suite = TestSuite({
     $id: Now.ID['atf_suite_p1'],
@@ -41,6 +42,7 @@ export const phase1Suite = TestSuite({
         inventoryTechAuditScanTest,
         cancelRefusedOnceShippedTest,
         sparePoolTopUpTest,
+        jobLockTest,
     ],
 })
 
