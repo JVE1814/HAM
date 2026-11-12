@@ -224,3 +224,86 @@ describe('a Return order saved in a Customer contact session', () => {
         expect(rows(RETURNS).map((saved) => [saved.customer, saved.site, saved.trigger])).toEqual([['acme', 'site1', 'defective_return']])
     })
 })
+
+describe('a Return order left open that no line keeps open', () => {
+    const CLOSED = '3'
+    const leftOpen = (fields: Row = {}): Row => ({ sys_id: 'retB', number: 'RET0009', customer: 'acme', site: 'site1', active: 'true', state: '1', sys_created_on: '2026-11-09 08:00:00', ...fields })
+    const line = (sysId: string, status: string): Row => ({ sys_id: sysId, return_order: 'retB', asset: 'a1', status })
+    const stateOf = (sysId: string) => rows(RETURNS).find((stored) => stored.sys_id === sysId)?.state
+
+    beforeEach(() => {
+        platform.references = { [`${RETURN_LINES}.return_order`]: RETURNS, [`${RETURNS}.agreement`]: 'x_daas_ham_agreement' }
+        platform.clock = Date.parse('2026-11-11T05:20:00Z')
+        platform.tables[RETURNS] = [leftOpen()]
+        platform.tables[RETURN_LINES] = []
+    })
+
+    it('is closed by the daily job when it has no line, with a work note, and logged', () => {
+        chaseOverdue()
+
+        expect(rows(RETURNS)[0]).toMatchObject({ state: CLOSED, work_notes: 'Closed by the daily job: no unit on it is awaited or being evaluated.' })
+        expect(platform.logs).toEqual([expect.stringContaining('Return RET0009 closed by the daily job: no line keeps it open')])
+        expect(rows(LOCKS)).toEqual([])
+    })
+
+    it('is closed when its lines are all evaluated or missing: a close refused as the last one was settled', () => {
+        platform.tables[RETURN_LINES] = [line('line1', 'evaluated'), line('line2', 'missing')]
+
+        chaseOverdue()
+
+        expect(stateOf('retB')).toBe(CLOSED)
+    })
+
+    it.each(['awaiting', 'received'])('stays open while a line of it is %s', (status) => {
+        platform.tables[RETURNS] = [leftOpen({ due_back: '2026-12-01' })]
+        platform.tables[RETURN_LINES] = [line('line1', 'evaluated'), line('line2', status)]
+
+        chaseOverdue()
+
+        expect(stateOf('retB')).toBe('1')
+        expect(platform.logs).toEqual([])
+    })
+
+    it('stays open for a day after it was created: its lines may still be added by hand', () => {
+        platform.tables[RETURNS] = [leftOpen({ sys_created_on: '2026-11-10 05:20:00' })]
+
+        chaseOverdue()
+
+        expect(stateOf('retB')).toBe('1')
+
+        platform.clock += 1000
+        chaseOverdue()
+
+        expect(stateOf('retB')).toBe(CLOSED)
+    })
+
+    it('is left as it is once closed by hand', () => {
+        platform.tables[RETURNS] = [leftOpen({ active: 'false', state: '4' })]
+
+        chaseOverdue()
+
+        expect(stateOf('retB')).toBe('4')
+        expect(platform.logs).toEqual([])
+    })
+
+    it('is warned about when the platform refuses the close, and closed by a later run', () => {
+        platform.refuses = (table) => (table === RETURNS ? 'closing needs close notes' : '')
+
+        chaseOverdue()
+
+        expect(stateOf('retB')).toBe('1')
+        expect(platform.warnings).toEqual([expect.stringContaining('Return RET0009 not closed, close it: closing needs close notes')])
+
+        platform.refuses = () => ''
+        chaseOverdue()
+
+        expect(stateOf('retB')).toBe(CLOSED)
+    })
+
+    it('closes nothing while another run holds the run lock', () => {
+        const other = withLock(LOCK.overdueReturnsRun(), () => chaseOverdue())
+
+        expect(other.ran).toBe(true)
+        expect(stateOf('retB')).toBe('1')
+    })
+})

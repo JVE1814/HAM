@@ -8,9 +8,10 @@ runner (`platform/chunked.ts`) walks a table one chunk at a time and is used in 
 
 - Scheduled, with the cursor in `x_daas_ham_job_cursor` (`runTableJob`): installed-base
   reconciliation (`reconcile_installed_base`), in-service detection (`in_service_detection`), raw
-  model normalization (`normalize_raw_models`), overdue return chasing (`chase_overdue_returns`) and
-  spare-pool top-up (`spare_pool_top_up`). A cursor save the platform refuses is logged, and the
-  next run repeats from the last saved cursor.
+  model normalization (`normalize_raw_models`), overdue return chasing (`chase_overdue_returns`),
+  the close of the Return orders no line keeps open (`close_done_returns`, a second pass of the
+  same daily job) and spare-pool top-up (`spare_pool_top_up`). A cursor save the platform refuses
+  is logged, and the next run repeats from the last saved cursor.
 - Event-driven, with the cursor in the event's `parm2` (`runEventTableJob`): the lifecycle phase
   and refresh date recalculation of a Model's, Agreement's or Lease's Assets (queued when the dates
   they are worked out from change, and by the daily lifecycle roll for the Models with a milestone

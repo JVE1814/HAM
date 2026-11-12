@@ -177,11 +177,13 @@ attestations and their items, whose rules take no lock. A run that has lost it o
 attestation.
 The daily chase of overdue returns holds `overdue_returns_run` for the whole run, so a run and an
 *Execute now* at once never both read a Return order as not escalated and notify its Customer
-twice, nor both advance the job's one cursor. It holds no other lock when it takes it, does not
+twice, nor both advance the job's cursors. It holds no other lock when it takes it, does not
 retry, and chases nothing when it finds it held. Under it, it declares each unit missing under that
 unit's `receive_asset_` lock, with what that takes under it, so it comes before `receive_asset`. A
-run ends on the job time budget (`x_daas_ham.job.budget_seconds`), well short of
-`ABANDONED_AFTER_MINUTES`, so it does not check for a lost lock.
+run makes two passes under it: the chase, then the close of the Return orders no line keeps open,
+which takes no other lock. Each pass ends on the job time budget
+(`x_daas_ham.job.budget_seconds`), so a run takes at most twice that, well short of
+`ABANDONED_AFTER_MINUTES` as shipped, and does not check for a lost lock.
 A unit is put on a Return order under `return_asset_<Asset sys_id>`: the check that it awaits no other
 return and the insert of its line are one critical section, so two Returns raised at once (a request
 sent twice, the record producer beside the customer page or an Agreement's end) never both take it.

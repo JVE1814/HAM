@@ -195,6 +195,13 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
     the depot while its line could not be saved), is in a stage the lifecycle does not move to
     missing, or is not a fleet asset (a line raised before the Fleet flag), is not declared missing,
     and no move is tried. It is logged on each run, to settle by hand.
+  - after the chase, the same run closes each open Return order, created more than a day ago, that
+    no line keeps open (`platform/returns.ts` `closeDoneReturns`): one with no line at all
+    (inserted by hand, or raised with no unit when its close or its removal was refused), and one
+    whose lines are all evaluated or missing but whose close was refused then. It gets a work
+    note, and the close is logged. One created within the last day is left, as its lines may still
+    be added by hand. A close the platform refuses is logged as a warning and tried again by the
+    next run. The pass keeps a job cursor of its own (`close_done_returns`, ADR 0007).
 - Fees use the Agreement's lost / late / damage amounts. A zero amount records nothing. Each fee type
   is charged at most once per Asset and Return order (a waived fee aside), so a step retried after a
   refused save never charges twice. Two steps charging the same fee at once (two users saving one

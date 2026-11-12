@@ -9,6 +9,7 @@ export const JOB = {
     normalizeRawModels: 'normalize_raw_models',
     inServiceDetection: 'in_service_detection',
     chaseOverdueReturns: 'chase_overdue_returns',
+    closeDoneReturns: 'close_done_returns',
     reconcileInstalledBase: 'reconcile_installed_base',
     sparePoolTopUp: 'spare_pool_top_up',
     providerTagSequence: 'provider_tag_sequence',

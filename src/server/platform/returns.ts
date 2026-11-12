@@ -40,7 +40,7 @@ import { isCustomerContact } from '../domain/visibility.ts'
 import { customerAdminIds } from './approvals.ts'
 import { clearWipeEvidence, isFleetAsset, moveAndSave, moveRefusal, readStage, transitionFacts } from './assets.ts'
 import { runTableJob } from './chunked.ts'
-import { nowGlide, todayIso } from './clock.ts'
+import { daysAgoGlide, nowGlide, todayIso } from './clock.ts'
 import { fire } from './events.ts'
 import { EVENT } from '../domain/events.ts'
 import { recordFee, waiveOpenFees } from './fees.ts'
@@ -478,7 +478,8 @@ export function evaluateReturnLine(line: GlideRecord): Evaluation {
  * runs at once (the scheduled job and an *Execute now*) would both read a Return order as not escalated and each notify
  * its Customer, and both advance the job's one cursor, so a run holds a job lock (ADR 0013) throughout; one that finds
  * it held chases nothing and logs so. Taking the lock throws only when an insert is refused with no lock row
- * (platform/locks): that error escapes.
+ * (platform/locks): that error escapes. Under the same lock the run then closes the Return orders that no line keeps
+ * open (`closeDoneReturns`).
  */
 export function chaseOverdue(): void {
     const lockName = LOCK.overdueReturnsRun()
@@ -514,6 +515,31 @@ function chaseHolding(): void {
             } else if (step === 'declare_missing') {
                 declareMissing({ lineId, assetId: line.assetId, returnOrderId: line.returnOrderId, number })
             }
+        },
+    })
+    closeDoneReturns()
+}
+
+/** A Return order this new is not closed for having no line: one inserted by hand may still get its lines. */
+const DONE_RETURN_GRACE_DAYS = 1
+
+/**
+ * Close the open Return orders that no line keeps open (the daily job, after its chase and under its run lock). A
+ * Return is closed as its last line is evaluated or declared missing (`closeReturnIfDone`) and nothing looks at it
+ * again, so two kinds would stay open for good, asking the Customer for equipment they do not await: one whose close
+ * the platform refused then, and one that never had a line (inserted by hand, or raised with no unit when its close
+ * or its removal was refused). A second pass of the job (ADR 0007), with a cursor of its own: it reads every open
+ * Return order, as no query can ask for those without a line.
+ */
+function closeDoneReturns(): void {
+    runTableJob({
+        job: JOB.closeDoneReturns,
+        table: RETURN,
+        query: `active=true^sys_created_on<${daysAgoGlide(DONE_RETURN_GRACE_DAYS)}`,
+        read: (returnOrder) => str(returnOrder, 'number'),
+        handle: (number, returnOrderId) => {
+            const note = 'Closed by the daily job: no unit on it is awaited or being evaluated.'
+            if (closeReturnIfDone(returnOrderId, note)) log.info(`Return ${number} closed by the daily job: no line keeps it open`)
         },
     })
 }
@@ -584,11 +610,15 @@ function mayGoMissing(asset: GlideRecord, stage: Stage | null): boolean {
     return isDeployed(stage) && checkTransition(stage, 'missing', transitionFacts(asset)).allowed
 }
 
-function closeReturnIfDone(returnOrderId: string): void {
-    if (exists(RETURN_LINE, `return_order=${returnOrderId}^statusIN${KEEPS_RETURN_OPEN.join(',')}`)) return
+/** Close the Return order once no line keeps it open, with `note` as its work note when given. True when this call closed it. */
+function closeReturnIfDone(returnOrderId: string, note = ''): boolean {
+    if (exists(RETURN_LINE, `return_order=${returnOrderId}^statusIN${KEEPS_RETURN_OPEN.join(',')}`)) return false
     const order = findById(RETURN, returnOrderId)
-    if (!order || str(order, 'state') === String(TASK_STATE.closedComplete)) return
+    if (!order || str(order, 'state') === String(TASK_STATE.closedComplete)) return false
     order.setValue('state', TASK_STATE.closedComplete)
-    // No later line calls this again, and an open Return still asks the Customer for its equipment.
-    if (!order.update()) warnRefused(order, `Return ${str(order, 'number')} not closed, close it`)
+    if (note) order.setValue('work_notes', note)
+    if (order.update()) return true
+    // No later line calls this again: the daily job closes it (`closeDoneReturns`), and warns again while it is refused.
+    warnRefused(order, `Return ${str(order, 'number')} not closed, close it`)
+    return false
 }
