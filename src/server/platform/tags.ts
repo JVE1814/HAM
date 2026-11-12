@@ -14,7 +14,7 @@ import { intProperty, stringProperty } from './properties.ts'
  * is read and advanced under a job lock, its first row created there too.
  * A holder that outlasted the lock (ADR 0013) and saved a stale number sets the counter back, so a number whose tag an
  * Asset already carries is skipped, and a holder that lost the lock before or while writing gives its number up. What
- * is left is a tag issued but not yet saved on its Asset when a write that ran past the ten minutes sets the counter
+ * is left is a tag issued but not yet saved on its Asset when a write that ran past `ABANDONED_AFTER_MINUTES` sets the counter
  * back, and taken again before that save.
  * Taking the lock throws only when an insert is refused with no lock row (platform/locks `withLockTries` tries again,
  * and that error escapes only when every try threw), as does a failure to save the counter.

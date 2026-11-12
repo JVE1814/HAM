@@ -278,8 +278,8 @@ function warnIfUsageLockLost(usageLock: HeldLock | null, order: GlideRecord): vo
 
 /**
  * A submission that found its Agreement's usage lock held through every try. Unless another submission of this same
- * Order took it ahead (then it went ahead), the Order stays a draft for now, noted, and is submitted again a minute
- * later from the event queue, as often as a sourcing request is queued again (domain/job-lock `REQUEUE`), then left
+ * Order took it ahead (then it went ahead), the Order stays a draft for now, noted, and is submitted again
+ * `REQUEUE.delaySeconds` later from the event queue, as often as a sourcing request is queued again (domain/job-lock `REQUEUE`), then left
  * for staff to submit (logged).
  */
 function submitLater(order: GlideRecord, tries: number): Submission {
