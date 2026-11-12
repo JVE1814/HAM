@@ -149,4 +149,11 @@ export default tseslint.config(
             ],
         },
     },
+    // The layer rules above read .ts files only, so a server module in any other form would pass them all.
+    {
+        files: ['src/server/**/*.{tsx,mts,cts,js,mjs,cjs}'],
+        rules: {
+            'no-restricted-syntax': ['error', { selector: 'Program', message: 'A server module is a .ts file, which the layer rules read.' }],
+        },
+    },
 )
