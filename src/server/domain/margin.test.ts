@@ -196,6 +196,11 @@ describe('marginRows', () => {
         ])
     })
 
+    it('keeps a stored currency whole, whatever it holds', () => {
+        const [row] = marginRows([{ customerId: 'acme', siteId: 'hq', currency: 'E|R', amount: 10 }], [])
+        expect(row).toMatchObject({ customerId: 'acme', siteId: 'hq', currency: 'E|R', revenue: 10 })
+    })
+
     it('never sets revenue in one currency against cost in another', () => {
         const rows = marginRows(
             [{ customerId: 'acme', siteId: 'hq', currency: 'EUR', amount: 1000 }],
