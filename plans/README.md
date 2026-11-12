@@ -31,7 +31,7 @@ untracked `.audit/` folder, which plan 001 fixes. Every other plan depends on 00
 | [016](016-lease-disposal-characterization.md) | Test lease decisions and disposal orders on the fake Glide | P3 | M | 001 | DONE |
 | [017](017-customer-equipment-grid.md) | Page the customer equipment grids, share one fault dialog, and say when the list is cut | P3 | S | 001 | DONE |
 | [018](018-client-logic-tests.md) | Test the client's untested mapping logic through pure modules | P3 | M | 001, 013, 015 | DONE |
-| [019](019-vitest-advisories.md) | Move Vitest to 4.1.12 so its three advisories and tinypool's two are gone | P3 | S | 001 | BLOCKED (now-sdk build type check fails on sn.test.ts:181 under Vitest 4) |
+| [019](019-vitest-advisories.md) | Move Vitest to 4.1.12 so its three advisories and tinypool's two are gone | P3 | S | 001 | DONE |
 | [020](020-agents-md.md) | Give coding agents an `AGENTS.md` that lists the gate and the traps | P3 | S | 001 | TODO |
 | [021](021-lock-checks-atf.md) | Check a job lock's row, release and abandonment in an ATF test | P3 | M | 001, 008 | TODO |
 | [022](022-scale-spike.md) | Draft the scale test: a design doc and a generator prototype, run on no instance | P3 | L | 001 | TODO |
