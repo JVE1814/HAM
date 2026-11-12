@@ -290,9 +290,12 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
   Order gives a temporary deployment instead. While it is pending in service the Asset keeps that
   sighting (*First seen since install*, `x_daas_ham_first_seen`), so a go-live that is put off
   (its Subscription line could not be started, below) still starts from it, whichever later
-  sighting or detection run completes it. A value from before the install completion (an Asset
-  installed again) is passed over. For a CI, the first sighting is the latest discovery the
-  detection job read at its first run after the install.
+  sighting or detection run completes it. Billing still starts no earlier than the line's start
+  date, a site package's as a per-device line's (`domain/billing.ts`). So when another unit's
+  go-live started the shared line on a later day first, this unit's days before that day are not
+  billed. A value from before the install completion (an Asset installed again) is passed over. For
+  a CI, the first sighting is the latest discovery the detection job read at its first run after
+  the install.
 - At that moment:
   - the in-service date is set to that first sighting;
   - the Asset joins its Site's package line, or else the Agreement's line for its device class
