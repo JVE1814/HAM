@@ -7,6 +7,7 @@ import {
     coverageDisposition,
     coverageSummary,
     groupExpiringCoverage,
+    INSTALLED_WITHOUT_COVERAGE,
     mergeCoverage,
     OPEN_ENDED_COVERAGE_END,
     staleCoverageQuery,
@@ -224,6 +225,27 @@ describe('withoutCoverage', () => {
         expect(withoutCoverage('2026-11-06', '2026-11-07')).toBe(true)
         expect(withoutCoverage('2026-11-07', '2026-11-07')).toBe(false)
         expect(withoutCoverage('2027-01-01', '2026-11-07')).toBe(false)
+    })
+})
+
+describe('INSTALLED_WITHOUT_COVERAGE', () => {
+    const today = '2026-11-07'
+    // The coverage end is a date column, which the platform compares with the start of today as a date.
+    const script = (expression: string) => {
+        if (expression !== 'gs.beginningOfToday()') throw new Error(expression)
+        return today
+    }
+    const installed = (coverageEnd: string) => assetIn('in_service', { x_daas_ham_fleet: 'true', x_daas_ham_coverage_end: coverageEnd })
+
+    it('finds the installed fleet Assets exactly when withoutCoverage holds for their coverage end', () => {
+        for (const end of ['', '2026-11-06', today, '2026-11-08', OPEN_ENDED_COVERAGE_END]) {
+            expect(matches(INSTALLED_WITHOUT_COVERAGE, installed(end), script), end).toBe(withoutCoverage(end, today))
+        }
+    })
+
+    it('leaves out an Asset not installed or outside the fleet', () => {
+        expect(matches(INSTALLED_WITHOUT_COVERAGE, { ...installed(''), ...assetIn('available') }, script)).toBe(false)
+        expect(matches(INSTALLED_WITHOUT_COVERAGE, { ...installed(''), x_daas_ham_fleet: 'false' }, script)).toBe(false)
     })
 })
 
