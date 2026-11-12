@@ -4,11 +4,10 @@ import type { HeldLock } from '../domain/job-lock.ts'
 import { isBillable } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { readStage } from './assets.ts'
-import { beyondVisibility } from './beyond-visibility.ts'
 import { todayIso } from './clock.ts'
 import { attemptLock, whyNotRun } from './locks.ts'
 import { log } from './log.ts'
-import { exists, str, warnRefused, type ForeignRecord } from './records.ts'
+import { exists, findById, str, warnRefused, type ForeignRecord } from './records.ts'
 
 /**
  * Start billing an Asset on a Subscription line from `startIso`, unless an interval is already open for
@@ -108,10 +107,8 @@ function latestClosedInterval(assetId: string): GlideRecord | null {
  * user whose save runs this may not see it; only read, never saved.
  */
 function inServiceNow(assetId: string): boolean {
-    const asset = new GlideRecord('alm_hardware')
-    asset.addQuery('sys_id', assetId)
-    beyondVisibility(asset, () => asset.query())
-    return asset.next() && isBillable(readStage(asset))
+    const asset = findById('alm_hardware', assetId, { beyondVisibility: true })
+    return !!asset && isBillable(readStage(asset))
 }
 
 /**

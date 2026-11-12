@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chargedFeeQuery } from './fees'
+import { chargedFeeQuery, openFeeQuery } from './fees'
 import { recordMatches as matches } from '../test-support/encoded-query'
 import type { SampleRecord } from '../test-support/stored-asset'
 
@@ -15,9 +15,18 @@ describe('fee identity', () => {
         expect(matches(chargedFeeQuery(fee), charge({ status: 'waived' }))).toBe(false)
     })
 
-    it('counts no charge of another type, Asset or Return order', () => {
-        expect(matches(chargedFeeQuery(fee), charge({ fee_type: 'lost' }))).toBe(false)
-        expect(matches(chargedFeeQuery(fee), charge({ asset: sysId('b') }))).toBe(false)
-        expect(matches(chargedFeeQuery(fee), charge({ return_order: sysId('s') }))).toBe(false)
+    it('finds open only the charges neither billed nor waived', () => {
+        expect(matches(openFeeQuery(fee), charge())).toBe(true)
+        expect(matches(openFeeQuery(fee), charge({ status: 'billed' }))).toBe(false)
+        expect(matches(openFeeQuery(fee), charge({ status: 'waived' }))).toBe(false)
+    })
+
+    it.each([
+        ['charged', chargedFeeQuery],
+        ['open', openFeeQuery],
+    ])('finds no %s charge of another type, Asset or Return order', (_, query) => {
+        expect(matches(query(fee), charge({ fee_type: 'lost' }))).toBe(false)
+        expect(matches(query(fee), charge({ asset: sysId('b') }))).toBe(false)
+        expect(matches(query(fee), charge({ return_order: sysId('s') }))).toBe(false)
     })
 })

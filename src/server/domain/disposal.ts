@@ -1,6 +1,6 @@
 import { APPROVER, type Approver } from './approvals.ts'
 import { disposalMethodsFor, legalOwnerOf, type Stage } from './lifecycle.ts'
-import type { DisposalMethod, LegalOwner } from './vocabulary.ts'
+import { DISPOSAL_STAGE, type DisposalMethod, type LegalOwner } from './vocabulary.ts'
 
 /** A line's Asset as Complete disposal finds it; `customerId` is its company: the Customer it belongs to (ADR 0006). */
 export interface DisposalLine {
@@ -59,7 +59,7 @@ export function disposalCustomerFindings(orderCustomerId: string, assets: readon
  * orders the change touches; a blank one is an order being deleted with its lines.
  */
 export function disposalScopeRefusal(orderStages: readonly string[]): string {
-    if (orderStages.every((stage) => stage === 'draft' || stage === '')) return ''
+    if (orderStages.every((stage) => stage === DISPOSAL_STAGE.draft || stage === '')) return ''
     return 'This disposal order has been submitted: its assets, methods and customer can no longer change'
 }
 

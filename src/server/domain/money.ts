@@ -98,6 +98,16 @@ export function currencyCode(value: string): string {
 }
 
 /**
+ * Why a currency entered on an Agreement cannot be saved (it must be a three-letter code, e.g. EUR), or null when it
+ * can: caught as it is entered, not when every line of the Agreement fails to bill. Blank is left to the field's
+ * mandatory check (an Agreement saved before it had one keeps saving until finance sets it).
+ */
+export function agreementCurrencyProblem(value: string): string | null {
+    if (value.trim() === '' || currencyCode(value)) return null
+    return `'${value.trim()}' is not a currency code: enter the three letters of an ISO 4217 code, e.g. EUR`
+}
+
+/**
  * A stored currency as totals and Margin group it: its code (currencyCode), else as stored, trimmed (so a value that is
  * no code is still kept apart from every other, never merged into one).
  */

@@ -1,5 +1,6 @@
 import { GlideAggregate, GlideRecord } from '@servicenow/glide'
 import { chooseCurrency, currencyCode, currencyKey, currencyOrThrow, monthBounds, overlapsMonth, roundToCent, timeInMonth, type AgreementCurrency, type MonthBounds } from '../domain/money.ts'
+import type { Failures } from '../domain/chunked-job.ts'
 import { messageOf } from '../domain/errors.ts'
 import { stillCovered } from '../domain/leases.ts'
 import {
@@ -208,21 +209,16 @@ function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void
     }
 }
 
-interface Failed {
-    failed: number
-    lastError: string
-}
-
 /**
  * Field work orders closed in the month, as Cost facts: their labour cost (an explicit 0 included), else the standard
  * visit cost. Each is kept in the currency of the Agreement its Order or Return order names, else in the one its
  * Customer's Agreements share (a site audit's); one without a currency is left out and counted.
  */
-function addFieldLabour(periodId: string, bounds: MonthBounds): Failed {
+function addFieldLabour(periodId: string, bounds: MonthBounds): Failures {
     const visitCost = intProperty(PROPERTY.visitCost)
     const currencies = memoized(customerCurrencies)
     const ledger = new CostLedger()
-    const result: Failed = { failed: 0, lastError: '' }
+    const result: Failures = { failed: 0, lastError: '' }
     const workOrder = new GlideRecord('wm_order')
     workOrder.addEncodedQuery(`x_daas_ham_purposeISNOTEMPTY^${timeInMonth('closed_at', bounds)}`)
     workOrder.query()
@@ -257,9 +253,9 @@ function workOrderAgreement(workOrder: GlideRecord): AgreementCurrency | null {
  * never converted. A voided label is refunded, so it is left out; one with a cost but no
  * currency or no Customer (a Cost fact needs both) is left out and counted.
  */
-function addShippingCosts(periodId: string, bounds: MonthBounds): Failed {
+function addShippingCosts(periodId: string, bounds: MonthBounds): Failures {
     const ledger = new CostLedger()
-    const result: Failed = { failed: 0, lastError: '' }
+    const result: Failures = { failed: 0, lastError: '' }
     const shipment = new GlideRecord('x_daas_ham_shipment')
     shipment.addEncodedQuery(`status!=${SHIPMENT_STATUS.voided}^cost>0^${timeInMonth('sys_created_on', bounds)}`)
     shipment.query()

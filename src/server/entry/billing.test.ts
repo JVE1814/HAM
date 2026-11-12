@@ -143,6 +143,23 @@ describe('Close period', () => {
         expect(close(period('2026-09'))).toEqual(['error Only a period ready for review can be closed'])
         expect(platform.events).toEqual([])
     })
+
+    it('marks the open fees it bills billed, and takes a fee waived during review off the period with its line', () => {
+        rows(FEE).push(
+            { sys_id: 'fee2', fee_type: 'damaged', customer: 'acme', agreement: 'ag1', asset: 'a2', amount: '30', occurred_on: '2026-09-21', status: 'open' },
+            { sys_id: 'fee3', fee_type: 'lost', customer: 'acme', agreement: 'ag1', asset: 'a3', amount: '50', occurred_on: '2026-10-02', status: 'open' },
+        )
+        generate('2026-09')
+        Object.assign(fee('fee2') ?? {}, { status: 'waived' })
+
+        expect(close(period('2026-09'))).toEqual(closed('2026-09'))
+
+        const periodId = periodRow('2026-09')?.sys_id
+        expect(fee('fee1')).toMatchObject({ status: 'billed', billing_period: periodId })
+        expect(fee('fee2')).toMatchObject({ status: 'waived', billing_period: '' })
+        expect(fee('fee3')).toMatchObject({ status: 'open' })
+        expect(linesOf('2026-09').map((line) => line.fee_event).filter(Boolean)).toEqual(['fee1'])
+    })
 })
 
 describe('Close and Regenerate of one period at once', () => {

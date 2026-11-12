@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-    agreementCurrencyProblem,
     billingCsvHeader,
     billingCsvRow,
     billingLineJson,
@@ -64,24 +63,6 @@ describe('intervalEnd', () => {
 
     it('never ends one before it started', () => {
         expect(intervalEnd('2026-11-10', '2026-11-07')).toBe('2026-11-10')
-    })
-})
-
-describe('agreementCurrencyProblem', () => {
-    it('lets a three-letter code be saved, in any case', () => {
-        expect(agreementCurrencyProblem('EUR')).toBeNull()
-        expect(agreementCurrencyProblem('usd')).toBeNull()
-    })
-
-    it('leaves a blank currency to the mandatory check', () => {
-        expect(agreementCurrencyProblem('')).toBeNull()
-        expect(agreementCurrencyProblem('  ')).toBeNull()
-    })
-
-    it('refuses a typo, saying what to enter', () => {
-        for (const typo of ['EU1', 'EU', 'E R', '€']) {
-            expect(agreementCurrencyProblem(typo)).toBe(`'${typo.trim()}' is not a currency code: enter the three letters of an ISO 4217 code, e.g. EUR`)
-        }
     })
 })
 

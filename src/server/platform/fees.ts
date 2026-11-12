@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { chargedFeeQuery, type FeeIdentity } from '../domain/fees.ts'
+import { chargedFeeQuery, type FeeIdentity, openFeeQuery } from '../domain/fees.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { FEE_STATUS, type FeeType } from '../domain/vocabulary.ts'
@@ -69,17 +69,14 @@ function chargeHolding(lock: HeldLock, fee: FeeIdentity, asset: GlideRecord, amo
     if (saved === 'refused') warnRefused(record, `${what} not recorded`)
 }
 
-/** Waive the not-yet-billed fees of one type charged for an Asset on a Return order. */
-export function waiveOpenFees(type: FeeType, assetId: string, returnOrderId: string): void {
+/** Waive the not-yet-billed charges of `identity`. */
+export function waiveOpenFees(identity: FeeIdentity): void {
     const fee = new GlideRecord(FEE)
-    fee.addQuery('fee_type', type)
-    fee.addQuery('asset', assetId)
-    fee.addQuery('return_order', returnOrderId)
-    fee.addQuery('status', FEE_STATUS.open)
+    fee.addEncodedQuery(openFeeQuery(identity))
     fee.query()
     while (fee.next()) {
         fee.setValue('status', FEE_STATUS.waived)
         // Left open, it is billed for a unit that came back.
-        if (!fee.update()) warnRefused(fee, `${type} fee ${fee.getUniqueValue()} not waived`)
+        if (!fee.update()) warnRefused(fee, `${identity.type} fee ${fee.getUniqueValue()} not waived`)
     }
 }
