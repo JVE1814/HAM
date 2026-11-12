@@ -79,7 +79,6 @@ export function submitDisposal(order: GlideRecord): DisposalSubmission {
 
 const DISPOSAL_APPROVAL: ApprovalFlow = {
     awaitingStage: DISPOSAL_STAGE.awaiting_approval,
-    standIn: 'provider',
     required: (order) => disposalApprovers(assetsOf(order.getUniqueValue()).map((asset) => asset.legalOwner)),
     decide: (order, outcome) => {
         order.setValue('approval', outcome)

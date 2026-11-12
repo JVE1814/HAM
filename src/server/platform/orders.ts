@@ -375,7 +375,6 @@ function warnIfLineLockLost(locks: readonly HeldLock[], number: string): void {
 
 const ORDER_APPROVAL: ApprovalFlow = {
     awaitingStage: ORDER_STAGE.awaiting_approval,
-    standIn: 'provider',
     required: (order) => approversFor(str(order, 'entitlement_verdict') as EntitlementVerdict),
     decide: (order, outcome) => (outcome === 'approved' ? startSourcing(order) : rejectOrder(order)),
 }
