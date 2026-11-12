@@ -95,8 +95,8 @@ export function receivedLate(dueBack: string, today: string): boolean {
     return !!dueBack && today > dueBack
 }
 
-/** The days a Customer has to hand equipment back when its Agreement names no allowance. */
-const DEFAULT_RETURN_ALLOWANCE_DAYS = 30
+/** The days a Customer has to hand equipment back when its Agreement names no allowance, and a new Agreement's allowance. */
+export const DEFAULT_RETURN_ALLOWANCE_DAYS = 30
 
 /** The day a Return raised on `raisedOn` is due back: after its Agreement's allowance (0 when it names none). */
 export function returnDueDate(raisedOn: string, allowanceDays: number): string {

@@ -18,6 +18,7 @@ import {
     SUBSCRIPTION_LINE_STATUS_CHOICES,
     SUBSCRIPTION_LINE_TYPE_CHOICES,
 } from '../../server/domain/vocabulary'
+import { DEFAULT_RETURN_ALLOWANCE_DAYS } from '../../server/domain/returns'
 import { NAAS_MODEL_CONDITION } from '../../server/domain/fleet'
 
 export const x_daas_ham_agreement = Table({
@@ -48,7 +49,7 @@ export const x_daas_ham_agreement = Table({
             dropdown: 'dropdown_without_none',
         }),
         spare_pool_ratio: DecimalColumn({ label: 'Spare-pool ratio', default: '0.05' }),
-        overdue_return_days: IntegerColumn({ label: 'Return due within (days)', default: 30, min: 1 }),
+        overdue_return_days: IntegerColumn({ label: 'Return due within (days)', default: DEFAULT_RETURN_ALLOWANCE_DAYS, min: 1 }),
         lost_asset_fee: DecimalColumn({ label: 'Lost asset fee' }),
         late_return_fee: DecimalColumn({ label: 'Late return fee' }),
         damage_fee: DecimalColumn({ label: 'Damage fee' }),
