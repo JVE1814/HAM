@@ -8,12 +8,11 @@ import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { AppContext } from '@/lib/app'
 import { sessionQuery } from '@/lib/session'
-import { fieldsQuery, listPageQuery, pageWithin, recordHref, type Field, type ListView, type SnRow } from '@/lib/sn'
+import { fieldsQuery, listPageQuery, pageWithin, recordHref, type Field, type SnRow } from '@/lib/sn'
 import { listById, menuFor, type ListId, type WorkspaceList } from './catalog'
 import { tabsFor } from './dashboard'
+import { parseListSearch, searchOf, viewOf, type ListSearch } from './list-search'
 import { WidgetCard } from './widget'
-
-const PAGE_SIZE = 50
 
 const listPath = (id: ListId) => `/lists/${id}`
 
@@ -66,38 +65,6 @@ function DashboardPage() {
             ))}
         </Tabs>
     )
-}
-
-/** A list's view in its address: `?page=2&sort=-ends&q=cisco`, each left out at its default. */
-interface ListSearch {
-    page?: number
-    /** A field, `-` first for descending. */
-    sort?: string
-    q?: string
-}
-
-function parseListSearch(search: Record<string, unknown>): ListSearch {
-    const page = Number(search.page)
-    const sort = typeof search.sort === 'string' && /^-?[\w.]+$/.test(search.sort) ? search.sort : undefined
-    const q = typeof search.q === 'string' || typeof search.q === 'number' ? String(search.q) : ''
-    return { ...(Number.isInteger(page) && page > 1 ? { page } : {}), ...(sort ? { sort } : {}), ...(q ? { q } : {}) }
-}
-
-function viewOf({ page, sort, q }: ListSearch): ListView {
-    return {
-        page: (page ?? 1) - 1,
-        size: PAGE_SIZE,
-        sort: sort ? { id: sort.replace(/^-/, ''), desc: sort.startsWith('-') } : null,
-        search: q ?? '',
-    }
-}
-
-function searchOf(view: ListView): ListSearch {
-    return {
-        ...(view.page > 0 ? { page: view.page + 1 } : {}),
-        ...(view.sort ? { sort: `${view.sort.desc ? '-' : ''}${view.sort.id}` } : {}),
-        ...(view.search ? { q: view.search } : {}),
-    }
 }
 
 const listRoute = createRoute({

@@ -9126,6 +9126,7 @@ declare global {
                     {
                         table: 'sys_ux_lib_asset'
                         id: '104f8200dabe4a0693ca79ad208dcf26'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham/workspace/main-DpUbscen'
                         }
@@ -28021,6 +28022,7 @@ declare global {
                     {
                         table: 'sys_ux_lib_asset'
                         id: '657bbedd28bb43a99918e54dbcb771a3'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham/workspace/main-DpUbscen.js.map'
                         }
@@ -36437,6 +36439,13 @@ declare global {
                         key: {
                             document_key: '97046e726f824b3e9820d07fd0eacef1'
                             variable: 'dd54cf535320220002c6435723dc34fd'
+                        }
+                    },
+                    {
+                        table: 'sys_ux_lib_asset'
+                        id: '88a6f34fc6ab49acbcd7336f867a9524'
+                        key: {
+                            name: 'x_daas_ham/workspace/main-BtptpYvN.js.map'
                         }
                     },
                     {
@@ -59847,6 +59856,13 @@ declare global {
                         key: {
                             name: 'x_daas_ham_fee_event'
                             element: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_ux_lib_asset'
+                        id: 'f55cb5c6bb0c493bbd3b9069877eb059'
+                        key: {
+                            name: 'x_daas_ham/workspace/main-BtptpYvN'
                         }
                     },
                     {
