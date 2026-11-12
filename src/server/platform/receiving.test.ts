@@ -84,4 +84,27 @@ describe('receiving a unit that comes back from a Site', () => {
         expect(returnLine()).toEqual(earlier)
         expect(rows(FEES)).toEqual([])
     })
+
+    it('waives only the open lost fee of a unit declared missing that turns up', () => {
+        Object.assign(unit(), inStage('missing'))
+        returnLine().status = 'missing'
+        const lostFee = (sys_id: string, fields: Row) => ({ sys_id, fee_type: 'lost', asset: 'asset1', return_order: 'ret1', status: 'open', ...fields })
+        platform.tables[FEES] = [
+            lostFee('fee1', {}),
+            lostFee('fee2', { status: 'billed' }),
+            lostFee('fee3', { return_order: 'ret0' }),
+            lostFee('fee4', { asset: 'asset2' }),
+            lostFee('fee5', { fee_type: 'damaged' }),
+        ]
+
+        expect(receive({ code: 'FOC111' }, 'depot1')).toHaveProperty('asset')
+
+        expect(rows(FEES).filter((fee) => fee.fee_type !== 'late_return').map((fee) => [fee.sys_id, fee.status])).toEqual([
+            ['fee1', 'waived'],
+            ['fee2', 'billed'],
+            ['fee3', 'open'],
+            ['fee4', 'open'],
+            ['fee5', 'open'],
+        ])
+    })
 })

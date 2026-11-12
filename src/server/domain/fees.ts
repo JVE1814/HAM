@@ -7,7 +7,16 @@ export interface FeeIdentity {
     returnOrderId: string
 }
 
+function sameFeeQuery(fee: FeeIdentity): string {
+    return `fee_type=${fee.type}^asset=${fee.assetId}^return_order=${fee.returnOrderId}`
+}
+
 /** The x_daas_ham_fee_event query for the charges of `fee` that count, any not waived: it is charged at most once. */
 export function chargedFeeQuery(fee: FeeIdentity): string {
-    return `fee_type=${fee.type}^asset=${fee.assetId}^return_order=${fee.returnOrderId}^status!=${FEE_STATUS.waived}`
+    return `${sameFeeQuery(fee)}^status!=${FEE_STATUS.waived}`
+}
+
+/** The x_daas_ham_fee_event query for the charges of `fee` not yet billed or waived. */
+export function openFeeQuery(fee: FeeIdentity): string {
+    return `${sameFeeQuery(fee)}^status=${FEE_STATUS.open}`
 }

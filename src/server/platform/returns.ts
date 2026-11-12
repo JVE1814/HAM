@@ -406,7 +406,7 @@ function settleReceivedLine(line: GlideRecord, asset: GlideRecord): void {
     if (!returnOrder) return
     if (turnedUp) {
         // Declared missing, then found: it is late, not lost, and its line needs evaluating again.
-        waiveOpenFees('lost', asset.getUniqueValue(), returnOrder.getUniqueValue())
+        waiveOpenFees({ type: 'lost', assetId: asset.getUniqueValue(), returnOrderId: returnOrder.getUniqueValue() })
         returnOrder.setValue('state', TASK_STATE.workInProgress)
         if (!returnOrder.update()) warnRefused(returnOrder, `${str(returnOrder, 'number')} not reopened for ${serial}`)
     }
