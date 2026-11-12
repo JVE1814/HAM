@@ -191,5 +191,20 @@ const NOTHING = Object.fromEntries(Object.keys(GENERATED).map((table) => [table,
     assert.match(dev.run(GENERATE, full), /created \{"x_daas_ham_service_interval":1\}, 0 refused, in \d+ s; complete$/)
     assert.deepEqual(counts(dev), GENERATED, 'a rerun creates the refused interval')
 }
+for (const [parent, children] of [
+    ['cmn_location', { x_daas_ham_subscription_line: 'site' }],
+    ['customer_account', { x_daas_ham_agreement: 'customer', cmn_location: 'company', x_daas_ham_subscription_line: 'customer' }],
+]) {
+    let refusals = 1
+    const dev = instance({ refuse: (table) => table === parent && refusals-- > 0 })
+    const full = { ...SHAPE, confirm: INSTANCE }
+    assert.doesNotMatch(dev.run(GENERATE, full), /complete$/, `a run with a refused ${parent} is not complete`)
+    assert.match(dev.run(GENERATE, full), /0 refused, in \d+ s; complete$/)
+    for (const [table, field] of Object.entries(children)) {
+        const orphans = dev.rowsOf(table).filter((row) => !row[field])
+        assert.equal(orphans.length, 0, `no ${table} names an empty ${field} after a refused ${parent} is retried`)
+    }
+    assert.deepEqual(counts(dev), GENERATED, `a rerun after a refused ${parent} creates every row once`)
+}
 
-console.log('dry run ok: 2 customers, 2 agreements, 6 sites, 6 lines, 30 assets, 30 intervals; rerun 0; capped 5 runs; refused interval retried; cleanup 4 runs')
+console.log('dry run ok: 2 customers, 2 agreements, 6 sites, 6 lines, 30 assets, 30 intervals; rerun 0; capped 5 runs; refused interval, Site and Customer retried; cleanup 4 runs')

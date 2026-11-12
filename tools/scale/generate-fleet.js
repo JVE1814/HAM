@@ -152,6 +152,8 @@
         for (var c = 1; c <= PARAMS.customers && complete; c++) {
             var name = 'Scale Customer ' + pad(c, 4);
             var customer = ensure('customer_account', { name: name }, { customer: true, number: 'ACCT-SCALE-' + pad(c, 4) });
+            // A record is only looked up by its key on the next run, never repaired, so nothing is made under a refused parent.
+            if (!customer) continue;
             var agreement = ensure('x_daas_ham_agreement', { customer: customer }, {
                 short_description: name + ' network',
                 state: 'active',
@@ -169,9 +171,11 @@
                 damage_fee: 400,
                 attestation_interval_months: 12,
             });
+            if (!agreement) continue;
             for (var s = 1; s <= PARAMS.sitesPerCustomer && complete; s++) {
                 var siteName = 'Scale Site ' + pad(c, 4) + '-' + pad(s, 3);
                 var site = ensure('cmn_location', { name: siteName }, { company: customer, city: 'Scale City', x_daas_ham_is_site: true });
+                if (!site) continue;
                 var line = ensure('x_daas_ham_subscription_line', { description: siteName + ' package' }, {
                     agreement: agreement,
                     customer: customer,
@@ -181,7 +185,7 @@
                     status: 'active',
                     start_date: '2026-02-01',
                 });
-                if (!customer || !agreement || !site || !line) continue;
+                if (!line) continue;
                 complete = fillSite(assets, models, { customer: c, site: s }, customer, agreement, site, line);
             }
         }
