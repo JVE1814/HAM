@@ -302,7 +302,7 @@ src/server/
                  record producer): reads its inputs, calls a platform service, reports the
                  outcome in the trigger's terms
   test-support/  the tests' in-memory stand-in for Glide and their encoded-query evaluator
-src/client/      React UI pages (warehouse, rack elevation, customer self-service)
+src/client/      React UI pages (workspace, warehouse, rack elevation, customer self-service)
 ```
 
 Conventions that the build or tests enforce:
@@ -400,7 +400,8 @@ the demo data loader).
   scoped table), the customer page (it reads several features) and the ATF suites (one per delivery
   phase, each listing tests of several features).
 - `workspace/` holds the workspace's UI page and its ACL. Its lists and its dashboard are data in
-  `src/client/workspace/` (`catalog.ts`, `dashboard.ts`), each one structure over every table.
+  `src/client/workspace/` (`catalog.ts`, `dashboard.ts`), each one structure over every table
+  ([ADR 0019](docs/adr/0019-workspace-is-a-react-page.md)).
 - A record's sys_id is keyed by its `$id` name in `generated/keys.ts`, not by its file: moving a
   record to another file changes nothing in the build.
 

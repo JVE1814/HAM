@@ -145,7 +145,7 @@ checked by reading only. Each executor still runs its own gate.
 | [031](031-ship-order-tests.md) | Test Ship and install confirmation on the fake Glide | P2 | M | none | TODO |
 | [032](032-customer-direct-insert-checks.md) | Check an Order or Return order a Customer contact inserts, whatever inserts it | P2 | M | step 1 instance check | TODO |
 | [033](033-typecheck-client-tests.md) | Make `npm run typecheck` check the client tests the way the build does | P3 | S | none | TODO |
-| [034](034-adr-react-workspace.md) | Record in an ADR that the workspace is a React page, not a Fluent Workspace | P3 | S | none | TODO |
+| [034](034-adr-react-workspace.md) | Record in an ADR that the workspace is a React page, not a Fluent Workspace | P3 | S | none | DONE (Owner-to-fill paragraph in ADR 0019 awaits the owner) |
 | [035](035-go-live-from-first-sighting.md) | Start billing from the first sighting since the install, also when the go-live is put off | P3 | M | 024 (landing order) | TODO |
 | [036](036-scale-generator-field-check.md) | Hold the scale scripts to the app's columns and choices before they run on an instance | P3 | S | none; land before 022's instance run | TODO |
 | [037](037-tracking-webhook-bounds.md) | Refuse a short webhook token, and take at most 100 tracking events from one update | P3 | S | 030 (landing order) | TODO |
