@@ -13,6 +13,8 @@ export const JOB = {
     sparePoolTopUp: 'spare_pool_top_up',
     providerTagSequence: 'provider_tag_sequence',
     oemClaimStranded: 'oem_claim_stranded',
+    endedAgreementReturns: 'ended_agreement_returns',
+    temporaryOrderReturns: 'temporary_order_returns',
     preflight: 'preflight',
     margin: (periodId: string) => `margin_${periodId}`,
     billingGenerate: (periodId: string) => `billing_generate_${periodId}`,

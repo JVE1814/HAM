@@ -203,8 +203,10 @@ cursors* in the workspace) shows how each scheduled pass ended: a *Last status* 
 far*) means records failed; *Failed (this pass)* and *Last error* say how many and the last error,
 and each run logs them as an error in the system log. Some rows are no scheduled pass and read
 differently: `preflight` holds the preflight check's result, `billing_generate_<period sys_id>` a
-billing pass (ADR 0007), `provider_tag_sequence` the Provider tag counter, and `oem_claim_stranded`
-only where the OEM claim run's check for stranded steps goes on from, with no status.
+billing pass (ADR 0007), `provider_tag_sequence` the Provider tag counter, `oem_claim_stranded`
+only where the OEM claim run's check for stranded steps goes on from, and
+`ended_agreement_returns` and `temporary_order_returns` only where the daily job that raises
+agreement-end and temporary-end returns reads on from, each with no status.
 
 A generator for a dev instance and a timing protocol are drafted in
 [research/scale-test.md](research/scale-test.md), with the prototype in `tools/scale/`. Neither has

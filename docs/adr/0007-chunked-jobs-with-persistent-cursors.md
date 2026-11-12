@@ -42,8 +42,12 @@ Other scheduled jobs do not use the runner. Each bounds its work its own way, or
   (the `x_daas_ham_job_cursor` row `oem_claim_stranded`, which holds only that position), starting
   over after the last.
 - Scheduled returns (`platform/scheduled-returns.ts` `raiseDueReturns`) take a limited number of ended
-  Agreements and of ending temporary Orders a run (the limits are in that module); each one raised
-  is flagged and drops out.
+  Agreements and of ending temporary Orders a run (`PAGE` in that module), each in sys_id order
+  from where the last run stopped (the `x_daas_ham_job_cursor` rows `ended_agreement_returns` and
+  `temporary_order_returns`, which hold only that position), starting over after the last. Each
+  one raised is flagged and drops out. One left for a later run (a Return or its mark refused, an
+  Order still being installed) stays, and no longer keeps those after it from being read; a run
+  that leaves every record it read logs a warning.
 - Attestations (`platform/attestations.ts` `raiseDueAttestations`) read the Sites of each active
   Agreement with an attestation interval with one count of its in-service or temporarily deployed
   fleet assets grouped by Site, so no Asset row is read, then check each Site for an open

@@ -82,6 +82,10 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
 | Agreement end | Daily job, once per Agreement after its end date: one Return per Site for all equipment installed or still shipped there, each a field de-install with its own normal change and de-install work order; each Site's Return is raised once per end, so a run whose mark on the Agreement is refused (logged) raises nothing twice and saves the mark again |
 | Temporary end | Daily job, `x_daas_ham.returns.temporary_lead_days` before a temporary Order's end date; raised once per Order, and a refused mark is logged and saved again on the next run |
 
+- The daily job reads at most 50 ended Agreements and 50 ending temporary Orders a run, each in
+  sys_id order from where the last run stopped, and starts over after the last (ADR 0007). One it
+  leaves for a later run (a Return or its mark refused, an Order still being installed) does not
+  keep those after it from being read. A run that leaves every record it read logs a warning.
 - Through the record producer, a return is raised only when the Return create rule lets its requester
   in (asset managers, account managers, NOC, the service desk and Customer admins): a Customer admin
   requests only for their own Customer, the others for any Customer, and site contacts never. The Site
