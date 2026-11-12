@@ -22,19 +22,19 @@ import {
 import { chooseCurrency, currencyOrThrow, monthBounds, overlapsMonth, type AgreementCurrency, type MonthBounds } from '../domain/money.ts'
 import { appendTo } from '../domain/collections.ts'
 import { messageOf } from '../domain/errors.ts'
-import type { FeeIdentity } from '../domain/fees.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { memoized } from '../domain/memo.ts'
 import { agreementCurrencyOf, customerCurrencies } from './agreements.ts'
 import { inCurrentPass, queuePass, runTriggeredChunk, visitInKeyOrder, type EventJobResult } from './chunked.ts'
 import { glideToMs, nowGlide, nowMs } from './clock.ts'
 import { queueJob, type JobEvent } from './events.ts'
+import { feeIdentityOf } from './fees.ts'
 import { EVENT } from '../domain/events.ts'
 import { findJobCursor, retirePass } from './job-cursor.ts'
 import { dropLinesForRegeneration } from './closed-period.ts'
 import { attemptLock, whyNotRun } from './locks.ts'
 import { deleteWhere, exists, findById, num, refusal, str, throwRefused } from './records.ts'
-import { BILLING_LINE_KIND, BILLING_PERIOD_STATUS, FEE_STATUS, type FeeStatus, type FeeType, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
+import { BILLING_LINE_KIND, BILLING_PERIOD_STATUS, FEE_STATUS, type FeeStatus, SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
 import { log } from './log.ts'
 
 /** Billing periods: generate, review, close (lock) and export (plan §13 Billing export, Q66). */
@@ -381,8 +381,7 @@ type FeeBilling = 'billed' | 'left' | { failed: string }
  * when another period has it by then, else it fails.
  */
 function billOnPeriod(fee: GlideRecord, periodId: string, addLine: (fee: GlideRecord) => void): FeeBilling {
-    const identity: FeeIdentity = { type: str(fee, 'fee_type') as FeeType, assetId: str(fee, 'asset'), returnOrderId: str(fee, 'return_order') }
-    const attempt = attemptLock(LOCK.fee(identity), (): FeeBilling => {
+    const attempt = attemptLock(LOCK.fee(feeIdentityOf(fee)), (): FeeBilling => {
         const current = findById(FEE, fee.getUniqueValue())
         if (!current || !billableOn(current, periodId)) return 'left'
         addLine(current)

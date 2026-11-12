@@ -69,6 +69,11 @@ function chargeHolding(lock: HeldLock, fee: FeeIdentity, asset: GlideRecord, amo
     if (saved === 'refused') warnRefused(record, `${what} not recorded`)
 }
 
+/** The identity a fee record was charged under (`chargeHolding`): what names its lock while it is charged or billed. */
+export function feeIdentityOf(fee: GlideRecord): FeeIdentity {
+    return { type: str(fee, 'fee_type') as FeeType, assetId: str(fee, 'asset'), returnOrderId: str(fee, 'return_order') }
+}
+
 /** Waive the not-yet-billed charges of `identity`. */
 export function waiveOpenFees(identity: FeeIdentity): void {
     const fee = new GlideRecord(FEE)
