@@ -397,7 +397,7 @@ Customer contact (the page's ACL). Its sidebar offers a role only the lists of i
 (`catalog.ts`), and each list shows what the table's ACLs and before-query rules let the user
 read. As a NOC-only or inventory-tech-only user, Operations,
 Billing integrity and Lifecycle risk show counts and the Margin tab is not offered; an inventory
-tech gets no subscription-line or reconciliation-exception figures. As finance, the Margin tab
+tech is not offered the subscription-line and reconciliation-exception tiles. As finance, the Margin tab
 shows figures, each in its own currency. As a non-admin staff user, *Overdue returns*, *Agreements
 up for renewal* and the Margin tiles (`javascript:gs.…` dates in the query) and *My staging tasks*
 (`assigned_toDYNAMIC`) show rows, and every list has its column labels (`/api/now/ui/meta`).

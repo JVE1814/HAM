@@ -57,7 +57,7 @@ import { PROPERTY, type PropertyOf } from './domain/properties'
 import type { ForeignRecord } from './platform/records'
 import { restMessagePort } from './platform/rest-messages'
 import { AUDIENCE, CATEGORIES } from '../client/workspace/catalog'
-import { DASHBOARD } from '../client/workspace/dashboard'
+import { DASHBOARD, widgetAudience } from '../client/workspace/dashboard'
 
 // The wired entry and platform functions this test type-checks, and the REST message port it calls, import Glide. A
 // property reads as its declared value.
@@ -1073,6 +1073,18 @@ describe('the NaaS Asset Workspace', () => {
         for (const table of tables) expect(readsOf(table).length, table).toBeGreaterThan(0)
         for (const table of ['x_daas_ham_margin', 'x_daas_ham_cost_fact']) {
             expect(readsOf(table).map((acl) => [...acl.roles].sort()), table).toEqual([MONEY_READERS])
+        }
+    })
+
+    it('offers each widget only to roles that read its table, so none shows a role a refusal', () => {
+        const rolesOf: Readonly<Record<string, readonly string[]>> = AUDIENCE
+        for (const tab of DASHBOARD) {
+            for (const widget of tab.widgets) {
+                const readers = readsOf(widget.source.table).flatMap((acl) => acl.roles)
+                const offered = (rolesOf[tab.audience] ?? []).filter((role) => rolesOf[widgetAudience(tab, widget)]?.includes(role))
+                expect(offered.length, `${tab.id} ${widget.id}`).toBeGreaterThan(0)
+                expect(offered.filter((role) => !readers.includes(role)), `${tab.id} ${widget.id}`).toEqual([])
+            }
         }
     })
 
