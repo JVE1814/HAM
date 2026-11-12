@@ -1363,6 +1363,41 @@ describe('the record producers', () => {
         )
         expect(scripts).toHaveLength(2)
     })
+
+    // The specs' requesters of both: the Order and Return create rules' roles (docs/spec/p1-ordering.md "Raising an
+    // Order", p2-aftersales.md). The service desk's role is the platform's, its sys_id per instance, so it is matched by
+    // name in the script.
+    const BY_ROLE = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, ROLE.customerAdmin].sort()
+
+    it('are available for the Order raisers and Customer admins only, never site contacts, with no Not available for row', () => {
+        const roleNames = new Map(records('sys_user_role').map((role) => [role.sys_id, role.name]))
+        const criteria = new Map(records('user_criteria').map((criterion) => [criterion.sys_id, criterion]))
+        const audiences = records('sc_cat_item_producer').map((producer) => ({
+            table: producer.table_name,
+            availableFor: records('sc_cat_item_user_criteria_mtom')
+                .filter((row) => row.sc_cat_item === producer.sys_id)
+                .map((row) => criteria.get(row.user_criteria ?? ''))
+                .map((criterion) => ({
+                    active: criterion?.active,
+                    matchAll: criterion?.match_all,
+                    roles: (criterion?.role ?? '')
+                        .split(',')
+                        .map((id) => roleNames.get(id) ?? `unknown role ${id}`)
+                        .sort(),
+                    script: criterion?.script ?? '',
+                })),
+        }))
+        expect(audiences.map(({ table }) => table).sort()).toEqual(['x_daas_ham_order', 'x_daas_ham_return_order'])
+        for (const { table, availableFor } of audiences) {
+            expect({ table, availableFor }).toEqual({ table, availableFor: [{ active: 'true', matchAll: 'false', roles: BY_ROLE, script: expect.any(String) }] })
+            const { script = '', roles = [] } = availableFor[0] ?? {}
+            expect(script).toContain(`held.addQuery('user', user_id);`)
+            expect(script).toContain(`held.addQuery('role.name', '${PLATFORM_ROLE.serviceDeskAgent}');`)
+            expect(script).not.toContain(ROLE.siteContact)
+            expect(roles).not.toContain(ROLE.siteContact)
+        }
+        expect(records('sc_cat_item_user_criteria_no_mtom')).toEqual([])
+    })
 })
 
 /*

@@ -87,6 +87,9 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   leaves for a later run (a Return or its mark refused, an Order still being installed) does not
   keep those after it from being read. A run that reads a full page and leaves every record of it
   logs a warning.
+- The record producer is offered to those the Return create rule lets in only (its user criterion
+  *NaaS - Order and Return raisers*). The platform also makes it *Not available for: SNC External*,
+  which keeps every Customer admin out until an admin removes that row (README "Install").
 - Through the record producer, a return is raised only when the Return create rule lets its requester
   in (asset managers, account managers, NOC, the service desk and Customer admins): a Customer admin
   requests only for their own Customer, the others for any Customer, and site contacts never. The Site

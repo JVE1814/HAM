@@ -14,7 +14,7 @@ import { BROAD_STAFF } from '../../server/domain/roles'
 import { afterReturnProduced, beforeReturnProduced } from '../../server/entry/returns'
 import { FLEET_INSTALLED, SITES_OF_CUSTOMER_QUERY } from '../../server/domain/fleet'
 import { SERVICE_CATALOG } from '../orders/forms.now'
-import { orderRaisers, providerStaff } from '../shared/roles.now'
+import { orderRaisers, producerRequesters, providerStaff } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
 Form({
@@ -116,6 +116,7 @@ export const requestReturn = CatalogItemRecordProducer({
     shortDescription: 'Decommission a whole site or remove individual devices; equipment is collected or shipped back.',
     table: 'x_daas_ham_return_order',
     catalogs: [SERVICE_CATALOG],
+    availableFor: [producerRequesters],
     redirectUrl: 'generatedRecord',
     variables: {
         customer: ReferenceVariable({

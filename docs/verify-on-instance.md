@@ -48,7 +48,10 @@ Run the on-demand job **NaaS - preflight check** (*System Definition > Scheduled
 present*, as on the development instance on 2026-11-09. Otherwise it reads *N prerequisite(s)
 missing* and names them, each also logged as an error. While `x_daas_ham.shipping.webhook_token`
 holds fewer than 32 characters it also reads *1 setting(s) to correct* and names that property, not
-its value; an empty token is not reported.
+its value; an empty token is not reported. Each record producer of the app that still has a *Not
+available for* row is a setting to correct too, named with its criterion: both, with *SNC
+External*, until an admin runs the script in README "Install"
+([customer creates](#customer-creates)).
 
 ### Choices
 
@@ -389,6 +392,19 @@ Site templates, the generated Order opens with its lines and *Submit* goes ahead
 producer opens the Return it raised. A Return they request through the producer for a Site of
 another Customer is refused and removed: no Return order of it stays open, and the system log has
 no *not removed* warning.
+
+Who opens the record producers (`shared/roles.now.ts` `producerRequesters`). After the install
+and the admin script of README "Install", each producer lists *Available for: NaaS - Order and
+Return raisers* and no *Not available for* row, and the script printed both with `removed`.
+Impersonating a customer admin, a service desk agent (`sn_customerservice_agent` only), a site
+contact and an internal user with no NaaS role, `GET
+/api/sn_sc/servicecatalog/items/<producer sys_id>` answers HTTP 200, 200, 400 and 400. On the
+development instance on 2026-11-12, a copy of a producer answered so with one criterion naming all
+five roles in its role list and *SNC External* removed (external-contracts N49). The app's
+criterion matches the service desk by name in its script instead, as that role's sys_id differs
+between instances: no instance has run that script yet, so the agent's HTTP 200 is the check of it.
+Before the admin script, the preflight check names both producers, and a customer admin gets HTTP
+400 for both.
 
 The before-insert rules (`returns/logic.now.ts`, `orders/logic.now.ts`). A customer admin is an
 external user (`snc_external`), and the platform's `*.*` create field ACL lets only internal users

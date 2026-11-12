@@ -776,6 +776,7 @@ Sources:
 | `gs.getPropertySecured` and a password2 property's read roles | Every secret is read with `gs.getProperty` (`platform/properties.ts` secretProperty), not `gs.getPropertySecured`; each declares read and write roles `admin`; the tracking webhook reads its token as guest, and *Ship* and *Create return label* read the ShipEngine key as asset managers or inventory techs | Not documented (only the signature in the typings). On an instance `getPropertySecured` checks the property's read roles against the session user and gives a non-admin the default; `getProperty` gives everyone the stored value | matches | N44, N45 |
 | A work note on a task-extended table | A note is added by assigning `work_notes` (`platform/records.ts` addWorkNote) and stored by the next insert or update, even one that changes nothing else | `setValue('work_notes', x)`, `setValue('comments', x)` and `getElement(f).setValue(x)` store nothing, in global and in `x_daas_ham`: the field reads back blank and a save with nothing else changed writes nothing yet returns the sys_id. Assignment stores one journal entry per assignment. `setJournalEntry` and `setDisplayValue` are refused in `x_daas_ham`. A journal field reads blank once read or saved | matches | N46 |
 | A record producer request refused before its insert | A Customer contact's request is refused in the producer's own script (`entry/orders` beforeOrderProduced, `entry/returns` beforeReturnProduced), before the before-insert rules that refuse every other insert | Refused by a before-insert business rule, the platform still writes the request's answers to `question_answer` and skips the post-insert script. Refused by `current.setAbortAction(true)` in the producer's script, it writes no answer and skips the post-insert script. That script sees the mapped values. `question_answer` is global with *Can delete* off and the app holds no privilege on it | matches | N48 |
+| Who may open a record producer | Each producer is *Available for* one user criterion with the app's requester roles in its role list and the service desk's matched by name in its script (`shared/roles.now.ts` producerRequesters); the platform's *Not available for: SNC External* is removed by an admin in global scope after the install (README "Install"); the preflight check reports a producer that still has a *Not available for* row | The platform adds *Not available for: SNC External* in the insert of every catalog item, and again whenever one is left with no criterion; *Not available for* wins over *Available for*. The row is in no update set, the update loader deletes by sys_id only, `Now.del` by keys mints a new sys_id, and `x_daas_ham` may not delete from `sc_cat_item_user_criteria_no_mtom`. A role's sys_id differs between instances (roles coalesce on name) | matches (the criterion's script was not run on an instance) | N49 |
 | Deleting a record producer's own record | A record its post-insert script refuses is deleted read again by its sys_id (`platform/records.ts` removeStored), not through the script's `current` | `current.deleteRecord()` in the post-insert script returns false, as admin too, with *Error during delete of ...* and a NullPointerException in `com.glide.db.PrimaryKey.getValue`; the row stays. A GlideRecord read by the same sys_id deletes it | matches | N47 |
 
 Notes:
@@ -1126,6 +1127,23 @@ Sources:
   no post-insert log. With the variable mapped to a field, the producer's script read the posted
   value from `current`. `sys_db_object` of `question_answer`: global, *Can delete* off. With the
   app's before-insert rules, a refused contact request left 6 answers per Return and 9 per Order.
+  The test records were deleted afterwards.
+- N49: development instance, 2026-11-12, `GET /api/sn_sc/servicecatalog/items/{id}`,
+  `submit_producer` and `sn_sc.CatItem.canView()` under impersonation, and background scripts on
+  copies of a producer. The deployed producers' only criterion was *Not available for: SNC
+  External*, created by admin in the same second as each item; a customer admin got HTTP 400
+  (*security constraints prevent access*) for both. A new item got the row in its insert's own
+  transaction, also with `setWorkflow(false)` and also when an *Available for* row naming its sys_id
+  was inserted first; no business rule or `glide.sc.*` property adds it. Deleting it with no other
+  criterion brought it back at once; with an *Available for* row it stayed deleted, through updates
+  of the item. With both rows, the customer admin, a site contact, an agent and a plain internal user
+  were all refused. With *Available for* one criterion of the roles asset manager, account manager,
+  NOC, customer admin and `sn_customerservice_agent` and *SNC External* deleted: customer admin and
+  agent HTTP 200, site contact and a user with `snc_internal` only HTTP 400. Through
+  `GlideUpdateManager2.loadXML`, a DELETE naming the row's keys under a new sys_id left it, one
+  naming its sys_id deleted it. From `x_daas_ham` the delete was refused by the table's cross-scope
+  access policy. ServiceNow KB1383355: `sys_user_role` records coalesce on name, so a role's sys_id
+  differs between instances, and a list field of role sys_ids that do not resolve grants nothing.
   The test records were deleted afterwards.
 
 ## Changes needed in the app

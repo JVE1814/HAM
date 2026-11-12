@@ -4310,6 +4310,10 @@ declare global {
                         table: 'sys_ui_action'
                         id: '45a282ec277343cb8ebc7c15e36b6440'
                     }
+                    uc_order_raisers: {
+                        table: 'user_criteria'
+                        id: '81f9fd119df842af865d02a65ed33be6'
+                    }
                     vs_order_devices: {
                         table: 'item_option_new_set'
                         id: '1db668e49f964e40bd59263b5c40a25b'
@@ -5223,6 +5227,14 @@ declare global {
                         table: 'sys_scope_privilege'
                         id: '850d9b76da524d31bf905a0a08100f1b'
                     }
+                    xsp_sc_cat_item_read: {
+                        table: 'sys_scope_privilege'
+                        id: 'c76126f43aab43fb841cd7a0a43f2ef1'
+                    }
+                    xsp_sc_cat_item_user_criteria_no_mtom_read: {
+                        table: 'sys_scope_privilege'
+                        id: '070d6684d5db42d79a7714bdbbcac367'
+                    }
                     xsp_sn_customerservice_case_create: {
                         table: 'sys_scope_privilege'
                         id: 'ff1e1502c00e436095ed630369673c73'
@@ -5287,6 +5299,10 @@ declare global {
                     xsp_task_read: {
                         table: 'sys_scope_privilege'
                         id: '8b17b045ea604e15ac5a7c30035ab57e'
+                    }
+                    xsp_user_criteria_read: {
+                        table: 'sys_scope_privilege'
+                        id: '7e1b5883ea424496933724093335e0ca'
                     }
                     xsp_wm_order_create: {
                         table: 'sys_scope_privilege'
@@ -34589,6 +34605,14 @@ declare global {
                         }
                     },
                     {
+                        table: 'sc_cat_item_user_criteria_mtom'
+                        id: '7f960ce66edd4de3ae8d164fe7ff1f2d'
+                        key: {
+                            sc_cat_item: '5d455ea958a8443a8913cf053541396f'
+                            user_criteria: '81f9fd119df842af865d02a65ed33be6'
+                        }
+                    },
+                    {
                         table: 'sys_variable_value'
                         id: '7fc7e5af4d1e46af8a0324e1ed432ae0'
                         key: {
@@ -35562,6 +35586,15 @@ declare global {
                         key: {
                             document_key: '0515b34d316840e79fadb121ffa9d22c'
                             variable: 'dd54cf535320220002c6435723dc34fd'
+                        }
+                    },
+                    {
+                        table: 'sc_cat_item_user_criteria_mtom'
+                        id: '839ae208b9a8431eb38ebf2ae6851ad3'
+                        deleted: false
+                        key: {
+                            sc_cat_item: 'b7ba0f44835549bb85650282ff5a23aa'
+                            user_criteria: '81f9fd119df842af865d02a65ed33be6'
                         }
                     },
                     {

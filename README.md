@@ -69,7 +69,8 @@ on-demand job **NaaS - preflight check** (System Definition > Scheduled Jobs); i
 
 The table says what each plugin is used for. What the preflight check looks for is one list in the
 code: the tables in `REQUIRED_TABLES` and the roles in `REQUIRED_ROLES`
-(`src/server/domain/preflight.ts`).
+(`src/server/domain/preflight.ts`). It also reports settings to correct: a short webhook token, and
+a record producer the platform still keeps from a criterion ([Install](#install)).
 
 The roles that must exist are the platform roles in `PLATFORM_ROLE` (`src/server/domain/roles.ts`).
 The app's own roles contain most of them. The app also grants Customer Service's service desk role
@@ -134,6 +135,26 @@ works at the NaaS stockrooms whose *Assignment group* they are a member of. Sett
 *Assignment group* takes the platform's `inventory_admin` (which `x_daas_ham.admin` contains); adding
 a user to a group takes `user_admin`.
 
+Open the two record producers to Customer admins. The app makes each *Available for* the user
+criterion *NaaS - Order and Return raisers* (asset managers, account managers, NOC, the service desk
+and Customer admins). The platform gives every new catalog item *Not available for: SNC External*,
+which wins over *Available for*, and every Customer admin is `snc_external`. No install removes that
+row, and the app's scope may not delete it, so after the install an admin runs this background
+script in global scope (*System Definition > Scripts - Background*):
+
+```js
+var row = new GlideRecord('sc_cat_item_user_criteria_no_mtom');
+row.addQuery('sc_cat_item.sys_scope.scope', 'x_daas_ham');
+row.addQuery('user_criteria.name', 'SNC External');
+row.query();
+while (row.next()) gs.print(row.getDisplayValue('sc_cat_item') + ': ' + (row.deleteRecord() ? 'removed' : 'kept'));
+```
+
+It prints each producer with `removed`. Run it only once the install has added *Available for*: the
+platform adds the row back at once to a catalog item left with no criterion. The preflight check
+names each producer that still has such a row
+([customer creates](docs/verify-on-instance.md#customer-creates)).
+
 The two machine roles go to integration users only, one user each: `x_daas_ham.integration` to
 the NMS's user and `x_daas_ham.billing_reader` to the billing consumer's
 ([Integrations](#integrations)). Neither is contained in a staff role.
@@ -190,6 +211,10 @@ On an instance where an earlier version was installed:
   answered HTTP 403. Nothing is lost by that: a pull is a read, to send again. Where the NMS and
   the billing consumer shared one user, give the billing consumer a user of its own
   ([machine roles](docs/verify-on-instance.md#machine-roles)).
+- Straight after upgrading, remove *Not available for: SNC External* from both record producers
+  with the script in [Install](#install): until then no Customer admin can open them. The producers
+  are now offered only to asset managers, account managers, NOC, the service desk and Customer
+  admins, so internal users without one of those roles no longer see them.
 - Nothing to enter for the new *First seen since install* on Assets
   (`alm_hardware.x_daas_ham_first_seen`): an Asset pending in service since before the upgrade
   has none, and goes in service from its last sighting since its install, as before.

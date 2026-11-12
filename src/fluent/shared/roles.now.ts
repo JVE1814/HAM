@@ -1,5 +1,5 @@
 import '@servicenow/sdk/global'
-import { Role } from '@servicenow/sdk/core'
+import { Record, Role } from '@servicenow/sdk/core'
 import { PLATFORM_ROLE, PROVIDER_STAFF, ROLE } from '../../server/domain/roles'
 
 /*
@@ -97,6 +97,36 @@ export const commercialEditors = [ROLE.accountManager, ROLE.assetManager]
  * which the producer's script adds, past ACLs.
  */
 export const orderRaisers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, PLATFORM_ROLE.serviceDeskAgent]
+
+/**
+ * Who may open the record producers "Request network equipment" and "Return or decommission network equipment": the
+ * Order raisers and Customer admins, never site contacts (docs/spec/p1-ordering.md, p2-aftersales.md). The service
+ * desk's role is the platform's, whose sys_id differs from instance to instance, so the script matches it by name.
+ * The platform also gives each producer "Not available for: SNC External", which wins over this and keeps the Customer
+ * admins out until an admin removes it (README "Install").
+ */
+export const producerRequesters = Record({
+    $id: Now.ID['uc_order_raisers'],
+    table: 'user_criteria',
+    data: {
+        name: 'NaaS - Order and Return raisers',
+        active: true,
+        match_all: false,
+        role: [
+            Now.ref('sys_user_role', { name: ROLE.assetManager }),
+            Now.ref('sys_user_role', { name: ROLE.accountManager }),
+            Now.ref('sys_user_role', { name: ROLE.noc }),
+            Now.ref('sys_user_role', { name: ROLE.customerAdmin }),
+        ],
+        advanced: true,
+        script: `var held = new GlideRecord('sys_user_has_role');
+held.addQuery('user', user_id);
+held.addQuery('role.name', '${PLATFORM_ROLE.serviceDeskAgent}');
+held.setLimit(1);
+held.query();
+answer = held.hasNext();`,
+    },
+})
 
 /** Who changes an Order as it is fulfilled. */
 export const orderWorkers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, ROLE.inventoryTech, ROLE.fieldTech, PLATFORM_ROLE.serviceDeskAgent]

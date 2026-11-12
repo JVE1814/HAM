@@ -4,7 +4,7 @@ import { PROPERTY } from './properties'
 import { WEBHOOK_TOKEN_MIN_LENGTH } from './shipping'
 
 const LONG_TOKEN = 'webhook-'.padEnd(WEBHOOK_TOKEN_MIN_LENGTH, 'x')
-const present = { tableExists: () => true, roleExists: () => true }
+const present = { tableExists: () => true, roleExists: () => true, exclusions: () => [] }
 
 describe('preflightReport', () => {
     it('passes when every required table and role exists', () => {
@@ -14,6 +14,7 @@ describe('preflightReport', () => {
 
     it('names each missing table with the plugin that provides it, and each missing role', () => {
         const report = preflightReport({
+            ...present,
             tableExists: (t) => t !== 'wm_order',
             roleExists: (r) => r !== 'procurement_user',
             webhookToken: () => LONG_TOKEN,
@@ -37,8 +38,24 @@ describe('preflightReport', () => {
         expect(preflightReport({ ...present, webhookToken: () => '' }).problems).toEqual([])
     })
 
+    it('names each catalog item still Not available for a criterion, which keeps out whom its Available for admits', () => {
+        const report = preflightReport({
+            ...present,
+            webhookToken: () => LONG_TOKEN,
+            exclusions: () => [
+                { item: 'Request network equipment', criterion: 'SNC External' },
+                { item: 'Return or decommission network equipment', criterion: 'SNC External' },
+            ],
+        })
+        expect(report.problems).toEqual([
+            '"Request network equipment" is Not available for SNC External, which wins over its Available for: as admin, in global scope, remove that row (README "Install")',
+            '"Return or decommission network equipment" is Not available for SNC External, which wins over its Available for: as admin, in global scope, remove that row (README "Install")',
+        ])
+        expect(report.summary).toBe('2 setting(s) to correct')
+    })
+
     it('counts missing prerequisites and settings to correct together', () => {
-        const report = preflightReport({ tableExists: (t) => t !== 'wm_order', roleExists: () => true, webhookToken: () => 'short' })
+        const report = preflightReport({ ...present, tableExists: (t) => t !== 'wm_order', webhookToken: () => 'short' })
         expect(report.summary).toBe('1 prerequisite(s) missing, 1 setting(s) to correct')
     })
 })

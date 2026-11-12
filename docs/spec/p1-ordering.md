@@ -4,7 +4,9 @@
 
 - Entry point: the record producer **Request network equipment** (service desk on the Customer's
   behalf in P1; the CSM portal in P2), or a draft Order created in the workspace and submitted with
-  **Submit**.
+  **Submit**. The producer is offered to the Order raisers below only (its user criterion *NaaS -
+  Order and Return raisers*). The platform also makes it *Not available for: SNC External*, which
+  keeps every Customer admin out until an admin removes that row (README "Install").
 - An Order has a Customer, Agreement, Site, order type (site rollout, device add, device replace,
   temporary deployment) and Install mode.
 - Lines come from the chosen Site template (its non-optional items, flagged *from site template*)

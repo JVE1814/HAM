@@ -19,16 +19,25 @@ const REQUIRED_TABLES: ReadonlyArray<{ table: string; provider: string }> = [
 
 const REQUIRED_ROLES: readonly string[] = Object.values(PLATFORM_ROLE)
 
+export const APP_SCOPE = 'x_daas_ham'
+
 export interface PreflightReport {
     missing: string[]
     problems: string[]
     summary: string
 }
 
+/** A "Not available for" row of one of the app's catalog items: the item's name and the criterion's. */
+export interface ItemExclusion {
+    item: string
+    criterion: string
+}
+
 export interface PreflightProbe {
     tableExists(table: string): boolean
     roleExists(role: string): boolean
     webhookToken(): string
+    exclusions(): readonly ItemExclusion[]
 }
 
 export function preflightReport(probe: PreflightProbe): PreflightReport {
@@ -36,12 +45,20 @@ export function preflightReport(probe: PreflightProbe): PreflightReport {
         ...REQUIRED_TABLES.filter((t) => !probe.tableExists(t.table)).map((t) => `table ${t.table} (${t.provider})`),
         ...REQUIRED_ROLES.filter((r) => !probe.roleExists(r)).map((r) => `role ${r}`),
     ]
-    const problems = webhookTokenProblems(probe.webhookToken())
+    const problems = [...webhookTokenProblems(probe.webhookToken()), ...probe.exclusions().map(exclusionProblem)]
     const counts = [
         ...(missing.length ? [`${missing.length} prerequisite(s) missing`] : []),
         ...(problems.length ? [`${problems.length} setting(s) to correct`] : []),
     ]
     return { missing, problems, summary: counts.length === 0 ? 'All prerequisites present' : counts.join(', ') }
+}
+
+/**
+ * The app gives its record producers no "Not available for" row; the platform adds SNC External to each, which wins
+ * over their "Available for" and keeps every Customer admin out. No install can remove it: an admin does (README "Install").
+ */
+function exclusionProblem({ item, criterion }: ItemExclusion): string {
+    return `"${item}" is Not available for ${criterion}, which wins over its Available for: as admin, in global scope, remove that row (README "Install")`
 }
 
 /** An empty token is no problem: the webhook then refuses every call by design, as when the aggregator is off. */
