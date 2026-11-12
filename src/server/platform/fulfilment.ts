@@ -18,7 +18,7 @@ import { readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { fire } from './events.ts'
 import { log } from './log.ts'
-import { saveLineStage } from './order-lines.ts'
+import { lineOpenness, saveLineStage } from './order-lines.ts'
 import { exists, findById, num, str, warnRefused, type ForeignRecord } from './records.ts'
 import { queueSourcing } from './sourcing-requests.ts'
 import { leaveOrderLine } from './stock.ts'
@@ -159,7 +159,9 @@ function deriveLine(line: GlideRecord, refill: boolean): LineStage | null {
 
 function closedNow(line: GlideRecord): boolean {
     const fresh = findById('x_daas_ham_order_line', line.getUniqueValue(), { beyondVisibility: true })
-    return !!fresh && (str(fresh, 'line_stage') === LINE_STAGE.cancelled || endedUnfulfilled(str(fresh, 'order.stage')))
+    if (!fresh) return false
+    const { lineStage, orderStage } = lineOpenness(fresh)
+    return lineStage === LINE_STAGE.cancelled || endedUnfulfilled(orderStage)
 }
 
 export function recomputeOrder(orderId: string): void {
