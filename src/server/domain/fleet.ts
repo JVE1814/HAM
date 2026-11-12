@@ -217,3 +217,16 @@ export function receiptProblem(unit: FleetCandidate, awaitingReceipt: boolean): 
     if (!awaitingReceipt) return 'it is not a fleet asset: an asset manager adds it to the fleet first'
     return adoptionProblem(unit)
 }
+
+/**
+ * The platform tables the app shares with the Provider's IT (ADR 0016), each with the condition that keeps a list or a
+ * count of it to the app's records: whatever reads one (a navigator module, a workspace list, a dashboard tile, a
+ * picker) holds it in every ^NQ clause of its query.
+ */
+export const SHARED_TABLE_CONDITION: Readonly<Record<string, string>> = {
+    alm_hardware: FLEET_CONDITION,
+    cmdb_model: NAAS_MODEL_CONDITION,
+    // The platform's Model lifecycle table (ADR 0017) holds the milestones of the Provider IT's Models too.
+    cmdb_model_lifecycle: `model.${NAAS_MODEL_CONDITION}`,
+    alm_stockroom: NAAS_STOCKROOM_CONDITION,
+}

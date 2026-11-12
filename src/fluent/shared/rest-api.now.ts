@@ -9,6 +9,7 @@ import { answerAttestation, confirmInstalled, customerOverview, reportFault, req
 import { getBillingLines, listBillingPeriods } from '../../server/entry/billing'
 import { PULL_PAGE } from '../../server/domain/billing'
 import { postTrackingUpdate } from '../../server/entry/shipping'
+import { sessionRoles } from '../../server/entry/session'
 
 /*
  * A route that sets nothing requires the snc_internal role and enforces the platform's "Scripted REST External
@@ -56,6 +57,15 @@ RestApi({
             authentication: true,
             authorization: true,
             script: postDeviceEvents,
+        },
+        {
+            $id: Now.ID['rest_naas_me'],
+            name: 'me',
+            method: 'GET',
+            path: '/me',
+            shortDescription: "The app's roles the signed-in user holds.",
+            authentication: true,
+            script: sessionRoles,
         },
         {
             $id: Now.ID['rest_naas_lookup'],

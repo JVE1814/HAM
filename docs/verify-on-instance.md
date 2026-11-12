@@ -379,17 +379,23 @@ authentication, ACL authorization and *Requires SNC Internal role* off. Imperson
 their Sites and racks. Impersonating *Sam Site (demo)*, both pages show only their Sites. As either
 user, `GET /api/x_daas_ham/naas/stockrooms` and `/billing_periods` answer HTTP 403.
 
-### NaaS dashboard
+### NaaS Asset Workspace
 
-`workspace/dashboard.now.ts`. *NaaS Asset Overview* shows in the workspace for each NaaS
-staff role (`PROVIDER_STAFF` in `src/server/domain/roles.ts`) and for app administrators, and for no
-Customer contact. As a NOC-only or
-inventory-tech-only user, Operations, Billing integrity and Lifecycle risk show counts. The Margin
-tab's tiles show no figures, because the money ACLs refuse them (if one shows a figure, the
-dashboard's widgets do not apply the tables' read ACLs), and an inventory tech also gets no
-subscription-line or reconciliation-exception counts. As finance, the Margin tab shows figures.
-Whether the Margin tab moves to a dashboard of its own for the money readers is an open owner
-decision.
+`x_daas_ham_workspace.do` (src/client/workspace). It opens for each NaaS staff role
+(`PROVIDER_STAFF` in `src/server/domain/roles.ts`) and for app administrators, and for no
+Customer contact (the page's ACL). Its sidebar offers a role only the lists of its audience
+(`catalog.ts`), and each list shows what the table's ACLs and before-query rules let the user
+read. As a NOC-only or inventory-tech-only user, Operations,
+Billing integrity and Lifecycle risk show counts and the Margin tab is not offered; an inventory
+tech gets no subscription-line or reconciliation-exception figures. As finance, the Margin tab
+shows figures, each in its own currency. As a non-admin staff user, *Overdue returns*, *Agreements
+up for renewal* and the Margin tiles (`javascript:gs.…` dates in the query) and *My staging tasks*
+(`assigned_toDYNAMIC`) show rows, and every list has its column labels (`/api/now/ui/meta`).
+
+**After an upgrade** from a version with the Next Experience workspace (`/x/daas/naas-assets/home`):
+the build carries a delete for each of its records (`dist/app/author_elective_update`). Check that
+the *NaaS Asset Workspace* experience, its list menu with its lists, categories and audiences, the
+*NaaS Asset Overview* dashboard and the `x.daas.naas-assets.*` route ACL are gone.
 
 ## Rules and form buttons
 

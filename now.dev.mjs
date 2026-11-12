@@ -1,33 +1,15 @@
-import { servicenowFrontEndPlugins, watch } from '@servicenow/isomorphic-rollup'
+import { createServer } from 'vite'
+import { createViteProxy, DEFAULT_PROXY_PATHS } from '@servicenow/isomorphic-rollup/vite'
+import { clientConfig } from './now.vite.mjs'
 
-export default async ({ rootDir, config, fs, path, logger, credential }) => {
-    const clientDir = path.join(rootDir, config.clientDir)
-    const staticContentDir = path.join(rootDir, config.staticContent.buildDir)
-    fs.rmSync(staticContentDir, { recursive: true, force: true })
-    const watcher = watch({
-        fs,
-        input: path.join(clientDir, '**', '*.html'),
-        plugins: servicenowFrontEndPlugins({
-            dev: true,
-            scope: config.scope,
-            rootDir: clientDir,
-            watchPaths: [staticContentDir],
-            credential,
-        }),
-        output: {
-            dir: staticContentDir,
-            sourcemap: true,
-        },
+/** Serves the UI pages from source, the instance's APIs proxied with the SDK's credential: /<page>.html, e.g. /workspace.html. */
+export default async ({ rootDir, config, path, logger, credential }) => {
+    const server = await createServer({
+        ...(await clientConfig({ rootDir, config, path })),
+        // '/api/', not '/api': the prefix alone also matches the page module /api.ts.
+        server: { proxy: await createViteProxy(credential, DEFAULT_PROXY_PATHS.map((path) => (path === '/api' ? '/api/' : path))) },
     })
-
-    return new Promise((resolve, reject) => {
-        watcher.on('event', (event) => {
-            if (event.error) {
-                reject(event.error)
-            } else if (event.result) {
-                logger.info(`Finished watch build in ${event.duration}ms`)
-                event.result.close()
-            }
-        })
-    })
+    await server.listen()
+    logger.info(`UI pages served at ${server.resolvedUrls?.local[0]}`)
+    return new Promise(() => {})
 }

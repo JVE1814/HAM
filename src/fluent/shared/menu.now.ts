@@ -2,7 +2,7 @@ import '@servicenow/sdk/global'
 import { ApplicationMenu, Record } from '@servicenow/sdk/core'
 import { BROAD_STAFF, ROLE } from '../../server/domain/roles'
 import { providerStaff, stockroomWorkers } from './roles.now'
-import { WORKSPACE_HOME } from '../workspace/workspace.now'
+import { WORKSPACE_PAGE } from '../workspace/workspace.now'
 
 /*
  * A module on alm_hardware lists fleet assets only (ADR 0016: the table holds the Provider IT's equipment too): its
@@ -25,7 +25,7 @@ Record({
         title: 'NaaS Asset Workspace',
         application: naasMenu,
         link_type: 'DIRECT',
-        query: WORKSPACE_HOME,
+        query: `${WORKSPACE_PAGE}.do`,
         roles: providerStaff,
         active: true,
         order: 100,

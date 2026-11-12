@@ -116,11 +116,3 @@ export const feeEditors = [ROLE.assetManager, ROLE.finance]
 
 /** Who opens or closes a Service interval by hand, when a stage change could not. */
 export const intervalEditors = [ROLE.assetManager, ROLE.finance]
-
-/*
- * Three of the groups again as role records, for the workspace's audiences: an Applicability stores role ids, which a
- * name does not give it. built-metadata.test.ts holds each audience to its group of names.
- */
-export const providerStaffRecords = [assetManager, inventoryTech, fieldTech, noc, accountManager, finance]
-export const broadStaffRecords = [assetManager, fieldTech, noc, accountManager, finance]
-export const moneyReaderRecords = [finance, accountManager, assetManager]

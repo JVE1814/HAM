@@ -7,6 +7,7 @@ import type {
     Stockroom,
     StockroomList,
 } from '../../server/domain/rest-contracts'
+import { queryOptions } from '@tanstack/react-query'
 import { ApiError, get, path, post } from '../api'
 
 export const warehouseApi = {
@@ -27,3 +28,5 @@ export const warehouseApi = {
             },
         ),
 }
+
+export const stockroomsQuery = queryOptions({ queryKey: ['warehouse', 'stockrooms'], queryFn: warehouseApi.stockrooms })

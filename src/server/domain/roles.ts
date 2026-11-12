@@ -16,6 +16,8 @@ export const ROLE = {
     integration: 'x_daas_ham.integration',
 } as const
 
+export type AppRole = (typeof ROLE)[keyof typeof ROLE]
+
 /**
  * The roles of other applications the app's roles contain or its metadata names. They must exist on the instance
  * (README "Required plugins"), which the preflight check reports (domain/preflight).
