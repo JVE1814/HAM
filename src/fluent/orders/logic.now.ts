@@ -13,9 +13,11 @@ import { accountManager, admin, assetManager, commercialEditors, orderRaisers } 
 
 /*
  * An Order saved in a Customer contact's session passes what Submit checks (their own Customer, with an Agreement and a
- * Site of that Customer), whatever inserts it: the record producer, a form or the Table API (platform/orders
- * `contactOrderInsertRefusal`). The customer admins' create ACL looks at the Customer only (orders/access.now.ts). The
- * table is the app's own, so the script refuses with current.setAbortAction (platform/rule-api `abortWith`).
+ * Site of that Customer), whatever inserts it (platform/orders `contactOrderInsertRefusal`). The customer admins'
+ * create ACL looks at the Customer only (orders/access.now.ts). A contact's insert by hand (a form, the Table API)
+ * keeps no posted value, as they are an external user, and fails that ACL; the rule guards the record producer and any
+ * other insert that keeps the values. The table is the app's own, so the script refuses with current.setAbortAction
+ * (platform/rule-api `abortWith`).
  */
 BusinessRule({
     $id: Now.ID['br_order_contact_insert'],

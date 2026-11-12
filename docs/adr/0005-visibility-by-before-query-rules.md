@@ -115,9 +115,12 @@ Orders and on Return orders checks the Customer the record names (`orders/access
 the Return's passes a record that names none yet, as the customer page asks `canCreate()` of an empty record. No ACL
 looks at the Site or the Agreement. So a before-insert rule on each table refuses, in a Customer contact's session, an
 Order that fails what *Submit* checks (`domain/entitlement` `ownershipFindings`) and a Return order that names another
-Customer, none, or a Site that is not its Customer's (`domain/returns` `returnRequestFindings`), whatever inserts it:
-the record producer, the customer page, a form or the Table API (`platform/orders` `contactOrderInsertRefusal`,
-`platform/returns` `contactReturnInsertRefusal`). The rule on Return orders does not judge who asks, which the create
+Customer, none, or a Site that is not its Customer's (`domain/returns` `returnRequestFindings`), whatever inserts it
+(`platform/orders` `contactOrderInsertRefusal`, `platform/returns` `contactReturnInsertRefusal`). A Customer contact
+is an external user, whose insert by hand (a form, the Table API) keeps no posted value: the platform's create field
+ACLs let only internal users set a field. Such a Return order names no Customer and is refused, and such an Order fails
+its create ACL. So the Site and Agreement checks guard the inserts that keep the values: the record producer, the
+customer page, a script. The rule on Return orders does not judge who asks, which the create
 ACL and the services do: a site contact's confirmation of a self-install raises the swap-back Return in their own
 session. Provider staff, the service desk and jobs are not checked.
 

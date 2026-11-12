@@ -379,21 +379,30 @@ billing period afterwards still writes the *Field labour* Cost fact from the cos
 
 `orders/access.now.ts`, `returns/access.now.ts`. As a customer admin, `POST /api/now/table/x_daas_ham_order` for another
 Customer and `POST /api/now/table/x_daas_ham_order_line` are refused; a `POST` of a Return order
-for another Customer is refused (this confirms the create rule sees the posted values); the
+for another Customer is refused (by the before-insert rule below, as the posted values are not
+kept, so this does not show whether the create rule sees them); the
 customer page's *Return selected* and the two record producers still work. As a service desk
 agent (`sn_customerservice_agent` only), the order producer offers the Customer's Agreements and
 Site templates, the generated Order opens with its lines and *Submit* goes ahead, and the return
 producer opens the Return it raised.
 
-The before-insert rules (`returns/logic.now.ts`, `orders/logic.now.ts`). As a customer admin,
-`POST /api/now/table/x_daas_ham_return_order` with no Customer, or with their Customer and another
-Customer's Site, is refused with *Return not raised. ...* and saves nothing; with their own
-Customer and Site it is saved. `POST /api/now/table/x_daas_ham_order` with their Customer and
-another Customer's Site or Agreement is refused with *Order not raised. ...*. Through each record
-producer, a request of theirs that names another Customer shows the refusal, opens no record and
-leaves no Order line behind. As a site contact, *Confirm installed* on a self-install Order that
-replaced a unit still raises the swap-back Return. The ATF test *NaaS - customer returns: admins
-only, own sites only, a decommission takes the whole site* covers the inserts by hand.
+The before-insert rules (`returns/logic.now.ts`, `orders/logic.now.ts`). A customer admin is an
+external user (`snc_external`), and the platform's `*.*` create field ACL lets only internal users
+set a field on insert. So their insert by hand (the Table API, a form, an ATF *Record Insert* step
+run as them) keeps none of the posted values. On the development instance on 2026-11-12, `POST
+/api/now/table/x_daas_ham_return_order` as a customer admin, whatever it named, was refused as a
+Return with no Customer (*Return not raised. Choose the customer.*) and saved nothing, their own
+Customer and Site included; `POST /api/now/table/x_daas_ham_order` was refused by its create ACL. A
+hand insert never brings a Site or an Agreement to the rules. Those checks were shown by a
+background script that, impersonating the customer admin, inserted by `GlideRecord`, which keeps
+the values and checks no ACL but runs the rules: six such inserts of a Return or an Order that
+broke the rules were refused with *Return not raised. ...* or *Order not raised. ...* and the
+reason, and a Return and an Order of their own Customer and Site were saved. The ATF test *NaaS - customer returns: admins only, own sites only,
+a decommission takes the whole site* repeats it: an insert by hand with no Customer, then such
+`GlideRecord` inserts in the admin's session. Through each record producer, a request of theirs
+that names another Customer shows the refusal, opens no record and leaves no Order line behind. As
+a site contact, *Confirm installed* on a self-install Order that replaced a unit still raises the
+swap-back Return.
 
 ### REST access for customer users
 

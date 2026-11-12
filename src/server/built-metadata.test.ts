@@ -1491,8 +1491,9 @@ describe('ATF tests', () => {
     it('load in their scripts server modules by the path the build installs them under, and call what those export', () => {
         const modules = new Map(records('sys_module').map((module) => [module.path ?? '', module.content ?? '']))
         for (const { step, script } of stepScripts()) {
-            // A script that calls a REST route over HTTP reaches the app through the route, not a module.
-            if (!/\bsn_ws\.RESTMessageV2\b/.test(script)) expect(loaded(script).length, step).toBeGreaterThan(0)
+            // A script that calls a REST route over HTTP reaches the app through the route, and one that only inserts
+            // records reaches it through the rules on their tables, not a module.
+            if (!/\bsn_ws\.RESTMessageV2\b|\.insert\(\)/.test(script)) expect(loaded(script).length, step).toBeGreaterThan(0)
             expect([...script.matchAll(/\brequire\(/g)].length, `${step}: every require is read`).toBe(loaded(script).length)
             const code = script.replace(/'[^'\n]*'/g, "''")
             for (const { binding, path } of loaded(script)) {
@@ -1547,6 +1548,11 @@ describe('ATF tests', () => {
         getRowCount() {
             return 1
         }
+        initialize() {}
+        setValue() {}
+        insert() {
+            return ''
+        }
     }
 
     class StandInRest {
@@ -1591,13 +1597,14 @@ describe('ATF tests', () => {
     }
 
     // A step passes or fails by what its script returns. Run here, a script fails only on the reply it checks, which a
-    // stand-in answers HTTP 599, or on the job lock it probes before it writes, which a stand-in module never says
-    // is free: one that fails for another reason, or returns nothing, has an error of its own.
+    // stand-in answers HTTP 599, on the job lock it probes before it writes, which a stand-in module never says
+    // is free, or on an insert's outcome, which a stand-in record never stores yet always finds: one that fails for
+    // another reason, or returns nothing, has an error of its own.
     it('run their scripts to a verdict', () => {
         for (const { step, script } of stepScripts()) {
             const { verdict, message } = run(script)
             expect({ step, verdict: typeof verdict }).toEqual({ step, verdict: 'boolean' })
-            if (verdict === false) expect(message, step).toMatch(/expected HTTP|expected the lock/)
+            if (verdict === false) expect(message, step).toMatch(/expected HTTP|expected the lock|expected the insert/)
             expect(message, step).not.toMatch(/TypeError|ReferenceError|is not a function|is not defined|undefined/)
         }
     })
