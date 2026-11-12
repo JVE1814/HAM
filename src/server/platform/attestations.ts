@@ -1,12 +1,14 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { ATTESTATION_STATE, attestationDue } from '../domain/audit.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
+import type { AttestationAnswers } from '../domain/rest-contracts.ts'
 import { ATTESTATION_RESPONSE_CHOICES, type AttestationResponse } from '../domain/vocabulary.ts'
 import { ACTIVE_AGREEMENTS } from './agreements.ts'
 import { customerAdminIds } from './approvals.ts'
 import { glideToIsoDate, nowGlide, todayIso } from './clock.ts'
 import { openException } from './exceptions.ts'
 import { bool, exists, findById, num, refusal, str, warnRefused } from './records.ts'
+import type { Sent } from './rest-api.ts'
 import { installedAssetIds } from './installed-assets.ts'
 import { IN_USE_STAGES } from '../domain/lifecycle.ts'
 import { log } from './log.ts'
@@ -105,10 +107,7 @@ export function findUnclosedAttestation(attestationId: string): GlideRecord | nu
 }
 
 /** One answer as the customer page sends it: the attestation item and the response chosen for its Asset. */
-export interface AttestationAnswer {
-    id?: string
-    response?: string
-}
+export type AttestationAnswer = Sent<AttestationAnswers['items'][number]>
 
 /**
  * Save the Customer's answers on the attestation's items; how many the platform refused (each logged). An answer that
