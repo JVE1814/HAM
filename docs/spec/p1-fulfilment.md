@@ -237,6 +237,9 @@ available | reserved | spare_pool | staging ─► in_transfer ─► available 
   uses a standard change; everything else uses a normal change.
 - If the tracking number, or the change and work order, cannot be saved on the Order, Ship still
   ships and says so; the Shipment, change (its *Parent*) and work order (its *Initiated from*) name the Order, to link them by hand.
+  The two are saved apart, the change and work order on the Order read again: a tracking number
+  the platform refused is not written by the later save, and does not keep that save from linking
+  the change and work order.
 - Ship runs one at a time per Order, under a job lock on it (`LOCK.shipOrder`), and reads the
   Order's tracking number and work order afresh. A Ship pressed while another of the same Order is
   running ships, buys and opens nothing and says another Ship is running. A Ship after it finds the

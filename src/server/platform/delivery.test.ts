@@ -418,6 +418,55 @@ describe('Ship, with the shipping aggregator on', () => {
         expect(asset('a1')).toMatchObject(stage('shipped'))
         expect(asset('a2')).toMatchObject(stage('shipped'))
     })
+
+    it('leaves a refused tracking number off the Order when the save that links the on-site work is accepted', () => {
+        let refusedOnce = false
+        platform.refuses = (table) => {
+            if (table !== ORDERS || refusedOnce) return ''
+            refusedOnce = true
+            return 'try again later'
+        }
+
+        expect(shipOrder('o1')).toEqual({
+            problems: ['Tracking number 1ZNEW02 not saved on the Order: try again later'],
+            shipped: { units: 2, siteName: 'Acme HQ' },
+        })
+
+        expect(order()).toMatchObject({ carrier: '', tracking_number: '', change_request: rows(CHANGES)[0]?.sys_id, work_order: rows(WORK_ORDERS)[0]?.sys_id })
+        expect(rows(SHIPMENTS)).toEqual([expect.objectContaining({ order: 'o1', tracking_number: '1ZNEW02' })])
+    })
+
+    it('links the on-site work to an Order whose tracking number alone the platform refuses', () => {
+        platform.refuses = (table, row) => (table === ORDERS && row.tracking_number ? 'tracking numbers are locked' : '')
+
+        expect(shipOrder('o1')).toEqual({
+            problems: ['Tracking number 1ZNEW02 not saved on the Order: tracking numbers are locked'],
+            shipped: { units: 2, siteName: 'Acme HQ' },
+        })
+
+        expect(order()).toMatchObject({ carrier: '', tracking_number: '', work_order: rows(WORK_ORDERS)[0]?.sys_id })
+
+        rows(ASSETS).push(unit('a3', 'staged'))
+        shipOrder('o1')
+
+        expect(rows(WORK_ORDERS)).toHaveLength(1)
+    })
+})
+
+describe('on-site work opened for an Order that is gone by then', () => {
+    it('is reported as not linked', () => {
+        // Another transaction deletes the Order as the work order is saved.
+        platform.onSave = (table) => {
+            if (table === WORK_ORDERS) platform.tables[ORDERS] = []
+        }
+
+        expect(shipOrder('o1')).toEqual({
+            problems: ['On-site work opened but not linked to the Order: the Order can no longer be read'],
+            shipped: { units: 2, siteName: 'Acme HQ' },
+        })
+
+        expect(rows(WORK_ORDERS)).toHaveLength(1)
+    })
 })
 
 describe('confirming an install', () => {
