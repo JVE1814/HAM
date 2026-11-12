@@ -18,6 +18,7 @@ import { claimRoutes, CLAIM_VENDORS, OEM_ADAPTERS } from './domain/oem/adapters'
 import { REST_MESSAGE } from './domain/rest-message-names'
 import { RMA_AT_OEM } from './domain/oem-rma'
 import { buyLabel, labelVoidable, SHIPPING_MESSAGE } from './domain/shipping'
+import { stagingClosing } from './domain/staging'
 import { SCOPED_TABLES, type TableScoping } from './domain/visibility'
 import {
     BROAD_STAFF,
@@ -33,6 +34,7 @@ import {
     SHIPMENT_DIRECTION_CHOICES,
     SHIPMENT_STATUS_CHOICES,
     STAGE_FIELDS,
+    TASK_STATE,
     type OrderStage,
     type RmaState,
     type ShipmentStatus,
@@ -634,7 +636,7 @@ describe('fields the forms, lists and record producers name', () => {
  * server code allows it is that rule written a second time, from the same named values. The built condition is run
  * here against each value and held to the rule.
  */
-describe('UI action conditions that restate a rule of the server code', () => {
+describe('UI action and business rule conditions that restate a rule of the server code', () => {
     const conditionOf = (actionName: string): string => {
         const action = records('sys_ui_action').find((found) => found.action_name === actionName)
         expect(action?.condition, actionName).toBeTruthy()
@@ -673,6 +675,23 @@ describe('UI action conditions that restate a rule of the server code', () => {
             })
         }
         expect(statuses.filter((status) => holds(condition, { direction: '', status }))).toEqual([])
+    })
+
+    it('run the Staging task closure rules on the states stagingClosing closes a task with', () => {
+        const ruleConditionOf = (name: string): string => {
+            const rule = records('sys_script').find((found) => found.name === name)
+            expect(rule?.condition, name).toBeTruthy()
+            return rule?.condition ?? ''
+        }
+        const states = Object.values(TASK_STATE).map(String)
+        const saved = (state: string, changed: boolean) => ({ state: { changes: () => changed, toString: () => state } })
+        const firing = (name: string) => {
+            const condition = ruleConditionOf(name)
+            expect(states.filter((state) => holds(condition, saved(state, false))), name).toEqual([])
+            return states.filter((state) => holds(condition, saved(state, true)))
+        }
+        expect(firing('NaaS - staging steps done before close')).toEqual(states.filter((state) => stagingClosing(state) !== null))
+        expect(firing('NaaS - staged asset on staging closure')).toEqual(states.filter((state) => stagingClosing(state) === 'complete'))
     })
 })
 
