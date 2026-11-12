@@ -2450,6 +2450,10 @@ declare global {
                         table: 'sys_script'
                         id: 'd93d4d0bcace4717b89350c742437a20'
                     }
+                    br_subscription_line_ended: {
+                        table: 'sys_script'
+                        id: 'e1d8b515ee994df6843ea2ab436acf62'
+                    }
                     br_work_order_closed: {
                         table: 'sys_script'
                         id: 'ebf8b2a2f98c4abdbe25b0004ce5cae0'

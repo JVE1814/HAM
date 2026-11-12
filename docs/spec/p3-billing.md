@@ -45,6 +45,13 @@
   workspace dashboard's *Billing integrity* tab, tile *In service on an ended line* (fleet assets in
   service or on a temporary deployment whose line is set ended or past its end date), and is never
   moved to another line.
+- Billing goes by a line's dates, not by its status: a line with no End date is still open. So a
+  Subscription line cannot be saved *Ended* without an End date, the last day it is billed. A
+  business rule refuses such a save, from a form, a list, an import or the Table API alike, and
+  asks for the date. It fills none in, since only whoever ends the line knows its last day. The
+  app's own ending of a site package sets both. A line saved *Ended* without an End date before
+  this rule keeps being billed until it is given one (*Ended subscription lines* in
+  `docs/verify-on-instance.md`).
 - The *Billing integrity* tab counts fleet assets only (ADR 0016): the Provider IT's equipment in use
   shares `alm_hardware` and is never billed. Its tile *In service without a subscription line*
   counts fleet assets in service with no Subscription line, which bill nothing.

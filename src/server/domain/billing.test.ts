@@ -7,6 +7,7 @@ import {
     billsFromIntervals,
     currencyTotals,
     decideGenerationReset,
+    endedLineProblem,
     IN_SERVICE_ON_ENDED_LINE,
     IN_SERVICE_UNBILLED,
     intervalEnd,
@@ -334,6 +335,22 @@ describe('restartInterval', () => {
     it('starts the day after an interval elsewhere that covers the restart day', () => {
         expect(restartInterval({ ...here, end: '2026-11-10' }, { ...here, lineId: 'L2' }, '2026-11-10')).toEqual({ start: '2026-11-11' })
         expect(restartInterval({ ...here, end: '2026-11-10' }, { ...here, siteId: 'S2' }, '2026-11-10')).toEqual({ start: '2026-11-11' })
+    })
+})
+
+describe('endedLineProblem', () => {
+    it('refuses a line set Ended without an End date, which billing would take as still open', () => {
+        expect(endedLineProblem({ status: 'ended', endDate: '' })).toBe(
+            'An Ended subscription line needs an End date, the last day it is billed: enter it (today, if the line ends now)',
+        )
+    })
+
+    it('lets an Ended line through with its End date, and a line that is not ended with or without one', () => {
+        expect(endedLineProblem({ status: 'ended', endDate: '2026-11-12' })).toBeNull()
+        for (const status of ['pending', 'active']) {
+            expect(endedLineProblem({ status, endDate: '' }), status).toBeNull()
+            expect(endedLineProblem({ status, endDate: '2026-11-12' }), status).toBeNull()
+        }
     })
 })
 

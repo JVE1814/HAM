@@ -827,6 +827,20 @@ has its open interval on the old one. List open Service intervals (*Last day* em
 the interval at the line and Site the Asset has now. List fleet assets in service that have a
 Subscription line and no open Service interval, and create theirs.
 
+### Ended subscription lines
+
+Open an active Subscription line, set *Status* to *Ended* with *End date* empty, and save. The save
+is refused with *An Ended subscription line needs an End date, the last day it is billed: enter it
+(today, if the line ends now)*, and the line keeps its status. Enter an End date and save: it is
+written. Clear the End date of an Ended line and save: it is refused the same way. A list edit is
+refused too.
+
+**After an upgrade:** a line set *Ended* without an End date before this release is still billed
+every month, and the rule refuses its next save until it has one. List Subscription lines with
+*Status* *Ended* and an empty *End date* (`status=ended^end_dateISEMPTY`), and give each the last
+day it should be billed. A Billing period still *Ready for review* that billed such a line past
+that day is put right with *Regenerate*. A closed period is not changed: credit it by hand.
+
 ### Replacement SLA stop
 
 Completing a replacement Order queues the event `x_daas_ham.replacement.complete` on it. Its script

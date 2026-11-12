@@ -100,6 +100,17 @@ function withinLine(interval: DayRange, line: Partial<DayRange>): DayRange | nul
     return end !== undefined && end < start ? null : { start, end }
 }
 
+/**
+ * Why a Subscription line cannot be saved as it is, or null: one set Ended needs its End date. Billing goes by a
+ * line's dates and takes one without an End date as still open, whatever its status, so an Ended line without one
+ * would be billed every month. The End date is the last day billed, which only whoever ends the line knows, so none
+ * is filled in for them.
+ */
+export function endedLineProblem(line: { status: string; endDate: string }): string | null {
+    if (line.status !== SUBSCRIPTION_LINE_STATUS.ended || line.endDate) return null
+    return 'An Ended subscription line needs an End date, the last day it is billed: enter it (today, if the line ends now)'
+}
+
 const NO_LINE = 'x_daas_ham_subscription_lineISEMPTY'
 
 /**
