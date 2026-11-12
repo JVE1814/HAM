@@ -2,6 +2,45 @@ import { messageOf } from './errors.ts'
 import { writeHoldingLock, type LockedWrite } from './job-lock.ts'
 
 /**
+ * Every job's row name in x_daas_ham_job_cursor, whose unique `job` column keys one row per job: two jobs given one
+ * name share a row. Installed instances hold these rows, so a name stays as it is.
+ */
+export const JOB = {
+    normalizeRawModels: 'normalize_raw_models',
+    inServiceDetection: 'in_service_detection',
+    chaseOverdueReturns: 'chase_overdue_returns',
+    reconcileInstalledBase: 'reconcile_installed_base',
+    sparePoolTopUp: 'spare_pool_top_up',
+    providerTagSequence: 'provider_tag_sequence',
+    oemClaimStranded: 'oem_claim_stranded',
+    preflight: 'preflight',
+    margin: (periodId: string) => `margin_${periodId}`,
+    billingGenerate: (periodId: string) => `billing_generate_${periodId}`,
+} as const
+
+/** The length of a Job cursor's Last status, which `save` cuts a status to. */
+export const JOB_STATUS_LENGTH = 255
+
+/** What a job's `last_status` reads (the preflight check writes its result there instead). */
+export const JOB_STATUS = {
+    /**
+     * A scheduled job's run reached the end of its pass, or a pass its runner started is complete. `cursorReport` adds
+     * a pass's failed records to these two.
+     */
+    complete: 'complete',
+    paused: 'paused (time budget)',
+    /** A pass its runner started and marks complete: one still running with an old last run has stalled. */
+    running: 'running',
+    /** A pass started where it was triggered. Nothing marks its end on the row, so it must not read as running. */
+    passStarted: 'pass started',
+    /** The current pass was retired by hand, and the job has none. */
+    reset: 'reset by hand',
+} as const
+
+/** The length of a Job cursor's Last error, which `save` cuts an error to. */
+export const JOB_ERROR_LENGTH = 1000
+
+/**
  * Bulk work in bounded chunks with a persistent cursor (ADR 0007).
  *
  * Records are visited in ascending key order. A run stops when its time budget is spent and saves
@@ -10,7 +49,6 @@ import { writeHoldingLock, type LockedWrite } from './job-lock.ts'
  */
 export interface ChunkedJobPorts<T> {
     loadCursor(): string
-    /** Up to `size` records with key > `after`, in ascending key order. */
     fetchBatch(after: string, size: number): T[]
     keyOf(record: T): string
     handle(record: T): void
@@ -90,8 +128,8 @@ export function cursorReport(stored: Failures, run: Failures & { resumed: boolea
     const failed = (run.resumed ? stored.failed : 0) + run.failed
     const lastError = run.lastError || (run.resumed && failed > 0 ? stored.lastError : '')
     const failedText = `${failed} failed record(s)`
-    if (run.done) return { failed, lastError, status: failed > 0 ? `complete with ${failedText}` : 'complete' }
-    return { failed, lastError, status: failed > 0 ? `paused (time budget), ${failedText} so far` : 'paused (time budget)' }
+    if (run.done) return { failed, lastError, status: failed > 0 ? `${JOB_STATUS.complete} with ${failedText}` : JOB_STATUS.complete }
+    return { failed, lastError, status: failed > 0 ? `${JOB_STATUS.paused}, ${failedText} so far` : JOB_STATUS.paused }
 }
 
 /**
@@ -129,20 +167,19 @@ export interface LockLost {
 
 export type ChunkWrite = { outcome: 'written' | 'superseded' } | LockLost
 
-/** What a chunk of a pass does as it writes, under its job's lock where the job has one (ADR 0013). */
+/** What a chunk of a pass does as it writes, under its job's lock (ADR 0013). */
 export interface LockedChunkPorts {
     isCurrent(): boolean
-    /** Whether the chunk still holds the job's lock: a taker that judged it abandoned may have cleared it. Always true for a job without a lock. */
+    /** Whether the chunk still holds the job's lock: a taker that judged it abandoned may have cleared it. */
     held(): boolean
     flush(): void
     queueNext(): void
-    /** Complete the pass (after its last chunk only). */
     complete(): void
 }
 
 /**
- * Write a chunk of a pass: flush, then queue the next chunk or, after the last one, complete the pass. A chunk whose
- * pass is no longer the current one writes nothing, and one that lost its job's lock during a write writes nothing more.
+ * A chunk whose pass is no longer the current one writes nothing, and one that lost its job's lock during a write
+ * writes nothing more.
  */
 export function writeChunkUnderLock(ports: LockedChunkPorts, last: boolean): ChunkWrite {
     if (!ports.isCurrent()) return { outcome: 'superseded' }

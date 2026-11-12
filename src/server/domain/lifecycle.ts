@@ -71,7 +71,7 @@ const ALLOWED_MOVES: Record<Stage, readonly Stage[]> = {
     staged: ['shipped', 'available', 'spare_pool'],
     in_transfer: TRANSFERABLE,
     shipped: ['pending_in_service', 'pending_return', 'missing'],
-    // Missing: an installed unit never seen, on a return that is overdue (platform/returns `chaseOverdue`), like one in service.
+    // Missing: an installed unit never seen, on a return that is overdue, like one in service.
     pending_in_service: ['in_service', 'temporary_deployment', 'pending_return', 'missing'],
     in_service: ['pending_return', 'missing'],
     temporary_deployment: ['pending_return', 'missing'],
@@ -148,6 +148,34 @@ export function checkTransition(from: Stage | null, to: Stage, facts: Transition
     }
     if (RETIRED.has(to)) return checkRetirement(from, to, facts)
     return { allowed: true }
+}
+
+/**
+ * The moves, one save each, by which an Asset gets from `from` to `to` in the fewest the matrix allows: the lifecycle
+ * rule checks every save as one move, so a unit going further walks the stages between (a Spare pool unit to pending
+ * wipe through available, a pending-wipe one to a retired stage through pending disposal). It passes only through
+ * stages In stock, where a move books the unit and nothing happens to it: an installed unit is never returned on the
+ * way. Empty when it is there already. With no path there it is `to` alone, so the move is refused with
+ * `checkTransition`'s reason.
+ */
+export function pathTo(from: Stage | null, to: Stage): readonly Stage[] {
+    if (from === to) return []
+    if (from === null) return [to]
+    const seen = new Set<Stage>([from])
+    let paths: Stage[][] = [[]]
+    while (paths.length > 0) {
+        const longer: Stage[][] = []
+        for (const path of paths) {
+            for (const next of ALLOWED_MOVES[path.length > 0 ? path[path.length - 1] : from]) {
+                if (next === to) return [...path, to]
+                if (seen.has(next) || STAGE_FIELDS[next].installStatus !== INSTALL_STATUS.inStock) continue
+                seen.add(next)
+                longer.push([...path, next])
+            }
+        }
+        paths = longer
+    }
+    return [to]
 }
 
 /**
@@ -275,14 +303,12 @@ export function isBillable(stage: Stage | null): boolean {
     return stage !== null && IN_USE_STAGES.includes(stage)
 }
 
-/** The dates a stage change can start or stop an Asset's billing on (YYYY-MM-DD). */
 export interface BillingDates {
     /** The day the Asset went into service, once it has. */
     inServiceDate?: string
     today: string
 }
 
-/** Billing (the Asset's Service interval) starts or stops on this day (YYYY-MM-DD). */
 export type BillingChange = { start: string } | { stop: string }
 
 /**

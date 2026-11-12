@@ -1,6 +1,7 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import {
     cursorReport,
+    JOB_STATUS,
     lockLostIn,
     passParm,
     readPassParm,
@@ -14,28 +15,30 @@ import {
 } from '../domain/chunked-job.ts'
 import { andEachClause } from '../domain/encoded-query.ts'
 import { messageOf } from '../domain/errors.ts'
-import { REQUEUE, writeHoldingLock, type HeldLock } from '../domain/job-lock.ts'
+import { REQUEUE, writeHoldingLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { nowMs } from './clock.ts'
 import { queueJobAt, type JobEvent } from './events.ts'
-import { completePass, isCurrentPass, JOB_STATUS, openJobCursor, startPass, type JobCursor } from './job-cursor.ts'
-import { isLocked, withLock, type LockRun } from './locks.ts'
-import { intProperty, PROPERTY } from './properties.ts'
+import { completePass, isCurrentPass, openJobCursor, startPass, type JobCursor } from './job-cursor.ts'
+import { isLocked, withLock } from './locks.ts'
+import { log } from './log.ts'
+import { intProperty } from './properties.ts'
 
 /**
- * The chunked-job runner over a table's records (ADR 0007), for a scheduled job (`runTableJob`, its cursor kept in
+ * The chunked-job runners over a table's records (ADR 0007), for a scheduled job (`runTableJob`, its cursor kept in
  * x_daas_ham_job_cursor) and for an event job (`runEventTableJob`, its cursor carried by its events).
  *
- * An event job whose passes replace each other (`PassJob`) runs in one of two modes, each with one user. Both exist
- * because the two jobs are kept from an old pass's writes in different ways:
- * - the margin recompute runs under the job's lock (`underLock`, ADR 0013). A fresh recompute may start while one is
- *   running, and an old pass writing after it would leave its Cost facts beside the fresh pass's or replace the fresh
- *   Margin. So a pass's start, each flush and its completion check that the pass is still current and write in one
- *   critical section;
- * - billing generation takes no lock (ADR 0007). A period is regenerated only once it is ready for review, never
- *   while it is generating, so no fresh pass starts beside a running one: a pass starts where it is triggered
- *   (`queuePass`), and its token only drops the chunks still queued of a pass reset by hand or replaced
- *   (`inCurrentPass`).
+ * An event job whose passes replace each other has a runner of its own, over the same table walk, because each of
+ * the two such jobs is kept from an old pass's writes in a different way:
+ * - the margin recompute runs on `runSupersedingChunk`, under the job's lock (ADR 0013). A fresh recompute may start
+ *   while one is running, and an old pass writing after it would leave its Cost facts beside the fresh pass's or
+ *   replace the fresh Margin. So a pass's start, each flush and its completion check that the pass is still current
+ *   and write in one critical section;
+ * - billing generation runs on `runTriggeredChunk` and takes no lock (ADR 0007). A period is regenerated only once it
+ *   is ready for review, never while it is generating, so no fresh pass starts beside a running one: a pass starts
+ *   where it is triggered (`queuePass`), and its token only drops the chunks still queued of a pass reset by hand or
+ *   replaced (`inCurrentPass`).
  *
  * Each record is read into a row `R`; the item handled is `T`, the row itself unless `prepare` is set.
  * A record whose handling throws is a failure: the pass moves on past it, the run logs its failures as an
@@ -65,7 +68,7 @@ type TableJob<T, R = T> = TableSourceFields<T, R> & Prepare<T, R> & { job: strin
 
 function logFailures(where: string, failures: Failures): void {
     if (failures.failed === 0) return
-    gs.error(`[x_daas_ham] ${where}: ${failures.failed} record(s) failed, the last: ${failures.lastError}`)
+    log.error(`${where}: ${failures.failed} record(s) failed, the last: ${failures.lastError}`)
 }
 
 function chunkOf(queued: JobEvent): string {
@@ -80,7 +83,7 @@ export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
     } catch (error) {
         // Without a cursor no progress is kept, and every run would handle the same records again from the start.
         const reason = messageOf(error)
-        gs.error(`[x_daas_ham] ${spec.job}: not run: ${reason}`)
+        log.error(`${spec.job}: not run: ${reason}`)
         return { processed: 0, failed: 0, done: false, cursor: '', lastError: reason }
     }
     const resumed = row.cursor !== ''
@@ -90,7 +93,7 @@ export function runTableJob<R, T = R>(spec: TableJob<T, R>): ChunkedJobResult {
             logFailures(`${spec.job}: in this run`, failures)
             const report = cursorReport({ failed: row.failed, lastError: row.lastError }, { ...failures, resumed, done })
             const refused = row.save({ cursor, processed, status: report.status, failed: report.failed, lastError: report.lastError, ranNow: true })
-            if (refused) gs.warn(`[x_daas_ham] ${spec.job}: cursor not saved, so the next run repeats this one: ${refused}`)
+            if (refused) log.warn(`${spec.job}: cursor not saved, so the next run repeats this one: ${refused}`)
         },
     })
 }
@@ -102,24 +105,21 @@ type EventJob<T, R = T> = TableSourceFields<T, R> &
          * The runner logs a chunk's failures either way; `flush` records them where the pass's outcome is kept.
          */
         flush?: (failures: Failures) => void
-        pass?: PassJob
     }
 
-/** How an event job's passes replace each other: each event carries its pass's token, and only the current pass writes. */
-export interface PassJob {
-    /** The job, whose cursor row (platform/job-cursor) names the current pass. */
+/** An event job whose passes replace each other: each event carries its pass's token, and only the current pass writes. */
+type PassJob<T, R> = EventJob<T, R> & {
+    /** The job, whose cursor row names the current pass. */
     job: string
-    /**
-     * The runner starts a pass itself, from an event that carries none (a fresh trigger), and makes each pass's writes
-     * under the job's lock (ADR 0013): `onStart` runs once as a pass starts, `complete` once its last chunk is flushed
-     * and `stopped` when a chunk throws, each only while the pass is still the current one. A chunk may be handled again
-     * (after finding the job locked), so `handle` must only accumulate in memory: every write belongs in `flush`,
-     * `onStart` and `complete`.
-     * Without it the job takes no lock and its passes are started where they are triggered (`queuePass`): an event that
-     * carries no pass is dropped as a stale one's is, and the caller completes the pass on a result that is `done`.
-     */
-    underLock?: { onStart(): void; complete?(): void; stopped?(error: string): void }
 }
+
+/**
+ * `onStart` runs once as a pass starts, `complete` once its last chunk is flushed and `stopped` when a chunk throws,
+ * each under the job's lock and only while the pass is still the current one. A chunk may be handled again (after
+ * finding the job locked), so `handle` must only accumulate in memory: every write belongs in `flush`, `onStart` and
+ * `complete`.
+ */
+type SupersedingJob<T, R> = PassJob<T, R> & { onStart(): void; complete?(): void; stopped?(error: string): void }
 
 export interface EventJobResult extends ChunkedJobResult {
     /** The chunk's pass is no longer its job's current one: nothing it handled was written, and nothing is queued. */
@@ -127,25 +127,20 @@ export interface EventJobResult extends ChunkedJobResult {
 }
 
 /**
+ * An event job's query is scoped by its subject: without one it would match every record that names none, so every
+ * event runner runs nothing for it.
+ */
+function unscoped(queued: JobEvent): EventJobResult {
+    return { processed: 0, failed: 0, done: false, cursor: queued.position, lastError: '', superseded: false }
+}
+
+/**
  * The same runner driven by an event instead of a schedule: the cursor travels in the event's parm2 and the event is
  * queued again until the pass is complete. A chunk's failed records are logged as an error; without `flush` they are
  * kept nowhere else.
- *
- * With `pass`, the events also carry the pass's token, and a chunk checks that its pass is still the job's current one
- * as it starts and again before it writes: a chunk of a pass replaced or retired since neither flushes nor queues the
- * next chunk, and is reported as `superseded`.
- *
- * With `pass.underLock`, a pass's start, each chunk's flush and the pass's completion hold the job's lock
- * (ADR 0013), and each checks under it that its pass is still the current one: a fresh pass starts only
- * between them, so a superseded chunk neither flushes, queues the next chunk nor completes its pass, and
- * nothing it handled is written. A chunk that finds the lock held runs again later from the same cursor
- * and pass; a pass that completes is marked complete on its job cursor. A holder that outlasts the lock's
- * abandonment time can lose it mid-write to a fresh pass, so after each write, and when a write throws,
- * it checks it still holds it; one that lost it writes nothing more and starts another fresh pass, which
- * clears what both wrote. A superseded, retried or restarted chunk reports `done: false` and no counts.
  */
 export function runEventTableJob<R, T = R>(queued: JobEvent, spec: EventJob<T, R>): EventJobResult {
-    if (spec.pass) return runPassChunk(queued, spec, spec.pass)
+    if (!queued.subject) return unscoped(queued)
     const result = runOverTable(spec, {
         loadCursor: () => queued.position,
         saveCursor: (next, _processed, done, failures) => {
@@ -158,9 +153,9 @@ export function runEventTableJob<R, T = R>(queued: JobEvent, spec: EventJob<T, R
 }
 
 /**
- * Start a pass of `job` where it is triggered and queue its first chunk, for a job whose runner starts none
- * (`PassJob` without `underLock`). The chunks still queued of an earlier pass are dropped from then on. Throws (with
- * why) when the pass cannot be recorded on the job's cursor, and then queues nothing.
+ * Start a pass of `job` where it is triggered and queue its first chunk, for a job run by `runTriggeredChunk`, which
+ * starts none. The chunks still queued of an earlier pass are dropped from then on. Throws (with why) when the pass
+ * cannot be recorded on the job's cursor, and then queues nothing.
  */
 export function queuePass(name: string, record: GlideRecord, subject: string, job: string): void {
     const token = startPass(job, JOB_STATUS.passStarted)
@@ -171,26 +166,60 @@ export function inCurrentPass(queued: JobEvent, job: string): boolean {
     return isCurrentPass(job, readPassParm(queued.position).token)
 }
 
-const NO_LOCK: Pick<HeldLock, 'held'> = { held: () => true }
+function superseded(cursor: string): EventJobResult {
+    return { processed: 0, failed: 0, done: false, cursor, lastError: '', superseded: true }
+}
 
-function runPassChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, pass: PassJob): EventJobResult {
-    const job = pass.job
-    const locked = pass.underLock
+/**
+ * One chunk of a pass started where it was triggered (`queuePass`). It checks that its pass is still the job's current
+ * one as it starts and again before it writes: a chunk of a pass replaced or retired since, or of an event that carries
+ * no pass, neither flushes nor queues the next chunk, and is reported as `superseded`. It takes no lock, and the caller
+ * completes the pass on a result that is `done`.
+ */
+export function runTriggeredChunk<R, T = R>(queued: JobEvent, spec: PassJob<T, R>): EventJobResult {
+    if (!queued.subject) return unscoped(queued)
+    const job = spec.job
+    const { token, cursor } = readPassParm(queued.position)
+    if (!isCurrentPass(job, token)) return superseded(cursor)
+    let current = true
+    const result = runOverTable(spec, {
+        loadCursor: () => cursor,
+        saveCursor: (next, _processed, done, failures) => {
+            current = isCurrentPass(job, token)
+            if (!current) return
+            logFailures(chunkOf(queued), failures)
+            spec.flush?.(failures)
+            if (!done) queueJobAt(queued, passParm({ token, cursor: next }))
+        },
+    })
+    return current ? { ...result, superseded: false } : superseded(cursor)
+}
+
+/**
+ * One chunk of a pass that a fresh pass supersedes, started by the runner itself from an event that carries none (a
+ * fresh trigger). A pass's start, each chunk's flush and the pass's completion hold the job's lock (ADR 0013), and each
+ * checks under it that its pass is still the current one: a fresh pass starts only between them, so a superseded chunk
+ * neither flushes, queues the next chunk nor completes its pass, and nothing it handled is written. A chunk that finds
+ * the lock held runs again later from the same cursor and pass; a pass that completes is marked complete on its job
+ * cursor. A holder that outlasts the lock's abandonment time can lose it mid-write to a fresh pass, so after each
+ * write, and when a write throws, it checks it still holds it; one that lost it writes nothing more and starts another
+ * fresh pass, which clears what both wrote. A superseded, retried or restarted chunk reports `done: false` and no counts.
+ */
+export function runSupersedingChunk<R, T = R>(queued: JobEvent, spec: SupersedingJob<T, R>): EventJobResult {
+    if (!queued.subject) return unscoped(queued)
+    const job = spec.job
     const lockName = LOCK.job(job)
-    const underLock = <V>(work: (lock: Pick<HeldLock, 'held'>) => V): LockRun<V> =>
-        locked ? withLock<V>(lockName, work) : { ran: true, value: work(NO_LOCK) }
     const position = readPassParm(queued.position)
     const cursor = position.cursor
     let token = position.token
-    const idle = { processed: 0, failed: 0, done: false, cursor, lastError: '', superseded: true }
     try {
-        if (!token && locked) {
-            const start = underLock((lock) => {
+        if (!token) {
+            const start = withLock(lockName, (lock) => {
                 const started = writeHoldingLock(
                     () => lock.held(),
                     () => {
                         token = startPass(job, JOB_STATUS.running)
-                        locked.onStart()
+                        spec.onStart()
                     },
                 )
                 return lockLostIn(started)
@@ -198,15 +227,15 @@ function runPassChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, pass: PassJo
             if (!start.ran) return retryLater(queued, '')
             if (start.value) return restartPass(queued, start.value.error)
         } else if (!isCurrentPass(job, token)) {
-            return idle
+            return superseded(cursor)
         }
         // A cheap probe first: a chunk only takes the lock at its end, and would throw its work away then.
-        if (locked && isLocked(lockName)) return retryLater(queued, passParm({ token, cursor }))
+        if (isLocked(lockName)) return retryLater(queued, passParm({ token, cursor }))
         let write = { outcome: 'written' } as ChunkWrite | { outcome: 'locked' }
         const result = runOverTable(spec, {
             loadCursor: () => cursor,
             saveCursor: (next, _processed, done, failures) => {
-                const chunk = underLock((lock) =>
+                const chunk = withLock(lockName, (lock) =>
                     writeChunkUnderLock(
                         {
                             isCurrent: () => isCurrentPass(job, token),
@@ -218,8 +247,7 @@ function runPassChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, pass: PassJo
                             },
                             queueNext: () => queueJobAt(queued, passParm({ token, cursor: next })),
                             complete: () => {
-                                if (!locked) return
-                                locked.complete?.()
+                                spec.complete?.()
                                 completePass(job)
                             },
                         },
@@ -231,25 +259,25 @@ function runPassChunk<T, R>(queued: JobEvent, spec: EventJob<T, R>, pass: PassJo
         })
         if (write.outcome === 'locked') return retryLater(queued, passParm({ token, cursor }))
         if (write.outcome === 'lost') return restartPass(queued, write.error)
-        return write.outcome === 'superseded' ? idle : { ...result, superseded: false }
+        return write.outcome === 'superseded' ? superseded(cursor) : { ...result, superseded: false }
     } catch (error) {
-        if (token && locked) recordStop(job, locked, token, messageOf(error))
+        if (token) recordStop(spec, token, messageOf(error))
         throw error
     }
 }
 
-function recordStop(job: string, locked: NonNullable<PassJob['underLock']>, token: string, error: string): void {
+function recordStop(pass: Pick<SupersedingJob<unknown, unknown>, 'job' | 'stopped'>, token: string, error: string): void {
     try {
-        withLock(LOCK.job(job), () => {
-            if (isCurrentPass(job, token)) locked.stopped?.(error)
+        withLock(LOCK.job(pass.job), () => {
+            if (isCurrentPass(pass.job, token)) pass.stopped?.(error)
         })
     } catch (unrecorded) {
-        gs.warn(`[x_daas_ham] ${job}: why the pass stopped was not recorded: ${messageOf(unrecorded)}`)
+        log.warn(`${pass.job}: why the pass stopped was not recorded: ${messageOf(unrecorded)}`)
     }
 }
 
 function retryLater(queued: JobEvent, parm2: string): EventJobResult {
-    gs.warn(`[x_daas_ham] ${queued.name} ${queued.subject}: job locked, running again in ${REQUEUE.delaySeconds} s`)
+    log.warn(`${queued.name} ${queued.subject}: job locked, running again in ${REQUEUE.delaySeconds} s`)
     queueJobAt(queued, parm2, 'later')
     return { processed: 0, failed: 0, done: false, cursor: parm2, lastError: 'job locked: retried later', superseded: false }
 }
@@ -260,7 +288,7 @@ function retryLater(queued: JobEvent, parm2: string): EventJobResult {
  */
 function restartPass(queued: JobEvent, error: string): EventJobResult {
     const threw = error ? ` (the write then threw: ${error})` : ''
-    gs.warn(`[x_daas_ham] ${queued.name} ${queued.subject}: job lock lost while writing${threw}, starting a fresh pass`)
+    log.warn(`${queued.name} ${queued.subject}: job lock lost while writing${threw}, starting a fresh pass`)
     queueJobAt(queued, '')
     return { processed: 0, failed: 0, done: false, cursor: '', lastError: 'job lock lost: pass restarted', superseded: false }
 }
@@ -296,7 +324,6 @@ function fetchBatch<T, R>(spec: TableSource<T, R>, after: string, size: number):
     const ids = visitPage(spec.table, spec.query, after, size, (record) => rows.push(spec.read(record)))
     let items: T[]
     try {
-        // Without `prepare` the rows are the items (T defaults to R).
         items = spec.prepare ? spec.prepare(rows) : (rows as unknown[] as T[])
     } catch (error) {
         // Thrown from here, outside the runner's per-record handling, it would stop the chunk with no cursor saved.

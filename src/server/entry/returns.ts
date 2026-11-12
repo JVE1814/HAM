@@ -1,12 +1,8 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
-import { chaseOverdue, evaluateReturnLine, requestProducedReturn } from '../platform/returns.ts'
-import { raiseDueReturns } from '../platform/scheduled-returns.ts'
-
-/** Returns, decommissions, depot evaluation and overdue chasing (P2.4): platform/returns. */
+import { evaluateReturnLine, requestProducedReturn } from '../platform/returns.ts'
 
 /**
- * Record producer "Return or decommission equipment" post-insert script: raise the Return it just saved for the
- * devices it lists (platform/returns `requestProducedReturn`, which removes one that is not raised). (`current` is
+ * Record producer "Return or decommission equipment" post-insert script. (`current` is
  * typed unknown because the SDK passes its own GlideRecord type here.)
  */
 export function afterReturnProduced(producer: Record<string, unknown>, current: unknown): void {
@@ -20,12 +16,4 @@ export function afterReturnProduced(producer: Record<string, unknown>, current: 
 export function onReturnEvaluated(current: GlideRecord): void {
     const evaluation = evaluateReturnLine(current)
     if (!evaluation.evaluated) gs.addErrorMessage(evaluation.why)
-}
-
-export function chaseOverdueReturns(): void {
-    chaseOverdue()
-}
-
-export function raiseScheduledReturns(): void {
-    raiseDueReturns()
 }

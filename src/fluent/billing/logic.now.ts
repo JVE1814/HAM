@@ -2,23 +2,23 @@ import '@servicenow/sdk/global'
 import { BusinessRule, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
 import {
     exportBillingPeriod,
+    onAssetServiceChange,
     generateBillingLines,
     guardBillingPeriodMonth,
     guardClosedBillingLine,
     guardClosedBillingPeriod,
     openMonthlyBillingPeriod,
-    startBillingPeriodGeneration,
     uiCloseBillingPeriod,
     uiExportBillingPeriod,
     uiRegenerateBillingPeriod,
     uiResetBillingGeneration,
 } from '../../server/entry/billing'
-import { EVENT } from '../../server/platform/events'
+import { generateNewPeriod } from '../../server/platform/billing'
+import { EVENT } from '../../server/domain/events'
+import { CURRENT_FLEET_STAGE_CHANGED } from '../../server/domain/fleet'
 import { BILLING_PERIOD_STATUS } from '../../server/domain/vocabulary'
 import { RESET_AFTER_IDLE_MINUTES } from '../../server/domain/billing'
 import { admin, finance } from '../shared/roles.now'
-
-/* Billing periods (plan §13 Billing export, Q66): monthly generation, review, close and lock, CSV export. */
 
 ScheduledScript({
     $id: Now.ID['job_open_billing_period'],
@@ -87,7 +87,7 @@ UiAction({
     script: uiRegenerateBillingPeriod,
 })
 
-// Admin only: a generation that stopped without being held for review (e.g. its chunk died) is left Generating.
+// A generation that stopped without being held for review (e.g. its chunk died) is left Generating.
 UiAction({
     $id: Now.ID['ua_billing_reset_generation'],
     name: 'Reset generation',
@@ -158,7 +158,6 @@ BusinessRule({
     script: guardBillingPeriodMonth,
 })
 
-// Where a new period's generation starts, whether the monthly job or a person created it (Regenerate starts its own).
 BusinessRule({
     $id: Now.ID['br_billing_period_generate'],
     name: 'NaaS - generate a new billing period',
@@ -167,5 +166,17 @@ BusinessRule({
     action: ['insert'],
     order: 200,
     condition: `current.status == '${BILLING_PERIOD_STATUS.generating}'`,
-    script: startBillingPeriodGeneration,
+    script: generateNewPeriod,
 })
+
+BusinessRule({
+    $id: Now.ID['br_asset_left_service'],
+    name: 'NaaS - start or stop billing on service',
+    table: 'alm_hardware',
+    when: 'after',
+    action: ['update'],
+    order: 210,
+    condition: CURRENT_FLEET_STAGE_CHANGED,
+    script: onAssetServiceChange,
+})
+

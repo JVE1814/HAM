@@ -1,9 +1,16 @@
 import '@servicenow/sdk/global'
-import { BusinessRule, EmailNotification, Record, ScheduledScript, UiAction } from '@servicenow/sdk/core'
-import { guardAgreementCurrency } from '../../server/entry/billing'
-import { onAgreementEndChanged, uiRenewAgreement, warnRenewals } from '../../server/entry/leases'
-import { EVENT } from '../../server/platform/events'
-import { commercialEditors } from '../shared/roles.now'
+import { BusinessRule, EmailNotification, Property, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
+import { EVENT } from '../../server/domain/events'
+import { PROPERTY } from '../../server/domain/properties'
+import {
+    guardAgreementCurrency,
+    onAgreementTermsChanged,
+    refreshAgreementAssets,
+    uiRenewAgreement,
+    warnRenewals,
+} from '../../server/entry/agreements'
+import { rearmForNewEnd } from '../../server/platform/renewals'
+import { admin, commercialEditors } from '../shared/roles.now'
 
 // A mistyped currency is refused as it is entered, not at the next generation (owner decision: one currency per Agreement).
 BusinessRule({
@@ -17,8 +24,6 @@ BusinessRule({
     script: guardAgreementCurrency,
 })
 
-/* Agreement renewals (plan §13 Renewals). */
-
 BusinessRule({
     $id: Now.ID['br_agreement_end_changed'],
     name: 'NaaS - re-arm renewal warning on new end',
@@ -27,7 +32,39 @@ BusinessRule({
     action: ['update'],
     order: 100,
     condition: "current.ends.changes() && current.ends != ''",
-    script: onAgreementEndChanged,
+    script: rearmForNewEnd,
+})
+
+BusinessRule({
+    $id: Now.ID['br_agreement_terms_changed'],
+    name: 'NaaS - agreement refresh terms changed',
+    table: 'x_daas_ham_agreement',
+    when: 'after',
+    action: ['update'],
+    order: 200,
+    condition: 'current.refresh_cycle_months.changes() || current.refresh_basis.changes()',
+    script: onAgreementTermsChanged,
+})
+
+Record({
+    $id: Now.ID['event_agreement_terms'],
+    table: 'sysevent_register',
+    data: {
+        suffix: 'agreement.terms',
+        event_name: EVENT.agreementTermsChanged,
+        table: 'x_daas_ham_agreement',
+        description: "An agreement's refresh terms changed; parm1 = agreement, parm2 = cursor.",
+        priority: 200,
+    },
+})
+
+ScriptAction({
+    $id: Now.ID['sa_agreement_terms'],
+    name: 'NaaS - refresh due of agreement assets',
+    eventName: EVENT.agreementTermsChanged,
+    active: true,
+    script: refreshAgreementAssets,
+    description: "Recomputes refresh due dates for an agreement's deployed assets in time-boxed chunks.",
 })
 
 UiAction({
@@ -78,4 +115,40 @@ EmailNotification({
         messageHtml:
             '<p>Agreement ${number} with ${customer} ends on ${ends}.</p><p>Renew it (Renew agreement) or let it end: at the end date all installed equipment is recovered automatically.</p>',
     },
+})
+
+Record({
+    $id: Now.ID['event_coverage_expiring'],
+    table: 'sysevent_register',
+    data: {
+        suffix: 'coverage.expiring',
+        event_name: EVENT.coverageExpiring,
+        table: 'customer_account',
+        description: 'OEM coverage of deployed assets ends soon; parm1 = recipients, parm2 = summary.',
+        priority: 200,
+    },
+})
+
+EmailNotification({
+    $id: Now.ID['mail_coverage_expiring'],
+    table: 'customer_account',
+    name: 'NaaS - OEM coverage expiring',
+    description: 'Tells the asset managers that OEM coverage of a customer’s deployed equipment ends soon.',
+    active: true,
+    triggerConditions: { generationType: 'event', eventName: EVENT.coverageExpiring },
+    recipientDetails: { eventParm1WithRecipient: true },
+    emailContent: {
+        subject: 'OEM coverage expiring for ${name}',
+        messageHtml:
+            '<p>${event.parm2} for equipment deployed at ${name}.</p><p>Renew the coverage with the manufacturer; the next coverage sync or CSV import picks up the new end dates.</p>',
+    },
+})
+
+Property({
+    $id: Now.ID['prop_coverage_warning_days'],
+    name: PROPERTY.coverageWarningDays.name,
+    type: 'integer',
+    value: PROPERTY.coverageWarningDays.default,
+    description: 'Days before an OEM coverage contract of deployed equipment ends that the asset managers are warned.',
+    roles: { read: [admin], write: [admin] },
 })

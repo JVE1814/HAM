@@ -4,7 +4,7 @@ import { DEVICE_CLASS, INSTALL_STATUS, LEGAL_OWNER, STAGE_FIELDS, STOCKROOM_TYPE
 import { assetManager, customerAdmin, inventoryTech, siteContact } from '../shared/roles.now'
 
 /*
- * ATF: depot evaluation routing (Q60), on fleet assets: the app moves those only (ADR 0016; suite "NaaS - P2").
+ * ATF: depot evaluation routing (Q60), on fleet assets: the app moves those only (ADR 0016).
  * Fixtures setting the Fleet flag insert without security enforcement: the flag is read-only on forms, and the app's
  * intake paths set it server-side.
  */
@@ -17,6 +17,8 @@ const CENTRAL_DEPOT = STOCKROOM_TYPE.central_depot
 const PROVIDER_OWNED = LEGAL_OWNER.provider
 const IN_USE = INSTALL_STATUS.inUse
 const SWITCH = DEVICE_CLASS.switch
+const AVAILABLE_FIELDS = `install_status=${STAGE_FIELDS.available.installStatus}^substatus=${STAGE_FIELDS.available.substatus}`
+const PENDING_RETURN_FIELDS = `install_status=${STAGE_FIELDS.pending_return.installStatus}^substatus=${STAGE_FIELDS.pending_return.substatus}`
 
 export const returnEvaluationTest = Test(
     {
@@ -100,15 +102,14 @@ export const returnEvaluationTest = Test(
             $id: Now.ID['atf_rev_validate_asset'],
             table: 'alm_hardware',
             recordId: asset.record_id,
-            fieldValues: 'install_status=6^substatus=available',
+            fieldValues: AVAILABLE_FIELDS,
             assert: 'record_validated',
         })
     },
 )
 
 /*
- * ATF: the customer return requests of POST /api/x_daas_ham/naas/customer/returns (entry/customer
- * `requestCustomerReturn`, Q49; suite "NaaS - P2"). ATF's inbound REST step signs in through a basic auth profile, which
+ * ATF's inbound REST step signs in through a basic auth profile, which
  * this scope may not create, so the server-side scripts call the route's handler in the impersonated user's session,
  * with the request and response objects it reads (body.data, setStatus, setBody), as the platform does: the handler's
  * role checks and the visibility rules (ADR 0005) apply as for that user. A script cannot read an earlier step's
@@ -317,14 +318,14 @@ export const customerReturnRequestTest = Test(
             $id: Now.ID['atf_crr_validate_listed'],
             table: 'alm_hardware',
             recordId: listed.record_id,
-            fieldValues: 'install_status=1^substatus=pending_return',
+            fieldValues: PENDING_RETURN_FIELDS,
             assert: 'record_validated',
         })
         atf.server.recordValidation({
             $id: Now.ID['atf_crr_validate_unlisted'],
             table: 'alm_hardware',
             recordId: unlisted.record_id,
-            fieldValues: 'install_status=1^substatus=pending_return',
+            fieldValues: PENDING_RETURN_FIELDS,
             assert: 'record_validated',
         })
         atf.server.recordQuery({

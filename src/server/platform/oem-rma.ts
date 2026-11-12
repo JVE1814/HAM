@@ -1,23 +1,25 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
 import { RMA_AT_OEM, RMA_AWAITED, RMA_OPEN, type OpenRma, type RmaReuse } from '../domain/oem-rma.ts'
-import { lineStillOpen } from '../domain/sourcing.ts'
+import { lineStillOpen } from '../domain/fulfilment.ts'
 import { LINE_STAGE, type OemVendor, RMA_STATE, type RmaState } from '../domain/vocabulary.ts'
 import { isFleetAsset, moveRefusal } from './assets.ts'
 import { nowGlide, todayIso } from './clock.ts'
+import { log } from './log.ts'
+import { lineOpenness } from './order-lines.ts'
 import { count, findById, refusal, str, warnRefused } from './records.ts'
 
-/** OEM RMA records (opening the RMA with the vendor is manual, ADR 0008). */
+/** Opening the RMA with the vendor is manual (ADR 0008). */
 
-/** The vendor an RMA is opened with when the defective Asset's Model names no OEM source. */
+const RMA = 'x_daas_ham_oem_rma'
+
 const DEFAULT_RMA_VENDOR: OemVendor = 'cisco'
 
-/** How many days after its RMA is opened the defective unit is due back at the OEM. */
 const SHIP_BACK_DAYS = 10
 
 /** Open an OEM RMA for an advance replacement: its sys_id, or '' (logged) when the platform refuses it. */
 export function openOemRma(input: { defectiveAsset: GlideRecord; orderLineId: string; caseId: string }): string {
-    const rma = new GlideRecord('x_daas_ham_oem_rma')
+    const rma = new GlideRecord(RMA)
     rma.initialize()
     rma.setValue('vendor', str(input.defectiveAsset, 'model.x_daas_ham_oem_source') || DEFAULT_RMA_VENDOR)
     rma.setValue('defective_asset', input.defectiveAsset.getUniqueValue())
@@ -32,23 +34,21 @@ export function openOemRma(input: { defectiveAsset: GlideRecord; orderLineId: st
     return ''
 }
 
-/** The RMAs still open for a defective Asset (domain/oem-rma `RMA_OPEN`), oldest first, with the line each serves. */
+/** The RMAs still open for a defective Asset, oldest first, with the line each serves. */
 export function openRmasFor(defectiveAssetId: string): OpenRma[] {
-    const rma = new GlideRecord('x_daas_ham_oem_rma')
+    const rma = new GlideRecord(RMA)
     rma.addQuery('defective_asset', defectiveAssetId)
     rma.addQuery('state', 'IN', RMA_OPEN.join(','))
     rma.orderBy('sys_created_on')
     rma.query()
     const open: OpenRma[] = []
     while (rma.next()) {
-        const line = { lineStage: str(rma, 'order_line.line_stage'), orderStage: str(rma, 'order_line.order.stage') }
         open.push({
             rmaId: rma.getUniqueValue(),
             rmaNumber: str(rma, 'rma_number'),
             state: str(rma, 'state') as RmaState,
             lineId: str(rma, 'order_line'),
-            // With no line both stages read '', which is no open line.
-            lineOpen: lineStillOpen(line),
+            lineOpen: lineStillOpen(lineOpenness(rma, 'order_line')),
         })
     }
     return open
@@ -59,10 +59,10 @@ export function openRmasFor(defectiveAssetId: string): OpenRma[] {
  * the line counts its replacement as on its way; false (logged) when the platform refuses.
  */
 export function reuseOemRma(reuse: RmaReuse, orderLineId: string): boolean {
-    const rma = findById('x_daas_ham_oem_rma', reuse.rma.rmaId)
+    const rma = findById(RMA, reuse.rma.rmaId)
     const notReused = `OEM RMA ${reuse.rma.rmaNumber || reuse.rma.rmaId} not reused`
     if (!rma) {
-        gs.warn(`[x_daas_ham] ${notReused}: not found`)
+        log.warn(`${notReused}: not found`)
         return false
     }
     rma.setValue('order_line', orderLineId)
@@ -78,22 +78,20 @@ export function reuseOemRma(reuse: RmaReuse, orderLineId: string): boolean {
  * replacement still to come.
  */
 export function markReplacementReceived(rmaId: string, replacementSerial: string): void {
-    const rma = findById('x_daas_ham_oem_rma', rmaId)
+    const rma = findById(RMA, rmaId)
     if (!rma) return
     rma.setValue('state', RMA_STATE.replacement_received)
     rma.setValue('replacement_serial', replacementSerial)
     if (!rma.update()) warnRefused(rma, `RMA ${str(rma, 'rma_number')} not marked replacement received`)
 }
 
-/** OEM advance replacements still expected for an Order line. */
 export function openRmaCount(orderLineId: string): number {
-    return count('x_daas_ham_oem_rma', `order_line=${orderLineId}^stateIN${RMA_AWAITED.join(',')}`)
+    return count(RMA, `order_line=${orderLineId}^stateIN${RMA_AWAITED.join(',')}`)
 }
 
-/** The Order line waiting for the OEM replacement announced under this RMA number. */
 export function lineAwaitingRma(rmaNumber: string, modelId: string): { lineId: string; rmaId: string } | null {
     if (!rmaNumber) return null
-    const rma = new GlideRecord('x_daas_ham_oem_rma')
+    const rma = new GlideRecord(RMA)
     rma.addQuery('rma_number', rmaNumber)
     rma.addQuery('order_line.line_stage', LINE_STAGE.awaiting_stock)
     rma.addQuery('order_line.model', modelId)
@@ -103,7 +101,6 @@ export function lineAwaitingRma(rmaNumber: string, modelId: string): { lineId: s
 }
 
 
-/** The most RMAs of one vendor a status sync asks about. */
 const RMAS_PER_SYNC = 200
 
 /**
@@ -111,7 +108,7 @@ const RMAS_PER_SYNC = 200
  * RMAS_PER_SYNC, least recently synced (never synced) first; their sys_ids, and their RMA numbers each once.
  */
 export function rmasToAskAbout(vendor: OemVendor): { ids: string[]; rmaNumbers: string[] } {
-    const rma = new GlideRecord('x_daas_ham_oem_rma')
+    const rma = new GlideRecord(RMA)
     rma.addQuery('vendor', vendor)
     rma.addQuery('state', 'IN', RMA_AT_OEM.join(','))
     rma.addNotNullQuery('rma_number')
@@ -134,7 +131,7 @@ export function rmasToAskAbout(vendor: OemVendor): { ids: string[]; rmaNumbers: 
 export function recordRmaStatuses(rmaIds: readonly string[], statusOf: ReadonlyMap<string, string>): string[] {
     const syncedAt = nowGlide()
     const refused: string[] = []
-    const asked = new GlideRecord('x_daas_ham_oem_rma')
+    const asked = new GlideRecord(RMA)
     asked.addQuery('sys_id', 'IN', rmaIds.join(','))
     asked.query()
     while (asked.next()) {

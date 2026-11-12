@@ -1,12 +1,11 @@
-import { activeDays, divideRounded, fromCents, monthBounds, toCents, type MonthBounds } from './billing.ts'
+import { activeDays, divideRounded, fromCents, monthBounds, toCents, type MonthBounds } from './money.ts'
 import { addDays, addMonths } from './calendar.ts'
-import { evenShare } from './leases.ts'
 import { legalOwnerOf } from './lifecycle.ts'
 import type { CostType, LegalOwner } from './vocabulary.ts'
 
 /**
  * Cost facts and Margin per Customer and Site (plan §13 Margin / TCO, Q72), each in one currency: costs take their Agreement's (a
- * shipment's, its carrier's), and amounts of two currencies are never added (domain/billing `chooseCurrency`).
+ * shipment's, its carrier's), and amounts of two currencies are never added (domain/money `chooseCurrency`).
  */
 
 export interface LeaseTerms {
@@ -92,12 +91,12 @@ function writeOffShare(
 }
 
 /**
- * Each Asset's share of a lease's monthly payment: split evenly over the Assets it covers. While a
- * buyout transfer runs, Assets leave the schedule one by one, so the payment keeps being split over
- * the Assets it covered when the buyout was decided.
+ * While a buyout transfer runs, Assets leave the schedule one by one, so the payment keeps being split over
+ * the Assets it covered when the buyout was decided. The share is not rounded: costs are summed before they are.
  */
-export function leaseShare(lease: Pick<LeaseTerms, 'monthlyPayment' | 'coveredAssets' | 'buyoutAssets'>): number {
-    return evenShare(lease.monthlyPayment, Math.max(lease.coveredAssets, lease.buyoutAssets))
+function leaseShare(lease: Pick<LeaseTerms, 'monthlyPayment' | 'coveredAssets' | 'buyoutAssets'>): number {
+    const assets = Math.max(lease.coveredAssets, lease.buyoutAssets)
+    return assets > 0 ? lease.monthlyPayment / assets : 0
 }
 
 function leaseRunsIn(lease: LeaseTerms, bounds: MonthBounds): boolean {
@@ -110,12 +109,6 @@ function marginKey(customerId: string, siteId: string, currency: string): string
     return `${customerId}|${siteId}|${currency}`
 }
 
-function splitMarginKey(key: string): { customerId: string; siteId: string; currency: string } {
-    const [customerId, siteId = '', currency = ''] = key.split('|')
-    return { customerId, siteId, currency }
-}
-
-/** Which Cost fact an amount belongs to: one per Customer, Site, cost type and currency in a period. */
 export function costFactKey(customerId: string, siteId: string, type: string, currency: string): string {
     return `${marginKey(customerId, siteId, currency)}|${type}`
 }
@@ -147,7 +140,7 @@ export class CostLedger {
 export interface Amount {
     customerId: string
     siteId: string
-    /** A three-letter code (domain/billing `currencyCode`). */
+    /** A three-letter code (domain/money `currencyCode`). */
     currency: string
     amount: number
 }
@@ -156,7 +149,7 @@ export interface CostEntry extends Amount {
     type: CostType
 }
 
-export interface MarginRow {
+interface MarginRow {
     customerId: string
     siteId: string
     currency: string
@@ -167,10 +160,6 @@ export interface MarginRow {
     marginPct: number | null
 }
 
-export function cents(value: number): number {
-    return fromCents(toCents(value))
-}
-
 /**
  * Margin for every Customer, Site and currency with revenue or cost, sorted by them in that order; amounts for the same
  * three are summed, then rounded to the cent, and the margin is worked out in whole cents. Revenue in one currency is
@@ -179,11 +168,11 @@ export function cents(value: number): number {
 export function marginRows(revenue: Iterable<Amount>, cost: Iterable<Amount>): MarginRow[] {
     const revenues = sumByKey(revenue)
     const costs = sumByKey(cost)
-    const keys = [...new Set([...revenues.keys(), ...costs.keys()])].map((key) => ({ key, ...splitMarginKey(key) }))
+    const keys = [...new Map([...costs, ...revenues])].map(([key, { customerId, siteId, currency }]) => ({ key, customerId, siteId, currency }))
     keys.sort((a, b) => compare(a.customerId, b.customerId) || compare(a.siteId, b.siteId) || compare(a.currency, b.currency))
     return keys.map(({ key, ...where }) => {
-        const r = toCents(revenues.get(key) ?? 0)
-        const c = toCents(costs.get(key) ?? 0)
+        const r = toCents(revenues.get(key)?.amount ?? 0)
+        const c = toCents(costs.get(key)?.amount ?? 0)
         return {
             ...where,
             revenue: fromCents(r),
@@ -198,11 +187,13 @@ function compare(a: string, b: string): number {
     return a < b ? -1 : a > b ? 1 : 0
 }
 
-function sumByKey(amounts: Iterable<Amount>): Map<string, number> {
-    const sums = new Map<string, number>()
+function sumByKey(amounts: Iterable<Amount>): Map<string, Amount> {
+    const sums = new Map<string, Amount>()
     for (const { customerId, siteId, currency, amount } of amounts) {
         const key = marginKey(customerId, siteId, currency)
-        sums.set(key, (sums.get(key) ?? 0) + amount)
+        const sum = sums.get(key)
+        if (sum) sum.amount += amount
+        else sums.set(key, { customerId, siteId, currency, amount })
     }
     return sums
 }

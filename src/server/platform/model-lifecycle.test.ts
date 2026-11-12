@@ -1,17 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { EVENT } from './events.ts'
-import {
-    queueModelRefresh,
-    queueModelsReachingMilestone,
-    readModelLifecycle,
-    writeModelLifecycle,
-    writingModelLifecycle,
-} from './model-lifecycle.ts'
-import { platform, type Row } from '../test-support/fake-glide.ts'
+import { EVENT } from '../domain/events.ts'
+import type { GlideRecord } from '@servicenow/glide'
+import { onModelLifecycleChanged } from '../entry/models.ts'
+import { importLifecycleRow, queueModelRefresh, queueModelsReachingMilestone, readModelLifecycle, writeModelLifecycle } from './model-lifecycle.ts'
+import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 
 /*
  * The repository run against the in-memory stand-in for the platform, whose Model lifecycle table applies the
- * platform's own rules as read on the instance (module comment): a start date is required, and one Model has one
+ * platform's own rules as read on the instance: a start date is required, and one Model has one
  * active row per lifecycle type, phase and source.
  */
 
@@ -33,15 +29,14 @@ function models(pids: Record<string, string>): void {
     platform.tables.cmdb_model = Object.entries(pids).map(([sysId, pid]) => ({ sys_id: sysId, x_daas_ham_oem_pid: pid }))
 }
 
-/** The Model lifecycle rows of either class. */
 const rows = (): Row[] => (platform.tables[TABLE] ??= [])
 
-/** The events queued: on which record, and its first parameter. */
 const queued = () => platform.events.map(({ name, record, parm1 }) => ({ name, row: record, parm1 }))
 
 const MODEL = 'model1'
 
-/** A row another source keeps: active, a manufacturer's milestone of ServiceNow's content service unless said otherwise. */
+const lifecycleRule = (row: Row) => onModelLifecycleChanged(recordOf<GlideRecord>(TABLE, row), null)
+
 function stored(row: Row): void {
     const sysId = `row${rows().length + 1}`
     rows().push({
@@ -87,12 +82,14 @@ describe('writeModelLifecycle', () => {
         expect(readModelLifecycle(MODEL)).toEqual({ endOfSale: '2028-10-31', endOfSupport: '2033-10-31' })
     })
 
-    it('queues the recomputation once for all the milestones it saves, and marks the Model while it saves them', () => {
-        const marked: boolean[] = []
-        platform.onSave = () => marked.push(writingModelLifecycle(MODEL))
+    it('queues the recomputation once for all the milestones it saves, though the rule on the table runs on each save', () => {
+        platform.onSave = (_table, row) => lifecycleRule(row)
         writeModelLifecycle(MODEL, { endOfSale: '2028-10-31', endOfSupport: '2033-10-31', endOfLife: '2035-10-31' }, { source: 'csv' })
-        expect(marked).toEqual([true, true, true])
-        expect(writingModelLifecycle(MODEL)).toBe(false)
+        expect(queued()).toEqual([{ name: EVENT.lifecycleChanged, row: MODEL, parm1: MODEL }])
+
+        platform.events = []
+        stored({ lifecycle_phase: 'end_of_life', start_date: '2036-01-31', source: 'service_now' })
+        lifecycleRule(rows().at(-1)!)
         expect(queued()).toEqual([{ name: EVENT.lifecycleChanged, row: MODEL, parm1: MODEL }])
     })
 
@@ -198,5 +195,41 @@ describe('queueModelRefresh', () => {
         queueModelRefresh('laptop')
         queueModelRefresh('gone')
         expect(queued()).toEqual([{ name: EVENT.lifecycleChanged, row: MODEL, parm1: MODEL }])
+    })
+})
+
+function lifecycleRow(row: Row): GlideRecord {
+    return recordOf<GlideRecord>('x_daas_ham_eox_import', { sys_id: 'row1', manufacturer: 'Cisco', ...row })
+}
+
+describe('importLifecycleRow', () => {
+    it('refuses a milestone that goes backwards from the dates stored, and saves none of the row', () => {
+        writeModelLifecycle(MODEL, { endOfSale: '2025-06-30', endOfSupport: '2030-06-30' }, { source: 'csv' })
+        const outcome = importLifecycleRow(lifecycleRow({ pid: 'C9300-48P-E', end_of_support: '2024-01-31' }))
+        expect(outcome).toEqual({ state: 'error', comment: expect.stringContaining('end of sale after end of support') })
+        expect(readModelLifecycle(MODEL)).toEqual({ endOfSale: '2025-06-30', endOfSupport: '2030-06-30' })
+    })
+
+    it('keeps the milestones a row leaves blank and saves those it gives in order with them', () => {
+        writeModelLifecycle(MODEL, { endOfSale: '2025-06-30' }, { source: 'csv' })
+        expect(importLifecycleRow(lifecycleRow({ pid: 'C9300-48P-E', end_of_support: '2030-06-30' }))).toEqual({
+            state: 'inserted',
+            comment: 'Lifecycle for C9300-48P-E',
+        })
+        expect(readModelLifecycle(MODEL)).toEqual({ endOfSale: '2025-06-30', endOfSupport: '2030-06-30' })
+    })
+
+    it('marks a row with no date at all ignored, whatever its PID', () => {
+        expect(importLifecycleRow(lifecycleRow({ pid: 'UNKNOWN-PID' }))).toMatchObject({ state: 'ignored' })
+        expect(importLifecycleRow(lifecycleRow({ pid: '', manufacturer: '' }))).toMatchObject({ state: 'ignored' })
+        expect(platform.tables.cmdb_model_lifecycle ?? []).toEqual([])
+    })
+
+    it('still refuses a row with a date and no PID, or a PID no Model has', () => {
+        expect(importLifecycleRow(lifecycleRow({ pid: ' ', end_of_sale: '2025-06-30' }))).toEqual({ state: 'error', comment: 'PID is required' })
+        expect(importLifecycleRow(lifecycleRow({ pid: 'UNKNOWN-PID', end_of_sale: '2025-06-30' }))).toEqual({
+            state: 'error',
+            comment: 'PID UNKNOWN-PID does not map to a model',
+        })
     })
 })

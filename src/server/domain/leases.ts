@@ -1,10 +1,8 @@
-import { fromCents, toCents } from './billing.ts'
+import { fromCents, toCents } from './money.ts'
 import { addDays } from './calendar.ts'
 import { inFleet } from './fleet.ts'
-import { notRetiredCondition, type Stage } from './lifecycle.ts'
+import { notRetiredCondition } from './lifecycle.ts'
 import type { LeaseEndAction } from './vocabulary.ts'
-
-/** Lease schedules and end-of-lease decisions (plan §13 Leases). */
 
 /**
  * `leaseCondition` (an encoded query on the Asset's lease) narrowed to the fleet assets (ADR 0016) the lease still
@@ -28,7 +26,6 @@ export function leaseMismatch(leaseEnd: string, serviceEnds: readonly string[]):
 /** How long after its end an undecided lease is still reviewed: its mismatch flagged, a decision raised for it. */
 const REVIEWED_DAYS_PAST_END = 30
 
-/** The earliest end date of the undecided leases the daily review on `today` still looks at. */
 export function earliestReviewedEnd(today: string): string {
     return addDays(today, -REVIEWED_DAYS_PAST_END)
 }
@@ -92,16 +89,7 @@ export function buyoutTerms(
     return { assets: assetIds.length, ...buyoutSplit(lease.price, assetIds) }
 }
 
-/**
- * One share of `amount` split evenly over `count` Assets (0 without any), unrounded: a lease payment's share for
- * Margin, whose costs are summed before they are rounded. An amount to be stored per Asset is split by `evenSplit`.
- */
-export function evenShare(amount: number, count: number): number {
-    return count > 0 ? amount / count : 0
-}
-
-/** An amount split to the cent over a number of Assets: each gets `share`, and the first `extra` of them one cent more. */
-export interface EvenSplit {
+interface EvenSplit {
     share: number
     extra: number
 }
@@ -111,7 +99,7 @@ export interface EvenSplit {
  * the cents left over after an equal split go one each to the first Assets, so the shares add up to the amount
  * (10000.00 over 3 is 3333.34, 3333.33 and 3333.33).
  */
-export function evenSplit(amount: number, count: number): EvenSplit {
+function evenSplit(amount: number, count: number): EvenSplit {
     const total = toCents(amount)
     if (count <= 0 || total <= 0) return { share: 0, extra: 0 }
     const base = Math.floor(total / count)
@@ -130,7 +118,7 @@ export interface BuyoutSplit {
  * when the buyout is decided: the left-over cents go to the first Assets in sys_id order, the order the buyout's
  * transfer runs in, so the Assets' costs add up to the price whichever chunk transfers each.
  */
-export function buyoutSplit(price: number, assetIds: readonly string[]): BuyoutSplit {
+function buyoutSplit(price: number, assetIds: readonly string[]): BuyoutSplit {
     const sorted = [...new Set(assetIds)].sort()
     const split = evenSplit(price, sorted.length)
     return { share: split.share, extraThrough: split.extra > 0 ? sorted[split.extra - 1] : '' }
@@ -154,13 +142,3 @@ export function buyoutPurchase(buyoutShare: number, buyoutDay: string): { cost: 
     return buyoutShare > 0 ? { cost: buyoutShare, date: buyoutDay } : undefined
 }
 
-/**
- * The moves, one save each, that take a returned lease's stock out of circulation: to pending wipe, where its
- * return-to-lessor disposal starts and sourcing and the spare-pool top-up no longer find it. Spare-pool stock leaves
- * its pool through available (the lifecycle has no direct move); anything else is not stock and has none.
- */
-export function stockReturnMoves(stage: Stage | null): readonly Stage[] {
-    if (stage === 'available') return ['pending_wipe']
-    if (stage === 'spare_pool') return ['available', 'pending_wipe']
-    return []
-}

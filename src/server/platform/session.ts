@@ -1,15 +1,13 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { naasStockroomCondition } from '../domain/fleet.ts'
+import { NAAS_STOCKROOM_CONDITION } from '../domain/fleet.ts'
 import { memoized } from '../domain/memo.ts'
 import type { CustomerActor } from '../domain/customer-parties.ts'
 import { contactScope, resolveVisibility, type ContactScope, type VisibilityScope } from '../domain/visibility.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { pluck } from './records.ts'
 
-/** The signed-in user's visibility and the identifiers it is scoped by (ADR 0005). */
 export interface SessionScope {
     scope: VisibilityScope
-    /** The scope the Customer contacts' read ACLs grant the user by (domain/visibility `contactScope`). */
     contactScope(): ContactScope
     userId: string
     customerId: string
@@ -39,7 +37,7 @@ function assignedStockrooms(userId: string): string[] {
     const groups = pluck('sys_user_grmember', `user=${userId}`, 'group').filter(Boolean)
     if (groups.length === 0) return []
     const stockroom = new GlideRecord('alm_stockroom')
-    stockroom.addEncodedQuery(`assignment_groupIN${groups.join(',')}^${naasStockroomCondition()}`)
+    stockroom.addEncodedQuery(`assignment_groupIN${groups.join(',')}^${NAAS_STOCKROOM_CONDITION}`)
     beyondVisibility(stockroom, () => stockroom.query())
     const ids: string[] = []
     while (stockroom.next()) ids.push(stockroom.getUniqueValue())

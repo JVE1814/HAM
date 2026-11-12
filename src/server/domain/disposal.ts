@@ -1,8 +1,6 @@
-import type { Approver } from './approvals.ts'
+import { APPROVER, type Approver } from './approvals.ts'
 import { disposalMethodsFor, legalOwnerOf, type Stage } from './lifecycle.ts'
-import type { DisposalMethod, LegalOwner } from './vocabulary.ts'
-
-/** Disposal orders (P2.5, Q61). */
+import { DISPOSAL_STAGE, type DisposalMethod, type LegalOwner } from './vocabulary.ts'
 
 /** A line's Asset as Complete disposal finds it; `customerId` is its company: the Customer it belongs to (ADR 0006). */
 export interface DisposalLine {
@@ -17,7 +15,6 @@ export interface DisposalLine {
     orderCustomerId: string
 }
 
-/** Why a line cannot be completed yet (empty when it can). */
 export function disposalLineBlockers(line: DisposalLine): string[] {
     const owner = legalOwnerOf(line.legalOwner)
     const methods = disposalMethodsFor(owner)
@@ -62,11 +59,10 @@ export function disposalCustomerFindings(orderCustomerId: string, assets: readon
  * orders the change touches; a blank one is an order being deleted with its lines.
  */
 export function disposalScopeRefusal(orderStages: readonly string[]): string {
-    if (orderStages.every((stage) => stage === 'draft' || stage === '')) return ''
+    if (orderStages.every((stage) => stage === DISPOSAL_STAGE.draft || stage === '')) return ''
     return 'This disposal order has been submitted: its assets, methods and customer can no longer change'
 }
 
-/** The provider always approves; Customer admins too when a customer-owned Asset is involved. */
 export function disposalApprovers(owners: ReadonlyArray<LegalOwner | ''>): Approver[] {
-    return owners.includes('customer') ? ['account_manager', 'customer_admin'] : ['account_manager']
+    return owners.includes('customer') ? [APPROVER.provider, APPROVER.customerAdmin] : [APPROVER.provider]
 }

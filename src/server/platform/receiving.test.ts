@@ -3,11 +3,6 @@ import { fieldsOf, stageOf, type Stage } from '../domain/lifecycle.ts'
 import { receive } from './receiving.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
-/*
- * A scan at the depot of a unit coming back from a Site, run against the in-memory stand-in for the platform, job
- * locks included: the unit is on Return order RET0001, due back on 1 November, and is scanned on 9 November.
- */
-
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
 const ASSETS = 'alm_hardware'
@@ -88,5 +83,28 @@ describe('receiving a unit that comes back from a Site', () => {
         expect(stageOfUnit()).toBe('pending_evaluation')
         expect(returnLine()).toEqual(earlier)
         expect(rows(FEES)).toEqual([])
+    })
+
+    it('waives only the open lost fee of a unit declared missing that turns up', () => {
+        Object.assign(unit(), inStage('missing'))
+        returnLine().status = 'missing'
+        const lostFee = (sys_id: string, fields: Row) => ({ sys_id, fee_type: 'lost', asset: 'asset1', return_order: 'ret1', status: 'open', ...fields })
+        platform.tables[FEES] = [
+            lostFee('fee1', {}),
+            lostFee('fee2', { status: 'billed' }),
+            lostFee('fee3', { return_order: 'ret0' }),
+            lostFee('fee4', { asset: 'asset2' }),
+            lostFee('fee5', { fee_type: 'damaged' }),
+        ]
+
+        expect(receive({ code: 'FOC111' }, 'depot1')).toHaveProperty('asset')
+
+        expect(rows(FEES).filter((fee) => fee.fee_type !== 'late_return').map((fee) => [fee.sys_id, fee.status])).toEqual([
+            ['fee1', 'waived'],
+            ['fee2', 'billed'],
+            ['fee3', 'open'],
+            ['fee4', 'open'],
+            ['fee5', 'open'],
+        ])
     })
 })

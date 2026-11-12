@@ -26,6 +26,15 @@ export const FLEET_CONDITION = `${FLEET_FIELD}=true`
 /** The same as a script condition on `current`, an Asset: what a business rule's or UI action's condition tests. */
 export const CURRENT_IS_FLEET = `current.${FLEET_FIELD} == true`
 
+/** `CURRENT_IS_FLEET` without its spaces, for a condition that needs all of the field's 254 characters. */
+export const CURRENT_IS_FLEET_UNSPACED = `current.${FLEET_FIELD}==true`
+
+/** Its complement: an Asset outside the fleet, the flag blank (a row from before the column) or false. */
+export const CURRENT_NOT_FLEET = `current.${FLEET_FIELD} != true`
+
+/** A fleet asset changed its stage: the change test and the Fleet flag every stage rule on alm_hardware starts with. */
+export const CURRENT_FLEET_STAGE_CHANGED = `(current.install_status.changes() || current.substatus.changes()) && ${CURRENT_IS_FLEET}`
+
 /** Encoded condition matching fleet assets only (through `via` from another table, e.g. `asset.`). */
 export function fleetCondition(via = ''): string {
     return `${via}${FLEET_CONDITION}`
@@ -40,10 +49,7 @@ export function outsideFleetCondition(via = ''): string {
     return `${flag}=false^OR${flag}ISEMPTY`
 }
 
-/**
- * `query` kept to fleet assets: the fleet condition is ANDed into every top-level `^NQ` clause, as a condition
- * appended after `^NQ` would bind to the last clause only. An empty query becomes the fleet condition alone.
- */
+/** `query` kept to fleet assets. An empty query becomes the fleet condition alone. */
 export function inFleet(query: string, via = ''): string {
     return andEachClause(query, fleetCondition(via))
 }
@@ -58,7 +64,7 @@ export function fleetStagesQuery(stages: readonly Stage[], base = '', via = ''):
 
 /**
  * Fleet assets in one stage, as `fleetStagesQuery([stage])` gives them: the constants Fluent metadata imports for its
- * lists, modules and dashboard tiles (domain/fleet.test.ts holds each to the function's result).
+ * lists, modules and dashboard tiles (domain/fleet.test.ts checks which Assets each finds).
  */
 export const FLEET_IN_STAGE = {
     in_service: `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${FLEET_CONDITION}`,
@@ -87,19 +93,13 @@ export const NAAS_STOCKROOM_CONDITION = `${STOCKROOM_TYPE_FIELD}IN${STOCKROOM_TY
 /** The same as a script condition on `current`, a Stockroom (domain/fleet.test.ts holds it to the list above too). */
 export const CURRENT_IS_NAAS_STOCKROOM = `current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.central_depot}' || current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.staging_centre}' || current.${STOCKROOM_TYPE_FIELD} == '${STOCKROOM_TYPE.customer_site}'`
 
-/** The NaaS stockroom type `value` (a stored type) names, or null for a stockroom outside NaaS. */
 export function naasStockroomType(value: string): StockroomType | null {
     return NAAS_STOCKROOM_TYPES.find((type) => type === value) ?? null
 }
 
-/** Encoded condition matching NaaS stockrooms (through `via`, e.g. `stockroom.` from an Asset). */
-export function naasStockroomCondition(via = ''): string {
-    return `${via}${NAAS_STOCKROOM_CONDITION}`
-}
-
 /**
  * Encoded condition matching stockrooms outside NaaS (through `via`, e.g. `from_stockroom.`): another type, or none,
- * which is not left to how `NOT IN` treats an empty value. The complement of `naasStockroomCondition`.
+ * which is not left to how `NOT IN` treats an empty value. The complement of `NAAS_STOCKROOM_CONDITION`.
  */
 export function outsideNaasStockroomCondition(via = ''): string {
     const type = `${via}${STOCKROOM_TYPE_FIELD}`
@@ -120,7 +120,9 @@ export function providerStockroomCondition(via = ''): string {
 
 export const OEM_PID_FIELD = 'x_daas_ham_oem_pid'
 
-/** Encoded condition matching NaaS Models, on cmdb_model itself. */
+/** The Model's OEM vendor (vocabulary `OEM_VENDOR_CHOICES`): whose API or CSV import its data comes from. */
+export const OEM_SOURCE_FIELD = 'x_daas_ham_oem_source'
+
 export const NAAS_MODEL_CONDITION = `${OEM_PID_FIELD}ISNOTEMPTY`
 
 /**
@@ -150,11 +152,23 @@ export function naasModelCondition(via = ''): string {
  */
 export const SITE_FIELD = 'x_daas_ham_is_site'
 
-/** Encoded condition matching customer Sites, on cmn_location itself. */
 export const SITE_CONDITION = `${SITE_FIELD}=true`
+
+export const CURRENT_IS_SITE = `current.${SITE_FIELD} == true`
 
 /** A Customer's Sites, once the Customer's sys_id is appended: what a Site picker's qualifier completes. */
 export const SITES_OF_CUSTOMER_QUERY = `${SITE_CONDITION}^company=`
+
+/**
+ * The Location fields that put a Rack or a Stockroom at a Site: the Site itself or one of its Rooms. A Configuration
+ * item reaches one level further (domain/reconciliation `CI_SITE_LOCATIONS`).
+ */
+export const SITE_OR_ROOM_LOCATIONS = ['location', 'location.parent'] as const
+
+/** Encoded condition: the Location reached through `via` is the Site `siteId` or one of its Rooms. */
+export function atSiteOrRoomCondition(siteId: string, via = ''): string {
+    return SITE_OR_ROOM_LOCATIONS.map((location) => `${via}${location}=${siteId}`).join('^OR')
+}
 
 /** An Asset as adoption into the fleet (or a receipt taking it in) judges it. */
 export interface FleetCandidate {

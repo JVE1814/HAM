@@ -1,6 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 import type { SessionRoles } from '../../server/domain/rest-contracts'
-import type { AppRole } from '../../server/domain/visibility'
+import type { AppRole } from '../../server/domain/roles'
 import { ApiError, get } from '../api'
 
 export interface Session {

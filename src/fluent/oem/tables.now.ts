@@ -3,8 +3,6 @@ import { BooleanColumn, ChoiceColumn, DateColumn, DateTimeColumn, DecimalColumn,
 import { CLAIM_ACTION_CHOICES, CLOUD_ACCOUNT_VENDOR_CHOICES, COVERAGE_SOURCE_CHOICES, OEM_VENDOR_CHOICES } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION } from '../../server/domain/fleet'
 
-/* OEM coverage contracts (P2.1). */
-
 /** The manufacturer support contract covering one serial number. */
 export const x_daas_ham_oem_coverage = Table({
     name: 'x_daas_ham_oem_coverage',

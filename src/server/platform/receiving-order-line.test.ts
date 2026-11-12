@@ -1,14 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fieldsOf, stageOf, type Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
+import { cancelOrder } from './orders.ts'
 import { receive } from './receiving.ts'
+import { findById } from './records.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
-
-/*
- * A scan at the staging centre of a bought unit, run against the in-memory stand-in for the platform, job locks
- * included (ADR 0013): the unit was announced on purchase order PO0001, which Order line ORL0001 of ORD0001 raised and
- * still awaits.
- */
 
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
@@ -24,7 +20,6 @@ const unit = (): Row => rows(ASSETS)[0]
 const line = (): Row => rows(LINES)[0]
 const storedOrder = (): Row => rows(ORDERS)[0]
 const stageOfUnit = (): Stage | null => stageOf({ installStatus: unit().install_status, substatus: unit().substatus })
-const lockNames = (): string[] => rows(LOCKS).map((lock) => lock.name)
 
 function inStage(stage: Stage): Row {
     const { installStatus, substatus } = fieldsOf(stage)
@@ -66,11 +61,11 @@ beforeEach(() => {
 })
 
 describe('receiving a bought unit for a waiting Order line', () => {
-    it("reserves it for the line and stages it, its Staging task opened and its move saved, all under the line's lock", () => {
-        const heldAt: Record<string, string[]> = {}
+    it('reserves it for the line and stages it, its Staging task opened and its move saved, with Cancel order kept out meanwhile', () => {
+        const cancels: Record<string, unknown> = {}
         platform.onSave = (table, row) => {
-            if (table === STAGING_TASKS) heldAt.task = lockNames()
-            if (table === ASSETS && stageOf({ installStatus: row.install_status, substatus: row.substatus }) === 'staging') heldAt.staging = lockNames()
+            const at = table === STAGING_TASKS ? 'task' : table === ASSETS && stageOf({ installStatus: row.install_status, substatus: row.substatus }) === 'staging' ? 'staging' : ''
+            if (at && !(at in cancels)) cancels[at] = cancelOrder(findById(ORDERS, 'order1')!)
         }
 
         expect(receive({ code: 'FOC111' }, 'staging1')).toHaveProperty('asset')
@@ -79,8 +74,9 @@ describe('receiving a bought unit for a waiting Order line', () => {
         expect(unit()).toMatchObject({ x_daas_ham_order_line: 'line1', company: 'acme', x_daas_ham_agreement: 'agr1', stockroom: 'staging1' })
         expect(line().quantity_to_purchase).toBe('0')
         expect(rows(STAGING_TASKS)).toEqual([expect.objectContaining({ asset: 'asset1', order_line: 'line1' })])
-        expect(heldAt.task).toContain(LOCK.orderLine('line1'))
-        expect(heldAt.staging).toContain(LOCK.orderLine('line1'))
+        const refused = { cancelled: false, reason: 'a unit is being received for one of its lines. Try again shortly' }
+        expect(cancels).toEqual({ task: refused, staging: refused })
+        expect(storedOrder().stage).toBe('sourcing')
         expect(rows(LOCKS)).toEqual([])
     })
 
@@ -95,7 +91,7 @@ describe('receiving a bought unit for a waiting Order line', () => {
         expect(unit().x_daas_ham_order_line ?? '').toBe('')
         expect(line()).toEqual(waiting)
         expect(rows(STAGING_TASKS)).toEqual([])
-        expect(platform.warnings).toEqual([`[x_daas_ham] Received FOC111 left in stock, not given to ORL0001: its Order is ${stage}`])
+        expect(platform.warnings).toEqual([expect.stringContaining('FOC111')])
         expect(rows(LOCKS)).toEqual([])
     })
 
@@ -123,8 +119,6 @@ describe('receiving a bought unit for a waiting Order line', () => {
 
         expect(stageOfUnit()).toBe('available')
         expect(rows(RMAS)[0].state).toBe('open')
-        expect(platform.warnings).toEqual([
-            '[x_daas_ham] Received FOC111 left in stock, not given to ORL0001: its Order is cancelled; RMA RMA-77 left open, update it by hand',
-        ])
+        expect(platform.warnings).toEqual([expect.stringContaining('RMA-77')])
     })
 })

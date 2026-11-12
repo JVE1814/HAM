@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { AppContext } from '@/lib/app'
 import { sessionQuery } from '@/lib/session'
 import type { RackDevice } from '../../server/domain/rest-contracts'
-import { PROVIDER_STAFF } from '../../server/domain/visibility'
+import { PROVIDER_STAFF } from '../../server/domain/roles'
 import { stageText } from '../stage'
 import { rackQuery, racksQuery, sitesQuery } from './api'
 import { assetHref, COLOUR_BY, PowerBar, RackFaces, type ColourBy } from './Elevation'

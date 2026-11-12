@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
     assessOrder,
     deployedUsageQuery,
+    type CatalogEntryView,
     inFlightLinesQuery,
     ownershipFindings,
     raiserRefusal,
@@ -46,11 +47,6 @@ describe('assessOrder', () => {
         expect(result.findings).toEqual(['Model fg60f is not in the customer catalog'])
     })
 
-    it('ignores catalog entries that have expired', () => {
-        const result = assessOrder({ lines: [{ modelId: 'mr46', deviceClass: 'ap', quantity: 1 }] }, context)
-        expect(result.verdict).toBe('off_catalog')
-    })
-
     it('treats lines from a catalogued site template as catalogued', () => {
         const result = assessOrder(
             { siteTemplateId: 'small-branch', lines: [{ modelId: 'fg60f', deviceClass: 'firewall', quantity: 1, fromSiteTemplate: true }] },
@@ -91,6 +87,59 @@ describe('assessOrder', () => {
         )
         expect(result.verdict).toBe('over_quota')
         expect(result.findings).toHaveLength(2)
+    })
+})
+
+describe('catalog entries an Order counts', () => {
+    const { today } = context
+    const contextWith = (...catalog: CatalogEntryView[]): EntitlementContext => ({ catalog, quantities: [], usage: [], today })
+    const switchLine = { lines: [{ modelId: 'c9300', deviceClass: 'switch', quantity: 1 }] }
+    const templateOrder = { siteTemplateId: 'small-branch', lines: [{ modelId: 'c9300', deviceClass: 'switch', quantity: 1, fromSiteTemplate: true }] }
+
+    it('leaves out an entry that has expired', () => {
+        const result = assessOrder({ lines: [{ modelId: 'mr46', deviceClass: 'ap', quantity: 1 }] }, context)
+        expect(result.verdict).toBe('off_catalog')
+    })
+
+    it('leaves out an inactive entry, even one valid today', () => {
+        const inactive = contextWith({ kind: 'model', modelId: 'c9300', active: false, validFrom: '2026-01-01', validTo: '2027-01-01' })
+        expect(assessOrder(switchLine, inactive)).toEqual({
+            verdict: 'off_catalog',
+            approvers: ['customer_admin'],
+            findings: ['Model c9300 is not in the customer catalog'],
+        })
+    })
+
+    it('leaves out an entry that becomes valid after today', () => {
+        const future = contextWith({ kind: 'model', modelId: 'c9300', active: true, validFrom: '2026-11-07' })
+        expect(assessOrder(switchLine, future).verdict).toBe('off_catalog')
+    })
+
+    it('counts an entry from the day it becomes valid and up to the day it ends', () => {
+        expect(assessOrder(switchLine, contextWith({ kind: 'model', modelId: 'c9300', active: true, validFrom: today })).verdict).toBe('within_agreement')
+        expect(assessOrder(switchLine, contextWith({ kind: 'model', modelId: 'c9300', active: true, validTo: today })).verdict).toBe('within_agreement')
+    })
+
+    it('counts an active entry without validity dates', () => {
+        expect(assessOrder(switchLine, contextWith({ kind: 'model', modelId: 'c9300', active: true })).verdict).toBe('within_agreement')
+    })
+
+    it('applies the same window to a Site template entry', () => {
+        const inactive = contextWith({ kind: 'site_template', siteTemplateId: 'small-branch', active: false })
+        const future = contextWith({ kind: 'site_template', siteTemplateId: 'small-branch', active: true, validFrom: '2027-01-01' })
+        const current = contextWith({ kind: 'site_template', siteTemplateId: 'small-branch', active: true, validFrom: '2026-01-01' })
+        expect(assessOrder(templateOrder, inactive).findings).toEqual(['Site template small-branch is not in the customer catalog'])
+        expect(assessOrder(templateOrder, future).findings).toEqual(['Site template small-branch is not in the customer catalog'])
+        expect(assessOrder(templateOrder, current)).toEqual({ verdict: 'within_agreement', approvers: [], findings: [] })
+    })
+
+    it('finds a current entry for the Model beside an inactive or future one', () => {
+        const mixed = contextWith(
+            { kind: 'model', modelId: 'c9300', active: false },
+            { kind: 'model', modelId: 'c9300', active: true, validFrom: '2027-01-01' },
+            { kind: 'model', modelId: 'c9300', active: true, validFrom: '2026-01-01', validTo: '2026-12-31' },
+        )
+        expect(assessOrder(switchLine, mixed).verdict).toBe('within_agreement')
     })
 })
 
@@ -239,7 +288,6 @@ describe('usage queries', () => {
     const OPEN_STAGES = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship'] as const
     const SENT_STAGES = ['shipped', 'installed', 'in_service', 'cancelled'] as const
     const LINE_STAGE = 'x_daas_ham_order_line.line_stage'
-    /** A fleet asset of Agreement a1 on no Order line, in `stage`. */
     const deployed = (stage: Stage, fields: SampleRecord = {}) => assetIn(stage, { x_daas_ham_fleet: 'true', x_daas_ham_agreement: 'a1', x_daas_ham_order_line: '', ...fields })
     const countedIn = (fields: SampleRecord = {}) => ALL_STAGES.filter((stage) => matches(deployedUsageQuery('a1'), deployed(stage, fields)))
 

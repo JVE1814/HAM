@@ -4,26 +4,30 @@ import {
     answersByContract,
     contractKey,
     COVERAGE_CHECKED_FIELD,
+    COVERAGE_END_FIELD,
     coverageBySerial,
     mergeCoverage,
     staleCoverageQuery,
     type AssetCoverage,
     type CoverageAnswer,
+    type CoverageDisposition,
     type SerialCoverage,
 } from '../domain/coverage.ts'
+import { FLEET_CONDITION } from '../domain/fleet.ts'
+import { parseCoverageRow } from '../domain/oem/adapters.ts'
 import { normalizeSerial } from '../domain/serials.ts'
 import type { CoverageSource, OemVendor } from '../domain/vocabulary.ts'
 import { nowGlide, todayIso } from './clock.ts'
-import { addAnyOf, bool, num, refusal, str } from './records.ts'
+import { addAnyOf, bool, num, refusal, rowError, str, type RowOutcome } from './records.ts'
 
 /**
  * OEM coverage as stored (P2.1): the contracts of each serial (x_daas_ham_oem_coverage) and their summary on the
  * Assets, of fleet assets only (ADR 0016). Every write of a contract is made here: the API sync (platform/oem-sync)
- * and the CSV import (platform/imports) both write through `applyCoverage`, and the mark that its expiry was warned
+ * and the CSV import (`importCoverageRow`) both write through `applyCoverage`, and the mark that its expiry was warned
  * about is set (`markExpiryWarned`) and cleared (`setCoverage`, when its end date moves) here too.
  */
 
-/** Up to `limit` of `vendor`'s fleet assets whose coverage is stale (domain/coverage `staleCoverageQuery`), longest unchecked first, by normalized serial (a serial can be shared by duplicate records). */
+/** Up to `limit` of `vendor`'s fleet assets whose coverage is stale, longest unchecked first, by normalized serial (a serial can be shared by duplicate records). */
 export function staleAssets(vendor: OemVendor, staleBefore: string, limit: number): Map<string, string[]> {
     const asset = new GlideRecord('alm_hardware')
     asset.addEncodedQuery(staleCoverageQuery(vendor, staleBefore))
@@ -35,24 +39,39 @@ export function staleAssets(vendor: OemVendor, staleBefore: string, limit: numbe
     return assets
 }
 
+/** A vendor's answer for a serial that has something to write, with the annual cost a coverage import reads beside it. */
+export type SerialAnswer = Exclude<CoverageDisposition, { kind: 'skip' }> & { annualCost?: number }
+
+/** One serial's coverage to write: the Assets carrying it, in the order staleAssets gives them, and its vendor's answer. */
+export interface SerialWrite {
+    assetIds: readonly string[]
+    answer: SerialAnswer
+}
+
 /**
- * Write the answers onto the answered serials' coverage (writeCoverage) and summarise it onto the Assets
- * (refreshAssetCoverage), with one check time; shared by the API sync and the CSV import. Returns the saves the
- * platform refused: a serial whose coverage is refused leaves its Assets unsummarised and unchecked, so it is asked
- * again rather than summarised from contracts that were not stored.
+ * Serials match after normalisation. Returns the saves the platform refused: a serial whose coverage is refused
+ * leaves its Assets unsummarised and unchecked, so it is asked again rather than summarised from contracts that were
+ * not stored.
  */
-export function applyCoverage(
-    vendor: OemVendor,
-    source: CoverageSource,
-    answered: ReadonlyMap<string, string>,
-    answers: readonly CoverageAnswer[],
-    stamped: readonly string[],
-): string[] {
+export function applyCoverage(vendor: OemVendor, source: CoverageSource, writes: ReadonlyMap<string, SerialWrite>): string[] {
     const checkedAt = nowGlide()
-    const serials = [...new Set(answered.values())]
+    const bySerial = new Map([...writes].map(([serial, write]) => [normalizeSerial(serial), write]))
+    const serials: string[] = []
+    const answers: CoverageAnswer[] = []
+    for (const [serial, { assetIds, answer }] of bySerial) {
+        if (answer.kind !== 'apply') continue
+        serials.push(serial)
+        const assetId = assetIds[assetIds.length - 1] ?? ''
+        for (const fact of answer.facts) answers.push({ assetId, fact, annualCost: answer.annualCost })
+    }
     const { contracts, refused } = writeCoverage(vendor, source, serials, answers, checkedAt)
-    const saved = new Map([...answered].filter(([, serial]) => !refused.has(serial)))
-    const unstamped = refreshAssetCoverage(saved, coverageBySerial(serials, contracts, todayIso()), stamped, checkedAt)
+    const coverageOf = coverageBySerial(serials, contracts, todayIso())
+    const assets = new Map<string, AssetCoverage | undefined>()
+    for (const [serial, { assetIds }] of bySerial) {
+        if (refused.has(serial)) continue
+        for (const assetId of assetIds) assets.set(assetId, coverageOf.get(serial))
+    }
+    const unstamped = refreshAssetCoverage(assets, checkedAt)
     return [...[...refused].map(([serial, reason]) => `coverage of ${serial} not saved: ${reason}`), ...unstamped]
 }
 
@@ -62,7 +81,7 @@ function writeCoverage(vendor: OemVendor, source: CoverageSource, serials: reado
     if (serials.length === 0) return { contracts, refused }
     const refuse = (coverage: GlideRecord) => {
         const contract = str(coverage, 'contract_number')
-        refused.set(str(coverage, 'serial_number'), `contract ${contract}: ${refusal(coverage)}`)
+        refused.set(normalizeSerial(str(coverage, 'serial_number')), `contract ${contract}: ${refusal(coverage)}`)
     }
     const pending = answersByContract(answers)
     const stored = new GlideRecord('x_daas_ham_oem_coverage')
@@ -127,25 +146,23 @@ function setCoverage(coverage: GlideRecord, vendor: OemVendor, source: CoverageS
 /**
  * Mark the contract as warned about (platform/coverage-warnings sends the warning once per contract) and save it;
  * false when the platform refuses, so it is counted again at the next run. `setCoverage` clears the mark when the
- * contract's end date moves (domain/coverage `mergeCoverage`), so the new end is warned about too.
+ * contract's end date moves, so the new end is warned about too.
  */
 export function markExpiryWarned(coverage: GlideRecord): boolean {
     coverage.setValue('expiry_notified', true)
     return !!coverage.update()
 }
 
-function refreshAssetCoverage(answered: ReadonlyMap<string, string>, coverageOf: ReadonlyMap<string, AssetCoverage>, stamped: readonly string[], checkedAt: string): string[] {
+function refreshAssetCoverage(coverageOf: ReadonlyMap<string, AssetCoverage | undefined>, checkedAt: string): string[] {
     const refused: string[] = []
-    const ids = [...answered.keys(), ...stamped]
-    if (ids.length === 0) return refused
+    if (coverageOf.size === 0) return refused
     const asset = new GlideRecord('alm_hardware')
-    asset.addQuery('sys_id', 'IN', ids.join(','))
+    asset.addQuery('sys_id', 'IN', [...coverageOf.keys()].join(','))
     asset.query()
     while (asset.next()) {
-        const serial = answered.get(asset.getUniqueValue())
-        const coverage = serial === undefined ? undefined : coverageOf.get(serial)
+        const coverage = coverageOf.get(asset.getUniqueValue())
         if (coverage) {
-            asset.setValue('x_daas_ham_coverage_end', coverage.coverageEnd)
+            asset.setValue(COVERAGE_END_FIELD, coverage.coverageEnd)
             asset.setValue('x_daas_ham_coverage_level', coverage.serviceLevel)
             asset.setValue('x_daas_ham_support_cost', coverage.supportCost)
         }
@@ -153,4 +170,40 @@ function refreshAssetCoverage(answered: ReadonlyMap<string, string>, coverageOf:
         if (!asset.update()) refused.push(`${str(asset, 'serial_number')} not saved: ${refusal(asset)}`)
     }
     return refused
+}
+
+/**
+ * Import a coverage row (vendors without an API): the coverage of a fleet asset's serial only. A row whose coverage
+ * the platform refuses is marked error with why, to load again once the cause is fixed.
+ */
+export function importCoverageRow(row: GlideRecord): RowOutcome {
+    const parsed = parseCoverageRow({
+        vendor: str(row, 'vendor'),
+        serial: str(row, 'serial_number'),
+        contractNumber: str(row, 'contract_number'),
+        serviceLevel: str(row, 'service_level'),
+        startDate: str(row, 'start_date'),
+        endDate: str(row, 'end_date'),
+        annualCost: str(row, 'annual_cost'),
+    })
+    if (!parsed.ok) return rowError(parsed.reason)
+    const { serial } = parsed.fact
+    const assetIds = fleetAssetsWithSerial(serial)
+    if (assetIds.length === 0) return rowError(`no fleet asset with serial ${serial}`)
+    const answer: SerialAnswer = { kind: 'apply', facts: [parsed.fact], annualCost: parsed.annualCost }
+    const refused = applyCoverage(parsed.vendor, 'csv', new Map([[serial, { assetIds, answer }]]))
+    if (refused.length > 0) return rowError(refused.join('; '))
+    return { state: 'inserted', comment: `Coverage for ${serial}` }
+}
+
+/** The fleet assets (ADR 0016) with this serial, in staleAssets' order: one of the Provider IT's that carries it is not covered here. */
+function fleetAssetsWithSerial(serial: string): string[] {
+    const asset = new GlideRecord('alm_hardware')
+    asset.addQuery('serial_number', serial)
+    asset.addEncodedQuery(FLEET_CONDITION)
+    asset.orderBy(COVERAGE_CHECKED_FIELD)
+    asset.query()
+    const ids: string[] = []
+    while (asset.next()) ids.push(asset.getUniqueValue())
+    return ids
 }

@@ -1,6 +1,10 @@
+import { ROLE } from './roles.ts'
 import { DEVICE_EVENT_KIND_CHOICES, DEVICE_EVENT_SOURCE_CHOICES, type DeviceEventKind, type DeviceEventSource } from './vocabulary.ts'
 
-/** Seen signals posted by the Provider's NMS (validated before anything touches the database). */
+/** Who posts Seen signals to the device-events route, and so creates device events: the Provider NMS, and asset managers. */
+export const DEVICE_EVENT_SENDERS = [ROLE.integration, ROLE.assetManager]
+
+export const DEFAULT_DEVICE_EVENT_SOURCE: DeviceEventSource = 'nms'
 
 export interface DeviceEvent {
     /** Serial number, Provider tag or Customer tag of the Asset. */
@@ -47,12 +51,12 @@ export function parseDeviceEvents(body: unknown, maxBatch: number, now: number):
         const identifier = typeof item?.identifier === 'string' ? item.identifier.trim() : ''
         const event = item?.event as DeviceEventKind
         const observedAt = typeof item?.observed_at === 'string' ? parseTimestamp(item.observed_at) : NaN
-        const source = (item?.source ?? 'nms') as DeviceEventSource
+        const source = (item?.source ?? DEFAULT_DEVICE_EVENT_SOURCE) as DeviceEventSource
         if (!identifier) return void rejected.push({ index, reason: 'identifier is required' })
-        if (!KINDS.includes(event)) return void rejected.push({ index, reason: 'event must be one of seen, down, up' })
+        if (!KINDS.includes(event)) return void rejected.push({ index, reason: `event must be one of ${KINDS.join(', ')}` })
         if (Number.isNaN(observedAt)) return void rejected.push({ index, reason: OBSERVED_AT_FORMAT })
         if (observedAt > now + MAX_CLOCK_SKEW_MS) return void rejected.push({ index, reason: 'observed_at is in the future' })
-        if (!SOURCES.includes(source)) return void rejected.push({ index, reason: 'source must be one of discovery, connector, nms' })
+        if (!SOURCES.includes(source)) return void rejected.push({ index, reason: `source must be one of ${SOURCES.join(', ')}` })
         accepted.push({ event: { identifier, event, observedAt, source }, index })
     })
     // The index breaks ties, so the order does not rest on the engine's sort being stable.
@@ -83,7 +87,7 @@ function parseTimestamp(value: string): number {
 
 /**
  * Whether an event is stored: device events keep state changes only, so a sighting that follows a stored sighting adds
- * nothing. `lastStored` (the kind of the Asset's newest stored event, '' for none) is read only for a sighting.
+ * nothing.
  */
 export function isStateChange(kind: DeviceEventKind, lastStored: () => string): boolean {
     return kind !== 'seen' || lastStored() !== 'seen'

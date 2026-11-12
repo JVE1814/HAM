@@ -9,7 +9,8 @@
 - **Outbound**: *Ship* on an Order without a tracking number entered by hand buys the label instead
   of asking for one: from the depot (`x_daas_ham.staging.default_stockroom`'s location) to the Site,
   addressed to the first site contact, one package per staged Asset (`x_daas_ham.shipping.package_kg`
-  each, at most 20), service `x_daas_ham.shipping.service_code`. Nothing is bought when nothing is
+  each, at most `MAX_LABEL_PACKAGES` in `domain/shipping.ts`), service
+  `x_daas_ham.shipping.service_code`. Nothing is bought when nothing is
   staged; hot spares already at the Site are handed over without a package. The carrier and tracking
   number land on the Order until the label is marked voided (below); a **Shipment** records the
   label, cost and status. A remote-hands install still needs no carrier. Ship runs one at a time per
@@ -24,7 +25,8 @@
   While it is *In transit* or *Out for delivery*, it says the return is already under way and names
   its tracking number, since *Mark label voided* is not offered then.
 - Two presses of *Create return label* at once buy one label. The check and the purchase are made
-  under a job lock on the Return order (`return_label_<sys_id>`), and a press that finds a label being
+  under a job lock on the Return order (`LOCK.returnLabel` in `domain/lock-names.ts`), and a press
+  that finds a label being
   bought is told so and buys nothing.
 - A return label voided with the carrier is closed with *Mark label voided* on its Shipment (asset
   managers, inventory techs and the NOC, while it is *Label created* or *Exception*). Nothing is sent
@@ -42,7 +44,7 @@
   and saying to buy the replacement with the carrier and type its carrier and tracking number on the
   Order. An Order tracking another label (a later Ship's, one typed since, or the same number with a
   different carrier) is left as it is. No unit is un-shipped and nothing is bought.
-- The void and the Order's clearing run under the Order's Ship lock (`ship_order_<sys_id>`), so a
+- The void and the Order's clearing run under the Order's Ship lock (`LOCK.shipOrder`), so a
   Ship buying a new label meanwhile cannot have its number cleared. A void pressed while a Ship or a
   *Cancel order* of the Order, or another void of its labels, is running changes nothing and says to
   try again once it has finished. If the Order's save is refused, the label stays voided and the
@@ -70,23 +72,27 @@
   the Shipment back (say from *Out for delivery* to *In transit*, or to *Label created*, which would
   offer *Mark label voided* again); a delivery or return is still taken.
   Unknown tracking numbers are acknowledged and ignored.
-  Each update is applied under the job lock `track_shipment_<Shipment sys_id>`, from the Shipment and
+  Each update is applied under the job lock `LOCK.trackShipment`, from the Shipment and
   its events read again there. So overlapping deliveries of the same history store each event once
   and note the delivery once, and an older status cannot replace a delivery.
-  A delivery that finds the lock held 5 times in a row is retried inside the app, not by the
+  A delivery that finds the lock held `LOCK_TRIES` times (`domain/job-lock.ts`) in a row is retried
+  inside the app, not by the
   aggregator: ShipEngine waits 10 seconds for a 2xx, then makes at most two more attempts, typically
   30 minutes apart, and drops the update (EasyPost up to 6). The delivery is answered HTTP 202
   `{"matched": true, "queued": true}` at once, and the update (status, detail, estimated delivery,
   delivery time, the time of its newest event and the events not stored yet) is queued as the event
-  `x_daas_ham.shipment.track` on the Shipment, in its `parm1` (at most 4000 characters, the event
+  `x_daas_ham.shipment.track` on the Shipment, in its `parm1` (at most `TRACKING_RETRY_CHARS` in
+  `domain/shipping.ts`, the event
   parameter's size; events that do not fit one are shared out over several events, each a whole
   update). Its script action applies it as the webhook would, under the same lock. Updates applied
   while it waited may be newer: when an event stored meanwhile happened after its newest, only its
   events are added, so its older status, latest update and estimate cannot move the Shipment back
   (say from *Out for delivery* to *In transit*); a delivery or return is still taken, as it would
   have stayed had the updates come in order. While the lock is still held, or the Shipment or an
-  event is refused, the script action queues it again about a minute later, at most 15 times (past
-  the lock's ten-minute abandonment), then drops it with a warning naming the Shipment and its
+  event is refused, the script action queues it again `REQUEUE.delaySeconds` seconds later, at most
+  `REQUEUE.times` times (past
+  the lock's abandonment, `ABANDONED_AFTER_MINUTES`), then drops it with a warning naming the
+  Shipment and its
   tracking number. Only an update that cannot be queued (one tracking event too long for a
   parameter by itself) is answered HTTP 503 *Another update of this Shipment is being saved; send
   it again*.
@@ -116,7 +122,7 @@
 |---|---|---|---|
 | Meraki | `inventory/claim` by serial into the Customer's organization; only serials in the returned `serials` count as claimed (a response without the field counts all) | — | — |
 | Mist | org inventory by **claim code** (already claimed counts as done; codes compared without dashes; a 400 with per-code results is read like a 200) | — | — |
-| Aruba (GreenLake) | add device by serial + **MAC** to the Provider's workspace, at most 5 per call (`network`, with `compute` and `storage` empty) | find the device, assign the Customer's subscription (merge-patch JSON); a device already carrying it counts as done | — |
+| Aruba (GreenLake) | add device by serial + **MAC** to the Provider's workspace, a capped number per call (`GREENLAKE_ADD_BATCH` in `domain/oem/claim-adapters.ts`; `network`, with `compute` and `storage` empty) | find the device, assign the Customer's subscription (merge-patch JSON); a device already carrying it counts as done | — |
 | Fortinet | FortiCloud product registration (Provider account) | — | FortiZTP: provision to the Customer's FortiManager |
 | Check Point | — | — | Zero Touch web API v2: `login`, `claim-gateway` (serial as object name, account id, template id, MAC), `logout`; login and logout count as calls |
 
@@ -129,34 +135,43 @@
   Check Point in `x_daas_ham.checkpoint.api_client_id` and `x_daas_ham.checkpoint.api_key` (generated
   in the Zero Touch portal, valid 1-180 days); GreenLake and FortiZTP through an OAuth 2.0 profile on
   the REST message.
-- API hosts: Meraki and Mist calls go to `x_daas_ham.meraki.api_host` (default `api.meraki.com`;
+- API hosts: Meraki and Mist calls go to `x_daas_ham.meraki.api_host` (set it to
   `api.meraki.ca`, `.cn`, `.in` or `api.gov-meraki.com` for other dashboards) and
-  `x_daas_ham.mist.api_host` (default `api.mist.com`; the portal host with `manage` replaced by
-  `api`). All Mist orgs must be on that one cloud. Whether RESTMessageV2 substitutes a variable in the
+  `x_daas_ham.mist.api_host` (the portal host with `manage` replaced by
+  `api`). `PROPERTY` in `domain/properties.ts` holds the host each ships with. All Mist orgs must be
+  on that one cloud. Whether RESTMessageV2 substitutes a variable in the
   host part is still to be confirmed on an instance (fallback: set the endpoint in code).
-- A job every 5 minutes works through pending steps, and failed ones last tried over 30 minutes
-  ago, per enabled vendor (`x_daas_ham.oem.claim.<vendor>.enabled`), within
-  `x_daas_ham.oem.claim.max_calls` calls per vendor per run (Meraki allows 10 claims per 5 minutes).
+- A job (its interval is in `oem/logic.now.ts`) works through pending steps, and failed ones last
+  tried longer ago than
+  `RETRY_AFTER_MINUTES` (`domain/oem/claims.ts`), per enabled vendor
+  (`x_daas_ham.oem.claim.<vendor>.enabled`), within
+  `x_daas_ham.oem.claim.max_calls` calls per vendor per run (Meraki allows 10 claims per 5 minutes,
+  so the
+  property's shipped value and the job's interval go together).
   Only the steps of fleet assets are sent (ADR 0016): no serial of the Provider IT's reaches an OEM
   cloud. A step whose staging task names another Asset is never sent, and is left to do by hand.
-- The run holds the job lock `oem_claim_run` throughout (ADR 0013). A run that finds it held (the
+- The run holds the job lock `LOCK.oemClaimRun` throughout (ADR 0013). A run that finds it held (the
   scheduled run beside *Execute now*) sends nothing and leaves the steps to the run holding it, so
   no step is sent twice in one rate-limit window. The run checks that it still holds the lock
   before every vendor call: one that has lost it (ADR 0013) sends no further call, saves what the
   calls already made returned, and leaves the steps it did not send to the run that took the lock
   over. A step found done when a failed attempt is saved stays done. Each run first releases waiting
-  licence and zero-touch steps whose active staging task has no open claim step left, checking 200
-  waiting steps a run in sys_id order, from where the last run stopped (job cursor
+  licence and zero-touch steps whose active staging task has no open claim step left, checking a
+  capped number of
+  waiting steps a run (`STRANDED_LOAD` in `platform/claim-steps.ts`) in sys_id order, from where the
+  last run stopped (job cursor
   `oem_claim_stranded`) and starting over after the last, so every waiting step gets its turn. These
   are steps whose release, saved one step at a time, was refused when the claim step was ticked done
-  (logged *OEM step "<label>" of <task> still waiting, not released: ...*).
-- A failure records the reason and counts an attempt; after 5 attempts the step is left for a
+  (logged as a warning, `platform/claim-steps.ts`).
+- A failure records the reason and counts an attempt; after `MAX_CLAIM_ATTEMPTS`
+  (`domain/oem/claims.ts`) the step is left for a
   person (*OEM claims to do by hand* in the workspace). Licence and zero-touch steps start as
   *Waiting for the OEM claim step* when their staging task also has a claim step: they are not
   sent and use no attempts, also while the claim step is left for a person, and go to pending as
   soon as the claim step is ticked done, by hand or by a run. A step whose save is refused is logged
   and stays due, so it is sent again.
-- *Ship* and *Create return label* refuse more than 20 packages (one label's maximum): enter the
+- *Ship* and *Create return label* refuse more packages than one label covers
+  (`MAX_LABEL_PACKAGES`): enter the
   carrier and tracking number by hand. A Return order gets one open return label at a time;
   delivered, returned and voided labels are not open, so to replace a label still *Label created* or
   *Exception*, void it with the carrier and mark it voided; one *In transit* or *Out for delivery* is

@@ -1,25 +1,22 @@
 import { addDays } from './calendar.ts'
 import { actorRefusal, CHOOSE_CUSTOMER, siteFinding, type ActWording, type NamedSite } from './customer-parties.ts'
-import { fleetStagesQuery } from './fleet.ts'
-import { DEPLOYED_STAGES, INSTALLED_STAGES, SERVING_STAGES, type Stage } from './lifecycle.ts'
+import { INSTALLED_STAGES, SERVING_STAGES, type Stage } from './lifecycle.ts'
 import type { VisibilityScope } from './visibility.ts'
 import {
     type EvaluationOutcome,
     FEE_STATUS,
-    type FeeType,
     type InstallMode,
     type LeaseEndAction,
     type LegalOwner,
     ORDER_STAGE,
     type OrderStage,
+    type OrderType,
     type ReturnLineStatus,
     type ReturnMethod,
+    RETURN_LINE_STATUS,
     RETURN_TRIGGER,
     type ReturnTrigger,
-    TASK_STATE,
 } from './vocabulary.ts'
-
-/** Returns, depot evaluation and Fee events (P2.4). */
 
 export interface RequestedReturn {
     customerId: string
@@ -36,11 +33,10 @@ export interface ReturnRequester {
 const REQUESTING_RETURNS: ActWording = { act: 'request returns', actForOwn: 'request returns' }
 
 /**
- * Why this person may not request a Return for the Customer, or null when they may (domain/customer-parties
- * `actorRefusal`, as for an Order): only those the Return create rule lets in ask for returns, a customer admin only
+ * Why this person may not request a Return for the Customer, or null when they may: only those the Return create rule lets in ask for returns, a customer admin only
  * for their own Customer.
  */
-export function returnRequesterRefusal(customerId: string, requester: ReturnRequester): string | null {
+function returnRequesterRefusal(customerId: string, requester: ReturnRequester): string | null {
     return actorRefusal(customerId, { ...requester, permitted: requester.mayRequest }, REQUESTING_RETURNS)
 }
 
@@ -61,12 +57,6 @@ export function returnRequestFindings(request: RequestedReturn, requester: Retur
     return misplaced ? [{ about: 'site', message: misplaced }] : []
 }
 
-/**
- * The platform's task states a Return order takes: Work in Progress while units are awaited or evaluated, Closed
- * Complete once every line is settled (or it has none).
- */
-export const RETURN_TASK_STATE = { inProgress: TASK_STATE.workInProgress, closed: TASK_STATE.closedComplete } as const
-
 /** The stages of a temporary deployment whose end date is watched: its equipment is being installed or is installed. */
 export const TEMPORARY_RETURN_STAGES: readonly OrderStage[] = [ORDER_STAGE.installing, ORDER_STAGE.complete]
 
@@ -74,7 +64,7 @@ export const TEMPORARY_RETURN_STAGES: readonly OrderStage[] = [ORDER_STAGE.insta
 export const OPEN_FEES_QUERY = `status=${FEE_STATUS.open}`
 
 /** The status of a Return line whose unit is still expected back: not at the depot yet, nor declared missing. */
-export const AWAITED: ReturnLineStatus = 'awaiting'
+export const AWAITED: ReturnLineStatus = RETURN_LINE_STATUS.awaiting
 
 /** The lines an arriving unit settles: awaited, or declared missing and now turning up late. */
 export const SETTLED_BY_RECEIPT: readonly ReturnLineStatus[] = ['awaiting', 'missing']
@@ -82,8 +72,13 @@ export const SETTLED_BY_RECEIPT: readonly ReturnLineStatus[] = ['awaiting', 'mis
 /** The lines that keep their Return order open: every other is evaluated or declared missing. */
 export const KEEPS_RETURN_OPEN: readonly ReturnLineStatus[] = ['awaiting', 'received']
 
-/** Returns whose unit the swap's own work order collects, so they open no de-install work of their own. */
-const COLLECTED_BY_SWAP: readonly ReturnTrigger[] = ['refresh_swap_back', 'defective_return']
+/** The Return an install that swaps units raises for the ones it replaced: a refresh's swap-back, else a defective unit. */
+export function swapReturnTrigger(orderType: OrderType | ''): ReturnTrigger {
+    return orderType === 'refresh' ? RETURN_TRIGGER.refresh_swap_back : RETURN_TRIGGER.defective_return
+}
+
+/** Returns whose unit the swap's own work order collects (`swapReturnTrigger`), so they open no de-install work of their own. */
+const COLLECTED_BY_SWAP: readonly ReturnTrigger[] = [swapReturnTrigger('refresh'), swapReturnTrigger('')]
 
 /** Whether a Return opens a de-install change and work order: a field de-install no swap work order already covers. */
 export function opensDeinstallWork(trigger: ReturnTrigger, method: ReturnMethod): boolean {
@@ -100,8 +95,8 @@ export function receivedLate(dueBack: string, today: string): boolean {
     return !!dueBack && today > dueBack
 }
 
-/** The days a Customer has to hand equipment back when its Agreement names no allowance. */
-const DEFAULT_RETURN_ALLOWANCE_DAYS = 30
+/** The days a Customer has to hand equipment back when its Agreement names no allowance, and a new Agreement's allowance. */
+export const DEFAULT_RETURN_ALLOWANCE_DAYS = 30
 
 /** The day a Return raised on `raisedOn` is due back: after its Agreement's allowance (0 when it names none). */
 export function returnDueDate(raisedOn: string, allowanceDays: number): string {
@@ -111,25 +106,14 @@ export function returnDueDate(raisedOn: string, allowanceDays: number): string {
 export type OverdueStep = 'none' | 'escalate' | 'declare_missing'
 
 /** What to do about an unreturned Asset today: escalate once after the due date, declare it missing after the grace period. */
-export function overdueStep(input: { dueDate: string; today: string; graceDays: number; received: boolean; escalated: boolean }): OverdueStep {
-    if (input.received || input.today <= input.dueDate) return 'none'
+export function overdueStep(input: { dueDate: string; today: string; graceDays: number; escalated: boolean }): OverdueStep {
+    if (input.today <= input.dueDate) return 'none'
     if (input.today > addDays(input.dueDate, input.graceDays)) return 'declare_missing'
     return input.escalated ? 'none' : 'escalate'
 }
 
 /**
- * The Assets that keep a site package open, as an encoded alm_hardware query: the fleet assets (ADR 0016) at its Site
- * under its Agreement on their way there, serving there or on their way back. A unit received at the depot or declared
- * missing no longer counts. A swap's new units do, before monitoring first sees them and attaches them to the package,
- * so a swap-back that reaches the depot first does not end it (Q60).
- */
-export function sitePackageHoldersQuery(line: { siteId: string; agreementId: string }): string {
-    return fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_site=${line.siteId}^x_daas_ham_agreement=${line.agreementId}`)
-}
-
-/**
- * A whole-Site recovery: the Returns that bring back all of a Site, by their trigger. What makes a Return one, the
- * stages it takes units in and the lines that await them are all said here.
+ * A whole-Site recovery: the Returns that bring back all of a Site, by their trigger.
  */
 const SITE_RECOVERY_TRIGGERS: readonly ReturnTrigger[] = [RETURN_TRIGGER.site_decommission, RETURN_TRIGGER.agreement_end]
 
@@ -154,19 +138,13 @@ export function deploymentEndLineQuery(assetId: string): string {
 }
 
 /**
- * What a whole-Site recovery (agreement end, site decommission) takes back: every unit serving the Site, including
- * those still shipped there, which the lifecycle lets go straight to pending return. Left off, a shipped unit would
- * miss the agreement-end Return, raised only once, and hold the site package open for good (`sitePackageHoldersQuery`).
- */
-export const SITE_RECOVERY_STAGES: readonly Stage[] = SERVING_STAGES
-
-/**
- * The stages of the units a Return with this trigger takes back: one that ends their deployment those still shipped
- * too, any other the installed ones. A temporary Order's units still shipped once its end date has passed would
- * otherwise stay deployed, and billed, with no Return raised again.
+ * The stages of the units a Return with this trigger takes back: one that ends their deployment every unit serving the
+ * Site, those still shipped there too (the lifecycle lets them go straight to pending return), any other the installed
+ * ones. Left off, a shipped unit would miss the agreement-end Return, raised only once, and hold the site package open
+ * for good (domain/billing `sitePackageHoldersQuery`); a temporary Order's would stay deployed, and billed, with no Return raised again.
  */
 export function stagesTakenBack(trigger: ReturnTrigger): readonly Stage[] {
-    return DEPLOYMENT_END_TRIGGERS.includes(trigger) ? SITE_RECOVERY_STAGES : INSTALLED_STAGES
+    return DEPLOYMENT_END_TRIGGERS.includes(trigger) ? SERVING_STAGES : INSTALLED_STAGES
 }
 
 /** Who an evaluated Asset belongs to: its Legal owner and the end action of its lease ('' without one). */
@@ -194,16 +172,4 @@ export function evaluationTarget(outcome: EvaluationOutcome, ownership: Evaluate
 
 function ownerTakesBack({ legalOwner, leaseEndAction }: EvaluatedOwnership): boolean {
     return legalOwner === 'customer' || (legalOwner === 'lessor' && leaseEndAction === 'return')
-}
-
-/** What makes two Fee events the same charge: one type, for one Asset on one Return order (that is, its line). */
-export interface FeeIdentity {
-    type: FeeType
-    assetId: string
-    returnOrderId: string
-}
-
-/** The x_daas_ham_fee_event query for the charges of `fee` that count, any not waived: it is charged at most once. */
-export function chargedFeeQuery(fee: FeeIdentity): string {
-    return `fee_type=${fee.type}^asset=${fee.assetId}^return_order=${fee.returnOrderId}^status!=${FEE_STATUS.waived}`
 }

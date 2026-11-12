@@ -11,7 +11,6 @@ Form({
                 {
                     layout: 'two-column',
                     leftElements: [{ field: 'period', type: 'table_field' }, { field: 'period_start', type: 'table_field' }, { field: 'period_end', type: 'table_field' }, { field: 'status', type: 'table_field' }],
-                    // Totals holds each currency's; Total is blank when the lines are in several (two currencies are never added).
                     rightElements: [{ field: 'line_count', type: 'table_field' }, { field: 'totals', type: 'table_field' }, { field: 'total_amount', type: 'table_field' }, { field: 'generated_at', type: 'table_field' }, { field: 'failed_lines', type: 'table_field' }, { field: 'last_error', type: 'table_field' }, { field: 'closed_at', type: 'table_field' }, { field: 'closed_by', type: 'table_field' }, { field: 'margin_failed', type: 'table_field' }, { field: 'margin_error', type: 'table_field' }],
                 },
             ],

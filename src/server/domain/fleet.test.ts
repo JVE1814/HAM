@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
     adoptionProblem,
     CURRENT_IS_FLEET,
+    CURRENT_IS_FLEET_UNSPACED,
+    CURRENT_NOT_FLEET,
     CURRENT_IS_NAAS_STOCKROOM,
     FLEET_FIELD,
     FLEET_IN_STAGE,
@@ -13,11 +15,9 @@ import {
     NAAS_STOCKROOM_CONDITION,
     NAAS_STOCKROOM_TYPES,
     naasModelCondition,
-    naasStockroomCondition,
     naasStockroomType,
     outsideFleetCondition,
     outsideNaasStockroomCondition,
-    PROVIDER_STOCKROOM_TYPES,
     providerStockroomCondition,
     receiptProblem,
     SITES_OF_CUSTOMER_QUERY,
@@ -25,7 +25,6 @@ import {
     type FleetCandidate,
 } from './fleet'
 import { ALL_STAGES, type Stage } from './lifecycle'
-import { STOCKROOM_TYPE_CHOICES } from './vocabulary'
 import { recordMatches as matches } from '../test-support/encoded-query'
 import { assetIn, through, type SampleRecord } from '../test-support/stored-asset'
 
@@ -77,7 +76,6 @@ const typesFound = (condition: string, via = '') => STOCKROOM_TYPES.filter((type
  * function the server code uses: the two forms must say the same.
  */
 describe('the conditions the metadata imports', () => {
-    /** Whether a script condition holds for `current`, a record with these field values. */
     const holds = (condition: string, current: Record<string, unknown>) => new Function('current', `return ${condition}`)(current) as boolean
 
     it('find the NaaS stockrooms: those of a NaaS type, and none with another type or without one', () => {
@@ -92,18 +90,22 @@ describe('the conditions the metadata imports', () => {
         expect(matches(query, { x_daas_ham_is_site: '', company: 'cust1' })).toBe(false)
     })
 
-    it('name every stockroom type as a NaaS stockroom’s', () => {
-        expect([...NAAS_STOCKROOM_TYPES].sort()).toEqual(Object.keys(STOCKROOM_TYPE_CHOICES).sort())
-    })
-
-    it('list the fleet assets of one stage as fleetStagesQuery does', () => {
-        for (const [stage, query] of Object.entries(FLEET_IN_STAGE)) expect({ stage, query }).toEqual({ stage, query: fleetStagesQuery([stage as Stage]) })
+    it('list the fleet assets of one stage, and no other Asset', () => {
+        for (const [stage, query] of Object.entries(FLEET_IN_STAGE)) {
+            for (const flag of [FLEET, OUTSIDE, UNFLAGGED]) {
+                expect(ALL_STAGES.filter((found) => matches(query, assetIn(found, flag))), stage).toEqual(flag === FLEET ? [stage] : [])
+            }
+        }
     })
 
     it('test the same in a script: the Fleet flag, and each NaaS stockroom type', () => {
         expect(holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: true })).toBe(true)
         expect(holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: false })).toBe(false)
         expect(holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: '' })).toBe(false)
+        for (const flag of [true, false, '']) {
+            expect(holds(CURRENT_IS_FLEET_UNSPACED, { [FLEET_FIELD]: flag })).toBe(holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: flag }))
+            expect(holds(CURRENT_NOT_FLEET, { [FLEET_FIELD]: flag })).toBe(!holds(CURRENT_IS_FLEET, { [FLEET_FIELD]: flag }))
+        }
         for (const type of NAAS_STOCKROOM_TYPES) expect(holds(CURRENT_IS_NAAS_STOCKROOM, { [STOCKROOM_TYPE_FIELD]: type }), type).toBe(true)
         expect(holds(CURRENT_IS_NAAS_STOCKROOM, { [STOCKROOM_TYPE_FIELD]: '' })).toBe(false)
         expect(holds(CURRENT_IS_NAAS_STOCKROOM, { [STOCKROOM_TYPE_FIELD]: 'it_storeroom' })).toBe(false)
@@ -142,19 +144,13 @@ describe('NaaS stockrooms', () => {
         expect(naasStockroomType('it_storeroom')).toBeNull()
     })
 
-    it('are found by their types through a reference, never by an empty type', () => {
-        expect(typesFound(naasStockroomCondition('stockroom.'), 'stockroom.')).toEqual(NAAS_STOCKROOM_TYPES)
-        expect(typesFound(naasStockroomCondition())).toEqual(NAAS_STOCKROOM_TYPES)
-    })
-
     it('leave every other stockroom, one with no type included, to the condition for those outside NaaS', () => {
         expect(typesFound(outsideNaasStockroomCondition())).toEqual(['', 'it_storeroom'])
         expect(typesFound(outsideNaasStockroomCondition('from_stockroom.'), 'from_stockroom.')).toEqual(['', 'it_storeroom'])
     })
 
-    it("are the Provider's own, its central depots and staging centres, or a Customer's site stockroom", () => {
-        expect([...PROVIDER_STOCKROOM_TYPES, 'customer_site'].sort()).toEqual([...NAAS_STOCKROOM_TYPES].sort())
-        expect(typesFound(providerStockroomCondition('stockroom.'), 'stockroom.')).toEqual(PROVIDER_STOCKROOM_TYPES)
+    it("are the Provider's own, its central depots and staging centres, beside a Customer's site stockroom", () => {
+        expect(typesFound(providerStockroomCondition('stockroom.'), 'stockroom.')).toEqual(['central_depot', 'staging_centre'])
     })
 })
 

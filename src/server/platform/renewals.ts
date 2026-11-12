@@ -1,15 +1,16 @@
 import { GlideRecord } from '@servicenow/glide'
 import { withinLead } from '../domain/calendar.ts'
+import { EVENT } from '../domain/events.ts'
 import { recoversAgainAt, renewedEnd } from '../domain/renewals.ts'
 import { providerApproverIds } from './approvals.ts'
 import { todayIso } from './clock.ts'
-import { EVENT, fire } from './events.ts'
+import { fire } from './events.ts'
 import { num, str, warnRefused } from './records.ts'
 import { recoverAgainAtEnd } from './scheduled-returns.ts'
 
 /**
- * Agreement renewals (plan §13 Renewals): the warning ahead of an Agreement's end, and what a change of its end date re-arms. The
- * Agreement's `renewal_notified` mark, which makes the warning go once per end date, is read and written here only.
+ * The Agreement's `renewal_notified` mark, which makes the warning go once per end date, is read and written here
+ * only.
  */
 
 const RENEWAL_WARNED = 'renewal_notified'
@@ -31,12 +32,13 @@ export function warnAgreementRenewals(today: string): void {
 }
 
 /**
- * An Agreement's end date changed (the caller saves it): the renewal warning goes again ahead of the new end, and an
- * Agreement that has not ended by it has its equipment recovered again once it has (domain/renewals `recoversAgainAt`).
+ * An Agreement's end date changed (a before rule, so the save that changed it stores this too): the renewal warning
+ * goes again ahead of the new end, and an Agreement that has not ended by it has its equipment recovered again once it
+ * has (domain/renewals `recoversAgainAt`).
  */
-export function rearmForNewEnd(agreement: GlideRecord): void {
-    agreement.setValue(RENEWAL_WARNED, false)
-    if (recoversAgainAt(str(agreement, 'ends'), todayIso())) recoverAgainAtEnd(agreement)
+export function rearmForNewEnd(current: GlideRecord): void {
+    current.setValue(RENEWAL_WARNED, false)
+    if (recoversAgainAt(str(current, 'ends'), todayIso())) recoverAgainAtEnd(current)
 }
 
 /**

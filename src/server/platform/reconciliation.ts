@@ -1,6 +1,8 @@
 import { GlideRecord } from '@servicenow/glide'
+import { JOB } from '../domain/chunked-job.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import {
+    CI_SITE_LOCATIONS,
     MONITORING_EXCEPTION_TYPES,
     outOfUseExceptionsQuery,
     outsideFleetExceptionsQuery,
@@ -11,11 +13,10 @@ import {
 import { runTableJob } from './chunked.ts'
 import { daysAgoGlide, glideToMs, nowMs } from './clock.ts'
 import { cisWithOpenException, openException, resolveExceptions, resolveExceptionsWhere, settleExceptions } from './exceptions.ts'
-import { intProperty, PROPERTY } from './properties.ts'
+import { intProperty } from './properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { pluck, str } from './records.ts'
 import { IN_USE_STAGES } from '../domain/lifecycle.ts'
-
-/** Reconciliation of the installed base with what monitoring reports (P2.7). */
 
 /**
  * Compare installed fleet assets with monitoring; open new exceptions and resolve cleared ones. The Provider IT's
@@ -27,7 +28,7 @@ export function reconcileInstalledBase(): void {
     const unseenDays = intProperty(PROPERTY.unseenDays)
     const now = nowMs()
     runTableJob({
-        job: 'reconcile_installed_base',
+        job: JOB.reconcileInstalledBase,
         table: 'alm_hardware',
         query: fleetStagesQuery(IN_USE_STAGES),
         read: (asset) => ({
@@ -39,7 +40,7 @@ export function reconcileInstalledBase(): void {
                 ci: str(asset, 'ci')
                     ? {
                           serial: str(asset, 'ci.serial_number'),
-                          locationIds: [str(asset, 'ci.location'), str(asset, 'ci.location.parent'), str(asset, 'ci.location.parent.parent')],
+                          locationIds: CI_SITE_LOCATIONS.map((location) => str(asset, `ci.${location}`)),
                       }
                     : undefined,
             },
@@ -70,7 +71,6 @@ function resolveClearedSeenWithoutAsset(): void {
 /** The most CIs one run reports: each costs an exception lookup, and the run has no cursor to go on from. */
 const SEEN_WITHOUT_ASSET_PER_RUN = 1000
 
-/** Network CIs recently discovered at a customer Site that no fleet asset points at (`seenWithoutFleetAssetQuery`). */
 function reportSeenWithoutAsset(days: number): void {
     const ci = new GlideRecord('cmdb_ci_netgear')
     ci.addQuery('last_discovered', '>=', daysAgoGlide(days))

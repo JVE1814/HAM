@@ -1,10 +1,15 @@
 import { GlideRecord } from '@servicenow/glide'
 import { installsOrder, planShipment, replacementInstalled, type OnSiteWork } from '../domain/delivery.ts'
-import { awaitsInstall, type InstallState } from '../domain/install-confirmation.ts'
+import {
+    awaitsInstall,
+    installRefusal,
+    type InstallConfirmer,
+    type InstallRefusal,
+    type InstallState,
+} from '../domain/install-confirmation.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { isDeployed, stagesQuery } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { collectionMethod } from '../domain/returns.ts'
 import type { InstallMode, OrderStage, OrderType } from '../domain/vocabulary.ts'
 import { moveAndSave, moveAsset, readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
@@ -12,8 +17,8 @@ import { nowGlide } from './clock.ts'
 import { openFieldWork, type WorkContext } from './field-work.ts'
 import { lineAssetStages, recomputeOrder } from './fulfilment.ts'
 import { withLock } from './locks.ts'
-import { choice, findById, num, refusal, str, type ForeignRecord } from './records.ts'
-import { raiseReturn } from './returns.ts'
+import { findById, num, refusal, str, type ForeignRecord } from './records.ts'
+import { returnSwappedAssets } from './returns.ts'
 import { labelOrder, orderLabelBought, shippingEnabled } from './shipping.ts'
 
 /**
@@ -30,7 +35,7 @@ function orderAssets(orderId: string): GlideRecord {
 }
 
 /**
- * What the install confirmation rules read of `order` (domain/install-confirmation). Its shipped units are counted at
+ * What the install confirmation rules read of `order`. Its shipped units are counted at
  * most once, and as `completeInstall` finds them for the same user, so a confirmation offered has units to move.
  */
 export function installState(order: GlideRecord): InstallState {
@@ -65,13 +70,13 @@ function notShipped(problem: string): ShipOutcome {
 
 /**
  * Ship an Order: send every staged Asset the lifecycle lets ship to the Site (buying the label for those when the
- * aggregator is on, platform/shipping, rather than ask for a tracking number entered by hand) and open the on-site work. Hot spares already at the Site are handed over as shipped, without a
+ * aggregator is on, rather than ask for a tracking number entered by hand) and open the on-site work. Hot spares already at the Site are handed over as shipped, without a
  * package. Which Assets may ship is checked before a label is bought.
  *
  * Two users pressing Ship while the first label purchase is in flight would both find the Order unshipped, and both
  * buy a label and open a change and work order. So Ship runs under a lock on the Order, from the Order read again
  * there; one that finds the lock held ships nothing and says another Ship is running. Taking the lock throws only
- * when an insert is refused with no lock row (platform/locks); that error escapes.
+ * when an insert is refused with no lock row; that error escapes.
  */
 export function shipOrder(orderId: string): ShipOutcome {
     const ship = withLock(LOCK.shipOrder(orderId), (lock) => {
@@ -171,15 +176,30 @@ function openOnSiteWork(order: GlideRecord, work: OnSiteWork): string | null {
     return order.update() ? null : `On-site work opened but not linked to the Order: ${refusal(order)}`
 }
 
+/** What came of a confirmation: how many units the platform refused to move, or why nothing was recorded. */
+export type InstallConfirmation = { confirmed: true; refused: number } | { confirmed: false; why: InstallRefusal | 'unsaved' }
+
 /**
- * Record an Order's shipped units as installed (Confirm installed, or its work order closed complete). How many units
- * the platform refused to move (logged): they and their line stay where they were, and so does the Asset their line
- * replaces, so confirming again retries only them and then retires it.
+ * The units
+ * take the Order's Site as `order` holds it, so `saveForm` first saves the values a user typed on its form (`unsaved`
+ * when the platform refused that save, and said why).
+ */
+export function confirmInstall(order: GlideRecord, confirmer: InstallConfirmer, saveForm: () => boolean = () => true): InstallConfirmation {
+    const why = installRefusal(confirmer, installState(order))
+    if (why) return { confirmed: false, why }
+    if (!saveForm()) return { confirmed: false, why: 'unsaved' }
+    return { confirmed: true, refused: completeInstall(order) }
+}
+
+/**
+ * Record an Order's shipped units as installed. How many units the platform refused to move (logged): they and their
+ * line stay where they were, and so does the Asset their line replaces, so confirming again retries only them and then
+ * retires it.
  *
- * Only shipped units move (domain/install-confirmation `awaitsInstall`): on an Order held back by a line filled again
+ * Only shipped units move: on an Order held back by a line filled again
  * after a unit was lost in transit, that line's new units, a hot spare allocated to it included, wait for Ship.
  */
-export function completeInstall(order: GlideRecord): number {
+function completeInstall(order: GlideRecord): number {
     const now = nowGlide()
     const asset = orderAssets(order.getUniqueValue())
     let refused = 0
@@ -195,18 +215,20 @@ export function completeInstall(order: GlideRecord): number {
 }
 
 /**
- * A work order was closed complete: when it is the on-site work of the NaaS Order it was initiated from (domain/delivery
- * `installsOrder`; a de-install or audit job is not), that Order's install is complete.
+ * A work order was closed complete: when it is the on-site work of the NaaS Order it was initiated from (a
+ * de-install or audit job is not), that Order's install is complete.
  */
-export function completeInstallOfWork(workOrder: ForeignRecord): void {
-    const order = findById('x_daas_ham_order', str(workOrder, 'initiated_from'))
-    if (order && installsOrder(str(workOrder, 'x_daas_ham_purpose'))) completeInstall(order)
+export function completeInstallOfWork(current: ForeignRecord): void {
+    const order = findById('x_daas_ham_order', str(current, 'initiated_from'))
+    if (order && installsOrder(str(current, 'x_daas_ham_purpose'))) completeInstall(order)
 }
 
 /**
  * The Assets an Order replaced (break-fix, refresh) come out of service and go back on a Return order, each once its
  * own line's replacement is installed: retired beside a replacement still shipped, the Site would lose the device.
- * The line's units are read past the user's before-query rules, as when its stage is derived (ADR 0005).
+ * The line's units are read past the user's before-query rules, as when its stage is derived (ADR 0005). When the
+ * platform refuses the Return (logged) the units stay in service and billed, and completing the install again raises
+ * it, as they are not yet pending return.
  */
 function retireReplacedAssets(order: GlideRecord): void {
     const line = new GlideRecord('x_daas_ham_order_line')
@@ -222,26 +244,5 @@ function retireReplacedAssets(order: GlideRecord): void {
         // Already pending return: an earlier completion (UI action, then work order close) raised it.
         if (asset && isDeployed(stage) && stage !== 'pending_return') replaced.push(asset.getUniqueValue())
     }
-    returnReplacedAssets(order, replaced)
-}
-
-/**
- * The Assets an install replaced (refresh swap-back, defective unit) go back on a Return, which opens no de-install
- * work: the swap work order already collects the old unit (domain/returns `opensDeinstallWork`). When the platform
- * refuses it (platform/returns `raiseReturn` logs why) the units stay in service and billed, and completing the install
- * again raises it, as they are not yet pending return.
- */
-function returnReplacedAssets(order: GlideRecord, assetIds: readonly string[]): void {
-    if (assetIds.length === 0) return
-    const refresh = choice<OrderType>(order, 'order_type') === 'refresh'
-    raiseReturn({
-        trigger: refresh ? 'refresh_swap_back' : 'defective_return',
-        customerId: str(order, 'customer'),
-        siteId: str(order, 'site'),
-        agreementId: str(order, 'agreement'),
-        method: collectionMethod(str(order, 'install_mode') as InstallMode),
-        assetIds,
-        sourceOrderId: order.getUniqueValue(),
-        description: `${refresh ? 'Refresh swap-back' : 'Defective unit'} from ${str(order, 'number')}`,
-    })
+    if (replaced.length > 0) returnSwappedAssets(order, replaced)
 }

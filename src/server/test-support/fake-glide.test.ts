@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { conditionsOf, glide, platform, recordOf } from './fake-glide'
+import { glide, platform, recordOf } from './fake-glide'
 
 const { GlideRecord, GlideAggregate, GlideDateTime, gs } = glide
 
@@ -45,7 +45,6 @@ describe('reading', () => {
         either.addQuery('line_stage', 'installed').addOrCondition('quantity', '>=', 5)
         either.addNotNullQuery('order')
         expect(idsOf(either)).toEqual(['l2', 'l3'])
-        expect(conditionsOf(either)).toEqual(['line_stage=installed^ORquantity>=5', 'orderISNOTEMPTY'])
     })
 
     it('orders by the fields named, numbers as numbers, and stops at the limit', () => {
@@ -103,6 +102,15 @@ describe('reading', () => {
         const groups: string[] = []
         while (byOrder.next()) groups.push(`${byOrder.getValue('order.customer')} ${byOrder.getAggregate('COUNT', '')} ${byOrder.getAggregate('SUM', 'quantity')}`)
         expect(groups).toEqual(['acme 2 12', 'globex 1 1'])
+
+        const all = new GlideAggregate(LINES)
+        all.addQuery('line_stage', 'new')
+        all.addAggregate('COUNT', '')
+        all.addAggregate('SUM', 'quantity')
+        all.query()
+        expect(all.next()).toBe(true)
+        expect([all.getAggregate('COUNT', ''), all.getAggregate('SUM', 'quantity')]).toEqual(['2', '7'])
+        expect(all.next()).toBe(false)
 
         const none = new GlideAggregate(LINES)
         none.addQuery('line_stage', 'cancelled')

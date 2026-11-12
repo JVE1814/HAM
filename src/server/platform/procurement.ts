@@ -1,7 +1,9 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import type { PurchaseResult } from '../domain/sourcing.ts'
-import { PROPERTY, stagingStockroom } from './properties.ts'
+import { stagingStockroom } from './properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { findById, refusal, str } from './records.ts'
+import { log } from './log.ts'
 
 /**
  * Purchase orders through the Procurement plugin (proc_po / proc_po_item), shipped to the staging
@@ -45,7 +47,6 @@ export function purchaseOrderId(number: string): string {
     return number && po.get('number', number) ? po.getUniqueValue() : ''
 }
 
-/** Statuses after which a PO, or a single line item, no longer counts as open. */
 const CLOSED_PURCHASE_STATUSES = 'received,canceled,cancelled'
 
 /**
@@ -57,7 +58,6 @@ function sparePurchasePrefix(customerId: string): string {
     return `Spare-pool top-up ${customerId}:`
 }
 
-/** Request the purchase of `quantity` spares of a Model for a Customer's Spare pool (the daily top-up). */
 export function requestSparePurchase(customerId: string, modelId: string, quantity: number): PurchaseResult {
     return requestPurchase({ modelId, quantity, description: `${sparePurchasePrefix(customerId)} ${quantity} unit(s)` })
 }
@@ -80,6 +80,6 @@ export function openSparePurchaseQuantity(customerId: string, modelId: string): 
 }
 
 function noPurchase(description: string, reason: string): PurchaseResult {
-    gs.warn(`[x_daas_ham] No purchase order (${reason}): ${description}`)
+    log.warn(`No purchase order (${reason}): ${description}`)
     return { ok: false, reason }
 }

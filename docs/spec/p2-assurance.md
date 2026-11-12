@@ -63,8 +63,9 @@
 Each installed Asset is checked for:
 - **unseen**: no Seen signal for `x_daas_ham.reconciliation.unseen_days`, or never seen;
 - **serial mismatch** with its CI;
-- **site mismatch** with its CI's location: the CI's location, or the location two levels up
-  (room → building → site), must be the Asset's Site.
+- **site mismatch** with its CI's location: the CI's location, or a location above it
+  (room → building → site, `CI_SITE_LOCATIONS` in `domain/reconciliation.ts`), must be the Asset's
+  Site.
 
 Exceptions open once per type and Asset (or CI; a rack's overlap and power exceptions once per
 rack), also when two runs raise the same one at once: the check and the insert are made under a lock
@@ -103,11 +104,12 @@ rack exception are re-checked as well (see Racks), and their rack exceptions ope
   counted (ADR 0016). The elevation page and its power figure still show only what the viewer may
   see.
 - The **rack elevation** page (`x_daas_ham_racks.do`) shows the front and rear of the racks in a
-  Site's rooms. A device links to its Asset form for provider staff only (the six NaaS staff roles,
+  Site's rooms. A device links to its Asset form for provider staff only (the NaaS staff roles,
+  `PROVIDER_STAFF` in `domain/roles.ts`,
   and administrators); Customer contacts, external users the platform UI does not open for, see its
   tag and Model as plain text. Colours are by stage, customer, or risk:
   - *high*: past end of support, or no current coverage;
-  - *medium*: end of sale, or refresh due within 180 days.
+  - *medium*: end of sale, or refresh due soon (`REFRESH_NEAR_DAYS` in `domain/support-risk.ts`).
 - The page and its endpoints show Customer contacts only the racks at Sites they can see (their
   Customer's; a Site contact's own Sites of their Customer). Other Sites and racks answer *not
   found*. Staff see every Site. A rack is shown only at a Site or in a Room of one (a location whose
@@ -130,13 +132,14 @@ contacts: their Sites).
 | Everyone | see installed equipment by Site; report a faulty device (CSM case with the failed asset); see open orders and returns; confirm self-installed orders, including the units already shipped of an Order back in preparing after a unit was lost in transit |
 | Customer admins | request returns of selected devices or a site decommission; answer attestations |
 
-The equipment listed is the Customer's fleet assets (ADR 0016; `domain/customer-page.ts`
-`customerEquipmentQuery`), from shipped to a Site to awaiting return, grouped by Site; one with no
+The equipment listed is the Customer's fleet assets (ADR 0016; `platform/customer-page.ts`
+`customerEquipment`), from shipped to a Site to awaiting return, grouped by Site; one with no
 Site (a data gap) is listed under *No site*, and one that has lost its Agreement (another) is listed
 all the same. The Provider IT's hardware, such as laptops in use, is outside the fleet and is not
 listed, in the staff preview either: the Fleet flag tells it apart, where the Agreement only stood in
-for it. The query carries the reader's Customer (site contacts: and Sites) in each stage's clause, as a
-before-query rule's filter reaches only the last clause of a query with `^NQ` (ADR 0005). A fault is
+for it. The query carries the reader's Customer (site contacts: and Sites) in each stage's clause
+(`platform/visibility` `visibleQuery`), as a before-query rule's filter reaches only the last clause
+of a query with `^NQ` (ADR 0005). A fault is
 reported, and a return requested, for fleet assets only: another device answers HTTP 404 *Unknown
 device* on `POST /customer/faults`, and is left out of the devices a return request lists.
 
@@ -144,7 +147,7 @@ The page calls the app's REST API under `/api/x_daas_ham/naas`. Its routes, and 
 (`/sites`, `/racks`), do not require the `snc_internal` role, which customer users (`snc_external`)
 lack. They admit a user who passes either the platform's *Scripted REST External Default* ACL
 (internal users) or the app's REST ACL for customer admins and site contacts
-(`shared/rest-acls.now.ts`), and each handler checks the role and the Customer. A call the
+(`shared/rest-api.now.ts`), and each handler checks the role and the Customer. A call the
 platform refuses answers
 HTTP 422, so it can be sent again:
 

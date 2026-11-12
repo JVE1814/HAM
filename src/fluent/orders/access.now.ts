@@ -1,7 +1,8 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
+import { CUSTOMER_CONTACTS } from '../../server/domain/roles'
 import { grantsCustomerRecord } from '../../server/entry/visibility'
-import { admin, assetManager, customerAdmin, customerRoles, orderRaisers, orderWorkers, providerStaff, serviceDesk } from '../shared/roles.now'
+import { admin, assetManager, customerAdmin, orderRaisers, orderWorkers, providerStaff, serviceDesk } from '../shared/roles.now'
 
 Acl({
     $id: Now.ID['acl_order_read_service_desk'],
@@ -32,7 +33,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_order',
     operation: 'read',
-    roles: customerRoles,
+    roles: CUSTOMER_CONTACTS,
     script: grantsCustomerRecord,
 })
 
@@ -46,7 +47,7 @@ Acl({
 
 /*
  * A customer admin creates an Order of their own Customer only. Every Order rule check of a customer admin is asked
- * of an Order that names its Customer (the producer's, platform/orders `orderingUser`), so one naming none is refused.
+ * of an Order that names its Customer, so one naming none is refused.
  */
 Acl({
     $id: Now.ID['acl_order_create_customer'],
@@ -87,11 +88,11 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_order_line',
     operation: 'read',
-    roles: customerRoles,
+    roles: CUSTOMER_CONTACTS,
     script: grantsCustomerRecord,
 })
 
-// No customer role: a customer admin's lines are the record producer's, which its script adds (platform/orders).
+// No customer role: a customer admin's lines are the record producer's, which its script adds.
 Acl({
     $id: Now.ID['acl_order_line_create'],
     type: 'record',

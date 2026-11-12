@@ -2,8 +2,6 @@ import '@servicenow/sdk/global'
 import { Test } from '@servicenow/sdk/core'
 import { finance } from '../shared/roles.now'
 
-/* ATF: billing period lock (Q66; suite "NaaS - P3"). */
-
 export const closedBillingPeriodLockedTest = Test(
     {
         $id: Now.ID['atf_billing_locked'],

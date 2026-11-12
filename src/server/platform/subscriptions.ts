@@ -1,15 +1,14 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
+import { sitePackageHoldersQuery } from '../domain/billing.ts'
 import { toIsoDate } from '../domain/calendar.ts'
 import { chooseSubscriptionLine, type SubscriptionLineView } from '../domain/in-service.ts'
 import { TRY_AGAIN, type HeldLock, type TryAgain } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { sitePackageHoldersQuery } from '../domain/returns.ts'
-import { SUBSCRIPTION_LINE_STATUS } from '../domain/vocabulary.ts'
+import { SUBSCRIPTION_LINE_STATUS, SUBSCRIPTION_LINE_TYPE } from '../domain/vocabulary.ts'
 import { todayIso } from './clock.ts'
 import { withLockTries } from './locks.ts'
+import { log } from './log.ts'
 import { exists, findById, refusal, str, warnRefused } from './records.ts'
-
-/** Subscription lines (x_daas_ham_subscription_line): a pending one starts with its first Asset into service, a site package ends as the last unit leaves its Site. */
 
 /**
  * Attach an Asset going into service to the Subscription line it delivers and start that line (the caller saves the
@@ -40,15 +39,15 @@ export function attachToSubscription(asset: GlideRecord, inServiceAt: number): b
         liveOn: toIsoDate(inServiceAt),
     })
     if (!lineId) return true
-    if (lines.find((l) => l.id === lineId)?.status === 'pending') {
+    if (lines.find((l) => l.id === lineId)?.status === SUBSCRIPTION_LINE_STATUS.pending) {
         const unstarted = startLine(lineId, inServiceAt)
         if (unstarted) {
             const serial = str(asset, 'serial_number')
-            gs.warn(`[x_daas_ham] ${serial} stays pending in service, line not started: ${unstarted}`)
+            log.warn(`${serial} stays pending in service, line not started: ${unstarted}`)
             return false
         }
     }
-    // The Service interval opens when the Asset actually enters service (entry/assets.ts onAssetServiceChange).
+    // The Service interval opens when the Asset actually enters service (entry/billing.ts onAssetServiceChange).
     asset.setValue('x_daas_ham_subscription_line', lineId)
     return true
 }
@@ -67,7 +66,6 @@ function startLine(lineId: string, inServiceAt: number): string {
     return started.ran ? started.value : 'another go-live held its lock through every try'
 }
 
-/** Start the line read afresh, holding its `lock` (see startLine); the try is given up when the lock was lost before the save. */
 function startHolding(lock: HeldLock, lineId: string, inServiceAt: number): string | TryAgain {
     const line = findById('x_daas_ham_subscription_line', lineId)
     if (!line) return 'the line is gone'
@@ -84,7 +82,7 @@ function startHolding(lock: HeldLock, lineId: string, inServiceAt: number): stri
 }
 
 /**
- * An active site package ends on the day nothing is left at its Site under its Agreement (domain/returns
+ * An active site package ends on the day nothing is left at its Site under its Agreement (domain/billing
  * `sitePackageHoldersQuery`). It is found by the Site and Agreement the unit leaves, not the line it carries, so a
  * swap's new unit that leaves before monitoring attached it still ends it. The Assets left are counted past the
  * before-query visibility rules (ADR 0005): the receiving tech sees only Assets in their stockrooms, so the units
@@ -95,7 +93,7 @@ export function endSitePackageIfEmpty(siteId: string, agreementId: string): void
     const line = new GlideRecord('x_daas_ham_subscription_line')
     line.addQuery('agreement', agreementId)
     line.addQuery('site', siteId)
-    line.addQuery('line_type', 'site_package')
+    line.addQuery('line_type', SUBSCRIPTION_LINE_TYPE.site_package)
     line.addQuery('status', SUBSCRIPTION_LINE_STATUS.active)
     line.query()
     if (!line.hasNext()) return

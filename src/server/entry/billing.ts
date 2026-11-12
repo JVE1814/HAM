@@ -1,40 +1,33 @@
-// Entry points: parameter names must be the platform globals (current, previous, event, request,
-// response) because the SDK's generated wrapper passes them by name.
 import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { agreementCurrencyProblem, billingMonthProblem, currencyCode, monthBounds, monthChangedError, previousMonth } from '../domain/billing.ts'
-import { ROLE } from '../domain/visibility.ts'
+import { billingMonthProblem, monthChangedError, PULL_PAGE, pullPageSize } from '../domain/billing.ts'
+import { monthBounds, previousMonth } from '../domain/money.ts'
+import { EVENT } from '../domain/events.ts'
+import { billingChange } from '../domain/lifecycle.ts'
+import { ROLE } from '../domain/roles.ts'
 import {
     attachExport,
-    closedLineRefusal,
-    closedPeriodRefusal,
     closePeriod,
     generateChunk,
-    generateNewPeriod,
     linesPage,
     openBillingPeriod,
-    queueExport,
     recentPeriods,
     regeneratePeriod,
     requestExport,
     resetGeneration,
     type PeriodOutcome,
 } from '../platform/billing.ts'
-import { todayIso } from '../platform/clock.ts'
-import { EVENT, jobEvent, subjectOf } from '../platform/events.ts'
-import { queueMarginCompute } from '../platform/margin.ts'
-import { str } from '../platform/records.ts'
+import { readStage } from '../platform/assets.ts'
+import { glideToIsoDate, todayIso } from '../platform/clock.ts'
+import { closedLineRefusal, closedPeriodRefusal } from '../platform/closed-period.ts'
+import { jobEvent, subjectOf } from '../platform/events.ts'
+import { str, type ForeignRecord } from '../platform/records.ts'
 import { pathParam, queryInt, reply, requireRole } from '../platform/rest-api.ts'
 import { abortWith } from '../platform/rule-api.ts'
-
-/** Billing periods: generate, review, close (lock) and export (plan §13 Billing export, Q66): platform/billing. */
+import { closeServiceIntervals, openServiceInterval } from '../platform/service-intervals.ts'
 
 export function openMonthlyBillingPeriod(): void {
     openBillingPeriod(previousMonth(todayIso()))
-}
-
-export function startBillingPeriodGeneration(current: GlideRecord): void {
-    generateNewPeriod(current)
 }
 
 export function generateBillingLines(event: GlideRecord, current: GlideRecord): void {
@@ -43,7 +36,7 @@ export function generateBillingLines(event: GlideRecord, current: GlideRecord): 
 
 function report(outcome: PeriodOutcome, done: string): void {
     if (!outcome.done) {
-        if (outcome.why) gs.addErrorMessage(outcome.why)
+        if ('why' in outcome) gs.addErrorMessage(outcome.why)
         return
     }
     gs.addInfoMessage(done)
@@ -60,12 +53,7 @@ export function uiResetBillingGeneration(current: GlideRecord): void {
 }
 
 export function uiCloseBillingPeriod(current: GlideRecord): void {
-    const closed = closePeriod(current)
-    if (closed.done) {
-        queueExport(current)
-        queueMarginCompute(current)
-    }
-    report(closed, `${str(current, 'period')} closed and locked; the CSV export and margin are being prepared`)
+    report(closePeriod(current), `${str(current, 'period')} closed and locked; the CSV export and margin are being prepared`)
 }
 
 export function uiExportBillingPeriod(current: GlideRecord): void {
@@ -81,19 +69,6 @@ export function exportBillingPeriod(event: GlideRecord): void {
 
 export function guardClosedBillingLine(current: GlideRecord, previous: GlideRecord): void {
     abortWith(current, closedLineRefusal(current, previous))
-}
-
-/**
- * Before insert/update rule on Agreements (when the currency changes): a currency that is no three-letter code is
- * refused as it is entered (domain/billing `agreementCurrencyProblem`), rather than failing every line of the Agreement
- * at the next generation; one entered in lower case is saved upper-cased, as billing reads it.
- */
-export function guardAgreementCurrency(current: GlideRecord): void {
-    const entered = str(current, 'currency')
-    const problem = agreementCurrencyProblem(entered)
-    if (problem) return abortWith(current, problem)
-    const code = currencyCode(entered)
-    if (code && code !== entered) current.setValue('currency', code)
 }
 
 export function guardBillingPeriodMonth(current: GlideRecord): void {
@@ -116,14 +91,25 @@ function canPull(response: RESTAPIResponse): boolean {
 
 export function listBillingPeriods(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!canPull(response)) return
-    reply(response, 200, recentPeriods(Math.min(Math.max(queryInt(request, 'limit', 24), 1), 120)))
+    reply(response, 200, recentPeriods(pullPageSize(queryInt(request, 'limit', PULL_PAGE.periods.size), PULL_PAGE.periods)))
 }
 
 export function getBillingLines(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!canPull(response)) return
     const offset = queryInt(request, 'offset', 0)
-    const limit = Math.min(Math.max(queryInt(request, 'limit', 1000), 1), 5000)
+    const limit = pullPageSize(queryInt(request, 'limit', PULL_PAGE.lines.size), PULL_PAGE.lines)
     const page = linesPage(pathParam(request, 'id'), offset, limit)
     if (!page) return reply(response, 404, { error: 'Unknown billing period' })
     reply(response, 200, page)
+}
+
+export function onAssetServiceChange(current: ForeignRecord, previous: ForeignRecord): void {
+    const change = billingChange(readStage(previous), readStage(current), {
+        inServiceDate: glideToIsoDate(str(current, 'x_daas_ham_in_service_date')),
+        today: todayIso(),
+    })
+    if (!change) return
+    const lineId = str(current, 'x_daas_ham_subscription_line')
+    if ('stop' in change) closeServiceIntervals(current.getUniqueValue(), change.stop)
+    else if (lineId) openServiceInterval(current, lineId, change.start)
 }

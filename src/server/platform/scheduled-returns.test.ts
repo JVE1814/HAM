@@ -1,15 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fieldsOf, type Stage } from '../domain/lifecycle.ts'
+import { RETURN_LINE_STATUS } from '../domain/vocabulary.ts'
 import { readStage } from './assets.ts'
 import { onLineAssetMoved } from './fulfilment.ts'
 import { findById } from './records.ts'
 import { raiseDueReturns } from './scheduled-returns.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
-
-/*
- * The daily job's Return for a temporary Order of two units (a switch and an access point) ending 2026-12-24, with the
- * default lead of 7 days, run against the in-memory stand-in for the platform.
- */
 
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
@@ -36,7 +32,7 @@ const marked = () => String(rows(ORDERS)[0]?.return_raised)
 beforeEach(() => {
     platform.reset()
     platform.uniqueKeys = { x_daas_ham_job_lock: 'name' }
-    platform.defaults = { [RETURNS]: () => ({ number: 'RET0001' }), [RETURN_LINES]: () => ({ status: 'awaiting' }) }
+    platform.defaults = { [RETURNS]: () => ({ number: 'RET0001' }), [RETURN_LINES]: () => ({ status: RETURN_LINE_STATUS.awaiting }) }
     platform.references = { 'alm_hardware.x_daas_ham_order_line': 'x_daas_ham_order_line', 'x_daas_ham_order_line.order': ORDERS, 'x_daas_ham_return_order_line.return_order': RETURNS }
     platform.tables[ORDERS] = [
         { sys_id: 'o1', number: 'ORD0001', order_type: 'temporary', return_raised: 'false', end_date: '2026-12-24', stage: 'installing', install_mode: 'self_install', customer: 'c1', site: 's1', agreement: 'ag1' },
@@ -72,6 +68,7 @@ describe('a temporary Order still being installed', () => {
         expect(readStage(ap)).toBe('pending_return')
         onLineAssetMoved(ap, 'l2', 'shipped', readStage(ap))
         expect(rows('alm_hardware').find((asset) => asset.sys_id === 'ap')?.x_daas_ham_order_line).toBe('l2')
-        expect(rows('x_daas_ham_order_line').find((line) => line.sys_id === 'l2')?.line_stage).not.toBe('awaiting_stock')
+        expect(rows('x_daas_ham_order_line').find((line) => line.sys_id === 'l2')?.line_stage).toBe('shipped')
+        expect(platform.events).toEqual([])
     })
 })

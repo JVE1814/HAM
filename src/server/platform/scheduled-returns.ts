@@ -1,23 +1,21 @@
 import { GlideRecord } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
-import { collectionMethod, TEMPORARY_RETURN_STAGES } from '../domain/returns.ts'
+import { PROPERTY } from '../domain/properties.ts'
+import { collectionMethod, stagesTakenBack, TEMPORARY_RETURN_STAGES } from '../domain/returns.ts'
 import { type InstallMode, ORDER_STAGE, type OrderType, RETURN_TRIGGER } from '../domain/vocabulary.ts'
 import { todayIso } from './clock.ts'
 import { installedAssetIds, installedAssetIdsBySite } from './installed-assets.ts'
-import { intProperty, PROPERTY } from './properties.ts'
+import { intProperty } from './properties.ts'
 import { exists, findById, str, warnRefused } from './records.ts'
-import { raiseReturn } from './returns.ts'
+import { raiseReturn, RETURN } from './returns.ts'
 
 /**
- * The Returns a date brings: an Agreement past its end and a temporary deployment about to end bring their equipment
- * back (P2.4). Each is raised once, which a mark on the Agreement (`end_return_raised`) and on the temporary Order
- * (`return_raised`) records; both marks are read and written here only.
+ * Each is raised once, which a mark on the Agreement (`end_return_raised`) and on the temporary Order (`return_raised`)
+ * records; both marks are read and written here only.
  */
 
 const END_RETURN_RAISED = 'end_return_raised'
-const RETURN = 'x_daas_ham_return_order'
 
-/** Raise the Returns due today (the daily job): see `recoverEndedAgreements` and `returnTemporaryDeployments`. */
 export function raiseDueReturns(): void {
     const today = todayIso()
     recoverEndedAgreements(today)
@@ -32,7 +30,6 @@ export function recoverAgainAtEnd(agreement: GlideRecord): void {
     agreement.setValue(END_RETURN_RAISED, false)
 }
 
-/** Agreements past their end date bring all their equipment back, once. */
 function recoverEndedAgreements(today: string): void {
     const agreement = new GlideRecord('x_daas_ham_agreement')
     agreement.addQuery('ends', '<', today)
@@ -44,8 +41,8 @@ function recoverEndedAgreements(today: string): void {
         const agreementId = agreement.getUniqueValue()
         const recover = `Agreement ${str(agreement, 'number')} ended ${str(agreement, 'ends')}: recover all equipment`
         // One Return per Site, each a field de-install with its own change and work order there. Units still shipped
-        // there go too (domain/returns `SITE_RECOVERY_STAGES`): once all are raised, the job leaves this Agreement.
-        const bySite = installedAssetIdsBySite({ agreementId, returning: 'agreement_end' })
+        // there go too (domain/returns `stagesTakenBack`): once all are raised, the job leaves this Agreement.
+        const bySite = installedAssetIdsBySite({ agreementId, stages: stagesTakenBack('agreement_end') })
         // The Returns this end raised: after the end date, so not those of an end before a renewal.
         const raisedForEnd = `trigger=${RETURN_TRIGGER.agreement_end}^agreement=${agreementId}^sys_created_on>=${str(agreement, 'ends')} 00:00:00`
         let refused = false
@@ -73,7 +70,6 @@ function recoverEndedAgreements(today: string): void {
     }
 }
 
-/** Temporary deployments ending within the lead time bring their equipment back, once. */
 function returnTemporaryDeployments(today: string): void {
     const leadDays = intProperty(PROPERTY.temporaryReturnLeadDays)
     const horizon = addDays(today, leadDays)
@@ -89,7 +85,7 @@ function returnTemporaryDeployments(today: string): void {
     order.query()
     while (order.next()) {
         const orderId = order.getUniqueValue()
-        const assetIds = installedAssetIds({ orderId, returning: 'temporary_end' })
+        const assetIds = installedAssetIds({ orderId, stages: stagesTakenBack('temporary_end') })
         // The Return is raised once, so an Order still being installed waits until every unit is installed. Once its
         // end date has passed, the units still shipped come back too.
         const installing = str(order, 'stage') === ORDER_STAGE.installing && str(order, 'end_date') >= today
@@ -107,7 +103,6 @@ function returnTemporaryDeployments(today: string): void {
                 sourceOrderId: orderId,
                 description: `Temporary deployment ${str(order, 'number')} ends ${str(order, 'end_date')}`,
             })
-            // Refused: raised on the next run.
             if (!raised) continue
         }
         order.setValue('return_raised', true)

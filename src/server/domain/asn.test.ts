@@ -1,28 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { validateAsnRows } from './asn'
+import { asnRowProblem } from './asn'
 
-describe('validateAsnRows', () => {
-    it('accepts rows with a serial, a PID and a purchase order', () => {
-        expect(validateAsnRows([{ serial: 'FOC1', pid: 'C9300-48P-E', poNumber: 'PO1' }], new Set())).toEqual([{ row: 0, ok: true }])
+const row = { serial: 'foc1 ', pid: 'C9300-48P-E', poNumber: 'PO1' }
+
+describe('asnRowProblem', () => {
+    it('accepts a row with a serial, a PID and a purchase order whose serial no Asset has', () => {
+        expect(asnRowProblem(row, false)).toBeNull()
     })
 
-    it('rejects missing fields, serials repeated in the file and serials already known', () => {
-        const result = validateAsnRows(
-            [
-                { serial: '', pid: 'X', poNumber: 'PO1' },
-                { serial: 'FOC2', pid: '', poNumber: 'PO1' },
-                { serial: 'foc3 ', pid: 'X', poNumber: 'PO1' },
-                { serial: 'FOC3', pid: 'X', poNumber: 'PO1' },
-                { serial: 'FOC9', pid: 'X', poNumber: 'PO1' },
-            ],
-            new Set(['FOC9']),
-        )
-        expect(result).toEqual([
-            { row: 0, ok: false, reason: 'serial is required' },
-            { row: 1, ok: false, reason: 'PID is required' },
-            { row: 2, ok: true },
-            { row: 3, ok: false, reason: 'serial FOC3 appears more than once in this ASN' },
-            { row: 4, ok: false, reason: 'serial FOC9 already exists' },
-        ])
+    it('refuses a row missing its serial, its PID or its purchase order', () => {
+        expect(asnRowProblem({ ...row, serial: '  ' }, false)).toBe('serial is required')
+        expect(asnRowProblem({ ...row, pid: ' ' }, false)).toBe('PID is required')
+        expect(asnRowProblem({ ...row, poNumber: '' }, false)).toBe('purchase order is required')
+    })
+
+    it('refuses a serial an Asset already has, naming it as stored', () => {
+        expect(asnRowProblem(row, true)).toBe('serial FOC1 already exists')
     })
 })

@@ -32,7 +32,8 @@ function noScript(expression: string): never {
     throw new Error(`encoded query: no value given for the operand ${SCRIPT}${expression}`)
 }
 
-function compare(value: string, operand: string): number {
+/** How the platform orders two stored values: as numbers when both are numbers, else as text. Sorts use it too. */
+export function compare(value: string, operand: string): number {
     if (NUMBER.test(value) && NUMBER.test(operand)) return Number(value) - Number(operand)
     return value < operand ? -1 : value > operand ? 1 : 0
 }

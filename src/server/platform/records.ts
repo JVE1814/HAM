@@ -1,10 +1,10 @@
-import { GlideAggregate, type GlideElement, GlideRecord, gs } from '@servicenow/glide'
+import { GlideAggregate, type GlideElement, GlideRecord } from '@servicenow/glide'
 import { oneOf } from '../domain/exhaustive.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
+import { log } from './log.ts'
 
-/** Small Glide helpers shared by repositories and gateways. Keep this module free of business rules. */
+/** Keep this module free of business rules. */
 
-/** How a read treats the app's before-query visibility rules (ADR 0005). */
 export interface ReadOptions {
     /**
      * Read past the app's visibility rules (platform/beyond-visibility), for server logic that must find the record
@@ -20,7 +20,6 @@ export function findById(table: string, sysId: string, options: ReadOptions = {}
     return found ? gr : null
 }
 
-/** Values of one field for every record matching an encoded query (bounded by `limit`). */
 export function pluck(table: string, encodedQuery: string, field: string, limit = 10000): string[] {
     const gr = new GlideRecord(table)
     gr.addEncodedQuery(encodedQuery)
@@ -82,7 +81,6 @@ export function noneLeft(table: string, encodedQuery: string): boolean {
     return !left.hasNext()
 }
 
-/** Whether any record matches an encoded query (stops at the first). */
 export function exists(table: string, encodedQuery: string, options: ReadOptions = {}): boolean {
     const gr = new GlideRecord(table)
     gr.addEncodedQuery(encodedQuery)
@@ -92,7 +90,6 @@ export function exists(table: string, encodedQuery: string, options: ReadOptions
     return gr.hasNext()
 }
 
-/** How many records match an encoded query (one aggregate query). */
 export function count(table: string, encodedQuery: string): number {
     const ga = new GlideAggregate(table)
     ga.addEncodedQuery(encodedQuery)
@@ -135,7 +132,7 @@ export function refusal(record: GlideRecord, fallback = 'the save was refused'):
  */
 export function warnRefused(record: GlideRecord, undone: string): string {
     const reason = refusal(record)
-    gs.warn(`[x_daas_ham] ${undone}: ${reason}`)
+    log.warn(`${undone}: ${reason}`)
     return reason
 }
 
@@ -174,7 +171,7 @@ export function num(gr: ForeignRecord, field: string): number {
     if (raw === null || raw === undefined) return 0
     const value = Number(raw)
     if (Number.isFinite(value)) return value
-    gs.warn(`[x_daas_ham] ${gr.getTableName()} ${gr.getUniqueValue()}: ${field} holds '${String(raw)}', not a number; read as 0`)
+    log.warn(`${gr.getTableName()} ${gr.getUniqueValue()}: ${field} holds '${String(raw)}', not a number; read as 0`)
     return 0
 }
 
@@ -200,4 +197,20 @@ export function choice<T extends string>(gr: ForeignRecord, field: string, allow
 export function bool(gr: ForeignRecord, field: string): boolean {
     const value = valueOf(gr, field)
     return value === '1' || value === 'true' || value === (true as unknown)
+}
+
+export interface RowOutcome {
+    state: 'inserted' | 'updated' | 'error' | 'ignored'
+    comment: string
+}
+
+export function rowError(comment: string): RowOutcome {
+    return { state: 'error', comment }
+}
+
+export function finishImportRow(row: GlideRecord, outcome: RowOutcome): void {
+    row.setValue('sys_import_state', outcome.state)
+    row.setValue('sys_import_state_comment', outcome.comment)
+    // The row was handled all the same; unsaved, it still shows as not imported.
+    if (!row.update()) warnRefused(row, `Import row ${row.getUniqueValue()} of ${row.getTableName()}: outcome "${outcome.state}" not saved`)
 }

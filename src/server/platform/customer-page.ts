@@ -1,23 +1,22 @@
 import { GlideRecord, gs } from '@servicenow/glide'
-import { customerEquipmentQuery } from '../domain/customer-page.ts'
+import { fleetStagesQuery } from '../domain/fleet.ts'
+import { OPEN_ORDERS_QUERY } from '../domain/fulfilment.ts'
 import { awaitsSelfInstallConfirmation } from '../domain/install-confirmation.ts'
+import { DEPLOYED_STAGES } from '../domain/lifecycle.ts'
 import type { Attestation, AttestationItem, CustomerAsset, CustomerOrder, CustomerReturn } from '../domain/rest-contracts.ts'
-import { SCOPED_TABLES, visibilityFilter } from '../domain/visibility.ts'
 import { isFleetAsset, readStage } from './assets.ts'
 import { OPEN_ATTESTATIONS } from './attestations.ts'
 import { installState } from './delivery.ts'
 import { findById, str, warnRefused } from './records.ts'
-import type { SessionScope } from './session.ts'
 import { returnLabels } from './shipping.ts'
-import { OPEN_ORDERS_QUERY } from '../domain/fulfilment.ts'
+import { visibleQuery } from './visibility.ts'
 
 /*
  * What the customer self-service page shows and takes (P2.9, Q49). Every query runs as the signed-in customer contact,
  * so the before-query visibility rules (ADR 0005) limit it to their Customer (site contacts: their Sites). Asset
- * managers may open the page as a preview, which shows every Customer. A server read is not checked by the read ACLs,
- * so a query with `^NQ` clauses carries the reader's filter in each one itself (customerEquipmentQuery). Only fleet
- * assets (ADR 0016) are the Customer's equipment, so each read checks the Fleet flag: the rules keep a contact to their
- * Customer's hardware, fleet or not, and show staff previewing the page all of it.
+ * managers may open the page as a preview, which shows every Customer. Only fleet assets (ADR 0016) are the
+ * Customer's equipment, so each read checks the Fleet flag: the rules keep a contact to their Customer's hardware,
+ * fleet or not, and show staff previewing the page all of it.
  */
 
 /** The name of the Customer the page is shown for ('' when the user belongs to none). */
@@ -25,10 +24,15 @@ export function customerName(customerId: string): string {
     return findById('core_company', customerId)?.getDisplayValue('name') ?? ''
 }
 
-export function customerEquipment(session: SessionScope): CustomerAsset[] {
+/**
+ * The Customer's equipment: the fleet assets shipped to a Site, serving there or awaiting return. The Fleet flag tells
+ * them from the Provider IT's hardware, laptops in use included, whatever their Agreement: a deployed fleet unit
+ * missing its Agreement (a data gap) is still its Customer's equipment.
+ */
+export function customerEquipment(): CustomerAsset[] {
     const assets: CustomerAsset[] = []
     const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(customerEquipmentQuery(visibilityFilter(session.scope, SCOPED_TABLES.alm_hardware, session)))
+    asset.addEncodedQuery(visibleQuery('alm_hardware', fleetStagesQuery(DEPLOYED_STAGES)))
     asset.orderBy('x_daas_ham_site')
     asset.setLimit(5000)
     asset.query()

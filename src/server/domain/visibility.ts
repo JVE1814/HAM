@@ -1,4 +1,5 @@
 import { FLEET_FIELD, naasStockroomType, outsideFleetCondition, outsideNaasStockroomCondition, STOCKROOM_TYPE_FIELD } from './fleet.ts'
+import { BROAD_STAFF, EQUIPMENT_HANDLERS, ROLE } from './roles.ts'
 
 /**
  * Which slice of the installed base a user may see (ADR 0005).
@@ -8,62 +9,7 @@ import { FLEET_FIELD, naasStockroomType, outsideFleetCondition, outsideNaasStock
  */
 export type VisibilityScope = 'everything' | 'assigned_stockrooms' | 'own_customer' | 'own_sites' | 'unscoped'
 
-export const ROLE = {
-    admin: 'x_daas_ham.admin',
-    assetManager: 'x_daas_ham.asset_manager',
-    inventoryTech: 'x_daas_ham.inventory_tech',
-    fieldTech: 'x_daas_ham.field_tech',
-    noc: 'x_daas_ham.noc',
-    accountManager: 'x_daas_ham.account_manager',
-    finance: 'x_daas_ham.finance',
-    customerAdmin: 'x_daas_ham.customer_admin',
-    siteContact: 'x_daas_ham.site_contact',
-    integration: 'x_daas_ham.integration',
-} as const
-
-export type AppRole = (typeof ROLE)[keyof typeof ROLE]
-
-/**
- * The roles of other applications the app's roles contain or its metadata names. They must exist on the instance
- * (README "Required plugins"), which the preflight check reports (domain/preflight).
- */
-export const PLATFORM_ROLE = {
-    asset: 'asset',
-    inventoryUser: 'inventory_user',
-    inventoryAdmin: 'inventory_admin',
-    procurementUser: 'procurement_user',
-    procurementAdmin: 'procurement_admin',
-    modelManager: 'model_manager',
-    reportUser: 'report_user',
-    external: 'snc_external',
-    canvasUser: 'canvas_user',
-    serviceDeskAgent: 'sn_customerservice_agent',
-} as const
-
-/**
- * Provider staff without inventory techs: who reads the customer, commercial and configuration tables, and sees every
- * Customer. The metadata's read lists (shared/roles.now.ts `broadStaff`) are this list.
- */
-export const BROAD_STAFF = [ROLE.assetManager, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance]
-
-/**
- * Every provider-staff role: who reads the installed base, and so opens an Asset's form (the rack page links a device
- * to it for them only). The metadata's `providerStaff` (shared/roles.now.ts) is this list, in the order the
- * navigator's modules store it.
- */
-export const PROVIDER_STAFF = [ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance]
-
-/** The roles that read the money tables: service intervals, billing, cost facts and margin. */
-export const MONEY_READERS = [ROLE.finance, ROLE.accountManager, ROLE.assetManager]
-
 const BROAD_STAFF_ROLES = [ROLE.admin, ...BROAD_STAFF]
-
-/**
- * The roles that may change a fleet asset by hand: its lifecycle data, on a form, a list or the Table API. An
- * inventory tech only of their Stockrooms. A Customer's Agreement, subscription line and lease, its company and its
- * cost are the asset manager's alone (writesFleetCommercialField).
- */
-export const ASSET_EDITOR_ROLES: readonly string[] = [ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech]
 
 export function resolveVisibility(hasRole: (role: string) => boolean): VisibilityScope {
     if (BROAD_STAFF_ROLES.some(hasRole)) return 'everything'
@@ -74,13 +20,13 @@ export function resolveVisibility(hasRole: (role: string) => boolean): Visibilit
 }
 
 /**
- * Whether the user takes the Customer admin's part on the customer page (Q49: request returns, answer attestations):
+ * Whether a user of `scope` takes the Customer admin's part on the customer page (Q49: request returns, answer attestations):
  * a Customer admin who sees only their own Customer. Staff who see every Customer do not, even holding the role (as a
  * platform admin holds every role) or previewing the page: an attestation is the Customer's own word, and staff raise
  * returns through the record producer.
  */
-export function actsAsCustomerAdmin(hasRole: (role: string) => boolean): boolean {
-    return resolveVisibility(hasRole) === 'own_customer'
+export function actsAsCustomerAdmin(scope: VisibilityScope): boolean {
+    return scope === 'own_customer'
 }
 
 /**
@@ -166,7 +112,7 @@ function stockroomPaths(scoping: TableScoping): string[] {
  * read ACLs' row checks pass it (outsideNaas, the same test on one record), so the platform's own ACLs and rules alone
  * decide whether they see it (see leavesOutsideNaas for Customer contacts). None on the app's own tables.
  */
-export function outsideNaasConditions(scoping: TableScoping): string[] {
+function outsideNaasConditions(scoping: TableScoping): string[] {
     switch (scoping.naas) {
         case undefined:
             return []
@@ -268,7 +214,7 @@ function leavesOutsideNaas(scope: VisibilityScope): boolean {
 }
 
 /** Whether `scope` is a Customer contact's (a customer admin or a site contact), kept to their own Customer. */
-export function isCustomerContact(scope: VisibilityScope): boolean {
+function isCustomerContact(scope: VisibilityScope): boolean {
     return scope === 'own_customer' || scope === 'own_sites'
 }
 
@@ -282,7 +228,7 @@ export interface ScopedRow {
     /** The value of a field its table's scoping names, or tells its NaaS records by ('' for blank). */
     valueOf(field: string): string
     /**
-     * Whether a record that holds the fields could not be read (an Asset's hardware record, entry/visibility
+     * Whether a record that holds the fields could not be read (an Asset's hardware record, platform/visibility
      * `hardwareOf`; a Stockroom a transfer order names, `transferOrderRow`): its fields are then blank, and the row is
      * not taken for a record outside NaaS. Omitted when the fields are the row's own.
      */
@@ -296,7 +242,6 @@ function keeps(scope: VisibilityScope, scoping: TableScoping | null, row: Scoped
     switch (scope) {
         case 'assigned_stockrooms': {
             if (!scoping.stockroom) return true
-            // This scope leaves the records outside NaaS to the platform (leavesOutsideNaas).
             if (outsideNaas(scoping, row)) return true
             const stockrooms = ids.stockroomIds()
             return columnsOf(scoping.stockroom).some((column) => {
@@ -380,7 +325,7 @@ export function grantsReturnOfOwnCustomer(customerId: string, returnCustomer: st
  */
 
 /**
- * Whether the user may save a record of hardware by hand. A fleet asset only an asset editor (ASSET_EDITOR_ROLES)
+ * Whether the user may save a record of hardware by hand. A fleet asset only an asset editor (EQUIPMENT_HANDLERS)
  * whose scope keeps it (an inventory tech: their Stockrooms), never a Customer contact or a NaaS role that runs no
  * assets (the NOC, account managers, finance). Hardware outside the fleet, and users with no NaaS role, are left to
  * the platform's ACLs, as for reads.
@@ -388,7 +333,7 @@ export function grantsReturnOfOwnCustomer(customerId: string, returnCustomer: st
 export function writesFleetAsset(scope: VisibilityScope, hasRole: (role: string) => boolean, row: ScopedRow, ids: ScopingIds): boolean {
     if (scope === 'unscoped' || !row.saved || outsideNaas(SCOPED_TABLES.alm_hardware, row)) return true
     if (isCustomerContact(scope)) return false
-    return ASSET_EDITOR_ROLES.some(hasRole) && rowVisible(scope, SCOPED_TABLES.alm_hardware, row, ids)
+    return EQUIPMENT_HANDLERS.some(hasRole) && rowVisible(scope, SCOPED_TABLES.alm_hardware, row, ids)
 }
 
 /**

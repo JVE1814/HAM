@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { ROLE } from '../domain/visibility.ts'
+import { ROLE } from '../domain/roles.ts'
 import { platform } from '../test-support/fake-glide.ts'
 import { sessionRoles } from './session.ts'
 

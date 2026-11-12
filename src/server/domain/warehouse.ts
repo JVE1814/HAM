@@ -1,9 +1,7 @@
 import { PROVIDER_STOCKROOM_TYPES } from './fleet.ts'
-import { endedUnfulfilled } from './fulfilment.ts'
+import { endedUnfulfilled, type LineOpenness } from './fulfilment.ts'
 import type { Stage } from './lifecycle.ts'
-import type { LineStage, StockroomType } from './vocabulary.ts'
-
-/** What the warehouse scanning app (P1.5) may do with a scanned Asset, by its Lifecycle stage. */
+import type { StockroomType } from './vocabulary.ts'
 
 /**
  * Receiving confirms bought units as available stock: in transit (an ASN row) or on order (created on receipt without
@@ -15,23 +13,17 @@ export function awaitsReceipt(stage: Stage | null): boolean {
 }
 
 /**
- * Stockroom types arriving units (bought or returned) are received into: the Provider's own, its central depots and
- * staging centres. A customer-site stockroom holds that Customer's own site stock: a bought unit received there would
- * be sourced only for that Customer's replacements, as a hot spare that skips staging, and a returned unit would await
- * evaluation away from the depot.
+ * Why an arriving unit (bought or returned) cannot be received into a Stockroom of this type, or null when it can: only
+ * the Provider's own take one. A customer-site stockroom holds that Customer's own site stock: a bought unit received
+ * there would be sourced only for that Customer's replacements, as a hot spare that skips staging, and a returned unit
+ * would await evaluation away from the depot.
  */
-export const RECEIVING_STOCKROOM_TYPES = PROVIDER_STOCKROOM_TYPES
-
-/** Why an arriving unit cannot be received into a Stockroom of this type, or null when it can. */
 export function receivingProblem(into: StockroomType): string | null {
-    return RECEIVING_STOCKROOM_TYPES.includes(into) ? null : 'Receive into a central depot or a staging centre'
+    return PROVIDER_STOCKROOM_TYPES.includes(into) ? null : 'Receive into a central depot or a staging centre'
 }
 
 /** An Order line as a receipt reads it again under the line's lock, to decide whether the unit still goes to it. */
-export interface ReceivingLine {
-    stage: LineStage | ''
-    /** Its Order's stage, read with the line. */
-    orderStage: string
+export interface ReceivingLine extends LineOpenness {
     quantity: number
     /** Assets on the line, in any stage. */
     allocated: number
@@ -46,7 +38,7 @@ export interface ReceivingLine {
  */
 export function allocationProblem(line: ReceivingLine): string | null {
     if (endedUnfulfilled(line.orderStage)) return `its Order is ${line.orderStage}`
-    if (line.stage !== 'awaiting_stock') return `it is no longer awaiting stock (${line.stage || 'unknown stage'})`
+    if (line.lineStage !== 'awaiting_stock') return `it is no longer awaiting stock (${line.lineStage || 'unknown stage'})`
     if (line.allocated >= line.quantity) return `it already has all ${line.quantity} unit(s)`
     return null
 }
@@ -65,4 +57,16 @@ export function putAwayProblem(stage: Stage | null, into: StockroomType): string
     if (stage !== null && FREE_TO_MOVE.has(stage)) return null
     if (stage === 'staging') return into === 'staging_centre' ? null : 'A unit being staged is put away in a staging centre'
     return `Cannot be put away (${stage ?? 'unknown stage'})`
+}
+
+/**
+ * Why a scanned unit cannot be picked for this Order, or null when it can: it must be on one of that Order's lines and
+ * staged, so a picker never ships another Order's unit or one still being prepared. `ownOrder` is the number of the
+ * Order its line belongs to ('' while it is on none).
+ */
+export function pickProblem(ownOrder: string, orderNumber: string, stage: Stage | null): string | null {
+    if (!ownOrder) return 'Not allocated to an order'
+    if (ownOrder !== orderNumber) return `Belongs to ${ownOrder}`
+    if (stage !== 'staged') return `Not ready to ship (${stage})`
+    return null
 }

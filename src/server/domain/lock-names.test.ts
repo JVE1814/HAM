@@ -4,35 +4,26 @@ import { LOCK, LOCK_NAME_LENGTH } from './lock-names'
 const sysId = (c: string) => c.repeat(32)
 const fee = { type: 'late_return' as const, assetId: sysId('a'), returnOrderId: sysId('r') }
 
-/** One name of every lock, in the registry's order. */
-function oneOfEach(id: string): string[] {
-    return [
-        LOCK.refreshOrders(),
-        LOCK.agreementUsage(id),
-        LOCK.oemClaimRun(),
-        LOCK.oemCoverageRun(),
-        LOCK.seenAsset(id),
-        LOCK.receiveSerial(id),
-        LOCK.receiveAsset(id),
-        LOCK.sourceOrder(id),
-        LOCK.shipOrder(id),
-        LOCK.trackShipment(id),
-        LOCK.returnLabel(id),
-        LOCK.orderLine(id),
-        LOCK.providerTagSequence(),
-        LOCK.sparePool(id, id),
-        LOCK.reserveAsset(id),
-        LOCK.returnRequest(id),
-        LOCK.returnAsset(id),
-        LOCK.fee({ ...fee, assetId: id }),
-        LOCK.audit(id),
-        LOCK.reconException('rack_overlap', id),
-        LOCK.subscriptionLine(id),
-        LOCK.serviceInterval(id),
-        LOCK.billingPeriod(id),
-        LOCK.job(`margin_${id}`),
-    ]
+type Locks = typeof LOCK
+/** The locks named by more than record ids, which the type system makes this test name arguments for. */
+type AllIds<P extends unknown[]> = { [I in keyof P]: string extends P[I] ? true : false }[number] extends true ? true : false
+type TakesMoreThanIds = { [K in keyof Locks]: AllIds<Parameters<Locks[K]>> extends true ? never : K }[keyof Locks]
+const ARGUMENTS: { [K in TakesMoreThanIds]: (id: string) => Parameters<Locks[K]> } = {
+    fee: (id) => [{ ...fee, assetId: id }],
+    reconException: (id) => ['rack_overlap', id],
 }
+const lockOf = (key: string) => LOCK[key as keyof Locks] as (...args: unknown[]) => string
+
+/** One name of every lock, in the registry's order, each naming the record `id` wherever it names one. */
+function oneOfEach(id: string): string[] {
+    return Object.keys(LOCK).map((key) => {
+        const lock = lockOf(key)
+        const args = ARGUMENTS[key as TakesMoreThanIds]
+        return lock(...(args ? args(id) : Array<string>(lock.length).fill(id)))
+    })
+}
+
+const recordless = Object.keys(LOCK).filter((key) => lockOf(key).length === 0)
 
 describe('LOCK', () => {
     it('names each lock as the locks held across an upgrade are named', () => {
@@ -66,10 +57,8 @@ describe('LOCK', () => {
     })
 
     it('gives every lock, and every record of one, a name of its own', () => {
-        expect(oneOfEach(sysId('a'))).toHaveLength(Object.keys(LOCK).length)
         const names = [...oneOfEach(sysId('a')), ...oneOfEach(sysId('b'))]
-        // The four locks that name no record are the same whatever the record.
-        expect(new Set(names).size).toBe(names.length - 4)
+        expect(new Set(names).size).toBe(names.length - recordless.length)
     })
 
     it('locks each fee identity on its own', () => {

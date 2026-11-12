@@ -1,7 +1,6 @@
 import '@servicenow/sdk/global'
 import { default_view, Form, List, Record } from '@servicenow/sdk/core'
-import { ROLE } from '../../server/domain/visibility'
-import { broadStaff } from '../shared/roles.now'
+import { BROAD_STAFF, ROLE } from '../../server/domain/roles'
 import { naasMenu } from '../shared/menu.now'
 
 Form({
@@ -48,7 +47,7 @@ Record({
         application: naasMenu,
         link_type: 'LIST',
         name: 'x_daas_ham_oem_coverage',
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 365,
     },

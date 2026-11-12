@@ -1,4 +1,4 @@
-import { matchesQuery } from './encoded-query.ts'
+import { compare, matchesQuery } from './encoded-query.ts'
 
 /**
  * The one in-memory stand-in for `@servicenow/glide` in unit tests of the platform and entry layers:
@@ -86,11 +86,9 @@ function state() {
 
 export const platform = {
     ...state(),
-    /** Back to an empty instance at the start of its clock. */
     reset(): void {
         Object.assign(platform, state())
     },
-    /** The messages logged as warnings. */
     get warnings(): string[] {
         return platform.logs.filter((line) => line.startsWith('warn ')).map((line) => line.slice('warn '.length))
     },
@@ -113,7 +111,6 @@ function isA(row: Row, table: string): boolean {
     return rowClass === table || (platform.parents[rowClass] ?? []).includes(table)
 }
 
-/** Every stored row of the hierarchy `table` is in. */
 function store(table: string): Row[] {
     return (platform.tables[rootOf(table)] ??= [])
 }
@@ -130,7 +127,6 @@ function referenceOf(table: string, field: string): string {
     return declared
 }
 
-/** The value of `path` on a row of `table`, dot-walked through the declared references; '' for blank or a path through an empty reference. */
 function walk(table: string, row: Row, path: string): string {
     const [field = '', ...rest] = path.split('.')
     const value = row[field] ?? ''
@@ -140,7 +136,6 @@ function walk(table: string, row: Row, path: string): string {
     return referenced ? walk(referenced.sys_class_name || target, referenced, rest.join('.')) : ''
 }
 
-/** What a row shows for itself where a form or a message names it. */
 function displayOf(row: Row): string {
     return row.display_name || row.number || row.name || row.sys_id || ''
 }
@@ -174,12 +169,6 @@ function term(field: string, operatorOrValue: unknown, value?: unknown): string 
     return `${field}${operator}${String(value ?? '')}`
 }
 
-function inOrder(left: string, right: string): number {
-    const numbers = /^-?\d{1,15}(\.\d+)?$/
-    if (numbers.test(left) && numbers.test(right)) return Number(left) - Number(right)
-    return left < right ? -1 : left > right ? 1 : 0
-}
-
 /** The conditions of a query on one table, as GlideRecord and GlideAggregate build them. */
 class Conditions {
     protected conditions: string[] = []
@@ -207,9 +196,6 @@ class Conditions {
     addActiveQuery(): void {
         this.conditions.push('active=true')
     }
-    getEncodedQuery(): string {
-        return this.conditions.join('^')
-    }
 
     protected matching(): Row[] {
         // How the platform joins a ^NQ query with further conditions is not something a test should lean on.
@@ -233,7 +219,6 @@ class GlideRecord extends Conditions {
     private fresh = false
     private error = ''
 
-    /** Hold `row` as if it had just been read (or, `fresh`, as a record not saved yet). */
     hold(row: Row, fresh: boolean): this {
         this.row = { ...row }
         this.read = fresh ? null : { ...row }
@@ -255,7 +240,7 @@ class GlideRecord extends Conditions {
     query(): void {
         const found = this.matching()
         for (const { field, descending } of [...this.ordering].reverse()) {
-            found.sort((a, b) => inOrder(walk(this.table, a, field), walk(this.table, b, field)) * (descending ? -1 : 1))
+            found.sort((a, b) => compare(walk(this.table, a, field), walk(this.table, b, field)) * (descending ? -1 : 1))
         }
         this.found = found.slice(0, this.limit)
         this.at = -1
@@ -269,9 +254,6 @@ class GlideRecord extends Conditions {
         if (row) this.hold(row, false)
         return row !== undefined
     }
-    getRowCount(): number {
-        return this.found.length
-    }
     get(fieldOrId: string, value?: string): boolean {
         const [field, wanted] = value === undefined ? ['sys_id', fieldOrId] : [fieldOrId, value]
         const row = wanted ? rowsOf(this.table).find((candidate) => walk(this.table, candidate, field) === String(wanted)) : undefined
@@ -282,14 +264,8 @@ class GlideRecord extends Conditions {
     initialize(): void {
         this.hold(inHierarchy(this.table) ? { sys_class_name: this.table } : {}, true)
     }
-    newRecord(): void {
-        this.initialize()
-    }
     isNewRecord(): boolean {
         return this.fresh
-    }
-    isValidRecord(): boolean {
-        return this.read !== null
     }
     getTableName(): string {
         return this.table
@@ -379,21 +355,11 @@ class GlideRecord extends Conditions {
     deleteMultiple(): void {
         for (const row of this.matching()) new GlideRecord(this.table).hold(row, false).deleteRecord()
     }
-    updateMultiple(): void {
-        const values = { ...this.row }
-        for (const row of this.matching()) {
-            const each = new GlideRecord(this.table).hold(row, false)
-            for (const [field, value] of Object.entries(values)) each.setValue(field, value)
-            each.update()
-        }
-    }
 }
 
 const AGGREGATES: Record<string, (values: string[]) => string> = {
     COUNT: (values) => String(values.length),
     SUM: (values) => String(values.reduce((sum, value) => sum + (Number(value) || 0), 0)),
-    MIN: (values) => [...values].sort(inOrder)[0] ?? '',
-    MAX: (values) => [...values].sort(inOrder).at(-1) ?? '',
 }
 
 class GlideAggregate extends Conditions {
@@ -409,13 +375,16 @@ class GlideAggregate extends Conditions {
     }
     query(): void {
         const found = new Map<string, { key: Row; rows: Row[] }>()
-        // Without a group-by the platform gives one row, also for no match.
-        if (this.groups.length === 0) found.set('', { key: {}, rows: [] })
-        for (const row of this.matching()) {
-            const key = Object.fromEntries(this.groups.map((field) => [field, walk(this.table, row, field)]))
+        const groupOf = (key: Row): Row[] => {
             const id = JSON.stringify(key)
-            if (!found.has(id)) found.set(id, { key, rows: [] })
-            found.get(id)?.rows.push(row)
+            let group = found.get(id)
+            if (!group) found.set(id, (group = { key, rows: [] }))
+            return group.rows
+        }
+        // Without a group-by the platform gives one row, also for no match.
+        if (this.groups.length === 0) groupOf({})
+        for (const row of this.matching()) {
+            groupOf(Object.fromEntries(this.groups.map((field) => [field, walk(this.table, row, field)]))).push(row)
         }
         this.found = [...found.values()]
         this.at = -1
@@ -469,17 +438,12 @@ const log = (level: string) => (message: string) => void platform.logs.push(`${l
 const gs = {
     eventQueue: queue(false),
     eventQueueScheduled: queue(true),
-    debug: log('debug'),
     info: log('info'),
     warn: log('warn'),
     error: log('error'),
     addErrorMessage: (message: string) => void platform.messages.push(`error ${message}`),
     addInfoMessage: (message: string) => void platform.messages.push(`info ${message}`),
     getProperty: (name: string, fallback?: string) => platform.properties[name] ?? fallback ?? null,
-    // As the platform answers for a property only admin may read, as every password2 property of the app is: the
-    // default to anyone else (docs/research/external-contracts.md N45).
-    getPropertySecured: (name: string, fallback?: string) =>
-        platform.user.roles.includes('admin') ? (platform.properties[name] ?? fallback ?? null) : (fallback ?? null),
     setProperty: (name: string, value: string) => void (platform.properties[name] = String(value)),
     getUserID: () => platform.user.id,
     getUserDisplayName: () => platform.user.name,
@@ -488,7 +452,6 @@ const gs = {
     isInteractive: () => platform.user.interactive,
 }
 
-/** What `@servicenow/glide` exports to the code under test. */
 export const glide = { GlideRecord, GlideAggregate, GlideDateTime, GlideTableHierarchy, gs }
 
 /**
@@ -497,9 +460,4 @@ export const glide = { GlideRecord, GlideAggregate, GlideDateTime, GlideTableHie
  */
 export function recordOf<Record = unknown>(table: string, row: Row, options: { fresh?: boolean } = {}): Record {
     return new GlideRecord(table).hold(row, options.fresh === true) as Record
-}
-
-/** The conditions added to a query so far, one entry per addQuery or addEncodedQuery call: what a before-query rule added. */
-export function conditionsOf(record: unknown): string[] {
-    return [...(record as unknown as { conditions: string[] }).conditions]
 }

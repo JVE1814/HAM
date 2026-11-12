@@ -1,16 +1,14 @@
 import '@servicenow/sdk/global'
 import { Acl, BusinessRule, Property, Record, StringColumn, Table, UiPage } from '@servicenow/sdk/core'
-import { processAsnRow } from '../../server/entry/imports'
-import { PROPERTY } from '../../server/platform/properties'
+import { EQUIPMENT_HANDLERS } from '../../server/domain/roles'
+import { processAsnRow } from '../../server/entry/warehouse'
+import { PROPERTY } from '../../server/domain/properties'
 import warehousePage from '../../client/warehouse.html'
-import { admin, scanners, stockroomWorkers } from '../shared/roles.now'
+import { admin, stockroomWorkers } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
-/* The warehouse: ASN rows from distributors, Provider tags and the scanning page. */
-
 /*
- * An import-set staging table. Load a CSV into it with System Import Sets > Load Data; rows are processed by the
- * after-insert rule below (no transform map), which sets the row's import state and comment.
+ * An import-set staging table. Load a CSV into it with System Import Sets > Load Data.
  */
 
 /** Advance shipment notice lines from a distributor. */
@@ -86,8 +84,6 @@ Acl({
     roles: stockroomWorkers,
 })
 
-/* The warehouse scanning app (receive, put away, pick, look up, print labels). */
-
 /** The page's name: its address is this with .do, and its ACL is named by it. */
 export const WAREHOUSE_PAGE = 'x_daas_ham_warehouse'
 
@@ -105,7 +101,7 @@ Acl({
     type: 'ui_page',
     name: WAREHOUSE_PAGE,
     operation: 'read',
-    roles: scanners,
+    roles: EQUIPMENT_HANDLERS,
 })
 
 Record({
@@ -116,8 +112,7 @@ Record({
         application: naasMenu,
         link_type: 'DIRECT',
         query: `${WAREHOUSE_PAGE}.do`,
-        // The roles the page's ACL grants (above).
-        roles: scanners,
+        roles: EQUIPMENT_HANDLERS,
         active: true,
         order: 110,
     },

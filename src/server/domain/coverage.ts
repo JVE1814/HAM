@@ -1,11 +1,10 @@
-import { appendTo } from './collections.ts'
-import { FLEET_CONDITION, fleetCondition, INSTALLED_CONDITION } from './fleet.ts'
+import { appendTo, firstBest } from './collections.ts'
+import { FLEET_CONDITION, INSTALLED_CONDITION, OEM_SOURCE_FIELD } from './fleet.ts'
 import { notRetiredCondition } from './lifecycle.ts'
 import type { CoverageFact, CoverageFetched } from './oem/types.ts'
 import { normalizeSerial } from './serials.ts'
 import type { OemVendor } from './vocabulary.ts'
 
-/** One coverage contract, as an Asset's coverage is summarised from it. */
 export interface CoverageView {
     covered: boolean
     endDate?: string
@@ -37,18 +36,16 @@ export function coverageSummary(contracts: readonly CoverageView[], today: strin
         const end = coveredUntil(contract)
         return end === null ? [] : [{ end, serviceLevel: contract.serviceLevel }]
     })
-    const latest = covering.sort((a, b) => b.end.localeCompare(a.end))[0]
+    const latest = firstBest(covering, (a, b) => a.end.localeCompare(b.end))
     if (!latest) return { coveredToday: false, coverageEnd: '', serviceLevel: '' }
     return { coveredToday: latest.end >= today, coverageEnd: latest.end, serviceLevel: latest.serviceLevel }
 }
 
-/** What the Provider pays per year for the contracts covering an Asset today (open-ended ones included, as coverageSummary counts them). */
 export function annualSupportCost(contracts: readonly CoverageView[], today: string): number {
     const coversToday = (contract: CoverageView) => (coveredUntil(contract) ?? '') >= today
     return contracts.filter(coversToday).reduce((sum, contract) => sum + (contract.annualCost ?? 0), 0)
 }
 
-/** What the coverage sync does with one asked serial once its vendor has been called. */
 export type CoverageDisposition =
     /** Answered: write these contracts (none: not covered) and re-summarise the Asset onto it. */
     | { kind: 'apply'; facts: CoverageFact[] }
@@ -77,13 +74,11 @@ export interface CoverageDates {
     endDate?: string
 }
 
-/** The values to write to a coverage contract on a fresh answer. */
 export interface CoverageWrite extends CoverageDates {
     /** The end date changed: a renewed contract can expire again, so its expiry warning is to be sent afresh. */
     resetExpiryNotified: boolean
 }
 
-/** Combine a stored coverage contract (empty when new) with a fresh answer from the OEM API or a CSV import. */
 export function mergeCoverage(stored: CoverageDates, incoming: CoverageDates): CoverageWrite {
     return {
         // A response without a start date (SN2INFO v2) keeps the one stored earlier.
@@ -93,7 +88,6 @@ export function mergeCoverage(stored: CoverageDates, incoming: CoverageDates): C
     }
 }
 
-/** One answered contract to write onto the coverage record of its serial and contract number. */
 export interface CoverageAnswer {
     /** The Asset the record points at: of duplicate Assets sharing the serial, the last answered. */
     assetId: string
@@ -118,7 +112,6 @@ export interface SerialCoverage extends CoverageView {
     serial: string
 }
 
-/** The coverage an Asset is given: the summary of its serial's contracts and what the Provider pays for them per year. */
 export interface AssetCoverage extends CoverageSummary {
     supportCost: number
 }
@@ -156,6 +149,7 @@ export function groupExpiringCoverage(rows: readonly ExpiringCoverage[]): Map<st
 }
 
 export const COVERAGE_CHECKED_FIELD = 'x_daas_ham_coverage_checked'
+export const COVERAGE_END_FIELD = 'x_daas_ham_coverage_end'
 
 /**
  * Encoded alm_hardware query: `vendor`'s fleet assets (ADR 0016: the Provider IT's serials are never sent to an OEM)
@@ -164,7 +158,7 @@ export const COVERAGE_CHECKED_FIELD = 'x_daas_ham_coverage_checked'
  */
 export function staleCoverageQuery(vendor: OemVendor, staleBefore: string): string {
     const stale = `${COVERAGE_CHECKED_FIELD}ISEMPTY^OR${COVERAGE_CHECKED_FIELD}<${staleBefore}`
-    return `${fleetCondition()}^model.x_daas_ham_oem_source=${vendor}^${notRetiredCondition()}^serial_numberISNOTEMPTY^${stale}`
+    return `${FLEET_CONDITION}^model.${OEM_SOURCE_FIELD}=${vendor}^${notRetiredCondition()}^serial_numberISNOTEMPTY^${stale}`
 }
 
 export function withoutCoverage(coverageEnd: string, today: string): boolean {
@@ -175,4 +169,4 @@ export function withoutCoverage(coverageEnd: string, today: string): boolean {
  * Encoded query on alm_hardware: the installed fleet assets (ADR 0016) without OEM coverage (`withoutCoverage`), as the
  * workspace lists and counts them.
  */
-export const INSTALLED_WITHOUT_COVERAGE = `${INSTALLED_CONDITION}^x_daas_ham_coverage_endISEMPTY^ORx_daas_ham_coverage_end<javascript:gs.beginningOfToday()^${FLEET_CONDITION}`
+export const INSTALLED_WITHOUT_COVERAGE = `${INSTALLED_CONDITION}^${COVERAGE_END_FIELD}ISEMPTY^OR${COVERAGE_END_FIELD}<javascript:gs.beginningOfToday()^${FLEET_CONDITION}`

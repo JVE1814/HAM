@@ -1,13 +1,47 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, Property, Record, RestMessage, ScriptAction, UiAction } from '@servicenow/sdk/core'
-import { explainWorkWindowRefusal, onWorkOrderClosed } from '../../server/entry/delivery'
-import { RETURN_METHOD, SHIPMENT_DIRECTION, SHIPMENT_STATUS, TASK_STATE } from '../../server/domain/vocabulary'
-import { REST_MESSAGE } from '../../server/domain/rest-message-names'
+import { explainWorkWindowRefusal, uiConfirmInstalled, uiShipOrder } from '../../server/entry/delivery'
+import { completeInstallOfWork } from '../../server/platform/delivery'
+import { INSTALL_MODE, ORDER_STAGE, RETURN_METHOD, SHIPMENT_DIRECTION, SHIPMENT_STATUS, STAGE_FIELDS, TASK_STATE } from '../../server/domain/vocabulary'
+import { PLATFORM_ROLE } from '../../server/domain/roles'
+import { SHIPPING_MESSAGE } from '../../server/domain/shipping'
 import { retryTrackingUpdate, uiCreateReturnLabel, uiMarkLabelVoided } from '../../server/entry/shipping'
-import { PROPERTY } from '../../server/platform/properties'
-import { EVENT } from '../../server/platform/events'
+import { PROPERTY } from '../../server/domain/properties'
+import { EVENT } from '../../server/domain/events'
 import { ENTRY_MODULES } from '../shared/server-modules.now'
-import { admin, returnWorkers } from '../shared/roles.now'
+import { admin, assetManager, customerAdmin, fieldTech, returnWorkers, siteContact, stockroomWorkers } from '../shared/roles.now'
+
+UiAction({
+    $id: Now.ID['ua_order_ship'],
+    name: 'Ship',
+    table: 'x_daas_ham_order',
+    actionName: 'x_daas_ham_ship_order',
+    hint: 'Ship all staged assets to the site and open the on-site work (change + work order).',
+    condition: `current.stage == '${ORDER_STAGE.delivering}'`,
+    roles: stockroomWorkers,
+    form: { showButton: true, style: 'primary' },
+    showUpdate: true,
+    script: uiShipOrder,
+})
+
+UiAction({
+    $id: Now.ID['ua_order_confirm_installed'],
+    name: 'Confirm installed',
+    table: 'x_daas_ham_order',
+    actionName: 'x_daas_ham_confirm_installed',
+    hint: 'Record that the shipped equipment is installed (self-install, or when the work order is closed elsewhere).',
+    // Customer contacts confirm only a self-install, staff any install: one installing, or one a line filled again
+    // holds back while units already shipped wait at the Site (platform/delivery confirmInstall checks
+    // domain/install-confirmation on the server). The condition column holds at most 254 characters, hence the terse script: staff are told apart
+    // by the platform's asset role, which asset managers and field techs contain and Customer roles do not, and the
+    // stage of an Order held back goes unchecked, as only one preparing, delivering or installing has units shipped.
+    condition:
+        `(current.install_mode=='${INSTALL_MODE.self_install}'||gs.hasRole('${PLATFORM_ROLE.asset}'))&&(current.stage=='${ORDER_STAGE.installing}'||(function(a){a.addQuery('substatus','${STAGE_FIELDS.shipped.substatus}');a.query('x_daas_ham_order_line.order',current.sys_id);return a.next()})(new GlideRecord('alm_hardware')))`,
+    roles: [assetManager, fieldTech, customerAdmin, siteContact],
+    form: { showButton: true },
+    showUpdate: true,
+    script: uiConfirmInstalled,
+})
 
 /*
  * Field work (ADR 0004). wm_order is a global table: the platform refuses current.setAbortAction from this scope on its
@@ -21,6 +55,8 @@ import { admin, returnWorkers } from '../shared/roles.now'
  * after its change test.
  */
 
+const NAAS_ORDER_WORK = "current.initiated_from.sys_class_name == 'x_daas_ham_order'"
+
 BusinessRule({
     $id: Now.ID['br_work_order_window'],
     name: 'NaaS - work inside the change window',
@@ -29,7 +65,7 @@ BusinessRule({
     action: ['insert', 'update'],
     order: 100,
     condition:
-        `(current.expected_start.changes() || current.estimated_end.changes()) && current.initiated_from.sys_class_name == 'x_daas_ham_order' && require('${ENTRY_MODULES}/delivery.ts').refusesWorkWindow(current)`,
+        `(current.expected_start.changes() || current.estimated_end.changes()) && ${NAAS_ORDER_WORK} && require('${ENTRY_MODULES}/delivery.ts').refusesWorkWindow(current)`,
     abortAction: true,
     script: explainWorkWindowRefusal,
 })
@@ -41,12 +77,12 @@ BusinessRule({
     when: 'after',
     action: ['update'],
     order: 200,
-    condition: `current.state.changes() && current.state == ${TASK_STATE.closedComplete} && current.initiated_from.sys_class_name == 'x_daas_ham_order'`,
-    script: onWorkOrderClosed,
+    condition: `current.state.changes() && current.state == ${TASK_STATE.closedComplete} && ${NAAS_ORDER_WORK}`,
+    script: completeInstallOfWork,
 })
 
 /*
- * Shipping aggregator (plan §13 Shipping aggregator, Q73). The message targets ShipEngine's label API; point the endpoint at
+ * The message targets ShipEngine's label API; point the endpoint at
  * another aggregator with the same request shape if needed. Tracking webhooks are registered at
  * /api/x_daas_ham/naas/shipping/tracking with the custom header
  * X-NaaS-Webhook-Token: <x_daas_ham.shipping.webhook_token> (ShipEngine `headers: [{ key, value }]`,
@@ -56,7 +92,7 @@ BusinessRule({
 
 RestMessage({
     $id: Now.ID['rm_shipping'],
-    name: REST_MESSAGE.shipping.name,
+    name: SHIPPING_MESSAGE.name,
     endpoint: 'https://api.shipengine.com/v1',
     description: 'Buys carrier labels (one call: shipment + label + tracking number).',
     headers: [
@@ -65,7 +101,7 @@ RestMessage({
     ],
     functions: [
         {
-            name: REST_MESSAGE.shipping.fn.createLabel,
+            name: SHIPPING_MESSAGE.fn.createLabel,
             httpMethod: 'POST',
             endpoint: 'https://api.shipengine.com/v1/labels',
             headers: [{ $id: Now.ID['rm_shipping_key_header'], name: 'API-Key', value: '${api_key}' }],

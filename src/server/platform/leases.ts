@@ -1,4 +1,4 @@
-import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
+import { GlideAggregate, GlideRecord } from '@servicenow/glide'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { withinLead } from '../domain/calendar.ts'
@@ -11,21 +11,22 @@ import {
     leaseDecisionProblem,
     leaseMismatch,
     stillCovered,
-    stockReturnMoves,
 } from '../domain/leases.ts'
 import { isRetired, SERVING_STAGES, type Stage, STOCK_STAGES } from '../domain/lifecycle.ts'
-import { isFree } from '../domain/sourcing.ts'
-import { LEASE_END_ACTION, type LeaseEndAction, LEGAL_OWNER, TASK_STATE } from '../domain/vocabulary.ts'
-import { assetManagerIds } from './approvals.ts'
-import { moveAsset, readStage } from './assets.ts'
-import { runEventTableJob } from './chunked.ts'
+import { isFree } from '../domain/stock.ts'
+import { type DisposalMethod, LEASE_END_ACTION, type LeaseEndAction, LEGAL_OWNER, TASK_STATE } from '../domain/vocabulary.ts'
+import { assetManagerIds } from './users.ts'
+import { readStage } from './assets.ts'
+import { runEventTableJob, visitInKeyOrder } from './chunked.ts'
 import { todayIso } from './clock.ts'
-import { addDisposalLine, draftLessorDisposal } from './disposal.ts'
-import { EVENT, fire, queueJob, type JobEvent } from './events.ts'
+import { fire, queueJob, type JobEvent } from './events.ts'
+import { EVENT } from '../domain/events.ts'
 import { queueRefresh } from './lifecycle-dates.ts'
-import { PROPERTY, stringProperty } from './properties.ts'
-import { bool, count, exists, findById, num, pluck, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
-import { changeStock, releaseToProviderStock, stockUnit } from './stock.ts'
+import { stringProperty } from './properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
+import { bool, count, exists, findById, num, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
+import { changeStock, moveAlongPath, stockUnit } from './stock.ts'
+import { log } from './log.ts'
 
 /**
  * Lease schedules and their end-of-lease decisions (plan §13 Leases), over fleet assets only (ADR 0016): the daily review, a
@@ -35,15 +36,15 @@ import { changeStock, releaseToProviderStock, stockUnit } from './stock.ts'
 
 const LEASE = 'x_daas_ham_lease_schedule'
 
-/** The task state an applied decision is closed with. */
-const DECISION_CLOSED = TASK_STATE.closedComplete
-
 /**
- * An Asset on a Lease schedule is owned by that schedule's Lessor (the lease's Vendor, which the Asset reaches through
- * its Lease schedule): set its Legal owner (the caller saves). One on no lease is left as it is.
+ * Before rule on alm_hardware (br_asset_lease), wired here: a fleet asset on a lease schedule is owned by that
+ * schedule's Lessor (the lease's Vendor), whether its lease is set or it joins the fleet with one already set (adoption
+ * and the warehouse receipt set a blank Legal owner to the Provider, which this replaces in the same save). The rule's
+ * condition runs it on a fleet asset only, once its Lease schedule or its Fleet flag changes: one of the Provider IT's
+ * is left as it is (ADR 0016). `current` is the rule's, saved by the platform; one on no lease is left as it is.
  */
-export function giveToLessor(asset: ForeignRecord): void {
-    if (findById(LEASE, str(asset, 'x_daas_ham_lease'))) asset.setValue('x_daas_ham_legal_owner', LEGAL_OWNER.lessor)
+export function giveToLessor(current: ForeignRecord): void {
+    if (findById(LEASE, str(current, 'x_daas_ham_lease'))) current.setValue('x_daas_ham_legal_owner', LEGAL_OWNER.lessor)
 }
 
 /**
@@ -80,13 +81,8 @@ function resumeBuyouts(): void {
     ga.query()
     while (ga.next()) {
         const lease = findById(LEASE, String(ga.getValue('x_daas_ham_lease') ?? ''))
-        if (lease) queueBuyout(lease)
+        if (lease) queueJob(EVENT.leaseBuyout, lease)
     }
-}
-
-/** Queue the transfer of the lease's Assets to the Provider (`transferToProvider`). */
-function queueBuyout(lease: GlideRecord): void {
-    queueJob(EVENT.leaseBuyout, lease)
 }
 
 /** Agreement end dates of the fleet assets a lease covers that are serving customers ('' = open-ended). */
@@ -109,7 +105,6 @@ function openDecision(leaseId: string): boolean {
     return exists('x_daas_ham_lease_decision', `lease=${leaseId}^active=true`)
 }
 
-/** The fleet assets the lease covers (those in `stages`, when given). */
 function countAssets(leaseId: string, stages?: readonly Stage[]): number {
     const ofLease = `x_daas_ham_lease=${leaseId}`
     return count('alm_hardware', stages ? fleetStagesQuery(stages, ofLease) : stillCovered(ofLease))
@@ -154,7 +149,7 @@ function notApplied(problem?: string): DecisionOutcome {
  * - extend: the lease runs to the new end date;
  * - return: stock leaves circulation onto a draft return-to-lessor disposal, and Assets at Sites get a
  *   Refresh due date no later than the lease end so automatic refresh swaps them out in time.
- * A lease being bought out or returned takes no further decision (domain/leases `leaseDecisionProblem`). The decision
+ * A lease being bought out or returned takes no further decision. The decision
  * is closed before the lease changes, and a closed one is not applied, so it never stays open over a lease it already
  * decided: applied again, an extension would extend once more (any new end date after the extended one passes), and
  * while it is open the daily review raises no decision before the new end (`openDecision`).
@@ -173,8 +168,7 @@ export function applyLeaseDecision(decisionRecord: GlideRecord): DecisionOutcome
     })
     if (problem || !decision) return notApplied(problem ?? undefined)
     const openState = str(decisionRecord, 'state')
-    decisionRecord.setValue('state', DECISION_CLOSED)
-    // Closed first: a refused form save (the platform says why) leaves the lease as it was and the decision open.
+    decisionRecord.setValue('state', TASK_STATE.closedComplete)
     if (!decisionRecord.update()) return notApplied()
 
     const decided = decidedLease(decision, str(decisionRecord, 'new_end_date'))
@@ -182,10 +176,11 @@ export function applyLeaseDecision(decisionRecord: GlideRecord): DecisionOutcome
     lease.setValue('end_action', decided.endAction)
     if (decided.mismatch !== undefined) lease.setValue('mismatch', decided.mismatch)
     const leaseId = lease.getUniqueValue()
-    const terms = buyoutTerms(decision, { fixedAssets: num(lease, 'buyout_assets'), price: num(lease, 'buyout_price') }, () =>
-        // Every covered Asset's sys_id (as many as are counted, not pluck's default limit), so none is left out of the split.
-        pluck('alm_hardware', stillCovered(`x_daas_ham_lease=${leaseId}`), 'sys_id', Math.max(countAssets(leaseId), 1)),
-    )
+    const terms = buyoutTerms(decision, { fixedAssets: num(lease, 'buyout_assets'), price: num(lease, 'buyout_price') }, () => {
+        const covered: string[] = []
+        visitInKeyOrder('alm_hardware', stillCovered(`x_daas_ham_lease=${leaseId}`), (asset) => void covered.push(asset.getUniqueValue()))
+        return covered
+    })
     if (terms) {
         lease.setValue('buyout_assets', terms.assets)
         lease.setValue('buyout_share', terms.share)
@@ -197,7 +192,7 @@ export function applyLeaseDecision(decisionRecord: GlideRecord): DecisionOutcome
     }
     const outcome: DecisionOutcome = { applied: true, notes: [], problems: [] }
     if (decision === 'buyout') {
-        queueBuyout(lease)
+        queueJob(EVENT.leaseBuyout, lease)
         outcome.notes.push("The lease's assets become Provider-owned in the background")
     }
     if (decision === 'return') {
@@ -228,7 +223,6 @@ function reopenDecision(decision: GlideRecord, openState: string, why: string): 
     return `${why}. The decision stays closed (see the system log); the daily lease review raises a new one`
 }
 
-/** What a return did with the lease's stock. */
 interface StockReturn {
     /** Its draft disposal's number; null without one. */
     disposal: string | null
@@ -242,7 +236,7 @@ interface StockReturn {
  * Take the lease's stock out of circulation onto a draft return-to-lessor disposal: each unit is saved at pending
  * wipe, so sourcing and the spare-pool top-up can no longer claim it, and only then gets its line. A hot spare already
  * linked to an Order line is left to that line; once at a Site, its Refresh due date is the lease end like the rest.
- * Each unit is withdrawn under the lock stock claims take, from a fresh read (`withdrawFromStock`), so one reserved
+ * Each unit is withdrawn under the lock stock claims take, from a fresh read, so one reserved
  * since the query keeps its reservation. A unit whose line, or the disposal itself, is refused stays at pending wipe on
  * no disposal and is counted as unlisted, to be put on one by hand.
  */
@@ -269,8 +263,7 @@ function disposeStockToLessor(lease: GlideRecord): StockReturn {
 }
 
 /**
- * Withdraw a unit the query found, under the lock stock claims take and from a fresh read (platform/stock
- * `changeStock`): a claim whose own fresh read came before the return was saved may still be saving it. A unit gone,
+ * Withdraw a unit the query found, under the lock stock claims take and from a fresh read: a claim whose own fresh read came before the return was saved may still be saving it. A unit gone,
  * or no longer free stock on no Order line, is left to whoever took it ('taken'). The Asset at pending wipe, or
  * 'refused' (logged) when a move is refused or the lock cannot be taken.
  */
@@ -281,37 +274,30 @@ function withdrawFromStock(found: GlideRecord): GlideRecord | 'taken' | 'refused
     })
     if (withdrawn.ran) return withdrawn.value
     const serial = str(found, 'serial_number')
-    gs.warn(`[x_daas_ham] Lease return: ${serial} not withdrawn: its stock lock could not be taken`)
+    log.warn(`Lease return: ${serial} not withdrawn: its stock lock could not be taken`)
     return 'refused'
 }
 
 /**
- * Save the Asset through its stock-return moves (domain/leases `stockReturnMoves`) holding its stock `lock`; false
- * (logged) when one is refused, or the lock was lost: a holder that outlasted it (ADR 0013) may overlap a claim. Each
- * move is saved through the lock, which platform/assets `moveAndSave` does not do.
+ * Move the stock Asset to pending wipe, where its return-to-lessor disposal starts and sourcing and the spare-pool
+ * top-up no longer find it, holding its stock `lock`; false (logged) when a move is refused, or the lock was lost: a
+ * holder that outlasted it (ADR 0013) may overlap a claim. Each move is saved through the lock, which platform/assets
+ * `moveAndSave` does not do.
  */
 function moveOutOfStock(lock: HeldLock, asset: GlideRecord): boolean {
-    const moves = stockReturnMoves(readStage(asset))
-    for (const to of moves) {
-        // Out of the Customer's Spare pool: Provider stock again, as when an Order lets a unit go.
-        if (to === 'available') releaseToProviderStock(asset)
-        const verdict = moveAsset(asset, to)
-        if (!verdict.allowed) return notMoved(asset, to, verdict.reason)
-        const saved = lock.save(`Lease return: ${str(asset, 'serial_number')} moved to ${to}`, () => asset.update())
-        if (saved === 'lock lost') return notMoved(asset, to, 'its stock lock was lost')
-        if (saved === 'refused') return notMoved(asset, to, refusal(asset))
-    }
-    return moves.length > 0
-}
-
-function notMoved(asset: GlideRecord, to: Stage, reason: string): false {
-    gs.warn(`[x_daas_ham] Lease return: ${str(asset, 'serial_number')} not moved to ${to}: ${reason}`)
-    return false
+    const serial = str(asset, 'serial_number')
+    const stopped = moveAlongPath(asset, 'pending_wipe', (to) => {
+        const saved = lock.save(`Lease return: ${serial} moved to ${to}`, () => asset.update())
+        if (saved === 'lock lost') return 'its stock lock was lost'
+        return saved === 'refused' ? refusal(asset) : ''
+    })
+    if (stopped) log.warn(`Lease return: ${serial} not moved to ${stopped.to}: ${stopped.why}`)
+    return !stopped
 }
 
 /**
  * The Provider owns the Assets the bought-out `lease` covers, each costing its share of the buyout price to the cent
- * (domain/leases `buyoutCost`, for Margin), a chunk at a time: the job of the event `queueBuyout` queues. Retired
+ * (for Margin), a chunk at a time: the job of `EVENT.leaseBuyout`. Retired
  * units, which the Lessor or the OEM holds, keep their lease link and are not transferred.
  *
  * Every transferred Asset leaves the query set. The cursor (sys_id > last handled) still holds:
@@ -323,12 +309,8 @@ function notMoved(asset: GlideRecord, to: Stage, reason: string): false {
  */
 export function transferToProvider(queued: JobEvent, lease: GlideRecord): void {
     const leaseId = queued.subject
-    // Never run with a blank lease: the query would match every Asset that has no lease.
-    if (!leaseId) return
-    // Each Asset's cost is its share of the price to the cent, fixed when the buyout was decided (domain/leases
-    // `buyoutCost`); a share stored before shares were split to the cent is rounded, with no cent left over to place.
+    // Each Asset's cost is its share of the price to the cent, fixed when the buyout was decided; a share stored before shares were split to the cent is rounded, with no cent left over to place.
     const split = { share: num(lease, 'buyout_share'), extraThrough: str(lease, 'buyout_extra_through') }
-    // Every Asset the chunk transfers is bought today.
     const today = todayIso()
     runEventTableJob(queued, {
         table: 'alm_hardware',
@@ -350,4 +332,26 @@ export function transferToProvider(queued: JobEvent, lease: GlideRecord): void {
             warnRefused(asset, `Buyout of ${str(lease, 'number')}: ${serial} not transferred`)
         },
     })
+}
+
+function draftLessorDisposal(lease: GlideRecord): GlideRecord | null {
+    const order = new GlideRecord('x_daas_ham_disposal_order')
+    order.initialize()
+    const method: DisposalMethod = 'return_to_lessor'
+    order.setValue('method', method)
+    order.setValue('disposal_vendor', str(lease, 'vendor'))
+    order.setValue('short_description', `Return stock to the lessor at the end of lease ${str(lease, 'number')}`)
+    if (order.insert()) return order
+    warnRefused(order, `Lease return: no disposal order for ${str(lease, 'number')}`)
+    return null
+}
+
+function addDisposalLine(order: GlideRecord, asset: GlideRecord): boolean {
+    const line = new GlideRecord('x_daas_ham_disposal_line')
+    line.initialize()
+    line.setValue('disposal_order', order.getUniqueValue())
+    line.setValue('asset', asset.getUniqueValue())
+    if (line.insert()) return true
+    warnRefused(line, `Lease return: ${str(asset, 'serial_number')} left off ${str(order, 'number')}`)
+    return false
 }

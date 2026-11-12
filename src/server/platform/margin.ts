@@ -1,9 +1,9 @@
-import { GlideAggregate, GlideRecord, gs } from '@servicenow/glide'
-import { chooseCurrency, currencyCode, currencyKey, currencyOrThrow, monthBounds, overlapsMonth, type AgreementCurrency, type MonthBounds } from '../domain/billing.ts'
+import { GlideAggregate, GlideRecord } from '@servicenow/glide'
+import { chooseCurrency, currencyCode, currencyKey, currencyOrThrow, monthBounds, overlapsMonth, roundToCent, timeInMonth, type AgreementCurrency, type MonthBounds } from '../domain/money.ts'
+import { JOB, type Failures } from '../domain/chunked-job.ts'
 import { messageOf } from '../domain/errors.ts'
 import { stillCovered } from '../domain/leases.ts'
 import {
-    cents,
     CostLedger,
     costFactKey,
     labourCost,
@@ -15,39 +15,39 @@ import {
     type LeaseTerms,
 } from '../domain/margin.ts'
 import { memoized } from '../domain/memo.ts'
-import { SHIPMENT_STATUS, type LegalOwner } from '../domain/vocabulary.ts'
+import { BILLING_PERIOD_STATUS, SHIPMENT_STATUS, type LegalOwner } from '../domain/vocabulary.ts'
 import { agreementCurrencyOf, customerCurrencies } from './agreements.ts'
-import { recordMarginOutcome } from './billing.ts'
-import { runEventTableJob } from './chunked.ts'
-import { EVENT, queueJob, type JobEvent } from './events.ts'
-import { intProperty, PROPERTY } from './properties.ts'
+import { recordMarginOutcome } from './closed-period.ts'
+import { runSupersedingChunk } from './chunked.ts'
+import { type JobEvent } from './events.ts'
+import { intProperty } from './properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { count, deleteWhere, findById, num, recordsById, str, throwRefused } from './records.ts'
+import { log } from './log.ts'
 
 /**
  * Cost facts and Margin per Customer, Site and currency, computed when a Billing period closes (plan §13 Margin / TCO). A cost is kept
  * in its Agreement's currency (a shipment's in its carrier's), and Margin sets revenue against cost per currency.
  */
 
-/** Queue a fresh margin pass for a closed period: it supersedes one still in progress (ADR 0013). */
-export function queueMarginCompute(period: GlideRecord): void {
-    queueJob(EVENT.marginCompute, period)
-}
-
 /**
  * One chunk of a margin pass for the period the event names: Asset costs over the month's Service intervals, then
- * labour and margin. A pass that stops is logged (the runner records it on the period while the pass is current).
+ * labour and margin. Only a closed period has Margin: its lines no longer change. A pass that stops is logged (the
+ * runner records it on the period while the pass is current).
  */
 export function computeMarginChunk(queued: JobEvent): void {
     const period = findById('x_daas_ham_billing_period', queued.subject)
     if (!period) return
+    if (str(period, 'status') !== BILLING_PERIOD_STATUS.closed) {
+        return void log.warn(`${queued.name}: dropped a margin chunk, as billing period ${str(period, 'period')} is not closed`)
+    }
     try {
         costServiceIntervals(period, queued)
     } catch (error) {
-        gs.error(`[x_daas_ham] Margin of ${str(period, 'period')} stopped: ${messageOf(error)}`)
+        log.error(`Margin of ${str(period, 'period')} stopped: ${messageOf(error)}`)
     }
 }
 
-/** One chunk of a margin pass over the period's Service intervals after the event's cursor; the pass's completion adds field labour and writes Margin. */
 function costServiceIntervals(period: GlideRecord, queued: JobEvent): void {
     const periodId = period.getUniqueValue()
     const bounds = monthBounds(str(period, 'period'))
@@ -56,29 +56,25 @@ function costServiceIntervals(period: GlideRecord, queued: JobEvent): void {
     const leases = memoized(leaseTermsOf)
     const currencies = memoized(customerCurrencies)
     const lineAgreements = memoized(lineAgreementOf)
-    runEventTableJob(queued, {
-        pass: {
-            job: `margin_${periodId}`,
-            underLock: {
-                onStart: () => {
-                    // The status first: if the period refuses it, the pass stops before its Margin is cleared.
-                    recordMarginOutcome(period, 0, '')
-                    clearPeriod(periodId)
-                },
-                complete: () => {
-                    const labour = addFieldLabour(periodId, bounds)
-                    const shipping = addShippingCosts(periodId, bounds)
-                    // Left out of Margin, as failed Service intervals are, and counted on the period with them.
-                    const failed = labour.failed + shipping.failed
-                    if (failed > 0) addMarginFailures(periodId, failed, shipping.lastError || labour.lastError)
-                    writeMargin(periodId)
-                },
-                // A chunk that throws queues no next one: the pass stops, and the period must not read as complete.
-                stopped: (error) => {
-                    const fresh = findById('x_daas_ham_billing_period', periodId)
-                    if (fresh) recordMarginOutcome(fresh, num(fresh, 'margin_failed'), `stopped: ${error}`)
-                },
-            },
+    runSupersedingChunk(queued, {
+        job: JOB.margin(periodId),
+        onStart: () => {
+            // The status first: if the period refuses it, the pass stops before its Margin is cleared.
+            recordMarginOutcome(period, 0, '')
+            clearPeriod(periodId)
+        },
+        complete: () => {
+            const labour = addFieldLabour(periodId, bounds)
+            const shipping = addShippingCosts(periodId, bounds)
+            // Left out of Margin, as failed Service intervals are, and counted on the period with them.
+            const failed = labour.failed + shipping.failed
+            if (failed > 0) addMarginFailures(periodId, failed, shipping.lastError || labour.lastError)
+            writeMargin(periodId)
+        },
+        // A chunk that throws queues no next one: the pass stops, and the period must not read as complete.
+        stopped: (error) => {
+            const fresh = findById('x_daas_ham_billing_period', periodId)
+            if (fresh) recordMarginOutcome(fresh, num(fresh, 'margin_failed'), `stopped: ${error}`)
         },
         table: 'x_daas_ham_service_interval',
         query: overlapsMonth(bounds),
@@ -108,14 +104,10 @@ function costServiceIntervals(period: GlideRecord, queued: JobEvent): void {
     })
 }
 
-/**
- * Count Service intervals a chunk of the margin pass failed to cost on its Billing period, with the last error (and the
- * work orders and shipments its completion failed to cost).
- */
 function addMarginFailures(periodId: string, failed: number, lastError: string): void {
     const period = findById('x_daas_ham_billing_period', periodId)
     if (!period) return
-    gs.error(`[x_daas_ham] Margin of ${str(period, 'period')}: ${failed} record(s) failed to cost: ${lastError}`)
+    log.error(`Margin of ${str(period, 'period')}: ${failed} record(s) failed to cost: ${lastError}`)
     recordMarginOutcome(period, num(period, 'margin_failed') + failed, lastError)
 }
 
@@ -136,7 +128,6 @@ function clearRows(table: string, periodId: string, what: string): void {
     if (!deleteWhere(table, `billing_period=${periodId}`)) throw new Error(`old ${what} not all removed`)
 }
 
-/** A Service interval as stored, with its Asset's and its Subscription line's sys_ids. */
 interface IntervalRow {
     customerId: string
     siteId: string
@@ -146,13 +137,11 @@ interface IntervalRow {
     lineId: string
 }
 
-/** The Agreement of a Subscription line, for its currency (a chunk reads each line once); null when the line is gone. */
 function lineAgreementOf(lineId: string): AgreementCurrency | null {
     const line = findById('x_daas_ham_subscription_line', lineId)
     return line && agreementCurrencyOf(line, 'agreement')
 }
 
-/** An Asset's cost fields as stored, with its Lease schedule's sys_id. */
 type AssetFields = Omit<AssetCostFacts, 'lease'> & { leaseId: string }
 
 /**
@@ -175,7 +164,6 @@ function withAssets(intervals: readonly IntervalRow[]): Array<IntervalRow & { as
     return intervals.map((interval) => ({ ...interval, asset: found.get(interval.assetId) ?? null }))
 }
 
-/** A Lease schedule's terms for Margin; null when it is not found. */
 function leaseTermsOf(leaseId: string): LeaseTerms | null {
     const lease = findById('x_daas_ham_lease_schedule', leaseId)
     return lease && {
@@ -189,8 +177,7 @@ function leaseTermsOf(leaseId: string): LeaseTerms | null {
 
 /**
  * Add a batch's totals by costFactKey (as CostLedger.drain hands them over; this uses them up) to
- * the period's Cost facts, reading the ones they add to with one query. A refused save throws (platform/records
- * `throwRefused`), so that the pass stops and records why on the period (ADR 0013) instead of completing with that cost
+ * the period's Cost facts, reading the ones they add to with one query. A refused save throws, so that the pass stops and records why on the period (ADR 0013) instead of completing with that cost
  * left out.
  */
 function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void {
@@ -205,7 +192,7 @@ function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void
         const key = costFactKey(str(fact, 'customer'), str(fact, 'site'), str(fact, 'cost_type'), str(fact, 'currency'))
         const entry = pending.get(key)
         if (!entry) continue
-        fact.setValue('amount', cents(num(fact, 'amount') + entry.amount))
+        fact.setValue('amount', roundToCent(num(fact, 'amount') + entry.amount))
         if (!fact.update()) throwRefused(fact, `${entry.type} Cost fact not saved`)
         pending.delete(key)
     }
@@ -217,15 +204,9 @@ function writeCostFacts(periodId: string, pending: Map<string, CostEntry>): void
         added.setValue('site', entry.siteId)
         added.setValue('cost_type', entry.type)
         added.setValue('currency', entry.currency)
-        added.setValue('amount', cents(entry.amount))
+        added.setValue('amount', roundToCent(entry.amount))
         if (!added.insert()) throwRefused(added, `${entry.type} Cost fact not saved`)
     }
-}
-
-/** How many records a step of the pass's completion failed to cost, and the last one's error. */
-interface Failed {
-    failed: number
-    lastError: string
 }
 
 /**
@@ -233,13 +214,13 @@ interface Failed {
  * visit cost. Each is kept in the currency of the Agreement its Order or Return order names, else in the one its
  * Customer's Agreements share (a site audit's); one without a currency is left out and counted.
  */
-function addFieldLabour(periodId: string, bounds: MonthBounds): Failed {
+function addFieldLabour(periodId: string, bounds: MonthBounds): Failures {
     const visitCost = intProperty(PROPERTY.visitCost)
     const currencies = memoized(customerCurrencies)
     const ledger = new CostLedger()
-    const result: Failed = { failed: 0, lastError: '' }
+    const result: Failures = { failed: 0, lastError: '' }
     const workOrder = new GlideRecord('wm_order')
-    workOrder.addEncodedQuery(`x_daas_ham_purposeISNOTEMPTY^closed_at>=${bounds.first} 00:00:00^closed_at<=${bounds.last} 23:59:59`)
+    workOrder.addEncodedQuery(`x_daas_ham_purposeISNOTEMPTY^${timeInMonth('closed_at', bounds)}`)
     workOrder.query()
     while (workOrder.next()) {
         const customerId = str(workOrder, 'company')
@@ -268,15 +249,15 @@ function workOrderAgreement(workOrder: GlideRecord): AgreementCurrency | null {
 }
 
 /**
- * Shipments whose label was bought in the month, as Cost facts of their Customer and Site in the carrier's currency
- * (domain/shipping `buyLabel`), never converted. A voided label is refunded, so it is left out; one with a cost but no
+ * Shipments whose label was bought in the month, as Cost facts of their Customer and Site in the carrier's currency,
+ * never converted. A voided label is refunded, so it is left out; one with a cost but no
  * currency or no Customer (a Cost fact needs both) is left out and counted.
  */
-function addShippingCosts(periodId: string, bounds: MonthBounds): Failed {
+function addShippingCosts(periodId: string, bounds: MonthBounds): Failures {
     const ledger = new CostLedger()
-    const result: Failed = { failed: 0, lastError: '' }
+    const result: Failures = { failed: 0, lastError: '' }
     const shipment = new GlideRecord('x_daas_ham_shipment')
-    shipment.addEncodedQuery(`status!=${SHIPMENT_STATUS.voided}^cost>0^sys_created_on>=${bounds.first} 00:00:00^sys_created_on<=${bounds.last} 23:59:59`)
+    shipment.addEncodedQuery(`status!=${SHIPMENT_STATUS.voided}^cost>0^${timeInMonth('sys_created_on', bounds)}`)
     shipment.query()
     while (shipment.next()) {
         const currency = currencyCode(str(shipment, 'currency'))
@@ -297,7 +278,7 @@ function addShippingCosts(periodId: string, bounds: MonthBounds): Failed {
 
 /**
  * The amounts of a table's records matching an encoded query, summed per Customer, Site and currency. The currency is
- * read as Billing period totals read it (domain/billing `currencyKey`): a line edited during review to 'eur' is set
+ * read as Billing period totals read it: a line edited during review to 'eur' is set
  * against the 'EUR' costs of its Customer and Site (marginRows merges the rows of one key).
  */
 function sumsBy(table: string, encodedQuery: string): Amount[] {

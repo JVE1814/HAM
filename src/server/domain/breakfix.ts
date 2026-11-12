@@ -2,8 +2,6 @@ import { UNFULFILLED_ORDER_STAGES } from './fulfilment.ts'
 import { INSTALLED_STAGES, type Stage } from './lifecycle.ts'
 import type { OrderStage } from './vocabulary.ts'
 
-/** Break-fix (P2.3, Q58): what "Raise replacement" does on a case that may already link a replacement Order. */
-
 /**
  * - `raise`: no replacement goes ahead for the case, so a new Order is raised and linked;
  * - `submit_draft`: the linked Order was left a draft to correct, so it is submitted again instead of raising another;

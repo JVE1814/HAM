@@ -4,12 +4,16 @@ import {
     INSTALLED_PAST_SUPPORT,
     backwardsMilestones,
     mergeLifecycle,
+    MILESTONE_ROW_CHANGED,
+    OWN_MILESTONE_ROWS,
     parseLifecycleRow,
     PAST_SUPPORT_PHASES,
     type AssetLifecycleFacts,
     type LifecycleDates,
 } from './model-lifecycle'
-import type { RefreshBasis } from './vocabulary'
+import { LIFECYCLE_PHASE, type RefreshBasis } from './vocabulary'
+import { recordMatches as matches } from '../test-support/encoded-query'
+import { assetIn } from '../test-support/stored-asset'
 
 const cisco = {
     endOfSale: '2024-04-30',
@@ -143,8 +147,27 @@ describe('mergeLifecycle', () => {
     })
 })
 
-describe('PAST_SUPPORT_PHASES', () => {
-    it('are the phases INSTALLED_PAST_SUPPORT selects', () => {
-        expect(INSTALLED_PAST_SUPPORT).toContain(`^x_daas_ham_lifecycle_phaseIN${PAST_SUPPORT_PHASES.join(',')}^`)
+describe('INSTALLED_PAST_SUPPORT', () => {
+    const installed = (phase: string) => assetIn('in_service', { x_daas_ham_fleet: 'true', x_daas_ham_lifecycle_phase: phase })
+
+    it('finds the installed fleet Assets in exactly the phases PAST_SUPPORT_PHASES names', () => {
+        for (const phase of Object.values(LIFECYCLE_PHASE)) {
+            expect(matches(INSTALLED_PAST_SUPPORT, installed(phase)), phase).toBe(PAST_SUPPORT_PHASES.includes(phase))
+        }
+        expect(matches(INSTALLED_PAST_SUPPORT, installed(''))).toBe(false)
+    })
+
+    it('leaves out an Asset not installed or outside the fleet', () => {
+        expect(matches(INSTALLED_PAST_SUPPORT, { ...installed('end_of_life'), ...assetIn('available') })).toBe(false)
+        expect(matches(INSTALLED_PAST_SUPPORT, { ...installed('end_of_life'), x_daas_ham_fleet: 'false' })).toBe(false)
+    })
+})
+
+describe('MILESTONE_ROW_CHANGED', () => {
+    it("holds for a change of every field the app reads a Model's milestones by", () => {
+        const read = `${OWN_MILESTONE_ROWS}^start_dateISNOTEMPTY^model=model1`
+        const fields = read.split('^').map((term) => /^[a-z_]+?(?==|IN|ISNOTEMPTY)/.exec(term)?.[0])
+        expect(fields).not.toContain(undefined)
+        for (const field of new Set(fields)) expect(MILESTONE_ROW_CHANGED).toContain(`current.${field}.changes()`)
     })
 })

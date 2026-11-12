@@ -1,4 +1,4 @@
-import { GlideDateTime, GlideRecord, gs } from '@servicenow/glide'
+import { GlideDateTime, GlideRecord } from '@servicenow/glide'
 import { messageOf } from '../domain/errors.ts'
 import {
     ABANDONED_AFTER_MINUTES,
@@ -9,6 +9,7 @@ import {
     type LockPorts,
     type TryAgain,
 } from '../domain/job-lock.ts'
+import { log } from './log.ts'
 import { deleteWhere, exists, refusal, str } from './records.ts'
 
 /** Job locks (ADR 0013): a row per lock held, behind a unique index, so taking a lock is one insert only one holder wins. */
@@ -18,7 +19,7 @@ const LOCK_ROWS: LockPorts = {
     take,
     release,
     held: (lockId) => new GlideRecord(LOCK_TABLE).get(lockId),
-    log: (level, message) => (level === 'error' ? gs.error(`[x_daas_ham] ${message}`) : gs.warn(`[x_daas_ham] ${message}`)),
+    log: (level, message) => log[level](message),
 }
 
 /** What became of work to run under a lock: it ran and returned `value`, or other holders kept the lock. */
@@ -28,7 +29,7 @@ export type LockRun<T> = { ran: true; value: T } | { ran: false }
 type Work<T> = (lock: HeldLock) => T | TryAgain
 
 /**
- * Run `work` holding the lock `name` (domain/lock-names `LOCK`) and give what it returned, or `ran: false` at once when
+ * Run `work` holding the lock `name` and give what it returned, or `ran: false` at once when
  * another holder has the lock. Throws when the lock cannot be taken for another reason (the insert is refused while no
  * lock row exists); `work`'s own errors escape. Not reentrant: a lock is one row, not a count of takes, so a nested
  * take of `name` (inside `work`, or anywhere in the same transaction while it is held) finds it held and does not run.
@@ -101,10 +102,9 @@ function insertLock(name: string): { id: string | null; error: string } {
 /** Clear the lock `name` when it is abandoned; one whose delete is refused is logged, as it is held until removed. */
 function clearAbandoned(name: string): void {
     if (deleteWhere(LOCK_TABLE, `name=${name}^sys_created_on<${abandonedBefore()}`)) return
-    gs.warn(`[x_daas_ham] Abandoned job lock ${name} not cleared (its delete was refused): every take finds it held until it is removed`)
+    log.warn(`Abandoned job lock ${name} not cleared (its delete was refused): every take finds it held until it is removed`)
 }
 
-/** The time a lock taken before it is abandoned (ABANDONED_AFTER_MINUTES ago). */
 function abandonedBefore(): string {
     const cutoff = new GlideDateTime()
     cutoff.addSeconds(-ABANDONED_AFTER_MINUTES * 60)
@@ -120,5 +120,5 @@ function release(lockId: string): void {
     const lock = new GlideRecord(LOCK_TABLE)
     if (!lock.get(lockId) || lock.deleteRecord()) return
     const held = `held until taken as abandoned, ${ABANDONED_AFTER_MINUTES} minutes after it was taken`
-    gs.warn(`[x_daas_ham] Job lock ${str(lock, 'name')} not released: ${refusal(lock, 'the delete was refused')}; ${held}`)
+    log.warn(`Job lock ${str(lock, 'name')} not released: ${refusal(lock, 'the delete was refused')}; ${held}`)
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { holdsInEveryClause } from '../../server/domain/encoded-query'
 import { SHARED_TABLE_CONDITION } from '../../server/domain/fleet'
-import { BROAD_STAFF, MONEY_READERS, PROVIDER_STAFF, ROLE } from '../../server/domain/visibility'
+import { BROAD_STAFF, MONEY_READERS, PROVIDER_STAFF, ROLE } from '../../server/domain/roles'
 import { listQuery, type Field, type ListView } from '../lib/sn'
 import { AUDIENCE, CATEGORIES, listById, menuFor } from './catalog'
 import { DASHBOARD, tabsFor } from './dashboard'

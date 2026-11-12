@@ -119,7 +119,6 @@ describe('attemptUnderLock', () => {
     })
 })
 
-/** Run `work` with a held lock whose rows the test can clear. */
 function holding<T>(work: (lock: HeldLock, rows: ReturnType<typeof lockRows>) => T): { value: T; log: string[] } {
     const rows = lockRows()
     const attempt = attemptUnderLock(rows.ports, 'order_line_a', 1, (lock) => work(lock, rows))

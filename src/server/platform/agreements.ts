@@ -8,27 +8,22 @@ import {
     type EntitlementContext,
     type Usage,
 } from '../domain/entitlement.ts'
-import type { AgreementCurrency } from '../domain/billing.ts'
+import type { AgreementCurrency } from '../domain/money.ts'
 import { todayIso } from './clock.ts'
 import { bool, num, str } from './records.ts'
 
 /**
  * The Agreements in force: an Agreement is a contract (it extends ast_contract), and this is the state the platform's
- * Contract Management gives one that is active. What the daily jobs that act for running Agreements select.
+ * Contract Management gives one that is active.
  */
 export const ACTIVE_AGREEMENTS = 'state=active'
 
-/** The Agreement `field` names on `record`, with its Currency as stored (domain/billing `chooseCurrency`); null for none. */
 export function agreementCurrencyOf(record: GlideRecord, field: string): AgreementCurrency | null {
     const agreementId = str(record, field)
     if (!agreementId) return null
     return { name: str(record, `${field}.number`) || agreementId, currency: str(record, `${field}.currency`) }
 }
 
-/**
- * The Currency of a Customer's Agreements as stored, one entry per value (an amount naming no Agreement takes theirs
- * when they share one); a job reads each Customer's once.
- */
 export function customerCurrencies(customerId: string): string[] {
     if (!customerId) return []
     const ga = new GlideAggregate('x_daas_ham_agreement')
@@ -122,7 +117,7 @@ function usageByModel(table: string, query: string, aggregate: 'COUNT' | 'SUM', 
 
 /**
  * The Models a Customer's catalog offers now, each with its Device class: its Model entries that are current as the
- * entitlement check reads them (domain/entitlement `isCurrent`: active and inside their validity dates), so a Model
+ * entitlement check reads them, so a Model
  * picked from here is one an Order for it is not flagged for.
  */
 export function catalogModels(customerId: string): Array<{ modelId: string; deviceClass: string }> {

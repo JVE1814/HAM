@@ -1,16 +1,12 @@
 import type { GlideRecord } from '@servicenow/glide'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LOCK } from '../domain/lock-names.ts'
-import { EVENT } from './events.ts'
-import { PROPERTY } from './properties.ts'
+import { EVENT } from '../domain/events.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { findById } from './records.ts'
 import { runSourcingPass } from './sourcing.ts'
+import { sourcingRequestOf } from './sourcing-requests.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
-
-/*
- * A sourcing pass run against the in-memory stand-in for the platform, job locks included (ADR 0013): an Order with
- * one line of two units and no stock to fill it from, so the pass has the whole line to buy.
- */
 
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
@@ -22,6 +18,15 @@ const PURCHASE_ITEMS = 'proc_po_item'
 
 const rows = (table: string): Row[] => platform.tables[table] ?? []
 const line = (): Row => rows(LINES)[0]
+
+function queuedRequests() {
+    return platform.events.map((queued) => ({
+        name: queued.name,
+        record: queued.record,
+        delayed: queued.delayed,
+        ...sourcingRequestOf({ getValue: (field: string) => queued[field as 'parm1' | 'parm2'] } as unknown as GlideRecord),
+    }))
+}
 
 function order(): GlideRecord {
     const found = findById(ORDERS, 'order1')
@@ -62,7 +67,7 @@ describe('a sourcing pass', () => {
         const [purchaseOrder] = rows(PURCHASE_ORDERS)
         expect(rows(PURCHASE_ITEMS)).toEqual([expect.objectContaining({ purchase_order: purchaseOrder.sys_id, model: 'model1', ordered_quantity: '2' })])
         expect(line()).toMatchObject({ quantity_to_purchase: '2', purchase_order: purchaseOrder.sys_id, purchase_orders: purchaseOrder.sys_id, sourcing_summary: '2 to purchase' })
-        expect(line().line_stage).not.toBe('new')
+        expect(line().line_stage).toBe('awaiting_stock')
         expect(platform.events).toEqual([])
         expect(rows(LOCKS)).toEqual([])
     })
@@ -76,7 +81,7 @@ describe('a sourcing pass', () => {
         expect(rows(PURCHASE_ORDERS)).toEqual([])
         expect(rows(PURCHASE_ITEMS)).toEqual([])
         expect(line()).toEqual(before)
-        expect(platform.events).toEqual([{ name: EVENT.sourceOrder, record: 'order1', parm1: '', parm2: '1', delayed: true }])
+        expect(queuedRequests()).toEqual([{ name: EVENT.sourceOrder, record: 'order1', delayed: true, request: 'pass', tries: 1 }])
         // The lock of the pass that took over is not this one's to release.
         expect(rows(LOCKS)).toEqual([{ sys_id: 'theirs', name: LOCK.sourceOrder('order1') }])
     })

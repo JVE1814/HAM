@@ -9,12 +9,14 @@
   billed. An Asset back in service on or before the day its interval on the same line closed gets
   that interval reopened, so no day is billed twice. The rule also runs when the stage change clears
   the Asset's Subscription line, so the interval still closes.
-- The rule opens or reopens the interval under a job lock on the Asset (`service_interval_<sys_id>`,
+- The rule opens or reopens the interval under a job lock on the Asset (`LOCK.serviceInterval` in
+  `domain/lock-names.ts`,
   ADR 0013), so two saves that put it in service at once (a Seen signal and the detection job) open
   one interval. The opening and the closing for one Asset take turns under that lock, and each reads
   its stage afresh. An Asset taken out of service before its go-live's rule ran gets its interval
   opened and closed that day. One put back in service before its close ran keeps its interval open.
-  A save that cannot take the lock after 5 tries leaves the interval to the holder, and logs an error
+  A save that cannot take the lock after `LOCK_TRIES` tries (`domain/job-lock.ts`) leaves the
+  interval to the holder, and logs an error
   if the interval is then not open (or still open for an Asset out of service), to fix by hand if the
   save holding the lock does not. An interval the platform refuses to open or close is logged as a
   warning, for finance to fix by hand.
@@ -57,13 +59,14 @@
 | Status | How it gets there | What can happen |
 |---|---|---|
 | Generating | A new period: the monthly job opens the previous month on day 1 unless it already has a period, or finance creates one by hand for a month that has ended (before the current month by UTC date). Either way, the insert starts its generation once. Or *Regenerate* | Lines are written in time-boxed chunks (event-driven); a subscription line or fee event that fails to bill is counted on the period (*Lines that failed to bill*) with the last error (*Last generation error*), and so is a fee whose link to the period is refused (a *Regenerate* links it). A chunk that cannot run at all (e.g. a month saved past the month rule), or whose failed-line count the period refuses, stops generation: its error is recorded and the period is held as *Ready for review*. If the period refuses that save, or the *ready* save at the end of generation, it stays *Generating* with nothing queued: the error is logged, *Close period* and *Regenerate* both refuse it, and once the cause is fixed an admin uses *Reset generation* (below). *Close period* refuses while a line failed to bill or an error is recorded, until a *Regenerate* bills every line |
-| Ready for review | Generation finished and totals are set, or generation stopped on an error (held for review) | *Regenerate* (rebuild from current data: the period is saved as *Generating* before its lines are deleted, so a refused save keeps it ready with its lines; if any old line is left after the delete, it goes back to *Ready for review* with the error recorded and nothing is generated, so no line is billed twice; if the platform refuses that save too, it stays *Generating* with nothing queued, which is logged and shown: once it has shown no activity for 30 minutes an admin uses *Reset generation*, then *Regenerate*); *Close period* |
+| Ready for review | Generation finished and totals are set, or generation stopped on an error (held for review) | *Regenerate* (rebuild from current data: the period is saved as *Generating* before its lines are deleted, so a refused save keeps it ready with its lines; if any old line is left after the delete, it goes back to *Ready for review* with the error recorded and nothing is generated, so no line is billed twice; if the platform refuses that save too, it stays *Generating* with nothing queued, which is logged and shown: once it has shown no activity for `RESET_AFTER_IDLE_MINUTES` (`domain/billing.ts`) an admin uses *Reset generation*, then *Regenerate*); *Close period* |
 | Closed (locked) | *Close period* (finance) | Lines of fees waived since generation are dropped (a waived fee leaves the period only once its line is gone; if its line survives the delete or its unlink is refused, it stays on the period and Close refuses, naming the first three such fees, how many more there are, and why) and the totals redone; the period is saved closed before its fees become *billed*, so a refused save leaves them open. Each fee is then saved as *billed* and checked: one the platform refuses stays open but linked to the closed period, which no later period bills, so Close names the first three (and how many more) with why, logs them all, and they are set to *Billed* by hand. The period and its lines can no longer change or be deleted, and none of its lines can be moved to another period (nor a line moved into it). The CSV export is attached in the background shortly after closing; *Re-export CSV* attaches it again if it is missing |
 
 - *Close period* and *Regenerate* of one period take turns under a job lock on it
-  (`billing_period_<sys_id>`, ADR 0013). Each reads the period afresh there and acts only while it
+  (`LOCK.billingPeriod`, ADR 0013). Each reads the period afresh there and acts only while it
   is still *Ready for review*: a Close never locks a period a Regenerate has emptied, and judges the
-  period by its latest generation. One that finds the lock held through 5 tries changes nothing and
+  period by its latest generation. One that finds the lock held through `LOCK_TRIES` tries changes
+  nothing and
   asks the user to try again.
 - A period's month is entered as YYYY-MM (e.g. 2026-10); a business rule refuses a period saved
   with any other month, or with a month that has not ended. The period's first and last day are set
@@ -73,28 +76,32 @@
   error*, so *Close period* refuses until *Regenerate* bills the new month.
 - A period whose month is changed past the rule bills nothing: its generation stops with the error
   recorded, and *Close period* refuses until the month is corrected and *Regenerate* run. A period
-  inserted without business rules does not start generating: delete it and create it again, or, 30
-  minutes after it was saved, an admin uses *Reset generation* and then *Regenerate*.
+  inserted without business rules does not start generating: delete it and create it again, or,
+  `RESET_AFTER_IDLE_MINUTES` after it was saved, an admin uses *Reset generation* and then
+  *Regenerate*.
 - A period can be created, or its month changed, only for a month that has ended: one before the
   current month by the instance's UTC date. The current or a later month is refused, since a new
   period is generated at once and would bill part of the month, and the monthly job would then skip
   it. The monthly job only opens last month, so the month rule never refuses it; any other refusal is
   logged as an error and the month must be created by hand.
 - **Reset generation** (admins only) works on a period in *Generating* whose generation has shown no
-  activity for 30 minutes. Activity is the later of the period's last save and the last chunk start
-  on its job cursor (`billing_generate_<period sys_id>`); a period with no job cursor can be reset
+  activity for `RESET_AFTER_IDLE_MINUTES`. Activity is the later of the period's last save and the
+  last chunk start
+  on its job cursor (named by `JOB.billingGenerate` in `domain/chunked-job.ts`); a period with no job cursor
+  can be reset
   too. Reset retires the pass, so its chunks still queued are dropped, even once a *Regenerate* has
-  the period generating again. It holds the period as *Ready for review*, with *Generation reset by
-  hand by <user> after N minutes without activity...* as its *Last generation error* and the totals
+  the period generating again. It holds the period as *Ready for review*, with a note naming the
+  user and the idle time
+  (`resetGenerationError` in `domain/billing.ts`) as its *Last generation error* and the totals
   of the lines written so far, and *Close period* refuses it until a *Regenerate*. Reset deletes and
-  bills nothing. A chunk that starts during the reset leaves the period *Generating*: reset again 30
-  minutes later.
+  bills nothing. A chunk that starts during the reset leaves the period *Generating*: reset again
+  once that time has passed.
 - Each generation pass is recorded on that job cursor, with a token its events carry in `parm2`,
   ahead of the chunk's position (`parm1` is the period). Chunks of a pass reset or replaced since,
   and events that name no pass or no period, are dropped with a warning. A pass whose cursor cannot
   be saved does not start: the period is held as *Ready for review* with the error. The
   *Background jobs* list (Administration) shows one
-  `billing_generate_<period sys_id>` row per period. Its *Cursor* is the current pass's token (empty
+  row per period, under that job cursor's name. Its *Cursor* is the current pass's token (empty
   once reset), *Last run* the latest chunk start, and *Last status* *pass started* or *reset by
   hand*. The period's own status says whether the pass finished. Rows are not removed when a period
   is deleted.
@@ -112,8 +119,9 @@
 - **Pull API** (finance or integration role):
   - `GET /api/x_daas_ham/naas/billing_periods` lists recent periods with status, line count and
     `totals`;
-  - `GET /api/x_daas_ham/naas/billing_periods/{id}/lines?offset=0&limit=1000` returns one page of
-    lines, each with its `currency`, and the period's `totals`; `final` is true once the period is
+  - `GET /api/x_daas_ham/naas/billing_periods/{id}/lines?offset=<n>&limit=<n>` returns one page of
+    lines (`PULL_PAGE` in `domain/billing.ts` holds the page sizes and their caps), each with its
+    `currency`, and the period's `totals`; `final` is true once the period is
     closed and `nextOffset` is null on the last page.
   - `totals` is one entry per currency, in currency order: `{ "currency": "EUR", "lines": 12,
     "amount": 1234.56 }`, counted and summed from the period's lines (there is no single total: two

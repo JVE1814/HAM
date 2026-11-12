@@ -10,11 +10,9 @@ import {
     Table,
     UrlColumn,
 } from '@servicenow/sdk/core'
-import { SHIPMENT_DIRECTION_CHOICES, SHIPMENT_STATUS_CHOICES } from '../../server/domain/vocabulary'
+import { SHIPMENT_DIRECTION_CHOICES, SHIPMENT_STATUS, SHIPMENT_STATUS_CHOICES } from '../../server/domain/vocabulary'
 import { NAAS_STOCKROOM_CONDITION } from '../../server/domain/fleet'
 import { TRACKING_DESCRIPTION_LENGTH, TRACKING_LOCATION_LENGTH } from '../../server/domain/shipping'
-
-/* Shipments bought through the shipping aggregator and their tracking events (plan §13 Shipping aggregator, Q73). */
 
 export const x_daas_ham_shipment = Table({
     name: 'x_daas_ham_shipment',
@@ -48,7 +46,7 @@ export const x_daas_ham_shipment = Table({
         cost: DecimalColumn({ label: 'Cost', readOnly: true }),
         // The carrier's currency for the cost, as the aggregator gives it (no default): Margin counts the cost in it.
         currency: StringColumn({ label: 'Currency', maxLength: 3, readOnly: true }),
-        status: ChoiceColumn({ label: 'Status', choices: SHIPMENT_STATUS_CHOICES, default: 'label_created', readOnly: true, dropdown: 'dropdown_without_none' }),
+        status: ChoiceColumn({ label: 'Status', choices: SHIPMENT_STATUS_CHOICES, default: SHIPMENT_STATUS.label_created, readOnly: true, dropdown: 'dropdown_without_none' }),
         status_detail: StringColumn({ label: 'Latest update', maxLength: TRACKING_DESCRIPTION_LENGTH, readOnly: true }),
         estimated_delivery: DateColumn({ label: 'Estimated delivery', readOnly: true }),
         delivered_at: DateTimeColumn({ label: 'Delivered at', readOnly: true }),

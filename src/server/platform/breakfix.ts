@@ -1,9 +1,10 @@
-import { gs, type GlideRecord } from '@servicenow/glide'
+import type { GlideRecord } from '@servicenow/glide'
 import { replacementProblem, replacementStep } from '../domain/breakfix.ts'
 import { ORDER_STAGE, type OrderStage } from '../domain/vocabulary.ts'
 import { isFleetAsset, readStage } from './assets.ts'
+import { log } from './log.ts'
 import { createOrder, submitOrder } from './orders.ts'
-import { bool, findById, refusal, str, warnRefused } from './records.ts'
+import { bool, findById, refusal, str, warnRefused, type ForeignRecord } from './records.ts'
 
 /**
  * Break-fix replacements (P2.3, Q58): the device-replace Order a CSM case raises for its failed Asset. It tells the
@@ -13,10 +14,10 @@ import { bool, findById, refusal, str, warnRefused } from './records.ts'
 /**
  * What came of "Raise replacement" on a case:
  * - `raised`: the replacement Order went ahead, to approval or sourcing (`already` says so, for the user, when another
- *   submission of it had taken it ahead: platform/orders `Submission`);
+ *   submission of it had taken it ahead);
  * - `already_raised`: the Order the case links is going ahead, in the stage `stageLabel` names, and is kept;
  * - `draft`: the Order could not be submitted (`why`) and is left a draft, linked to the case, to correct and submit;
- * - `not_raised`: nothing was raised or submitted, and why.
+ * - `not_raised`: nothing was raised or submitted, and why ('' when the platform refused the case's save and said so).
  */
 export type Replacement =
     | { outcome: 'raised'; number: string; already?: string }
@@ -24,18 +25,33 @@ export type Replacement =
     | { outcome: 'draft'; number: string; why: string }
     | { outcome: 'not_raised'; why: string }
 
+/**
+ * Before insert/update rule on cases naming a failed Asset (br_case_failed_asset), wired here: the case takes its
+ * customer and service level from the Asset. A failed asset outside the fleet (ADR 0016), set by a script past the
+ * field's reference qualifier, gives the case nothing. `current` is the rule's case, which the platform saves.
+ */
+export function takeFailedAssetTerms(current: ForeignRecord): void {
+    const asset = findById('alm_hardware', str(current, 'x_daas_ham_failed_asset'))
+    if (!asset || !isFleetAsset(asset)) return
+    current.setValue('x_daas_ham_replacement_tier', str(asset, 'x_daas_ham_agreement.replacement_tier'))
+    if (!str(current, 'account')) current.setValue('account', str(asset, 'company'))
+}
+
 function notRaised(why: string): Replacement {
     return { outcome: 'not_raised', why }
 }
 
 /**
- * Raise an Order replacing the case's failed Asset like-for-like, link it to the case (saves the case) and submit it.
+ * Saves the case,
+ * the record of the form it was asked from, first: a refused save raises nothing, as the failed asset and linked Order
+ * would be values the case does not hold.
  * One that cannot be submitted as raised stays a draft, still linked to the case so a second one is not raised, for
  * the user to correct. "Raise replacement" is offered while the case links no Order or one rejected or cancelled, but
  * a form opened before then can still send it: then a linked draft is submitted again and a linked Order going ahead
- * is kept (domain/breakfix).
+ * is kept.
  */
 export function raiseReplacement(kase: GlideRecord): Replacement {
+    if (!kase.update()) return notRaised('')
     const linked = findById('x_daas_ham_order', str(kase, 'x_daas_ham_replacement_order'))
     const step = replacementStep(linked ? (str(linked, 'stage') as OrderStage) : null)
     if (linked && step === 'submit_draft') return submitReplacement(linked)
@@ -89,7 +105,7 @@ function submitReplacement(order: GlideRecord): Replacement {
  * and completing the Order does not save it. Only an open case that still links this Order, now complete, is saved. A
  * case not found, or a refused save, leaves the SLA running, to breach: that is logged, to save the case by hand.
  *
- * Run from the event queue (platform/events `EVENT.replacementComplete`, fired by platform/fulfilment
+ * Run from the event queue (domain/events `EVENT.replacementComplete`, fired by platform/fulfilment
  * `recomputeOrder`), never in the save that completes the Order: that save is often made in a user's interactive session
  * (an asset manager moving the unit to in service on the form, a customer contact confirming the install), where
  * Customer Service's before-query rule 'Case query rules' narrows every read of a case to the CSM query rules of a user
@@ -102,7 +118,7 @@ export function noteReplacementComplete(orderId: string): void {
     const caseId = str(order, 'case')
     if (!caseId) return
     const kase = findById('sn_customerservice_case', caseId)
-    if (!kase) return void gs.warn(`[x_daas_ham] ${str(order, 'number')} complete, but its case ${caseId} was not found: save the case to stop its SLA`)
+    if (!kase) return void log.warn(`${str(order, 'number')} complete, but its case ${caseId} was not found: save the case to stop its SLA`)
     if (!bool(kase, 'active') || str(kase, 'x_daas_ham_replacement_order') !== order.getUniqueValue()) return
     kase.setValue('work_notes', `Replacement order ${str(order, 'number')} is complete: the replacement is installed.`)
     if (!kase.update()) warnRefused(kase, `${str(kase, 'number')}: replacement SLA not stopped, the case save was refused; save the case`)

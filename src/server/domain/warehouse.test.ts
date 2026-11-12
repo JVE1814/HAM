@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ALL_STAGES, type Stage } from './lifecycle'
-import {
-    allocationProblem,
-    awaitsReceipt,
-    putAwayProblem,
-    RECEIVING_STOCKROOM_TYPES,
-    receivingProblem,
-} from './warehouse'
+import { allocationProblem, awaitsReceipt, pickProblem, putAwayProblem, receivingProblem } from './warehouse'
 import type { StockroomType } from './vocabulary'
 
 describe('awaitsReceipt', () => {
@@ -31,15 +25,10 @@ describe('receivingProblem', () => {
     it("refuses a customer-site stockroom, which holds that Customer's own stock, saying where units go", () => {
         expect(receivingProblem('customer_site')).toBe('Receive into a central depot or a staging centre')
     })
-
-    it('lists exactly the types it receives into, for the stockroom picker', () => {
-        const TYPES: readonly StockroomType[] = ['central_depot', 'staging_centre', 'customer_site']
-        expect(TYPES.filter((type) => receivingProblem(type) === null)).toEqual([...RECEIVING_STOCKROOM_TYPES])
-    })
 })
 
 describe('allocationProblem', () => {
-    const waiting = { stage: 'awaiting_stock', orderStage: 'preparing', quantity: 2, allocated: 1 } as const
+    const waiting = { lineStage: 'awaiting_stock', orderStage: 'preparing', quantity: 2, allocated: 1 } as const
 
     it('gives the unit to a line still awaiting stock with room for it', () => {
         expect(allocationProblem(waiting)).toBeNull()
@@ -58,7 +47,7 @@ describe('allocationProblem', () => {
     })
 
     it('names the ended Order before the line', () => {
-        expect(allocationProblem({ ...waiting, stage: 'cancelled', orderStage: 'cancelled' })).toBe('its Order is cancelled')
+        expect(allocationProblem({ ...waiting, lineStage: 'cancelled', orderStage: 'cancelled' })).toBe('its Order is cancelled')
     })
 
     it('leaves the unit free once the line has all its units, as when two receipts raced for its last one', () => {
@@ -67,10 +56,10 @@ describe('allocationProblem', () => {
     })
 
     it('leaves the unit free once the line has moved on, whatever room it shows', () => {
-        expect(allocationProblem({ ...waiting, stage: 'sourced' })).toBe('it is no longer awaiting stock (sourced)')
-        const cancelled = allocationProblem({ ...waiting, stage: 'cancelled', allocated: 0 })
+        expect(allocationProblem({ ...waiting, lineStage: 'sourced' })).toBe('it is no longer awaiting stock (sourced)')
+        const cancelled = allocationProblem({ ...waiting, lineStage: 'cancelled', allocated: 0 })
         expect(cancelled).toBe('it is no longer awaiting stock (cancelled)')
-        expect(allocationProblem({ ...waiting, stage: '' })).toBe('it is no longer awaiting stock (unknown stage)')
+        expect(allocationProblem({ ...waiting, lineStage: '' })).toBe('it is no longer awaiting stock (unknown stage)')
     })
 })
 
@@ -97,5 +86,23 @@ describe('putAwayProblem', () => {
             expect(putAwayProblem('staged', into)).toBe('Cannot be put away (staged)')
             expect(putAwayProblem(null, into)).toBe('Cannot be put away (unknown stage)')
         }
+    })
+})
+
+describe('pickProblem', () => {
+    it('picks a staged unit of the Order being picked', () => {
+        expect(pickProblem('ORD1', 'ORD1', 'staged')).toBeNull()
+    })
+
+    it('refuses a unit on no Order, or on another Order, naming that Order', () => {
+        expect(pickProblem('', 'ORD1', 'staged')).toBe('Not allocated to an order')
+        expect(pickProblem('', '', 'staged')).toBe('Not allocated to an order')
+        expect(pickProblem('ORD2', 'ORD1', 'staged')).toBe('Belongs to ORD2')
+    })
+
+    it('refuses a unit of the Order in any stage but staged, naming its stage', () => {
+        const others = ALL_STAGES.filter((stage) => stage !== 'staged')
+        expect(others.filter((stage) => pickProblem('ORD1', 'ORD1', stage) === null)).toEqual([])
+        expect(pickProblem('ORD1', 'ORD1', 'staging')).toBe('Not ready to ship (staging)')
     })
 })

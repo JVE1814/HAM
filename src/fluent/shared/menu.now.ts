@@ -1,12 +1,10 @@
 import '@servicenow/sdk/global'
 import { ApplicationMenu, Record } from '@servicenow/sdk/core'
-import { ROLE } from '../../server/domain/visibility'
-import { broadStaff, providerStaff, stockroomWorkers } from './roles.now'
+import { BROAD_STAFF, ROLE } from '../../server/domain/roles'
+import { providerStaff, stockroomWorkers } from './roles.now'
 import { WORKSPACE_PAGE } from '../workspace/workspace.now'
 
 /*
- * Navigator menu "NaaS Asset Management".
- *
  * A module on alm_hardware lists fleet assets only (ADR 0016: the table holds the Provider IT's equipment too): its
  * filter holds the fleet condition in each ^NQ clause, and none opens the table unfiltered (link type LIST), which
  * built-metadata.test.ts checks.
@@ -67,7 +65,7 @@ Record({
         title: 'Commercial',
         application: naasMenu,
         link_type: 'SEPARATOR',
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 400,
     },
@@ -80,7 +78,7 @@ Record({
         title: 'Models',
         application: naasMenu,
         link_type: 'SEPARATOR',
-        roles: broadStaff,
+        roles: BROAD_STAFF,
         active: true,
         order: 500,
     },

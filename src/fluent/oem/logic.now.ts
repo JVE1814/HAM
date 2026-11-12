@@ -1,13 +1,11 @@
 import '@servicenow/sdk/global'
-import { BusinessRule, EmailNotification, Property, Record, ScheduledScript } from '@servicenow/sdk/core'
-import { processCoverageRow, syncOemCoverage, syncOemLifecycle, syncOemRmaStatus } from '../../server/entry/oem-sync'
-import { EVENT } from '../../server/platform/events'
-import { PROPERTY } from '../../server/platform/properties'
-import { runOemClaims } from '../../server/entry/oem-claims'
+import { BusinessRule, Property, ScheduledScript } from '@servicenow/sdk/core'
+import { processCoverageRow } from '../../server/entry/oem-sync'
+import { syncCoverage, syncLifecycle, syncRmaStatus } from '../../server/platform/oem-sync'
+import { runClaims } from '../../server/platform/claim-steps'
+import { PROPERTY } from '../../server/domain/properties'
 import { REST_MESSAGE } from '../../server/domain/rest-message-names'
 import { admin } from '../shared/roles.now'
-
-/* OEM data (ADR 0008): coverage imports and expiry warnings, the sync jobs, claims, and each vendor's settings. */
 
 BusinessRule({
     $id: Now.ID['br_coverage_row'],
@@ -19,42 +17,6 @@ BusinessRule({
     script: processCoverageRow,
 })
 
-Record({
-    $id: Now.ID['event_coverage_expiring'],
-    table: 'sysevent_register',
-    data: {
-        suffix: 'coverage.expiring',
-        event_name: EVENT.coverageExpiring,
-        table: 'customer_account',
-        description: 'OEM coverage of deployed assets ends soon; parm1 = recipients, parm2 = summary.',
-        priority: 200,
-    },
-})
-
-EmailNotification({
-    $id: Now.ID['mail_coverage_expiring'],
-    table: 'customer_account',
-    name: 'NaaS - OEM coverage expiring',
-    description: 'Tells the asset managers that OEM coverage of a customer’s deployed equipment ends soon.',
-    active: true,
-    triggerConditions: { generationType: 'event', eventName: EVENT.coverageExpiring },
-    recipientDetails: { eventParm1WithRecipient: true },
-    emailContent: {
-        subject: 'OEM coverage expiring for ${name}',
-        messageHtml:
-            '<p>${event.parm2} for equipment deployed at ${name}.</p><p>Renew the coverage with the manufacturer; the next coverage sync or CSV import picks up the new end dates.</p>',
-    },
-})
-
-Property({
-    $id: Now.ID['prop_coverage_warning_days'],
-    name: PROPERTY.coverageWarningDays.name,
-    type: 'integer',
-    value: PROPERTY.coverageWarningDays.default,
-    description: 'Days before an OEM coverage contract of deployed equipment ends that the asset managers are warned.',
-    roles: { read: [admin], write: [admin] },
-})
-
 ScheduledScript({
     $id: Now.ID['job_oem_lifecycle'],
     name: 'NaaS - sync OEM lifecycle (EoX)',
@@ -62,7 +24,7 @@ ScheduledScript({
     frequency: 'daily',
     executionTime: { hours: 1, minutes: 35, seconds: 0 },
     timeZone: 'UTC',
-    script: syncOemLifecycle,
+    script: syncLifecycle,
 })
 
 ScheduledScript({
@@ -73,7 +35,7 @@ ScheduledScript({
     executionInterval: { hours: 4 },
     executionStart: '2026-01-01 00:50:00',
     timeZone: 'UTC',
-    script: syncOemCoverage,
+    script: syncCoverage,
 })
 
 ScheduledScript({
@@ -84,10 +46,8 @@ ScheduledScript({
     executionInterval: { hours: 1 },
     executionStart: '2026-01-01 00:05:00',
     timeZone: 'UTC',
-    script: syncOemRmaStatus,
+    script: syncRmaStatus,
 })
-
-/* OEM claim and provisioning of staging steps (plan §13 OEM claim adapters, Q70). Every vendor is off until enabled. */
 
 ScheduledScript({
     $id: Now.ID['job_oem_claims'],
@@ -97,7 +57,7 @@ ScheduledScript({
     executionInterval: { minutes: 5 },
     executionStart: '2026-01-01 00:02:00',
     timeZone: 'UTC',
-    script: runOemClaims,
+    script: runClaims,
 })
 
 Property({

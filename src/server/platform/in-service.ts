@@ -1,21 +1,23 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
+import { JOB } from '../domain/chunked-job.ts'
 import { isStateChange, type DeviceEvent } from '../domain/device-events.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import { decideInService, seenSourceOf } from '../domain/in-service.ts'
 import { LONG_HOLD_LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import type { OrderType, SeenSource } from '../domain/vocabulary.ts'
+import { findAssetByIdentifier } from './asset-identifiers.ts'
 import { moveAndSave, readStage } from './assets.ts'
 import { runTableJob } from './chunked.ts'
 import { daysAgoGlide, glideToMs, msToGlide } from './clock.ts'
 import { applyLifecycleDates, lifecycleReaders, type LifecycleReaders } from './lifecycle-dates.ts'
 import { withLockTries } from './locks.ts'
+import { log } from './log.ts'
 import { choice, deleteWhere, findById, refusal, str } from './records.ts'
 import { attachToSubscription } from './subscriptions.ts'
 
 /** In-service detection: Seen signals in, billing start out (P1.8), and the device events they are kept as. */
 
-/** Record that an Asset was seen at `at` (only moves last_seen forward). */
 function recordSeen(asset: GlideRecord, at: number, source: SeenSource): void {
     const previous = glideToMs(str(asset, 'x_daas_ham_last_seen'))
     if (previous !== undefined && previous >= at) return
@@ -41,7 +43,7 @@ function goLiveIfSeen(lock: HeldLock, asset: GlideRecord, readers: LifecycleRead
     // An Asset whose Subscription line could not be started stays pending, so a later sighting or run attaches it.
     if (!decision.goesLive || !attachToSubscription(asset, decision.at)) {
         if (asset.update()) return true
-        gs.error(`[x_daas_ham] in-service detection: sighting of ${str(asset, 'serial_number')} not saved: ${refusal(asset)}`)
+        log.error(`in-service detection: sighting of ${str(asset, 'serial_number')} not saved: ${refusal(asset)}`)
         return false
     }
     asset.setValue('x_daas_ham_in_service_date', msToGlide(decision.at))
@@ -49,7 +51,7 @@ function goLiveIfSeen(lock: HeldLock, asset: GlideRecord, readers: LifecycleRead
     if (moveAndSave(asset, decision.stage, 'in-service detection')) return true
     // A line started above stays active: the sighting applied again finds it active and joins it, its start date kept.
     const pending = `${str(asset, 'serial_number')} stays pending in service, its Subscription line possibly active`
-    gs.error(`[x_daas_ham] in-service detection: ${pending}: left to the next sighting or run`)
+    log.error(`in-service detection: ${pending}: left to the next sighting or run`)
     return false
 }
 
@@ -59,9 +61,9 @@ function goLiveIfSeen(lock: HeldLock, asset: GlideRecord, readers: LifecycleRead
  * save refused. Two NMS batches, or a batch and the detection job, can see one Asset at once; each reading it before
  * the other saved, the later save would put back an older last_seen and in-service date, or move an Asset the other had
  * put in service (and since moved on) into service again. Taken before any other lock, by the sightings below only: a
- * go-live starts its Subscription line under the line's lock (platform/subscriptions) and its save's rule takes the
- * Asset's interval lock (platform/service-intervals), and a second take of a lock is refused. A holder keeps it for one
- * event and, on a go-live, the Asset's save and its rules. A lock that cannot be taken throws (platform/locks); that
+ * go-live starts its Subscription line under the line's lock and its save's rule takes the
+ * Asset's interval lock, and a second take of a lock is refused. A holder keeps it for one
+ * event and, on a go-live, the Asset's save and its rules. A lock that cannot be taken throws; that
  * error escapes.
  */
 function underSeenLock(assetId: string, see: (lock: HeldLock, asset: GlideRecord) => boolean): boolean {
@@ -84,13 +86,30 @@ function underSeenLock(assetId: string, see: (lock: HeldLock, asset: GlideRecord
  * stored, so one refused would be lost once acknowledged; a refused event sent again has its sighting applied again,
  * which changes nothing.
  */
-export function applyDeviceEvent(assetId: string, event: DeviceEvent, readers: LifecycleReaders): boolean {
+function applyDeviceEvent(assetId: string, event: DeviceEvent, readers: LifecycleReaders): boolean {
     return underSeenLock(assetId, (lock, asset) => {
         const stored = !isStateChange(event.event, () => lastEventKind(assetId)) || storeEvent(assetId, event)
         if (event.event === 'down') return stored
         recordSeen(asset, event.observedAt, event.source)
         return goLiveIfSeen(lock, asset, readers) && stored
     })
+}
+
+/**
+ * Apply a batch of NMS events, each to the fleet asset its identifier names (ADR 0016).
+ * The identifiers no fleet asset carries, the Provider IT's included, are `unknown`
+ * and stored as no event; those `busy` were not wholly applied, for the NMS to send again.
+ */
+export function applyDeviceEvents(events: readonly DeviceEvent[]): { unknown: string[]; busy: string[] } {
+    const readers = lifecycleReaders()
+    const unknown: string[] = []
+    const busy: string[] = []
+    for (const event of events) {
+        const asset = findAssetByIdentifier(event.identifier)
+        if (!asset) unknown.push(event.identifier)
+        else if (!applyDeviceEvent(asset.getUniqueValue(), event, readers)) busy.push(event.identifier)
+    }
+    return { unknown, busy }
 }
 
 /**
@@ -112,7 +131,7 @@ function applyCiSighting(assetId: string, readers: LifecycleReaders): boolean {
 export function detectPendingInService(): void {
     const readers = lifecycleReaders()
     runTableJob({
-        job: 'in_service_detection',
+        job: JOB.inServiceDetection,
         table: 'alm_hardware',
         query: fleetStagesQuery(['pending_in_service']),
         read: (asset) => asset.getUniqueValue(),
@@ -131,7 +150,6 @@ function lastEventKind(assetId: string): string {
     return gr.next() ? str(gr, 'event') : ''
 }
 
-/** Store the event; false when the platform refuses it (logged as an error). */
 function storeEvent(assetId: string, event: DeviceEvent): boolean {
     const gr = new GlideRecord('x_daas_ham_device_event')
     gr.initialize()
@@ -141,11 +159,10 @@ function storeEvent(assetId: string, event: DeviceEvent): boolean {
     gr.setValue('source', event.source)
     gr.setValue('observed_at', msToGlide(event.observedAt))
     if (gr.insert()) return true
-    gs.error(`[x_daas_ham] in-service detection: ${event.event} event of ${event.identifier} not stored: ${refusal(gr)}`)
+    log.error(`in-service detection: ${event.event} event of ${event.identifier} not stored: ${refusal(gr)}`)
     return false
 }
 
-/** Drop the device events stored more than `retentionDays` ago. */
 export function purgeDeviceEventsOlderThan(retentionDays: number): void {
     // What is left (deleteWhere says whether any is) is not checked: tomorrow's purge takes it.
     deleteWhere('x_daas_ham_device_event', `sys_created_on<${daysAgoGlide(retentionDays)}`)

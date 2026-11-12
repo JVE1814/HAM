@@ -1,27 +1,42 @@
 import '@servicenow/sdk/global'
-import { RestApi } from '@servicenow/sdk/core'
+import { Acl, RestApi } from '@servicenow/sdk/core'
+import { CUSTOMER_CONTACTS } from '../../server/domain/roles'
 import { postDeviceEvents } from '../../server/entry/in-service'
 import { listStockrooms, lookupAsset, pickAsset, putAwayAsset, receiveAsset } from '../../server/entry/warehouse'
 import { scanAudit } from '../../server/entry/assurance'
 import { getRack, listRacks, listSites } from '../../server/entry/racks'
 import { answerAttestation, confirmInstalled, customerOverview, reportFault, requestCustomerReturn } from '../../server/entry/customer'
 import { getBillingLines, listBillingPeriods } from '../../server/entry/billing'
+import { PULL_PAGE } from '../../server/domain/billing'
 import { postTrackingUpdate } from '../../server/entry/shipping'
 import { sessionRoles } from '../../server/entry/session'
-import { customerRestAcl } from './rest-acls.now'
 
 /*
- * Scripted REST API: /api/x_daas_ham/naas/... A route that sets nothing requires the snc_internal role and enforces
- * the platform's "Scripted REST External Default" ACL, which admits internal users only: the staff and integration
- * routes. The routes built for customer users too (sites, racks, customer/...) turn the snc_internal requirement off and
- * enforce that ACL or the app's customer one (rest-acls.now.ts); a user passes either. The shipping webhook
- * runs unauthenticated (as guest, who holds no role) and checks its token itself. Each handler checks the caller's role.
+ * A route that sets nothing requires the snc_internal role and enforces the platform's "Scripted REST External
+ * Default" ACL, which admits internal users only: the staff and integration routes. The routes built for customer
+ * users too (sites, racks, customer/..., for the customer self-service and rack pages) turn the snc_internal
+ * requirement off, which customer users, who hold snc_external, cannot pass, and enforce `staffOrCustomer`. A user
+ * passes either of its ACLs, as on the platform's own CSM case API. The shipping webhook runs unauthenticated (as
+ * guest, who holds no role) and checks its token itself. Each handler checks the caller's role, and on a customer
+ * route the caller's Customer.
  */
 
-/** The platform's "Scripted REST External Default" ACL (global): role snc_internal and no snc_external. */
+const customerRestAcl = Acl({
+    $id: Now.ID['acl_rest_customer'],
+    type: 'rest_endpoint',
+    name: 'x_daas_ham NaaS customer routes',
+    operation: 'execute',
+    roles: CUSTOMER_CONTACTS,
+    description: "Admits customer admins and site contacts to the NaaS API's customer, site and rack routes; the handlers check the role and the Customer.",
+})
+
+/**
+ * The platform's "Scripted REST External Default" ACL (global): role snc_internal and the script
+ * `answer = !gs.hasRole("snc_external")`.
+ */
 const SCRIPTED_REST_EXTERNAL_DEFAULT = 'cf9d01d3e73003009d6247e603f6a990'
 
-/** Staff pass the platform's default ACL, customer admins and site contacts the app's. */
+/** A customer route's ACLs: staff pass the platform's default one, customer admins and site contacts the app's. */
 const staffOrCustomer = [SCRIPTED_REST_EXTERNAL_DEFAULT, customerRestAcl]
 
 RestApi({
@@ -209,7 +224,7 @@ RestApi({
             name: 'billing_lines',
             method: 'GET',
             path: '/billing_periods/{id}/lines',
-            shortDescription: 'One page of a billing period\'s lines (?offset=0&limit=1000); final once the period is closed.',
+            shortDescription: `One page of a billing period's lines (?offset=0&limit=${PULL_PAGE.lines.size}); final once the period is closed.`,
             authentication: true,
             script: getBillingLines,
         },

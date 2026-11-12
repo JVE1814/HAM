@@ -1,15 +1,17 @@
 import '@servicenow/sdk/global'
 import { Test } from '@servicenow/sdk/core'
+import { MODEL_LIFECYCLE } from '../../server/domain/model-lifecycle'
 import { DEVICE_CLASS } from '../../server/domain/vocabulary'
 
 /*
- * ATF: a Model's manufacturer milestones are kept in the platform's Model lifecycle table (ADR 0017; suite "NaaS - P1").
  * The recomputation of the Model's fleet assets is not tested here: it runs from the event queue, after the test.
  */
 
 // The vocabulary's values the fixtures below are created with, each under a name: for a value, a Test takes a
 // name, but no property access (VOCABULARY.value).
 const SWITCH = DEVICE_CLASS.switch
+const LIFECYCLE_TABLE = MODEL_LIFECYCLE.table
+const HARDWARE_LIFECYCLE_TABLE = MODEL_LIFECYCLE.hardwareTable
 
 export const lifecycleImportTest = Test(
     {
@@ -42,19 +44,19 @@ export const lifecycleImportTest = Test(
         })
         atf.server.recordQuery({
             $id: Now.ID['atf_lci_end_of_sale'],
-            table: 'cmdb_hardware_model_lifecycle',
+            table: HARDWARE_LIFECYCLE_TABLE,
             fieldValues: `model=${model.record_id}^lifecycle_phase=end_of_sale^start_date=2020-01-31^lifecycle_type=publisher^source=internal^active=true^description=CSV import: ATF-BULLETIN-1`,
             assert: 'records_match_query',
         })
         atf.server.recordQuery({
             $id: Now.ID['atf_lci_end_of_support'],
-            table: 'cmdb_hardware_model_lifecycle',
+            table: HARDWARE_LIFECYCLE_TABLE,
             fieldValues: `model=${model.record_id}^lifecycle_phase=end_of_support^start_date=2040-01-31^lifecycle_type=publisher^source=internal^active=true`,
             assert: 'records_match_query',
         })
         atf.server.recordQuery({
             $id: Now.ID['atf_lci_no_other_milestone'],
-            table: 'cmdb_model_lifecycle',
+            table: LIFECYCLE_TABLE,
             fieldValues: `model=${model.record_id}^lifecycle_phaseNOT INend_of_sale,end_of_support`,
             assert: 'no_records_match_query',
         })

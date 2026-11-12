@@ -1,50 +1,41 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { messageOf } from '../domain/errors.ts'
 import { LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
-import type { Stage } from '../domain/lifecycle.ts'
+import { pathTo, type Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import {
-    candidateLimit,
+    CANDIDATE_ORDER,
+    freeStockQuery,
     isClaimable,
-    stockQueries,
-    type StockCandidate,
-    type StockScope,
+    LEASE_END_ACTION,
+    reservationValues,
+    type LineExit,
+    type Reservation,
     type StockUnit,
-} from '../domain/sourcing.ts'
-import { moveAsset, readStage } from './assets.ts'
+} from '../domain/stock.ts'
+import { moveAndSave, moveAsset, readStage } from './assets.ts'
 import { attemptLock, type LockRun } from './locks.ts'
-import { PROPERTY, stringProperty } from './properties.ts'
-import { refusal, str } from './records.ts'
+import { stringProperty } from './properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
+import { refusal, str, warnRefused } from './records.ts'
 import { STOCK_STAGES } from '../domain/lifecycle.ts'
+import { log } from './log.ts'
 
-/** Stock that can serve an Order line, claiming it for one, giving it back, and changing it where a claim could race. */
-
-/**
- * Stock on no Order line that may serve `scope` for a `shortfall`, each unit under the Source whose query found it
- * (domain/sourcing `stockQueries`): a bounded number per Source (`candidateLimit`), by stockroom then sys_id so the
- * limit cuts the same way each run. A hot spare linked to a line stays in the pool but is taken.
- */
-export function stockCandidates(scope: StockScope, shortfall: number): StockCandidate[] {
-    const limit = candidateLimit(shortfall)
-    const candidates: StockCandidate[] = []
-    for (const { source, query } of stockQueries(scope)) {
-        const asset = new GlideRecord('alm_hardware')
-        asset.addEncodedQuery(query)
-        asset.orderBy('stockroom')
-        asset.orderBy('sys_id')
-        asset.setLimit(limit)
-        asset.query()
-        while (asset.next()) {
-            candidates.push({ assetId: asset.getUniqueValue(), modelId: scope.modelId, stockroomId: str(asset, 'stockroom'), source })
-        }
-    }
-    return candidates
+/** The first `count` units of the Provider's free stock of `modelId` (domain/stock `freeStockQuery`), as the top-up takes them. */
+export function freeStock(modelId: string, count: number): string[] {
+    const asset = inCandidateOrder(freeStockQuery(modelId), count)
+    const ids: string[] = []
+    while (asset.next()) ids.push(asset.getUniqueValue())
+    return ids
 }
 
-export interface Reservation {
-    orderLineId: string
-    customerId: string
-    agreementId: string
+export function inCandidateOrder(query: string, limit: number): GlideRecord {
+    const asset = new GlideRecord('alm_hardware')
+    asset.addEncodedQuery(query)
+    for (const field of CANDIDATE_ORDER) asset.orderBy(field)
+    asset.setLimit(limit)
+    asset.query()
+    return asset
 }
 
 /**
@@ -52,7 +43,7 @@ export interface Reservation {
  * free or the save is refused (see `claim`).
  */
 export function reserveAsset(assetId: string, reservation: Reservation): GlideRecord | null {
-    return claim(assetId, { from: STOCK_STAGES, to: 'reserved', values: lineValues(reservation) })
+    return claim(assetId, { from: STOCK_STAGES, to: 'reserved', values: reservationValues(reservation) })
 }
 
 /**
@@ -60,7 +51,7 @@ export function reserveAsset(assetId: string, reservation: Reservation): GlideRe
  * in the pool and is installed from where it is. Null when it is no longer free or the save is refused (see `claim`).
  */
 export function linkHotSpare(assetId: string, reservation: Reservation): GlideRecord | null {
-    return claim(assetId, { from: STOCK_STAGES, to: 'spare_pool', values: lineValues(reservation) })
+    return claim(assetId, { from: STOCK_STAGES, to: 'spare_pool', values: reservationValues(reservation) })
 }
 
 /**
@@ -68,39 +59,59 @@ export function linkHotSpare(assetId: string, reservation: Reservation): GlideRe
  * line or the save is refused (see `claim`).
  */
 export function moveToSparePool(assetId: string, customerId: string, agreementId: string): GlideRecord | null {
-    const values = { company: customerId, x_daas_ham_agreement: agreementId, x_daas_ham_order_line: '' }
+    const values = reservationValues({ orderLineId: '', customerId, agreementId })
     return claim(assetId, { from: ['available'], to: 'spare_pool', values })
 }
 
-function lineValues(reservation: Reservation): Record<string, string> {
-    return {
-        x_daas_ham_order_line: reservation.orderLineId,
-        company: reservation.customerId,
-        x_daas_ham_agreement: reservation.agreementId,
+/**
+ * Take `asset` off its Order line and save it where `exit` sends it. False when the platform refuses the move or the
+ * save (logged with `context`): the Asset stays on the line. Every unit that leaves a line leaves it here, one that
+ * stays its Customer's (a hot spare, a unit that failed staging or left in transit) as much as one given back.
+ */
+export function leaveOrderLine(asset: GlideRecord, exit: LineExit, context: string): boolean {
+    if (exit.keeps === 'provider') releaseToProviderStock(asset)
+    else asset.setValue('x_daas_ham_order_line', '')
+    if (exit.to) return moveAndSave(asset, exit.to, context)
+    if (asset.update()) return true
+    warnRefused(asset, context)
+    return false
+}
+
+export interface StoppedShort {
+    to: Stage
+    why: string
+}
+
+/**
+ * Move the Asset to `to` through the stages between (domain/lifecycle `pathTo`), saving each move with `save`: why it
+ * was not saved, '' once it was. On its way to available it is given back to Provider stock (`releaseToProviderStock`),
+ * as a unit that is free stock again always is. Null once at `to`, else where it stopped and why, not logged: the
+ * caller puts the reason where it belongs. The moves made before that stay saved.
+ */
+export function moveAlongPath(
+    asset: GlideRecord,
+    to: Stage,
+    save: (to: Stage) => string = (step) => (asset.update() ? '' : refusal(asset, `the asset could not be saved as ${step}`)),
+): StoppedShort | null {
+    for (const step of pathTo(readStage(asset), to)) {
+        if (step === 'available') releaseToProviderStock(asset)
+        const verdict = moveAsset(asset, step)
+        if (!verdict.allowed) return { to: step, why: verdict.reason }
+        const why = save(step)
+        if (why) return { to: step, why }
     }
+    return null
 }
 
 /**
- * Take a unit off its Order line and no more (the caller saves): one that stays its Customer's (a hot spare, a unit
- * that failed staging or left in transit). Every unit that leaves a line is taken off it here or by
- * `releaseToProviderStock`.
+ * Give a unit back to Provider stock, the inverse of a reservation (domain/stock `reservationValues`): it is the Provider's own again
+ * (its company, ADR 0006), under no Agreement and on no Order line. Sets the fields only: its caller moves and saves it.
  */
-export function takeOffOrderLine(asset: GlideRecord): void {
-    asset.setValue('x_daas_ham_order_line', '')
+function releaseToProviderStock(asset: GlideRecord): void {
+    const released = reservationValues({ orderLineId: '', customerId: stringProperty(PROPERTY.providerCompany), agreementId: '' })
+    for (const [field, value] of Object.entries(released)) asset.setValue(field, value)
 }
 
-/**
- * Give a unit back to Provider stock, the inverse of a reservation (`lineValues`): it is the Provider's own again
- * (its company, ADR 0006), under no Agreement and on no Order line. Sets the fields only: the caller moves the Asset to
- * the stage it goes back to and saves it, each with its own answer to a refusal.
- */
-export function releaseToProviderStock(asset: GlideRecord): void {
-    takeOffOrderLine(asset)
-    asset.setValue('company', stringProperty(PROPERTY.providerCompany))
-    asset.setValue('x_daas_ham_agreement', '')
-}
-
-/** A claim: the stages the Asset may be in, the stage it moves to, and the values it takes. */
 interface Claim {
     from: readonly Stage[]
     to: Stage
@@ -110,7 +121,7 @@ interface Claim {
 /**
  * Make `wanted` on an in-stock Asset. Sourcing runs and the spare-pool top-up may pick the same Asset, so the claim is
  * made under the Asset's stock lock (`underStockLock`) and checks a fresh read: still in one of the `from` stages, on
- * no Order line, and not bound for its Lessor (domain/sourcing `isClaimable`). A run that finds the lock held leaves
+ * no Order line, and not bound for its Lessor (domain/stock `isClaimable`). A run that finds the lock held leaves
  * the Asset, so it tries once: the holder is another claim taking it, or a change (`changeStock`) holding it for one
  * read and one save, and the unit then counts as short just as one another run claimed.
  */
@@ -131,7 +142,6 @@ export function changeStock<T>(assetId: string, what: string, change: StockWork<
     return underStockLock(assetId, LOCK_TRIES, what, change)
 }
 
-/** Work on an Asset read afresh holding its stock `lock`; null when the Asset is gone. */
 type StockWork<T> = (asset: GlideRecord | null, lock: HeldLock) => T
 
 /**
@@ -148,7 +158,7 @@ function underStockLock<T>(assetId: string, tries: number, what: string, work: S
         },
         tries,
     )
-    if (!attempt.ran && !attempt.held) gs.warn(`[x_daas_ham] Asset ${assetId} not ${what}: ${messageOf(attempt.error)}`)
+    if (!attempt.ran && !attempt.held) log.warn(`Asset ${assetId} not ${what}: ${messageOf(attempt.error)}`)
     return attempt
 }
 
@@ -166,7 +176,7 @@ function claimHolding(lock: HeldLock, asset: GlideRecord, wanted: Claim): GlideR
     const saved = lock.write(() => asset.update())
     if (!saved.written) return lockLost(assetId)
     if (!saved.value) {
-        gs.warn(`[x_daas_ham] Asset ${str(asset, 'serial_number') || assetId} not claimed as ${wanted.to}: ${refusal(asset)}`)
+        log.warn(`Asset ${str(asset, 'serial_number') || assetId} not claimed as ${wanted.to}: ${refusal(asset)}`)
         return null
     }
     if (!saved.lockLost) return asset
@@ -174,12 +184,11 @@ function claimHolding(lock: HeldLock, asset: GlideRecord, wanted: Claim): GlideR
     return fresh.get(assetId) && shows(fresh, wanted) ? fresh : lockLost(assetId)
 }
 
-/** The Asset as domain/sourcing judges whether it is still free stock (`isFree`, `isClaimable`). */
 export function stockUnit(asset: GlideRecord): StockUnit {
     return {
         stage: readStage(asset),
         orderLineId: str(asset, 'x_daas_ham_order_line'),
-        leaseEndAction: str(asset, 'x_daas_ham_lease.end_action') as StockUnit['leaseEndAction'],
+        leaseEndAction: str(asset, LEASE_END_ACTION) as StockUnit['leaseEndAction'],
     }
 }
 
@@ -188,6 +197,6 @@ function shows(asset: GlideRecord, wanted: Claim): boolean {
 }
 
 function lockLost(assetId: string): null {
-    gs.warn(`[x_daas_ham] Asset ${assetId} not claimed: its lock was lost while claiming it`)
+    log.warn(`Asset ${assetId} not claimed: its lock was lost while claiming it`)
     return null
 }

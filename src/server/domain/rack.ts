@@ -1,11 +1,10 @@
-import { RACK_FACE_CHOICES, type RackFace } from './vocabulary.ts'
+import { RACK_FACE_CHOICES, type ExceptionType, type RackFace } from './vocabulary.ts'
 
 /**
  * Rack placement (P2.8) and power budget (plan §13 Rack power budget): units are numbered from 1 at the bottom; a device
  * occupies ruStart..ruStart+height-1.
  */
 
-/** Every rack face, to read x_daas_ham_rack_face with (platform/records `choice`). */
 export const RACK_FACES: readonly RackFace[] = Object.keys(RACK_FACE_CHOICES) as RackFace[]
 
 export interface Placement {
@@ -27,8 +26,7 @@ export interface Placement {
     powerW?: number
 }
 
-/** A device placed in a rack, as its callers read it: the Asset's fields, and its Model's height and draw. */
-export interface RackedDevice {
+interface RackedDevice {
     /** The Asset's sys_id. */
     id: string
     tag: string
@@ -61,7 +59,6 @@ export const PLACEMENT_FIELDS = { rack: 'x_daas_ham_rack', ruStart: 'x_daas_ham_
 /** The height taken for a rack that records none (cmdb_ci_rack.rack_units empty or 0): a full-height rack. */
 export const DEFAULT_RACK_UNITS = 42
 
-/** The face a placed Asset is on when it records none. */
 export const DEFAULT_RACK_FACE: RackFace = 'front'
 
 /**
@@ -107,7 +104,7 @@ function sharedUnit(a: Placement, b: Placement): number | null {
 }
 
 /** Two devices on one face of a rack that share units; `unit` is the lowest unit they share. */
-export interface Overlap {
+interface Overlap {
     /** The two devices' keys (Placement `assetId`), in list order, to tell them apart. Messages name them by `labels`. */
     assetIds: [string, string]
     /** Their names (Placement `label`, else `assetId`), for messages. */
@@ -121,7 +118,7 @@ export interface Overlap {
  * would overlap, but two saves into the same units at the same moment both pass it, so the whole rack is re-checked
  * once they are written. Pairs are by position in the list, so two devices with the same name are still compared.
  */
-export function overlaps(placements: readonly Placement[]): Overlap[] {
+function overlaps(placements: readonly Placement[]): Overlap[] {
     const found: Overlap[] = []
     placements.forEach((a, i) => {
         for (const b of placements.slice(i + 1)) {
@@ -139,7 +136,6 @@ export interface PowerBudget {
     utilisation: number | null
 }
 
-/** Typical power drawn by the placed devices against the rack's capacity. */
 export function powerBudget(capacityW: number, placements: readonly Placement[]): PowerBudget {
     const usedW = placements.reduce((sum, p) => sum + drawW(p), 0)
     if (capacityW <= 0) return { capacityW: 0, usedW, utilisation: null }
@@ -171,4 +167,34 @@ export function rackElevation(rackUnits: number, placements: readonly Placement[
         }
     }
     return rows
+}
+
+/** The types a rack check raises and resolves: each is the rack's, open once per rack. */
+export const RACK_EXCEPTION_TYPES = ['rack_overlap', 'rack_over_power'] as const satisfies readonly ExceptionType[]
+
+export type RackExceptionType = (typeof RACK_EXCEPTION_TYPES)[number]
+
+export interface RackException {
+    type: RackExceptionType
+    detail: string
+}
+
+/**
+ * What a fresh read of every device placed in a rack finds wrong with it: devices sharing units on one face, and
+ * typical power over the rack's capacity (none recorded: no budget). The before rule refuses a save that would cause
+ * either, but two saves at the same moment can both pass it. A type not found here no longer applies: its open one
+ * resolves.
+ */
+export function reconcileRack(rack: RackSpec, placements: readonly Placement[]): RackException[] {
+    const found: RackException[] = []
+    const shared = overlaps(placements)
+    if (shared.length > 0) {
+        const detail = shared.map(({ labels: [a, b], face, unit }) => `${a} and ${b} share rack unit ${unit} (${face})`).join('; ')
+        found.push({ type: 'rack_overlap', detail })
+    }
+    const budget = powerBudget(rack.powerCapacityW, placements)
+    if (budget.capacityW > 0 && budget.usedW > budget.capacityW) {
+        found.push({ type: 'rack_over_power', detail: `Typical power ${budget.usedW} W is over the rack's ${budget.capacityW} W` })
+    }
+    return found
 }

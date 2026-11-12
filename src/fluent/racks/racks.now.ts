@@ -1,16 +1,16 @@
 import '@servicenow/sdk/global'
 import { Acl, BusinessRule, Record, UiPage } from '@servicenow/sdk/core'
+import { RACK_PAGE_USERS } from '../../server/domain/roles'
 import { PLACEMENT_FIELDS } from '../../server/domain/rack'
-import { explainRackRefusal, recheckRackPlacement } from '../../server/entry/racks'
-import { CURRENT_IS_FLEET, FLEET_FIELD } from '../../server/domain/fleet'
+import { explainRackRefusal } from '../../server/entry/racks'
+import { recheckRacksOf } from '../../server/platform/racks'
+import { CURRENT_IS_FLEET, CURRENT_IS_FLEET_UNSPACED, FLEET_FIELD } from '../../server/domain/fleet'
 import rackPage from '../../client/rack.html'
 import { ENTRY_MODULES } from '../shared/server-modules.now'
-import { providerStaff, staffAndCustomers } from '../shared/roles.now'
+import { providerStaff } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
-/* Racks (P2.8): the placement rules and the rack elevation page. */
-
-/** A save sets an Asset's rack placement (its rack, lowest unit or face); written without spaces, as the rack rules' conditions are. */
+/** Written without spaces, as the rack rules' conditions are. */
 const PLACEMENT_SET = `current.${PLACEMENT_FIELDS.rack}.changes()||current.${PLACEMENT_FIELDS.ruStart}.changes()||current.${PLACEMENT_FIELDS.face}.changes()`
 
 // alm_hardware is a global table: the platform refuses current.setAbortAction from this scope and saves anyway, so
@@ -30,14 +30,14 @@ BusinessRule({
     action: ['insert', 'update'],
     order: 150,
     condition:
-        `(${PLACEMENT_SET})&&current.${FLEET_FIELD}==true&&require('${ENTRY_MODULES}/racks.ts').refusesRackPlacement(current,previous)`,
+        `(${PLACEMENT_SET})&&${CURRENT_IS_FLEET_UNSPACED}&&require('${ENTRY_MODULES}/racks.ts').refusesRackPlacement(current,previous)`,
     abortAction: true,
     script: explainRackRefusal,
 })
 
 // The same check when a racked Asset keeps its placement and gets a new Model (its height and power change) or joins
 // the fleet: "Add to fleet" saves the form first, while the unit is outside the fleet and no rule checks it, then
-// changes only the flag, so its placement is checked as one new to the rack (entry/racks refusesKeptPlacement). A
+// changes only the flag, so its placement is checked as one new to the rack. A
 // save that also sets the placement is the rule above's. An update only, as an insert with a rack sets the placement.
 BusinessRule({
     $id: Now.ID['br_rack_placement_model'],
@@ -63,8 +63,8 @@ BusinessRule({
     action: ['insert', 'update'],
     order: 150,
     condition:
-        `(${PLACEMENT_SET}||((current.model.changes()||current.${FLEET_FIELD}.changes())&&current.${PLACEMENT_FIELDS.rack}!=''))&&current.${FLEET_FIELD}==true`,
-    script: recheckRackPlacement,
+        `(${PLACEMENT_SET}||((current.model.changes()||current.${FLEET_FIELD}.changes())&&current.${PLACEMENT_FIELDS.rack}!=''))&&${CURRENT_IS_FLEET_UNSPACED}`,
+    script: recheckRacksOf,
 })
 
 /** The rack page's name: its address is this with .do, and its ACL is named by it. */
@@ -84,7 +84,7 @@ Acl({
     type: 'ui_page',
     name: RACKS_PAGE,
     operation: 'read',
-    roles: staffAndCustomers,
+    roles: RACK_PAGE_USERS,
 })
 
 Record({

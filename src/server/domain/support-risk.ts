@@ -7,7 +7,7 @@ import { LIFECYCLE_PHASE, type LifecyclePhase } from './vocabulary.ts'
 export type SupportRisk = 'high' | 'medium' | 'low'
 
 /** A refresh due within this many days counts as near. */
-export const REFRESH_NEAR_DAYS = 180
+const REFRESH_NEAR_DAYS = 180
 
 /**
  * A device's support risk on `today`: high once its Model is past its end of support or it is without OEM coverage;

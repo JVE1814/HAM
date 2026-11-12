@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
     awaitsInstall,
     awaitsSelfInstallConfirmation,
-    beingInstalled,
-    mayConfirmInstall,
+    confirmerFor,
+    installRefusal,
     type InstallState,
 } from './install-confirmation'
 import { ALL_STAGES, fieldsOf } from './lifecycle'
@@ -39,28 +39,6 @@ describe('awaitsInstall', () => {
     })
 })
 
-describe('beingInstalled', () => {
-    it('is true for an Order installing, without counting its units', () => {
-        expect(beingInstalled({ ...selfInstall, shippedUnits: uncounted })).toBe(true)
-    })
-
-    it('is true for an Order a line filled again holds back while units already shipped wait at the Site', () => {
-        expect(beingInstalled(order('preparing', 'fsm_engineer', 2))).toBe(true)
-        expect(beingInstalled(order('delivering', 'fsm_engineer', 1))).toBe(true)
-    })
-
-    it('is false for an Order not installing with nothing shipped', () => {
-        expect(beingInstalled(order('preparing', 'fsm_engineer'))).toBe(false)
-        expect(beingInstalled(order('delivering', 'self_install'))).toBe(false)
-    })
-
-    it('is false once the Order is complete, cancelled or not yet sourced, whatever its units', () => {
-        for (const stage of ['complete', 'cancelled', 'draft', 'awaiting_approval', 'sourcing'] as const) {
-            expect(beingInstalled(order(stage, 'fsm_engineer', 1))).toBe(false)
-        }
-    })
-})
-
 describe('awaitsSelfInstallConfirmation', () => {
     it('is true only for a self-install being installed', () => {
         expect(awaitsSelfInstallConfirmation(selfInstall)).toBe(true)
@@ -79,36 +57,44 @@ describe('awaitsSelfInstallConfirmation', () => {
     })
 })
 
-describe('mayConfirmInstall', () => {
-    it('lets staff who see every Customer record any install in progress', () => {
-        expect(mayConfirmInstall('everything', engineerInstall)).toBe(true)
-        expect(mayConfirmInstall('everything', order('installing', 'subcontractor'))).toBe(true)
-        expect(mayConfirmInstall('everything', selfInstall)).toBe(true)
+describe('installRefusal', () => {
+    it('lets staff record any install in progress, without counting its units', () => {
+        expect(installRefusal('staff', engineerInstall)).toBeNull()
+        expect(installRefusal('staff', order('installing', 'subcontractor'))).toBeNull()
+        expect(installRefusal('staff', { ...selfInstall, shippedUnits: uncounted })).toBeNull()
     })
 
     it('lets staff record the units already shipped of an Order a line filled again holds back', () => {
-        expect(mayConfirmInstall('everything', order('preparing', 'fsm_engineer', 1))).toBe(true)
-        expect(mayConfirmInstall('everything', order('preparing', 'fsm_engineer'))).toBe(false)
+        expect(installRefusal('staff', order('preparing', 'fsm_engineer', 2))).toBeNull()
+        expect(installRefusal('staff', order('delivering', 'fsm_engineer', 1))).toBeNull()
+        expect(installRefusal('staff', order('preparing', 'fsm_engineer'))).toBe('nothing_waiting')
+        expect(installRefusal('staff', order('delivering', 'self_install'))).toBe('nothing_waiting')
     })
 
     it('lets Customer contacts confirm only a self-install', () => {
-        for (const scope of ['own_customer', 'own_sites'] as const) {
-            expect(mayConfirmInstall(scope, selfInstall)).toBe(true)
-            expect(mayConfirmInstall(scope, engineerInstall)).toBe(false)
-            expect(mayConfirmInstall(scope, order('installing', 'remote_hands'))).toBe(false)
-            expect(mayConfirmInstall(scope, order('preparing', 'self_install', 1))).toBe(true)
-            expect(mayConfirmInstall(scope, order('preparing', 'fsm_engineer', 1))).toBe(false)
-        }
+        expect(installRefusal('customer', selfInstall)).toBeNull()
+        expect(installRefusal('customer', engineerInstall)).toBe('not_self_install')
+        expect(installRefusal('customer', order('installing', 'remote_hands'))).toBe('not_self_install')
+        expect(installRefusal('customer', order('preparing', 'self_install', 1))).toBeNull()
+        expect(installRefusal('customer', order('preparing', 'fsm_engineer', 1))).toBe('not_self_install')
     })
 
     it('refuses everyone once the Order is no longer being installed', () => {
-        expect(mayConfirmInstall('everything', order('complete', 'fsm_engineer'))).toBe(false)
-        expect(mayConfirmInstall('own_sites', order('complete', 'self_install'))).toBe(false)
+        for (const stage of ['complete', 'cancelled', 'draft', 'awaiting_approval', 'sourcing'] as const) {
+            expect(installRefusal('staff', order(stage, 'fsm_engineer', 1))).toBe('nothing_waiting')
+        }
+        expect(installRefusal('staff', order('complete', 'fsm_engineer'))).toBe('nothing_waiting')
+        expect(installRefusal('customer', order('complete', 'self_install'))).toBe('nothing_waiting')
+        expect(installRefusal('customer', order('complete', 'fsm_engineer'))).toBe('nothing_waiting')
     })
+})
 
-    it('treats other users as Customer contacts', () => {
-        expect(mayConfirmInstall('assigned_stockrooms', engineerInstall)).toBe(false)
-        expect(mayConfirmInstall('unscoped', engineerInstall)).toBe(false)
+describe('confirmerFor', () => {
+    it('makes staff only of those who see every Customer', () => {
+        expect(confirmerFor('everything')).toBe('staff')
+        for (const scope of ['own_customer', 'own_sites', 'assigned_stockrooms', 'unscoped'] as const) {
+            expect(confirmerFor(scope)).toBe('customer')
+        }
     })
 })
 

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ALL_STAGES, checkTransition, DEPLOYED_STAGES, INSTALLED_STAGES, type Stage } from './lifecycle'
+import { checkTransition, DEPLOYED_STAGES, INSTALLED_STAGES } from './lifecycle'
 import {
-    chargedFeeQuery,
     collectionMethod,
     evaluationTarget,
     isSiteRecovery,
@@ -11,17 +10,15 @@ import {
     requestedTrigger,
     returnDueDate,
     returnRequestFindings,
-    returnRequesterRefusal,
-    SITE_RECOVERY_STAGES,
-    sitePackageHoldersQuery,
     deploymentEndLineQuery,
     stagesTakenBack,
+    swapReturnTrigger,
     type RequestedReturn,
     type ReturnRequester,
 } from './returns'
 import { type LeaseEndAction, RETURN_TRIGGER_CHOICES, type ReturnTrigger } from './vocabulary'
 import { recordMatches as matches } from '../test-support/encoded-query'
-import { assetIn, type SampleRecord } from '../test-support/stored-asset'
+import type { SampleRecord } from '../test-support/stored-asset'
 
 describe('returnRequestFindings', () => {
     const acmeSite: RequestedReturn = { customerId: 'acme', site: { id: 'acme-hq', customerId: 'acme', isSite: true } }
@@ -69,18 +66,6 @@ describe('returnRequestFindings', () => {
     })
 })
 
-describe('returnRequesterRefusal', () => {
-    it('says only who may ask, so a caller can tell a refused requester from a wrong site', () => {
-        const acmeAdmin: ReturnRequester = { mayRequest: true, scope: 'own_customer', customerId: 'acme' }
-        const staff: ReturnRequester = { mayRequest: true, scope: 'everything', customerId: 'provider' }
-        expect(returnRequesterRefusal('acme', acmeAdmin)).toBeNull()
-        expect(returnRequesterRefusal('globex', staff)).toBeNull()
-        expect(returnRequesterRefusal('globex', acmeAdmin)).toBe('You can only request returns for your own customer')
-        expect(returnRequesterRefusal('acme', { ...acmeAdmin, mayRequest: false })).toBe('You may not request returns')
-        expect(returnRequesterRefusal('acme', { ...acmeAdmin, scope: 'own_sites' })).toBe('You may not request returns')
-    })
-})
-
 describe('returnDueDate', () => {
     it('is the agreement allowance after the return was raised', () => {
         expect(returnDueDate('2026-11-07', 30)).toBe('2026-12-07')
@@ -107,6 +92,9 @@ describe('opensDeinstallWork', () => {
     it("opens none for a swapped-out unit, which the swap's own work order collects", () => {
         expect(opensDeinstallWork('refresh_swap_back', 'fsm_deinstall')).toBe(false)
         expect(opensDeinstallWork('defective_return', 'fsm_deinstall')).toBe(false)
+        for (const orderType of ['refresh', 'device_replace'] as const) {
+            expect(opensDeinstallWork(swapReturnTrigger(orderType), 'fsm_deinstall'), orderType).toBe(false)
+        }
     })
 })
 
@@ -131,63 +119,36 @@ describe('receivedLate', () => {
 
 describe('overdueStep', () => {
     const due = '2026-12-07'
-    it('does nothing before the due date or once received', () => {
-        expect(overdueStep({ dueDate: due, today: '2026-12-07', graceDays: 14, received: false, escalated: false })).toBe('none')
-        expect(overdueStep({ dueDate: due, today: '2027-02-01', graceDays: 14, received: true, escalated: false })).toBe('none')
+    it('does nothing up to the due date', () => {
+        expect(overdueStep({ dueDate: due, today: '2026-12-07', graceDays: 14, escalated: false })).toBe('none')
     })
 
     it('escalates once when the due date has passed', () => {
-        expect(overdueStep({ dueDate: due, today: '2026-12-08', graceDays: 14, received: false, escalated: false })).toBe('escalate')
-        expect(overdueStep({ dueDate: due, today: '2026-12-08', graceDays: 14, received: false, escalated: true })).toBe('none')
+        expect(overdueStep({ dueDate: due, today: '2026-12-08', graceDays: 14, escalated: false })).toBe('escalate')
+        expect(overdueStep({ dueDate: due, today: '2026-12-08', graceDays: 14, escalated: true })).toBe('none')
     })
 
     it('declares the asset missing after the grace period', () => {
-        expect(overdueStep({ dueDate: due, today: '2026-12-22', graceDays: 14, received: false, escalated: true })).toBe('declare_missing')
+        expect(overdueStep({ dueDate: due, today: '2026-12-22', graceDays: 14, escalated: true })).toBe('declare_missing')
     })
 })
 
-describe('sitePackageHoldersQuery', () => {
-    const query = sitePackageHoldersQuery({ siteId: 'acme-hq', agreementId: 'acme-msa' })
-    /** A fleet asset at the Site under the Agreement, in `stage`. */
-    const unit = (stage: Stage, fields: SampleRecord = {}) => assetIn(stage, { x_daas_ham_fleet: 'true', x_daas_ham_site: 'acme-hq', x_daas_ham_agreement: 'acme-msa', ...fields })
-    const holding = (fields: SampleRecord = {}) => ALL_STAGES.filter((stage) => matches(query, unit(stage, fields)))
-
-    // A swap's new units before monitoring sees them, units serving there and units still to come back.
-    it('is held open by a unit shipped, awaiting first sighting, in service, temporarily deployed or awaiting return, and by no other', () => {
-        expect(holding()).toEqual(['shipped', 'pending_in_service', 'in_service', 'temporary_deployment', 'pending_return'])
-    })
-
-    it.each<Stage>(['pending_evaluation', 'missing', 'available'])('lets go of a unit %s', (stage) => {
-        expect(matches(query, unit(stage))).toBe(false)
-    })
-
-    it('counts only Assets at the Site under the Agreement, whatever their stage', () => {
-        expect(holding({ x_daas_ham_site: 'acme-branch' })).toEqual([])
-        expect(holding({ x_daas_ham_agreement: 'acme-old' })).toEqual([])
-        expect(holding({ x_daas_ham_site: '' })).toEqual([])
-    })
-
-    it('counts fleet assets only, whatever their stage (ADR 0016)', () => {
-        expect(holding({ x_daas_ham_fleet: 'false' })).toEqual([])
-        expect(holding({ x_daas_ham_fleet: '' })).toEqual([])
-    })
-})
-
-describe('SITE_RECOVERY_STAGES', () => {
+describe('what a whole-Site recovery takes back', () => {
     // Facts a unit at a Site under an Agreement has; pending return needs nothing more.
     const atSite = { hasSite: true, hasAgreement: true, legalOwner: 'provider', wipeEvidenceComplete: false } as const
+    const recovered = stagesTakenBack('agreement_end')
 
     it('takes every unit that holds the site package open, but those already coming back', () => {
-        expect([...SITE_RECOVERY_STAGES, 'pending_return'].sort()).toEqual([...DEPLOYED_STAGES].sort())
+        expect([...recovered, 'pending_return'].sort()).toEqual([...DEPLOYED_STAGES].sort())
     })
 
-    it('takes the units still shipped to the Site, which installed-only lists leave out', () => {
-        expect(SITE_RECOVERY_STAGES).toContain('shipped')
-        expect(INSTALLED_STAGES).not.toContain('shipped')
-        for (const stage of INSTALLED_STAGES) expect(SITE_RECOVERY_STAGES).toContain(stage)
+    it('takes the units still shipped to the Site, which a device removal leaves out', () => {
+        expect(recovered).toContain('shipped')
+        expect(stagesTakenBack('device_removal')).not.toContain('shipped')
+        for (const stage of INSTALLED_STAGES) expect(recovered).toContain(stage)
     })
 
-    it.each(SITE_RECOVERY_STAGES)('can move a unit %s to pending return', (stage) => {
+    it.each(recovered)('can move a unit %s to pending return', (stage) => {
         expect(checkTransition(stage, 'pending_return', atSite)).toEqual({ allowed: true })
     })
 })
@@ -215,9 +176,9 @@ describe('a whole-Site recovery, by the trigger of its Return', () => {
     })
 
     it('takes the units still shipped to the Site too, as a temporary end does; any other Return the installed ones', () => {
+        expect(triggers.filter((trigger) => stagesTakenBack(trigger).includes('shipped'))).toEqual(['site_decommission', 'agreement_end', 'temporary_end'])
         for (const trigger of triggers) {
-            const takesShipped = isSiteRecovery(trigger) || trigger === 'temporary_end'
-            expect(stagesTakenBack(trigger)).toBe(takesShipped ? SITE_RECOVERY_STAGES : INSTALLED_STAGES)
+            for (const stage of INSTALLED_STAGES) expect(stagesTakenBack(trigger), trigger).toContain(stage)
         }
     })
 
@@ -257,24 +218,5 @@ describe('evaluationTarget', () => {
         expect(evaluationTarget('oem_rma', lessor('return'))).toBe('pending_oem_rma')
         expect(evaluationTarget('scrap', provider)).toBe('pending_wipe')
         expect(evaluationTarget('return_to_owner', lessor(''))).toBe('pending_wipe')
-    })
-})
-
-describe('fee identity', () => {
-    const sysId = (c: string) => c.repeat(32)
-    const fee = { type: 'late_return' as const, assetId: sysId('a'), returnOrderId: sysId('r') }
-
-    const charge = (fields: SampleRecord = {}) => ({ fee_type: 'late_return', asset: sysId('a'), return_order: sysId('r'), status: 'open', ...fields })
-
-    it('counts every charge of the same type, Asset and Return order but a waived one', () => {
-        expect(matches(chargedFeeQuery(fee), charge())).toBe(true)
-        expect(matches(chargedFeeQuery(fee), charge({ status: 'billed' }))).toBe(true)
-        expect(matches(chargedFeeQuery(fee), charge({ status: 'waived' }))).toBe(false)
-    })
-
-    it('counts no charge of another type, Asset or Return order', () => {
-        expect(matches(chargedFeeQuery(fee), charge({ fee_type: 'lost' }))).toBe(false)
-        expect(matches(chargedFeeQuery(fee), charge({ asset: sysId('b') }))).toBe(false)
-        expect(matches(chargedFeeQuery(fee), charge({ return_order: sysId('s') }))).toBe(false)
     })
 })

@@ -8,10 +8,8 @@ import {
     EXCEPTION_TYPE_CHOICES,
 } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION, NAAS_STOCKROOM_CONDITION } from '../../server/domain/fleet'
+import { EXCEPTION_DETAIL_MAX_LENGTH } from '../../server/domain/reconciliation'
 
-/* Audits, attestations and reconciliation exceptions (P2.7, Q63). */
-
-/** A check of what is physically present: a stockroom blind count or a site audit. */
 export const x_daas_ham_audit = Table({
     name: 'x_daas_ham_audit',
     label: 'Audit',
@@ -58,7 +56,6 @@ export const x_daas_ham_audit_line = Table({
     index: [{ name: 'x_daas_ham_al_audit', unique: false, element: 'audit' }],
 })
 
-/** A Customer admin's periodic confirmation of the Assets installed at a Site. */
 export const x_daas_ham_attestation = Table({
     name: 'x_daas_ham_attestation',
     label: 'Attestation',
@@ -91,7 +88,6 @@ export const x_daas_ham_attestation_item = Table({
     index: [{ name: 'x_daas_ham_ati_att', unique: false, element: 'attestation' }],
 })
 
-/** A disagreement between Assets and monitoring, an audit or an attestation, or a rack's placements. */
 export const x_daas_ham_recon_exception = Table({
     name: 'x_daas_ham_recon_exception',
     label: 'Reconciliation exception',
@@ -105,7 +101,7 @@ export const x_daas_ham_recon_exception = Table({
         asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', referenceQual: FLEET_CONDITION }),
         ci: ReferenceColumn({ label: 'Configuration item', referenceTable: 'cmdb_ci' }),
         customer: ReferenceColumn({ label: 'Customer', referenceTable: 'core_company' }),
-        detail: StringColumn({ label: 'Detail', maxLength: 255 }),
+        detail: StringColumn({ label: 'Detail', maxLength: EXCEPTION_DETAIL_MAX_LENGTH }),
         status: ChoiceColumn({
             label: 'Status',
             choices: EXCEPTION_STATUS_CHOICES,

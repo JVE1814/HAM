@@ -1,10 +1,10 @@
 import '@servicenow/sdk/global'
 import { Role } from '@servicenow/sdk/core'
-import { BROAD_STAFF, MONEY_READERS, PLATFORM_ROLE, PROVIDER_STAFF, ROLE } from '../../server/domain/visibility'
+import { PLATFORM_ROLE, PROVIDER_STAFF, ROLE } from '../../server/domain/roles'
 
 /*
  * The base-platform roles contained below must exist on the instance, as must the service desk's, which the ACLs grant
- * directly (`serviceDesk`): domain/visibility PLATFORM_ROLE; see README "Required plugins".
+ * directly (`serviceDesk`); see README "Required plugins".
  */
 
 export const inventoryTech = Role({
@@ -69,24 +69,18 @@ export const integration = Role({
 })
 
 /*
- * The role groups the access lists name, each defined here once. They hold role names, which every record that takes
+ * The role groups hold role names, which every record that takes
  * roles reads (a navigator module takes nothing else), and a list keeps the order its module shows the roles in.
  */
 
 /** Every provider-staff role: reads the installed base and the tables of stockroom work, the only app tables an inventory tech reads. */
 export const providerStaff = PROVIDER_STAFF
 
-/** Provider staff without inventory techs: the read list for customer, commercial and configuration tables. */
-export const broadStaff = BROAD_STAFF
-
 /**
  * The service desk (Customer Service agents, a platform role the ACLs name directly): raises Orders and Returns for any
  * Customer, so it reads the Agreements, Site templates, Orders and Returns that work needs, and no other NaaS table.
  */
 export const serviceDesk = [PLATFORM_ROLE.serviceDeskAgent]
-
-/** External customer roles; their reads are filtered to their own customer. */
-export const customerRoles = [ROLE.customerAdmin, ROLE.siteContact]
 
 /** Who writes Agreements, Catalog entries and the other commercial records. */
 export const commercialEditors = [ROLE.accountManager, ROLE.assetManager]
@@ -95,18 +89,21 @@ export const commercialEditors = [ROLE.accountManager, ROLE.assetManager]
  * Who raises an Order or a Return for any Customer, from the navigator, a record producer or its form: provider roles
  * and the service desk. A customer admin raises them for their own Customer only, through the record producers, and has
  * create ACLs of its own that check the Customer (a Table API insert meets no producer); it creates no Order lines,
- * which the producer's script adds (platform/orders), past ACLs.
+ * which the producer's script adds, past ACLs.
  */
 export const orderRaisers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, PLATFORM_ROLE.serviceDeskAgent]
 
 /** Who changes an Order as it is fulfilled. */
 export const orderWorkers = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, ROLE.inventoryTech, ROLE.fieldTech, PLATFORM_ROLE.serviceDeskAgent]
 
+/** Who changes a Return as it is worked: the Order workers but the service desk, which raises Returns and works none. */
+export const returnEditors = [ROLE.assetManager, ROLE.accountManager, ROLE.noc, ROLE.inventoryTech, ROLE.fieldTech]
+
+/** Who changes an Attestation from the provider side: its Customer admin answers it through the customer page instead. */
+export const attestationEditors = [ROLE.accountManager, ROLE.assetManager]
+
 /** Who does the stockroom's work: receiving, staging, shipping, blind counts. */
 export const stockroomWorkers = [ROLE.inventoryTech, ROLE.assetManager]
-
-/** Who scans equipment: the warehouse page, and Audits with their lines. */
-export const scanners = [ROLE.assetManager, ROLE.inventoryTech, ROLE.fieldTech]
 
 /** Who sends equipment back: opens OEM RMAs and Return lines, buys and voids labels. */
 export const returnWorkers = [ROLE.assetManager, ROLE.inventoryTech, ROLE.noc]
@@ -114,17 +111,8 @@ export const returnWorkers = [ROLE.assetManager, ROLE.inventoryTech, ROLE.noc]
 /** Who writes Lease schedules and their decisions. */
 export const leaseEditors = [ROLE.assetManager, ROLE.finance]
 
-/** Roles that read the money tables (service intervals, billing, cost facts and margin), the workspace dashboard's Margin tab among them. */
-export const moneyReaders = MONEY_READERS
+/** Who raises or corrects a Fee event by hand, besides the charges the returns workflow raises. */
+export const feeEditors = [ROLE.assetManager, ROLE.finance]
 
-/** Every person the app serves, provider staff and Customer contacts: the rack elevations are open to them all. */
-export const staffAndCustomers = [
-    ROLE.assetManager,
-    ROLE.inventoryTech,
-    ROLE.fieldTech,
-    ROLE.noc,
-    ROLE.accountManager,
-    ROLE.finance,
-    ROLE.customerAdmin,
-    ROLE.siteContact,
-]
+/** Who opens or closes a Service interval by hand, when a stage change could not. */
+export const intervalEditors = [ROLE.assetManager, ROLE.finance]

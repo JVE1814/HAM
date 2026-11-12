@@ -1,27 +1,20 @@
 import { GlideRecord } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
-import { stagesTakenBack } from '../domain/returns.ts'
-import type { ReturnTrigger } from '../domain/vocabulary.ts'
+import { INSTALLED_STAGES, type Stage } from '../domain/lifecycle.ts'
 import { str } from './records.ts'
-import { INSTALLED_STAGES } from '../domain/lifecycle.ts'
-
-/** The fleet assets installed at Sites, as returns, audits and attestations list them. */
 
 interface InstalledFilter {
     agreementId?: string
     siteId?: string
     orderId?: string
-    /**
-     * The trigger of the Return the units are listed for: a whole-Site recovery also takes those still shipped there
-     * (domain/returns `stagesTakenBack`). None for a list that is no Return's.
-     */
-    returning?: ReturnTrigger
+    /** The stages listed: a Return passes those it takes back (domain/returns `stagesTakenBack`). */
+    stages?: readonly Stage[]
 }
 
 /**
- * Fleet assets installed at a Site (in service, temporary or awaiting first sighting, and shipped there for a
- * whole-Site recovery), by Agreement, Site or Order. The Provider IT's equipment is never listed (ADR 0016).
+ * Fleet assets installed at a Site (in service, temporary or awaiting first sighting, unless `stages` says otherwise),
+ * by Agreement, Site or Order. The Provider IT's equipment is never listed (ADR 0016).
  */
 export function installedAssetIds(filter: InstalledFilter): string[] {
     const asset = queryInstalled(filter)
@@ -47,7 +40,7 @@ function queryInstalled(filter: InstalledFilter): GlideRecord {
         .filter(Boolean)
         .join('^')
     const asset = new GlideRecord('alm_hardware')
-    asset.addEncodedQuery(fleetStagesQuery(filter.returning ? stagesTakenBack(filter.returning) : INSTALLED_STAGES, base))
+    asset.addEncodedQuery(fleetStagesQuery(filter.stages ?? INSTALLED_STAGES, base))
     asset.query()
     return asset
 }

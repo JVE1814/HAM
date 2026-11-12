@@ -86,18 +86,20 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   is raised for the caller's own Customer. Provider staff and platform admins get HTTP 403 there and
   use the record producer.
 - A Customer's requests from the customer page are raised one at a time, under the job lock
-  `return_request_<Customer sys_id>` (ADR 0013), and only for devices not already awaiting a return.
+  `LOCK.returnRequest` in `domain/lock-names.ts` (ADR 0013), and only for devices not already
+  awaiting a return.
   A request that finds the lock held answers HTTP 503 and raises nothing. A request whose devices all
   await a return already answers HTTP 409. So a request sent twice raises one Return order (and, for
   a field de-install, one de-install work order and one change). The page sends one action at a
   time, offers no device pending return for another return, and clears the selection once a Return
-  is raised. Every Return, whoever raises it, puts each unit on it under `return_asset_<Asset
-  sys_id>` and checks under that lock that the unit awaits no other return, so a unit is on one
-  awaiting line at a time. A unit whose lock is held through 5 tries is left off. If it then still
+  is raised. Every Return, whoever raises it, puts each unit on it under `LOCK.returnAsset` and
+  checks under that lock that the unit awaits no other return, so a unit is on one
+  awaiting line at a time. A unit whose lock is held through `LOCK_TRIES` tries
+  (`domain/job-lock.ts`) is left off. If it then still
   awaits no return (the holder was slow, refused or died holding the lock), it counts as refused and
   a warning says to put it on a return by hand if it is due back.
 - Only fleet assets go on a Return: one of the Provider IT's that a request or a job lists is left off,
-  logged (*... left off return ...: it is not a fleet asset*), and a Return left with no unit closes at
+  logged as a warning (`platform/returns.ts`), and a Return left with no unit closes at
   once. The units a site decommission, an agreement end or a temporary end returns are the fleet assets
   there.
 - Installed and shipped Assets on a return become *pending return*. The due date is the Agreement's
@@ -110,7 +112,7 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   has passed, its units still shipped come back too).
 - A site decommission returns everything installed at the Site (in service, temporary, pending in
   service), whatever devices the request lists. From the record producer and the customer page it
-  also returns units still shipped to the Site (`domain/returns.ts` `SITE_RECOVERY_STAGES`), so none
+  also returns units still shipped to the Site (`domain/returns.ts` `stagesTakenBack`), so none
   is left holding the site package open.
 - Devices chosen for a device removal must be fleet assets deployed at the chosen Site (shipped,
   pending in service, in service, temporary or pending return); others are ignored, so a unit
@@ -128,7 +130,7 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
     monitoring first sees them, so a swap-back that reaches the depot first leaves the package open,
     and a new unit that leaves before it was seen still ends it. All units count, not only those the
     receiving tech can see. A pending package waiting for its rollout is not ended
-    (`domain/returns.ts` `sitePackageHoldersQuery`);
+    (`domain/billing.ts` `sitePackageHoldersQuery`);
   - a unit received after the due date incurs a **late-return fee**;
   - a unit declared missing that turns up settles its line again: the open lost-asset fee is
     waived, the late-return fee applies, and the Return order reopens for evaluation.
@@ -160,7 +162,7 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
     next run declares it again: the lost-asset fee and the site package's end follow only a saved
     move. A line that cannot be saved as missing is logged and declared again on the next run,
     without a second fee;
-  - the declaration takes the unit's receive lock (`receive_asset_<sys_id>`), the same one a depot
+  - the declaration takes the unit's receive lock (`LOCK.receiveAsset`), the same one a depot
     scan takes (P1 fulfilment spec), and works from a fresh read. It goes ahead only while the line
     still awaits the unit and the unit is still at or on its way to the Site, pending return or
     already missing. A run that finds a scan receiving the unit leaves the line awaiting for the next
@@ -174,7 +176,8 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   is charged at most once per Asset and Return order (a waived fee aside), so a step retried after a
   refused save never charges twice. Two steps charging the same fee at once (two users saving one
   return line's evaluation) check for and record it under a job lock on the fee (ADR 0013), so it is
-  charged once. One that finds the lock held 5 times leaves the fee to the other and logs a warning if
+  charged once. One that finds the lock held `LOCK_TRIES` times leaves the fee to the other and logs
+  a warning if
   it is still not recorded. Two scans of one unit, and overlapping overdue runs, already take turns
   under the unit's receive lock. A fee the platform refuses is logged.
 
@@ -182,7 +185,8 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
 
 - Daily, fully automatic. It covers in-service fleet assets of an Agreement with a refresh due date
   within `x_daas_ham.refresh.horizon_days` that are not already on an open replacing line, grouped
-  per Agreement and Site. A run raises at most 2000, earliest due first, and Assets already on an
+  per Agreement and Site. A run raises a capped number (`CANDIDATES_PER_RUN` in
+  `platform/refresh.ts`), earliest due first, and Assets already on an
   open replacing line take none of those places (ADR 0007).
 - **Successor model**: the same Model while it is a current catalog entry and not past end of sale.
   Otherwise, the catalogued Model of the same device class with the latest end of support. A Model
@@ -195,7 +199,8 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   again on the next run. An Order none of whose lines is saved is removed again, and the removal is
   logged, so refused saves leave no empty drafts behind. One the platform will not remove is logged
   by number, to cancel.
-- A run holds the job lock `refresh_orders` (ADR 0013) from its read of the open replacing lines to
+- A run holds the job lock `LOCK.refreshOrders` (ADR 0013) from its read of the open replacing lines
+  to
   its last Order. A run that finds it held, such as the scheduled job and an *Execute now* at once,
   raises nothing and logs so. A run that outlasts the lock stops after the wave it lost it in and
   logs an error naming that Order, to check its Assets are on no other open Order.

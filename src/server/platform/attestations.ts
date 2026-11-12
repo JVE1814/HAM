@@ -1,14 +1,17 @@
 import { GlideRecord, gs } from '@servicenow/glide'
 import { ATTESTATION_STATE, attestationDue } from '../domain/audit.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
-import { ATTESTATION_RESPONSE_CHOICES } from '../domain/vocabulary.ts'
+import type { AttestationAnswers } from '../domain/rest-contracts.ts'
+import { ATTESTATION_RESPONSE_CHOICES, type AttestationResponse } from '../domain/vocabulary.ts'
 import { ACTIVE_AGREEMENTS } from './agreements.ts'
 import { customerAdminIds } from './approvals.ts'
 import { glideToIsoDate, nowGlide, todayIso } from './clock.ts'
 import { openException } from './exceptions.ts'
 import { bool, exists, findById, num, refusal, str, warnRefused } from './records.ts'
+import type { Sent } from './rest-api.ts'
 import { installedAssetIds } from './installed-assets.ts'
 import { IN_USE_STAGES } from '../domain/lifecycle.ts'
+import { log } from './log.ts'
 
 /**
  * Attestations: a Customer admin confirms the equipment installed at a Site (P2.7, Q63). The daily job raises them,
@@ -80,7 +83,7 @@ function openAttestation(agreement: GlideRecord, siteId: string): void {
         why = `not opened: ${refusal(attestation)}`
     }
     const kept = attestation.deleteRecord() ? '' : `; ${str(attestation, 'number')} stays pending, cancel it`
-    gs.warn(`[x_daas_ham] No attestation for site ${siteId}: ${why}${kept}`)
+    log.warn(`No attestation for site ${siteId}: ${why}${kept}`)
 }
 
 function listAttested(attestationId: string, assetIds: readonly string[]): string {
@@ -104,10 +107,7 @@ export function findUnclosedAttestation(attestationId: string): GlideRecord | nu
 }
 
 /** One answer as the customer page sends it: the attestation item and the response chosen for its Asset. */
-export interface AttestationAnswer {
-    id?: string
-    response?: string
-}
+export type AttestationAnswer = Sent<AttestationAnswers['items'][number]>
 
 /**
  * Save the Customer's answers on the attestation's items; how many the platform refused (each logged). An answer that
@@ -143,7 +143,8 @@ export function completeAttestation(attestation: GlideRecord): string {
     if (!bool(attestation, 'active')) return notClosed(number, 'it is closed')
     const item = new GlideRecord(ITEM)
     item.addQuery('attestation', attestation.getUniqueValue())
-    item.addQuery('response', 'missing')
+    const missing: AttestationResponse = 'missing'
+    item.addQuery('response', missing)
     item.query()
     while (item.next()) {
         openException('attested_missing', { assetId: str(item, 'asset') }, { customerId: str(attestation, 'customer'), detail: `Reported not present in ${number}` })
@@ -155,6 +156,6 @@ export function completeAttestation(attestation: GlideRecord): string {
 }
 
 function notClosed(number: string, reason: string): string {
-    gs.warn(`[x_daas_ham] Attestation ${number} not closed: ${reason}`)
+    log.warn(`Attestation ${number} not closed: ${reason}`)
     return reason
 }

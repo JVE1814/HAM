@@ -105,7 +105,7 @@ List({ table: 'x_daas_ham_order_line', view: default_view, columns: ['number', '
 
 /*
  * "Request network equipment": the one catalog entry point for Orders. The Agreement, Site and Site template
- * choices follow the chosen Customer; submitting checks the same again (domain/entitlement ownershipFindings).
+ * choices follow the chosen Customer; submitting checks the same again.
  */
 
 /** The platform's Service Catalog (sc_catalog), which the app's catalog items are listed in. */
@@ -120,7 +120,6 @@ export const deviceRows = VariableSet({
         model: ReferenceVariable({
             question: 'Model',
             referenceTable: 'cmdb_model',
-            // NaaS Models (ADR 0016) of a device class other than optic.
             referenceQualCondition: `${NAAS_MODEL_CONDITION}^x_daas_ham_device_classISNOTEMPTY^x_daas_ham_device_class!=${DEVICE_CLASS.optic}`,
             mandatory: true,
             order: 100,
@@ -191,7 +190,6 @@ export const requestNetworkEquipment = CatalogItemRecordProducer({
             question: 'Site template',
             referenceTable: 'x_daas_ham_site_template',
             useReferenceQualifier: 'advanced',
-            // A Site template with no Customer is offered to every Customer.
             referenceQual: "javascript:'active=true^customerISEMPTY^ORcustomer=' + current.variables.customer",
             attributes: 'ref_qual_elements=customer',
             mapToField: true,

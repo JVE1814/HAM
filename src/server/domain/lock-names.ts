@@ -1,6 +1,6 @@
+import type { FeeIdentity } from './fees.ts'
 import { normalizeSerial } from './serials.ts'
 import type { ExceptionType } from './vocabulary.ts'
-import type { FeeIdentity } from './returns.ts'
 
 /** A job lock's name is the unique key of its row (x_daas_ham_job_lock.name): a longer one shares its lock with those it starts like. */
 export const LOCK_NAME_LENGTH = 100
@@ -64,7 +64,11 @@ export const LOCK = {
     returnRequest: (customerId: string) => named(`return_request_${customerId}`),
     /** An Asset is put on a Return order under it: the check that it awaits no other return, and the insert of its line. */
     returnAsset: (assetId: string) => named(`return_asset_${assetId}`),
-    /** A fee is checked and charged, and billed on a period, under it: one per fee identity. */
+    /**
+     * One per fee identity. Charging checks the fee and inserts it under it (platform/fees `recordFee`), and a period's
+     * generation reads it afresh, adds its line and saves it (platform/billing `billOnPeriod`): each tries again while the
+     * other holds it for that long.
+     */
     fee: (fee: FeeIdentity) => named(`fee_${fee.type}_${fee.assetId}_${fee.returnOrderId}`),
     /**
      * An audit's scans and its close take turns under it, so a scan lands wholly before the close reads the lines, or

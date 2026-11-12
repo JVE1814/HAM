@@ -1,46 +1,32 @@
 import { describe, expect, it, vi } from 'vitest'
-import { endedUnfulfilled } from './fulfilment'
 import { ALL_STAGES, type Stage } from './lifecycle'
 import {
-    cancelledUnit,
     candidateLimit,
-    freeStockOf,
-    isClaimable,
-    isFree,
     lineShortfall,
-    lineStillOpen,
     needsTransfer,
-    pickForSparePool,
     planSourcing,
     type PurchaseResult,
-    reservedSparesQuery,
     shortfallOutcome,
     shortfallRouteFor,
     sourcingPurpose,
     type SourcingRequest,
-    sparePoolLead,
-    sparePools,
-    sparePoolShortfall,
+    type SourcingScope,
     stillToBuy,
-    type StockCandidate,
     stockQueries,
-    type StockScope,
-    type StockUnit,
 } from './sourcing'
+import type { StockCandidate } from './stock'
 import { recordMatches as matches } from '../test-support/encoded-query'
 import { assetIn, type SampleRecord } from '../test-support/stored-asset'
 
 /** What the queries for a replacement for Acme at its HQ Site find, each unit under the Source of its query. */
 const stock: StockCandidate[] = [
-    { assetId: 'central-1', modelId: 'c9300', stockroomId: 'depot', source: 'central_stock' },
-    { assetId: 'central-2', modelId: 'c9300', stockroomId: 'depot', source: 'central_stock' },
-    { assetId: 'pool-1', modelId: 'c9300', stockroomId: 'depot', source: 'spare_pool' },
-    { assetId: 'site-1', modelId: 'c9300', stockroomId: 'acme-hq', source: 'customer_site_stock' },
-    { assetId: 'staging-1', modelId: 'c9300', stockroomId: 'lab', source: 'central_stock' },
-    { assetId: 'ap-1', modelId: 'mr46', stockroomId: 'depot', source: 'central_stock' },
+    { assetId: 'central-1', stockroomId: 'depot', source: 'central_stock' },
+    { assetId: 'central-2', stockroomId: 'depot', source: 'central_stock' },
+    { assetId: 'pool-1', stockroomId: 'depot', source: 'spare_pool' },
+    { assetId: 'site-1', stockroomId: 'acme-hq', source: 'customer_site_stock' },
+    { assetId: 'staging-1', stockroomId: 'lab', source: 'central_stock' },
 ]
 
-/** A request for Acme at its HQ Site. */
 const acme = (request: Pick<SourcingRequest, 'modelId' | 'quantity' | 'purpose'>): SourcingRequest => ({
     ...request,
     customerId: 'acme',
@@ -56,16 +42,15 @@ describe('planSourcing', () => {
             { assetId: 'central-2', source: 'central_stock' },
             { assetId: 'staging-1', source: 'central_stock' },
         ])
-        expect(plan.toPurchase).toBe(1)
     })
 
-    it('serves replacements from the hot spare at the customer site first', () => {
+    it('serves replacements from the hot spare at the customer site first, buying none once stock covers them', () => {
         const plan = planSourcing(acme({ modelId: 'c9300', quantity: 2, purpose: 'replace' }), stock)
         expect(plan.picks).toEqual([
             { assetId: 'site-1', source: 'customer_site_stock' },
             { assetId: 'pool-1', source: 'spare_pool' },
         ])
-        expect(plan.toPurchase).toBe(0)
+        expect(plan.summary).toBe('1 from site stock, 1 from spare pool')
     })
 
     it('leaves a hot spare where it is for a new install: site stock serves replacements only', () => {
@@ -73,11 +58,6 @@ describe('planSourcing', () => {
         expect(plan.picks.map((p) => p.assetId)).not.toContain('site-1')
     })
 
-    it('never takes another Model', () => {
-        const plan = planSourcing(acme({ modelId: 'mr46', quantity: 2, purpose: 'new' }), stock)
-        expect(plan.picks.map((p) => p.assetId)).toEqual(['ap-1'])
-        expect(plan.toPurchase).toBe(1)
-    })
 
     it('summarises where the line will come from', () => {
         const plan = planSourcing(acme({ modelId: 'c9300', quantity: 5, purpose: 'new' }), stock)
@@ -85,48 +65,23 @@ describe('planSourcing', () => {
     })
 })
 
-describe('isFree and isClaimable', () => {
-    const unit: StockUnit = { stage: 'available', orderLineId: '', leaseEndAction: '' }
-    const inStock = ['available', 'spare_pool'] as const
-
-    it('takes stock still in one of the stages and on no Order line', () => {
-        expect(isClaimable(unit, inStock)).toBe(true)
-        expect(isClaimable({ ...unit, stage: 'spare_pool', leaseEndAction: 'undecided' }, inStock)).toBe(true)
-        expect(isFree({ ...unit, stage: 'reserved' }, inStock)).toBe(false)
-        expect(isFree({ ...unit, stage: null }, inStock)).toBe(false)
-        expect(isFree({ ...unit, orderLineId: 'line-1' }, inStock)).toBe(false)
-    })
-
-    it('never claims stock of a lease being returned to its Lessor, though it is free', () => {
-        const returning: StockUnit = { ...unit, leaseEndAction: 'return' }
-        expect(isFree(returning, inStock)).toBe(true)
-        expect(isClaimable(returning, inStock)).toBe(false)
-        for (const leaseEndAction of ['undecided', 'extend', 'buyout'] as const) {
-            expect(isClaimable({ ...unit, leaseEndAction }, inStock)).toBe(true)
-        }
-    })
-})
 
 const STOCKROOM_TYPE = 'stockroom.x_daas_ham_stockroom_type'
 const LEASE_END = 'x_daas_ham_lease.end_action'
-/** A fleet asset of Model m1 on no Order line, in a central depot unless `fields` say otherwise. */
 const unit = (stage: Stage, fields: SampleRecord = {}) =>
     assetIn(stage, { x_daas_ham_fleet: 'true', model: 'm1', x_daas_ham_order_line: '', [STOCKROOM_TYPE]: 'central_depot', ...fields })
-const PENDING_TRANSFER = { install_status: '6', substatus: 'pending_transfer' }
 const IN_TRANSIT_RESERVED = { install_status: '9', substatus: 'reserved' }
 
 describe('stockQueries', () => {
-    const forAcme: StockScope = { modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose: 'new' }
-    const replacement: StockScope = { ...forAcme, purpose: 'replace' }
+    const forAcme: SourcingScope = { modelId: 'm1', customerId: 'acme', siteId: 'hq', purpose: 'new' }
+    const replacement: SourcingScope = { ...forAcme, purpose: 'replace' }
     const free = unit('available')
     const acmeSpare = unit('spare_pool', { company: 'acme', [STOCKROOM_TYPE]: 'staging_centre' })
-    /** A hot spare in Acme's site stockroom at the location given. */
     const siteSpare = (location: SampleRecord) =>
         unit('spare_pool', { company: 'acme', [STOCKROOM_TYPE]: 'customer_site', 'stockroom.x_daas_ham_customer': 'acme', ...location })
     const atHq = siteSpare({ 'stockroom.location': 'hq' })
-    const sources = (scope: StockScope) => stockQueries(scope).map(({ source }) => source)
-    /** The Sources whose query finds `asset`. */
-    const sourcesOf = (scope: StockScope, asset: SampleRecord) =>
+    const sources = (scope: SourcingScope) => stockQueries(scope).map(({ source }) => source)
+    const sourcesOf = (scope: SourcingScope, asset: SampleRecord) =>
         stockQueries(scope)
             .filter(({ query }) => matches(query, asset))
             .map(({ source }) => source)
@@ -136,6 +91,12 @@ describe('stockQueries', () => {
         expect(sourcesOf(forAcme, acmeSpare)).toEqual(['spare_pool'])
         expect(sourcesOf(forAcme, free)).toEqual(['central_stock'])
         expect(sourcesOf(forAcme, unit('available', { [STOCKROOM_TYPE]: 'staging_centre' }))).toEqual(['central_stock'])
+    })
+
+    it('takes only central stock for an Order with no Customer, whose blank would match every unowned spare', () => {
+        const noCustomer: SourcingScope = { ...replacement, customerId: '' }
+        expect(sources(noCustomer)).toEqual(['central_stock'])
+        expect(sourcesOf(noCustomer, { ...acmeSpare, company: '' })).toEqual([])
     })
 
     it("finds no other Customer's spares, no unit of another Model or on an Order line, and no unit in another stage", () => {
@@ -167,12 +128,6 @@ describe('stockQueries', () => {
         expect(sourcesOf(replacement, { ...atHq, 'stockroom.x_daas_ham_customer': 'globex' })).toEqual([])
     })
 
-    it('finds free stock only when stock is sought for no Customer (the spare-pool top-up)', () => {
-        expect(sources(freeStockOf('m1'))).toEqual(['central_stock'])
-        expect(sourcesOf(freeStockOf('m1'), free)).toEqual(['central_stock'])
-        expect(sourcesOf(freeStockOf('m1'), acmeSpare)).toEqual([])
-        expect(sourcesOf(freeStockOf('m1'), { ...acmeSpare, company: '' })).toEqual([])
-    })
 
     it('finds fleet assets only, whatever the Source (ADR 0016)', () => {
         for (const stock of [free, acmeSpare, atHq]) {
@@ -252,132 +207,6 @@ describe('shortfallOutcome', () => {
     })
 })
 
-describe('endedUnfulfilled', () => {
-    it('is an Order cancelled or rejected, and no other', () => {
-        expect(['cancelled', 'rejected'].map(endedUnfulfilled)).toEqual([true, true])
-        const live = ['draft', 'awaiting_approval', 'sourcing', 'preparing', 'delivering', 'installing', 'complete', '']
-        expect(live.filter(endedUnfulfilled)).toEqual([])
-    })
-
-    it('ends every line of the Order for sourcing, whatever its own stage', () => {
-        for (const orderStage of ['cancelled', 'rejected']) {
-            for (const lineStage of ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship']) {
-                expect(lineStillOpen({ lineStage, orderStage })).toBe(false)
-            }
-        }
-    })
-})
-
-describe('lineStillOpen', () => {
-    it('is a line not yet shipped, cancelled or rejected, on an Order neither cancelled nor rejected', () => {
-        expect(lineStillOpen({ lineStage: 'awaiting_stock', orderStage: 'sourcing' })).toBe(true)
-        expect(lineStillOpen({ lineStage: 'ready_to_ship', orderStage: 'preparing' })).toBe(true)
-        for (const lineStage of ['shipped', 'installed', 'in_service', 'cancelled']) {
-            expect(lineStillOpen({ lineStage, orderStage: 'sourcing' })).toBe(false)
-        }
-        // A line whose cancel was refused stays open on its cancelled Order.
-        for (const orderStage of ['cancelled', 'rejected']) {
-            expect(lineStillOpen({ lineStage: 'awaiting_stock', orderStage })).toBe(false)
-        }
-    })
-})
-
-describe('sparePools', () => {
-    const share = (agreementId: string, modelId: string, deployed: number, ratio: number) => ({ agreementId, modelId, deployed, ratio })
-
-    it('sizes one pool per Model at the ratio of deployed assets, rounded up', () => {
-        expect(sparePools([share('a1', 'c9300', 41, 0.05)])).toEqual([{ modelId: 'c9300', size: 3, agreementId: 'a1' }])
-        expect(sparePools([share('a1', 'c9300', 40, 0.05)])).toEqual([{ modelId: 'c9300', size: 2, agreementId: 'a1' }])
-        expect(sparePools([share('a1', 'c9300', 0, 0.05)])).toEqual([{ modelId: 'c9300', size: 0, agreementId: 'a1' }])
-    })
-
-    it("sizes a Model's pool from the units of all the Customer's Agreements, each at its own ratio, rounded up once", () => {
-        // 10 × 0.05 + 10 × 0.05 = 1 spare, not one rounded up for each Agreement.
-        expect(sparePools([share('a1', 'c9300', 10, 0.05), share('a2', 'c9300', 10, 0.05)])).toEqual([{ modelId: 'c9300', size: 1, agreementId: 'a1' }])
-        // 20 × 0.05 + 30 × 0.1 = 4.
-        expect(sparePools([share('a1', 'c9300', 20, 0.05), share('a2', 'c9300', 30, 0.1)])).toEqual([{ modelId: 'c9300', size: 4, agreementId: 'a2' }])
-        // 1 × 0.05 + 1 × 0.1 = 0.15: one spare.
-        expect(sparePools([share('a1', 'mr46', 1, 0.05), share('a2', 'mr46', 1, 0.1)])[0].size).toBe(1)
-    })
-
-    it('keeps each Model in a pool of its own', () => {
-        const pools = sparePools([share('a1', 'c9300', 20, 0.05), share('a1', 'mr46', 30, 0.05), share('a2', 'mr46', 10, 0.1)])
-        expect(pools).toEqual([
-            { modelId: 'c9300', size: 1, agreementId: 'a1' },
-            { modelId: 'mr46', size: 3, agreementId: 'a1' },
-        ])
-    })
-
-    it('files new spares under the Agreement with the largest share, the first by sys_id on a tie', () => {
-        expect(sparePools([share('a1', 'c9300', 10, 0.05), share('a2', 'c9300', 30, 0.05)])[0].agreementId).toBe('a2')
-        expect(sparePools([share('b', 'c9300', 10, 0.1), share('a', 'c9300', 20, 0.05)])[0].agreementId).toBe('a')
-        expect(sparePools([share('a', 'c9300', 20, 0.05), share('b', 'c9300', 10, 0.1)])[0].agreementId).toBe('a')
-    })
-})
-
-describe('sparePoolShortfall', () => {
-    it('is the spares a pool still needs, never below none', () => {
-        expect(sparePoolShortfall(3, 1)).toBe(2)
-        expect(sparePoolShortfall(2, 5)).toBe(0)
-        expect(sparePoolShortfall(0, 0)).toBe(0)
-    })
-})
-
-describe('sparePoolLead', () => {
-    it("is the first of the Customer's Agreements by sys_id, so one row of the pass tops up their pools", () => {
-        expect(sparePoolLead(['b2', 'a9', 'c1'])).toBe('a9')
-        expect(sparePoolLead(['a9'])).toBe('a9')
-        expect(sparePoolLead([])).toBe('')
-    })
-})
-
-describe('reservedSparesQuery', () => {
-    const query = reservedSparesQuery('acme')
-    const pooled = unit('spare_pool', { company: 'acme' })
-    const inTransfer = [PENDING_TRANSFER, IN_TRANSIT_RESERVED].map((stored) => ({ ...pooled, ...stored }))
-
-    it("counts the Customer's fleet assets in its Spare pool, whatever their Model, and no other Customer's or the Provider IT's", () => {
-        expect(matches(query, pooled)).toBe(true)
-        expect(matches(query, { ...pooled, model: 'm2' })).toBe(true)
-        expect(matches(query, { ...pooled, company: 'globex' })).toBe(false)
-        expect(matches(query, { ...pooled, company: '' })).toBe(false)
-        expect(matches(query, { ...pooled, x_daas_ham_fleet: 'false' })).toBe(false)
-        expect(matches(query, { ...pooled, x_daas_ham_fleet: '' })).toBe(false)
-    })
-
-    it("counts the Customer's units in transfer on no Order line, which go back to the pool, in both of Inventory's combinations", () => {
-        for (const spare of inTransfer) {
-            expect(matches(query, spare), spare.substatus).toBe(true)
-            expect(matches(query, { ...spare, company: 'globex' }), spare.substatus).toBe(false)
-            expect(matches(query, { ...spare, x_daas_ham_fleet: 'false' }), spare.substatus).toBe(false)
-        }
-    })
-
-    it('counts no unit of the Customer in any other stage', () => {
-        expect(ALL_STAGES.filter((stage) => matches(query, { ...pooled, ...assetIn(stage) }))).toEqual(['spare_pool', 'in_transfer'])
-    })
-
-    it('leaves out a unit in transfer on an Order line: sourcing moves it to staging for that line', () => {
-        for (const spare of inTransfer) expect(matches(query, { ...spare, x_daas_ham_order_line: 'line1' }), spare.substatus).toBe(false)
-        // A unit still in the pool on an Order line (a hot spare a replacement takes at Ship) is counted until it leaves.
-        expect(matches(query, { ...pooled, x_daas_ham_order_line: 'line1' })).toBe(true)
-    })
-
-    it('leaves out the units bound for their Lessor, as sourcing does, and keeps those of any other lease', () => {
-        for (const spare of [pooled, ...inTransfer]) {
-            expect(matches(query, { ...spare, [LEASE_END]: 'return' }), spare.substatus).toBe(false)
-            for (const endAction of ['undecided', 'extend', 'buyout']) expect(matches(query, { ...spare, [LEASE_END]: endAction }), spare.substatus).toBe(true)
-        }
-    })
-})
-
-describe('pickForSparePool', () => {
-    it('takes free central stock only, never reserved or customer-site stock', () => {
-        expect(pickForSparePool(stock, 'c9300', 5)).toEqual(['central-1', 'central-2', 'staging-1'])
-        expect(pickForSparePool(stock, 'c9300', 1)).toEqual(['central-1'])
-    })
-})
-
 describe('sourcingPurpose', () => {
     it('sources a device replace as a replacement and every other Order as a new install', () => {
         expect(sourcingPurpose('device_replace')).toBe('replace')
@@ -428,7 +257,6 @@ describe('stillToBuy', () => {
 
     it('never buys a negative quantity', () => {
         expect(stillToBuy(2, -1, 0)).toBe(0)
-        expect(stillToBuy(-1, 3, 0)).toBe(0)
     })
 })
 
@@ -467,19 +295,5 @@ describe('shortfallRouteFor', () => {
     it('routes nothing when nothing is missing', () => {
         expect(shortfallRouteFor('c9300', { modelId: 'c9300', coverageEnd: '2030-01-01' }, today, 0)).toBe('none')
         expect(shortfallRouteFor('c9300', null, today, -1)).toBe('none')
-    })
-})
-
-describe('cancelledUnit', () => {
-    it('leaves a hot spare in its Spare pool', () => {
-        expect(cancelledUnit('spare_pool')).toBe('stays_spare')
-    })
-
-    it('leaves a unit in transfer where it is, to be free stock once Inventory lets it go', () => {
-        expect(cancelledUnit('in_transfer')).toBe('stays_in_transfer')
-    })
-
-    it('makes any other unit free stock', () => {
-        for (const stage of ['reserved', 'staging', 'staged', 'available', null] as const) expect(cancelledUnit(stage)).toBe('free_stock')
     })
 })

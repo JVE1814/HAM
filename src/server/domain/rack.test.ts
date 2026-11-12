@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { devicePlacement, overlaps, placementProblem, powerBudget, rackElevation } from './rack'
+import { devicePlacement, placementProblem, powerBudget, rackElevation, reconcileRack } from './rack'
 
 const rack42 = { units: 42, powerCapacityW: 0 }
 const placed = [
@@ -92,54 +92,6 @@ describe('powerBudget', () => {
     })
 })
 
-describe('overlaps', () => {
-    it('finds nothing in a rack whose devices each have their own units', () => {
-        expect(overlaps(placed)).toEqual([])
-    })
-
-    it('lets devices touch: one directly above or below another shares no unit', () => {
-        const touching = [
-            ...placed,
-            { assetId: 'above', ruStart: 32, height: 1, face: 'front' as const },
-            { assetId: 'below', ruStart: 28, height: 2, face: 'front' as const },
-        ]
-        expect(overlaps(touching)).toEqual([])
-        expect(overlaps([...placed, { assetId: 'low', ruStart: 29, height: 2, face: 'front' }])).toEqual([
-            { assetIds: ['fw1', 'low'], labels: ['fw1', 'low'], face: 'front', unit: 30 },
-        ])
-    })
-
-    it('finds devices sharing units on the same face, lowest shared unit first', () => {
-        const twoSaves = [
-            ...placed,
-            { assetId: 'sw2', ruStart: 31, height: 2, face: 'front' as const },
-            { assetId: 'ap1', ruStart: 40, height: 1, face: 'front' as const },
-        ]
-        expect(overlaps(twoSaves)).toEqual([
-            { assetIds: ['fw1', 'sw2'], labels: ['fw1', 'sw2'], face: 'front', unit: 31 },
-            { assetIds: ['sw1', 'ap1'], labels: ['sw1', 'ap1'], face: 'front', unit: 40 },
-        ])
-    })
-
-    it('lets devices share units on opposite faces, and counts a height under 1 as 1', () => {
-        expect(overlaps([...placed, { assetId: 'pdu', ruStart: 30, height: 2, face: 'rear' }])).toEqual([])
-        expect(overlaps([...placed, { assetId: 'blank', ruStart: 40, height: 0, face: 'front' }])).toEqual([
-            { assetIds: ['sw1', 'blank'], labels: ['sw1', 'blank'], face: 'front', unit: 40 },
-        ])
-    })
-
-    it('compares two devices with the same name', () => {
-        const unnamed = { assetId: '', ruStart: 5, height: 1, face: 'front' as const }
-        expect(overlaps([unnamed, unnamed])).toEqual([{ assetIds: ['', ''], labels: ['', ''], face: 'front', unit: 5 }])
-    })
-
-    it('reports the two devices by id and by label', () => {
-        const a = { assetId: 'sys-a', label: 'NAAS-0001', ruStart: 5, height: 1, face: 'front' as const }
-        const b = { assetId: 'sys-b', label: 'FOC123', ruStart: 5, height: 1, face: 'front' as const }
-        expect(overlaps([a, b])).toEqual([{ assetIds: ['sys-a', 'sys-b'], labels: ['NAAS-0001', 'FOC123'], face: 'front', unit: 5 }])
-    })
-})
-
 describe('rackElevation', () => {
     it('lists units top-down with each device once at its top unit', () => {
         const rows = rackElevation(4, [{ assetId: 'sys-a', label: 'NAAS-0001', ruStart: 2, height: 2, face: 'front' }], 'front')
@@ -179,5 +131,95 @@ describe('devicePlacement', () => {
             { unit: 2, assetId: 'sys-b', label: 'NAAS-0001', span: 1 },
             { unit: 1, assetId: 'sys-c', label: 'sys-c', span: 1 },
         ])
+    })
+})
+
+describe('reconcileRack', () => {
+    const rack = { units: 42, powerCapacityW: 1000 }
+    const placed = [
+        { assetId: 'sw1', ruStart: 40, height: 1, face: 'front' as const, powerW: 350 },
+        { assetId: 'fw1', ruStart: 30, height: 2, face: 'front' as const, powerW: 250 },
+    ]
+
+    it('finds nothing wrong with a rack whose devices fit and draw within its capacity', () => {
+        expect(reconcileRack(rack, placed)).toEqual([])
+    })
+
+    it('names the overlapping devices by their label, not their sys_id', () => {
+        const keyed = [
+            { assetId: 'a1b2', label: 'NAAS-0001', ruStart: 20, height: 1, face: 'front' as const },
+            { assetId: 'c3d4', label: 'FOC222', ruStart: 20, height: 1, face: 'front' as const },
+        ]
+        expect(reconcileRack(rack, keyed)).toEqual([{ type: 'rack_overlap', detail: 'NAAS-0001 and FOC222 share rack unit 20 (front)' }])
+    })
+
+    it('raises an overlap naming each pair that shares units', () => {
+        const twoSaves = [
+            ...placed,
+            { assetId: 'sw2', ruStart: 31, height: 1, face: 'front' as const },
+            { assetId: 'sw3', ruStart: 31, height: 1, face: 'front' as const },
+        ]
+        expect(reconcileRack(rack, twoSaves)).toEqual([
+            {
+                type: 'rack_overlap',
+                detail: 'fw1 and sw2 share rack unit 31 (front); fw1 and sw3 share rack unit 31 (front); sw2 and sw3 share rack unit 31 (front)',
+            },
+        ])
+    })
+
+    it('lets devices touch: one directly above or below another shares no unit', () => {
+        const touching = [
+            ...placed,
+            { assetId: 'above', ruStart: 32, height: 1, face: 'front' as const },
+            { assetId: 'below', ruStart: 28, height: 2, face: 'front' as const },
+        ]
+        expect(reconcileRack(rack, touching)).toEqual([])
+        expect(reconcileRack(rack, [...placed, { assetId: 'low', ruStart: 29, height: 2, face: 'front' }])).toEqual([
+            { type: 'rack_overlap', detail: 'fw1 and low share rack unit 30 (front)' },
+        ])
+    })
+
+    it('names the pairs lowest shared unit first, whatever their order in the rack', () => {
+        const twoSaves = [
+            ...placed,
+            { assetId: 'sw2', ruStart: 31, height: 2, face: 'front' as const },
+            { assetId: 'ap1', ruStart: 40, height: 1, face: 'front' as const },
+        ]
+        expect(reconcileRack(rack, twoSaves)).toEqual([
+            { type: 'rack_overlap', detail: 'fw1 and sw2 share rack unit 31 (front); sw1 and ap1 share rack unit 40 (front)' },
+        ])
+    })
+
+    it('lets devices share units on opposite faces, and counts a height under 1 as 1', () => {
+        expect(reconcileRack(rack, [...placed, { assetId: 'pdu', ruStart: 30, height: 2, face: 'rear' }])).toEqual([])
+        expect(reconcileRack(rack, [...placed, { assetId: 'blank', ruStart: 40, height: 0, face: 'front' }])).toEqual([
+            { type: 'rack_overlap', detail: 'sw1 and blank share rack unit 40 (front)' },
+        ])
+    })
+
+    it('compares two devices with the same name', () => {
+        const twin = { assetId: 'sys-a', label: 'NAAS-0001', ruStart: 5, height: 1, face: 'front' as const }
+        expect(reconcileRack(rack, [twin, twin])).toEqual([{ type: 'rack_overlap', detail: 'NAAS-0001 and NAAS-0001 share rack unit 5 (front)' }])
+    })
+
+    it('raises the power budget once typical power is over the capacity, counting both faces', () => {
+        expect(reconcileRack(rack, [...placed, { assetId: 'pdu', ruStart: 30, height: 1, face: 'rear', powerW: 400 }])).toEqual([])
+        expect(reconcileRack(rack, [...placed, { assetId: 'pdu', ruStart: 30, height: 1, face: 'rear', powerW: 401 }])).toEqual([
+            { type: 'rack_over_power', detail: "Typical power 1001 W is over the rack's 1000 W" },
+        ])
+    })
+
+    it('does not judge the power of a rack without a recorded capacity', () => {
+        const big = { assetId: 'big', ruStart: 1, height: 1, face: 'front' as const, powerW: 5000 }
+        expect(reconcileRack({ units: 42, powerCapacityW: 0 }, [...placed, big])).toEqual([])
+    })
+
+    it('raises both when two saves overlap and take the rack over its budget', () => {
+        const both = [...placed, { assetId: 'sw2', ruStart: 40, height: 1, face: 'front' as const, powerW: 500 }]
+        expect(reconcileRack(rack, both).map((found) => found.type)).toEqual(['rack_overlap', 'rack_over_power'])
+    })
+
+    it('finds nothing in an empty rack', () => {
+        expect(reconcileRack(rack, [])).toEqual([])
     })
 })

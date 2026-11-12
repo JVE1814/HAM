@@ -1,40 +1,8 @@
-import { addDays, addMonths, daysBetween } from './calendar.ts'
-import { FLEET_CONDITION } from './fleet.ts'
-import { STAGE_FIELDS, SUBSCRIPTION_LINE_STATUS } from './vocabulary.ts'
-
-/** Billing periods: daily proration of Subscription lines and Fee events (plan §13 Billing export, Q52, Q66). */
-
-export interface MonthBounds {
-    /** YYYY-MM */
-    month: string
-    first: string
-    last: string
-    days: number
-}
-
-export function isMonth(value: string): boolean {
-    return /^\d{4}-(0[1-9]|1[0-2])$/.test(value)
-}
-
-/** The first and last day and the length of a YYYY-MM month; throws for any other value. */
-export function monthBounds(month: string): MonthBounds {
-    if (!isMonth(month)) throw new Error(`'${month}' is not a YYYY-MM month`)
-    const first = `${month}-01`
-    const next = addMonths(first, 1)
-    return { month, first, last: addDays(next, -1), days: daysBetween(first, next) }
-}
-
-/**
- * An encoded query for records whose date range (end blank = still open) overlaps the month.
- * The ^OR binds to the end-date clause only: start <= last AND (end empty OR end >= first).
- */
-export function overlapsMonth(bounds: MonthBounds): string {
-    return `start_date<=${bounds.last}^end_dateISEMPTY^ORend_date>=${bounds.first}`
-}
-
-export function previousMonth(today: string): string {
-    return addMonths(`${today.slice(0, 7)}-01`, -1).slice(0, 7)
-}
+import { addDays, addMonths } from './calendar.ts'
+import { activeDays, currencyKey, divideRounded, fromCents, isMonth, previousMonth, toCents, type MonthBounds } from './money.ts'
+import { FLEET_CONDITION, fleetStagesQuery } from './fleet.ts'
+import { DEPLOYED_STAGES } from './lifecycle.ts'
+import { BILLING_PERIOD_STATUS, STAGE_FIELDS, SUBSCRIPTION_LINE_STATUS, SUBSCRIPTION_LINE_TYPE } from './vocabulary.ts'
 
 /**
  * Why a Billing period cannot be saved for `month` on `today`, or null. The month must be YYYY-MM and over: a new
@@ -48,55 +16,6 @@ export function billingMonthProblem(month: string, today: string): string | null
     return `${month} has not ended yet: a period is generated as soon as it is created, so it can be created from ${from} (the monthly job opens it then)`
 }
 
-/** Days from `from` to `to` (both inclusive; open-ended without `to`) that fall in the month. */
-export function activeDays(bounds: MonthBounds, from: string, to?: string): number {
-    if (!from) return 0
-    const start = from > bounds.first ? from : bounds.first
-    const end = to && to < bounds.last ? to : bounds.last
-    return end < start ? 0 : daysBetween(start, end) + 1
-}
-
-/*
- * Money is rounded in whole cents, half away from zero. Binary fractions cannot hold most decimal amounts (1.005 is
- * stored as 1.00499...), so rounding `amount * 100` directly would round many half-cents down.
- */
-
-/** An amount as whole cents, rounded half away from zero; the binary noise of a decimal amount is ignored (1.005 is 101). */
-export function toCents(amount: number): number {
-    if (!Number.isFinite(amount)) return 0
-    const rounded = Math.round(Number((Math.abs(amount) * 100).toPrecision(15)))
-    return (amount < 0 ? -rounded : rounded) || 0
-}
-
-export function fromCents(cents: number): number {
-    return cents / 100
-}
-
-export function roundToCent(amount: number): number {
-    return fromCents(toCents(amount))
-}
-
-/**
- * `numerator / denominator` for integers (denominator not 0), rounded half away from zero, exactly: the quotient a float
- * division gives is corrected by its remainder, so a half is never lost to binary rounding.
- */
-export function divideRounded(numerator: number, denominator: number): number {
-    const negative = numerator < 0 !== denominator < 0
-    const n = Math.abs(numerator)
-    const d = Math.abs(denominator)
-    let quotient = Math.floor(n / d)
-    let remainder = n - quotient * d
-    if (remainder < 0) {
-        quotient--
-        remainder += d
-    } else if (remainder >= d) {
-        quotient++
-        remainder -= d
-    }
-    const rounded = 2 * remainder >= d ? quotient + 1 : quotient
-    return (negative ? -rounded : rounded) || 0
-}
-
 /** Rates are taken to four decimals (ten-thousandths of the currency unit): a rate with more is rounded to four first. */
 const RATE_SCALE = 10000
 
@@ -104,74 +23,10 @@ const RATE_SCALE = 10000
  * A monthly rate charged for `units` (whole) days, or device-days, of a month, to the cent: worked out in whole numbers,
  * so a charge of exactly half a cent rounds up (0.29 a month for 14 of 28 days is 0.15).
  */
-export function prorate(monthlyRate: number, units: number, daysInMonth: number): number {
+function prorate(monthlyRate: number, units: number, daysInMonth: number): number {
     if (daysInMonth <= 0) return 0
     const rate = Math.round(monthlyRate * RATE_SCALE)
     return fromCents(divideRounded(rate * Math.round(units), daysInMonth * (RATE_SCALE / 100)))
-}
-
-/*
- * Currency (the owner's decision): each Agreement bills in one currency, a mandatory field with no default. Its Billing
- * lines and Cost facts are kept in it, and no amounts of two currencies are ever added: totals and Margin are kept per
- * currency. A shipment's cost is the exception: it stays in the carrier's currency, and Margin counts it in that one.
- */
-
-/** A currency code as entered (ISO 4217: three letters, any case), upper-cased; '' for anything else. */
-export function currencyCode(value: string): string {
-    const code = value.trim()
-    return /^[A-Za-z]{3}$/.test(code) ? code.toUpperCase() : ''
-}
-
-/**
- * A stored currency as totals and Margin group it: its code (currencyCode), else as stored, trimmed (so a value that is
- * no code is still kept apart from every other, never merged into one).
- */
-export function currencyKey(value: string): string {
-    return currencyCode(value) || value.trim()
-}
-
-/**
- * Why a currency entered on an Agreement cannot be saved (it must be a three-letter code, e.g. EUR), or null when it
- * can: caught as it is entered, not when every line of the Agreement fails to bill. Blank is left to the field's
- * mandatory check (an Agreement saved before it had one keeps saving until finance sets it).
- */
-export function agreementCurrencyProblem(value: string): string | null {
-    if (value.trim() === '' || currencyCode(value)) return null
-    return `'${value.trim()}' is not a currency code: enter the three letters of an ISO 4217 code, e.g. EUR`
-}
-
-/** An Agreement an amount names, for its currency: `name` (its number) for messages, and its Currency as stored. */
-export interface AgreementCurrency {
-    name: string
-    currency: string
-}
-
-export type CurrencyChoice = { currency: string } | { problem: string }
-
-/**
- * The currency an amount is billed or costed in, never a default: its Agreement's, when it names one. One that names
- * none (a fee entered by hand, a site audit's work order) takes the currency every Agreement of its Customer has
- * (`customerCurrencies`, as stored, read only then); a Customer whose Agreements have several, or none, leaves it
- * without one. A choice without a currency says why, to fix the Agreement (or name one) and run the job again.
- */
-export function chooseCurrency(agreement: AgreementCurrency | null, customerCurrencies: () => readonly string[]): CurrencyChoice {
-    if (agreement) {
-        const currency = currencyCode(agreement.currency)
-        if (currency) return { currency }
-        const stored = agreement.currency.trim()
-        const why = stored ? `'${stored}' as its currency, not a three-letter code` : 'no currency'
-        return { problem: `its Agreement ${agreement.name} has ${why}: set the Agreement's currency` }
-    }
-    const codes = [...new Set(customerCurrencies().map(currencyCode))].sort()
-    if (codes.length === 1 && codes[0]) return { currency: codes[0] }
-    const has = codes.length === 0 ? 'none' : codes.map((code) => code || 'no currency').join(', ')
-    return { problem: `it names no Agreement, and its Customer's Agreements are in ${has}: set its Agreement` }
-}
-
-/** The currency chosen; throws with why there is none, so the line or cost fails (and is counted) instead of guessing one. */
-export function currencyOrThrow(choice: CurrencyChoice): string {
-    if ('problem' in choice) throw new Error(`no currency: ${choice.problem}`)
-    return choice.currency
 }
 
 /** The days one Asset (or `count` Assets) delivered a Subscription line at a Site (end inclusive; none while still in service). */
@@ -188,8 +43,7 @@ export function intervalEnd(start: string, closedOn: string): string {
     return closedOn < start ? start : closedOn
 }
 
-/** Where an Asset delivers (or delivered) a Subscription line. */
-export interface IntervalPlace {
+interface IntervalPlace {
     lineId: string
     siteId: string
 }
@@ -199,12 +53,15 @@ export interface IntervalPlace {
  * `latest` (end inclusive): one at the same place that ends on or after `start` is reopened, so no day
  * is billed twice; one elsewhere makes the new interval start the day after it ends; otherwise it starts on `start`.
  */
-export function restartInterval(latest: (IntervalPlace & { end: string }) | null, place: IntervalPlace, start: string): { reopen: true } | { start: string } {
+export function restartInterval<Closed extends IntervalPlace & { end: string }>(
+    latest: Closed | null,
+    place: IntervalPlace,
+    start: string,
+): { reopen: Closed } | { start: string } {
     if (!latest || latest.end < start) return { start }
-    return latest.lineId === place.lineId && latest.siteId === place.siteId ? { reopen: true } : { start: addDays(latest.end, 1) }
+    return latest.lineId === place.lineId && latest.siteId === place.siteId ? { reopen: latest } : { start: addDays(latest.end, 1) }
 }
 
-/** What a Subscription line is billed by, as stored on it. */
 export interface SubscriptionLineTerms {
     /** As stored. 'site_package' bills its own dates, 'device_class' its Service intervals; any other value bills nothing. */
     lineType: string
@@ -220,11 +77,11 @@ export interface SubscriptionLineTerms {
 }
 
 export function billsFromIntervals(line: Pick<SubscriptionLineTerms, 'lineType'>): boolean {
-    return line.lineType === 'device_class'
+    return line.lineType === SUBSCRIPTION_LINE_TYPE.device_class
 }
 
 /** A range of days, end inclusive; no end means still open. */
-export interface DayRange {
+interface DayRange {
     start: string
     end?: string
 }
@@ -235,14 +92,14 @@ export interface DayRange {
  * flags it, IN_SERVICE_ON_ENDED_LINE; it is never moved to another line). Null when they do not overlap, and for a
  * line without a start date, which has not started (a site package without one bills nothing either).
  */
-export function withinLine(interval: DayRange, line: Partial<DayRange>): DayRange | null {
+function withinLine(interval: DayRange, line: Partial<DayRange>): DayRange | null {
     if (!line.start || !interval.start) return null
     const start = interval.start > line.start ? interval.start : line.start
     const end = !line.end || (interval.end && interval.end < line.end) ? interval.end : line.end
     return end !== undefined && end < start ? null : { start, end }
 }
 
-export const NO_LINE = 'x_daas_ham_subscription_lineISEMPTY'
+const NO_LINE = 'x_daas_ham_subscription_lineISEMPTY'
 
 /**
  * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets in service on no Subscription line,
@@ -250,16 +107,26 @@ export const NO_LINE = 'x_daas_ham_subscription_lineISEMPTY'
  */
 export const IN_SERVICE_UNBILLED = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${NO_LINE}^${FLEET_CONDITION}`
 
-export const ON_ENDED_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION_LINE_STATUS.ended}^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()`
+const ON_ENDED_LINE = `x_daas_ham_subscription_line.status=${SUBSCRIPTION_LINE_STATUS.ended}^ORx_daas_ham_subscription_line.end_date<javascript:gs.beginningOfToday()`
 
 /**
  * Encoded query on alm_hardware for the Billing integrity dashboard: fleet assets (ADR 0016) billed from a Service
  * interval whose Subscription line has ended (set ended, or past its end date; the end date itself is billed). Their
  * days after the line's end are not billed (withinLine), so they are flagged; nothing moves them to another line.
  * It is `fleetStagesQuery(IN_USE_STAGES, ON_ENDED_LINE)` written out, one clause per stage in use: the dashboard tile
- * imports it, and Fluent metadata reads no function call (domain/billing.test.ts holds it to the function's result).
+ * imports it, and Fluent metadata reads no function call (domain/billing.test.ts checks which Assets it flags).
  */
 export const IN_SERVICE_ON_ENDED_LINE = `install_status=${STAGE_FIELDS.in_service.installStatus}^substatusISEMPTY^${ON_ENDED_LINE}^${FLEET_CONDITION}^NQinstall_status=${STAGE_FIELDS.temporary_deployment.installStatus}^substatus=${STAGE_FIELDS.temporary_deployment.substatus}^${ON_ENDED_LINE}^${FLEET_CONDITION}`
+
+/**
+ * The Assets that keep a site package open, as an encoded alm_hardware query: the fleet assets (ADR 0016) at its Site
+ * under its Agreement on their way there, serving there or on their way back. A unit received at the depot or declared
+ * missing no longer counts. A swap's new units do, before monitoring first sees them and attaches them to the package,
+ * so a swap-back that reaches the depot first does not end it (Q60).
+ */
+export function sitePackageHoldersQuery(line: { siteId: string; agreementId: string }): string {
+    return fleetStagesQuery(DEPLOYED_STAGES, `x_daas_ham_site=${line.siteId}^x_daas_ham_agreement=${line.agreementId}`)
+}
 
 /** What one Subscription line bills at one Site for the month: the content of its Billing line. */
 export interface Charge {
@@ -270,7 +137,6 @@ export interface Charge {
     units: number
     /** To the cent, in `currency`. */
     amount: number
-    /** The line's (its Agreement's) currency. */
     currency: string
 }
 
@@ -301,7 +167,7 @@ export function subscriptionCharges(line: SubscriptionLineTerms, bounds: MonthBo
 
 function unitsBySite(line: SubscriptionLineTerms, bounds: MonthBounds, sources: ChargeSources): Map<string, number> {
     const bySite = new Map<string, number>()
-    if (line.lineType === 'site_package') {
+    if (line.lineType === SUBSCRIPTION_LINE_TYPE.site_package) {
         const units = line.start ? activeDays(bounds, line.start, line.end) : 0
         if (units > 0) bySite.set(line.siteId, units)
     } else if (billsFromIntervals(line)) {
@@ -314,10 +180,9 @@ function unitsBySite(line: SubscriptionLineTerms, bounds: MonthBounds, sources: 
     return bySite
 }
 
-/** How long a generating Billing period must show no activity before an admin may reset it (Reset generation). */
 export const RESET_AFTER_IDLE_MINUTES = 30
 
-export type GenerationReset = { reset: true; idleMinutes: number } | { reset: false; why: string }
+type GenerationReset = { reset: true; idleMinutes: number } | { reset: false; why: string }
 
 /**
  * Whether a Billing period stuck in Generating may be reset by hand to Ready for review: only once its generation has
@@ -330,7 +195,7 @@ export function decideGenerationReset(
     activityMs: ReadonlyArray<number | undefined>,
     nowMs: number,
 ): GenerationReset {
-    if (status !== 'generating') return { reset: false, why: 'only a period still generating can be reset' }
+    if (status !== BILLING_PERIOD_STATUS.generating) return { reset: false, why: 'only a period still generating can be reset' }
     const known = activityMs.filter((ms): ms is number => ms !== undefined)
     if (known.length === 0) {
         return { reset: false, why: 'when its generation was last active cannot be read, so it may still be running' }
@@ -346,10 +211,16 @@ export function decideGenerationReset(
 /** The length of the errors a Billing period records: its `last_error` (generation) and its `margin_error`. */
 export const PERIOD_ERROR_LENGTH = 255
 
+/** `text` as a Billing period stores it in either error field: the platform refuses or cuts a longer value unseen. */
+export function periodError(text: string): string {
+    return text.slice(0, PERIOD_ERROR_LENGTH)
+}
+
 /** The generation error a reset period records, which Close period refuses on until a Regenerate clears it. */
 export function resetGenerationError(byUser: string, idleMinutes: number): string {
-    const note = `Generation reset by hand by ${byUser} after ${idleMinutes} minutes without activity; its lines may be incomplete: Regenerate before closing`
-    return note.slice(0, PERIOD_ERROR_LENGTH)
+    return periodError(
+        `Generation reset by hand by ${byUser} after ${idleMinutes} minutes without activity; its lines may be incomplete: Regenerate before closing`,
+    )
 }
 
 /**
@@ -360,7 +231,6 @@ export function monthChangedError(month: string): string {
     return `Month changed to ${month}; its lines are still the old month's: Regenerate before closing`
 }
 
-/** A column of a Billing line, as its exports give it. */
 interface BillingLineColumn<Field extends string = string> {
     field: Field
     /** A reference reads as its display value in the CSV. */
@@ -375,8 +245,7 @@ interface BillingLineColumn<Field extends string = string> {
 
 /**
  * What a Billing line holds besides its period, in the order every export gives it: the CSV attached to a closed
- * period and the pull API's lines are both read off this list (`billingCsvRow`, `billingLineJson`), and a generated
- * line sets these fields (`BillingLineValues`).
+ * period and the pull API's lines are both read off this list.
  */
 const BILLING_LINE_COLUMNS = [
     { field: 'kind', type: 'text', csv: true, json: 'kind' },
@@ -397,7 +266,6 @@ export type BillingLineField = (typeof BILLING_LINE_COLUMNS)[number]['field']
 /** The fields a generated Billing line is given; one left out keeps the column's default. */
 export type BillingLineValues = { readonly [field in BillingLineField]?: string | number }
 
-/** A stored Billing line as an export reads it. */
 export interface StoredBillingLine {
     /** The field's stored value ('' when empty). */
     value(field: BillingLineField): string
@@ -418,12 +286,10 @@ export function billingCsvHeader(): string[] {
     return ['period', ...CSV_COLUMNS.map((column) => column.field)]
 }
 
-/** A Billing line's row in the CSV export of `period` (its YYYY-MM month). */
 export function billingCsvRow(period: string, line: StoredBillingLine): Array<string | number> {
     return [period, ...CSV_COLUMNS.map((column) => (column.type === 'reference' ? line.display(column.field) : storedValue(line, column)))]
 }
 
-/** A Billing line as the pull API gives it. */
 export function billingLineJson(id: string, line: StoredBillingLine): { [key: string]: string | number } {
     const json: { [key: string]: string | number } = { id }
     for (const column of COLUMNS) {
@@ -433,12 +299,19 @@ export function billingLineJson(id: string, line: StoredBillingLine): { [key: st
     return json
 }
 
-/** A Billing period's lines and their amount in one currency. */
+export const PULL_PAGE = {
+    periods: { size: 24, most: 120 },
+    lines: { size: 1000, most: 5000 },
+} as const
+
+export function pullPageSize(requested: number, page: { most: number }): number {
+    return Math.min(Math.max(requested, 1), page.most)
+}
+
 export interface CurrencyTotal {
     /** As stored on the lines (currencyCode); '' for lines without one. */
     currency: string
     lines: number
-    /** To the cent. */
     amount: number
 }
 
@@ -462,7 +335,7 @@ export function currencyTotals(groups: Iterable<CurrencyTotal>): CurrencyTotal[]
 }
 
 /** The most a period's Totals text holds (its field's length). */
-const TOTALS_TEXT_LENGTH = 255
+export const TOTALS_TEXT_LENGTH = 255
 
 /** A period's totals as its Totals field shows them, e.g. 'EUR 1234.56; USD 99.00' ('' without lines). */
 export function totalsText(totals: readonly CurrencyTotal[]): string {

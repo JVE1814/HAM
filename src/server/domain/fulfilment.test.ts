@@ -3,17 +3,19 @@ import {
     anythingShipped,
     CANCELLABLE_ORDER_STAGES,
     closedStateFor,
+    endedUnfulfilled,
     ENDED_ORDER_STAGES,
     followsLines,
     leftInTransit,
-    LINE_STAGES,
     lineStageFor,
+    lineStillOpen,
     OPEN_ORDERS_QUERY,
     orderStageFor,
     refillsLine,
     UNFULFILLED_ORDER_STAGES,
 } from './fulfilment'
 import { LINE_STAGE_CHOICES, ORDER_STAGE_CHOICES, type LineStage, type OrderStage } from './vocabulary'
+import { recordMatches as matches } from '../test-support/encoded-query'
 
 describe('lineStageFor', () => {
     it('waits for stock while fewer assets than ordered are allocated', () => {
@@ -134,7 +136,7 @@ describe('orderStageFor', () => {
     })
 
     it('derives every live line stage to a stage of its own, complete only from in service', () => {
-        const live = LINE_STAGES.filter((stage) => stage !== 'cancelled')
+        const live = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped', 'installed', 'in_service'] as const
         expect(live.map((stage) => orderStageFor([stage]))).toEqual([
             'sourcing',
             'preparing',
@@ -242,8 +244,8 @@ describe('the Order stage sets', () => {
         expect(UNFULFILLED_ORDER_STAGES).not.toContain('complete')
     })
 
-    it('select the open Orders with the query the metadata imports', () => {
-        expect(OPEN_ORDERS_QUERY).toBe(`stageNOT IN${ENDED_ORDER_STAGES.join(',')}`)
+    it('select the open Orders, every one that has not ended, with the query the metadata imports', () => {
+        expect(stages.filter((stage) => matches(OPEN_ORDERS_QUERY, { stage }))).toEqual(stages.filter((stage) => !ENDED_ORDER_STAGES.includes(stage)))
     })
 
     it('offer Cancel order until Ship: on no Order that ended, is being installed or is complete', () => {
@@ -255,5 +257,35 @@ describe('the Order line stages', () => {
     it('have a line filled again from awaiting stock to shipped', () => {
         const refilled = (Object.keys(LINE_STAGE_CHOICES) as LineStage[]).filter((stage) => refillsLine({ stage, deploymentEnds: false }))
         expect(refilled).toEqual(['awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped'])
+    })
+})
+
+describe('endedUnfulfilled', () => {
+    it('is an Order cancelled or rejected, and no other', () => {
+        expect(['cancelled', 'rejected'].map(endedUnfulfilled)).toEqual([true, true])
+        const live = ['draft', 'awaiting_approval', 'sourcing', 'preparing', 'delivering', 'installing', 'complete', '']
+        expect(live.filter(endedUnfulfilled)).toEqual([])
+    })
+
+    it('ends every line of the Order for sourcing, whatever its own stage', () => {
+        for (const orderStage of ['cancelled', 'rejected']) {
+            for (const lineStage of ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship']) {
+                expect(lineStillOpen({ lineStage, orderStage })).toBe(false)
+            }
+        }
+    })
+})
+
+describe('lineStillOpen', () => {
+    it('is a line not yet shipped, cancelled or rejected, on an Order neither cancelled nor rejected', () => {
+        expect(lineStillOpen({ lineStage: 'awaiting_stock', orderStage: 'sourcing' })).toBe(true)
+        expect(lineStillOpen({ lineStage: 'ready_to_ship', orderStage: 'preparing' })).toBe(true)
+        for (const lineStage of ['shipped', 'installed', 'in_service', 'cancelled']) {
+            expect(lineStillOpen({ lineStage, orderStage: 'sourcing' })).toBe(false)
+        }
+        // A line whose cancel was refused stays open on its cancelled Order.
+        for (const orderStage of ['cancelled', 'rejected']) {
+            expect(lineStillOpen({ lineStage: 'awaiting_stock', orderStage })).toBe(false)
+        }
     })
 })

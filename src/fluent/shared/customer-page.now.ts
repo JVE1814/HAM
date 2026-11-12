@@ -1,7 +1,7 @@
 import '@servicenow/sdk/global'
 import { Acl, Record, UiPage } from '@servicenow/sdk/core'
 import customerPage from '../../client/customer.html'
-import { ROLE } from '../../server/domain/visibility'
+import { ROLE } from '../../server/domain/roles'
 import { assetManager, customerAdmin, siteContact } from './roles.now'
 import { naasMenu } from './menu.now'
 

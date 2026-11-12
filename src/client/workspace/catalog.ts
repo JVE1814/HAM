@@ -5,13 +5,13 @@ import { OPEN_ORDERS_QUERY, ORDERS_AWAITING_APPROVAL_QUERY } from '../../server/
 import { INSTALLED_PAST_SUPPORT } from '../../server/domain/model-lifecycle'
 import { OPEN_NORM_EXCEPTIONS_QUERY } from '../../server/domain/normalization'
 import { OPEN_RMAS_QUERY } from '../../server/domain/oem-rma'
+import { PROPERTY } from '../../server/domain/properties'
 import { STEP_STATUS } from '../../server/domain/oem/claims'
 import { OPEN_EXCEPTIONS_QUERY } from '../../server/domain/reconciliation'
-import { REFRESH_HORIZON_DAYS } from '../../server/domain/refresh'
 import { OPEN_FEES_QUERY } from '../../server/domain/returns'
 import { OPEN_SHIPMENTS } from '../../server/domain/shipping'
 import { DISPOSAL_STAGE, INSTALL_STATUS, LINE_STAGE, ORDER_STAGE, ORDER_TYPE, RETURN_LINE_STATUS, SHIPMENT_STATUS, SUBSCRIPTION_LINE_STATUS } from '../../server/domain/vocabulary'
-import { BROAD_STAFF, MONEY_READERS, PROVIDER_STAFF, ROLE, type AppRole } from '../../server/domain/visibility'
+import { BROAD_STAFF, MONEY_READERS, PROVIDER_STAFF, ROLE, type AppRole } from '../../server/domain/roles'
 import type { Session } from '../lib/session'
 import type { Source } from '../lib/sn'
 
@@ -148,9 +148,9 @@ const CATALOG = {
             audience: 'staff',
         },
         assets_refresh_due: {
-            title: `Refresh due within ${REFRESH_HORIZON_DAYS} days`,
+            title: `Refresh due within ${PROPERTY.refreshHorizonDays.default} days`,
             table: 'alm_hardware',
-            query: `x_daas_ham_refresh_dueRELATIVELT@dayofweek@ahead@${REFRESH_HORIZON_DAYS}^${FLEET_INSTALLED}`,
+            query: `x_daas_ham_refresh_dueRELATIVELT@dayofweek@ahead@${PROPERTY.refreshHorizonDays.default}^${FLEET_INSTALLED}`,
             columns: `${INSTALLED_ASSET_COLUMNS},x_daas_ham_refresh_due,x_daas_ham_lifecycle_phase`,
             audience: 'staff',
         },

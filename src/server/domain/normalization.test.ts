@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
     fleetOnRawModelQuery,
-    manufacturerKey,
     normalizeModel,
     notNaasRawModelsQuery,
     RAW_MODEL_EXCEPTIONS_QUERY,
@@ -24,11 +23,10 @@ const aliases = [
 ]
 
 const rules: ModelMatchRule[] = [
-    { id: 'r1', order: 100, manufacturerId: 'cisco', matchType: 'exact', pattern: 'C9300-48P-E', modelId: 'c9300-48p', active: true },
-    { id: 'r2', order: 200, manufacturerId: 'cisco', matchType: 'prefix', pattern: 'C9300', modelId: 'c9300-generic', active: true },
-    { id: 'r3', order: 50, manufacturerId: 'fortinet', matchType: 'regex', pattern: '^FortiGate[- ]?60F', modelId: 'fg60f', active: true },
-    { id: 'r4', order: 10, manufacturerId: 'cisco', matchType: 'regex', pattern: '([', modelId: 'broken', active: true },
-    { id: 'r5', order: 1, manufacturerId: 'cisco', matchType: 'prefix', pattern: 'C', modelId: 'inactive', active: false },
+    { id: 'r1', order: 100, manufacturerId: 'cisco', matchType: 'exact', pattern: 'C9300-48P-E', modelId: 'c9300-48p' },
+    { id: 'r2', order: 200, manufacturerId: 'cisco', matchType: 'prefix', pattern: 'C9300', modelId: 'c9300-generic' },
+    { id: 'r3', order: 50, manufacturerId: 'fortinet', matchType: 'regex', pattern: '^FortiGate[- ]?60F', modelId: 'fg60f' },
+    { id: 'r4', order: 10, manufacturerId: 'cisco', matchType: 'regex', pattern: '([', modelId: 'broken' },
 ]
 
 describe('normalizeModel', () => {
@@ -38,14 +36,14 @@ describe('normalizeModel', () => {
     })
 
     it('treats any punctuation as a word break when matching manufacturer aliases', () => {
-        expect(manufacturerKey('Hewlett-Packard Enterprise')).toBe(manufacturerKey('Hewlett Packard Enterprise'))
-        expect(manufacturerKey('Hewlett Packard (Enterprise)')).toBe('hewlett packard enterprise')
-        expect(manufacturerKey('Hewlett/Packard_Enterprise')).toBe('hewlett packard enterprise')
-        expect(manufacturerKey('Hewlett\u2013Packard Enterprise\u2122')).toBe('hewlett packard enterprise')
-        expect(manufacturerKey('\u2018Dell\u2019 Technologies\u00ae')).toBe('dell technologies')
-        expect(manufacturerKey('Cisco Systems,Inc.')).toBe('cisco systems inc')
-        const result = normalizeModel({ manufacturer: 'Hewlett-Packard Enterprise', model: 'DL380' }, aliases, rules)
-        expect(result).toEqual({ matched: false, manufacturerId: 'hpe', reason: 'no_matching_rule' })
+        const withDell = [...aliases, { alias: 'Dell Technologies', manufacturerId: 'dell' }]
+        const manufacturerOf = (manufacturer: string) => normalizeModel({ manufacturer, model: 'DL380' }, withDell, rules)
+        expect(manufacturerOf('Hewlett-Packard Enterprise')).toEqual({ matched: false, manufacturerId: 'hpe', reason: 'no_matching_rule' })
+        for (const written of ['Hewlett Packard (Enterprise)', 'Hewlett/Packard_Enterprise', 'Hewlett–Packard Enterprise™']) {
+            expect(manufacturerOf(written), written).toMatchObject({ manufacturerId: 'hpe' })
+        }
+        expect(manufacturerOf('‘Dell’ Technologies®')).toMatchObject({ manufacturerId: 'dell' })
+        expect(manufacturerOf('Cisco Systems,Inc.')).toMatchObject({ manufacturerId: 'cisco' })
     })
 
     it('never matches a manufacturer that is only punctuation or blank', () => {
@@ -63,7 +61,7 @@ describe('normalizeModel', () => {
         expect(result).toMatchObject({ matched: true, modelId: 'fg60f' })
     })
 
-    it('skips inactive rules and rules with an invalid pattern', () => {
+    it('skips rules with an invalid pattern', () => {
         const result = normalizeModel({ manufacturer: 'cisco', model: 'ISR4331' }, aliases, rules)
         expect(result).toEqual({ matched: false, manufacturerId: 'cisco', reason: 'no_matching_rule' })
     })
@@ -100,7 +98,6 @@ describe('shouldLearnAlias', () => {
     })
 })
 
-/** A raw model still to normalize: no OEM PID, mapped to no canonical Model. */
 const RAW = { x_daas_ham_oem_pid: '', x_daas_ham_normalized_to: '' }
 const CANONICAL = { x_daas_ham_oem_pid: 'C9300-48P-E', x_daas_ham_normalized_to: '' }
 const MAPPED = { x_daas_ham_oem_pid: '', x_daas_ham_normalized_to: 'c9300-48p' }

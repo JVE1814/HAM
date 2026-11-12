@@ -1,13 +1,14 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
-import { assetManager, broadStaff } from '../shared/roles.now'
+import { BROAD_STAFF } from '../../server/domain/roles'
+import { assetManager } from '../shared/roles.now'
 
 Acl({
     $id: Now.ID['acl_manufacturer_alias_read'],
     type: 'record',
     table: 'x_daas_ham_manufacturer_alias',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
@@ -39,7 +40,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_model_match_rule',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({
@@ -71,7 +72,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_norm_exception',
     operation: 'read',
-    roles: broadStaff,
+    roles: BROAD_STAFF,
 })
 
 Acl({

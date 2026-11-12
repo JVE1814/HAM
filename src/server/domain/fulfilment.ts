@@ -41,9 +41,6 @@ const SHIPPED_AT = LINE_ORDER.indexOf('shipped')
 
 type LiveLineStage = (typeof LINE_ORDER)[number]
 
-/** Every line stage, to read x_daas_ham_order_line.line_stage with (platform/records `choice`). */
-export const LINE_STAGES: readonly LineStage[] = [...LINE_ORDER, 'cancelled']
-
 function rank(stage: LineStage): number {
     return (LINE_ORDER as readonly LineStage[]).indexOf(stage)
 }
@@ -54,7 +51,6 @@ function rank(stage: LineStage): number {
  */
 export const OPEN_LINE_STAGES: readonly LineStage[] = LINE_ORDER.slice(0, SHIPPED_AT)
 
-/** Line stages at which the line's equipment has left the Provider. */
 const DELIVERED: ReadonlySet<LineStage> = new Set(LINE_ORDER.slice(SHIPPED_AT))
 
 /**
@@ -157,7 +153,6 @@ export const ORDER_TASK_STATE = {
     cancelled: TASK_STATE.closedSkipped,
 } as const
 
-/** The task state an Order is closed with as it enters `stage`; undefined for a stage that leaves it open. */
 export function closedStateFor(stage: OrderStage): number | undefined {
     return stage === 'complete' || stage === 'rejected' || stage === 'cancelled' ? ORDER_TASK_STATE[stage] : undefined
 }
@@ -176,6 +171,17 @@ export function endedUnfulfilled(orderStage: string): boolean {
     return (UNFULFILLED_ORDER_STAGES as readonly string[]).includes(orderStage)
 }
 
+/** An Order line's stage and its Order's: what tells whether the line still waits to be filled. */
+export interface LineOpenness {
+    lineStage: string
+    orderStage: string
+}
+
+/** Whether an Order line still waits to be filled: not shipped or cancelled, its Order not cancelled or rejected. */
+export function lineStillOpen(line: LineOpenness): boolean {
+    return OPEN_LINE_STAGES.includes(line.lineStage as LineStage) && !endedUnfulfilled(line.orderStage)
+}
+
 /** Stages in which an Order has ended, fulfilled or not. Every other Order is open (`OPEN_ORDERS_QUERY`). */
 export const ENDED_ORDER_STAGES: readonly OrderStage[] = [ORDER_STAGE.complete, ORDER_STAGE.cancelled, ORDER_STAGE.rejected]
 
@@ -186,7 +192,6 @@ export const ENDED_ORDER_STAGES: readonly OrderStage[] = [ORDER_STAGE.complete, 
  */
 export const OPEN_ORDERS_QUERY = `stageNOT IN${ORDER_STAGE.complete},${ORDER_STAGE.cancelled},${ORDER_STAGE.rejected}`
 
-/** Encoded query on x_daas_ham_order: the Orders waiting for an approval, which the workspace lists and the dashboard counts. */
 export const ORDERS_AWAITING_APPROVAL_QUERY = `stage=${ORDER_STAGE.awaiting_approval}`
 
 /**
@@ -210,9 +215,9 @@ export function followsLines(orderStage: string): boolean {
 }
 
 /**
- * The stage an Order takes from its lines: cancelled once every line is, else that of its slowest live line, complete
- * only once each is in service. A line stage the app does not know (a corrupt row, a choice an administrator added: the
- * stages are read from records) counts as slower than any, so it holds the Order at sourcing and never completes it.
+ * The stage an Order takes from its lines. A line stage the app does not know (a corrupt row, a choice an administrator
+ * added: the stages are read from records) counts as slower than any, so it holds the Order at sourcing and never
+ * completes it.
  */
 export function orderStageFor(lineStages: readonly LineStage[]): OrderStage {
     const live = lineStages.filter((s) => s !== 'cancelled')

@@ -43,12 +43,6 @@ export interface SubscriptionLineView {
     end?: string
 }
 
-/**
- * The open Subscription line an in-service Asset delivers from `liveOn`: its Site's package, else its Device-class line.
- * A Device-class line for the Asset's Site is chosen before one with no Site, whatever order the lines are read in. A
- * line whose end date is before `liveOn` is passed over, set ended or not: it would bill none of the unit's days. Within
- * each of those, a line started by `liveOn` (or pending, which starts then) is chosen before one that starts later.
- */
 export function chooseSubscriptionLine(
     lines: readonly SubscriptionLineView[],
     asset: { siteId: string; deviceClass: string; liveOn: string },

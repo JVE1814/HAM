@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { default_view, Form, List, Record } from '@servicenow/sdk/core'
-import { ROLE } from '../../server/domain/visibility'
+import { ROLE } from '../../server/domain/roles'
 import { providerStaff } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 

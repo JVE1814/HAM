@@ -1,10 +1,10 @@
 import '@servicenow/sdk/global'
 import { Test } from '@servicenow/sdk/core'
-import { INSTALL_STATUS, STAGE_FIELDS } from '../../server/domain/vocabulary'
+import { INSTALL_STATUS, LEASE_END_ACTION, STAGE_FIELDS, TASK_STATE } from '../../server/domain/vocabulary'
 import { assetManager } from '../shared/roles.now'
 
 /*
- * ATF: lessor ownership and lease extension (Q65; suite "NaaS - P3"). The lease rules act on fleet assets only
+ * The lease rules act on fleet assets only
  * (ADR 0016), so the Assets here are fleet assets. Fixtures setting the Fleet flag insert without security enforcement:
  * the flag is read-only on forms, and the app's intake paths set it server-side.
  */
@@ -13,6 +13,8 @@ import { assetManager } from '../shared/roles.now'
 // name, but no property access (VOCABULARY.value).
 const IN_STOCK = INSTALL_STATUS.inStock
 const AVAILABLE = STAGE_FIELDS.available.substatus
+const EXTENDED_LEASE_FIELDS = `endsON2028-01-31@javascript:gs.dateGenerate('2028-01-31','start')@javascript:gs.dateGenerate('2028-01-31','end')^end_action=${LEASE_END_ACTION.undecided}`
+const DECISION_CLOSED_FIELDS = `state=${TASK_STATE.closedComplete}`
 
 export const leasedAssetOwnershipTest = Test(
     {
@@ -104,15 +106,14 @@ export const leaseExtensionTest = Test(
             $id: Now.ID['atf_lext_validate_lease'],
             table: 'x_daas_ham_lease_schedule',
             recordId: lease.record_id,
-            fieldValues:
-                "endsON2028-01-31@javascript:gs.dateGenerate('2028-01-31','start')@javascript:gs.dateGenerate('2028-01-31','end')^end_action=undecided",
+            fieldValues: EXTENDED_LEASE_FIELDS,
             assert: 'record_validated',
         })
         atf.server.recordValidation({
             $id: Now.ID['atf_lext_validate_decision'],
             table: 'x_daas_ham_lease_decision',
             recordId: decision.record_id,
-            fieldValues: 'state=3',
+            fieldValues: DECISION_CLOSED_FIELDS,
             assert: 'record_validated',
         })
     },

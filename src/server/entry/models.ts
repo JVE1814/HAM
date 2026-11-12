@@ -1,15 +1,9 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import { todayIso } from '../platform/clock.ts'
-import { queueRefresh, runRefreshPass } from '../platform/lifecycle-dates.ts'
-import { queueModelRefresh, queueModelsReachingMilestone, writingModelLifecycle } from '../platform/model-lifecycle.ts'
-import { normalizeNaasRawModels, resolveNormalizationException } from '../platform/normalization.ts'
-import { str, type ForeignRecord } from '../platform/records.ts'
-
-/** Model normalization and Lifecycle phase / Refresh due date upkeep (P1.2), for fleet assets only (ADR 0016). */
-
-export function normalizeRawModels(): void {
-    normalizeNaasRawModels()
-}
+import { runRefreshPass } from '../platform/lifecycle-dates.ts'
+import { importLifecycleRow, queueModelRefresh, queueModelsReachingMilestone, writingModelLifecycle } from '../platform/model-lifecycle.ts'
+import { resolveNormalizationException } from '../platform/normalization.ts'
+import { finishImportRow, str, type ForeignRecord } from '../platform/records.ts'
 
 export function onNormalizationResolved(current: GlideRecord): void {
     const resolution = resolveNormalizationException(current)
@@ -23,8 +17,7 @@ export function onNormalizationResolved(current: GlideRecord): void {
 
 /**
  * After rule on the platform's Model lifecycle table (ADR 0017), for a row inserted, deleted or changed in what a
- * Model's milestones are read from (the rule's condition): recompute the fleet assets of its Model in the background,
- * and of the Model it left when the row moved to another. A save the app's own write makes is left to that write,
+ * Model's milestones are read from (the rule's condition). A save the app's own write makes is left to that write,
  * which queues the pass once for all the milestones it saves.
  */
 export function onModelLifecycleChanged(current: ForeignRecord, previous: ForeignRecord | null): void {
@@ -43,10 +36,6 @@ export function rollLifecyclePhases(): void {
     queueModelsReachingMilestone(todayIso())
 }
 
-export function onAgreementTermsChanged(current: GlideRecord): void {
-    queueRefresh('agreement', current)
-}
-
-export function refreshAgreementAssets(event: GlideRecord, current: GlideRecord): void {
-    runRefreshPass('agreement', event, current)
+export function processLifecycleRow(current: GlideRecord): void {
+    finishImportRow(current, importLifecycleRow(current))
 }

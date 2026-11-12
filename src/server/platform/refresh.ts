@@ -1,4 +1,4 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { addDays } from '../domain/calendar.ts'
 import { fleetStagesQuery } from '../domain/fleet.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
@@ -14,31 +14,46 @@ import {
     type RefreshCandidate,
     type RefreshWave,
 } from '../domain/refresh.ts'
+import { LOCK } from '../domain/lock-names.ts'
 import { catalogModels } from './agreements.ts'
 import { nowMs, todayIso } from './clock.ts'
 import { readModelLifecycle } from './model-lifecycle.ts'
 import type { NewLine } from './order-lines.ts'
 import { createOrder, submitOrder } from './orders.ts'
-import { intProperty, PROPERTY } from './properties.ts'
+import { withLock } from './locks.ts'
+import { intProperty } from './properties.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { pluck, str, warnRefused } from './records.ts'
 import { OPEN_ORDERS_QUERY } from '../domain/fulfilment.ts'
+import { log } from './log.ts'
 
 /** Refresh Orders for in-service Assets due within the horizon (P2.2, Q48: fully automatic). */
 
-/** Candidates a run raises at most, and the Assets due it reads per query. */
 const CANDIDATES_PER_RUN = 2000
+
+/**
+ * Daily job: the refresh Orders due. Two runs at once (the scheduled job and an *Execute now*) would both read an Asset
+ * as on no open replacing line and raise it twice, so a run holds a job lock (ADR 0013) from its read of the Assets due
+ * to its last Order; one that finds it held raises nothing and logs so. Taking the lock throws only when an insert is
+ * refused with no lock row (platform/locks): that error escapes.
+ */
+export function raiseRefreshOrders(): void {
+    const lockName = LOCK.refreshOrders()
+    if (withLock(lockName, raiseDueHolding).ran) return
+    log.info(`Refresh Orders not raised: another run holds the ${lockName} lock and raises them`)
+}
 
 /**
  * Raise the refresh Orders due, a wave at a time, holding the run's `lock`. A run that outlasts it (ADR 0013) stops
  * after the wave it lost it in: the run that took it over read what is on order afresh and raises the rest, but may
  * have read that wave's Assets before their lines were saved.
  */
-export function raiseDueRefreshOrders(lock: HeldLock): void {
+function raiseDueHolding(lock: HeldLock): void {
     for (const wave of refreshWaves(dueCandidates())) {
         const number = raiseWave(wave)
         if (lock.held()) continue
         const check = number ? `; check ${number}'s Assets are on no other open Order` : ''
-        gs.error(`[x_daas_ham] Refresh run stopped, its lock lost: the run that took it over raises the rest${check}`)
+        log.error(`Refresh run stopped, its lock lost: the run that took it over raises the rest${check}`)
         return
     }
 }
@@ -117,18 +132,18 @@ function raiseWave({ customerId, siteId, agreementId, assets }: RefreshWave): st
         lines,
     )
     if (!raised.created && raised.step === 'order') {
-        gs.warn(`[x_daas_ham] No refresh Order for site ${siteId}: ${raised.reason}`)
+        log.warn(`No refresh Order for site ${siteId}: ${raised.reason}`)
         return ''
     }
     const number = raised.created ? str(raised.order, 'number') : raised.number
     for (const { line, reason } of raised.refused) {
-        gs.warn(`[x_daas_ham] Asset ${line.replacesAssetId} left off ${number}: ${reason}`)
+        log.warn(`Asset ${line.replacesAssetId} left off ${number}: ${reason}`)
         unmatched.delete(line)
     }
     if (!raised.created) {
         const empty = `Refresh Order ${number} for site ${siteId}`
-        if (!raised.kept) gs.warn(`[x_daas_ham] ${empty} removed: none of its lines was saved`)
-        else gs.warn(`[x_daas_ham] ${empty} has no lines and was not removed (${raised.kept}): cancel it`)
+        if (!raised.kept) log.warn(`${empty} removed: none of its lines was saved`)
+        else log.warn(`${empty} has no lines and was not removed (${raised.kept}): cancel it`)
         return ''
     }
     const order = raised.order
@@ -136,10 +151,10 @@ function raiseWave({ customerId, siteId, agreementId, assets }: RefreshWave): st
         order.setValue('work_notes', `${unmatched.size} asset(s) have no sellable catalogued successor; their lines reuse the current model. Review before submitting.`)
         // Without the note nothing tells the account manager why the Order is a draft.
         if (!order.update()) warnRefused(order, `Refresh Order ${number}: note on its ${unmatched.size} unmatched asset(s) not saved`)
-        return number // left in draft for the account manager to adjust
+        return number
     }
     const submission = submitOrder(order)
     // Nobody is there to be told: the Order stays a draft for the account manager, with why in the log.
-    if (!submission.submitted) gs.warn(`[x_daas_ham] Refresh Order ${number} left a draft: ${submission.message}`)
+    if (!submission.submitted) log.warn(`Refresh Order ${number} left a draft: ${submission.message}`)
     return number
 }

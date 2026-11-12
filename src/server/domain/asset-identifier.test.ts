@@ -1,15 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ambiguousIdentifier, fieldMatch, IDENTIFIER_FIELDS, IDENTIFIER_READ_LIMIT } from './asset-identifier.ts'
-
-describe('IDENTIFIER_FIELDS', () => {
-    it('looks for an identifier as a serial number, then a Provider tag, then a Customer tag', () => {
-        expect(IDENTIFIER_FIELDS.map((field) => field.field)).toEqual(['serial_number', 'asset_tag', 'x_daas_ham_customer_tag'])
-    })
-
-    it('reads two Assets per field, enough to tell an identifier is ambiguous', () => {
-        expect(IDENTIFIER_READ_LIMIT).toBe(2)
-    })
-})
+import { ambiguousIdentifier, fieldMatch, IDENTIFIER_FIELDS } from './asset-identifier.ts'
 
 describe('fieldMatch', () => {
     it('finds nothing when no Asset carries the identifier in the field, so the next field is tried', () => {

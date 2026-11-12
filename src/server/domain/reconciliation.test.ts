@@ -3,7 +3,6 @@ import {
     outOfUseExceptionsQuery,
     outsideFleetExceptionsQuery,
     reconcileAsset,
-    reconcileRack,
     seenWithoutFleetAssetQuery,
     stillSeenWithoutFleetAssetQuery,
 } from './reconciliation'
@@ -49,56 +48,6 @@ describe('reconcileAsset', () => {
     })
 })
 
-describe('reconcileRack', () => {
-    const rack = { units: 42, powerCapacityW: 1000 }
-    const placed = [
-        { assetId: 'sw1', ruStart: 40, height: 1, face: 'front' as const, powerW: 350 },
-        { assetId: 'fw1', ruStart: 30, height: 2, face: 'front' as const, powerW: 250 },
-    ]
-
-    it('finds nothing wrong with a rack whose devices fit and draw within its capacity', () => {
-        expect(reconcileRack(rack, placed)).toEqual([])
-    })
-
-    it('names the overlapping devices by their label, not their sys_id', () => {
-        const keyed = [
-            { assetId: 'a1b2', label: 'NAAS-0001', ruStart: 20, height: 1, face: 'front' as const },
-            { assetId: 'c3d4', label: 'FOC222', ruStart: 20, height: 1, face: 'front' as const },
-        ]
-        expect(reconcileRack(rack, keyed)).toEqual([{ type: 'rack_overlap', detail: 'NAAS-0001 and FOC222 share rack unit 20 (front)' }])
-    })
-
-    it('raises an overlap naming each pair that shares units', () => {
-        const twoSaves = [
-            ...placed,
-            { assetId: 'sw2', ruStart: 31, height: 1, face: 'front' as const },
-            { assetId: 'sw3', ruStart: 31, height: 1, face: 'front' as const },
-        ]
-        const detail = ['fw1 and sw2', 'fw1 and sw3', 'sw2 and sw3'].map((pair) => `${pair} share rack unit 31 (front)`).join('; ')
-        expect(reconcileRack(rack, twoSaves)).toEqual([{ type: 'rack_overlap', detail }])
-    })
-
-    it('raises the power budget once typical power is over the capacity, counting both faces', () => {
-        expect(reconcileRack(rack, [...placed, { assetId: 'pdu', ruStart: 30, height: 1, face: 'rear', powerW: 400 }])).toEqual([])
-        expect(reconcileRack(rack, [...placed, { assetId: 'pdu', ruStart: 30, height: 1, face: 'rear', powerW: 401 }])).toEqual([
-            { type: 'rack_over_power', detail: "Typical power 1001 W is over the rack's 1000 W" },
-        ])
-    })
-
-    it('does not judge the power of a rack without a recorded capacity', () => {
-        const big = { assetId: 'big', ruStart: 1, height: 1, face: 'front' as const, powerW: 5000 }
-        expect(reconcileRack({ units: 42, powerCapacityW: 0 }, [...placed, big])).toEqual([])
-    })
-
-    it('raises both when two saves overlap and take the rack over its budget', () => {
-        const both = [...placed, { assetId: 'sw2', ruStart: 40, height: 1, face: 'front' as const, powerW: 500 }]
-        expect(reconcileRack(rack, both).map((found) => found.type)).toEqual(['rack_overlap', 'rack_over_power'])
-    })
-
-    it('finds nothing in an empty rack', () => {
-        expect(reconcileRack(rack, [])).toEqual([])
-    })
-})
 
 /** A network-gear CI at a customer Site, by the Asset it points at: none, or one with this Fleet flag on its hardware record. */
 const FLAG = 'asset.ref_alm_hardware.x_daas_ham_fleet'
@@ -151,7 +100,7 @@ describe('stillSeenWithoutFleetAssetQuery', () => {
 })
 
 describe('outsideFleetExceptionsQuery', () => {
-    const query = outsideFleetExceptionsQuery(['unseen', 'serial_mismatch'])
+    const query = outsideFleetExceptionsQuery(['unseen', 'serial_mismatch']) ?? ''
     const raised = { status: 'open', exception_type: 'unseen', asset: 'a1', 'asset.x_daas_ham_fleet': 'false' }
 
     it('finds the open exceptions of the types on an Asset outside the fleet, flag false or blank', () => {
@@ -167,10 +116,14 @@ describe('outsideFleetExceptionsQuery', () => {
         expect(matches(query, { ...raised, exception_type: 'rack_overlap' })).toBe(false)
         expect(matches(query, { ...raised, asset: '', 'asset.x_daas_ham_fleet': '' })).toBe(false)
     })
+
+    it('gives no query for no types, which would match every type', () => {
+        expect(outsideFleetExceptionsQuery([])).toBeNull()
+    })
 })
 
 describe('outOfUseExceptionsQuery', () => {
-    const query = outOfUseExceptionsQuery(['unseen', 'serial_mismatch'])
+    const query = outOfUseExceptionsQuery(['unseen', 'serial_mismatch']) ?? ''
     const onAsset = (installStatus: string, substatus: string, fleet = 'true') => ({
         status: 'open',
         exception_type: 'unseen',
@@ -193,5 +146,9 @@ describe('outOfUseExceptionsQuery', () => {
         expect(matches(query, onAsset('7', 'disposed', 'false'))).toBe(false)
         expect(matches(query, { ...onAsset('7', 'disposed'), status: 'resolved' })).toBe(false)
         expect(matches(query, { ...onAsset('7', 'disposed'), exception_type: 'rack_overlap' })).toBe(false)
+    })
+
+    it('gives no query for no types, which would match every type', () => {
+        expect(outOfUseExceptionsQuery([])).toBeNull()
     })
 })

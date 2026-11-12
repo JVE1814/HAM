@@ -1,6 +1,6 @@
 import { addMonths, earliest, isIsoDate } from './calendar.ts'
-import { FLEET_CONDITION, INSTALLED_CONDITION } from './fleet.ts'
-import { LEASE_END_ACTION, type LeaseEndAction, LIFECYCLE_PHASE, type LifecyclePhase, type RefreshBasis } from './vocabulary.ts'
+import { FLEET_CONDITION, INSTALLED_CONDITION, PUBLISHER_LIFECYCLE_TYPE } from './fleet.ts'
+import { LEASE_END_ACTION, type LeaseEndAction, LIFECYCLE_PHASE, type LifecyclePhase, type OemVendor, type RefreshBasis } from './vocabulary.ts'
 
 /** A Model's manufacturer support milestones (ISO dates). */
 export interface LifecycleDates {
@@ -13,7 +13,7 @@ export interface LifecycleDates {
 /**
  * The milestones in the order a manufacturer reaches them: the date each is kept in, the Lifecycle phase an Asset is in
  * once its Model has reached it (also the `lifecycle_phase` of its row in the platform's Model lifecycle table, ADR
- * 0017), and its name in messages. Reading, checking, merging and storing milestones all go through this list.
+ * 0017), and its name in messages.
  */
 export const MILESTONES: ReadonlyArray<{ field: keyof LifecycleDates; phase: LifecyclePhase; label: string }> = [
     { field: 'endOfSale', phase: 'end_of_sale', label: 'end of sale' },
@@ -22,7 +22,49 @@ export const MILESTONES: ReadonlyArray<{ field: keyof LifecycleDates; phase: Lif
     { field: 'endOfLife', phase: 'end_of_life', label: 'end of life' },
 ]
 
-/** What an Asset contributes to its Lifecycle phase and Refresh due date. */
+/**
+ * The platform's Model lifecycle table (ADR 0017) as the app keeps milestones in it, for platform/model-lifecycle and
+ * the metadata on the table alike: rows are of the parent class or a child class per kind of Model.
+ */
+export const MODEL_LIFECYCLE = {
+    /** Every class of row: what the app reads. */
+    table: 'cmdb_model_lifecycle',
+    /** The class the app creates its rows in: NaaS Models are hardware Models. */
+    hardwareTable: 'cmdb_hardware_model_lifecycle',
+    publisher: PUBLISHER_LIFECYCLE_TYPE,
+    /** `source` of the rows the app writes (and of those maintained by hand); ServiceNow's content rows carry another. */
+    ownSource: 'internal',
+} as const
+
+/**
+ * Active manufacturer milestone rows, of any class and source: those in the `lifecycle_phase` of a milestone. The
+ * platform's General availability phase is no milestone of the app's.
+ */
+export const MILESTONE_ROWS = `active=true^lifecycle_type=${MODEL_LIFECYCLE.publisher}^lifecycle_phaseIN${/* @__PURE__ */ MILESTONES.map(({ phase }) => phase).join(',')}`
+
+/** The Model's rows the app writes: the platform keeps them to one per milestone. */
+export const OWN_MILESTONE_ROWS = `${MILESTONE_ROWS}^source=${MODEL_LIFECYCLE.ownSource}`
+
+/**
+ * Script condition of the rule on the table: a row inserted or deleted, or changed in a field a Model's milestones are
+ * read by (`MILESTONE_ROWS`, `OWN_MILESTONE_ROWS`, and the row's Model and date). Written out, as Fluent reads it.
+ */
+export const MILESTONE_ROW_CHANGED =
+    "current.operation() != 'update' || current.start_date.changes() || current.active.changes() || current.lifecycle_phase.changes() || current.lifecycle_type.changes() || current.model.changes() || current.source.changes()"
+
+export type LifecycleSource = 'manual' | 'csv' | OemVendor
+
+export const LIFECYCLE_SOURCE_LABEL: Readonly<Record<LifecycleSource, string>> = {
+    manual: 'Manual',
+    csv: 'CSV import',
+    cisco: 'Cisco EoX API',
+    meraki: 'Meraki Dashboard API',
+    fortinet: 'Fortinet Asset Management API',
+    mist: 'HPE Mist API',
+    aruba: 'HPE Aruba',
+    checkpoint: 'Check Point',
+}
+
 export interface AssetLifecycleFacts {
     /**
      * The Asset's Agreement refresh basis as stored, or '' when the Asset has no Agreement (`NO_AGREEMENT_BASIS`). A
@@ -40,7 +82,7 @@ export interface AssetLifecycleFacts {
 /** An Asset without an Agreement has no basis stored, and refreshes on whichever comes first. */
 const NO_AGREEMENT_BASIS: RefreshBasis = 'earliest'
 
-export interface AssetLifecycleStamp {
+interface AssetLifecycleStamp {
     phase: LifecyclePhase
     /** Refresh due date as YYYY-MM-DD, or '' when none can be determined. */
     refreshDue: string
@@ -85,7 +127,6 @@ function byBasis(asset: AssetLifecycleFacts, inServiceDate: string, endOfSupport
     }
 }
 
-/** The date a leased Asset must be off the network: its lease end, once the decision is to return it. */
 function returnBy(lease: AssetLifecycleFacts['lease']): string | undefined {
     return lease?.endAction === LEASE_END_ACTION.return && lease.ends ? lease.ends.slice(0, 10) : undefined
 }

@@ -10,7 +10,6 @@ import type { InstallMode, OrderStage } from './vocabulary.ts'
 export interface InstallState {
     stage: OrderStage
     installMode: InstallMode
-    /** How many of its units are shipped (`awaitsInstall`): read only for an Order held back before installing. */
     shippedUnits(): number
 }
 
@@ -29,11 +28,7 @@ export function awaitsInstall(stage: Stage | null): boolean {
  */
 const HELD_BACK: readonly string[] = ['preparing', 'delivering']
 
-/**
- * Whether the Order has equipment at its Site to confirm installed: it is installing, or a line not shipped yet holds
- * it back while units already shipped wait there. Confirming installs only those; the line waits for its own units.
- */
-export function beingInstalled(order: InstallState): boolean {
+function beingInstalled(order: InstallState): boolean {
     return order.stage === 'installing' || (HELD_BACK.includes(order.stage) && order.shippedUnits() > 0)
 }
 
@@ -42,11 +37,18 @@ export function awaitsSelfInstallConfirmation(order: InstallState): boolean {
 }
 
 /**
- * Whether a user with visibility `scope` may record the Order as installed. Staff who see every Customer may do so
- * for any Order being installed (for instance when its work order was closed elsewhere); everyone else, such as
- * Customer contacts, only confirms a self-install.
+ * Who records an Order as installed. Staff record any Order being installed (for instance when its work order was
+ * closed elsewhere); a Customer contact only confirms a self-install, and so does anyone on the customer page.
  */
-export function mayConfirmInstall(scope: VisibilityScope, order: InstallState): boolean {
-    if (scope === 'everything') return beingInstalled(order)
-    return awaitsSelfInstallConfirmation(order)
+export type InstallConfirmer = 'staff' | 'customer'
+
+export function confirmerFor(scope: VisibilityScope): InstallConfirmer {
+    return scope === 'everything' ? 'staff' : 'customer'
+}
+
+export type InstallRefusal = 'nothing_waiting' | 'not_self_install'
+
+export function installRefusal(confirmer: InstallConfirmer, order: InstallState): InstallRefusal | null {
+    if (confirmer === 'staff' ? beingInstalled(order) : awaitsSelfInstallConfirmation(order)) return null
+    return beingInstalled(order) ? 'not_self_install' : 'nothing_waiting'
 }

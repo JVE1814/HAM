@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { fleetCondition, SITE_CONDITION } from '../domain/fleet.ts'
+import { FLEET_CONDITION, SITE_CONDITION, SITE_OR_ROOM_LOCATIONS } from '../domain/fleet.ts'
 import {
     DEFAULT_RACK_FACE,
     DEFAULT_RACK_UNITS,
@@ -7,11 +7,12 @@ import {
     PLACEMENT_FIELDS,
     placementProblem,
     powerBudget,
+    RACK_EXCEPTION_TYPES,
     RACK_FACES,
+    reconcileRack,
     type Placement,
     type RackSpec,
 } from '../domain/rack.ts'
-import { RACK_EXCEPTION_TYPES, reconcileRack } from '../domain/reconciliation.ts'
 import type { RackDevice, RackElevation, RackListing, Site } from '../domain/rest-contracts.ts'
 import { visibilityFilter, type TableScoping } from '../domain/visibility.ts'
 import type { RackFace } from '../domain/vocabulary.ts'
@@ -21,14 +22,9 @@ import { cisWithOpenException, settleExceptions } from './exceptions.ts'
 import { choice, exists, findById, num, recordsById, str, type ForeignRecord } from './records.ts'
 import { currentSession } from './session.ts'
 
-/**
- * Racks: where fleet assets are placed, whether a placement fits (P2.8), the rack exceptions (Q67) and the reads of
- * the rack elevation view. None of it tells the user anything: each gives what it found, for the trigger that asked.
- */
+/** None of it tells the user anything: each gives what it found, for the trigger that asked. */
 
-/** Where an Asset sits in its rack, and its Model (whose name, size and draw are read separately). */
 interface Slot {
-    /** The Asset's sys_id: the Placement's key, read the same way for the candidate and for the rack's other devices. */
     id: string
     tag: string
     serial: string
@@ -48,7 +44,6 @@ function slotOf(asset: ForeignRecord): Slot {
     }
 }
 
-/** What the rack checks and the elevation view need of a Model. */
 interface RackModel {
     name: string
     rackUnits: number
@@ -58,7 +53,7 @@ interface RackModel {
 /** A missing or deleted Model reads as a dot-walk through a broken reference did: blank and zeros. */
 const NO_MODEL: RackModel = { name: '', rackUnits: 0, powerW: 0 }
 
-/** Name, rack units and typical power (the platform's cmdb_model.power_consumption, in watts) of each Model, read with one query. */
+/** Typical power is the platform's cmdb_model.power_consumption, in watts. */
 function rackModels(modelIds: readonly string[]): Map<string, RackModel> {
     return recordsById('cmdb_model', modelIds, (model) => ({
         name: str(model, 'display_name'),
@@ -85,7 +80,7 @@ function rackSpec(rack: GlideRecord): RackSpec {
 function placedIn(rackId: string): GlideRecord {
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery(PLACEMENT_FIELDS.rack, rackId)
-    asset.addEncodedQuery(fleetCondition())
+    asset.addEncodedQuery(FLEET_CONDITION)
     asset.addNotNullQuery(PLACEMENT_FIELDS.ruStart)
     return asset
 }
@@ -120,25 +115,20 @@ export function placementRefusal(current: ForeignRecord, previous: ForeignRecord
     if (!rack) return null
     const candidate = slotOf(current)
     const others = slotsIn(rackId, candidate.id)
-    // The Model this device already had in this rack, as a fleet asset; undefined when it is new to the rack or to
-    // the fleet.
     const previousModelId =
         previous && isFleetAsset(previous) && str(previous, PLACEMENT_FIELDS.rack) === rackId && str(previous, PLACEMENT_FIELDS.ruStart)
             ? str(previous, 'model')
             : undefined
-    // Every Model involved in one query; an unchanged Model is the candidate's own entry.
     const models = rackModels([candidate.modelId, previousModelId ?? '', ...others.map((slot) => slot.modelId)])
     const previousPowerW = previousModelId === undefined ? undefined : (models.get(previousModelId) ?? NO_MODEL).powerW
     const placements = others.map((slot) => placementOf(slot, models))
     return placementProblem(rackSpec(rack), placements, placementOf(candidate, models), previousPowerW)
 }
 
-/** Whether the save leaves the Asset where it was placed: not an insert, and its rack, lowest unit and face unchanged. */
 export function keepsPlacement(current: ForeignRecord, previous: ForeignRecord | null): boolean {
     return !!previous && Object.values(PLACEMENT_FIELDS).every((field) => str(current, field) === str(previous, field))
 }
 
-/** Every device placed in the rack, past the visibility rules, with its Model's height and draw. */
 function placementsIn(rackId: string): Placement[] {
     const slots = slotsIn(rackId)
     const models = rackModels(slots.map((slot) => slot.modelId))
@@ -147,7 +137,7 @@ function placementsIn(rackId: string): Placement[] {
 
 /**
  * Open the rack's overlap and power exceptions that a fresh read of the rack and every device placed in it finds
- * (domain/reconciliation `reconcileRack`), and resolve the others. A rack no longer there holds nothing, so its
+ * (domain/rack `reconcileRack`), and resolve the others. A rack no longer there holds nothing, so its
  * exceptions resolve.
  */
 function recheckRack(rackId: string): void {
@@ -156,7 +146,12 @@ function recheckRack(rackId: string): void {
     settleExceptions({ ciId: rackId }, rack ? str(rack, 'company') : '', RACK_EXCEPTION_TYPES, found)
 }
 
-/** Re-check the rack a saved Asset is placed in, and the one the save took it out of (`recheckRack`), each once. */
+/**
+ * After rule on alm_hardware: re-check the rack the Asset is placed in, and the one it left (`recheckRack`), each once,
+ * now the save is written. The before rule checks against the placements saved before, so two saves into the same
+ * units (or the last of a rack's power) at the same moment can both pass it. Each after rule runs once its own save is
+ * written, so the later of the two reads both and raises the exception; a later save that clears it resolves it.
+ */
 export function recheckRacksOf(current: ForeignRecord, previous: ForeignRecord | null): void {
     const left = previous ? str(previous, PLACEMENT_FIELDS.rack) : ''
     for (const rackId of new Set([str(current, PLACEMENT_FIELDS.rack), left])) if (rackId) recheckRack(rackId)
@@ -200,10 +195,8 @@ function seesSite(locationIds: readonly string[]): boolean {
     return exists('cmn_location', [`sys_idIN${ids.join(',')}`, SITE_CONDITION, ...(filter ? [filter] : [])].join('^'))
 }
 
-/** The most Sites the page's picker lists. */
 const SITES_LISTED = 1000
 
-/** The customer Sites the user may see, by name (customers only their own, site contacts only theirs). */
 export function visibleSites(): Site[] {
     const site = new GlideRecord('cmn_location')
     site.addEncodedQuery(SITE_CONDITION)
@@ -217,14 +210,20 @@ export function visibleSites(): Site[] {
     return sites
 }
 
+/** The Asset left its Site: free its Rack units (the caller saves). */
+export function clearRackPlacement(asset: GlideRecord): void {
+    for (const field of Object.values(PLACEMENT_FIELDS)) asset.setValue(field, '')
+}
+
 /** The racks at a Site and in its rooms, by name; null when `siteId` names no Site the user may see. */
 export function racksAtSite(siteId: string): RackListing[] | null {
     // The Site is read first so the visibility check and the rack query below use the same sys_id.
     const site = findById('cmn_location', siteId)
     if (!site || !seesSite([site.getUniqueValue()])) return null
     const rack = new GlideRecord('cmdb_ci_rack')
-    const atSite = rack.addQuery('location', site.getUniqueValue())
-    atSite.addOrCondition('location.parent', site.getUniqueValue())
+    const [standsAt, ...under] = SITE_OR_ROOM_LOCATIONS
+    const atSite = rack.addQuery(standsAt, site.getUniqueValue())
+    for (const location of under) atSite.addOrCondition(location, site.getUniqueValue())
     rack.orderBy('name')
     rack.query()
     const racks: RackListing[] = []
@@ -238,8 +237,7 @@ export function racksAtSite(siteId: string): RackListing[] | null {
  */
 export function rackElevation(rackId: string): RackElevation | null {
     const rack = new GlideRecord('cmdb_ci_rack')
-    // A rack stands in a Room of the Site (or at the Site itself), as `racksAtSite` lists it.
-    if (!rack.get(rackId) || !seesSite([str(rack, 'location'), str(rack, 'location.parent')])) return null
+    if (!rack.get(rackId) || !seesSite(SITE_OR_ROOM_LOCATIONS.map((location) => str(rack, location)))) return null
     const asset = placedIn(rack.getUniqueValue())
     asset.query()
     const found: Array<{ slot: Slot; companyId: string; device: Omit<RackDevice, 'customer' | 'model' | 'ruStart' | 'height' | 'face'> }> = []
@@ -258,7 +256,6 @@ export function rackElevation(rackId: string): RackElevation | null {
             },
         })
     }
-    // Models and Customer names each read with one query.
     const models = rackModels(found.map(({ slot }) => slot.modelId))
     const customerNames = recordsById('core_company', found.map(({ companyId }) => companyId), (company) => str(company, 'name'))
     const placements = found.map(({ slot }) => placementOf(slot, models))

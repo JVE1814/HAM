@@ -25,10 +25,6 @@ import {
 } from '../../server/domain/vocabulary'
 import { FLEET_CONDITION, NAAS_MODEL_CONDITION } from '../../server/domain/fleet'
 
-/*
- * Columns this app adds to platform tables (ADR 0001). Every column carries the x_daas_ham_ prefix.
- */
-
 export const alm_hardware = Table({
     augments: 'alm_hardware',
     schema: {
@@ -44,7 +40,7 @@ export const alm_hardware = Table({
             label: 'Legal owner',
             choices: LEGAL_OWNER_CHOICES,
             // No default: rows the Provider's IT creates are not stamped as NaaS-owned. The app's intake paths set the
-            // owner (platform/assets newAsset, joinFleet), and a blank owner counts as the Provider's (domain/lifecycle).
+            // owner, and a blank owner counts as the Provider's (domain/lifecycle).
             dropdown: 'dropdown_with_none',
         }),
         x_daas_ham_lease: ReferenceColumn({ label: 'Lease schedule', referenceTable: 'x_daas_ham_lease_schedule' }),

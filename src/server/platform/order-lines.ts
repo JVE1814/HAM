@@ -1,31 +1,62 @@
 import { GlideRecord } from '@servicenow/glide'
-import { LINE_STAGE, type LineStage } from '../domain/vocabulary.ts'
-import { num, refusal, str } from './records.ts'
+import type { LineOpenness } from '../domain/fulfilment.ts'
+import { LONG_HOLD_LOCK_TRIES, type HeldLock } from '../domain/job-lock.ts'
+import { LOCK } from '../domain/lock-names.ts'
+import type { LineStage } from '../domain/vocabulary.ts'
+import { withLockTries, type LockRun } from './locks.ts'
+import { num, refusal, str, type ForeignRecord } from './records.ts'
 
 /**
- * Order lines (x_daas_ham_order_line). Every write of a line is made here: its insert, its stage (cancelled, as
- * sourcing left it, derived from its Assets), its on-order count, and the purchase and transfer orders it lists. Each
- * write says whether the platform took it and logs nothing: the caller holds the locks it needs (ADR 0013) and answers
- * a refusal.
+ * Each write says whether the platform took it and logs nothing: the caller holds the locks it needs (ADR 0013, the
+ * line's own through `withOrderLineLock`) and answers a refusal.
  */
 
-/** A line to add to an Order. */
+/**
+ * Run `work` holding the Order line's lock and give what it returned, or `ran: false` when other holders kept it through
+ * every try: a holder keeps it for a receipt (the Asset, the line, the reservation and the move into staging saved),
+ * for sourcing's read of the line or its purchase and save, or for a cancel or rejection of its Order
+ * (`withOrderLineLocks`). Taking the lock throws only when an insert is refused with no lock row (platform/locks
+ * `withLockTries` tries again, and that error escapes only when every try threw), as does an error from `work`.
+ */
+export function withOrderLineLock<T>(lineId: string, work: (lock: HeldLock) => T): LockRun<T> {
+    return withLockTries(LOCK.orderLine(lineId), work, LONG_HOLD_LOCK_TRIES)
+}
+
+/**
+ * Run `work` holding the lock of every line in `lineIds`, taken one under another in sys_id order (ADR 0013), and give
+ * what it returned, or `ran: false`, with nothing run, when one stayed held through its tries.
+ */
+export function withOrderLineLocks<T>(lineIds: readonly string[], work: (locks: HeldLock[]) => T): LockRun<T> {
+    const ids = [...lineIds].sort()
+    const holdFrom = (next: number, held: HeldLock[]): LockRun<T> => {
+        if (next === ids.length) return { ran: true, value: work(held) }
+        const under = withOrderLineLock(ids[next], (lock) => holdFrom(next + 1, [...held, lock]))
+        return under.ran ? under.value : { ran: false }
+    }
+    return holdFrom(0, [])
+}
+
+/**
+ * The stages that tell whether an Order line is still open, read from `record`: the line itself, or a record that
+ * references it through the field `pathToLine`.
+ */
+export function lineOpenness(record: ForeignRecord, pathToLine = ''): LineOpenness {
+    const line = pathToLine ? `${pathToLine}.` : ''
+    return { lineStage: str(record, `${line}line_stage`), orderStage: str(record, `${line}order.stage`) }
+}
+
 export interface NewLine {
     modelId: string
     quantity: number
-    /** It came from the Order's Site template; left unset, the column's default (false) stands. */
-    fromSiteTemplate?: boolean
-    /** The Asset it replaces like-for-like (break-fix, refresh). */
+    fromSiteTemplate?: true
     replacesAssetId?: string
 }
 
-/** A line the platform refused to save, and why. */
 export interface RefusedLine {
     line: NewLine
     reason: string
 }
 
-/** Add `lines` to `order`, in order; those the platform refused (for the caller to report). */
 export function addOrderLines(order: GlideRecord, lines: readonly NewLine[]): RefusedLine[] {
     const refused: RefusedLine[] = []
     for (const line of lines) {
@@ -34,33 +65,22 @@ export function addOrderLines(order: GlideRecord, lines: readonly NewLine[]): Re
         record.setValue('order', order.getUniqueValue())
         record.setValue('model', line.modelId)
         record.setValue('quantity', line.quantity)
-        if (line.fromSiteTemplate !== undefined) record.setValue('from_site_template', line.fromSiteTemplate)
+        if (line.fromSiteTemplate) record.setValue('from_site_template', true)
         if (line.replacesAssetId) record.setValue('replaces_asset', line.replacesAssetId)
         if (!record.insert()) refused.push({ line, reason: refusal(record) })
     }
     return refused
 }
 
-/** Cancel the line; false when the platform refuses the save. */
-export function cancelLine(line: GlideRecord): boolean {
-    return saveLineStage(line, LINE_STAGE.cancelled)
-}
-
-/** Save the line at the `stage` derived from its Assets (platform/fulfilment); false when the platform refuses. */
 export function saveLineStage(line: GlideRecord, stage: LineStage): boolean {
     line.setValue('line_stage', stage)
     return !!line.update()
 }
 
-/** How a sourcing pass left a line (platform/sourcing `settleHolding`). */
 export interface LineSourcing {
-    /** The transfer orders the pass requested for it, added to those it lists. */
     transfers: readonly string[]
-    /** The purchase order the pass raised for it, added to those it lists. */
     purchaseOrder?: string
-    /** The units on the line, counted again by the pass. */
     allocated: number
-    /** The units the pass bought, added to its on-order count. */
     purchased: number
     summary: string
     stage: LineStage
@@ -86,7 +106,6 @@ export function saveLineSourcing(line: GlideRecord, sourcing: LineSourcing): boo
     return !!line.update()
 }
 
-/** Take one received unit off the line's on-order count; false when the platform refuses the save. */
 export function takeUnitOffOrder(line: GlideRecord): boolean {
     line.setValue('quantity_to_purchase', Math.max(0, num(line, 'quantity_to_purchase') - 1))
     return !!line.update()

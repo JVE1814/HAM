@@ -1,44 +1,42 @@
-import { gs, GlideRecord } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { appendTo } from '../domain/collections.ts'
-import { LONG_HOLD_LOCK_TRIES, REQUEUE, type HeldLock } from '../domain/job-lock.ts'
+import { REQUEUE, type HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
+import { lineStillOpen } from '../domain/fulfilment.ts'
 import { advanceReplacementRma } from '../domain/oem-rma.ts'
 import {
+    candidateLimit,
     lineShortfall,
     LINES_TO_SOURCE,
-    lineStillOpen,
     needsTransfer,
     planSourcing,
     shortfallOutcome,
     shortfallRouteFor,
     sourcingPurpose,
     stillToBuy,
+    stockQueries,
     type ShortfallRoute,
-    type Source,
     type SourcingRequest,
     type UnmovedStock,
 } from '../domain/sourcing.ts'
+import { putBackUnit, type Source, type StockCandidate } from '../domain/stock.ts'
 import type { OrderType } from '../domain/vocabulary.ts'
-import { moveAndSave } from './assets.ts'
 import { todayIso } from './clock.ts'
-import { EVENT, requeueCounted } from './events.ts'
 import { lineLostUnit, recomputeLine, recomputeOrder, unitsOnLine } from './fulfilment.ts'
-import { withLock, withLockTries, type LockRun } from './locks.ts'
-import { saveLineSourcing } from './order-lines.ts'
+import { withLock } from './locks.ts'
+import { lineOpenness, saveLineSourcing, withOrderLineLock } from './order-lines.ts'
 import { openOemRma, openRmaCount, openRmasFor, reuseOemRma } from './oem-rma.ts'
 import { requestPurchase } from './procurement.ts'
 import { stagingStockroom } from './properties.ts'
 import { findById, num, str, warnRefused, type ForeignRecord } from './records.ts'
 import { openStagingTask, skipOpenStagingTasks, startStaging } from './staging-tasks.ts'
-import { linkHotSpare, releaseToProviderStock, reserveAsset, stockCandidates, takeOffOrderLine } from './stock.ts'
+import { inCandidateOrder, leaveOrderLine, linkHotSpare, reserveAsset } from './stock.ts'
+import { queuePassAgain } from './sourcing-requests.ts'
 import { requestTransfer } from './transfers.ts'
+import { log } from './log.ts'
 
-/**
- * Sourcing an Order's lines (ADR 0004): allocate stock, request transfers and purchases, and put back what could not
- * be moved. Stages after sourcing are derived from Asset stages (platform/fulfilment).
- */
+/** Stages after sourcing are derived from Asset stages (platform/fulfilment). */
 
-/** How sourcing left a line: done (sourced, or a refused save logged), or for a pass queued again to finish. */
 type LineSourcing = 'done' | 'line busy' | 'lock lost'
 
 const AGAIN_BECAUSE: Record<Exclude<LineSourcing, 'done'>, string> = {
@@ -47,15 +45,12 @@ const AGAIN_BECAUSE: Record<Exclude<LineSourcing, 'done'>, string> = {
 }
 
 /**
- * One sourcing pass over `order`, for a request queued again `queuedAgain` times: allocate stock, request transfers
- * and purchases for its lines that are new or awaiting stock.
- *
  * Two passes over one Order (two staging tasks failed seconds apart, or one failed while the first pass runs) would
  * count the same shortfall, and one would buy what the other claimed. So a pass holds a lock on the Order, which Cancel
- * order holds too (platform/orders `cancelOrder`). One that finds it held runs again a minute later rather than leave
- * its work to the holder, which may have counted before the change that queued it; so does a pass that left a line
- * whose lock stayed held, or that lost the Order's lock. A request is queued again a minute apart and past the lock's
- * abandonment (domain/job-lock `REQUEUE`), then dropped with a warning: a lock still held by then was taken after the
+ * order holds too (platform/orders `cancelOrder`). One that finds it held runs again later rather than leave its work
+ * to the holder, which may have counted before the change that queued it; so does a pass that left a line whose lock
+ * stayed held, or that lost the Order's lock. A request is queued again `REQUEUE.delaySeconds` apart and past the
+ * lock's abandonment (domain/job-lock), then dropped with a warning: a lock still held by then was taken after the
  * request was queued, by a pass that counted its change. Taking the lock throws only when an insert is refused with no
  * lock row (platform/locks): that error escapes.
  */
@@ -76,41 +71,24 @@ export function runSourcingPass(order: GlideRecord, queuedAgain: number): void {
     const again = pass.ran ? pass.value : null
     if (!pass.ran || again) {
         const why = again ? AGAIN_BECAUSE[again] : 'another pass or a cancel holds its lock'
-        queuePassAgain(order, queuedAgain, why)
+        runAgainLater(order, queuedAgain, why)
     }
     if (pass.ran) recomputeOrder(orderId)
 }
 
-/** Queue the request to source `order` again a minute later, unless it was already queued again `tries` times. */
-function queuePassAgain(order: GlideRecord, tries: number, why: string): void {
+function runAgainLater(order: GlideRecord, tries: number, why: string): void {
     const number = str(order, 'number')
-    if (!requeueCounted(EVENT.sourceOrder, order, '', tries)) {
-        return void gs.warn(`[x_daas_ham] ${number} not sourced again after ${tries} tries (${why}): check its lines`)
+    if (!queuePassAgain(order, tries)) {
+        return void log.warn(`${number} not sourced again after ${tries} tries (${why}): check its lines`)
     }
-    gs.info(`[x_daas_ham] ${number} sourced again in ${REQUEUE.delaySeconds} s: ${why}`)
+    log.info(`${number} sourced again in ${REQUEUE.delaySeconds} s: ${why}`)
 }
 
-/**
- * Run `work` holding the Order line's lock and give what it returned, or `ran: false` when other holders kept it through
- * every try: a holder keeps it for a receipt (the Asset, the line, the reservation and the move into staging saved),
- * for sourcing's read of the line or its purchase and save, or for a cancel or rejection of its Order (platform/orders
- * `withOrderLineLocks`). Taking the lock throws only when an insert is refused with no lock row
- * (platform/locks `withLockTries` tries again, and that error escapes only when every try threw), as does an error
- * from `work`.
- */
-export function withOrderLineLock<T>(lineId: string, work: (lock: HeldLock) => T): LockRun<T> {
-    return withLockTries(LOCK.orderLine(lineId), work, LONG_HOLD_LOCK_TRIES)
-}
-
-/** What sourcing found and did for a line outside its lock: what `settleHolding` routes, buys and saves. */
 interface Sourced {
     lineId: string
     modelId: string
-    /** Routes what is still missing when the line is saved (domain/sourcing `shortfallRouteFor`). */
     route: (missing: number) => ShortfallRoute
-    /** The Asset a break-fix line replaces, which an OEM advance replacement is asked for. */
     replaced: GlideRecord | null
-    /** What the pass would buy by its own read: the shortfall less the stock it claimed. */
     toPurchase: number
     /** Claimed units put back for want of a transfer order: missing again, but not bought (`shortfallOutcome`). */
     putBack: number
@@ -119,7 +97,6 @@ interface Sourced {
     transfers: string[]
 }
 
-/** Source one line holding the Order's `orderLock`; see `LineSourcing`. */
 function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord): LineSourcing {
     // A pass that outlasted the Order's lock (ADR 0013) may overlap the one that took it over: it sources nothing more.
     if (!orderLock.held()) return leftUnsaved(line, 'lock lost', [])
@@ -134,7 +111,7 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
     const customerId = str(order, 'customer')
     const purpose = sourcingPurpose(str(order, 'order_type') as OrderType | '')
     const request: SourcingRequest = { modelId, quantity: shortfall, customerId, siteId: str(order, 'site'), purpose }
-    const plan = planSourcing(request, stockCandidates(request, shortfall))
+    const plan = planSourcing(request, stockCandidates(request))
 
     const stagingId = stagingStockroom()
     const reservation = { orderLineId: lineId, customerId, agreementId: str(order, 'agreement') }
@@ -171,7 +148,7 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
         for (const { asset, source } of picked) {
             // As Inventory left it once its line was removed (platform/transfers `requestTransfer`).
             const fresh = findById('alm_hardware', asset.getUniqueValue())
-            if (fresh && unreserve(fresh, source)) putBack++
+            if (fresh && leaveOrderLine(fresh, putBackUnit(source), 'no transfer order')) putBack++
         }
     }
     // An Asset whose Staging task could not be opened stays reserved for the line rather than staging with no task to
@@ -181,9 +158,8 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
         if (startStaging(asset, lineId, 'sourcing') === 'not_moved') skipOpenStagingTasks(asset.getUniqueValue(), 'Not moved into staging at sourcing')
     }
     // A unit in transfer gets its Staging task now and goes into staging when its line is received at the staging
-    // centre (entry/assets `onTransferReleased`); without the task it is reserved for the line there.
+    // centre (`takeBackStageAfterTransfer`); without the task it is reserved for the line there.
     for (const asset of inTransfer) openStagingTask(asset, lineId)
-    // Unmoved stock is not bought (see shortfallOutcome).
     const toPurchase = shortfall - reserved
     // Only a break-fix line can be served by the OEM's advance replacement (domain/sourcing `shortfallRouteFor`).
     const replaced = purpose === 'replace' ? findById('alm_hardware', str(line, 'replaces_asset')) : null
@@ -200,16 +176,11 @@ function sourceLine(orderLock: HeldLock, order: GlideRecord, line: GlideRecord):
     return leftUnsaved(line, settled, transfers)
 }
 
-/**
- * Units the line still needs, read afresh (`shortfallOf`). Null for a line gone or no longer open, so nothing is
- * reserved for it.
- */
 function openLineShortfall(lineId: string): number | null {
     const line = openLine(lineId)
     return line ? shortfallOf(line, unitsOnLine(lineId)) : null
 }
 
-/** Units the open `line` still needs beside its `allocated` ones (domain/sourcing `lineShortfall`). */
 function shortfallOf(line: GlideRecord, allocated: number): number {
     return lineShortfall({
         quantity: num(line, 'quantity'),
@@ -220,7 +191,22 @@ function shortfallOf(line: GlideRecord, allocated: number): number {
 }
 
 /**
- * The line read afresh while it and its Order are still open (domain/sourcing `lineStillOpen`), else null. Cancel
+ * Stock on no Order line that may serve `request`, each unit under the Source whose query found it
+ * (domain/sourcing `stockQueries`): a bounded number per Source (`candidateLimit`). A hot spare linked to a line stays
+ * in the pool but is taken.
+ */
+function stockCandidates(request: SourcingRequest): StockCandidate[] {
+    const limit = candidateLimit(request.quantity)
+    const candidates: StockCandidate[] = []
+    for (const { source, query } of stockQueries(request)) {
+        const asset = inCandidateOrder(query, limit)
+        while (asset.next()) candidates.push({ assetId: asset.getUniqueValue(), stockroomId: str(asset, 'stockroom'), source })
+    }
+    return candidates
+}
+
+/**
+ * The line read afresh while it and its Order are still open (domain/fulfilment `lineStillOpen`), else null. Cancel
  * order takes turns with sourcing under the Order's lock, but a rejected Order's lines are cancelled without that lock,
  * a cancel may overlap a pass that outlasted it (ADR 0013), and a line whose cancel was refused stays open on its
  * cancelled Order; so sourcing checks the line here before it reserves, buys or saves. The Order is saved as cancelled
@@ -228,7 +214,7 @@ function shortfallOf(line: GlideRecord, allocated: number): number {
  */
 function openLine(lineId: string): GlideRecord | null {
     const line = findById('x_daas_ham_order_line', lineId)
-    const open = line && lineStillOpen({ lineStage: str(line, 'line_stage'), orderStage: str(line, 'order.stage') })
+    const open = line && lineStillOpen(lineOpenness(line))
     return open ? line : null
 }
 
@@ -296,7 +282,7 @@ function putUnderRma(order: GlideRecord, line: GlideRecord, replaced: GlideRecor
         return reuse.askAgain ? ` (${which}: its replacement was received, ask the vendor for another)` : ` (${which})`
     }
     if (openOemRma({ defectiveAsset: replaced, orderLineId: lineId, caseId: str(order, 'case') })) return ''
-    gs.warn(`[x_daas_ham] ${str(line, 'number')}: no OEM RMA saved for ${serial}`)
+    log.warn(`${str(line, 'number')}: no OEM RMA saved for ${serial}`)
     return ' (none saved: open it by hand)'
 }
 
@@ -308,32 +294,17 @@ function leftClosed(line: GlideRecord, transfers: readonly string[]): void {
     const units = unitsOnLine(line.getUniqueValue())
     const release = units > 0 ? `; release the ${units} unit(s) still on it` : ''
     const cancel = transfers.length > 0 ? `; cancel ${transfers.join(', ')}` : ''
-    gs.warn(`[x_daas_ham] ${str(line, 'number')} closed while it was sourced: nothing bought for it${release}${cancel}`)
+    log.warn(`${str(line, 'number')} closed while it was sourced: nothing bought for it${release}${cancel}`)
 }
 
-/** Log a line left to the pass queued again, naming the transfer orders it does not list. */
 function leftUnsaved(line: GlideRecord, why: keyof typeof AGAIN_BECAUSE, transfers: readonly string[]): LineSourcing {
     const listThem = transfers.length > 0 ? `; it does not list ${transfers.join(', ')}, add them by hand` : ''
-    gs.warn(`[x_daas_ham] ${str(line, 'number')} left to the next sourcing pass (${AGAIN_BECAUSE[why]})${listThem}`)
+    log.warn(`${str(line, 'number')} left to the next sourcing pass (${AGAIN_BECAUSE[why]})${listThem}`)
     return why
 }
 
 /**
- * Put back stock reserved for a line but never moved to staging: Spare-pool stock to the pool, still its Customer's,
- * the rest to the Provider's free stock. False when the platform refuses (logged with `why`): the Asset stays on the
- * line.
- */
-function unreserve(asset: GlideRecord, source: Source, why = 'no transfer order'): boolean {
-    if (source === 'spare_pool') {
-        takeOffOrderLine(asset)
-        return moveAndSave(asset, 'spare_pool', why)
-    }
-    releaseToProviderStock(asset)
-    return moveAndSave(asset, 'available', why)
-}
-
-/**
- * A unit's transfer to the staging centre fell through (`current` as its after-update rule sees it, entry/assets
+ * A unit's transfer to the staging centre fell through (`current` as its after-update rule sees it, entry/orders
  * `onAllocatedAssetStageChange`): Inventory let it go short of the staging centre, its transfer order line cancelled
  * or deleted, and it was reserved for its line again where it was, which nothing moves it on from (domain/lifecycle
  * `transferFellThrough`). So it is put back as stock is for want of a transfer order, as free stock: the Source it was
@@ -349,8 +320,8 @@ export function putBackUntransferred(current: ForeignRecord, lineId: string): vo
     // twice, and an inventory tech of the staging centre who cancelled the line does not see a unit stored elsewhere.
     const asset = findById('alm_hardware', current.getUniqueValue(), { beyondVisibility: true })
     if (!asset) return
-    if (!unreserve(asset, 'central_stock', `${what}, so it is put back`)) return
+    if (!leaveOrderLine(asset, putBackUnit('central_stock'), `${what}, so it is put back`)) return
     skipOpenStagingTasks(asset.getUniqueValue(), 'Transfer to the staging centre fell through')
     lineLostUnit(lineId)
-    gs.warn(`[x_daas_ham] ${what}: put back as free stock, its line sourced again`)
+    log.warn(`${what}: put back as free stock, its line sourced again`)
 }

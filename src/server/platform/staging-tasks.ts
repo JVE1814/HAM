@@ -1,6 +1,7 @@
-import { GlideRecord, gs } from '@servicenow/glide'
-import { claimRouted, initialAutomationStatus } from '../domain/oem/claims.ts'
-import { lineStillOpen } from '../domain/sourcing.ts'
+import { GlideRecord } from '@servicenow/glide'
+import { claimRouted } from '../domain/oem/adapters.ts'
+import { initialAutomationStatus } from '../domain/oem/claims.ts'
+import { lineStillOpen } from '../domain/fulfilment.ts'
 import {
     closureMoveProblem,
     DEFAULT_STAGING_SOURCE,
@@ -18,16 +19,12 @@ import {
 import { moveAndSave, readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { lineLostUnit } from './fulfilment.ts'
+import { log } from './log.ts'
+import { lineOpenness } from './order-lines.ts'
 import { bool, deleteWhere, exists, findById, num, refusal, str, warnRefused } from './records.ts'
-import { takeOffOrderLine } from './stock.ts'
+import { leaveOrderLine } from './stock.ts'
 
-/**
- * Staging tasks with their checklist steps: opening them, starting the staging, and skipping those no longer needed.
- * A task's steps are created (and removed with a task that could not be opened) here; what an automated step goes
- * through afterwards is platform/claim-steps'.
- */
-
-function templates(): StagingTemplateView[] {
+function activeTemplates(): StagingTemplateView[] {
     const gr = new GlideRecord('x_daas_ham_staging_template')
     gr.addQuery('active', true)
     gr.query()
@@ -40,7 +37,6 @@ function templates(): StagingTemplateView[] {
             manufacturerId: str(gr, 'manufacturer'),
             deviceClass: str(gr, 'device_class'),
             source: str(gr, 'staging_source') as StagingTemplateView['source'],
-            active: true,
         })
     }
     return list
@@ -52,7 +48,7 @@ function templates(): StagingTemplateView[] {
  */
 export function openStagingTask(asset: GlideRecord, orderLineId: string): string | null {
     const source = (str(asset, 'x_daas_ham_staging_source') || DEFAULT_STAGING_SOURCE) as StagingTemplateView['source']
-    const templateId = selectStagingTemplate(templates(), {
+    const templateId = selectStagingTemplate(activeTemplates(), {
         customerId: str(asset, 'company'),
         manufacturerId: str(asset, 'model.manufacturer'),
         deviceClass: str(asset, 'model.x_daas_ham_device_class'),
@@ -75,8 +71,8 @@ export function openStagingTask(asset: GlideRecord, orderLineId: string): string
     if (stepRefused === null) return taskId
     deleteWhere('x_daas_ham_staging_step', `staging_task=${taskId}`)
     const removed = task.deleteRecord()
-    gs.warn(
-        `[x_daas_ham] No Staging task for ${str(asset, 'serial_number')}: ${stepRefused}` +
+    log.warn(
+        `No Staging task for ${str(asset, 'serial_number')}: ${stepRefused}` +
             (removed ? '' : `; ${str(task, 'number')} keeps an incomplete checklist, cancel it`),
     )
     return null
@@ -85,14 +81,20 @@ export function openStagingTask(asset: GlideRecord, orderLineId: string): string
 /**
  * Start staging the Asset for its Order line: open its Staging task and move it into staging. Without its task
  * (`no_task`) the Asset stays reserved for the line rather than staging with no task to finish; so does one whose move
- * the lifecycle or the platform refuses (`not_moved`, logged with `context`), its task left open: the caller skips the
- * task (sourcing). A receipt does the same two steps under its line's lock, checking the lock between them, and leaves
- * the task of a unit not moved for its close to move the unit into staging first (platform/receiving `stageReserved`;
- * `completeStaging`).
+ * the lifecycle or the platform refuses (`not_moved`, logged with `context`), its task left open for the caller to skip
+ * (sourcing) or for the task's close to move the unit first (a receipt; `completeStaging`). A caller holding a lock
+ * passes `lostAfter`, asked after each write: once it says the lock was lost, nothing more is written (`not_moved`).
  */
-export function startStaging(asset: GlideRecord, orderLineId: string, context: string): 'staging' | 'no_task' | 'not_moved' {
+export function startStaging(
+    asset: GlideRecord,
+    orderLineId: string,
+    context: string,
+    lostAfter: (written: string) => boolean = () => false,
+): 'staging' | 'no_task' | 'not_moved' {
     if (!openStagingTask(asset, orderLineId)) return 'no_task'
-    return moveAndSave(asset, 'staging', context) ? 'staging' : 'not_moved'
+    if (lostAfter('given a Staging task') || !moveAndSave(asset, 'staging', context)) return 'not_moved'
+    lostAfter('moved into staging')
+    return 'staging'
 }
 
 /**
@@ -109,11 +111,10 @@ export function stagingClosureProblem(current: GlideRecord, task: ClosedStagingT
 }
 
 function closingAsset(asset: GlideRecord): ClosingAsset {
-    const line = { lineStage: str(asset, 'x_daas_ham_order_line.line_stage'), orderStage: str(asset, 'x_daas_ham_order_line.order.stage') }
-    return { serial: str(asset, 'serial_number'), stage: readStage(asset), lineId: str(asset, 'x_daas_ham_order_line'), lineOpen: lineStillOpen(line) }
+    const lineOpen = lineStillOpen(lineOpenness(asset, 'x_daas_ham_order_line'))
+    return { serial: str(asset, 'serial_number'), stage: readStage(asset), lineId: str(asset, 'x_daas_ham_order_line'), lineOpen }
 }
 
-/** A newer open Staging task of the task's Asset ('' for none; domain/staging `newerTask`). */
 function newerTaskThan(current: GlideRecord): string {
     const other = new GlideRecord('x_daas_ham_staging_task')
     other.addQuery('asset', str(current, 'asset'))
@@ -151,7 +152,6 @@ export function completeStaging(assetId: string, task: ClosedStagingTask): strin
     }
     if (task.failed) return failStaging(asset, task.number)
     if (moveAndSave(asset, 'staged', `staging ${task.number}`)) return null
-    // Refused, the unit stays in staging and its line waits on it.
     return `${serial} not moved to staged (see the system log): it stays in staging; reopen ${task.number} and close it again`
 }
 
@@ -165,8 +165,7 @@ export function completeStaging(assetId: string, task: ClosedStagingTask): strin
  */
 function failStaging(asset: GlideRecord, number: string): string | null {
     const lineId = str(asset, 'x_daas_ham_order_line')
-    takeOffOrderLine(asset)
-    if (moveAndSave(asset, 'pending_evaluation', `staging ${number} failed`)) {
+    if (leaveOrderLine(asset, { keeps: 'customer', to: 'pending_evaluation' }, `staging ${number} failed`)) {
         if (lineId) lineLostUnit(lineId)
         return null
     }
@@ -183,10 +182,7 @@ function failStaging(asset: GlideRecord, number: string): string | null {
 function leaveLine(assetId: string, lineId: string, number: string): boolean {
     const asset = findById('alm_hardware', assetId)
     if (!asset || str(asset, 'x_daas_ham_order_line') !== lineId) return true
-    takeOffOrderLine(asset)
-    if (asset.update()) return true
-    warnRefused(asset, `staging ${number} failed: ${str(asset, 'serial_number')} not taken off its order line`)
-    return false
+    return leaveOrderLine(asset, { keeps: 'customer', to: null }, `staging ${number} failed: ${str(asset, 'serial_number')} not taken off its order line`)
 }
 
 /**
@@ -251,7 +247,7 @@ function copyTemplateSteps(templateId: string, taskId: string, vendor: string): 
     return null
 }
 
-export function stagingSteps(taskId: string): Array<{ mandatory: boolean; done: boolean }> {
+function stagingSteps(taskId: string): Array<{ mandatory: boolean; done: boolean }> {
     const step = new GlideRecord('x_daas_ham_staging_step')
     step.addQuery('staging_task', taskId)
     step.query()

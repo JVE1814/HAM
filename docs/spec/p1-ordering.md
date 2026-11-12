@@ -41,7 +41,8 @@
   quantity are uncapped.
 - Verdict: **over quota** if any cap would be exceeded, else **off catalog** if anything is not
   catalogued, else **within agreement**. All findings are recorded on the Order.
-- Submissions of one Agreement take turns under the job lock `agreement_usage_<Agreement sys_id>`
+- Submissions of one Agreement take turns under the job lock `LOCK.agreementUsage` in
+  `domain/lock-names.ts`
   (ADR 0013): each reads the Order, its lines and the Agreement's quantities and usage afresh,
   assesses it and saves it out of draft before the next reads, so two Orders submitted at once never
   both fit a quantity only one fits. Only an Order with a line that adds a unit takes it: one whose
@@ -50,11 +51,14 @@
   counts as gone ahead (a second *Raise replacement* says it is raised); one whose Customer or
   Agreement changed meanwhile, or that gained a line adding a unit, stays a draft, to submit again.
 - Every submission, with or without that lock, holds the Order's sourcing lock
-  (`source_order_<sys_id>`, as **Cancel** below) from its read of the draft through its save out of
-  draft, so a cancel never lands between them. One that finds it held through 10 tries stays a draft
+  (`LOCK.sourceOrder`, as **Cancel** below) from its read of the draft through its save out of
+  draft, so a cancel never lands between them. One that finds it held through `LONG_HOLD_LOCK_TRIES`
+  tries (`domain/job-lock.ts`) stays a draft
   and says *Order not submitted: it is being cancelled. Try again shortly*.
-- A submission that finds the lock held through 10 tries leaves the Order a draft, its work notes
-  saying why, and it is submitted again automatically a minute later, at most 15 times, then left
+- A submission that finds the lock held through `LONG_HOLD_LOCK_TRIES` tries leaves the Order a
+  draft, its work notes
+  saying why, and it is submitted again automatically `REQUEUE.delaySeconds` seconds later, at most
+  `REQUEUE.times` times, then left
   for staff to submit (logged). *Submit* says *Order not submitted yet: another Order of its
   Agreement was being submitted at the same time. It is submitted again automatically in a minute*.
   Through the record producer, whose requester may have no *Submit*, it says *Order <number> is
@@ -96,7 +100,7 @@
   also stays a draft, and the user is told why; requests already made are cancelled again.
 - A rejected Order cancels its lines, so they stop counting as usage. It is saved as rejected first,
   so one the platform refuses keeps its lines. Both are done holding each open line's lock
-  (`order_line_<sys_id>`, as **Cancel** below): a rejection that finds one held changes nothing, is
+  (`LOCK.orderLine`, as **Cancel** below): a rejection that finds one held changes nothing, is
   logged and leaves the Order awaiting approval, and *Re-check approvals* says *Order not saved as
   rejected: one of its lines is being received or cancelled*. Usage also ignores draft and cancelled
   Orders. Units a cancelled line had already shipped count as deployed again, since cancelling closes
@@ -104,7 +108,7 @@
 
 ## Sourcing (`domain/sourcing.ts`)
 
-| Purpose | Priority |
+| Purpose | Priority (`PRIORITY`) |
 |---|---|
 | New install | Customer Spare pool → free central stock → purchase |
 | Replacement (device replace) | hot spare in a customer-site stockroom of that Customer at the Order's Site (the stockroom's location is the Site or one of its Rooms) → Spare pool → free central stock → purchase |
@@ -126,7 +130,7 @@
   claimed, wherever it sits.
 - Two sourcing runs, or a run and a receipt reserving its unit for the waiting line, never claim the
   same Asset, whether reserving it or linking a hot spare: each claim is made under a lock on that
-  Asset (`reserve_asset_<sys_id>`) and re-checks that it is still free stock or spare-pool stock on no
+  Asset (`LOCK.reserveAsset`) and re-checks that it is still free stock or spare-pool stock on no
   Order line and not on a lease being returned. A run that finds it locked or taken leaves it, and
   that unit counts in the line's shortfall. Put-away (P1 fulfilment spec) and a lease return's
   withdrawal (P3 contracts spec) take the same lock, so neither can move a unit a claim is taking.
@@ -167,11 +171,12 @@
   units bought and not yet received, and the OEM RMAs are those whose replacement is still to come
   (*to open*, *open*). These figures are read together under the line's lock (below), so a receipt
   for the line is counted whole or not at all.
-- An Order's sourcing passes take turns under a job lock on the Order (`source_order_<sys_id>`, ADR
+- An Order's sourcing passes take turns under a job lock on the Order (`LOCK.sourceOrder`, ADR
   0013), so two passes never count the same shortfall. **Cancel** holds it too (below). A pass that
-  finds it held, by another pass or a cancel, runs again about a minute later, up to 15 times, then
+  finds it held, by another pass or a cancel, runs again `REQUEUE.delaySeconds` seconds later, at
+  most `REQUEUE.times` times, then
   is dropped with a warning.
-- A line's need is counted under a job lock on the line (`order_line_<sys_id>`), which a receipt for
+- A line's need is counted under a job lock on the line (`LOCK.orderLine`), which a receipt for
   the line, **Cancel** and a rejection take too. The stock pick runs outside that lock, each claim under its Asset's lock. The
   pass then buys and saves the line under its lock again. There the line is counted again and the
   pass buys only what is still missing: what its first count left to buy, less any need met since
@@ -182,7 +187,8 @@
   line (rare: a unit received for the line with nothing left on order to take off). What the pass
   bought is added to the *On order* count as it then stands, and its transfer and purchase orders
   are added to the line's lists as they then stand.
-- A line whose lock stays held through 10 tries, or a pass that lost the Order's lock (ADR 0013), is
+- A line whose lock stays held through `LONG_HOLD_LOCK_TRIES` tries, or a pass that lost the Order's
+  lock (ADR 0013), is
   left to the pass queued again. A warning names any transfer orders the line does not list, to add
   by hand.
 - Several source stockrooms give several transfer orders, all listed on the line.
@@ -197,14 +203,15 @@
   shipped or later (a hot spare handed over at Ship included), also on a line not delivered whole.
   The user is told to use a Return order instead. A unit taken off its line in transit no longer
   counts. Cancel does nothing when the form's save is refused (the platform says why). It runs
-  under the Order's sourcing lock (`source_order_<sys_id>`), taking turns with sourcing passes and
+  under the Order's sourcing lock (`LOCK.sourceOrder`), taking turns with sourcing passes and
   submissions: pressed while one holds it, it changes nothing and says *Order not cancelled: it is
   being submitted or sourced. Try again in a minute*. Under it, it also takes the Order's Ship lock
-  (`ship_order_<sys_id>`), so no Ship sends units between its shipped check and its release of the
+  (`LOCK.shipOrder`), so no Ship sends units between its shipped check and its release of the
   lines: pressed while a Ship (or *Mark label voided* on one of the Order's outbound labels) holds
   it, it changes nothing and says *Order not cancelled: a Ship of the Order is running. Try again
-  once it is done*. Under that, it takes the lock of each line not shipped (`order_line_<sys_id>`,
-  in sys_id order, 10 tries each), which a receipt holds while it gives its unit to the line and
+  once it is done*. Under that, it takes the lock of each line not shipped (`LOCK.orderLine`,
+  in sys_id order, `LONG_HOLD_LOCK_TRIES` tries each), which a receipt holds while it gives its unit
+  to the line and
   stages it (P1 fulfilment spec): so no unit is given to a line between the cancel's release of its
   units and its cancel. Pressed while a receipt (or a rejection) holds one, it changes nothing and
   says *Order not cancelled: a unit is being received for one of its lines. Try again shortly*.
@@ -229,13 +236,12 @@
   before it buys and saves. It leaves a line that is no longer open, or whose Order is cancelled or
   rejected: a rejected Order's lines are cancelled without the sourcing lock, and a line whose cancel
   was refused stays open. For a line that closed while the pass picked stock for it, nothing is bought
-  or saved, and the warning *<line> closed while it was sourced: nothing bought for it* names the
+  or saved, and a warning (`platform/sourcing.ts`) names the
   units still on it to release and the transfer orders to cancel. A cancel that outlasted its lock
-  (ADR 0013) logs *<Order> cancelled after its lock source_order_<sys_id> was lost*, to check its
-  lines for stock reserved or bought meanwhile. One that outlasted the Ship lock logs *<Order>
-  cancelled after its lock ship_order_<sys_id> was lost*, to check for units shipped meanwhile, and
-  one that outlasted a line's lock logs *<Order>: lines cancelled after its lock order_line_<sys_id>
-  was lost*, to check them for units received meanwhile. A receipt reads the line and its Order
+  (ADR 0013) logs which lock it lost. For the sourcing lock, check its
+  lines for stock reserved or bought meanwhile. For the Ship lock, check for units shipped meanwhile.
+  For a line's lock, check the lines for units received meanwhile. A receipt reads the line and its
+  Order
   again under the line's lock and gives its unit only to a line awaiting stock on an Order neither
   cancelled nor rejected (P1 fulfilment spec). A line's stage derived from its Assets is never saved
   on a cancelled line or one whose Order ended, and a line whose Order ended while its stage was
@@ -246,7 +252,7 @@
 A Customer has one Spare pool per Model (owner decision), sized from all their deployed fleet units
 of that Model across their active Agreements with a spare-pool ratio, each Agreement's ratio applied
 to its own units and the sum rounded up once: `size = ceil(Σ deployed × ratio)` and
-`shortfall = size − reserved spares` (`domain/sourcing.ts` `sparePools`). Units on an Agreement
+`shortfall = size − reserved spares` (`domain/spare-pools.ts` `sparePools`). Units on an Agreement
 without a ratio, or not active, add nothing to the pool. The daily pass runs over those Agreements;
 each Customer's pools are topped up once, from the row of their first Agreement by sys_id
 (`sparePoolLead`), and their other Agreements' rows are passed over.
@@ -264,7 +270,7 @@ and only while it is still available on no Order line and not on a lease being r
 sourcing took in the meantime, or whose save is refused, is not moved and stays in the shortfall. A
 spare moved in carries the Agreement with the largest share of the pool (the first by sys_id on a
 tie); sourcing gives it its line's Agreement when it is used. A pool is counted again, filled and
-bought for under its lock `spare_pool_<Customer sys_id>_<Model sys_id>` (ADR 0013). If
+bought for under its lock `LOCK.sparePool` (ADR 0013). If
 `x_daas_ham.spare_pool.auto_purchase` is true, purchase orders are requested for the rest, net of
-top-up purchases still open for that Customer and Model (described *Spare-pool top-up <Customer
-sys_id>: <n> unit(s)*).
+top-up purchases still open for that Customer and Model (found by the description
+`requestSparePurchase` gives them, `platform/procurement.ts`).

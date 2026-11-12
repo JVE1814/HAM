@@ -1,23 +1,14 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, EmailNotification, Property, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
-import {
-    onAssetLeaseChanged,
-    onReturnedLeaseEndChanged,
-    refreshLeaseAssets,
-    reviewLeases,
-    transferLeaseAssets,
-    uiApplyLeaseDecision,
-} from '../../server/entry/leases'
+import { onReturnedLeaseEndChanged, refreshLeaseAssets, transferLeaseAssets, uiApplyLeaseDecision } from '../../server/entry/leases'
+import { giveToLessor, runLeaseReview } from '../../server/platform/leases'
 import { CURRENT_IS_FLEET, FLEET_FIELD } from '../../server/domain/fleet'
 import { LEASE_END_ACTION } from '../../server/domain/vocabulary'
-import { EVENT } from '../../server/platform/events'
-import { PROPERTY } from '../../server/platform/properties'
+import { EVENT } from '../../server/domain/events'
+import { PROPERTY } from '../../server/domain/properties'
 import { admin, leaseEditors } from '../shared/roles.now'
 
-/* Leases and end-of-lease decisions (plan §13 Leases). */
-
-// Fleet assets only (ADR 0016): the condition tests the Fleet flag right after its change test, as the header of
-// fleet/logic.now.ts has it. A unit of the Provider IT's that joins the fleet with its Lease schedule already set (Add
+// Fleet assets only (ADR 0016). A unit of the Provider IT's that joins the fleet with its Lease schedule already set (Add
 // to fleet, a warehouse receipt) changes only its flag, so that change runs the rule too, in the save that adds it.
 BusinessRule({
     $id: Now.ID['br_asset_lease'],
@@ -28,7 +19,7 @@ BusinessRule({
     order: 90,
     condition:
         `(current.x_daas_ham_lease.changes() || current.${FLEET_FIELD}.changes()) && ${CURRENT_IS_FLEET} && current.x_daas_ham_lease != ''`,
-    script: onAssetLeaseChanged,
+    script: giveToLessor,
 })
 
 UiAction({
@@ -62,7 +53,7 @@ ScheduledScript({
     frequency: 'daily',
     executionTime: { hours: 5, minutes: 35, seconds: 0 },
     timeZone: 'UTC',
-    script: reviewLeases,
+    script: runLeaseReview,
 })
 
 Record({

@@ -14,15 +14,13 @@ import {
     Table,
     UiAction,
 } from '@servicenow/sdk/core'
+import { MONEY_READERS } from '../../server/domain/roles'
 import { BILLING_PERIOD_STATUS, COST_TYPE_CHOICES } from '../../server/domain/vocabulary'
-import { EVENT } from '../../server/platform/events'
+import { EVENT } from '../../server/domain/events'
 import { computeMargin, uiRecomputeMargin } from '../../server/entry/margin'
-import { PROPERTY } from '../../server/platform/properties'
-import { admin, finance, moneyReaders } from '../shared/roles.now'
+import { PROPERTY } from '../../server/domain/properties'
+import { admin, finance } from '../shared/roles.now'
 
-/* Cost facts and Margin per Customer, Site and currency (plan §13 Margin / TCO, Q72). */
-
-/** A cost attributed to a Customer and Site, in one currency, for one Billing period. */
 export const x_daas_ham_cost_fact = Table({
     name: 'x_daas_ham_cost_fact',
     label: 'Cost fact',
@@ -46,7 +44,6 @@ export const x_daas_ham_cost_fact = Table({
     ],
 })
 
-/** Subscription and fee revenue minus Cost facts, per Customer, Site and currency, for one Billing period (two currencies are never added). */
 export const x_daas_ham_margin = Table({
     name: 'x_daas_ham_margin',
     label: 'Margin',
@@ -124,7 +121,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_cost_fact',
     operation: 'read',
-    roles: moneyReaders,
+    roles: MONEY_READERS,
 })
 
 Acl({
@@ -156,7 +153,7 @@ Acl({
     type: 'record',
     table: 'x_daas_ham_margin',
     operation: 'read',
-    roles: moneyReaders,
+    roles: MONEY_READERS,
 })
 
 Acl({
@@ -217,5 +214,4 @@ Form({
     ],
 })
 
-// One row per Customer, Site and currency: its amounts are in that currency.
 List({ table: 'x_daas_ham_margin', view: default_view, columns: ['billing_period', 'customer', 'site', 'currency', 'revenue', 'cost', 'margin', 'margin_pct'] })

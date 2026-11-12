@@ -1,15 +1,13 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { intervalEnd, restartInterval } from '../domain/billing.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { isBillable } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { readStage } from './assets.ts'
-import { beyondVisibility } from './beyond-visibility.ts'
 import { todayIso } from './clock.ts'
 import { attemptLock, whyNotRun } from './locks.ts'
-import { exists, str, warnRefused, type ForeignRecord } from './records.ts'
-
-/** Service intervals: the days each Asset delivered a Subscription line (plan §13 Billing export). */
+import { log } from './log.ts'
+import { exists, findById, str, warnRefused, type ForeignRecord } from './records.ts'
 
 /**
  * Start billing an Asset on a Subscription line from `startIso`, unless an interval is already open for
@@ -31,7 +29,7 @@ export function openServiceInterval(asset: ForeignRecord, lineId: string, startI
     // The holder has normally opened it by now; one that has not may be slow, or have died holding the lock.
     if (why === null || hasOpenInterval(assetId)) return
     const unopened = `${str(asset, 'serial_number')} in service from ${startIso}, no interval open`
-    gs.error(`[x_daas_ham] ${unopened}: ${why}; open it by hand if it is still not open`)
+    log.error(`${unopened}: ${why}; open it by hand if it is still not open`)
 }
 
 /**
@@ -57,12 +55,12 @@ function openHolding(lock: HeldLock, asset: ForeignRecord, lineId: string, start
     closeHolding(lock, asset.getUniqueValue(), todayIso())
 }
 
-/** Open the interval (see openHolding); false when it is not saved or the lock was lost before saving it. */
 function openInterval(lock: HeldLock, asset: ForeignRecord, lineId: string, startIso: string): boolean {
     const assetId = asset.getUniqueValue()
     const place = { lineId, siteId: str(asset, 'x_daas_ham_site') }
     const latest = latestClosedInterval(assetId)
     const closed = latest && {
+        record: latest,
         lineId: str(latest, 'subscription_line'),
         siteId: str(latest, 'site'),
         end: str(latest, 'end_date'),
@@ -71,9 +69,7 @@ function openInterval(lock: HeldLock, asset: ForeignRecord, lineId: string, star
     const reopen = 'reopen' in restart
     let interval: GlideRecord
     if (reopen) {
-        // restartInterval only reopens the latest interval, so it exists here.
-        if (!latest) return false
-        interval = latest
+        interval = restart.reopen.record
         interval.setValue('end_date', '')
     } else {
         interval = new GlideRecord('x_daas_ham_service_interval')
@@ -111,10 +107,8 @@ function latestClosedInterval(assetId: string): GlideRecord | null {
  * user whose save runs this may not see it; only read, never saved.
  */
 function inServiceNow(assetId: string): boolean {
-    const asset = new GlideRecord('alm_hardware')
-    asset.addQuery('sys_id', assetId)
-    beyondVisibility(asset, () => asset.query())
-    return asset.next() && isBillable(readStage(asset))
+    const asset = findById('alm_hardware', assetId, { beyondVisibility: true })
+    return !!asset && isBillable(readStage(asset))
 }
 
 /**
@@ -131,7 +125,7 @@ export function closeServiceIntervals(assetId: string, endIso: string): void {
     if (!open.next() || inServiceNow(assetId)) return
     // A holder that is an open closes it too once it sees the Asset out of service, so this may clear itself.
     const unclosed = `${str(open, 'asset.serial_number')} left service on ${endIso}, its Service interval still open`
-    gs.error(`[x_daas_ham] ${unclosed}: ${why}; close it by hand if it is still open`)
+    log.error(`${unclosed}: ${why}; close it by hand if it is still open`)
 }
 
 /**
@@ -151,7 +145,6 @@ function closeHolding(lock: HeldLock, assetId: string, endIso: string): void {
             closed = serial
             continue
         }
-        // Left open, the interval goes on billing an Asset that has left service.
         warnRefused(interval, `${serial} left service on ${endIso}, its Service interval did not close`)
     }
     // The save that took a lost lock over may have put the Asset back in service and found the interval still open.

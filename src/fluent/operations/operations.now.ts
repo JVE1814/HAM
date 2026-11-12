@@ -12,25 +12,21 @@ import {
     StringColumn,
     Table,
 } from '@servicenow/sdk/core'
+import { JOB_ERROR_LENGTH, JOB_STATUS_LENGTH } from '../../server/domain/chunked-job'
 import { LOCK_NAME_LENGTH } from '../../server/domain/lock-names'
 import { runPreflight } from '../../server/entry/preflight'
-import { PROPERTY } from '../../server/platform/properties'
+import { PROPERTY } from '../../server/domain/properties'
 import { DEMO_DEPOT_GROUP, loadDemoData } from '../../server/entry/demo-seed'
-import { ROLE } from '../../server/domain/visibility'
+import { ROLE } from '../../server/domain/roles'
 import { admin } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
 
-/*
- * What the app's background work runs on: where each job keeps its place and its lock, the settings every job reads
- * (jobs are chunked where they touch many assets, ADR 0007), the preflight check and the demo data loader.
- */
-
 /**
- * One row per background job, read and written only by src/server/platform/job-cursor.ts. Most are cursors (ADR 0007):
+ * One row per background job. Most are cursors (ADR 0007):
  * where a scheduled chunked job stopped, so the next run resumes there, or, for a job whose passes replace each other
- * (`margin_<period>`, `billing_generate_<period>`), the current pass's token. Two rows are not cursors and are kept
- * here under the names they have always had, so an upgrade keeps them: `provider_tag_sequence`, whose Cursor is the
- * last Provider tag number issued, and `preflight`, whose Last status is the preflight check's last result.
+ * (`JOB.margin`, `JOB.billingGenerate`), the current pass's token. Two rows are not cursors: `JOB.providerTagSequence`,
+ * whose Cursor is the last Provider tag number issued, and `JOB.preflight`, whose Last status is the preflight check's
+ * last result. domain/chunked-job `JOB` names every row.
  */
 export const x_daas_ham_job_cursor = Table({
     name: 'x_daas_ham_job_cursor',
@@ -40,11 +36,10 @@ export const x_daas_ham_job_cursor = Table({
         job: StringColumn({ label: 'Job', maxLength: 100, mandatory: true }),
         cursor: StringColumn({ label: 'Cursor', maxLength: 100 }),
         last_run: DateTimeColumn({ label: 'Last run' }),
-        last_status: StringColumn({ label: 'Last status', maxLength: 255 }),
+        last_status: StringColumn({ label: 'Last status', maxLength: JOB_STATUS_LENGTH }),
         processed_total: IntegerColumn({ label: 'Processed (last run)', default: 0 }),
-        // A pass's records that failed so far, over all its runs, and the last error (platform/chunked `runTableJob`).
         failed_total: IntegerColumn({ label: 'Failed (this pass)', default: 0 }),
-        last_error: StringColumn({ label: 'Last error', maxLength: 1000 }),
+        last_error: StringColumn({ label: 'Last error', maxLength: JOB_ERROR_LENGTH }),
     },
     index: [{ name: 'x_daas_ham_jc_job', unique: true, element: 'job' }],
 })
@@ -100,7 +95,7 @@ Property({
 /*
  * Demo data (installMethod demo): the SDK installs it unless the app is installed with `now-sdk install --no-demoData`,
  * so install production that way (README "Install"). Run it once with "Execute Now"; it loads nothing on an instance in
- * use (entry/demo-seed `demoRefusal`).
+ * use.
  */
 
 /*

@@ -1,9 +1,10 @@
-import { GlideRecord, gs } from '@servicenow/glide'
+import { GlideRecord } from '@servicenow/glide'
 import { stageAfterTransfer, transferFellThrough, type TransferContext } from '../domain/lifecycle.ts'
 import { createMarks } from '../domain/marks.ts'
-import type { TransferResult } from '../domain/sourcing.ts'
+import { PROPERTY } from '../domain/properties.ts'
 import { moveAsset, moveRefusal, readStage } from './assets.ts'
-import { PROPERTY, stagingStockroom, stringProperty } from './properties.ts'
+import { log } from './log.ts'
+import { stagingStockroom, stringProperty } from './properties.ts'
 import { bool, deleteWhere, refusal, str, type ForeignRecord } from './records.ts'
 import { hasOpenStagingTask } from './staging-tasks.ts'
 
@@ -12,6 +13,8 @@ import { hasOpenStagingTask } from './staging-tasks.ts'
  * line is open, Inventory keeps its Asset In transfer (domain/lifecycle; external-contracts N38); once it lets the
  * Asset go, the Asset takes back the stage it left (`takeBackStageAfterTransfer`).
  */
+
+export type TransferResult = { ok: true; transferId: string } | { ok: false; reason: string }
 
 /**
  * Request a transfer order moving reserved stock to the staging centre. Inventory takes a unit onto a line only from
@@ -56,7 +59,6 @@ function handOver(asset: GlideRecord): string | null {
     return refused ? `${str(asset, 'serial_number')} could not be handed over: ${refused}` : null
 }
 
-/** Insert the Asset's line on the transfer order; why not, or null once inserted. */
 function addLine(transferId: string, modelId: string, asset: GlideRecord): string | null {
     const line = new GlideRecord('alm_transfer_order_line')
     line.initialize()
@@ -68,7 +70,7 @@ function addLine(transferId: string, modelId: string, asset: GlideRecord): strin
 }
 
 function noTransfer(fromStockroomId: string, reason: string): TransferResult {
-    gs.warn(`[x_daas_ham] No transfer order from stockroom ${fromStockroomId} (${reason})`)
+    log.warn(`No transfer order from stockroom ${fromStockroomId} (${reason})`)
     return { ok: false, reason }
 }
 
@@ -79,7 +81,6 @@ function noTransfer(fromStockroomId: string, reason: string): TransferResult {
  */
 const withdrawn = createMarks<string>()
 
-/** Run `remove` with every one of `assets` marked as withdrawn by sourcing; what it returns. */
 function withdrawing<R>(assets: readonly GlideRecord[], remove: () => R): R {
     const [first, ...rest] = assets
     return first === undefined ? remove() : withdrawn.during(String(first.getUniqueValue()), () => withdrawing(rest, remove))
@@ -96,30 +97,30 @@ export function onTransferOrderLine(asset: ForeignRecord): boolean {
 }
 
 /**
- * In the save by which Inventory lets `asset` go from its transfer order line (`before`: the Asset as stored), give it
- * back the stage it left; the save under way carries it. Inventory clears its flag and saves the Asset In stock:
+ * Before-update rule on alm_hardware once Inventory's *Active transfer order* flag changes (br_asset_transfer_released):
+ * in the save by which Inventory lets the Asset go from its transfer order line (`previous`: as stored), give it back
+ * the stage it left; the save under way carries it, so the lifecycle rule checks that move and the after rules see it. Inventory clears its flag and saves the Asset In stock:
  * Available (Reserved for a line requested for a user) in the transfer order's to-stockroom once received, Available
  * where it was when the line is cancelled or deleted (external-contracts N38, N39). The Asset takes back the stage it
  * left instead (domain/lifecycle `stageAfterTransfer`); the stockroom Inventory set is kept. Any other save is left as
  * it is: one putting the Asset onto a line, or one leaving it in transfer with the flag cleared (its line received
  * after its last task was closed skipped), for its stage to be set by hand. A stage the lifecycle refuses is logged.
  */
-export function takeBackStageAfterTransfer(asset: ForeignRecord, before: ForeignRecord): void {
-    const now = readStage(asset)
-    const released = readStage(before) === 'in_transfer' && now !== 'in_transfer' && !onTransferOrderLine(asset)
-    if (!released) return
-    const stage = stageAfterTransfer(transferContext(asset))
+export function takeBackStageAfterTransfer(current: ForeignRecord, previous: ForeignRecord): void {
+    const now = readStage(current)
+    if (!releasedFromTransfer(current, previous) || now === 'in_transfer') return
+    const stage = stageAfterTransfer(transferContext(current))
     // From the stock Inventory made it: each stage it can take back is a move the matrix allows from there.
-    const verdict = moveAsset(asset, stage)
+    const verdict = moveAsset(current, stage)
     if (verdict.allowed) return
-    gs.warn(`[x_daas_ham] ${str(asset, 'serial_number')} left its transfer as ${now}, not ${stage}: ${verdict.reason}`)
+    log.warn(`${str(current, 'serial_number')} left its transfer as ${now}, not ${stage}: ${verdict.reason}`)
 }
 
 /**
  * What the Asset Inventory let go carries, and where it was left (domain/lifecycle `TransferContext`): what tells the
  * stage it left (`stageAfterTransfer`) and whether its transfer fell through (`transferFellThrough`).
  */
-export function transferContext(asset: ForeignRecord): TransferContext {
+function transferContext(asset: ForeignRecord): TransferContext {
     const company = str(asset, 'company')
     const staging = stagingStockroom()
     return {
@@ -132,10 +133,19 @@ export function transferContext(asset: ForeignRecord): TransferContext {
 }
 
 /**
- * Whether Inventory let the Asset go from the transfer sourcing raised for it short of the staging centre, its line
- * cancelled or deleted (domain/lifecycle `transferFellThrough`): read once the save that let it go is made, from the
- * Asset as saved.
+ * Whether the save (`current`, `previous` as stored) let the Asset go from the transfer sourcing raised for it short
+ * of the staging centre, its line cancelled or deleted (domain/lifecycle `transferFellThrough`): read once the save is
+ * made, from the Asset as saved.
  */
-export function fellShortOfStagingCentre(asset: ForeignRecord): boolean {
-    return !onTransferOrderLine(asset) && transferFellThrough(transferContext(asset))
+export function fellShortOfStagingCentre(current: ForeignRecord, previous: ForeignRecord): boolean {
+    return releasedFromTransfer(current, previous) && transferFellThrough(transferContext(current))
+}
+
+/**
+ * Whether the save took the Asset off its transfer order line. Its stage can stay In transfer: a line received after
+ * its last task was closed skipped only clears the flag, and a form save may then switch between the two ways In
+ * transfer is stored.
+ */
+function releasedFromTransfer(current: ForeignRecord, previous: ForeignRecord): boolean {
+    return readStage(previous) === 'in_transfer' && !onTransferOrderLine(current)
 }

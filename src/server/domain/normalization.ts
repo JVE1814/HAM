@@ -1,3 +1,4 @@
+import { anyOf } from './encoded-query.ts'
 import { inFleet, OEM_PID_FIELD } from './fleet.ts'
 import { seenWithoutFleetAssetQuery } from './reconciliation.ts'
 import { type MatchType, NORM_EXCEPTION_STATUS } from './vocabulary.ts'
@@ -19,7 +20,6 @@ export interface ModelMatchRule {
     matchType: MatchType
     pattern: string
     modelId: string
-    active: boolean
 }
 
 export type NormalizationResult =
@@ -27,14 +27,13 @@ export type NormalizationResult =
     | { matched: false; manufacturerId: string; reason: 'no_matching_rule' }
     | { matched: false; reason: 'unknown_manufacturer' }
 
-/** ASCII punctuation and symbols, the typographic dashes (U+2010 to U+2015) and quotes (U+2018 to U+201F), and the ©, ® and ™ marks. */
 const PUNCTUATION = /[!-/:-@[-`{-~\u00a9\u00ae\u2010-\u2015\u2018-\u201f\u2122]/g
 
 /**
  * Lower-case, treat punctuation as a word break and collapse whitespace, so "Cisco Systems, Inc." matches "cisco systems inc"
  * and "Hewlett-Packard" matches "Hewlett Packard".
  */
-export function manufacturerKey(raw: string): string {
+function manufacturerKey(raw: string): string {
     return raw.toLowerCase().replace(PUNCTUATION, ' ').replace(/\s+/g, ' ').trim()
 }
 
@@ -96,7 +95,7 @@ export function normalizeModel(
     if (!manufacturerId) return { matched: false, reason: 'unknown_manufacturer' }
 
     const rule = rules
-        .filter((r) => r.active && r.manufacturerId === manufacturerId)
+        .filter((r) => r.manufacturerId === manufacturerId)
         .sort((a, b) => a.order - b.order)
         .find((r) => ruleMatches(r, raw.model))
     if (!rule) return { matched: false, manufacturerId, reason: 'no_matching_rule' }
@@ -117,12 +116,6 @@ export const NORMALIZED_TO = 'x_daas_ham_normalized_to'
 
 /** The order a model match rule gets when none is entered: the default of its `order` column. */
 export const DEFAULT_RULE_ORDER = 100
-
-/**
- * The rule learned from a resolved exception: an exact match on its raw model, at the order a rule gets when none is
- * entered, so a rule given a lower order still wins.
- */
-export const LEARNED_RULE = { order: DEFAULT_RULE_ORDER, matchType: 'exact' } as const satisfies Pick<ModelMatchRule, 'order' | 'matchType'>
 
 /** Encoded condition: the Model in `field` has no OEM PID (it is a raw model, ADR 0016) and is not yet normalized. */
 function onUnmappedRawModel(field: string): string {
@@ -149,14 +142,10 @@ export function siteCiOnRawModelQuery(): string {
     return `${seenWithoutFleetAssetQuery()}^${onUnmappedRawModel('model_id')}`
 }
 
-/**
- * Encoded query on RAW_MODEL_TABLE: those of `rawModelIds` still to normalize (no OEM PID, not yet mapped). Null when
- * there are none, as an empty id list would not narrow the query at all.
- */
+/** Encoded query on RAW_MODEL_TABLE: those of `rawModelIds` still to normalize (no OEM PID, not yet mapped); null for none. */
 export function rawModelsToNormalizeQuery(rawModelIds: readonly string[]): string | null {
-    const ids = [...new Set(rawModelIds.filter(Boolean))]
-    if (ids.length === 0) return null
-    return `${OEM_PID_FIELD}ISEMPTY^${NORMALIZED_TO}ISEMPTY^sys_idIN${ids.join(',')}`
+    const ids = anyOf('sys_id', rawModelIds)
+    return ids && `${OEM_PID_FIELD}ISEMPTY^${NORMALIZED_TO}ISEMPTY^${ids}`
 }
 
 /** The reason a normalization exception is closed with when its raw model is not NaaS's to map. */
@@ -181,6 +170,6 @@ export const RAW_MODEL_EXCEPTIONS_QUERY = `${OPEN_NORM_EXCEPTIONS_QUERY}^source_
 export function notNaasRawModelsQuery(exceptionModelIds: readonly string[], naasRawModelIds: readonly string[]): string | null {
     const named = rawModelsToNormalizeQuery(exceptionModelIds)
     if (!named) return null
-    const naas = [...new Set(naasRawModelIds.filter(Boolean))]
-    return naas.length > 0 ? `${named}^sys_idNOT IN${naas.join(',')}` : named
+    const naas = anyOf('sys_id', naasRawModelIds, 'NOT IN')
+    return naas ? `${named}^${naas}` : named
 }

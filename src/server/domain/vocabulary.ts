@@ -34,7 +34,6 @@ export const TASK_STATE = {
 
 /* Assets (alm_hardware) */
 
-/** Platform install_status values (alm_asset.install_status). */
 export const INSTALL_STATUS = {
     inUse: '1',
     onOrder: '2',
@@ -107,7 +106,7 @@ export const STAGE_FIELDS = {
     returned_to_lessor: { installStatus: INSTALL_STATUS.retired, substatus: 'lease_return' },
 } as const
 
-/** alm_hardware.x_daas_ham_legal_owner. The column has no default: a blank owner counts as the Provider's. */
+/** The column has no default: a blank owner counts as the Provider's. */
 export const LEGAL_OWNER_CHOICES = {
     provider: { label: 'Provider', sequence: 0 },
     customer: { label: 'Customer', sequence: 1 },
@@ -211,7 +210,7 @@ export const NORM_EXCEPTION_STATUS_CHOICES = {
     open: { label: 'Open', sequence: 0 },
     resolved: { label: 'Resolved', sequence: 1 },
 } as const
-export type NormExceptionStatus = keyof typeof NORM_EXCEPTION_STATUS_CHOICES
+type NormExceptionStatus = keyof typeof NORM_EXCEPTION_STATUS_CHOICES
 export const NORM_EXCEPTION_STATUS = {
     open: 'open',
     resolved: 'resolved',
@@ -248,7 +247,7 @@ export const CLOUD_ACCOUNT_VENDOR_CHOICES = {
     fortinet: { label: 'FortiZTP (FortiManager OID)', sequence: 3 },
     checkpoint: { label: 'Check Point Zero Touch (User Center account id/template id)', sequence: 4 },
 } as const
-export type CloudAccountVendor = keyof typeof CLOUD_ACCOUNT_VENDOR_CHOICES
+type CloudAccountVendor = keyof typeof CLOUD_ACCOUNT_VENDOR_CHOICES
 
 // Fluent cannot read a list written with `satisfies`, so that both lists label OEM vendors is checked here instead.
 type Holds<T extends true> = T
@@ -263,7 +262,6 @@ export const COVERAGE_SOURCE_CHOICES = {
 } as const
 export type CoverageSource = keyof typeof COVERAGE_SOURCE_CHOICES
 
-/** x_daas_ham_oem_rma.state. */
 export const RMA_STATE_CHOICES = {
     to_open: { label: 'To open with OEM', sequence: 0 },
     open: { label: 'Open', sequence: 1 },
@@ -282,7 +280,7 @@ export const RMA_STATE = {
 
 /* Stockrooms, Sites and on-site work */
 
-/** alm_stockroom.x_daas_ham_stockroom_type. The column has no default: a stockroom with no type is not a NaaS one. */
+/** The column has no default: a stockroom with no type is not a NaaS one. */
 export const STOCKROOM_TYPE_CHOICES = {
     central_depot: { label: 'Central depot', sequence: 0 },
     staging_centre: { label: 'Staging centre', sequence: 1 },
@@ -319,7 +317,7 @@ export const REPLACEMENT_TIER_CHOICES = {
     same_day: { label: 'Same day (8x5x4)', sequence: 1 },
     four_hour: { label: '24x7x4', sequence: 2 },
 } as const
-export type ReplacementTier = keyof typeof REPLACEMENT_TIER_CHOICES
+type ReplacementTier = keyof typeof REPLACEMENT_TIER_CHOICES
 export const REPLACEMENT_TIER = {
     nbd: 'nbd',
     same_day: 'same_day',
@@ -331,6 +329,10 @@ export const SUBSCRIPTION_LINE_TYPE_CHOICES = {
     device_class: { label: 'Per device class', sequence: 1 },
 } as const
 export type SubscriptionLineType = keyof typeof SUBSCRIPTION_LINE_TYPE_CHOICES
+export const SUBSCRIPTION_LINE_TYPE = {
+    site_package: 'site_package',
+    device_class: 'device_class',
+} as const satisfies Named<SubscriptionLineType>
 
 export const SUBSCRIPTION_LINE_STATUS_CHOICES = {
     pending: { label: 'Pending', sequence: 0 },
@@ -593,7 +595,7 @@ export const DISPOSAL_STAGE_CHOICES = {
     completed: { label: 'Completed', sequence: 3 },
     rejected: { label: 'Rejected', sequence: 4 },
 } as const
-export type DisposalStage = keyof typeof DISPOSAL_STAGE_CHOICES
+type DisposalStage = keyof typeof DISPOSAL_STAGE_CHOICES
 export const DISPOSAL_STAGE = {
     draft: 'draft',
     awaiting_approval: 'awaiting_approval',
@@ -608,6 +610,11 @@ export const DISPOSAL_LINE_STATUS_CHOICES = {
     blocked: { label: 'Blocked', sequence: 2 },
 } as const
 export type DisposalLineStatus = keyof typeof DISPOSAL_LINE_STATUS_CHOICES
+export const DISPOSAL_LINE_STATUS = {
+    pending: 'pending',
+    done: 'done',
+    blocked: 'blocked',
+} as const satisfies Named<DisposalLineStatus>
 
 /* Lease schedules */
 
@@ -666,7 +673,7 @@ export const EXCEPTION_STATUS_CHOICES = {
     resolved: { label: 'Resolved', sequence: 1 },
     accepted: { label: 'Accepted (no action)', sequence: 2 },
 } as const
-export type ExceptionStatus = keyof typeof EXCEPTION_STATUS_CHOICES
+type ExceptionStatus = keyof typeof EXCEPTION_STATUS_CHOICES
 export const EXCEPTION_STATUS = {
     open: 'open',
     resolved: 'resolved',
@@ -680,7 +687,7 @@ export const BILLING_PERIOD_STATUS_CHOICES = {
     ready: { label: 'Ready for review', sequence: 1 },
     closed: { label: 'Closed (locked)', sequence: 2 },
 } as const
-export type BillingPeriodStatus = keyof typeof BILLING_PERIOD_STATUS_CHOICES
+type BillingPeriodStatus = keyof typeof BILLING_PERIOD_STATUS_CHOICES
 export const BILLING_PERIOD_STATUS = {
     generating: 'generating',
     ready: 'ready',
@@ -691,7 +698,11 @@ export const BILLING_LINE_KIND_CHOICES = {
     subscription: { label: 'Subscription', sequence: 0 },
     fee: { label: 'Fee', sequence: 1 },
 } as const
-export type BillingLineKind = keyof typeof BILLING_LINE_KIND_CHOICES
+type BillingLineKind = keyof typeof BILLING_LINE_KIND_CHOICES
+export const BILLING_LINE_KIND = {
+    subscription: 'subscription',
+    fee: 'fee',
+} as const satisfies Named<BillingLineKind>
 
 export const COST_TYPE_CHOICES = {
     purchase: { label: 'Purchase (written off)', sequence: 0 },

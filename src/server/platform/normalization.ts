@@ -1,9 +1,10 @@
-import { GlideRecord, gs } from '@servicenow/glide'
-import { fleetCondition, OEM_PID_FIELD } from '../domain/fleet.ts'
+import { GlideRecord } from '@servicenow/glide'
+import { JOB } from '../domain/chunked-job.ts'
+import { FLEET_CONDITION, OEM_PID_FIELD } from '../domain/fleet.ts'
 import {
     aliasedManufacturer,
+    DEFAULT_RULE_ORDER,
     fleetOnRawModelQuery,
-    LEARNED_RULE,
     MODEL_TABLE,
     NORMALIZED_TO,
     normalizeModel,
@@ -16,15 +17,19 @@ import {
     siteCiOnRawModelQuery,
     type ManufacturerAlias,
     type ModelMatchRule,
+    type NormalizationResult,
     unusableRules,
 } from '../domain/normalization.ts'
 import { runTableJob } from './chunked.ts'
-import { bool, countBy, num, pluck, str, warnRefused } from './records.ts'
+import { countBy, num, pluck, str, warnRefused } from './records.ts'
 import { NORM_EXCEPTION_STATUS } from '../domain/vocabulary.ts'
+import { log } from './log.ts'
 
-/** Resolving raw manufacturer/model strings to canonical Models (domain/normalization). */
+const ALIAS_TABLE = 'x_daas_ham_manufacturer_alias'
+const RULE_TABLE = 'x_daas_ham_model_match_rule'
+const EXCEPTION_TABLE = 'x_daas_ham_norm_exception'
 
-export interface NormalizationData {
+interface NormalizationData {
     aliases: ManufacturerAlias[]
     rules: ModelMatchRule[]
 }
@@ -32,12 +37,12 @@ export interface NormalizationData {
 /** Load aliases and active rules once per job run or transaction. */
 export function loadNormalizationData(): NormalizationData {
     const aliases: ManufacturerAlias[] = []
-    const alias = new GlideRecord('x_daas_ham_manufacturer_alias')
+    const alias = new GlideRecord(ALIAS_TABLE)
     alias.query()
     while (alias.next()) aliases.push({ alias: str(alias, 'alias'), manufacturerId: str(alias, 'manufacturer') })
 
     const rules: ModelMatchRule[] = []
-    const rule = new GlideRecord('x_daas_ham_model_match_rule')
+    const rule = new GlideRecord(RULE_TABLE)
     rule.addQuery('active', true)
     rule.query()
     while (rule.next()) {
@@ -48,13 +53,11 @@ export function loadNormalizationData(): NormalizationData {
             matchType: str(rule, 'match_type') as ModelMatchRule['matchType'],
             pattern: str(rule, 'pattern'),
             modelId: str(rule, 'model'),
-            active: bool(rule, 'active'),
         })
     }
     return { aliases, rules }
 }
 
-/** A canonical Model with exactly this OEM PID. */
 function modelByPid(pid: string): string {
     if (!pid.trim()) return ''
     const model = new GlideRecord(MODEL_TABLE)
@@ -64,14 +67,17 @@ function modelByPid(pid: string): string {
     return model.next() ? model.getUniqueValue() : ''
 }
 
-export type Resolution = { modelId: string } | { modelId: ''; reason: string }
+/** Why a raw pair maps to no Model: '' when the rule it matches names no Model (its Model was deleted, say). */
+type NormalizationFailure = Extract<NormalizationResult, { matched: false }>['reason'] | ''
 
-/** PID first, then aliases + match rules. */
+type Resolution = { matched: true; modelId: string } | { matched: false; reason: NormalizationFailure }
+
 export function resolveModel(raw: { manufacturer: string; model: string }, data: NormalizationData): Resolution {
     const byPid = modelByPid(raw.model)
-    if (byPid) return { modelId: byPid }
+    if (byPid) return { matched: true, modelId: byPid }
     const result = normalizeModel(raw, data.aliases, data.rules)
-    return result.matched ? { modelId: result.modelId } : { modelId: '', reason: result.reason }
+    if (!result.matched) return { matched: false, reason: result.reason }
+    return result.modelId ? { matched: true, modelId: result.modelId } : { matched: false, reason: '' }
 }
 
 /**
@@ -83,11 +89,11 @@ export function resolveModel(raw: { manufacturer: string; model: string }, data:
  */
 export function recordNormalizationException(
     raw: { manufacturer: string; model: string },
-    reason: string,
+    reason: NormalizationFailure,
     source: { table: string; id: string },
 ): boolean {
     const rawPair = `${raw.manufacturer} / ${raw.model}`
-    const exception = new GlideRecord('x_daas_ham_norm_exception')
+    const exception = new GlideRecord(EXCEPTION_TABLE)
     exception.addQuery('raw_manufacturer', raw.manufacturer)
     exception.addQuery('raw_model', raw.model)
     exception.addQuery('status', NORM_EXCEPTION_STATUS.open)
@@ -118,37 +124,29 @@ export function recordNormalizationException(
  */
 export function normalizeNaasRawModels(): void {
     const naas = [
-        ...distinctValues('alm_hardware', fleetOnRawModelQuery(), 'model'),
-        ...distinctValues('cmdb_ci_netgear', siteCiOnRawModelQuery(), 'model_id'),
+        ...countBy('alm_hardware', fleetOnRawModelQuery(), 'model').keys(),
+        ...countBy('cmdb_ci_netgear', siteCiOnRawModelQuery(), 'model_id').keys(),
     ]
     closeNonNaasExceptions(naas)
     const query = rawModelsToNormalizeQuery(naas)
     // No raw model is NaaS's: nothing to map.
     if (!query) return
     const data = loadNormalizationData()
-    for (const rule of unusableRules(data.rules)) gs.warn(`[x_daas_ham] Model match rule skipped: its pattern ${rule.pattern} is not a regular expression`)
+    for (const rule of unusableRules(data.rules)) log.warn(`Model match rule skipped: its pattern ${rule.pattern} is not a regular expression`)
     runTableJob({
-        job: 'normalize_raw_models',
+        job: JOB.normalizeRawModels,
         table: RAW_MODEL_TABLE,
         query,
         read: (model) => ({ manufacturer: str(model, 'manufacturer.name'), model: str(model, 'name') }),
         handle: (raw, rawModelId) => {
             const resolution = resolveModel(raw, data)
-            if (!resolution.modelId) {
-                recordNormalizationException(raw, 'reason' in resolution ? resolution.reason : '', {
-                    table: RAW_MODEL_TABLE,
-                    id: rawModelId,
-                })
+            if (!resolution.matched) {
+                recordNormalizationException(raw, resolution.reason, { table: RAW_MODEL_TABLE, id: rawModelId })
                 return
             }
             repointModel(rawModelId, resolution.modelId)
         },
     })
-}
-
-/** The distinct values of `field` among the rows of `table` that `query` matches, read with one aggregate query. */
-function distinctValues(table: string, query: string, field: string): string[] {
-    return [...countBy(table, query, field).keys()]
 }
 
 /**
@@ -162,7 +160,7 @@ function repointModel(rawModelId: string, canonicalModelId: string): void {
     let refused = 0
     const asset = new GlideRecord('alm_hardware')
     asset.addQuery('model', rawModelId)
-    asset.addEncodedQuery(fleetCondition())
+    asset.addEncodedQuery(FLEET_CONDITION)
     asset.query()
     while (asset.next()) {
         asset.setValue('model', canonicalModelId)
@@ -177,14 +175,14 @@ function repointModel(rawModelId: string, canonicalModelId: string): void {
 
 /**
  * Close the open exceptions the hourly normalization raised for raw models that are not NaaS's to map: unmapped and
- * none of `naasRawModelIds` (domain/normalization `notNaasRawModelsQuery`). Each is resolved with no Model, its reason
+ * none of `naasRawModelIds`. Each is resolved with no Model, its reason
  * `not_naas`. One the platform refuses to close is logged and stays open for the next run.
  */
 function closeNonNaasExceptions(naasRawModelIds: readonly string[]): void {
-    const query = notNaasRawModelsQuery(pluck('x_daas_ham_norm_exception', RAW_MODEL_EXCEPTIONS_QUERY, 'source_record'), naasRawModelIds)
+    const query = notNaasRawModelsQuery(pluck(EXCEPTION_TABLE, RAW_MODEL_EXCEPTIONS_QUERY, 'source_record'), naasRawModelIds)
     const notNaas = query ? pluck(RAW_MODEL_TABLE, query, 'sys_id') : []
     if (notNaas.length === 0) return
-    const exception = new GlideRecord('x_daas_ham_norm_exception')
+    const exception = new GlideRecord(EXCEPTION_TABLE)
     exception.addEncodedQuery(RAW_MODEL_EXCEPTIONS_QUERY)
     exception.addQuery('source_record', 'IN', notNaas.join(','))
     exception.query()
@@ -212,17 +210,19 @@ function learnFromResolution(exception: GlideRecord, data: NormalizationData): b
     const rawManufacturer = str(exception, 'raw_manufacturer')
     const rawPair = `${rawManufacturer} / ${str(exception, 'raw_model')}`
     if (shouldLearnAlias(rawManufacturer, data.aliases)) {
-        const alias = new GlideRecord('x_daas_ham_manufacturer_alias')
+        const alias = new GlideRecord(ALIAS_TABLE)
         alias.initialize()
         alias.setValue('alias', rawManufacturer)
         alias.setValue('manufacturer', manufacturerId)
         if (!learned(alias, 'alias', rawPair)) return false
     }
-    const rule = new GlideRecord('x_daas_ham_model_match_rule')
+    // An exact match at the order a rule gets when none is entered, so a rule given a lower order still wins.
+    const exact: ModelMatchRule['matchType'] = 'exact'
+    const rule = new GlideRecord(RULE_TABLE)
     rule.initialize()
-    rule.setValue('order', LEARNED_RULE.order)
+    rule.setValue('order', DEFAULT_RULE_ORDER)
     rule.setValue('manufacturer', aliasedManufacturer(rawManufacturer, data.aliases) ?? manufacturerId)
-    rule.setValue('match_type', LEARNED_RULE.matchType)
+    rule.setValue('match_type', exact)
     rule.setValue('pattern', str(exception, 'raw_model'))
     rule.setValue('model', modelId)
     return learned(rule, 'match rule', rawPair)
@@ -241,7 +241,7 @@ function learned(record: GlideRecord, what: string, rawPair: string): boolean {
 export type NormalizationResolution = { learned: false } | { learned: true; unresolved?: string }
 
 /**
- * A normalization exception was given its resolved Model: learn a rule from it (learnFromResolution) and resolve it.
+ * A normalization exception was given its resolved Model: learn a rule from it and resolve it.
  * When no rule was learned the exception stays open, as nothing maps its raw pair yet. One learned whose resolution
  * the platform refuses stays open too (logged): the user sets it resolved by hand, which learns nothing twice, as the
  * rule runs only on a new resolved model.
