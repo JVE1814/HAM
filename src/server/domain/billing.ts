@@ -43,7 +43,8 @@ export function intervalEnd(start: string, closedOn: string): string {
     return closedOn < start ? start : closedOn
 }
 
-interface IntervalPlace {
+/** Where an Asset in service is billed: the Subscription line it delivers ('' for none) and its Site. A Service interval records both once, as it opens. */
+export interface IntervalPlace {
     lineId: string
     siteId: string
 }

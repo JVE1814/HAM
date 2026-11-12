@@ -9,6 +9,21 @@
   billed. An Asset back in service on or before the day its interval on the same line closed gets
   that interval reopened, so no day is billed twice. The rule also runs when the stage change clears
   the Asset's Subscription line, so the interval still closes.
+- A Service interval records its Asset's Subscription line and Site once, as it opens. So the rule
+  also runs when the Subscription line or the Site of a fleet asset is changed, and moves the
+  interval of a unit that stays in service (an asset manager may change a unit's line by hand, ADR
+  0005). The interval at the old line or Site ends that day, which it bills as any last day. The
+  interval at the new line and Site starts the day after, so no day is billed twice. A unit in
+  service given its first line gets an interval from that day. One whose line is cleared has its
+  interval ended and none opened, and the *In service without a subscription line* tile counts it.
+  An interval that has not started yet (it starts the day after an earlier move that day) has
+  billed no day: it is removed, not ended, so a move taken back the same day leaves the first
+  interval open as it was. The move takes the Asset's job lock as the opening and the closing do,
+  and reads the Asset afresh under it, so two such saves at once leave the interval at the line
+  and Site the Asset has. A move that cannot take the lock leaves it to the holder, and logs an
+  error if the interval is then still elsewhere. An interval the platform refuses to end is logged
+  as a warning, and no second one is opened beside it. A change of the Asset's company alone moves
+  nothing: an interval keeps the Customer it opened with.
 - The rule opens or reopens the interval under a job lock on the Asset (`LOCK.serviceInterval` in
   `domain/lock-names.ts`,
   ADR 0013), so two saves that put it in service at once (a Seen signal and the detection job) open

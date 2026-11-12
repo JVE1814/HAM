@@ -5,6 +5,7 @@ import {
     getBillingLines,
     guardBillingPeriodMonth,
     listBillingPeriods,
+    onAssetServiceChange,
     uiCloseBillingPeriod,
     uiExportBillingPeriod,
     uiRegenerateBillingPeriod,
@@ -14,6 +15,7 @@ import { generateNewPeriod, type BillingLinesPage } from '../platform/billing.ts
 import { waiveOpenFees } from '../platform/fees.ts'
 import { PULL_PAGE } from '../domain/billing.ts'
 import { EVENT } from '../domain/events.ts'
+import { fieldsOf, type Stage } from '../domain/lifecycle.ts'
 import { ROLE } from '../domain/roles.ts'
 import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 import type { GlideRecord } from '@servicenow/glide'
@@ -544,5 +546,86 @@ describe('the CSV export of a closed period', () => {
         expect(reexport(period('2026-09'))).toEqual(['info The CSV export of 2026-09 is being prepared'])
         drainExport()
         expect(rows(ATTACHMENT).map((attachment) => attachment.file_name)).toEqual([FILE])
+    })
+})
+
+describe('a save of a fleet asset', () => {
+    const ASSETS = 'alm_hardware'
+    const INTERVALS = 'x_daas_ham_service_interval'
+    const TODAY = '2026-11-11'
+
+    function unit(stage: Stage, fields: Row = {}): Row {
+        const { installStatus, substatus } = fieldsOf(stage)
+        return {
+            sys_id: 'a1',
+            serial_number: 'FOC111',
+            company: 'acme',
+            install_status: installStatus,
+            substatus: substatus ?? '',
+            x_daas_ham_subscription_line: 'sub1',
+            x_daas_ham_site: 'site1',
+            ...fields,
+        }
+    }
+
+    /** Run the rule as the platform does after a save that took the Asset from `before` to `after`. */
+    function saved(before: Row, after: Row): void {
+        platform.tables[ASSETS] = [after]
+        onAssetServiceChange(recordOf(ASSETS, after), recordOf(ASSETS, before))
+    }
+
+    /** Each interval as [Subscription line, Site, first day, last day], in the order stored. */
+    const billed = () => rows(INTERVALS).map((row) => [row.subscription_line, row.site, row.start_date, row.end_date ?? ''])
+
+    beforeEach(() => {
+        platform.references = { ...platform.references, [`${INTERVALS}.asset`]: ASSETS }
+        platform.tables[INTERVALS] = [{ sys_id: 'int1', asset: 'a1', subscription_line: 'sub1', site: 'site1', start_date: '2026-10-01', end_date: '' }]
+    })
+
+    it('moves the interval of a unit in service whose Subscription line was changed by hand', () => {
+        saved(unit('in_service'), unit('in_service', { x_daas_ham_subscription_line: 'sub2' }))
+
+        expect(billed()).toEqual([
+            ['sub1', 'site1', '2026-10-01', TODAY],
+            ['sub2', 'site1', '2026-11-12', ''],
+        ])
+    })
+
+    it('moves it when only the Site changed, and when the stage changed between two stages in service too', () => {
+        saved(unit('in_service'), unit('temporary_deployment', { x_daas_ham_site: 'site2' }))
+
+        expect(billed()).toEqual([
+            ['sub1', 'site1', '2026-10-01', TODAY],
+            ['sub1', 'site2', '2026-11-12', ''],
+        ])
+    })
+
+    it('starts billing a unit in service the day it is given a line', () => {
+        platform.tables[INTERVALS] = []
+
+        saved(unit('in_service', { x_daas_ham_subscription_line: '' }), unit('in_service'))
+
+        expect(billed()).toEqual([['sub1', 'site1', TODAY, '']])
+    })
+
+    it('leaves the interval alone of a unit billed where it already is, and of one that is not in service', () => {
+        saved(unit('in_service'), unit('in_service', { asset_tag: 'P-1' }))
+        saved(unit('available'), unit('available', { x_daas_ham_subscription_line: 'sub2' }))
+
+        expect(billed()).toEqual([['sub1', 'site1', '2026-10-01', '']])
+    })
+
+    it('opens one interval, from the in-service date, for a go-live that attaches the line in the same save', () => {
+        platform.tables[INTERVALS] = []
+
+        saved(unit('pending_in_service', { x_daas_ham_subscription_line: '' }), unit('in_service', { x_daas_ham_in_service_date: '2026-11-09 08:00:00' }))
+
+        expect(billed()).toEqual([['sub1', 'site1', '2026-11-09', '']])
+    })
+
+    it('closes the interval, and opens none, for a save that takes the unit out of service and clears its line and Site', () => {
+        saved(unit('in_service'), unit('pending_evaluation', { x_daas_ham_subscription_line: '', x_daas_ham_site: '' }))
+
+        expect(billed()).toEqual([['sub1', 'site1', '2026-10-01', TODAY]])
     })
 })

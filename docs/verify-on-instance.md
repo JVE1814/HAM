@@ -809,6 +809,24 @@ units then ends it.
   the move: list Fee events (not waived) that share type, Asset and Return order, and waive the
   duplicates.
 
+### Subscription line or Site changed in service
+
+As an asset manager, open a fleet asset in service that has an open Service interval, and change
+its *Subscription line* to another line of its Agreement. The open interval gets today as its *Last
+day*, and a new interval on the new line and the Asset's Site is created with tomorrow as its
+*First day*. Change the line back the same day: the new interval is gone and the first one is open
+again. Clear the line: the open interval ends today and none is created. Change the *Site* of a
+unit in service: its interval moves the same way. With a row named `service_interval_<Asset
+sys_id>` in *Job lock* ([how a job lock behaves](#how-a-job-lock-behaves)), the same change leaves
+the interval where it was and logs *[x_daas_ham] <serial> changed its Subscription line or Site on
+<date>, its Service interval not moved: ...* (error).
+
+**After an upgrade:** a unit whose line or Site was changed in service before this release still
+has its open interval on the old one. List open Service intervals (*Last day* empty) whose
+*Subscription line* or *Site* differs from their Asset's. For each, set its *Last day* and create
+the interval at the line and Site the Asset has now. List fleet assets in service that have a
+Subscription line and no open Service interval, and create theirs.
+
 ### Replacement SLA stop
 
 Completing a replacement Order queues the event `x_daas_ham.replacement.complete` on it. Its script

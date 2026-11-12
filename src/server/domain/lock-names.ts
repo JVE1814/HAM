@@ -86,7 +86,7 @@ export const LOCK = {
     reconException: (type: ExceptionType, subjectId: string) => named(`recon_exception_${type}_${subjectId}`),
     /** A pending Subscription line is started under it: nothing is taken under it. */
     subscriptionLine: (lineId: string) => named(`subscription_line_${lineId}`),
-    /** The open and the close of an Asset's Service interval take turns under it. */
+    /** The open, the close and the move of an Asset's Service interval take turns under it. */
     serviceInterval: (assetId: string) => named(`service_interval_${assetId}`),
     /**
      * A Billing period's Close and Regenerate take turns under it, each reading its status afresh, and a fee's waiver

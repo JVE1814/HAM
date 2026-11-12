@@ -3,7 +3,7 @@ import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_in
 import { billingMonthProblem, monthChangedError, PULL_PAGE, pullPageSize } from '../domain/billing.ts'
 import { monthBounds, previousMonth } from '../domain/money.ts'
 import { EVENT } from '../domain/events.ts'
-import { billingChange } from '../domain/lifecycle.ts'
+import { billingChange, isBillable } from '../domain/lifecycle.ts'
 import { ROLE } from '../domain/roles.ts'
 import {
     attachExport,
@@ -24,7 +24,7 @@ import { jobEvent, subjectOf } from '../platform/events.ts'
 import { str, type ForeignRecord } from '../platform/records.ts'
 import { pathParam, queryInt, reply, requireRole } from '../platform/rest-api.ts'
 import { abortWith } from '../platform/rule-api.ts'
-import { closeServiceIntervals, openServiceInterval } from '../platform/service-intervals.ts'
+import { closeServiceIntervals, moveServiceInterval, openServiceInterval } from '../platform/service-intervals.ts'
 
 export function openMonthlyBillingPeriod(): void {
     openBillingPeriod(previousMonth(todayIso()))
@@ -103,13 +103,20 @@ export function getBillingLines(request: RESTAPIRequest, response: RESTAPIRespon
     reply(response, 200, page)
 }
 
+/**
+ * A save of a fleet asset that changed its stage, its Subscription line or its Site. One that takes it into or out of
+ * service starts or stops its billing. One that leaves it in service (on another line or none, at another Site, or in
+ * the other stage in service) moves its Service interval to the line and Site it has now.
+ */
 export function onAssetServiceChange(current: ForeignRecord, previous: ForeignRecord): void {
+    const today = todayIso()
     const change = billingChange(readStage(previous), readStage(current), {
         inServiceDate: glideToIsoDate(str(current, 'x_daas_ham_in_service_date')),
-        today: todayIso(),
+        today,
     })
-    if (!change) return
     const lineId = str(current, 'x_daas_ham_subscription_line')
-    if ('stop' in change) closeServiceIntervals(current.getUniqueValue(), change.stop)
+    if (!change) {
+        if (isBillable(readStage(current))) moveServiceInterval(current.getUniqueValue(), today)
+    } else if ('stop' in change) closeServiceIntervals(current.getUniqueValue(), change.stop)
     else if (lineId) openServiceInterval(current, lineId, change.start)
 }
