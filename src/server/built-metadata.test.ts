@@ -401,10 +401,10 @@ function dashboardSources(): SharedQuery[] {
  * therefore never a condition; a script of any other shape counts as no query.
  */
 function qualifierQuery(qualifier: string): string {
-    if (!qualifier.startsWith('javascript:')) return qualifier
-    const script = /^javascript:\s*'([^']*)'\s*(\+?)/.exec(qualifier)
-    if (!script) return ''
-    return script[2] ? `${script[1]}<form value>` : (script[1] ?? '')
+    const script = /^javascript:(?:\s*'([^']*)'\s*(\+?))?/.exec(qualifier)
+    if (!script) return qualifier
+    if (script[1] === undefined) return ''
+    return script[2] ? `${script[1]}<form value>` : script[1]
 }
 
 interface BuiltColumn {
