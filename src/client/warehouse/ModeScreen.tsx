@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import Label from './Label'
 import ScanField from './ScanField'
 import type { Entry, FailedScan } from './scan-log'
-import { MODES, useStation, type ContextField, type ModeSpec, type Scan } from './station'
+import { MODES, type ContextField, type ModeSpec, type Scan } from './scans'
+import { useStation } from './station'
 
 const TEXT_FIELDS: Record<Exclude<ContextField, 'stockroom'>, { label: string; placeholder: string; trim: boolean }> = {
     pid: { label: 'PID (only for units without an ASN)', placeholder: 'e.g. C9300-48P-E', trim: false },

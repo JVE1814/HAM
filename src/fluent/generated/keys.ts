@@ -8517,6 +8517,7 @@ declare global {
                     {
                         table: 'sys_ux_lib_asset'
                         id: '0d6d0c4245574bd78f92aa989bac408f'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham/warehouse/main-B1nlTgyV.js.map'
                         }
@@ -14081,6 +14082,13 @@ declare global {
                             name: 'x_daas_ham_lease_decision'
                             element: 'NULL'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ux_lib_asset'
+                        id: '278c160569f74b8597dd58170fa1f5fd'
+                        key: {
+                            name: 'x_daas_ham/warehouse/main-QTZRtMNg.js.map'
                         }
                     },
                     {
@@ -27551,6 +27559,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ux_lib_asset'
+                        id: '638c324edfbe4f19b127fdfb2829f213'
+                        key: {
+                            name: 'x_daas_ham/warehouse/main-QTZRtMNg'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '6395a84a0ad948b990edc15736f43ac5'
                         key: {
@@ -39718,6 +39733,7 @@ declare global {
                     {
                         table: 'sys_ux_lib_asset'
                         id: '969b6ac5f4ec4fe09dc9a41eab2010b0'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham/warehouse/main-B1nlTgyV'
                         }
