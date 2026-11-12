@@ -12,6 +12,8 @@ import {
     STAGE_FIELDS,
     STOCKROOM_TYPE,
 } from '../../server/domain/vocabulary'
+import { APPROVAL } from '../../server/domain/approvals'
+import { ORDER_TASK_STATE } from '../../server/domain/fulfilment'
 import { assetManager, inventoryTech } from '../shared/roles.now'
 
 // The vocabulary's values the fixtures below are created with, each under a name: for a value, a Test takes a
@@ -38,6 +40,16 @@ const PROVIDER_OWNED = LEGAL_OWNER.provider
 const IN_STOCK = INSTALL_STATUS.inStock
 const AVAILABLE = STAGE_FIELDS.available.substatus
 const CENTRAL_DEPOT = STOCKROOM_TYPE.central_depot
+const APPROVED_WITHIN_AGREEMENT_FIELDS = `entitlement_verdict=within_agreement^approval=${APPROVAL.approved}^stage!=${ORDER_STAGE.awaiting_approval}`
+const OFF_CATALOG_AWAITING_APPROVAL_FIELDS = `entitlement_verdict=off_catalog^stage=${ORDER_STAGE.awaiting_approval}^approval=${APPROVAL.requested}`
+const MISSING_OFF_LINE_FIELDS = `install_status=${STAGE_FIELDS.missing.installStatus}^substatus=${STAGE_FIELDS.missing.substatus}^x_daas_ham_order_lineISEMPTY`
+const REFILLED_LINE_SOURCED_FIELDS = `line_stageIN${LINE_STAGE.awaiting_stock},${LINE_STAGE.sourced}^quantity=1^quantity_to_purchase=0^sourcing_summaryLIKEATF-RMA-0001`
+const APPROVED_ORDER_GOING_ON_FIELDS = `approval=${APPROVAL.approved}^entitlement_verdict=within_agreement^stageNOT IN${ORDER_STAGE.awaiting_approval},${ORDER_STAGE.cancelled},${ORDER_STAGE.rejected}`
+const ORDER_NOT_CANCELLED_FIELDS = `stage=${ORDER_STAGE.preparing}^state!=${ORDER_TASK_STATE.cancelled}`
+const SHIPPED_LINE_KEPT_FIELDS = `line_stage=${LINE_STAGE.ready_to_ship}^quantity=2`
+const ORDER_CANCELLED_FIELDS = `stage=${ORDER_STAGE.cancelled}^state=${ORDER_TASK_STATE.cancelled}`
+const LINE_CANCELLED_FIELDS = `line_stage=${LINE_STAGE.cancelled}`
+const IN_TRANSFER_ON_LINE_FIELDS = `install_status=${STAGE_FIELDS.in_transfer.installStatus}^substatus=${STAGE_FIELDS.in_transfer.substatus}^active_to=true`
 
 export const withinAgreementOrderTest = Test(
     {
@@ -129,7 +141,7 @@ export const withinAgreementOrderTest = Test(
             $id: Now.ID['atf_owa_validate'],
             table: 'x_daas_ham_order',
             recordId: order.record_id,
-            fieldValues: 'entitlement_verdict=within_agreement^approval=approved^stage!=awaiting_approval',
+            fieldValues: APPROVED_WITHIN_AGREEMENT_FIELDS,
             assert: 'record_validated',
         })
     },
@@ -202,7 +214,7 @@ export const offCatalogOrderTest = Test(
             $id: Now.ID['atf_ooc_validate'],
             table: 'x_daas_ham_order',
             recordId: order.record_id,
-            fieldValues: 'entitlement_verdict=off_catalog^stage=awaiting_approval^approval=requested',
+            fieldValues: OFF_CATALOG_AWAITING_APPROVAL_FIELDS,
             assert: 'record_validated',
         })
     },
@@ -329,7 +341,7 @@ export const lostInTransitResourcingTest = Test(
             $id: Now.ID['atf_lit_validate_off_line'],
             table: 'alm_hardware',
             recordId: replacement.record_id,
-            fieldValues: 'install_status=8^substatus=lost^x_daas_ham_order_lineISEMPTY',
+            fieldValues: MISSING_OFF_LINE_FIELDS,
             assert: 'record_validated',
         })
         // Filled again: the line left Shipped. The save also queued its Order's sourcing (below), which the event
@@ -396,14 +408,14 @@ export const lostInTransitResourcingTest = Test(
             $id: Now.ID['atf_lit_validate_line_sourced'],
             table: 'x_daas_ham_order_line',
             recordId: line.record_id,
-            fieldValues: 'line_stageINawaiting_stock,sourced^quantity=1^quantity_to_purchase=0^sourcing_summaryLIKEATF-RMA-0001',
+            fieldValues: REFILLED_LINE_SOURCED_FIELDS,
             assert: 'record_validated',
         })
         atf.server.recordValidation({
             $id: Now.ID['atf_lit_validate_order'],
             table: 'x_daas_ham_order',
             recordId: order.record_id,
-            fieldValues: 'approval=approved^entitlement_verdict=within_agreement^stageNOT INawaiting_approval,cancelled,rejected',
+            fieldValues: APPROVED_ORDER_GOING_ON_FIELDS,
             assert: 'record_validated',
         })
         atf.server.recordQuery({
@@ -522,14 +534,14 @@ export const cancelRefusedOnceShippedTest = Test(
             $id: Now.ID['atf_cro_validate_shipped_order'],
             table: 'x_daas_ham_order',
             recordId: shippedOrder.record_id,
-            fieldValues: 'stage=preparing^state!=7',
+            fieldValues: ORDER_NOT_CANCELLED_FIELDS,
             assert: 'record_validated',
         })
         atf.server.recordValidation({
             $id: Now.ID['atf_cro_validate_shipped_line'],
             table: 'x_daas_ham_order_line',
             recordId: shippedLine.record_id,
-            fieldValues: 'line_stage=ready_to_ship^quantity=2',
+            fieldValues: SHIPPED_LINE_KEPT_FIELDS,
             assert: 'record_validated',
         })
         atf.server.recordValidation({
@@ -550,14 +562,14 @@ export const cancelRefusedOnceShippedTest = Test(
             $id: Now.ID['atf_cro_validate_open_order'],
             table: 'x_daas_ham_order',
             recordId: openOrder.record_id,
-            fieldValues: 'stage=cancelled^state=7',
+            fieldValues: ORDER_CANCELLED_FIELDS,
             assert: 'record_validated',
         })
         atf.server.recordValidation({
             $id: Now.ID['atf_cro_validate_open_line'],
             table: 'x_daas_ham_order_line',
             recordId: openLine.record_id,
-            fieldValues: 'line_stage=cancelled',
+            fieldValues: LINE_CANCELLED_FIELDS,
             assert: 'record_validated',
         })
     },
@@ -878,7 +890,7 @@ export const transferStageTest = Test(
             $id: Now.ID['atf_xfer_validate_in_transfer'],
             table: 'alm_hardware',
             recordId: asset.record_id,
-            fieldValues: 'install_status=6^substatus=pending_transfer^active_to=true',
+            fieldValues: IN_TRANSFER_ON_LINE_FIELDS,
             assert: 'record_validated',
             enforceSecurity: false,
         })
