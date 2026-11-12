@@ -20,6 +20,7 @@ import { moveAndSave, readStage } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { lineLostUnit } from './fulfilment.ts'
 import { log } from './log.ts'
+import { lineOpenness } from './order-lines.ts'
 import { bool, deleteWhere, exists, findById, num, refusal, str, warnRefused } from './records.ts'
 import { leaveOrderLine } from './stock.ts'
 
@@ -110,8 +111,8 @@ export function stagingClosureProblem(current: GlideRecord, task: ClosedStagingT
 }
 
 function closingAsset(asset: GlideRecord): ClosingAsset {
-    const line = { lineStage: str(asset, 'x_daas_ham_order_line.line_stage'), orderStage: str(asset, 'x_daas_ham_order_line.order.stage') }
-    return { serial: str(asset, 'serial_number'), stage: readStage(asset), lineId: str(asset, 'x_daas_ham_order_line'), lineOpen: lineStillOpen(line) }
+    const lineOpen = lineStillOpen(lineOpenness(asset, 'x_daas_ham_order_line'))
+    return { serial: str(asset, 'serial_number'), stage: readStage(asset), lineId: str(asset, 'x_daas_ham_order_line'), lineOpen }
 }
 
 function newerTaskThan(current: GlideRecord): string {

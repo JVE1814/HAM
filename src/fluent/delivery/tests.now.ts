@@ -16,6 +16,8 @@ import { SHIPMENT_DIRECTION, SHIPMENT_STATUS } from '../../server/domain/vocabul
 // name, but no property access (VOCABULARY.value).
 const TO_SITE = SHIPMENT_DIRECTION.to_site
 const LABEL_CREATED = SHIPMENT_STATUS.label_created
+const UNDELIVERED_FIELDS = `status=${SHIPMENT_STATUS.label_created}^delivered_atISEMPTY`
+const DELIVERED_FIELDS = `status=${SHIPMENT_STATUS.delivered}^delivered_atISNOTEMPTY`
 
 export const trackingWebhookTest = Test(
     {
@@ -66,7 +68,7 @@ export const trackingWebhookTest = Test(
             $id: Now.ID['atf_twh_validate_unchanged'],
             table: 'x_daas_ham_shipment',
             recordId: shipment.record_id,
-            fieldValues: 'status=label_created^delivered_atISEMPTY',
+            fieldValues: UNDELIVERED_FIELDS,
             assert: 'record_validated',
         })
         atf.server.runServerSideScript({
@@ -128,7 +130,7 @@ export const trackingWebhookTest = Test(
             $id: Now.ID['atf_twh_validate_delivered'],
             table: 'x_daas_ham_shipment',
             recordId: shipment.record_id,
-            fieldValues: 'status=delivered^delivered_atISNOTEMPTY',
+            fieldValues: DELIVERED_FIELDS,
             assert: 'record_validated',
         })
         atf.server.recordQuery({

@@ -15,7 +15,7 @@ import { unitsOnLine } from './fulfilment.ts'
 import { attemptLock, whyNotRun, withLock } from './locks.ts'
 import { loadNormalizationData, recordNormalizationException, resolveModel } from './normalization.ts'
 import { lineAwaitingRma, markReplacementReceived } from './oem-rma.ts'
-import { takeUnitOffOrder, withOrderLineLock } from './order-lines.ts'
+import { lineOpenness, takeUnitOffOrder, withOrderLineLock } from './order-lines.ts'
 import { purchaseOrderId } from './procurement.ts'
 import { choice, findById, num, refusal, rowError, str, warnRefused, type RowOutcome } from './records.ts'
 import { receiveReturnedAsset } from './returns.ts'
@@ -297,8 +297,7 @@ function allocateHolding(lineLock: HeldLock, asset: GlideRecord, waiting: Waitin
 /** The line as `allocationProblem` judges it; its Assets are counted past the user's stockroom rule (ADR 0005). */
 function receivingLine(line: GlideRecord): ReceivingLine {
     return {
-        stage: str(line, 'line_stage') as ReceivingLine['stage'],
-        orderStage: str(line, 'order.stage'),
+        ...lineOpenness(line),
         quantity: num(line, 'quantity'),
         allocated: unitsOnLine(line.getUniqueValue()),
     }

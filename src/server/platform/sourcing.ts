@@ -22,7 +22,7 @@ import type { OrderType } from '../domain/vocabulary.ts'
 import { todayIso } from './clock.ts'
 import { lineLostUnit, recomputeLine, recomputeOrder, unitsOnLine } from './fulfilment.ts'
 import { withLock } from './locks.ts'
-import { saveLineSourcing, withOrderLineLock } from './order-lines.ts'
+import { lineOpenness, saveLineSourcing, withOrderLineLock } from './order-lines.ts'
 import { openOemRma, openRmaCount, openRmasFor, reuseOemRma } from './oem-rma.ts'
 import { requestPurchase } from './procurement.ts'
 import { stagingStockroom } from './properties.ts'
@@ -197,7 +197,7 @@ function shortfallOf(line: GlideRecord, allocated: number): number {
  */
 function openLine(lineId: string): GlideRecord | null {
     const line = findById('x_daas_ham_order_line', lineId)
-    const open = line && lineStillOpen({ lineStage: str(line, 'line_stage'), orderStage: str(line, 'order.stage') })
+    const open = line && lineStillOpen(lineOpenness(line))
     return open ? line : null
 }
 

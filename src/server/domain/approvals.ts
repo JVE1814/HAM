@@ -25,22 +25,15 @@ export function rollupApprovals(required: readonly Approver[], decisions: readon
 }
 
 /**
- * Who decides for the admins of a Customer that has none, a choice each kind of task makes: its provider-side
- * approvers (`provider`), or nobody, so it cannot be approved where the customer-admin group is required.
- */
-export type StandIn = 'provider' | 'nobody'
-
-/**
  * Tag raw approvals with their group: the Customer admins asked decide for the customer-admin group; everyone else
  * (the account manager or the asset managers) for the Provider's group, and with no Customer admin asked, for
- * the customer-admin group too when they `standIn` for the admins.
+ * the customer-admin group too, standing in for the admins.
  */
 export function groupDecisions(
     approvals: ReadonlyArray<{ approverId: string; state: ApprovalState }>,
     customerAdminIds: readonly string[],
-    standIn: StandIn,
 ): ApprovalDecision[] {
-    const providerForAdmins = customerAdminIds.length === 0 && standIn === 'provider'
+    const providerForAdmins = customerAdminIds.length === 0
     return approvals.flatMap(({ approverId, state }): ApprovalDecision[] => {
         if (customerAdminIds.includes(approverId)) return [{ group: APPROVER.customerAdmin, state }]
         const provider: ApprovalDecision = { group: APPROVER.provider, state }
@@ -51,15 +44,14 @@ export function groupDecisions(
 /**
  * Who is asked to decide for the `required` groups: the Customer's admins for the customer-admin group, the
  * provider-side approvers for the Provider's group, and those too in place of the admins of a Customer that has
- * none when they `standIn` for them (`groupDecisions` then counts their decision for both groups). Each is asked once.
+ * none (`groupDecisions` then counts their decision for both groups). Each is asked once.
  */
 export function approversToAsk(
     required: readonly Approver[],
     customerAdminIds: readonly string[],
     providerApproverIds: readonly string[],
-    standIn: StandIn,
 ): string[] {
-    const forAdmins = customerAdminIds.length > 0 || standIn === 'nobody' ? customerAdminIds : providerApproverIds
+    const forAdmins = customerAdminIds.length > 0 ? customerAdminIds : providerApproverIds
     const ids = new Set<string>()
     for (const group of required) {
         for (const id of group === APPROVER.customerAdmin ? forAdmins : providerApproverIds) ids.add(id)

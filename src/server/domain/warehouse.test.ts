@@ -28,7 +28,7 @@ describe('receivingProblem', () => {
 })
 
 describe('allocationProblem', () => {
-    const waiting = { stage: 'awaiting_stock', orderStage: 'preparing', quantity: 2, allocated: 1 } as const
+    const waiting = { lineStage: 'awaiting_stock', orderStage: 'preparing', quantity: 2, allocated: 1 } as const
 
     it('gives the unit to a line still awaiting stock with room for it', () => {
         expect(allocationProblem(waiting)).toBeNull()
@@ -47,7 +47,7 @@ describe('allocationProblem', () => {
     })
 
     it('names the ended Order before the line', () => {
-        expect(allocationProblem({ ...waiting, stage: 'cancelled', orderStage: 'cancelled' })).toBe('its Order is cancelled')
+        expect(allocationProblem({ ...waiting, lineStage: 'cancelled', orderStage: 'cancelled' })).toBe('its Order is cancelled')
     })
 
     it('leaves the unit free once the line has all its units, as when two receipts raced for its last one', () => {
@@ -56,10 +56,10 @@ describe('allocationProblem', () => {
     })
 
     it('leaves the unit free once the line has moved on, whatever room it shows', () => {
-        expect(allocationProblem({ ...waiting, stage: 'sourced' })).toBe('it is no longer awaiting stock (sourced)')
-        const cancelled = allocationProblem({ ...waiting, stage: 'cancelled', allocated: 0 })
+        expect(allocationProblem({ ...waiting, lineStage: 'sourced' })).toBe('it is no longer awaiting stock (sourced)')
+        const cancelled = allocationProblem({ ...waiting, lineStage: 'cancelled', allocated: 0 })
         expect(cancelled).toBe('it is no longer awaiting stock (cancelled)')
-        expect(allocationProblem({ ...waiting, stage: '' })).toBe('it is no longer awaiting stock (unknown stage)')
+        expect(allocationProblem({ ...waiting, lineStage: '' })).toBe('it is no longer awaiting stock (unknown stage)')
     })
 })
 

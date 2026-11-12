@@ -49,7 +49,6 @@ function flow(required: ApprovalRequest['required']): ApprovalFlow & { decided: 
     return {
         decided,
         awaitingStage: 'awaiting_approval',
-        standIn: 'provider',
         required: () => required,
         decide: (task, outcome) => {
             decided.push(outcome)
@@ -85,17 +84,6 @@ describe('putToApproval', () => {
 
         expect(put(task, ['customer_admin'], { customerAdmins: [], providerApprovers: [] })).toEqual({ awaiting: false, step: 'request', reason: 'nobody to approve it' })
 
-        expect(stored(task).stage).toBe('draft')
-    })
-
-    it('asks nobody in place of the admins of a Customer that has none when its flow lets nobody stand in', () => {
-        const task = order('draft')
-        const required = ['customer_admin', 'account_manager'] as const
-
-        const asked = putToApproval(task, { ...flow([...required]), standIn: 'nobody' }, request([...required], { customerAdmins: [] }))
-
-        expect(asked).toEqual({ awaiting: false, step: 'request', reason: 'nobody to approve it' })
-        expect(requests()).toEqual({ am: 'cancelled' })
         expect(stored(task).stage).toBe('draft')
     })
 
