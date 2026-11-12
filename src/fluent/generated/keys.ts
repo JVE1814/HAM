@@ -1588,6 +1588,7 @@ declare global {
                     atf_jl_abandoned: {
                         table: 'sys_atf_step'
                         id: '0e99bb00d07b406cb9e97ec9481e3973'
+                        deleted: true
                     }
                     atf_jl_run: {
                         table: 'sys_atf_step'
@@ -15603,6 +15604,7 @@ declare global {
                     {
                         table: 'sys_variable_value'
                         id: '2d54b34fc73047438c6b10751842a895'
+                        deleted: true
                         key: {
                             document_key: '0e99bb00d07b406cb9e97ec9481e3973'
                             variable: '989d9e235324220002c6435723dc3484'
@@ -22664,6 +22666,7 @@ declare global {
                     {
                         table: 'sys_element_mapping'
                         id: '4d2d86c765e34a539cca9b5a5b3b4e2b'
+                        deleted: true
                         key: {
                             id: '0e99bb00d07b406cb9e97ec9481e3973'
                             table: 'var__m_atf_input_variable_41de4a935332120028bc29cac2dc349a'
@@ -25990,6 +25993,7 @@ declare global {
                     {
                         table: 'sys_variable_value'
                         id: '5c983792c7d640eaa7f6b6927eeabeaa'
+                        deleted: true
                         key: {
                             document_key: '0e99bb00d07b406cb9e97ec9481e3973'
                             variable: '42f2564b73031300440211d8faf6a777'

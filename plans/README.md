@@ -33,7 +33,7 @@ untracked `.audit/` folder, which plan 001 fixes. Every other plan depends on 00
 | [018](018-client-logic-tests.md) | Test the client's untested mapping logic through pure modules | P3 | M | 001, 013, 015 | DONE |
 | [019](019-vitest-advisories.md) | Move Vitest to 4.1.12 so its three advisories and tinypool's two are gone | P3 | S | 001 | DONE |
 | [020](020-agents-md.md) | Give coding agents an `AGENTS.md` that lists the gate and the traps | P3 | S | 001 | DONE |
-| [021](021-lock-checks-atf.md) | Check a job lock's row, release and abandonment in an ATF test | P3 | M | 001, 008 | DONE (instance run pending) |
+| [021](021-lock-checks-atf.md) | Check a job lock's row, release and abandonment in an ATF test | P3 | M | 001, 008 | DONE (abandonment step dropped: the instance stamps `sys_created_on` itself, so it stays a manual check) |
 | [022](022-scale-spike.md) | Draft the scale test: a design doc and a generator prototype, run on no instance | P3 | L | 001 | DONE (instance run awaits the owner's approval) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with

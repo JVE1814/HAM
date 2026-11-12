@@ -505,11 +505,10 @@ A job lock is a row in *Job lock* (`x_daas_ham_job_lock`) named after what it gu
 test *NaaS - a job lock is one row that only one holder takes* (suite *NaaS - P1*) checks this on
 the instance, under lock names of its own. A second row with the same name is refused
 (`GlideRecord.insert()` returns no sys_id) without throwing. A row made by hand holds the lock
-until it is deleted. A run leaves no row behind, also when its work throws. A row older than
-`ABANDONED_AFTER_MINUTES` is cleared by the next take. Confirm that the test passes, and check once
-that *Job lock* shows a unique database index on *Lock*. The test's last step ages a row by setting
-`sys_created_on` on insert: if it reports *NOT BACK-DATED*, the instance stamped the row itself,
-and an abandoned lock is checked by hand, as below.
+until it is deleted. A run leaves no row behind, also when its work throws. Confirm that the test
+passes, and check once that *Job lock* shows a unique database index on *Lock*. Check an abandoned
+lock by hand, as below: the instance stamps `sys_created_on` itself on an insert from the app's
+scope, so a test cannot age a row (development instance, 2026-11-12).
 
 Every lock below behaves as follows, which its own check does not repeat:
 
@@ -528,8 +527,8 @@ Every lock below behaves as follows, which its own check does not repeat:
   next take, which then goes ahead; a fresh one is not cleared.
 - **Nothing left behind.** No lock row is left once the run, request or action that took it ends.
 
-The ATF test checks the last three of these for the lock itself. What each job, request or action
-does when it finds its lock held, and what it logs, is checked by hand in the sections below.
+The ATF test checks the second and last of these for the lock itself. What each job, request or
+action does when it finds its lock held, and what it logs, is checked by hand in the sections below.
 
 ### Margin recompute lock
 
