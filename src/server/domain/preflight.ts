@@ -18,7 +18,6 @@ const REQUIRED_TABLES: ReadonlyArray<{ table: string; provider: string }> = [
 const REQUIRED_ROLES: readonly string[] = Object.values(PLATFORM_ROLE)
 
 export interface PreflightReport {
-    ok: boolean
     missing: string[]
     summary: string
 }
@@ -29,7 +28,6 @@ export function preflightReport(probe: { tableExists(table: string): boolean; ro
         ...REQUIRED_ROLES.filter((r) => !probe.roleExists(r)).map((r) => `role ${r}`),
     ]
     return {
-        ok: missing.length === 0,
         missing,
         summary: missing.length === 0 ? 'All prerequisites present' : `${missing.length} prerequisite(s) missing`,
     }
