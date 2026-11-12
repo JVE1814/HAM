@@ -28,7 +28,7 @@ untracked `.audit/` folder, which plan 001 fixes. Every other plan depends on 00
 | [013](013-failed-scans-visible.md) | Keep failed warehouse scans on screen until the operator rescans or dismisses them | P2 | S | 001 | DONE |
 | [014](014-greenlake-serial-match.md) | Assign a GreenLake subscription only to the device whose serial was asked for | P3 | S | 001 | DONE |
 | [015](015-list-page-out-of-range.md) | Show the last page of a workspace list when its address is past the end | P3 | S | 001 | DONE |
-| [016](016-lease-disposal-characterization.md) | Test lease decisions and disposal orders on the fake Glide | P3 | M | 001 | TODO |
+| [016](016-lease-disposal-characterization.md) | Test lease decisions and disposal orders on the fake Glide | P3 | M | 001 | DONE |
 | [017](017-customer-equipment-grid.md) | Page the customer equipment grids, share one fault dialog, and say when the list is cut | P3 | S | 001 | TODO |
 | [018](018-client-logic-tests.md) | Test the client's untested mapping logic through pure modules | P3 | M | 001, 013, 015 | TODO |
 | [019](019-vitest-advisories.md) | Move Vitest to 4.1.12 so its three advisories and tinypool's two are gone | P3 | S | 001 | TODO |
