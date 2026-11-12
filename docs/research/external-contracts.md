@@ -843,7 +843,8 @@ Notes:
   controls updates to "the discovery_source and last_discovered fields".
 - **Attachments.** `write(GlideRecord record, String fileName, String contentType, String content)`
   "Attaches a specified attachment to the specified record" and returns the sys_id, or null if not
-  added (the app ignores the return value). `deleteAttachment(String attachmentID)` returns void. The
+  added (the app logs a CSV export that returns none as failed, `platform/billing.ts`
+  `attachExport`). `deleteAttachment(String attachmentID)` returns void. The
   `@servicenow/glide` 27.0.5 typings match. `sys_attachment` in the SDK: `file_name` (String, max 100),
   `table_name` (String, max 80), `table_sys_id`, `content_type`.
 - **queryParams.** `RESTAPIRequest.queryParams` type "Array": "The query parameters from the web

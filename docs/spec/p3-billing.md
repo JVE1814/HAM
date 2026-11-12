@@ -147,6 +147,8 @@
   attaching it does not update the period, and a period that already has the file is skipped (delete
   it, then *Re-export CSV*, to rebuild it).
   Racing exports keep only the oldest copy; a failed export is logged as an error naming the period.
+  A file the platform does not attach counts as failed: the platform reports that by returning no
+  attachment, with no error of its own.
 - **Pull API** (role `x_daas_ham.finance`, or `x_daas_ham.billing_reader`, the machine role of the
   billing consumer; the NMS's `x_daas_ham.integration` is refused with HTTP 403):
   - `GET /api/x_daas_ham/naas/billing_periods` lists recent periods with status, line count and
@@ -154,7 +156,7 @@
   - `GET /api/x_daas_ham/naas/billing_periods/{id}/lines?offset=<n>&limit=<n>` returns one page of
     lines (`PULL_PAGE` in `domain/billing.ts` holds the page sizes and their caps), each with its
     `currency`, and the period's `totals`; `final` is true once the period is
-    closed and `nextOffset` is null on the last page.
+    closed and `nextOffset` is null on the last page, also when that page is full.
   - `totals` is one entry per currency, in currency order: `{ "currency": "EUR", "lines": 12,
     "amount": 1234.56 }`, counted and summed from the period's lines (there is no single total: two
     currencies are never added).

@@ -391,9 +391,11 @@ describe('the billing pull API', () => {
         expect([ids(last.lines), last.offset, last.nextOffset]).toEqual([['l2'], 4, null])
     })
 
-    it('follows a last page that is full with an empty one, which names no next page', () => {
+    it('names no next page on a last page that is full, and gives an empty page past the end', () => {
         rows(LINE).pop()
-        expect(page({ limit: '2', offset: '2' }).nextOffset).toBe(4)
+        const last = page({ limit: '2', offset: '2' })
+        expect([ids(last.lines), last.nextOffset]).toEqual([['l4', 'l2'], null])
+        expect(page({ limit: '4' }).nextOffset).toBeNull()
         expect(page({ limit: '2', offset: '4' })).toMatchObject({ lines: [], nextOffset: null })
     })
 
@@ -533,6 +535,20 @@ describe('the CSV export of a closed period', () => {
         drainExport()
 
         expect(raced).toBe(true)
+        expect(contents()).toEqual([CSV])
+    })
+
+    it('logs an error naming the period when the platform refuses the file, and attaches it on a Re-export CSV after that', () => {
+        platform.refuses = (table) => (table === ATTACHMENT ? 'no attachment' : '')
+        drainExport()
+        expect(rows(ATTACHMENT)).toEqual([])
+        expect(platform.logs.filter((logged) => logged.startsWith('error '))).toEqual([
+            `error [x_daas_ham] CSV export of billing period 2026-09 failed: the platform did not attach ${FILE}`,
+        ])
+
+        platform.refuses = () => ''
+        expect(reexport(period('2026-09'))).toEqual(['info The CSV export of 2026-09 is being prepared'])
+        drainExport()
         expect(contents()).toEqual([CSV])
     })
 

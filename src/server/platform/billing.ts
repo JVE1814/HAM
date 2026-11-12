@@ -595,7 +595,8 @@ export function requestExport(period: GlideRecord): ExportRequest {
 /**
  * Attach the CSV of a closed period's lines unless it is already attached. Only reads the period, so the
  * closed-period lock is not hit. Two exports racing each other converge on one file: each keeps only the oldest copy.
- * A failure is logged as an error naming the period, and Re-export CSV can be used once it is fixed.
+ * A failure is logged as an error naming the period, and Re-export CSV can be used once it is fixed. A write the
+ * platform refuses throws nothing and returns no sys_id, so that is taken as a failure too.
  */
 export function attachExport(periodId: string): void {
     const period = findById(PERIOD, periodId)
@@ -603,16 +604,17 @@ export function attachExport(periodId: string): void {
     const found = exportState(period)
     if (found.state !== 'missing') return
     const { fileName } = found
+    const failed = (why: string): void => log.error(`CSV export of billing period ${str(period, 'period')} failed: ${why}`)
     try {
         const rows: Array<Array<string | number>> = [billingCsvHeader()]
         const stored = lineReader()
         const line = linesOf(periodId)
         line.query()
         while (line.next()) rows.push(billingCsvRow(str(period, 'period'), stored(line)))
-        new GlideSysAttachment().write(period, fileName, 'text/csv', toCsv(rows))
+        if (!new GlideSysAttachment().write(period, fileName, 'text/csv', toCsv(rows))) return failed(`the platform did not attach ${fileName}`)
         keepOldestExport(period, fileName)
     } catch (error) {
-        log.error(`CSV export of billing period ${str(period, 'period')} failed: ${messageOf(error)}`)
+        failed(messageOf(error))
     }
 }
 
@@ -692,10 +694,11 @@ export function linesPage(periodId: string, offset: number, limit: number): Bill
     if (!period) return null
     const stored = lineReader()
     const line = linesOf(periodId)
-    line.chooseWindow(offset, offset + limit, false)
+    // One row past the page is read, to know whether a page follows: a last page that is full names none.
+    line.chooseWindow(offset, offset + limit + 1, false)
     line.query()
     const lines: BillingLinesPage['lines'] = []
-    while (line.next()) lines.push(billingLineJson(line.getUniqueValue(), stored(line)))
+    while (lines.length < limit && line.next()) lines.push(billingLineJson(line.getUniqueValue(), stored(line)))
     return {
         period: str(period, 'period'),
         status: str(period, 'status'),
@@ -703,6 +706,6 @@ export function linesPage(periodId: string, offset: number, limit: number): Bill
         totals: totalsOf([periodId]).get(periodId) ?? [],
         offset,
         lines,
-        nextOffset: lines.length === limit ? offset + limit : null,
+        nextOffset: line.hasNext() ? offset + limit : null,
     }
 }
