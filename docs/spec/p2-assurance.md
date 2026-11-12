@@ -158,6 +158,11 @@ HTTP 422, so it can be sent again:
 - `POST /customer/attestations/{id}` when an answer or the submission is refused, or the attestation
   is still pending or was cancelled, without submitting.
 
+A return request (`assets`) or an attestation's answers (`items`) that lists more than
+`MAX_LISTED_DEVICES` entries (`domain/customer-requests.ts`) answers HTTP 400 before anything is
+read or saved: the page lists only devices it was shown, and it is shown no more than that. A
+device a return request lists twice is read once.
+
 New equipment is ordered through the *Request network equipment* record producer.
 
 On the Order form too, Customer contacts can use *Confirm installed* only on self-install Orders; asset

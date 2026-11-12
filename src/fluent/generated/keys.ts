@@ -3426,6 +3426,10 @@ declare global {
                         table: 'sys_module'
                         id: '6f43ccbaa5a344348008627ef2bc5652'
                     }
+                    'src_server_domain_customer-requests_ts': {
+                        table: 'sys_module'
+                        id: '9cc72e50dc584f9b95ed9306401b4b7b'
+                    }
                     src_server_domain_delivery_ts: {
                         table: 'sys_module'
                         id: 'c1213aa1a1b94f8f8929726ae70d8c2f'

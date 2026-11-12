@@ -22,7 +22,7 @@ untracked `.audit/` folder, which plan 001 fixes. Every other plan depends on 00
 | [007](007-dashboard-widget-audience.md) | Offer a dashboard widget only to the roles that read its table | P2 | S | 001 | DONE |
 | [008](008-job-run-locks.md) | Hold a run lock in the lease review, attestation and overdue-return jobs | P2 | S | 001 | DONE |
 | [009](009-fee-lock-waive-close.md) | Waive a fee under its lock and its Billing period's lock | P2 | M | 001, 008 | DONE |
-| [010](010-customer-route-array-caps.md) | Refuse a customer page request that lists more than 5000 devices | P2 | S | 001 | TODO |
+| [010](010-customer-route-array-caps.md) | Refuse a customer page request that lists more than 5000 devices | P2 | S | 001 | DONE |
 | [011](011-in-service-characterization.md) | Test in-service detection and the subscription start on the fake Glide | P2 | M | 001 | TODO |
 | [012](012-customer-routes-cross-tenant-atf.md) | Prove with ATF that the customer routes refuse another Customer's records | P2 | M | 001 | TODO |
 | [013](013-failed-scans-visible.md) | Keep failed warehouse scans on screen until the operator rescans or dismisses them | P2 | S | 001 | TODO |
