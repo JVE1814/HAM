@@ -1,6 +1,7 @@
 import { GlideRecord } from '@servicenow/glide'
 import {
     cursorReport,
+    JOB_STATUS,
     lockLostIn,
     passParm,
     readPassParm,
@@ -19,7 +20,7 @@ import { LOCK } from '../domain/lock-names.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { nowMs } from './clock.ts'
 import { queueJobAt, type JobEvent } from './events.ts'
-import { completePass, isCurrentPass, JOB_STATUS, openJobCursor, startPass, type JobCursor } from './job-cursor.ts'
+import { completePass, isCurrentPass, openJobCursor, startPass, type JobCursor } from './job-cursor.ts'
 import { isLocked, withLock } from './locks.ts'
 import { log } from './log.ts'
 import { intProperty } from './properties.ts'

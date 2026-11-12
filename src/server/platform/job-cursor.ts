@@ -1,5 +1,5 @@
 import { GlideRecord } from '@servicenow/glide'
-import { isCurrentPass as namesCurrentPass, JOB_ERROR_LENGTH, JOB_STATUS_LENGTH } from '../domain/chunked-job.ts'
+import { isCurrentPass as namesCurrentPass, JOB_ERROR_LENGTH, JOB_STATUS, JOB_STATUS_LENGTH } from '../domain/chunked-job.ts'
 import { nowGlide, nowMs } from './clock.ts'
 import { log } from './log.ts'
 import { num, refusal, str } from './records.ts'
@@ -14,22 +14,6 @@ import { num, refusal, str } from './records.ts'
  * - `preflight` (entry/preflight): nothing, its result is the row's `last_status`.
  */
 const TABLE = 'x_daas_ham_job_cursor'
-
-/** What a job's `last_status` reads (the preflight check writes its result there instead). */
-export const JOB_STATUS = {
-    /**
-     * A scheduled job's run reached the end of its pass, or a pass its runner started is complete. A scheduled job's
-     * status is worded by domain/chunked-job `cursorReport`, which adds the pass's failed records to these two.
-     */
-    complete: 'complete',
-    paused: 'paused (time budget)',
-    /** A pass its runner started and marks complete: one still running with an old last run has stalled. */
-    running: 'running',
-    /** A pass started where it was triggered. Nothing marks its end on the row, so it must not read as running. */
-    passStarted: 'pass started',
-    /** The current pass was retired by hand, and the job has none. */
-    reset: 'reset by hand',
-} as const
 
 /** What a save changes on a job's row; what is left out stays as it is. */
 export interface JobCursorValues {

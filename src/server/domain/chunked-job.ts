@@ -4,6 +4,22 @@ import { writeHoldingLock, type LockedWrite } from './job-lock.ts'
 /** The length of a Job cursor's Last status, which `save` cuts a status to. */
 export const JOB_STATUS_LENGTH = 255
 
+/** What a job's `last_status` reads (the preflight check writes its result there instead). */
+export const JOB_STATUS = {
+    /**
+     * A scheduled job's run reached the end of its pass, or a pass its runner started is complete. `cursorReport` adds
+     * a pass's failed records to these two.
+     */
+    complete: 'complete',
+    paused: 'paused (time budget)',
+    /** A pass its runner started and marks complete: one still running with an old last run has stalled. */
+    running: 'running',
+    /** A pass started where it was triggered. Nothing marks its end on the row, so it must not read as running. */
+    passStarted: 'pass started',
+    /** The current pass was retired by hand, and the job has none. */
+    reset: 'reset by hand',
+} as const
+
 /** The length of a Job cursor's Last error, which `save` cuts an error to. */
 export const JOB_ERROR_LENGTH = 1000
 
@@ -95,8 +111,8 @@ export function cursorReport(stored: Failures, run: Failures & { resumed: boolea
     const failed = (run.resumed ? stored.failed : 0) + run.failed
     const lastError = run.lastError || (run.resumed && failed > 0 ? stored.lastError : '')
     const failedText = `${failed} failed record(s)`
-    if (run.done) return { failed, lastError, status: failed > 0 ? `complete with ${failedText}` : 'complete' }
-    return { failed, lastError, status: failed > 0 ? `paused (time budget), ${failedText} so far` : 'paused (time budget)' }
+    if (run.done) return { failed, lastError, status: failed > 0 ? `${JOB_STATUS.complete} with ${failedText}` : JOB_STATUS.complete }
+    return { failed, lastError, status: failed > 0 ? `${JOB_STATUS.paused}, ${failedText} so far` : JOB_STATUS.paused }
 }
 
 /**

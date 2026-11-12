@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { completePass, findJobCursor, isCurrentPass, JOB_STATUS, openJobCursor, retirePass, startPass } from './job-cursor.ts'
-import { JOB_ERROR_LENGTH, JOB_STATUS_LENGTH } from '../domain/chunked-job.ts'
+import { completePass, findJobCursor, isCurrentPass, openJobCursor, retirePass, startPass } from './job-cursor.ts'
+import { JOB_ERROR_LENGTH, JOB_STATUS, JOB_STATUS_LENGTH } from '../domain/chunked-job.ts'
 import { platform, type Row } from '../test-support/fake-glide.ts'
 
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
