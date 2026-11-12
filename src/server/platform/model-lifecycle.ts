@@ -193,7 +193,7 @@ export function importLifecycleRow(row: GlideRecord): RowOutcome {
     if (Object.keys(parsed.dates).length === 0) return { state: 'ignored', comment: `No milestone date${parsed.pid ? ` for ${parsed.pid}` : ''}` }
 
     const resolution = resolveModel({ manufacturer: str(row, 'manufacturer'), model: parsed.pid }, loadNormalizationData())
-    if (!resolution.modelId) return rowError(`PID ${parsed.pid} does not map to a model`)
+    if (!resolution.matched) return rowError(`PID ${parsed.pid} does not map to a model`)
     const backwards = backwardsMilestones(mergeLifecycle(readModelLifecycle(resolution.modelId), parsed.dates))
     if (backwards) return rowError(`${backwards}, counting the milestones stored for ${parsed.pid}`)
 

@@ -220,8 +220,8 @@ function createReceivedAsset<E>(
  */
 function firstScanAsset(code: string, pid: string): Scan {
     const resolution = resolveModel({ manufacturer: '', model: pid }, loadNormalizationData())
-    const modelId = resolution.modelId
-    if (!modelId) return { reason: 'refused', why: `PID ${pid} does not map to a model` }
+    if (!resolution.matched) return { reason: 'refused', why: `PID ${pid} does not map to a model` }
+    const { modelId } = resolution
     // Any Asset the scanned code names, the Provider IT's too: the receipt refuses it rather than create a second one.
     const attempt = createReceivedAsset(normalizeSerial(code), modelId, 'on_order', {}, () => scanned(identifyAnyAsset(code)), 1)
     if (!attempt.ran && !attempt.held) throw attempt.error
@@ -392,12 +392,8 @@ export function importAsnRow(row: GlideRecord): RowOutcome {
 
     const raw = { manufacturer: str(row, 'manufacturer'), model: str(row, 'pid') }
     const resolution = resolveModel(raw, loadNormalizationData())
-    const modelId = resolution.modelId
-    if (!modelId) {
-        const raised = recordNormalizationException(raw, 'reason' in resolution ? resolution.reason : '', {
-            table: 'x_daas_ham_asn_import',
-            id: row.getUniqueValue(),
-        })
+    if (!resolution.matched) {
+        const raised = recordNormalizationException(raw, resolution.reason, { table: 'x_daas_ham_asn_import', id: row.getUniqueValue() })
         const see = raised ? 'see normalization exceptions' : 'no normalization exception was raised (see the system log)'
         return rowError(`PID ${raw.model} does not map to a model; ${see}`)
     }
@@ -414,7 +410,7 @@ export function importAsnRow(row: GlideRecord): RowOutcome {
         const again = checkAsnRow(row, serial)
         return again ? rowError(again) : null
     }
-    const attempt = createReceivedAsset(serial, modelId, 'in_transit', values, existing, LOCK_TRIES)
+    const attempt = createReceivedAsset(serial, resolution.modelId, 'in_transit', values, existing, LOCK_TRIES)
     if (!attempt.ran) return loadAgain(serial, whyNotRun(attempt, 'a scan or another row is receiving it'))
     const made = attempt.value
     if (made === 'lock lost') return loadAgain(serial, 'its lock was lost while checking it')

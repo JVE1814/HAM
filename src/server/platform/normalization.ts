@@ -16,6 +16,7 @@ import {
     siteCiOnRawModelQuery,
     type ManufacturerAlias,
     type ModelMatchRule,
+    type NormalizationResult,
     unusableRules,
 } from '../domain/normalization.ts'
 import { runTableJob } from './chunked.ts'
@@ -65,13 +66,17 @@ function modelByPid(pid: string): string {
     return model.next() ? model.getUniqueValue() : ''
 }
 
-type Resolution = { modelId: string } | { modelId: ''; reason: string }
+/** Why a raw pair maps to no Model: '' when the rule it matches names no Model (its Model was deleted, say). */
+type NormalizationFailure = Extract<NormalizationResult, { matched: false }>['reason'] | ''
+
+type Resolution = { matched: true; modelId: string } | { matched: false; reason: NormalizationFailure }
 
 export function resolveModel(raw: { manufacturer: string; model: string }, data: NormalizationData): Resolution {
     const byPid = modelByPid(raw.model)
-    if (byPid) return { modelId: byPid }
+    if (byPid) return { matched: true, modelId: byPid }
     const result = normalizeModel(raw, data.aliases, data.rules)
-    return result.matched ? { modelId: result.modelId } : { modelId: '', reason: result.reason }
+    if (!result.matched) return { matched: false, reason: result.reason }
+    return result.modelId ? { matched: true, modelId: result.modelId } : { matched: false, reason: '' }
 }
 
 /**
@@ -83,7 +88,7 @@ export function resolveModel(raw: { manufacturer: string; model: string }, data:
  */
 export function recordNormalizationException(
     raw: { manufacturer: string; model: string },
-    reason: string,
+    reason: NormalizationFailure,
     source: { table: string; id: string },
 ): boolean {
     const rawPair = `${raw.manufacturer} / ${raw.model}`
@@ -134,11 +139,8 @@ export function normalizeNaasRawModels(): void {
         read: (model) => ({ manufacturer: str(model, 'manufacturer.name'), model: str(model, 'name') }),
         handle: (raw, rawModelId) => {
             const resolution = resolveModel(raw, data)
-            if (!resolution.modelId) {
-                recordNormalizationException(raw, 'reason' in resolution ? resolution.reason : '', {
-                    table: RAW_MODEL_TABLE,
-                    id: rawModelId,
-                })
+            if (!resolution.matched) {
+                recordNormalizationException(raw, resolution.reason, { table: RAW_MODEL_TABLE, id: rawModelId })
                 return
             }
             repointModel(rawModelId, resolution.modelId)
