@@ -1,0 +1,291 @@
+import { describe, expect, it } from 'vitest'
+import {
+    anythingShipped,
+    CANCELLABLE_ORDER_STAGES,
+    closedStateFor,
+    endedUnfulfilled,
+    ENDED_ORDER_STAGES,
+    followsLines,
+    leftInTransit,
+    lineStageFor,
+    lineStillOpen,
+    OPEN_ORDERS_QUERY,
+    orderStageFor,
+    refillsLine,
+    UNFULFILLED_ORDER_STAGES,
+} from './fulfilment'
+import { LINE_STAGE_CHOICES, ORDER_STAGE_CHOICES, type LineStage, type OrderStage } from './vocabulary'
+import { recordMatches as matches } from '../test-support/encoded-query'
+
+describe('lineStageFor', () => {
+    it('waits for stock while fewer assets than ordered are allocated', () => {
+        expect(lineStageFor({ current: 'sourced', quantity: 3, assetStages: ['reserved'] })).toBe('awaiting_stock')
+    })
+
+    it('follows the slowest asset of the line', () => {
+        expect(lineStageFor({ current: 'sourced', quantity: 2, assetStages: ['reserved', 'reserved'] })).toBe('sourced')
+        expect(lineStageFor({ current: 'sourced', quantity: 2, assetStages: ['staging', 'staged'] })).toBe('staging')
+        expect(lineStageFor({ current: 'staging', quantity: 2, assetStages: ['staged', 'staged'] })).toBe('ready_to_ship')
+        expect(lineStageFor({ current: 'ready_to_ship', quantity: 2, assetStages: ['shipped', 'pending_in_service'] })).toBe('shipped')
+        expect(lineStageFor({ current: 'shipped', quantity: 2, assetStages: ['pending_in_service', 'in_service'] })).toBe('installed')
+        expect(lineStageFor({ current: 'installed', quantity: 2, assetStages: ['in_service', 'temporary_deployment'] })).toBe('in_service')
+    })
+
+    it('counts a unit in transfer to the staging centre as sourced, on its way', () => {
+        expect(lineStageFor({ current: 'awaiting_stock', quantity: 1, assetStages: ['in_transfer'] })).toBe('sourced')
+        expect(lineStageFor({ current: 'sourced', quantity: 2, assetStages: ['in_transfer', 'staged'] })).toBe('sourced')
+        expect(lineStageFor({ current: 'sourced', quantity: 3, assetStages: ['in_transfer', 'reserved'] })).toBe('awaiting_stock')
+    })
+
+    it('counts a hot spare that skips staging as staged', () => {
+        expect(lineStageFor({ current: 'sourced', quantity: 1, assetStages: ['spare_pool'] })).toBe('ready_to_ship')
+    })
+
+    it('counts a hot spare handed over at Ship as shipped', () => {
+        expect(lineStageFor({ current: 'ready_to_ship', quantity: 2, assetStages: ['shipped', 'shipped'] })).toBe('shipped')
+    })
+
+    it('treats an asset that failed staging as still being prepared', () => {
+        expect(lineStageFor({ current: 'staging', quantity: 1, assetStages: ['pending_evaluation'] })).toBe('awaiting_stock')
+    })
+
+    it('lets a line not yet shipped fall back when it loses an asset', () => {
+        expect(lineStageFor({ current: 'ready_to_ship', quantity: 2, assetStages: ['staged'] })).toBe('awaiting_stock')
+    })
+
+    it('keeps a delivered line where it is when its assets later leave service', () => {
+        const returned = ['pending_return', 'in_service'] as const
+        expect(lineStageFor({ current: 'in_service', quantity: 2, assetStages: returned })).toBe('in_service')
+        expect(lineStageFor({ current: 'in_service', quantity: 1, assetStages: ['missing'] })).toBe('in_service')
+        expect(lineStageFor({ current: 'in_service', quantity: 1, assetStages: ['pending_evaluation'] })).toBe('in_service')
+        expect(lineStageFor({ current: 'installed', quantity: 2, assetStages: ['pending_return', 'pending_in_service'] })).toBe('installed')
+        expect(lineStageFor({ current: 'shipped', quantity: 1, assetStages: ['pending_return'] })).toBe('shipped')
+    })
+
+    it('still moves a delivered line forward', () => {
+        expect(lineStageFor({ current: 'shipped', quantity: 1, assetStages: ['in_service'] })).toBe('in_service')
+    })
+
+    it('lets a delivered line go into service without a unit that left before it did', () => {
+        // A dead-on-arrival unit swapped out by break-fix: the rest of the line still completes.
+        const swapped = ['pending_return', 'in_service', 'in_service'] as const
+        expect(lineStageFor({ current: 'installed', quantity: 3, assetStages: swapped })).toBe('in_service')
+        expect(lineStageFor({ current: 'installed', quantity: 3, assetStages: ['in_service', 'in_service'] })).toBe('in_service')
+        expect(lineStageFor({ current: 'shipped', quantity: 2, assetStages: ['missing', 'pending_in_service'] })).toBe('installed')
+    })
+
+    it('sends a shipped line filled again after a unit left in transit back to awaiting stock', () => {
+        expect(lineStageFor({ current: 'shipped', quantity: 1, assetStages: [], refill: true })).toBe('awaiting_stock')
+        const rest = ['pending_in_service', 'in_service'] as const
+        expect(lineStageFor({ current: 'shipped', quantity: 3, assetStages: rest, refill: true })).toBe('awaiting_stock')
+    })
+
+    it('follows a line filled again like one not yet delivered, its installed units included', () => {
+        const refilled = ['in_service', 'pending_in_service', 'staged'] as const
+        expect(lineStageFor({ current: 'awaiting_stock', quantity: 3, assetStages: refilled })).toBe('ready_to_ship')
+        const shipped = ['in_service', 'pending_in_service', 'shipped'] as const
+        expect(lineStageFor({ current: 'ready_to_ship', quantity: 3, assetStages: shipped })).toBe('shipped')
+    })
+
+    it('counts a unit of a line filled again that left after install as delivered', () => {
+        // Swapped out, then received and evaluated while the line waits for the unit lost in transit.
+        for (const left of ['pending_return', 'pending_evaluation', 'pending_wipe'] as const) {
+            expect(lineStageFor({ current: 'awaiting_stock', quantity: 2, assetStages: [left] })).toBe('awaiting_stock')
+            expect(lineStageFor({ current: 'awaiting_stock', quantity: 2, assetStages: [left, 'staged'] })).toBe('ready_to_ship')
+        }
+    })
+
+    it('does not count a unit lost before Ship as delivered', () => {
+        expect(lineStageFor({ current: 'staging', quantity: 2, assetStages: ['missing', 'staged'] })).toBe('awaiting_stock')
+    })
+
+    it('treats a line for nothing as cancelled', () => {
+        expect(lineStageFor({ current: 'sourced', quantity: 0, assetStages: [] })).toBe('cancelled')
+    })
+
+    it('stays cancelled', () => {
+        expect(lineStageFor({ current: 'cancelled', quantity: 1, assetStages: ['staged'] })).toBe('cancelled')
+    })
+})
+
+describe('orderStageFor', () => {
+    it('is complete when every live line is in service', () => {
+        expect(orderStageFor(['in_service', 'cancelled'])).toBe('complete')
+    })
+
+    it('follows the slowest line', () => {
+        expect(orderStageFor(['awaiting_stock', 'ready_to_ship'])).toBe('preparing')
+        expect(orderStageFor(['ready_to_ship', 'ready_to_ship'])).toBe('delivering')
+        expect(orderStageFor(['shipped', 'installed'])).toBe('installing')
+        expect(orderStageFor(['installed', 'in_service'])).toBe('installing')
+    })
+
+    it('is cancelled when every line is cancelled', () => {
+        expect(orderStageFor(['cancelled', 'cancelled'])).toBe('cancelled')
+    })
+
+    it('is still sourcing while a line is new', () => {
+        expect(orderStageFor(['new', 'sourced'])).toBe('sourcing')
+    })
+
+    it('is never complete while a line is in a stage the app does not know, read from a record as it is', () => {
+        const unknown = 'on_hold' as LineStage
+        expect(orderStageFor(['in_service', unknown])).toBe('sourcing')
+        expect(orderStageFor([unknown])).toBe('sourcing')
+        expect(orderStageFor(['' as LineStage, 'in_service', 'cancelled'])).toBe('sourcing')
+    })
+
+    it('derives every live line stage to a stage of its own, complete only from in service', () => {
+        const live = ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped', 'installed', 'in_service'] as const
+        expect(live.map((stage) => orderStageFor([stage]))).toEqual([
+            'sourcing',
+            'preparing',
+            'preparing',
+            'preparing',
+            'delivering',
+            'installing',
+            'installing',
+            'complete',
+        ])
+    })
+})
+
+describe('leftInTransit', () => {
+    it.each(['missing', 'pending_return'] as const)('is a unit shipped, then %s', (to) => {
+        expect(leftInTransit('shipped', to)).toBe(true)
+    })
+
+    it('is not a unit that reached the Site', () => {
+        expect(leftInTransit('shipped', 'pending_in_service')).toBe(false)
+    })
+
+    it.each(['pending_in_service', 'in_service', 'temporary_deployment'] as const)('is not a unit leaving %s', (from) => {
+        expect(leftInTransit(from, 'pending_return')).toBe(false)
+        expect(leftInTransit(from, 'missing')).toBe(false)
+    })
+
+    it('is not a unit lost before Ship', () => {
+        expect(leftInTransit('reserved', 'missing')).toBe(false)
+        expect(leftInTransit('in_transfer', 'available')).toBe(false)
+        expect(leftInTransit(null, 'missing')).toBe(false)
+    })
+})
+
+describe('refillsLine', () => {
+    it.each(['shipped', 'ready_to_ship', 'awaiting_stock', 'sourced', 'staging'] as const)('fills a %s line again', (stage) => {
+        expect(refillsLine({ stage, deploymentEnds: false })).toBe(true)
+    })
+
+    it('leaves a line on a Return that ends the deployment, which brings everything back', () => {
+        expect(refillsLine({ stage: 'shipped', deploymentEnds: true })).toBe(false)
+    })
+
+    it.each(['installed', 'in_service', 'cancelled', 'new'] as const)('leaves a %s line as it is', (stage) => {
+        expect(refillsLine({ stage, deploymentEnds: false })).toBe(false)
+    })
+})
+
+describe('anythingShipped', () => {
+    it('is a delivered line', () => {
+        for (const stage of ['shipped', 'installed', 'in_service'] as const) {
+            expect(anythingShipped({ lineStages: ['ready_to_ship', stage], unitStages: [] })).toBe(true)
+        }
+    })
+
+    it('is a unit sent on a line not delivered whole (a partial Ship, a hot spare handed over)', () => {
+        expect(anythingShipped({ lineStages: ['ready_to_ship'], unitStages: ['staged', 'shipped'] })).toBe(true)
+    })
+
+    it('is a unit installed on a line filled again after a unit left in transit', () => {
+        expect(anythingShipped({ lineStages: ['awaiting_stock'], unitStages: ['in_service'] })).toBe(true)
+        expect(anythingShipped({ lineStages: ['awaiting_stock'], unitStages: ['pending_return'] })).toBe(true)
+    })
+
+    it('is nothing before Ship', () => {
+        const unitStages = ['reserved', 'in_transfer', 'staging', 'staged', 'spare_pool', 'missing', null] as const
+        expect(anythingShipped({ lineStages: ['awaiting_stock', 'ready_to_ship', 'cancelled'], unitStages })).toBe(false)
+    })
+})
+
+describe('followsLines', () => {
+    it.each(['sourcing', 'preparing', 'delivering', 'installing'])('moves a %s Order with its lines', (stage) => {
+        expect(followsLines(stage)).toBe(true)
+    })
+
+    it.each(['draft', 'awaiting_approval', 'rejected', 'cancelled'])('leaves a %s Order as it is', (stage) => {
+        expect(followsLines(stage)).toBe(false)
+    })
+
+    it('keeps a complete Order complete when its assets later leave service', () => {
+        expect(followsLines('complete')).toBe(false)
+    })
+})
+
+describe('closedStateFor', () => {
+    it('closes the task of an Order that ends: complete, rejected (incomplete) or cancelled (skipped)', () => {
+        expect(closedStateFor('complete')).toBe(3)
+        expect(closedStateFor('rejected')).toBe(4)
+        expect(closedStateFor('cancelled')).toBe(7)
+    })
+
+    it('leaves the task open in every other stage', () => {
+        for (const stage of ['draft', 'awaiting_approval', 'sourcing', 'preparing', 'delivering', 'installing'] as const) {
+            expect(closedStateFor(stage)).toBeUndefined()
+        }
+    })
+})
+
+describe('the Order stage sets', () => {
+    const stages = Object.keys(ORDER_STAGE_CHOICES) as OrderStage[]
+
+    it('count as ended exactly the stages an Order is closed with', () => {
+        expect([...ENDED_ORDER_STAGES].sort()).toEqual(stages.filter((stage) => closedStateFor(stage) !== undefined).sort())
+        for (const stage of UNFULFILLED_ORDER_STAGES) expect(ENDED_ORDER_STAGES).toContain(stage)
+        expect(UNFULFILLED_ORDER_STAGES).not.toContain('complete')
+    })
+
+    it('select the open Orders, every one that has not ended, with the query the metadata imports', () => {
+        expect(stages.filter((stage) => matches(OPEN_ORDERS_QUERY, { stage }))).toEqual(stages.filter((stage) => !ENDED_ORDER_STAGES.includes(stage)))
+    })
+
+    it('offer Cancel order until Ship: on no Order that ended, is being installed or is complete', () => {
+        expect(stages.filter((stage) => !CANCELLABLE_ORDER_STAGES.includes(stage))).toEqual(['installing', 'complete', 'rejected', 'cancelled'])
+    })
+})
+
+describe('the Order line stages', () => {
+    it('have a line filled again from awaiting stock to shipped', () => {
+        const refilled = (Object.keys(LINE_STAGE_CHOICES) as LineStage[]).filter((stage) => refillsLine({ stage, deploymentEnds: false }))
+        expect(refilled).toEqual(['awaiting_stock', 'sourced', 'staging', 'ready_to_ship', 'shipped'])
+    })
+})
+
+describe('endedUnfulfilled', () => {
+    it('is an Order cancelled or rejected, and no other', () => {
+        expect(['cancelled', 'rejected'].map(endedUnfulfilled)).toEqual([true, true])
+        const live = ['draft', 'awaiting_approval', 'sourcing', 'preparing', 'delivering', 'installing', 'complete', '']
+        expect(live.filter(endedUnfulfilled)).toEqual([])
+    })
+
+    it('ends every line of the Order for sourcing, whatever its own stage', () => {
+        for (const orderStage of ['cancelled', 'rejected']) {
+            for (const lineStage of ['new', 'awaiting_stock', 'sourced', 'staging', 'ready_to_ship']) {
+                expect(lineStillOpen({ lineStage, orderStage })).toBe(false)
+            }
+        }
+    })
+})
+
+describe('lineStillOpen', () => {
+    it('is a line not yet shipped, cancelled or rejected, on an Order neither cancelled nor rejected', () => {
+        expect(lineStillOpen({ lineStage: 'awaiting_stock', orderStage: 'sourcing' })).toBe(true)
+        expect(lineStillOpen({ lineStage: 'ready_to_ship', orderStage: 'preparing' })).toBe(true)
+        for (const lineStage of ['shipped', 'installed', 'in_service', 'cancelled']) {
+            expect(lineStillOpen({ lineStage, orderStage: 'sourcing' })).toBe(false)
+        }
+        // A line whose cancel was refused stays open on its cancelled Order.
+        for (const orderStage of ['cancelled', 'rejected']) {
+            expect(lineStillOpen({ lineStage: 'awaiting_stock', orderStage })).toBe(false)
+        }
+    })
+})

@@ -1,0 +1,160 @@
+import { GlideRecord } from '@servicenow/glide'
+import { intervalEnd, restartInterval } from '../domain/billing.ts'
+import type { HeldLock } from '../domain/job-lock.ts'
+import { isBillable } from '../domain/lifecycle.ts'
+import { LOCK } from '../domain/lock-names.ts'
+import { readStage } from './assets.ts'
+import { todayIso } from './clock.ts'
+import { attemptLock, whyNotRun } from './locks.ts'
+import { log } from './log.ts'
+import { exists, findById, str, warnRefused, type ForeignRecord } from './records.ts'
+
+/**
+ * Start billing an Asset on a Subscription line from `startIso`, unless an interval is already open for
+ * it; one it closed on that day or later at the same line and Site is reopened instead (restartInterval).
+ * Two saves of the Asset can put it in service at once (a Seen signal and the detection job, two NMS batches), and one
+ * can take it out of service before this save's rule runs, its close finding nothing open yet. So the open and the
+ * close (closeServiceIntervals) of one Asset take turns under a lock on it, each reading the Asset afresh there: the
+ * open re-checks what is open, and closes its interval today if the Asset has left service since, as that close would
+ * have done had it come second. A save that finds the lock held tries again, then leaves the interval to the holder.
+ *
+ * It runs after the Asset's save, which it cannot undo, and no later stage change retries it, so an interval not open
+ * is logged for an asset manager or finance to open by hand: a refused save as a warning, like every refusal, and as an
+ * error one the lock kept from opening (the holder had still not opened it when this save gave up, and may have died
+ * holding the lock, ADR 0013; or the lock could not be taken, platform/locks `attemptLock`).
+ */
+export function openServiceInterval(asset: ForeignRecord, lineId: string, startIso: string): void {
+    const assetId = asset.getUniqueValue()
+    const why = underIntervalLock(assetId, (lock) => openHolding(lock, asset, lineId, startIso))
+    // The holder has normally opened it by now; one that has not may be slow, or have died holding the lock.
+    if (why === null || hasOpenInterval(assetId)) return
+    const unopened = `${str(asset, 'serial_number')} in service from ${startIso}, no interval open`
+    log.error(`${unopened}: ${why}; open it by hand if it is still not open`)
+}
+
+/**
+ * Run `work` holding the Asset's interval lock, trying again while another save holds it (a holder keeps it for a few
+ * reads and a save or two). Null once it ran, else why it did not (held through every try, or the lock could not be
+ * taken), for the caller to log; `work`'s own errors escape.
+ */
+function underIntervalLock(assetId: string, work: (lock: HeldLock) => void): string | null {
+    const attempt = attemptLock(LOCK.serviceInterval(assetId), (lock) => {
+        work(lock)
+    })
+    if (attempt.ran) return null
+    return whyNotRun(attempt, 'left to another save holding its lock, which has not finished')
+}
+
+/**
+ * Open (or reopen) the interval holding `lock`, then close it today if the Asset has left service since. A holder that
+ * outlasts the lock (ADR 0013) may overlap the save that took it over and opens the interval too: one that lost it
+ * before saving leaves the interval to that save, one that lost it during the save is logged.
+ */
+function openHolding(lock: HeldLock, asset: ForeignRecord, lineId: string, startIso: string): void {
+    if (!hasOpenInterval(asset.getUniqueValue()) && !openInterval(lock, asset, lineId, startIso)) return
+    closeHolding(lock, asset.getUniqueValue(), todayIso())
+}
+
+function openInterval(lock: HeldLock, asset: ForeignRecord, lineId: string, startIso: string): boolean {
+    const assetId = asset.getUniqueValue()
+    const place = { lineId, siteId: str(asset, 'x_daas_ham_site') }
+    const latest = latestClosedInterval(assetId)
+    const closed = latest && {
+        record: latest,
+        lineId: str(latest, 'subscription_line'),
+        siteId: str(latest, 'site'),
+        end: str(latest, 'end_date'),
+    }
+    const restart = restartInterval(closed, place, startIso)
+    const reopen = 'reopen' in restart
+    let interval: GlideRecord
+    if (reopen) {
+        interval = restart.reopen.record
+        interval.setValue('end_date', '')
+    } else {
+        interval = new GlideRecord('x_daas_ham_service_interval')
+        interval.initialize()
+        interval.setValue('asset', assetId)
+        interval.setValue('subscription_line', lineId)
+        interval.setValue('customer', str(asset, 'company'))
+        interval.setValue('site', place.siteId)
+        interval.setValue('start_date', restart.start)
+    }
+    const opened = `${str(asset, 'serial_number')} in service from ${startIso}`
+    // The save that took a lost lock over may have opened one too.
+    const late = { check: 'check only one is open', level: 'error' } as const
+    const saved = lock.save(`${opened}, interval opened`, () => (reopen ? interval.update() : interval.insert()), late)
+    if (saved === 'refused') warnRefused(interval, `${opened}, no interval open`)
+    return saved === 'saved'
+}
+
+function hasOpenInterval(assetId: string): boolean {
+    return exists('x_daas_ham_service_interval', `asset=${assetId}^end_dateISEMPTY`)
+}
+
+function latestClosedInterval(assetId: string): GlideRecord | null {
+    const interval = new GlideRecord('x_daas_ham_service_interval')
+    interval.addQuery('asset', assetId)
+    interval.addNotNullQuery('end_date')
+    interval.orderByDesc('end_date')
+    interval.setLimit(1)
+    interval.query()
+    return interval.next() ? interval : null
+}
+
+/**
+ * Whether the Asset, read afresh, is in a billed stage now. It is read past the before-query rules (ADR 0005), as the
+ * user whose save runs this may not see it; only read, never saved.
+ */
+function inServiceNow(assetId: string): boolean {
+    const asset = findById('alm_hardware', assetId, { beyondVisibility: true })
+    return !!asset && isBillable(readStage(asset))
+}
+
+/**
+ * Stop billing an Asset: its open intervals end on `endIso` (inclusive). It takes turns with the open under the Asset's
+ * interval lock (see openServiceInterval) and closes only while the Asset, read afresh there, is still out of service:
+ * one a later save put back in service keeps its interval, which that save's open then finds open. A save that finds
+ * the lock held tries again, then leaves the close to the holder; an interval still open for an Asset out of service
+ * when it gives up is logged as an error, to close by hand if the holder does not.
+ */
+export function closeServiceIntervals(assetId: string, endIso: string): void {
+    const why = underIntervalLock(assetId, (lock) => closeHolding(lock, assetId, endIso))
+    if (why === null) return
+    const open = openIntervals(assetId)
+    if (!open.next() || inServiceNow(assetId)) return
+    // A holder that is an open closes it too once it sees the Asset out of service, so this may clear itself.
+    const unclosed = `${str(open, 'asset.serial_number')} left service on ${endIso}, its Service interval still open`
+    log.error(`${unclosed}: ${why}; close it by hand if it is still open`)
+}
+
+/**
+ * Close the open intervals holding `lock`, unless the Asset is back in service. A holder that outlasts the lock may
+ * overlap the save that took it over: one that lost it before saving leaves the close to that save (an open, too,
+ * closes what it finds open for an Asset out of service), one that lost it during the save is logged.
+ */
+function closeHolding(lock: HeldLock, assetId: string, endIso: string): void {
+    if (inServiceNow(assetId)) return
+    const interval = openIntervals(assetId)
+    if (!interval.hasNext() || !lock.held()) return
+    let closed = ''
+    while (interval.next()) {
+        const serial = str(interval, 'asset.serial_number')
+        interval.setValue('end_date', intervalEnd(str(interval, 'start_date'), endIso))
+        if (interval.update()) {
+            closed = serial
+            continue
+        }
+        warnRefused(interval, `${serial} left service on ${endIso}, its Service interval did not close`)
+    }
+    // The save that took a lost lock over may have put the Asset back in service and found the interval still open.
+    if (closed) lock.lostAfter(`${closed} interval closed`, { check: "check it matches the Asset's stage", level: 'error' })
+}
+
+function openIntervals(assetId: string): GlideRecord {
+    const interval = new GlideRecord('x_daas_ham_service_interval')
+    interval.addQuery('asset', assetId)
+    interval.addNullQuery('end_date')
+    interval.query()
+    return interval
+}

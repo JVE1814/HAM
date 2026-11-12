@@ -1,0 +1,83 @@
+import '@servicenow/sdk/global'
+import { ChoiceColumn, DateColumn, DateTimeColumn, DecimalColumn, IntegerColumn, ReferenceColumn, StringColumn, Table } from '@servicenow/sdk/core'
+import { FLEET_CONDITION } from '../../server/domain/fleet'
+import { BILLING_LINE_KIND_CHOICES, BILLING_PERIOD_STATUS, BILLING_PERIOD_STATUS_CHOICES } from '../../server/domain/vocabulary'
+import { PERIOD_ERROR_LENGTH, TOTALS_TEXT_LENGTH } from '../../server/domain/billing'
+
+export const x_daas_ham_service_interval = Table({
+    name: 'x_daas_ham_service_interval',
+    label: 'Service interval',
+    schema: {
+        asset: ReferenceColumn({ label: 'Asset', referenceTable: 'alm_hardware', mandatory: true, referenceQual: FLEET_CONDITION }),
+        subscription_line: ReferenceColumn({ label: 'Subscription line', referenceTable: 'x_daas_ham_subscription_line', mandatory: true }),
+        customer: ReferenceColumn({ label: 'Customer', referenceTable: 'customer_account' }),
+        site: ReferenceColumn({ label: 'Site', referenceTable: 'cmn_location' }),
+        start_date: DateColumn({ label: 'First day', mandatory: true }),
+        end_date: DateColumn({ label: 'Last day' }),
+    },
+    index: [
+        { name: 'x_daas_ham_si_line', unique: false, element: 'subscription_line' },
+        { name: 'x_daas_ham_si_asset', unique: false, element: 'asset' },
+    ],
+})
+
+export const x_daas_ham_billing_period = Table({
+    name: 'x_daas_ham_billing_period',
+    label: 'Billing period',
+    display: 'period',
+    schema: {
+        period: StringColumn({ label: 'Month (YYYY-MM)', maxLength: 7, mandatory: true }),
+        period_start: DateColumn({ label: 'First day', readOnly: true }),
+        period_end: DateColumn({ label: 'Last day', readOnly: true }),
+        status: ChoiceColumn({
+            label: 'Status',
+            choices: BILLING_PERIOD_STATUS_CHOICES,
+            default: BILLING_PERIOD_STATUS.generating,
+            readOnly: true,
+            dropdown: 'dropdown_without_none',
+        }),
+        generated_at: DateTimeColumn({ label: 'Generated at', readOnly: true }),
+        failed_lines: IntegerColumn({ label: 'Lines that failed to bill', default: 0, readOnly: true }),
+        last_error: StringColumn({ label: 'Last generation error', maxLength: PERIOD_ERROR_LENGTH, readOnly: true }),
+        margin_failed: IntegerColumn({ label: 'Records that failed to cost', default: 0, readOnly: true }),
+        margin_error: StringColumn({ label: 'Last margin error', maxLength: PERIOD_ERROR_LENGTH, readOnly: true }),
+        line_count: IntegerColumn({ label: 'Lines', readOnly: true }),
+        // Amounts of two currencies are never added: Totals holds one total per currency (e.g. 'EUR 1234.56; USD 99.00'),
+        // and Total only the one while every line is in one currency (blank when they are in several).
+        totals: StringColumn({ label: 'Totals per currency', maxLength: TOTALS_TEXT_LENGTH, readOnly: true }),
+        total_amount: DecimalColumn({ label: 'Total (lines in one currency)', readOnly: true }),
+        closed_at: DateTimeColumn({ label: 'Closed at', readOnly: true }),
+        closed_by: ReferenceColumn({ label: 'Closed by', referenceTable: 'sys_user', readOnly: true }),
+    },
+    index: [{ name: 'x_daas_ham_bp_period', unique: true, element: 'period' }],
+})
+
+export const x_daas_ham_billing_line = Table({
+    name: 'x_daas_ham_billing_line',
+    label: 'Billing line',
+    schema: {
+        billing_period: ReferenceColumn({ label: 'Billing period', referenceTable: 'x_daas_ham_billing_period', mandatory: true, cascadeRule: 'delete' }),
+        kind: ChoiceColumn({
+            label: 'Kind',
+            choices: BILLING_LINE_KIND_CHOICES,
+            mandatory: true,
+            dropdown: 'dropdown_without_none',
+        }),
+        customer: ReferenceColumn({ label: 'Customer', referenceTable: 'customer_account', mandatory: true }),
+        agreement: ReferenceColumn({ label: 'Agreement', referenceTable: 'x_daas_ham_agreement' }),
+        subscription_line: ReferenceColumn({ label: 'Subscription line', referenceTable: 'x_daas_ham_subscription_line' }),
+        site: ReferenceColumn({ label: 'Site', referenceTable: 'cmn_location' }),
+        fee_event: ReferenceColumn({ label: 'Fee event', referenceTable: 'x_daas_ham_fee_event' }),
+        description: StringColumn({ label: 'Description', maxLength: 200 }),
+        units: DecimalColumn({ label: 'Units (days or device-days)' }),
+        monthly_rate: DecimalColumn({ label: 'Monthly rate' }),
+        amount: DecimalColumn({ label: 'Amount', mandatory: true }),
+        // Its Agreement's currency (a fee's too), set by the generation; no default.
+        currency: StringColumn({ label: 'Currency', maxLength: 3, mandatory: true }),
+    },
+    index: [
+        { name: 'x_daas_ham_bl_period', unique: false, element: 'billing_period' },
+        { name: 'x_daas_ham_bl_customer', unique: false, element: 'customer' },
+        { name: 'x_daas_ham_bl_period_customer', unique: false, element: ['billing_period', 'customer'] },
+    ],
+})
