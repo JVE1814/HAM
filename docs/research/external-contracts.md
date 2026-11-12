@@ -778,6 +778,7 @@ Sources:
 | A record producer request refused before its insert | A Customer contact's request is refused in the producer's own script (`entry/orders` beforeOrderProduced, `entry/returns` beforeReturnProduced), before the before-insert rules that refuse every other insert | Refused by a before-insert business rule, the platform still writes the request's answers to `question_answer` and skips the post-insert script. Refused by `current.setAbortAction(true)` in the producer's script, it writes no answer and skips the post-insert script. That script sees the mapped values. `question_answer` is global with *Can delete* off and the app holds no privilege on it | matches | N48 |
 | Who may open a record producer | Each producer is *Available for* one user criterion with the app's requester roles in its role list and the service desk's matched by name in its script (`shared/roles.now.ts` producerRequesters); the platform's *Not available for: SNC External* is removed by an admin in global scope after the install (README "Install"); the preflight check reports a producer that still has a *Not available for* row | The platform adds *Not available for: SNC External* in the insert of every catalog item, and again whenever one is left with no criterion; *Not available for* wins over *Available for*. The row is in no update set, the update loader deletes by sys_id only, `Now.del` by keys mints a new sys_id, and `x_daas_ham` may not delete from `sc_cat_item_user_criteria_no_mtom`. A role's sys_id differs between instances (roles coalesce on name) | matches (the criterion's script was not run on an instance) | N49 |
 | Deleting a record producer's own record | A record its post-insert script refuses is deleted read again by its sys_id (`platform/records.ts` removeStored), not through the script's `current` | `current.deleteRecord()` in the post-insert script returns false, as admin too, with *Error during delete of ...* and a NullPointerException in `com.glide.db.PrimaryKey.getValue`; the row stays. A GlideRecord read by the same sys_id deletes it | matches | N47 |
+| Who reads a platform table the app's records point at | Provider staff read `customer_account` and its `name`, the broad staff `core_company`, `cmdb_ci` and `proc_po`, through the app's Allow-If ACLs on those global tables (`shared/platform-access.now.ts`, `orders/access.now.ts`, `assurance/access.now.ts`); field ACLs on the Agreement and Lease schedule tables, for read and query_range, replace `ast_contract`'s and name every role that reads each field (`agreements/access.now.ts`, `leases/access.now.ts`); the workspace audience check judges platform tables by the ACLs recorded in `src/server/test-support/platform-acls.ts` | A reference shows, and is searched or grouped by, only when the reader reads its table and that table's display field. `customer_account`'s ACLs name Customer Service and CRM roles only; `core_company`, `cmdb_ci` and `proc_po` name roles inside the platform's `asset`, which the NOC, account managers and finance do not hold. `ast_contract.*` read and query_range need `contract_manager`; `number`, `short_description`, `state`, `starts` and `ends` read also pass the service desk; `starts`, `vendor`, `vendor_contract` query_range need `contract_manager`. A field is decided at the most specific level with an ACL for it, ORed within the level: field on the table, on each parent, `*.<field>`, then `*` on the table and each parent. Every other field's query_range is public (`*.<field>`). An app-scoped ACL on a global table installs in the app's scope | matches (emulated with app-scoped ACLs made by REST on the instance, not installed from the build) | N50 |
 
 Notes:
 
@@ -1145,6 +1146,35 @@ Sources:
   access policy. ServiceNow KB1383355: `sys_user_role` records coalesce on name, so a role's sys_id
   differs between instances, and a list field of role sys_ids that do not resolve grants nothing.
   The test records were deleted afterwards.
+- N50: development instance, 2026-11-12 and 13, the Table and Stats APIs as one test user per
+  provider role (its role and `snc_internal`), the ACL records read as admin. Every reference a
+  workspace list column, search, filter or group-by reaches, read with `sysparm_limit=1` as each
+  role: `customer_account` 403 for all six staff roles and the app admin; `core_company`, `cmdb_ci`
+  and `proc_po` 403 for the NOC, account managers and finance; `sn_customerservice_case` 403 for
+  all; `cmn_location`, `sys_user`, `cmdb_model`, `alm_stockroom` read by all. `customer_account`'s
+  read ACLs (CRM Base Entities) name `csm_ws_integration`, `sn_crm_account_viewer`,
+  `sn_customerservice.customer_data_viewer`, `sn_customerservice_agent`, `contact_manager`,
+  `customer` and a granular role; `customer_account.name` the same roles; its two Deny-Unless ACLs
+  pass every signed-in user. The platform's `asset` contains `contract_manager`, `cmdb_read`,
+  `procurement_user`, `inventory_user` and `model_manager`. An Agreement read as finance or an
+  account manager came back with no field at all; as an asset manager with every field. An
+  app-scoped Allow-If read ACL on `customer_account` for finance gave the group-by its display
+  value, but the column stayed out and `customer.nameLIKE` was refused until a
+  `customer_account.name` ACL was added; `phone`, `street` and `city` stayed out, read directly or
+  through `core_company`. An `x_daas_ham_agreement.*` read ACL for finance gave it the app's
+  columns, the currency and the Customer, not `number`, `state`, `starts` or `ends`, which an
+  `x_daas_ham_agreement.starts` ACL then gave `starts`; the finance-only `*` ACL took the currency,
+  the Customer and the app's columns from the asset manager. The service desk read `number`,
+  `short_description`, `state`, `starts` and `ends` of an Agreement and nothing else of it. The
+  query_range ACLs: `ast_contract.*`, `.starts`, `.vendor`, `.vendor_contract` and `.po_number`
+  need `contract_manager`; `*.<field>` ones are public for some 175 common field names. With the
+  app's 25 ACLs emulated (19 read, 6 query_range) a sweep of every list's columns, search and sort
+  and every widget, for the seven roles, went from 270 refused or blank requests of 3237 to 9 of
+  3178: the search of *Open replacement orders* through its case (`sn_customerservice_case`) for
+  all, and of *Unbilled fees* through its Billing period for field techs and the NOC. App ACLs the
+  build installed on `alm_asset`, `alm_stockroom` and `alm_transfer_order` are in `x_daas_ham`
+  scope though `sys_db_object.create_access_controls` is false on each; a background script in
+  `x_daas_ham` could not create one (the table's cross-scope access policy refused it). The test records were deleted afterwards.
 
 ## Changes needed in the app
 

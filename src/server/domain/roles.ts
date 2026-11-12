@@ -43,6 +43,13 @@ export const PLATFORM_ROLE = {
 export const BROAD_STAFF = [ROLE.assetManager, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance]
 
 /**
+ * Who reads an Agreement's fields: BROAD_STAFF and the service desk. An Agreement extends ast_contract, and a field ACL
+ * on the Agreement table replaces ast_contract's for that field, so the Agreement's field ACLs name everyone who reads
+ * the field, the service desk included (ADR 0005). Written out, as the metadata cannot evaluate a spread.
+ */
+export const AGREEMENT_READERS = [ROLE.assetManager, ROLE.fieldTech, ROLE.noc, ROLE.accountManager, ROLE.finance, PLATFORM_ROLE.serviceDeskAgent]
+
+/**
  * Every provider-staff role: who reads the installed base, and so opens an Asset's form (the rack page links a device
  * to it for them only). The metadata's `providerStaff` (shared/roles.now.ts) is this list, in the order the
  * navigator's modules store it.

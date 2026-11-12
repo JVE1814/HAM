@@ -175,7 +175,7 @@ const CATALOG = {
             title: 'Open replacement orders',
             table: 'x_daas_ham_order',
             query: `order_type=${ORDER_TYPE.device_replace}^${OPEN_ORDERS_QUERY}`,
-            columns: 'number,case,customer,site,stage,install_mode',
+            columns: 'number,customer,site,stage,install_mode',
             audience: 'staff',
         },
         refresh_open: {
@@ -405,12 +405,13 @@ const CATALOG = {
             columns: 'billing_period,kind,customer,site,description,units,monthly_rate,amount,currency',
             audience: 'money',
         },
+        // Its Billing period column reads a money table; the other broad staff find the same fees under Open fee events.
         fees_unbilled: {
             title: 'Unbilled fees',
             table: 'x_daas_ham_fee_event',
             query: `${OPEN_FEES_QUERY}^ORDERBYoccurred_on`,
             columns: 'fee_type,customer,asset,return_order,amount,agreement.currency,occurred_on,billing_period',
-            audience: 'broadStaff',
+            audience: 'money',
         },
         service_intervals: {
             title: 'Open service intervals',

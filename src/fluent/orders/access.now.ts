@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { Acl } from '@servicenow/sdk/core'
-import { CUSTOMER_CONTACTS } from '../../server/domain/roles'
+import { BROAD_STAFF, CUSTOMER_CONTACTS } from '../../server/domain/roles'
 import { grantsCustomerRecord } from '../../server/entry/visibility'
 import { admin, assetManager, customerAdmin, orderRaisers, orderWorkers, providerStaff, serviceDesk } from '../shared/roles.now'
 
@@ -115,4 +115,15 @@ Acl({
     table: 'x_daas_ham_order_line',
     operation: 'delete',
     roles: [assetManager],
+})
+
+// Asset Management's ACL lets the platform's asset and procurement_user roles read purchase orders, which the NOC,
+// account managers and finance do not hold: an Order line's purchase orders would show blank to them.
+Acl({
+    $id: Now.ID['acl_proc_po_read_staff'],
+    type: 'record',
+    table: 'proc_po',
+    operation: 'read',
+    roles: BROAD_STAFF,
+    description: 'NaaS provider staff read the purchase orders an Order line names.',
 })

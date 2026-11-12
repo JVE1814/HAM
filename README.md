@@ -449,8 +449,9 @@ the demo data loader).
   `Table({ augments })` per table, whichever feature a column serves), the REST API (one `RestApi`
   with every route) and the ACL that admits customer users to it, the entry modules' installed path,
   the menu root with its separators (a feature's navigator modules are in its folder and name the
-  root), the visibility rules and row checks with their ATF tests (ADR 0005: one concern over every
-  scoped table), the customer page (it reads several features) and the ATF suites (one per delivery
+  root), the read ACLs on the platform tables nearly every feature points at (`customer_account`,
+  `core_company`), the visibility rules and row checks with their ATF tests (ADR 0005: one concern
+  over every scoped table), the customer page (it reads several features) and the ATF suites (one per delivery
   phase, each listing tests of several features).
 - `workspace/` holds the workspace's UI page and its ACL. Its lists and its dashboard are data in
   `src/client/workspace/` (`catalog.ts`, `dashboard.ts`), each one structure over every table

@@ -380,6 +380,23 @@ dispatcher of the Provider IT) gets no `x_daas_ham_labour_cost` from `GET
 /api/now/table/wm_order/<id>?sysparm_fields=number,x_daas_ham_labour_cost`. Closing the month's
 billing period afterwards still writes the *Field labour* Cost fact from the cost entered.
 
+### Platform tables staff read
+
+`shared/platform-access.now.ts`, `orders/access.now.ts`, `assurance/access.now.ts`,
+`agreements/access.now.ts`, `leases/access.now.ts` (external-contracts N50). After the install, the
+25 ACLs on `customer_account`, `customer_account.name`, `core_company`, `proc_po`, `cmdb_ci` and
+the fields of `x_daas_ham_agreement` and `x_daas_ham_lease_schedule` are in `x_daas_ham` scope.
+Impersonating a finance-only user, `GET
+/api/now/table/customer_account?sysparm_limit=1&sysparm_fields=name,phone` returns `name` and no
+`phone`, and `GET /api/now/table/x_daas_ham_agreement?sysparm_limit=1&sysparm_fields=number,customer,account_manager,state,currency,starts,ends`
+returns every field asked for. In the workspace, as a NOC-only user, a search on *All orders* for
+part of a Customer's name finds that Customer's Orders, and *Lines awaiting stock* shows its
+purchase orders. As finance, *Agreements* and *Lease schedules* show every column, and a search on
+either for part of a number or a contract number finds the record. As an inventory-tech-only user,
+*All orders* shows each Order's Customer. As a service desk agent with no NaaS role, an Agreement
+still shows its number, short description, state, starts and ends. None of this was run on an
+instance from the build: the ACLs were made by hand there and the reads emulated.
+
 ### Customer creates
 
 `orders/access.now.ts`, `returns/access.now.ts`. As a customer admin, `POST /api/now/table/x_daas_ham_order` for another
@@ -455,7 +472,8 @@ billing consumer's user holds `x_daas_ham.billing_reader` and no longer `x_daas_
 Customer contact (the page's ACL). Its sidebar offers a role only the lists of its audience
 (`catalog.ts`), and each list shows what the table's ACLs and before-query rules let the user
 read. As a NOC-only user, Operations, Billing integrity and Lifecycle risk show counts and the
-Margin tab is not offered. As an inventory-tech-only user, Operations and Lifecycle risk show
+Margin tab is not offered, nor the list *Unbilled fees*, whose Billing period column reads a money
+table; *Open fee events* shows the same fees. As an inventory-tech-only user, Operations and Lifecycle risk show
 counts, and neither Billing integrity (each of its tiles reads Subscription lines) nor Margin is
 offered; the tech is not offered the reconciliation-exception tiles, nor the list *Data gaps (no
 tag, serial, agreement or site)*, whose filter reads the Agreement. As finance, the Margin tab

@@ -20,6 +20,7 @@ import { buyLabel, labelVoidable, SHIPPING_MESSAGE } from './domain/shipping'
 import { stagingClosing } from './domain/staging'
 import { SCOPED_TABLES, type TableScoping } from './domain/visibility'
 import {
+    AGREEMENT_READERS,
     BROAD_STAFF,
     MONEY_READERS as MONEY_READERS_IN_ORDER,
     PLATFORM_ROLE,
@@ -56,6 +57,7 @@ import { giveToLessor } from './platform/leases'
 import { PROPERTY, type PropertyOf } from './domain/properties'
 import type { ForeignRecord } from './platform/records'
 import { restMessagePort } from './platform/rest-messages'
+import { PLATFORM_ROLE_CONTAINS, PLATFORM_TABLES, PUBLIC, PUBLIC_QUERY_RANGE_FIELDS, SIGNED_IN } from './test-support/platform-acls'
 import { AUDIENCE, CATEGORIES } from '../client/workspace/catalog'
 import { DASHBOARD, widgetAudience } from '../client/workspace/dashboard'
 
@@ -140,7 +142,8 @@ const unescapeXml = (text: string) =>
 
 /**
  * One built record: the table it is a record of (`$table`), and each of its fields as the instance stores it ('' for an
- * empty one). A reference built with the name of what it points at has that under `<field>.name`.
+ * empty one). A reference built with the name of what it points at has that under `<field>.name`, and one built with
+ * what it shows under `<field>.display_value`.
  */
 interface BuiltRecord {
     $table: string
@@ -157,9 +160,11 @@ function builtRecords(): BuiltRecord[] {
         const record: BuiltRecord = { $table: table }
         for (const [, field = '', attributes = '', value] of xml.matchAll(/^ {4}<(\w+)((?: [^>]*)?)(?:\/>|>([\s\S]*?)<\/\1>)$/gm)) {
             record[field] = unescapeXml(value ?? '')
-            // A reference is built as the record's id, with what it names beside it.
+            // A reference is built as the record's id, with what it names or shows beside it.
             const named = / name="([^"]*)"/.exec(attributes)?.[1]
             if (named !== undefined) record[`${field}.name`] = unescapeXml(named)
+            const shownAs = / display_value="([^"]*)"/.exec(attributes)?.[1]
+            if (shownAs !== undefined) record[`${field}.display_value`] = unescapeXml(shownAs)
         }
         return [record]
     })
@@ -741,7 +746,8 @@ function builtAcls(): BuiltAcl[] {
                 table,
                 field,
                 records: /^sys_class_name=(\w+)$/.exec(acl.applies_to ?? '')?.[1] ?? table,
-                operation: acl.operation ?? '',
+                // An operation other than the CRUD ones is built as the id of its sys_security_operation.
+                operation: acl['operation.display_value'] ?? acl.operation ?? '',
                 deny: acl.decision_type === 'deny',
                 roles: rolesOf.get(acl.sys_id ?? '') ?? [],
                 appliesTo: acl.applies_to ?? '',
@@ -971,6 +977,39 @@ describe('the rules and ACLs that scope what a reader sees', () => {
         })
     })
 
+    /*
+     * A reference shows and is searched only when its table and display field are readable (ADR 0005). On a child of
+     * ast_contract, a field ACL replaces ast_contract's for that field, so it names everyone who reads the field.
+     */
+    describe("ACLs on the platform tables and contract fields the app's records name", () => {
+        it('let provider staff read the Customer and its name only, and the broad staff companies, purchase orders and configuration items', () => {
+            const PLATFORM_TABLES_NAMED = ['customer_account', 'core_company', 'proc_po', 'cmdb_ci']
+            const CONTRACT_TABLES = ['x_daas_ham_agreement', 'x_daas_ham_lease_schedule']
+            const granted = Object.fromEntries(
+                builtAcls()
+                    .filter((acl) => PLATFORM_TABLES_NAMED.includes(acl.table) || (CONTRACT_TABLES.includes(acl.table) && acl.field))
+                    .map((acl) => [`${acl.operation} ${acl.table}${acl.field ? `.${acl.field}` : ''}`, [[...acl.roles].sort(), acl.deny, acl.script, acl.condition]]),
+            )
+            const allow = (roles: readonly string[]) => [[...roles].sort(), false, '', '']
+            const agreementReaders = allow(AGREEMENT_READERS)
+            const broadStaff = allow(BROAD_STAFF)
+            expect(granted).toEqual({
+                'read customer_account': allow(PROVIDER_STAFF),
+                'read customer_account.name': allow(PROVIDER_STAFF),
+                'read core_company': broadStaff,
+                'read proc_po': broadStaff,
+                'read cmdb_ci': broadStaff,
+                ...Object.fromEntries(['*', 'number', 'short_description', 'state', 'starts', 'ends'].map((field) => [`read x_daas_ham_agreement.${field}`, agreementReaders])),
+                ...Object.fromEntries(['*', 'starts'].map((field) => [`query_range x_daas_ham_agreement.${field}`, agreementReaders])),
+                ...Object.fromEntries(
+                    ['*', 'number', 'short_description', 'state', 'starts', 'ends', 'vendor', 'vendor_contract'].map((field) => [`read x_daas_ham_lease_schedule.${field}`, broadStaff]),
+                ),
+                ...Object.fromEntries(['*', 'starts', 'vendor', 'vendor_contract'].map((field) => [`query_range x_daas_ham_lease_schedule.${field}`, broadStaff])),
+            })
+            expect(AGREEMENT_READERS).toEqual([...BROAD_STAFF, PLATFORM_ROLE.serviceDeskAgent])
+        })
+    })
+
     describe('create ACLs of Orders, Order lines and Returns', () => {
         const creators = (table: string) => recordAcls().filter((acl) => acl.table === table && acl.operation === 'create')
         const forCustomer = (table: string) => creators(table).filter((acl) => acl.roles.some(isCustomerRole))
@@ -1018,11 +1057,13 @@ describe('the rules and ACLs that scope what a reader sees', () => {
         /**
          * The app tables an inventory tech with no broader role may read: the Assets, Staging tasks and Audits of their
          * Stockrooms, and the ASN imports, Staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and
-         * Disposal orders they work on, which are not narrowed to their Stockrooms. Every other table's read ACL leaves
-         * inventory techs out: the before-query rules do not hide those from them (ADR 0005).
+         * Disposal orders they work on, which are not narrowed to their Stockrooms, and the platform's Customers those
+         * name. Every other table's read ACL leaves inventory techs out: the before-query rules do not hide those from
+         * them (ADR 0005).
          */
         const INVENTORY_TECH_TABLES = [
             'alm_hardware',
+            'customer_account',
             'x_daas_ham_asn_import',
             'x_daas_ham_staging_task',
             'x_daas_ham_staging_step',
@@ -1107,25 +1148,96 @@ describe('the NaaS Asset Workspace', () => {
     })
 
     /*
-     * The instance lets a role read a reference field only when it reads the table the field points at, whatever the
-     * field's own ACLs say: a query that names the field, or dot-walks through it, is refused (the Table API) or matches
-     * nothing (the Stats API). The platform's tables are left out: the app ships none of their dictionary or ACLs.
+     * The instance lets a role read a reference field only when it reads the table the field points at, and show or
+     * search it only when it also reads that table's display field: a query that names the field, or dot-walks through
+     * it, is refused (the Table API) or matches nothing (the Stats API), and a column it may not read comes back blank.
+     * A list's search is a LIKE on each text column and on each reference column's display field, which needs their
+     * query_range ACLs too. The platform decides a field at the most specific level that has an ACL for it, ORing that
+     * level's ACLs: the field on its table, then on each table that one extends, then `*.<field>`, then `*` on the table
+     * and on each it extends. The platform tables' ACLs are those recorded in test-support/platform-acls.ts.
      */
-    it("offers each widget and list only to roles that read its table and every app table its filter's fields point at", () => {
+    it('offers each widget and list only to roles that read, and search, every table and field it reaches', () => {
         const rolesOf: Readonly<Record<string, readonly string[]>> = AUDIENCE
-        const reference = new Map(builtColumns().flatMap((column) => (typeof column.reference === 'string' ? [[`${column.table}.${column.name}`, column.reference]] : [])))
-        const parents = new Map(records('sys_db_object').map((table) => [table.name ?? '', table['super_class.name'] ?? '']))
-        const grants = builtAcls().filter((acl) => acl.operation === 'read' && !acl.deny)
+        const appTables = new Map(records('sys_db_object').map((table) => [table.name ?? '', table['super_class.name'] ?? '']))
+        const columns = builtColumns()
+        const displayOverrides = records('sys_dictionary_override').filter((override) => override.display_override === 'true')
+        const unrecorded = new Set<string>()
+        const chain = (table: string): string[] => {
+            const tables: string[] = []
+            for (let on = table; on; on = appTables.get(on) ?? PLATFORM_TABLES[on]?.extends ?? '') {
+                if (!appTables.has(on) && !PLATFORM_TABLES[on]) unrecorded.add(on)
+                tables.push(on)
+            }
+            return tables
+        }
+        const column = (table: string, field: string) => columns.find((found) => found.table === table && found.name === field)
+        const referenceOf = (table: string, field: string): string | undefined => {
+            for (const on of chain(table)) {
+                const target = column(on, field)?.reference ?? PLATFORM_TABLES[on]?.references?.[field]
+                if (typeof target === 'string' && target) return target
+            }
+            return undefined
+        }
+        const displayOf = (table: string): string | undefined => {
+            for (const on of chain(table)) {
+                const display =
+                    columns.find((found) => found.table === on && found.display === 'true')?.name ??
+                    displayOverrides.find((override) => override.name === on)?.element ??
+                    PLATFORM_TABLES[on]?.display
+                if (display) return display
+            }
+            return undefined
+        }
+        const grants = builtAcls().filter((acl) => !acl.deny)
+        type Operation = 'read' | 'query_range'
+        const level = (operation: Operation, table: string, field: string): string[] | null => {
+            const own = grants.filter((acl) => acl.operation === operation && acl.records === table && acl.field === field).flatMap((acl) => acl.roles)
+            const facts = PLATFORM_TABLES[table]
+            const recorded = !field ? (operation === 'read' ? facts?.read : undefined) : (operation === 'read' ? facts?.fieldRead : facts?.fieldQueryRange)?.[field]
+            return own.length || recorded ? [...own, ...(recorded ?? [])] : null
+        }
         const tableReaders = (table: string): string[] | null => {
-            const own = grants.filter((acl) => !acl.field && acl.records === table)
-            if (own.length) return own.flatMap((acl) => acl.roles)
-            const parent = parents.get(table)
-            return parent ? tableReaders(parent) : null
+            for (const on of chain(table)) {
+                const readers = level('read', on, '')
+                if (readers) return readers
+            }
+            return null
+        }
+        const fieldReaders = (operation: Operation, table: string, field: string): string[] | null => {
+            const tables = chain(table)
+            for (const on of tables) {
+                const readers = level(operation, on, field)
+                if (readers) return readers
+            }
+            if (operation === 'query_range' && PUBLIC_QUERY_RANGE_FIELDS.has(field)) return [PUBLIC]
+            for (const on of tables) {
+                const readers = level(operation, on, '*')
+                if (readers) return readers
+            }
+            return null
+        }
+        const NOT_SEARCHED = new Set(['integer', 'longint', 'decimal', 'float', 'currency', 'price', 'percent_complete', 'boolean'])
+        const searchedAs = (table: string, path: string): string | null => {
+            const parts = path.split('.')
+            const last = parts.pop() ?? ''
+            const on = parts.reduce((from, part) => referenceOf(from, part) ?? '', table)
+            const target = referenceOf(on, last)
+            if (target) {
+                const display = displayOf(target)
+                return display ? `${path}.${display}` : null
+            }
+            const type = chain(on)
+                .map((from) => column(from, last)?.type)
+                .find((found) => typeof found === 'string')
+            return typeof type === 'string' && NOT_SEARCHED.has(type) ? null : path
         }
         const contained = records('sys_user_role_contains')
         const held = (role: string) => {
-            const roles = new Set([role])
-            for (const one of roles) for (const link of contained.filter((found) => found['role.name'] === one)) roles.add(link['contains.name'] ?? '')
+            const roles = new Set([role, PUBLIC, SIGNED_IN])
+            for (const one of roles) {
+                for (const link of contained.filter((found) => found['role.name'] === one)) roles.add(link['contains.name'] ?? '')
+                for (const inner of PLATFORM_ROLE_CONTAINS[one] ?? []) roles.add(inner)
+            }
             return roles
         }
         const conditionFields = (filter: string) =>
@@ -1133,38 +1245,55 @@ describe('the NaaS Asset Workspace', () => {
                 .split(/\^NQ|\^OR|\^/)
                 .flatMap((term) => /^[a-z0-9_]+(?:\.[a-z0-9_]+)*/.exec(term)?.[0] ?? [])
                 .filter((field) => field !== 'javascript')
-        const refusals = (role: string, table: string, paths: readonly string[]): string[] => {
+        interface Reach {
+            path: string
+            search: boolean
+        }
+        const refusals = (role: string, table: string, reaches: readonly Reach[]): string[] => {
             const roles = held(role)
             const reads = (readers: readonly string[] | null) => readers === null || readers.some((reader) => roles.has(reader))
             const refused = reads(tableReaders(table)) ? [] : [table]
-            for (const path of new Set(paths)) {
+            for (const { path, search } of reaches) {
                 let on = table
                 for (const field of path.split('.')) {
-                    const fieldReaders = grants.filter((acl) => acl.records === on && acl.field === field).flatMap((acl) => acl.roles)
-                    if (fieldReaders.length && !reads(fieldReaders)) refused.push(`${path}: ${on}.${field}`)
-                    const target = reference.get(`${on}.${field}`)
+                    if (!reads(fieldReaders('read', on, field))) refused.push(`${path}: ${on}.${field}`)
+                    if (search && !reads(fieldReaders('query_range', on, field))) refused.push(`search ${path}: ${on}.${field}`)
+                    const target = referenceOf(on, field)
                     if (!target) break
                     if (!reads(tableReaders(target))) refused.push(`${path}: ${on}.${field} -> ${target}`)
                     on = target
                 }
             }
-            return refused
+            return [...new Set(refused)]
         }
+        const shown = (paths: readonly string[]): Reach[] => [...new Set(paths)].map((path) => ({ path, search: false }))
         const offeredQueries = [
             ...DASHBOARD.flatMap((tab) =>
                 tab.widgets.map((widget) => ({
                     what: `widget ${tab.id}/${widget.id}`,
                     roles: (rolesOf[tab.audience] ?? []).filter((role) => rolesOf[widgetAudience(tab, widget)]?.includes(role)),
                     table: widget.source.table,
-                    paths: [...conditionFields(widget.source.filter), ...('by' in widget ? [widget.by] : []), ...('sum' in widget ? [widget.sum.amount, widget.sum.currency] : [])],
+                    reaches: shown([...conditionFields(widget.source.filter), ...('by' in widget ? [widget.by] : []), ...('sum' in widget ? [widget.sum.amount, widget.sum.currency] : [])]),
                 })),
             ),
-            ...WORKSPACE_LISTS.map((list) => ({ what: `list ${list.id}`, roles: rolesOf[list.audience] ?? [], table: list.table, paths: conditionFields(list.filter) })),
+            ...WORKSPACE_LISTS.map((list) => ({
+                what: `list ${list.id}`,
+                roles: rolesOf[list.audience] ?? [],
+                table: list.table,
+                reaches: [
+                    ...shown([...conditionFields(list.filter), ...list.columns]),
+                    ...list.columns.flatMap((name) => {
+                        const searched = searchedAs(list.table, name)
+                        return searched ? [{ path: searched, search: true }] : []
+                    }),
+                ],
+            })),
         ]
         for (const query of offeredQueries) expect(query.roles.length, query.what).toBeGreaterThan(0)
-        expect(
-            offeredQueries.flatMap((query) => query.roles.flatMap((role) => refusals(role, query.table, query.paths).map((refused) => `${query.what} ${role} ${refused}`))),
-        ).toEqual([])
+        const refused = offeredQueries.flatMap((query) =>
+            query.roles.flatMap((role) => refusals(role, query.table, query.reaches).map((refusal) => `${query.what} ${role} ${refusal}`)),
+        )
+        expect([...[...unrecorded].map((table) => `record who reads ${table}`), ...refused]).toEqual([])
     })
 
     it('offers a list or a tab on a money table to the money readers only', () => {

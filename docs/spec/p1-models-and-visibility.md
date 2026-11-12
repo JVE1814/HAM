@@ -47,7 +47,7 @@
 | User | Sees |
 |---|---|
 | asset manager, field tech, NOC, account manager, finance, admin | everything |
-| inventory tech only | fleet assets, NaaS stockrooms, transfer orders from or to a NaaS stockroom, staging tasks and audits (with their lines) of their stockrooms; plus, across all stockrooms and Customers, the ASN imports, staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and Disposal orders; no other app table; the Provider IT's hardware, stockrooms and transfer orders, and Model lifecycle milestones, as the platform allows |
+| inventory tech only | fleet assets, NaaS stockrooms, transfer orders from or to a NaaS stockroom, staging tasks and audits (with their lines) of their stockrooms; plus, across all stockrooms and Customers, the ASN imports, staging steps and templates, Orders, Shipments, Return orders, OEM RMAs and Disposal orders, and the name of every Customer; no other app table; the Provider IT's hardware, stockrooms and transfer orders, and Model lifecycle milestones, as the platform allows |
 | customer admin | their Customer's fleet assets (and no other company's hardware), Orders, lines, Return orders and lines, Shipments and events, Attestations and items, Agreements, subscription lines, catalog entries and Fee events; Site templates with their items, their Customer's and those offered to every Customer (checked by the read ACL, no before-query rule) |
 | site contact | their Customer's fleet assets (and no other company's hardware), Orders and lines, Return orders and lines, Shipments and events, and Attestations and items at the Sites listing them as contacts; no Fee events |
 | service desk (`sn_customerservice_agent`, no NaaS role) | every Customer's Agreements, Site templates with their items, Orders and lines, and Return orders and lines, to raise, submit and follow them (read ACLs of its own, in the features' `access.now.ts`); no other app table; hardware as the platform's ACLs allow |
@@ -58,6 +58,18 @@ whoever reads the Asset, and a Customer contact does not read a fleet asset's *C
 ACLs grant its contacts, nor a Shipment's carrier cost (`fleet/access.now.ts`,
 `delivery/access.now.ts`). A work order's *NaaS field labour cost* is read by provider staff alone, whoever reads
 the work order, and changed by hand by asset managers and finance (`margin/margin.now.ts`).
+
+**Platform tables staff read.** A reference shows, and a list is searched or grouped by it, only when the reader reads
+its table and that table's display field. Provider staff read the Customers the app's records name
+(`customer_account`, its *Name* only: no phone, address or other account field) and the broad staff the companies,
+configuration items and purchase orders (`core_company`, `cmdb_ci`, `proc_po`), through the app's own Allow-If ACLs
+(`shared/platform-access.now.ts`, `orders/access.now.ts`, `assurance/access.now.ts`). No staff role reads Customer
+Service's cases, so the workspace shows no case column. Agreements and Lease schedules extend `ast_contract`, whose
+field ACLs let only `contract_manager` read and search every field. The platform decides a field at the most specific
+level with an ACL for it, ORing that level's ACLs: the field on the table, then on each table it extends, then
+`*.<field>`, then `*` on the table and on each it extends. So the app's field ACLs on the two tables
+(`agreements/access.now.ts`, `leases/access.now.ts`) name every role that reads each field: the broad staff, and on
+Agreements the service desk, which reads an Agreement's number, short description, state, starts and ends (ADR 0005).
 
 An inventory tech's stockrooms are the NaaS stockrooms whose *Assignment group* (the platform's
 `alm_stockroom.assignment_group`) is a group they are a member of (ADR 0018).
