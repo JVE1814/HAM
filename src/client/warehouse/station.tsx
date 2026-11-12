@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createContext, use, useEffect, useReducer, useState, type ReactNode } from 'react'
 import type { AssetSummary, Stockroom } from '../../server/domain/rest-contracts'
 import { stockroomsQuery } from './api'
-import { EMPTY_LOG, scanLog, type Entry, type FailedScan, type ScanLog } from './scan-log'
+import { EMPTY_LOG, scanLog, type Entry, type FailedScan } from './scan-log'
 import { scanQueue } from './scan-queue'
 import { contextAfter, describe, perform, scanOf, type Context, type ContextField, type Mode, type Scan } from './scans'
 
@@ -35,7 +35,7 @@ export function StationProvider({ children }: { children: ReactNode }) {
     const stockrooms = useQuery(stockroomsQuery).data ?? []
     const [chosen, setChosen] = useState<Context>({ stockroom: '', pid: '', orderNumber: '', auditNumber: '' })
     const [pending, setPending] = useState(0)
-    const [log, record] = useReducer(scanLog<Scan>, EMPTY_LOG as ScanLog<Scan>)
+    const [log, record] = useReducer(scanLog<Scan>, EMPTY_LOG)
     const [labels, setLabels] = useState<AssetSummary[]>([])
     const context = { ...chosen, stockroom: chosen.stockroom || (stockrooms[0]?.id ?? '') }
 
