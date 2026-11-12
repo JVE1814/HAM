@@ -10,3 +10,8 @@ export function bySite(assets: readonly CustomerAsset[]): Map<string, CustomerAs
     }
     return sites
 }
+
+/** The device count as the page writes it: "5000+" when the server cut the list. */
+export function equipmentCount(count: number, truncated: boolean): string {
+    return truncated ? `${count}+` : String(count)
+}

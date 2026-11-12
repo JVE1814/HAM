@@ -40,10 +40,12 @@ function allowed(response: RESTAPIResponse): boolean {
 export function customerOverview(request: RESTAPIRequest, response: RESTAPIResponse): void {
     if (!allowed(response)) return
     const session = currentSession()
+    const equipment = customerEquipment()
     reply(response, 200, {
         customer: customerName(session.customerId),
         isCustomerAdmin: actsAsCustomerAdmin(session.scope),
-        assets: customerEquipment(),
+        assets: equipment.assets,
+        assetsTruncated: equipment.truncated,
         orders: ordersUnderWay(),
         returns: openReturns(),
         attestations: openAttestations(),

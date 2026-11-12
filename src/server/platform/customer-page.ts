@@ -24,19 +24,28 @@ export function customerName(customerId: string): string {
     return findById('core_company', customerId)?.getDisplayValue('name') ?? ''
 }
 
+const EQUIPMENT_LIMIT = 5000
+
 /**
  * The Customer's equipment: the fleet assets shipped to a Site, serving there or awaiting return. The Fleet flag tells
  * them from the Provider IT's hardware, laptops in use included, whatever their Agreement: a deployed fleet unit
- * missing its Agreement (a data gap) is still its Customer's equipment.
+ * missing its Agreement (a data gap) is still its Customer's equipment. At most EQUIPMENT_LIMIT of them; `truncated`
+ * says there are more.
  */
-export function customerEquipment(): CustomerAsset[] {
+export function customerEquipment(): { assets: CustomerAsset[]; truncated: boolean } {
     const assets: CustomerAsset[] = []
     const asset = new GlideRecord('alm_hardware')
     asset.addEncodedQuery(visibleQuery('alm_hardware', fleetStagesQuery(DEPLOYED_STAGES)))
     asset.orderBy('x_daas_ham_site')
-    asset.setLimit(5000)
+    // One more than is listed, to tell a full list from a cut one.
+    asset.setLimit(EQUIPMENT_LIMIT + 1)
     asset.query()
+    let truncated = false
     while (asset.next()) {
+        if (assets.length === EQUIPMENT_LIMIT) {
+            truncated = true
+            break
+        }
         assets.push({
             id: asset.getUniqueValue(),
             serial: str(asset, 'serial_number'),
@@ -48,7 +57,7 @@ export function customerEquipment(): CustomerAsset[] {
             refreshDue: str(asset, 'x_daas_ham_refresh_due'),
         })
     }
-    return assets
+    return { assets, truncated }
 }
 
 export function ordersUnderWay(): CustomerOrder[] {

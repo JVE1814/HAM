@@ -2,6 +2,7 @@ import { useMutation, useSuspenseQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { DataGrid, type GridColumn } from '@/components/data-grid'
 import { required, useAppForm } from '@/components/form'
+import { Alert, AlertTitle } from '@/components/ui/alert'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -74,6 +75,13 @@ export function Equipment() {
     }
     return (
         <>
+            {overview.assetsTruncated && (
+                <Alert>
+                    <AlertTitle className="font-normal">
+                        Showing the first {overview.assets.length.toLocaleString()} devices. The Sites last in the list may be incomplete; ask your provider for the full list.
+                    </AlertTitle>
+                </Alert>
+            )}
             {[...sites].map(([siteId, assets]) => (
                 <Site key={siteId} siteId={siteId} assets={assets} admin={overview.isCustomerAdmin} columns={columns} />
             ))}

@@ -154,6 +154,8 @@ export interface CustomerOverview {
     customer: string
     isCustomerAdmin: boolean
     assets: CustomerAsset[]
+    /** The Customer has more equipment than `assets` holds: the list is cut at the page's limit. */
+    assetsTruncated: boolean
     orders: CustomerOrder[]
     returns: CustomerReturn[]
     attestations: Attestation[]

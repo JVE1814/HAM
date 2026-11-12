@@ -6,11 +6,12 @@ import { overviewQuery } from './api'
 import { Attestations } from './attestations'
 import { Equipment } from './equipment'
 import { Orders } from './orders'
+import { equipmentCount } from './sites'
 
 function Shell() {
     const { data: overview } = useSuspenseQuery(overviewQuery)
     const items = [
-        { label: `Equipment (${overview.assets.length})`, to: '/equipment' },
+        { label: `Equipment (${equipmentCount(overview.assets.length, overview.assetsTruncated)})`, to: '/equipment' },
         { label: 'Orders & returns', to: '/orders' },
         ...(overview.isCustomerAdmin ? [{ label: 'Confirm equipment', to: '/attestations', badge: overview.attestations.length }] : []),
     ]

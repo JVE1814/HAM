@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CustomerAsset } from '../../server/domain/rest-contracts'
-import { bySite } from './sites'
+import { bySite, equipmentCount } from './sites'
 
 const asset = (id: string, siteId: string): CustomerAsset => ({ id, serial: id, customerTag: '', model: 'M', site: siteId, siteId, stage: 'in_service', refreshDue: '' })
 
@@ -27,5 +27,15 @@ describe('bySite', () => {
         const given = [asset('a', 's1'), asset('b', 's2'), asset('c', 's1')]
         bySite(given)
         expect(ids(given)).toEqual(['a', 'b', 'c'])
+    })
+})
+
+describe('equipmentCount', () => {
+    it('writes a whole list as its count', () => {
+        expect(equipmentCount(12, false)).toBe('12')
+    })
+
+    it('writes a cut list as its count and a plus', () => {
+        expect(equipmentCount(5000, true)).toBe('5000+')
     })
 })
