@@ -87,8 +87,7 @@ One runner and one repository of the rows (`platform/chunked.ts`, `platform/job-
 all of these. The table also holds two rows that are not cursors, the Provider tag counter
 (`provider_tag_sequence`) and the preflight check's last result (`preflight`).
 
-Billing generation keeps one such row per period (named by `generationJob` in
-`platform/billing.ts`), with the
+Billing generation keeps one such row per period (named by `JOB.billingGenerate` in `domain/chunked-job.ts`), with the
 current pass's token and the time the last chunk started. So a reset or replaced pass's queued
 chunks are dropped, and *Reset generation* can tell whether the generation is idle. A pass starts
 where it is triggered (the period's insert, *Regenerate*), not from its first event, and, unlike

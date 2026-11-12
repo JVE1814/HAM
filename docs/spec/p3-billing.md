@@ -87,7 +87,7 @@
 - **Reset generation** (admins only) works on a period in *Generating* whose generation has shown no
   activity for `RESET_AFTER_IDLE_MINUTES`. Activity is the later of the period's last save and the
   last chunk start
-  on its job cursor (named by `generationJob` in `platform/billing.ts`); a period with no job cursor
+  on its job cursor (named by `JOB.billingGenerate` in `domain/chunked-job.ts`); a period with no job cursor
   can be reset
   too. Reset retires the pass, so its chunks still queued are dropped, even once a *Regenerate* has
   the period generating again. It holds the period as *Ready for review*, with a note naming the
