@@ -16019,6 +16019,7 @@ declare global {
                     {
                         table: 'sys_ux_lib_asset'
                         id: '2fe382537b3649bab6d408f6cf63cb56'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham/workspace/main-DU_Q58oN'
                         }
@@ -22699,6 +22700,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ux_lib_asset'
+                        id: '4dc6e24666114e05b225658972ed1b1a'
+                        key: {
+                            name: 'x_daas_ham/workspace/main-DK1AeTqo.js.map'
+                        }
+                    },
+                    {
                         table: 'sys_ui_list_element'
                         id: '4dd4490ee62340bbb9aa748ff7950104'
                         key: {
@@ -24639,6 +24647,7 @@ declare global {
                     {
                         table: 'sys_ux_lib_asset'
                         id: '567dd71159054646b503be892c4e5e92'
+                        deleted: true
                         key: {
                             name: 'x_daas_ham/workspace/main-DU_Q58oN.js.map'
                         }
@@ -37241,6 +37250,13 @@ declare global {
                             name: 'x_daas_ham_stockroom_member'
                             element: 'stockroom'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ux_lib_asset'
+                        id: '8d46d08260cb496091c8134f63929898'
+                        key: {
+                            name: 'x_daas_ham/workspace/main-DK1AeTqo'
                         }
                     },
                     {

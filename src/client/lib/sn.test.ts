@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { holdsInEveryClause } from '../../server/domain/encoded-query'
-import { listQuery, type Field, type ListView } from './sn'
+import { listQuery, pageWithin, type Field, type ListView } from './sn'
 
 const field = (name: string, overrides: Partial<Field> = {}): Field => ({
     name,
@@ -42,5 +42,27 @@ describe('listQuery', () => {
         const query = listQuery(SOURCE, [], { ...VIEW, search: 'x^NQactive=true' }, [field('number')])
         expect(query.split('^NQ')).toHaveLength(2)
         expect(holdsInEveryClause(query, 'x_daas_ham_fleet=true')).toBe(true)
+    })
+})
+
+describe('pageWithin', () => {
+    it.each([
+        { page: 0, total: 0, shown: 0 },
+        { page: 0, total: 120, shown: 0 },
+        { page: 2, total: 120, shown: 2 },
+        { page: 1, total: 51, shown: 1 },
+    ])('keeps page $page of $total rows', ({ page, total, shown }) => {
+        expect(pageWithin({ ...VIEW, page }, total)).toBe(shown)
+    })
+
+    it.each([
+        { page: 1, total: 50, shown: 0 },
+        { page: 1, total: 12, shown: 0 },
+        { page: 3, total: 120, shown: 2 },
+        { page: 2, total: 100, shown: 1 },
+        { page: 4, total: 0, shown: 0 },
+        { page: 1e9, total: 51, shown: 1 },
+    ])('shows the last page with rows for page $page of a list shrunk to $total', ({ page, total, shown }) => {
+        expect(pageWithin({ ...VIEW, page }, total)).toBe(shown)
     })
 })

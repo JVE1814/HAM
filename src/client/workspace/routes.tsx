@@ -1,14 +1,14 @@
 import { keepPreviousData, useQuery, useSuspenseQuery } from '@tanstack/react-query'
 import { createRootRouteWithContext, createRoute, notFound } from '@tanstack/react-router'
 import { CheckIcon } from 'lucide-react'
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, type ReactNode } from 'react'
 import { AppShell, type NavGroup } from '@/components/app-shell'
 import { DataGrid, type GridColumn } from '@/components/data-grid'
 import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { AppContext } from '@/lib/app'
 import { sessionQuery } from '@/lib/session'
-import { fieldsQuery, listPageQuery, recordHref, type Field, type ListView, type SnRow } from '@/lib/sn'
+import { fieldsQuery, listPageQuery, pageWithin, recordHref, type Field, type ListView, type SnRow } from '@/lib/sn'
 import { listById, menuFor, type ListId, type WorkspaceList } from './catalog'
 import { tabsFor } from './dashboard'
 import { WidgetCard } from './widget'
@@ -124,6 +124,11 @@ function RecordList({ list }: { list: WorkspaceList }) {
     const columns = useMemo(() => recordColumns(list.table, fields), [list.table, fields])
     const view = viewOf(search)
     const page = useQuery({ ...listPageQuery(list, list.order, view, fields), placeholderData: keepPreviousData })
+    // The total of the page asked for, not of the previous view's rows kept on screen meanwhile.
+    const shown = page.data && !page.isPlaceholderData ? pageWithin(view, page.data.total) : view.page
+    useEffect(() => {
+        if (shown !== view.page) void navigate({ search: (current: ListSearch) => searchOf({ ...viewOf(current), page: shown }), replace: true })
+    }, [shown, view.page, navigate])
     return (
         <>
             <h1 className="font-heading text-xl font-semibold">{list.title}</h1>
