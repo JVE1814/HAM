@@ -28,7 +28,7 @@ export function awaitsInstall(stage: Stage | null): boolean {
  */
 const HELD_BACK: readonly string[] = ['preparing', 'delivering']
 
-export function beingInstalled(order: InstallState): boolean {
+function beingInstalled(order: InstallState): boolean {
     return order.stage === 'installing' || (HELD_BACK.includes(order.stage) && order.shippedUnits() > 0)
 }
 

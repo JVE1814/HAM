@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
     awaitsInstall,
     awaitsSelfInstallConfirmation,
-    beingInstalled,
     confirmerFor,
     installRefusal,
     type InstallState,
@@ -40,28 +39,6 @@ describe('awaitsInstall', () => {
     })
 })
 
-describe('beingInstalled', () => {
-    it('is true for an Order installing, without counting its units', () => {
-        expect(beingInstalled({ ...selfInstall, shippedUnits: uncounted })).toBe(true)
-    })
-
-    it('is true for an Order a line filled again holds back while units already shipped wait at the Site', () => {
-        expect(beingInstalled(order('preparing', 'fsm_engineer', 2))).toBe(true)
-        expect(beingInstalled(order('delivering', 'fsm_engineer', 1))).toBe(true)
-    })
-
-    it('is false for an Order not installing with nothing shipped', () => {
-        expect(beingInstalled(order('preparing', 'fsm_engineer'))).toBe(false)
-        expect(beingInstalled(order('delivering', 'self_install'))).toBe(false)
-    })
-
-    it('is false once the Order is complete, cancelled or not yet sourced, whatever its units', () => {
-        for (const stage of ['complete', 'cancelled', 'draft', 'awaiting_approval', 'sourcing'] as const) {
-            expect(beingInstalled(order(stage, 'fsm_engineer', 1))).toBe(false)
-        }
-    })
-})
-
 describe('awaitsSelfInstallConfirmation', () => {
     it('is true only for a self-install being installed', () => {
         expect(awaitsSelfInstallConfirmation(selfInstall)).toBe(true)
@@ -81,15 +58,17 @@ describe('awaitsSelfInstallConfirmation', () => {
 })
 
 describe('installRefusal', () => {
-    it('lets staff record any install in progress', () => {
+    it('lets staff record any install in progress, without counting its units', () => {
         expect(installRefusal('staff', engineerInstall)).toBeNull()
         expect(installRefusal('staff', order('installing', 'subcontractor'))).toBeNull()
-        expect(installRefusal('staff', selfInstall)).toBeNull()
+        expect(installRefusal('staff', { ...selfInstall, shippedUnits: uncounted })).toBeNull()
     })
 
     it('lets staff record the units already shipped of an Order a line filled again holds back', () => {
-        expect(installRefusal('staff', order('preparing', 'fsm_engineer', 1))).toBeNull()
+        expect(installRefusal('staff', order('preparing', 'fsm_engineer', 2))).toBeNull()
+        expect(installRefusal('staff', order('delivering', 'fsm_engineer', 1))).toBeNull()
         expect(installRefusal('staff', order('preparing', 'fsm_engineer'))).toBe('nothing_waiting')
+        expect(installRefusal('staff', order('delivering', 'self_install'))).toBe('nothing_waiting')
     })
 
     it('lets Customer contacts confirm only a self-install', () => {
@@ -101,6 +80,9 @@ describe('installRefusal', () => {
     })
 
     it('refuses everyone once the Order is no longer being installed', () => {
+        for (const stage of ['complete', 'cancelled', 'draft', 'awaiting_approval', 'sourcing'] as const) {
+            expect(installRefusal('staff', order(stage, 'fsm_engineer', 1))).toBe('nothing_waiting')
+        }
         expect(installRefusal('staff', order('complete', 'fsm_engineer'))).toBe('nothing_waiting')
         expect(installRefusal('customer', order('complete', 'self_install'))).toBe('nothing_waiting')
         expect(installRefusal('customer', order('complete', 'fsm_engineer'))).toBe('nothing_waiting')
