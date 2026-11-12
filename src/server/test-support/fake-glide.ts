@@ -1,4 +1,4 @@
-import { matchesQuery } from './encoded-query.ts'
+import { compare, matchesQuery } from './encoded-query.ts'
 
 /**
  * The one in-memory stand-in for `@servicenow/glide` in unit tests of the platform and entry layers:
@@ -169,12 +169,6 @@ function term(field: string, operatorOrValue: unknown, value?: unknown): string 
     return `${field}${operator}${String(value ?? '')}`
 }
 
-function inOrder(left: string, right: string): number {
-    const numbers = /^-?\d{1,15}(\.\d+)?$/
-    if (numbers.test(left) && numbers.test(right)) return Number(left) - Number(right)
-    return left < right ? -1 : left > right ? 1 : 0
-}
-
 /** The conditions of a query on one table, as GlideRecord and GlideAggregate build them. */
 class Conditions {
     protected conditions: string[] = []
@@ -246,7 +240,7 @@ class GlideRecord extends Conditions {
     query(): void {
         const found = this.matching()
         for (const { field, descending } of [...this.ordering].reverse()) {
-            found.sort((a, b) => inOrder(walk(this.table, a, field), walk(this.table, b, field)) * (descending ? -1 : 1))
+            found.sort((a, b) => compare(walk(this.table, a, field), walk(this.table, b, field)) * (descending ? -1 : 1))
         }
         this.found = found.slice(0, this.limit)
         this.at = -1
