@@ -1,8 +1,10 @@
 import type { Stage } from './lifecycle.ts'
-import { TASK_STATE, type StagingSource } from './vocabulary.ts'
+import { STAGING_SOURCE_CHOICES, TASK_STATE, type StagingSource } from './vocabulary.ts'
 
 /** How an Asset is staged when nothing says otherwise: by the Provider, in house. */
 export const DEFAULT_STAGING_SOURCE: StagingSource = 'in_house'
+
+export const STAGING_SOURCES = Object.keys(STAGING_SOURCE_CHOICES) as StagingSource[]
 
 export interface StagingTemplateView {
     id: string

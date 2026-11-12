@@ -7,8 +7,8 @@ import type { Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import type { AssetSummary } from '../domain/rest-contracts.ts'
 import { allocationProblem, awaitsReceipt, pickProblem, putAwayProblem, receivingProblem, type ReceivingLine } from '../domain/warehouse.ts'
-import { DEFAULT_STAGING_SOURCE } from '../domain/staging.ts'
-import { LINE_STAGE, type StagingSource, type StockroomType } from '../domain/vocabulary.ts'
+import { DEFAULT_STAGING_SOURCE, STAGING_SOURCES } from '../domain/staging.ts'
+import { LINE_STAGE, type StockroomType } from '../domain/vocabulary.ts'
 import { findAnyAssetBySerial, identifyAnyAsset, identifyAsset, type AssetIdentified } from './asset-identifiers.ts'
 import { fleetCandidate, isFleetAsset, joinFleet, moveAsset, newAsset, readStage } from './assets.ts'
 import { unitsOnLine } from './fulfilment.ts'
@@ -397,7 +397,7 @@ export function importAsnRow(row: GlideRecord): RowOutcome {
         return rowError(`PID ${raw.model} does not map to a model; ${see}`)
     }
 
-    const stagingSource: StagingSource = choice<StagingSource>(row, 'staging_source') === 'distributor' ? 'distributor' : DEFAULT_STAGING_SOURCE
+    const stagingSource = choice(row, 'staging_source', STAGING_SOURCES, DEFAULT_STAGING_SOURCE)
     const values = {
         po_number: str(row, 'po_number'),
         x_daas_ham_customer_tag: str(row, 'customer_tag'),
