@@ -11,7 +11,7 @@ import {
     SingleLineTextVariable,
 } from '@servicenow/sdk/core'
 import { BROAD_STAFF } from '../../server/domain/roles'
-import { afterReturnProduced } from '../../server/entry/returns'
+import { afterReturnProduced, beforeReturnProduced } from '../../server/entry/returns'
 import { FLEET_INSTALLED, SITES_OF_CUSTOMER_QUERY } from '../../server/domain/fleet'
 import { SERVICE_CATALOG } from '../orders/forms.now'
 import { orderRaisers, providerStaff } from '../shared/roles.now'
@@ -175,6 +175,7 @@ export const requestReturn = CatalogItemRecordProducer({
             order: 600,
         }),
     },
+    script: beforeReturnProduced,
     postInsertScript: afterReturnProduced,
 })
 

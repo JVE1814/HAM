@@ -31,11 +31,6 @@ export function removeStored(record: GlideRecord): string {
     return refusal(stored, 'the delete was refused')
 }
 
-/** Whether `record` is a stored row, read past the app's visibility rules: false for one a rule refused to insert. */
-export function isStored(record: GlideRecord): boolean {
-    return findById(record.getTableName(), record.getUniqueValue(), { beyondVisibility: true }) !== null
-}
-
 export function pluck(table: string, encodedQuery: string, field: string, limit = 10000): string[] {
     const gr = new GlideRecord(table)
     gr.addEncodedQuery(encodedQuery)

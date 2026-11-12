@@ -13,7 +13,7 @@ import {
     submitQueuedOrder,
     type Submission,
 } from '../platform/orders.ts'
-import { isStored, str, type ForeignRecord } from '../platform/records.ts'
+import { str, type ForeignRecord } from '../platform/records.ts'
 import { abortWith } from '../platform/rule-api.ts'
 import { putBackUntransferred, runSourcingPass } from '../platform/sourcing.ts'
 import { sourcingRequestOf } from '../platform/sourcing-requests.ts'
@@ -30,9 +30,6 @@ interface DeviceRow {
  */
 export function afterOrderProduced(producer: Record<string, unknown>, current: unknown): void {
     const order = current as GlideRecord
-    // A rule that refused the insert has told the requester why (`guardContactOrder`). Whether the platform still
-    // runs this script then is not known, and no line is added to an Order that is not stored.
-    if (!isStored(order)) return
     const asked = deviceRows(producer.devices)
     const devices: NewLine[] = []
     for (const row of asked.rows) {
@@ -47,6 +44,15 @@ export function afterOrderProduced(producer: Record<string, unknown>, current: u
 
 export function guardContactOrder(current: GlideRecord): void {
     abortWith(current, contactOrderInsertRefusal(current))
+}
+
+/**
+ * Record producer script, run before the Order is inserted: a Customer contact's request is checked here, as the
+ * before-insert rule checks it. Refused by the rule, the platform still stores the producer's answers; refused here, it
+ * stores nothing (docs/research/external-contracts.md N48).
+ */
+export function beforeOrderProduced(_producer: Record<string, unknown>, current: unknown): void {
+    guardContactOrder(current as GlideRecord)
 }
 
 /**

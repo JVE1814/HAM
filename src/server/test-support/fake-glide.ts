@@ -22,6 +22,7 @@ import { compare, matchesQuery } from './encoded-query.ts'
  *     `getLastErrorMessage`;
  *   - a record producer's `current` (`recordOf` with `produced`) refuses to delete itself, as on the platform; the same
  *     row read afresh deletes;
+ *   - a record a script called `setAbortAction(true)` on is not written: its insert, update or delete is refused;
  *   - `setValue` of a journal field (work_notes, comments) throws: the platform stores nothing for it. Assigning one
  *     queues an entry that the next insert or update stores in `platform.journal`, even with no other field changed.
  * A Glide method the fake does not have fails the test with a TypeError: add it here, once, with the platform's
@@ -242,6 +243,7 @@ class GlideRecord extends Conditions {
     private error = ''
     private notes: Array<{ field: string; value: string }> = []
     produced = false
+    private aborted = false
 
     hold(row: Row, fresh: boolean): this {
         this.row = { ...row }
@@ -344,11 +346,15 @@ class GlideRecord extends Conditions {
     getLastErrorMessage(): string {
         return this.error
     }
+    setAbortAction(abort: boolean): void {
+        this.aborted = abort
+    }
     canCreate(): boolean {
         return platform.creatable(this.table)
     }
 
     private refusal(operation: Operation, stored: Row | undefined): string {
+        if (this.aborted) return 'aborted by a script'
         const others = store(this.table).filter((row) => row !== stored)
         if (operation !== 'delete') {
             const key = platform.uniqueKeys[rootOf(this.table)]

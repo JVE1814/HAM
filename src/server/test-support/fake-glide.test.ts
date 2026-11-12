@@ -277,6 +277,18 @@ describe('the rest of the instance', () => {
         expect(platform.tables[LINES]).toHaveLength(4)
     })
 
+    it('writes nothing of a record a script aborted', () => {
+        const aborted = recordOf<InstanceType<typeof GlideRecord>>(ORDERS, { number: 'ORD9' }, { fresh: true })
+        aborted.setAbortAction(true)
+        expect(aborted.insert()).toBeNull()
+        const stored = find(ORDERS, 'o1')
+        stored.setAbortAction(true)
+        stored.setValue('stage', 'complete')
+        expect(stored.update()).toBeNull()
+        expect(stored.deleteRecord()).toBe(false)
+        expect(platform.tables[ORDERS]).toEqual([expect.objectContaining({ sys_id: 'o1', stage: 'sourcing' }), expect.objectContaining({ sys_id: 'o2' })])
+    })
+
     it("refuses a record producer's current its own delete, which the row read afresh is allowed", () => {
         const current = recordOf<InstanceType<typeof GlideRecord>>(ORDERS, { sys_id: 'o1', number: 'ORD1' }, { produced: true })
         expect(current.deleteRecord()).toBe(false)

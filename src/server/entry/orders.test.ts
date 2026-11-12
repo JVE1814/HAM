@@ -1,6 +1,7 @@
 import type { GlideRecord } from '@servicenow/glide'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { afterOrderProduced } from './orders.ts'
+import { ROLE } from '../domain/roles.ts'
+import { afterOrderProduced, beforeOrderProduced } from './orders.ts'
 import { submitProducedOrder, type Submission } from '../platform/orders.ts'
 import { platform, recordOf } from '../test-support/fake-glide.ts'
 
@@ -31,10 +32,25 @@ describe('afterOrderProduced', () => {
         expect(produce({ submitted: true })).toEqual([])
     })
 
-    it('does nothing for an Order that is not stored: a rule refused its insert and said why', () => {
-        vi.mocked(submitProducedOrder).mockClear()
-        afterOrderProduced({ devices: '' }, recordOf<GlideRecord>('x_daas_ham_order', { sys_id: 'order9', number: 'ORD0009' }, { produced: true }))
-        expect(submitProducedOrder).not.toHaveBeenCalled()
+})
+
+describe('beforeOrderProduced', () => {
+    const produce = () => {
+        const current = recordOf<GlideRecord>('x_daas_ham_order', { customer: 'other' }, { fresh: true, produced: true })
+        beforeOrderProduced({ devices: '' }, current)
+        return current.insert()
+    }
+
+    it("refuses a Customer contact's request before its Order is inserted, as the insert rule would", () => {
+        platform.user = { id: 'producing-admin', name: 'Ada', company: 'acme', roles: [ROLE.customerAdmin], interactive: true }
+        expect(produce()).toBeNull()
+        expect(platform.messages).toEqual(['error Order not raised. You can only order for your own customer.'])
+        expect(platform.tables.x_daas_ham_order ?? []).toEqual([])
+    })
+
+    it('lets provider staff save a draft for any Customer, to correct', () => {
+        platform.user = { id: 'producing-staff', name: 'Max', company: 'provider', roles: [ROLE.assetManager], interactive: true }
+        expect(produce()).not.toBeNull()
         expect(platform.messages).toEqual([])
     })
 })

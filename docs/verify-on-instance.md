@@ -404,7 +404,8 @@ broke the rules were refused with *Return not raised. ...* or *Order not raised.
 reason, and a Return and an Order of their own Customer and Site were saved. The ATF test *NaaS - customer returns: admins only, own sites only,
 a decommission takes the whole site* repeats it: an insert by hand with no Customer, then such
 `GlideRecord` inserts in the admin's session. Through each record producer, a request of theirs
-that names another Customer shows the refusal, opens no record and leaves no Order line behind. As
+that names another Customer shows the refusal, opens no record and leaves no Order line behind, and
+`question_answer` gains no row. As
 a site contact, *Confirm installed* on a self-install Order that replaced a unit still raises the
 swap-back Return.
 

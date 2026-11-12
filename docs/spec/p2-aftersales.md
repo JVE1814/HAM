@@ -100,8 +100,10 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   `contactReturnInsertRefusal`). A contact's insert by hand (a form, the Table API) keeps no posted
   value, as they are an external user, so it names no Customer and is refused; the Site check
   guards the record producer, the customer page and any other insert that keeps the values. The
-  swap-back Return that a site contact's install confirmation raises passes: it is for the Order's
-  Customer and Site.
+  record producer runs the check in its own script, before the insert (`entry/returns.ts`
+  `beforeReturnProduced`): refused there, the request stores none of its answers, which a refusal
+  by the before-insert rule would leave on the instance. The swap-back Return that a site contact's
+  install confirmation raises passes: it is for the Order's Customer and Site.
 - From the customer page, only a Customer admin limited to their own Customer requests returns
   (`domain/visibility.ts` `actsAsCustomerAdmin`), under the record producer's rule
   (`domain/returns.ts` `returnRequestFindings`). The API answers HTTP 403 when the Return create rule

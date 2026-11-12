@@ -14,7 +14,7 @@ import {
 } from '@servicenow/sdk/core'
 import { DEVICE_CLASS, INSTALL_MODE_CHOICES, ORDER_TYPE_CHOICES } from '../../server/domain/vocabulary'
 import { NAAS_MODEL_CONDITION, SITES_OF_CUSTOMER_QUERY } from '../../server/domain/fleet'
-import { afterOrderProduced } from '../../server/entry/orders'
+import { afterOrderProduced, beforeOrderProduced } from '../../server/entry/orders'
 import { OPEN_ORDERS_QUERY } from '../../server/domain/fulfilment'
 import { orderRaisers, providerStaff } from '../shared/roles.now'
 import { naasMenu } from '../shared/menu.now'
@@ -224,6 +224,7 @@ export const requestNetworkEquipment = CatalogItemRecordProducer({
         }),
     },
     variableSets: [{ variableSet: deviceRows, order: 1000 }],
+    script: beforeOrderProduced,
     postInsertScript: afterOrderProduced,
 })
 

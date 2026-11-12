@@ -272,7 +272,7 @@ function andTerms(condition: string): string[] {
 }
 
 describe('scripts wired to server modules', () => {
-    const SCRIPTED = ['sys_script', 'sys_ui_action', 'sysevent_script_action', 'sysauto_script', 'sys_ws_operation', 'sys_security_acl']
+    const SCRIPTED = ['sys_script', 'sys_ui_action', 'sysevent_script_action', 'sysauto_script', 'sys_ws_operation', 'sys_security_acl', 'sc_cat_item_producer']
     const SCRIPT_FIELDS = ['script', 'operation_script', 'post_insert_script']
     const calls = () =>
         SCRIPTED.flatMap((table) => records(table)).flatMap((record) =>
@@ -287,7 +287,7 @@ describe('scripts wired to server modules', () => {
      * `sourceOrder(event, current)`), so they must be the globals the platform provides to that script.
      */
     it('call each entry point with the globals the platform provides', () => {
-        const PLATFORM_GLOBALS = new Set(['current', 'previous', 'event', 'producer', 'request', 'response'])
+        const PLATFORM_GLOBALS = new Set(['current', 'previous', 'event', 'producer', 'cat_item', 'request', 'response'])
         const found = calls()
         expect(found.length).toBeGreaterThan(100)
         const unknown = found.flatMap(({ record, fn, call }) =>
@@ -1347,6 +1347,21 @@ describe('choices of the record producers', () => {
         for (const { variable, offered, column } of withChoices) {
             expect({ variable, unknown: offered.filter((value) => !(column ?? []).includes(value)) }).toEqual({ variable, unknown: [] })
         }
+    })
+})
+
+describe('the record producers', () => {
+    // Refused by the before-insert rule, a producer's request still stores its answers (question_answer), which the app
+    // may not delete; refused by the producer's own script, it stores none (external-contracts N48).
+    it("check a Customer contact's request in their script, before the insert rule would", () => {
+        const scripts = records('sc_cat_item_producer').map((producer) => ({ table: producer.table_name, script: wrapped(producer.script ?? '') }))
+        expect(scripts).toEqual(
+            expect.arrayContaining([
+                { table: 'x_daas_ham_order', script: { fn: 'beforeOrderProduced', path: expect.stringContaining('/src/server/entry/orders.ts'), call: 'producer, current' } },
+                { table: 'x_daas_ham_return_order', script: { fn: 'beforeReturnProduced', path: expect.stringContaining('/src/server/entry/returns.ts'), call: 'producer, current' } },
+            ]),
+        )
+        expect(scripts).toHaveLength(2)
     })
 })
 

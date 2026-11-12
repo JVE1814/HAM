@@ -775,6 +775,7 @@ Sources:
 | A row inserted into an import-set table outside an import set | The app processes its import rows by business rule and ships no transform map (ADR 0018); an ATF test that inserts such a row does not fail on server errors and checks the outcome (`src/fluent/models/tests.now.ts`) | The platform transforms the row at once and, where the table has no transform map, logs the error *Transform map record not provided, transform stopped*; the insert is written and the app's rule runs | matches | N43 |
 | `gs.getPropertySecured` and a password2 property's read roles | Every secret is read with `gs.getProperty` (`platform/properties.ts` secretProperty), not `gs.getPropertySecured`; each declares read and write roles `admin`; the tracking webhook reads its token as guest, and *Ship* and *Create return label* read the ShipEngine key as asset managers or inventory techs | Not documented (only the signature in the typings). On an instance `getPropertySecured` checks the property's read roles against the session user and gives a non-admin the default; `getProperty` gives everyone the stored value | matches | N44, N45 |
 | A work note on a task-extended table | A note is added by assigning `work_notes` (`platform/records.ts` addWorkNote) and stored by the next insert or update, even one that changes nothing else | `setValue('work_notes', x)`, `setValue('comments', x)` and `getElement(f).setValue(x)` store nothing, in global and in `x_daas_ham`: the field reads back blank and a save with nothing else changed writes nothing yet returns the sys_id. Assignment stores one journal entry per assignment. `setJournalEntry` and `setDisplayValue` are refused in `x_daas_ham`. A journal field reads blank once read or saved | matches | N46 |
+| A record producer request refused before its insert | A Customer contact's request is refused in the producer's own script (`entry/orders` beforeOrderProduced, `entry/returns` beforeReturnProduced), before the before-insert rules that refuse every other insert | Refused by a before-insert business rule, the platform still writes the request's answers to `question_answer` and skips the post-insert script. Refused by `current.setAbortAction(true)` in the producer's script, it writes no answer and skips the post-insert script. That script sees the mapped values. `question_answer` is global with *Can delete* off and the app holds no privilege on it | matches | N48 |
 | Deleting a record producer's own record | A record its post-insert script refuses is deleted read again by its sys_id (`platform/records.ts` removeStored), not through the script's `current` | `current.deleteRecord()` in the post-insert script returns false, as admin too, with *Error during delete of ...* and a NullPointerException in `com.glide.db.PrimaryKey.getValue`; the row stays. A GlideRecord read by the same sys_id deletes it | matches | N47 |
 
 Notes:
@@ -1115,6 +1116,16 @@ Sources:
   and the row stayed; a `GlideRecord` read by `current`'s sys_id there returned true and the row was
   gone. In `x_daas_ham`, admin deleted one of the kept Orders read the same way. Each answer of a
   deleted record stays: `question_answer.table_sys_id` is a plain string and nothing removes them.
+  The test records were deleted afterwards.
+- N48: development instance, 2026-11-12, a copy of a producer writing `sys_user_preference` with one
+  variable, submitted through `/api/sn_sc/servicecatalog/items/{id}/submit_producer` as a service
+  desk agent. Kept: one `question_answer` row for the new record, and the post-insert script logged.
+  A global before-insert rule calling `current.setAbortAction(true)`: the submit answered sys_id
+  `-1`, one `question_answer` row was written for a sys_id never stored, and the post-insert script
+  logged nothing. `current.setAbortAction(true)` in the producer's script: sys_id `-1`, no answer,
+  no post-insert log. With the variable mapped to a field, the producer's script read the posted
+  value from `current`. `sys_db_object` of `question_answer`: global, *Can delete* off. With the
+  app's before-insert rules, a refused contact request left 6 answers per Return and 9 per Order.
   The test records were deleted afterwards.
 
 ## Changes needed in the app

@@ -120,9 +120,12 @@ Customer, none, or a Site that is not its Customer's (`domain/returns` `returnRe
 is an external user, whose insert by hand (a form, the Table API) keeps no posted value: the platform's create field
 ACLs let only internal users set a field. Such a Return order names no Customer and is refused, and such an Order fails
 its create ACL. So the Site and Agreement checks guard the inserts that keep the values: the record producer, the
-customer page, a script. The rule on Return orders does not judge who asks, which the create
-ACL and the services do: a site contact's confirmation of a self-install raises the swap-back Return in their own
-session. Provider staff, the service desk and jobs are not checked.
+customer page, a script. The record producers run the same check in their own script, before the insert
+(`entry/orders` `beforeOrderProduced`, `entry/returns` `beforeReturnProduced`): a producer request a before-insert
+rule refuses still stores its answers in `question_answer`, which no application may delete, and one the producer's
+script refuses stores none (docs/research/external-contracts.md N48). The rule on Return orders does not judge who
+asks, which the create ACL and the services do: a site contact's confirmation of a self-install raises the swap-back
+Return in their own session. Provider staff, the service desk and jobs are not checked.
 
 ## Consequences
 

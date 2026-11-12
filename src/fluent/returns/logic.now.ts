@@ -24,8 +24,9 @@ BusinessRule({
  * it (platform/returns `contactReturnInsertRefusal`). The customer admins' create ACL cannot hold it to that: it passes
  * a Return that names no Customer yet (returns/access.now.ts) and never looks at the Site. A contact's insert by hand (a
  * form, the Table API) keeps no posted value, as they are an external user, so it arrives naming no Customer; the Site
- * check guards the record producer, the customer page and any other insert that keeps the values. The table is the
- * app's own, so the script refuses with current.setAbortAction (platform/rule-api `abortWith`).
+ * check guards the record producer, the customer page and any other insert that keeps the values; the producer runs it
+ * first, in its own script, so that a refused request stores no answers (returns/forms.now.ts). The table is the app's
+ * own, so the script refuses with current.setAbortAction (platform/rule-api `abortWith`).
  */
 BusinessRule({
     $id: Now.ID['br_return_contact_insert'],
