@@ -1,6 +1,6 @@
 import { gs, type GlideRecord } from '@servicenow/glide'
 import type { RESTAPIRequest, RESTAPIResponse } from '@servicenow/glide/sn_ws_int'
-import { billingMonthProblem, monthChangedError, PULL_PAGE, pullPageSize } from '../domain/billing.ts'
+import { BILLING_PULL_READERS, billingMonthProblem, monthChangedError, PULL_PAGE, pullPageSize } from '../domain/billing.ts'
 import { monthBounds, previousMonth } from '../domain/money.ts'
 import { EVENT } from '../domain/events.ts'
 import { billingChange, isBillable } from '../domain/lifecycle.ts'
@@ -86,7 +86,7 @@ export function guardClosedBillingPeriod(current: GlideRecord, previous: GlideRe
 }
 
 function canPull(response: RESTAPIResponse): boolean {
-    return requireRole(response, [ROLE.finance, ROLE.integration], 'Requires the finance or integration role')
+    return requireRole(response, BILLING_PULL_READERS, 'Requires the finance or billing reader role')
 }
 
 export function listBillingPeriods(request: RESTAPIRequest, response: RESTAPIResponse): void {

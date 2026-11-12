@@ -14,6 +14,7 @@ export const ROLE = {
     customerAdmin: 'x_daas_ham.customer_admin',
     siteContact: 'x_daas_ham.site_contact',
     integration: 'x_daas_ham.integration',
+    billingReader: 'x_daas_ham.billing_reader',
 } as const
 
 export type AppRole = (typeof ROLE)[keyof typeof ROLE]

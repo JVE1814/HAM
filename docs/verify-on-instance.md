@@ -394,6 +394,16 @@ authentication, ACL authorization and *Requires SNC Internal role* off. Imperson
 their Sites and racks. Impersonating *Sam Site (demo)*, both pages show only their Sites. As either
 user, `GET /api/x_daas_ham/naas/stockrooms` and `/billing_periods` answer HTTP 403.
 
+### Machine roles
+
+`shared/roles.now.ts`, `entry/billing.ts`. Also **after an upgrade**. As an internal user holding
+only `x_daas_ham.billing_reader`, `GET /api/x_daas_ham/naas/billing_periods` and
+`/billing_periods/<id>/lines` answer HTTP 200, and `POST /api/x_daas_ham/naas/device_events`
+answers HTTP 403 *Requires the x_daas_ham.integration role*. As an internal user holding only
+`x_daas_ham.integration`, both billing routes answer HTTP 403 *Requires the finance or billing
+reader role*, and a device-events batch is taken as before (HTTP 202). After an upgrade, the
+billing consumer's user holds `x_daas_ham.billing_reader` and no longer `x_daas_ham.integration`.
+
 ### NaaS Asset Workspace
 
 `x_daas_ham_workspace.do` (src/client/workspace). It opens for each NaaS staff role

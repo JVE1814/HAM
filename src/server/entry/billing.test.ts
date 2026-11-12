@@ -89,7 +89,7 @@ function drainExport(): void {
 function pull(
     route: (request: RESTAPIRequest, response: RESTAPIResponse) => void,
     sent: { id?: string; query?: Record<string, string> } = {},
-    roles: string[] = [ROLE.integration],
+    roles: string[] = [ROLE.billingReader],
 ): { status: number; body: unknown } {
     platform.user = { ...platform.user, roles }
     const reply = { status: 0, body: null as unknown }
@@ -412,12 +412,18 @@ describe('the billing pull API', () => {
         expect(page({})).toMatchObject({ status: 'ready', final: false })
     })
 
-    it('answers 404 for a period it does not know, and 403 without the finance or integration role', () => {
+    it('answers 404 for a period it does not know, and 403 without the finance or billing reader role', () => {
         expect(pull(getBillingLines, { id: 'nosuch' })).toEqual({ status: 404, body: { error: 'Unknown billing period' } })
-        const refused = { status: 403, body: { error: 'Requires the finance or integration role' } }
+        const refused = { status: 403, body: { error: 'Requires the finance or billing reader role' } }
         expect(pull(getBillingLines, { id: 'p9' }, [ROLE.assetManager])).toEqual(refused)
         expect(pull(listBillingPeriods, {}, [])).toEqual(refused)
         expect(pull(listBillingPeriods, {}, [ROLE.finance]).status).toBe(200)
+    })
+
+    it("refuses the NMS's integration role on both routes", () => {
+        const refused = { status: 403, body: { error: 'Requires the finance or billing reader role' } }
+        expect(pull(listBillingPeriods, {}, [ROLE.integration])).toEqual(refused)
+        expect(pull(getBillingLines, { id: 'p9' }, [ROLE.integration])).toEqual(refused)
     })
 })
 

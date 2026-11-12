@@ -68,6 +68,11 @@ export const integration = Role({
     description: 'Machine role for the provider NMS that posts device events (server-side writes need no table roles).',
 })
 
+export const billingReader = Role({
+    name: ROLE.billingReader,
+    description: 'Machine role for the billing consumer (an ERP) that reads Billing periods and their lines through the pull API; it grants no table and posts no device events.',
+})
+
 /*
  * The role groups hold role names, which every record that takes
  * roles reads (a navigator module takes nothing else), and a list keeps the order its module shows the roles in.

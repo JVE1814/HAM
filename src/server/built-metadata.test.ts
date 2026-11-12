@@ -1105,6 +1105,20 @@ describe('the NaaS Asset Workspace', () => {
 })
 
 /*
+ * domain/roles ROLE is the one list of the app's roles. A role the server code asks for but the metadata does not
+ * declare exists on no instance: gs.hasRole is then false for everyone but an administrator, and the build passes.
+ */
+describe('roles', () => {
+    it('are declared, each once, under the name the server code asks for', () => {
+        expect(
+            records('sys_user_role')
+                .map((role) => role.name)
+                .sort(),
+        ).toEqual(Object.values(ROLE).sort())
+    })
+})
+
+/*
  * domain/events EVENT is the one list of the app's events. An event the metadata does not register is dropped by the
  * platform when it is queued, and one nothing answers does nothing: both pass the build.
  */

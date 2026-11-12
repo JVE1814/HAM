@@ -145,7 +145,8 @@
   attaching it does not update the period, and a period that already has the file is skipped (delete
   it, then *Re-export CSV*, to rebuild it).
   Racing exports keep only the oldest copy; a failed export is logged as an error naming the period.
-- **Pull API** (finance or integration role):
+- **Pull API** (role `x_daas_ham.finance`, or `x_daas_ham.billing_reader`, the machine role of the
+  billing consumer; the NMS's `x_daas_ham.integration` is refused with HTTP 403):
   - `GET /api/x_daas_ham/naas/billing_periods` lists recent periods with status, line count and
     `totals`;
   - `GET /api/x_daas_ham/naas/billing_periods/{id}/lines?offset=<n>&limit=<n>` returns one page of

@@ -3,6 +3,7 @@ import { activeDays, currencyKey, divideRounded, fromCents, isMonth, previousMon
 import { FLEET_CONDITION, fleetStagesQuery } from './fleet.ts'
 import { DEPLOYED_STAGES } from './lifecycle.ts'
 import { BILLING_PERIOD_STATUS, STAGE_FIELDS, SUBSCRIPTION_LINE_STATUS, SUBSCRIPTION_LINE_TYPE } from './vocabulary.ts'
+import { ROLE, type AppRole } from './roles.ts'
 
 /**
  * Why a Billing period cannot be saved for `month` on `today`, or null. The month must be YYYY-MM and over: a new
@@ -310,6 +311,13 @@ export function billingLineJson(id: string, line: StoredBillingLine): { [key: st
     }
     return json
 }
+
+/**
+ * Who pulls Billing periods and their lines through the pull API: finance, and the billing consumer (an ERP), whose
+ * machine role reads them and grants nothing else. Not the NMS's role (domain/device-events `DEVICE_EVENT_SENDERS`):
+ * a credential that posts device events reads no Customer's bill, and one that reads bills posts no sighting.
+ */
+export const BILLING_PULL_READERS: readonly AppRole[] = [ROLE.finance, ROLE.billingReader]
 
 export const PULL_PAGE = {
     periods: { size: 24, most: 120 },

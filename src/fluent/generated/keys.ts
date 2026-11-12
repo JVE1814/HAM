@@ -58753,6 +58753,13 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_user_role'
+                        id: 'ee692a7f436b484e81279a43ab9eb865'
+                        key: {
+                            name: 'x_daas_ham.billing_reader'
+                        }
+                    },
+                    {
                         table: 'sys_element_mapping'
                         id: 'ee6deef9cc3d494cbd2f828a159b84af'
                         key: {

@@ -215,7 +215,7 @@ RestApi({
             name: 'billing_periods',
             method: 'GET',
             path: '/billing_periods',
-            shortDescription: 'Most recent billing periods with their status and totals (finance, integration).',
+            shortDescription: 'Most recent billing periods with their status and totals (finance, billing reader).',
             authentication: true,
             script: listBillingPeriods,
         },

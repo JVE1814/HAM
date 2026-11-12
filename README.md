@@ -134,6 +134,10 @@ works at the NaaS stockrooms whose *Assignment group* they are a member of. Sett
 *Assignment group* takes the platform's `inventory_admin` (which `x_daas_ham.admin` contains); adding
 a user to a group takes `user_admin`.
 
+The two machine roles go to integration users only, one user each: `x_daas_ham.integration` to
+the NMS's user and `x_daas_ham.billing_reader` to the billing consumer's
+([Integrations](#integrations)). Neither is contained in a staff role.
+
 Mark what is NaaS ([ADR 0016](docs/adr/0016-fleet-assets.md)): give each NaaS stockroom its
 *Stockroom type* (central depot, staging centre or customer site) and each NaaS Model its *OEM PID*
 and a *Model category* (e.g. *Network Gear*). A stockroom with no type and a Model without an OEM
@@ -180,6 +184,12 @@ On an instance where an earlier version was installed:
   are now counted by *Customer admins asked*, which the app saves when it asks for approval. On a
   task asked before that, the field is empty and reads as "no Customer admin asked", so a provider
   approval would stand in for the Customer admins.
+- Straight after upgrading, give the billing consumer's integration user the role
+  `x_daas_ham.billing_reader`, which this version adds, and take `x_daas_ham.integration` from
+  it. The billing pull API no longer admits `x_daas_ham.integration`, so until then its pulls are
+  answered HTTP 403. Nothing is lost by that: a pull is a read, to send again. Where the NMS and
+  the billing consumer shared one user, give the billing consumer a user of its own
+  ([machine roles](docs/verify-on-instance.md#machine-roles)).
 - Work through the checks marked **After an upgrade** in
   [docs/verify-on-instance.md](docs/verify-on-instance.md): adopting the fleet and clearing the
   earlier version's column defaults, and clean-ups of returns, fees and spare-pool purchases.
@@ -245,7 +255,7 @@ role, which the asset manager role contains): lifecycle type *Publisher*, the ph
 The list shows the *Publisher* rows of NaaS Models, the ones the app reads; a row left on the form's
 default type, *Internal*, is an organisation's own plan for the Model, which the app ignores.
 
-**Billing pull API** (role `x_daas_ham.finance` or `x_daas_ham.integration`):
+**Billing pull API** (role `x_daas_ham.finance` or `x_daas_ham.billing_reader`):
 `GET /api/x_daas_ham/naas/billing_periods` and
 `GET /api/x_daas_ham/naas/billing_periods/{id}/lines?offset=<n>&limit=<n>` (`final` once the period is
 closed, `nextOffset` null on the last page; `PULL_PAGE` in `src/server/domain/billing.ts` holds the
@@ -253,8 +263,11 @@ page sizes and their caps). Each line carries its `currency`, and a period its
 `totals`, one per currency: there is no single `total`, as two currencies are never added
 ([billing spec](docs/spec/p3-billing.md)).
 
-The NMS and billing integrations sign in as an internal user, one without the `snc_external` role
-(the Explicit Roles plugin gives such a user `snc_internal`). Their routes, like the warehouse ones,
+The NMS and the billing consumer each sign in as an internal user of their own, one without the
+`snc_external` role (the Explicit Roles plugin gives such a user `snc_internal`). The NMS's user
+holds `x_daas_ham.integration` and the billing consumer's holds `x_daas_ham.billing_reader`: the
+billing pull API refuses the first and the device-events route the second, so neither credential
+does the other's work. Their routes, like the warehouse ones,
 require `snc_internal` and the platform's *Scripted REST External Default* ACL. Only the site, rack
 and `/customer/...` routes admit customer admins and site contacts (`shared/rest-api.now.ts`).
 The tracking webhook needs no sign-in and checks its token itself.
