@@ -45,7 +45,6 @@ export function afterOrderProduced(producer: Record<string, unknown>, current: u
     gs.addInfoMessage(`${saved}. There is no need to raise it again`)
 }
 
-/** Before-insert rule on Orders: refuses one a Customer contact may not save as it stands. */
 export function guardContactOrder(current: GlideRecord): void {
     abortWith(current, contactOrderInsertRefusal(current))
 }

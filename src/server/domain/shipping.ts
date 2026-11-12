@@ -539,7 +539,6 @@ export function webhookToken(header: unknown, query: string): string {
  */
 export const WEBHOOK_TOKEN_MIN_LENGTH = 32
 
-/** Whether a configured secret is long enough to serve as the webhook token: one that is not counts as none. */
 export function webhookTokenUsable(secret: string): boolean {
     return secret.length >= WEBHOOK_TOKEN_MIN_LENGTH
 }

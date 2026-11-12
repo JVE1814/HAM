@@ -21,7 +21,6 @@ export function guardAgreementCurrency(current: GlideRecord): void {
     if (code && code !== entered) current.setValue('currency', code)
 }
 
-/** A Subscription line set Ended is refused without its End date, which billing would take as still open. */
 export function guardEndedSubscriptionLine(current: GlideRecord): void {
     abortWith(current, endedLineProblem({ status: str(current, 'status'), endDate: str(current, 'end_date') }))
 }

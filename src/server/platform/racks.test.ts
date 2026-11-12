@@ -14,7 +14,6 @@ function rack(id: string, name: string, location: string, fields: Row = {}): Row
     return { sys_id: id, name, location, ...fields }
 }
 
-/** A fleet asset in service, placed in a rack. */
 function device(id: string, rackId: string, ruStart: string, fields: Row = {}): Row {
     const { installStatus, substatus } = fieldsOf('in_service')
     return {

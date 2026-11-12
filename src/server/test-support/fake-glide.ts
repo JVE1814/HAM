@@ -239,7 +239,6 @@ class GlideRecord extends Conditions {
     setLimit(limit: number): void {
         this.window = { first: 0, last: limit }
     }
-    /** Rows `first` up to, not including, `last` of the ordered result; forceCount changes no row. */
     chooseWindow(first: number, last: number, _forceCount?: boolean): void {
         this.window = { first, last }
     }

@@ -72,7 +72,6 @@ function create(month: string): void {
     generateNewPeriod(created)
 }
 
-/** Create the period of `month` as finance does by hand, and run its generation. */
 function generate(month: string): void {
     create(month)
     drainGeneration()
@@ -596,7 +595,6 @@ describe('a save of a fleet asset', () => {
         onAssetServiceChange(recordOf(ASSETS, after), recordOf(ASSETS, before))
     }
 
-    /** Each interval as [Subscription line, Site, first day, last day], in the order stored. */
     const billed = () => rows(INTERVALS).map((row) => [row.subscription_line, row.site, row.start_date, row.end_date ?? ''])
 
     beforeEach(() => {

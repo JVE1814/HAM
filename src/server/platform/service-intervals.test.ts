@@ -79,7 +79,6 @@ describe('moving the billing of an Asset in service', () => {
     /** The Asset in service, as stored after the save that changed its line or Site. */
     const inService = (fields: Row = {}): Row => ({ ...assetIn('in_service'), company: 'acme', x_daas_ham_subscription_line: 'sub1', x_daas_ham_site: 'site1', ...fields })
     const stored = (id: string, lineId: string, start: string, end: string, siteId = 'site1'): Row => ({ sys_id: id, asset: 'asset1', subscription_line: lineId, site: siteId, start_date: start, end_date: end })
-    /** Each interval as [Subscription line, Site, first day, last day], in the order stored. */
     const billed = () => (platform.tables[INTERVALS] ?? []).map((row) => [row.subscription_line, row.site, row.start_date, row.end_date ?? ''])
 
     beforeEach(() => {

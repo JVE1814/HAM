@@ -19,7 +19,6 @@ export function afterReturnProduced(producer: Record<string, unknown>, current: 
     if (!outcome.raised) gs.addErrorMessage(`Return not raised. ${outcome.why}.`)
 }
 
-/** Before-insert rule on Return orders: refuses one a Customer contact may not save as it stands. */
 export function guardContactReturn(current: GlideRecord): void {
     abortWith(current, contactReturnInsertRefusal(current))
 }

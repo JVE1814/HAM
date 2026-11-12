@@ -9,7 +9,6 @@ import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
-/** What the shipping aggregator is sent, and what it answers each call. */
 const aggregator = { sent: [] as string[], answer: { status: 200, body: '' } }
 
 vi.mock('@servicenow/glide/sn_ws', () => ({
@@ -46,7 +45,6 @@ function stage(of: Stage): Row {
     return { install_status: installStatus, substatus: substatus ?? '' }
 }
 
-/** A fleet asset of the Order's line `ol1`, under the Customer's Agreement. */
 function unit(id: string, of: Stage, fields: Row = {}): Row {
     return { sys_id: id, serial_number: `FOC-${id}`, x_daas_ham_fleet: 'true', x_daas_ham_agreement: 'ag1', x_daas_ham_order_line: 'ol1', ...stage(of), ...fields }
 }
