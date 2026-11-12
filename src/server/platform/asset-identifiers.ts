@@ -5,7 +5,6 @@ import { normalizeSerial } from '../domain/serials.ts'
 import { isFleetAsset } from './assets.ts'
 import { beyondVisibility } from './beyond-visibility.ts'
 import { log } from './log.ts'
-import type { ReadOptions } from './records.ts'
 
 /** What an identifier names: the one Asset, none, or more than one (refused, saying why). */
 export type AssetIdentified = { asset: GlideRecord } | { ambiguous: string } | null
@@ -20,20 +19,19 @@ const ARRIVING: IdentifierLookup = { fleetOnly: false, beyondVisibility: true }
 /**
  * The fleet asset (ADR 0016) this identifier names: by serial number, else Provider tag, else Customer tag;
  * `{ ambiguous }`, saying why, when two Assets carry it in the first of those fields that any does,
- * as two Customers may give their switches one Customer tag; null when none carries it. `beyondVisibility` reads past
- * the app's before-query visibility rules (ADR 0005): the device-events API must find any
- * fleet asset (it reports another identifier unknown). Its later saves run every rule.
+ * as two Customers may give their switches one Customer tag; null when none carries it.
  */
-export function identifyAsset(identifier: string, options: ReadOptions = {}): AssetIdentified {
-    return identify(identifier, { fleetOnly: true, beyondVisibility: !!options.beyondVisibility })
+export function identifyAsset(identifier: string): AssetIdentified {
+    return identify(identifier, { fleetOnly: true, beyondVisibility: false })
 }
 
 /**
- * The fleet asset this identifier names, or null when none does or it is ambiguous (logged), for a
- * caller that reports both as an unknown identifier.
+ * The fleet asset this identifier names as `identifyAsset` reads it, or null when none does or it is ambiguous (logged),
+ * for the device-events API, which reports both as an unknown identifier. It reads past the app's before-query
+ * visibility rules (ADR 0005), because the API must find any fleet asset; its later saves run every rule.
  */
-export function findAssetByIdentifier(identifier: string, options: ReadOptions = {}): GlideRecord | null {
-    const identified = identifyAsset(identifier, options)
+export function findAssetByIdentifier(identifier: string): GlideRecord | null {
+    const identified = identify(identifier, { fleetOnly: true, beyondVisibility: true })
     if (identified && 'ambiguous' in identified) {
         log.warn(`Identifier ${identifier.trim()} refused: ${identified.ambiguous}`)
         return null

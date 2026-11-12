@@ -104,7 +104,7 @@ export function applyDeviceEvents(events: readonly DeviceEvent[]): { unknown: st
     const unknown: string[] = []
     const busy: string[] = []
     for (const event of events) {
-        const asset = findAssetByIdentifier(event.identifier, { beyondVisibility: true })
+        const asset = findAssetByIdentifier(event.identifier)
         if (!asset) unknown.push(event.identifier)
         else if (!applyDeviceEvent(asset.getUniqueValue(), event, readers)) busy.push(event.identifier)
     }
