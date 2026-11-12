@@ -1,7 +1,7 @@
 import { isIsoDate } from '../calendar.ts'
 import { oneOf } from '../exhaustive.ts'
 import { normalizeSerial } from '../serials.ts'
-import type { ClaimAction, OemVendor } from '../vocabulary.ts'
+import type { OemVendor } from '../vocabulary.ts'
 import type { CoverageFact, CoverageFetched, Fetched, LifecycleFact, RmaFact } from './types.ts'
 import { PROPERTY, type PropertyOf } from '../properties.ts'
 import { REST_MESSAGE, type OemMessageName } from '../rest-message-names.ts'
