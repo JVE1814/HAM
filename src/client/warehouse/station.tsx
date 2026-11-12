@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { createContext, use, useEffect, useState, type ReactNode } from 'react'
+import { createContext, use, useEffect, useReducer, useState, type ReactNode } from 'react'
 import type { AssetSummary, Stockroom } from '../../server/domain/rest-contracts'
 import { stageText } from '../stage'
 import { stockroomsQuery, warehouseApi } from './api'
+import { EMPTY_LOG, scanLog, type Entry, type FailedScan, type ScanLog } from './scan-log'
 import { scanQueue } from './scan-queue'
 
 export type Mode = 'receive' | 'putaway' | 'pick' | 'audit' | 'lookup'
@@ -34,15 +35,9 @@ export function modesFor(stockrooms: Stockroom[] | null | undefined): readonly M
 
 type Context = Record<ContextField, string>
 
-interface Scan extends Context {
+export interface Scan extends Context {
     mode: Mode
     code: string
-}
-
-export interface Entry {
-    id: number
-    ok: boolean
-    message: string
 }
 
 type Scanned = { mode: Exclude<Mode, 'audit'>; asset: AssetSummary } | { mode: 'audit'; code: string }
@@ -54,6 +49,11 @@ interface Station {
     scan: (mode: Mode, code: string) => void
     pending: number
     log: readonly Entry[]
+    failed: readonly FailedScan<Scan>[]
+    /** Sends a failed scan again as it was scanned. Never done for the operator: the server may have applied the first try. */
+    rescan: (failure: FailedScan<Scan>) => void
+    dismiss: (id: number) => void
+    dismissAll: () => void
     labels: readonly AssetSummary[]
     clearLabels: () => void
 }
@@ -66,12 +66,12 @@ export function useStation(): Station {
     return station
 }
 
-/** The scanning state that outlives a mode switch: the context fields, the scan queue, its log and the labels. */
+/** The scanning state that outlives a mode switch: the context fields, the scan queue, its log, the failed scans and the labels. */
 export function StationProvider({ children }: { children: ReactNode }) {
     const stockrooms = useQuery(stockroomsQuery).data ?? []
     const [chosen, setChosen] = useState<Context>({ stockroom: '', pid: '', orderNumber: '', auditNumber: '' })
     const [pending, setPending] = useState(0)
-    const [log, setLog] = useState<Entry[]>([])
+    const [log, record] = useReducer(scanLog<Scan>, EMPTY_LOG as ScanLog<Scan>)
     const [labels, setLabels] = useState<AssetSummary[]>([])
     const context = { ...chosen, stockroom: chosen.stockroom || (stockrooms[0]?.id ?? '') }
 
@@ -83,19 +83,17 @@ export function StationProvider({ children }: { children: ReactNode }) {
     }, [pending])
 
     // One queue for the page's life: each scan carries its own context, and the queue only sets state.
-    const [queue] = useState(() => {
-        let next = 0
-        const record = (ok: boolean, message: string) => setLog((l) => [{ id: next++, ok, message }, ...l].slice(0, 50))
-        return scanQueue<Scan>(async (scan) => {
+    const [queue] = useState(() =>
+        scanQueue<Scan>(async (scan) => {
             try {
                 const scanned = await perform(scan)
-                record(true, describe(scanned))
+                record({ type: 'sent', message: describe(scanned) })
                 if (scanned.mode === 'receive' && scanned.asset.providerTag) setLabels((current) => [scanned.asset, ...current])
             } catch (error) {
-                record(false, `${scan.code}: ${(error as Error).message}`)
+                record({ type: 'failed', scan, message: `${scan.code}: ${(error as Error).message}` })
             }
-        }, setPending)
-    })
+        }, setPending),
+    )
 
     const scan = (mode: Mode, code: string) => {
         queue({ ...context, mode, code, pid: mode === 'receive' ? context.pid.trim() : '' })
@@ -110,7 +108,14 @@ export function StationProvider({ children }: { children: ReactNode }) {
         setContext: (field, value) => setChosen((c) => ({ ...c, [field]: value })),
         scan,
         pending,
-        log,
+        log: log.sent,
+        failed: log.failed,
+        rescan: (failure) => {
+            record({ type: 'dismissed', id: failure.id })
+            queue(failure.scan)
+        },
+        dismiss: (id) => record({ type: 'dismissed', id }),
+        dismissAll: () => record({ type: 'dismissedAll' }),
         labels,
         clearLabels: () => setLabels([]),
     }
