@@ -73,7 +73,8 @@ export const LOCK = {
     /**
      * One per fee identity. Charging checks the fee and inserts it under it (platform/fees `recordFee`), and a period's
      * generation reads it afresh, adds its line and saves it (platform/billing `billOnPeriod`): each tries again while the
-     * other holds it for that long.
+     * other holds it for that long. A waiver reads the open charges and waives them under it (platform/fees
+     * `waiveOpenFees`), taking the lock of the Billing period a charge is on under it: the only lock taken under it.
      */
     fee: (fee: FeeIdentity) => named(`fee_${fee.type}_${fee.assetId}_${fee.returnOrderId}`),
     /**
@@ -87,7 +88,10 @@ export const LOCK = {
     subscriptionLine: (lineId: string) => named(`subscription_line_${lineId}`),
     /** The open and the close of an Asset's Service interval take turns under it. */
     serviceInterval: (assetId: string) => named(`service_interval_${assetId}`),
-    /** A Billing period's Close and Regenerate take turns under it, each reading its status afresh: nothing is taken under it. */
+    /**
+     * A Billing period's Close and Regenerate take turns under it, each reading its status afresh, and a fee's waiver
+     * takes it under the fee's lock so that it never lands inside a Close: nothing is taken under it.
+     */
     billingPeriod: (periodId: string) => named(`billing_period_${periodId}`),
     /** A superseding job's lock (the margin recompute's), named as its job cursor is. */
     job: (job: string) => named(job),

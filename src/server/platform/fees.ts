@@ -2,7 +2,7 @@ import { GlideRecord } from '@servicenow/glide'
 import { chargedFeeQuery, type FeeIdentity, openFeeQuery } from '../domain/fees.ts'
 import type { HeldLock } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
-import { FEE_STATUS, type FeeType } from '../domain/vocabulary.ts'
+import { BILLING_PERIOD_STATUS, FEE_STATUS, type FeeType } from '../domain/vocabulary.ts'
 import { todayIso } from './clock.ts'
 import { attemptLock, whyNotRun } from './locks.ts'
 import { log } from './log.ts'
@@ -14,6 +14,7 @@ import { exists, findById, num, str, warnRefused } from './records.ts'
  */
 
 const FEE = 'x_daas_ham_fee_event'
+const PERIOD = 'x_daas_ham_billing_period'
 
 const AGREEMENT_FEE: Record<FeeType, string> = { lost: 'lost_asset_fee', damaged: 'damage_fee', late_return: 'late_return_fee' }
 
@@ -74,14 +75,40 @@ export function feeIdentityOf(fee: GlideRecord): FeeIdentity {
     return { type: str(fee, 'fee_type') as FeeType, assetId: str(fee, 'asset'), returnOrderId: str(fee, 'return_order') }
 }
 
-/** Waive the not-yet-billed charges of `identity`. */
+/**
+ * Waive the not-yet-billed charges of `identity`. A generation puts a charge on its Billing period under the fee's lock,
+ * and a Close takes waived charges off its period and marks the open ones billed under the period's (ADR 0013). So the
+ * charges are read under the fee's lock, and one on a period is waived under that period's lock too, only while the
+ * period is not closed: a waiver saved in the middle of a Close would stay on the closed bill, or be overwritten as
+ * billed. A charge left open is billed for a unit that came back, so it is logged as an error to settle by hand.
+ */
 export function waiveOpenFees(identity: FeeIdentity): void {
-    const fee = new GlideRecord(FEE)
-    fee.addEncodedQuery(openFeeQuery(identity))
-    fee.query()
-    while (fee.next()) {
-        fee.setValue('status', FEE_STATUS.waived)
-        // Left open, it is billed for a unit that came back.
-        if (!fee.update()) warnRefused(fee, `${identity.type} fee ${fee.getUniqueValue()} not waived`)
-    }
+    const attempt = attemptLock(LOCK.fee(identity), () => {
+        const fee = new GlideRecord(FEE)
+        fee.addEncodedQuery(openFeeQuery(identity))
+        fee.query()
+        while (fee.next()) waiveHolding(fee, `${identity.type} fee ${fee.getUniqueValue()}`)
+    })
+    if (attempt.ran) return
+    const why = whyNotRun(attempt, 'a run billing it holds its lock')
+    log.error(`${identity.type} fee of Asset ${identity.assetId} on Return order ${identity.returnOrderId} not waived: ${why}; waive it by hand`)
+}
+
+/** Waive the open charge `fee`, read holding its lock: under its Billing period's lock too when it is on one. */
+function waiveHolding(fee: GlideRecord, what: string): void {
+    const periodId = str(fee, 'billing_period')
+    if (!periodId) return saveWaived(fee, what)
+    const attempt = attemptLock(LOCK.billingPeriod(periodId), () => {
+        const period = findById(PERIOD, periodId)
+        if (!period || str(period, 'status') !== BILLING_PERIOD_STATUS.closed) return saveWaived(fee, what)
+        log.error(`${what} not waived: Billing period ${str(period, 'period')} bills it and is closed; credit it by hand`)
+    })
+    if (attempt.ran) return
+    const why = whyNotRun(attempt, "its Billing period's lock is held (a Close, a Regenerate or another waiver)")
+    log.error(`${what} not waived: ${why}; waive it by hand, or credit it if its period is closed by then`)
+}
+
+function saveWaived(fee: GlideRecord, what: string): void {
+    fee.setValue('status', FEE_STATUS.waived)
+    if (!fee.update()) warnRefused(fee, `${what} not waived`)
 }

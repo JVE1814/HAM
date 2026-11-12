@@ -141,7 +141,9 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
     (`domain/billing.ts` `sitePackageHoldersQuery`);
   - a unit received after the due date incurs a **late-return fee**;
   - a unit declared missing that turns up settles its line again: the open lost-asset fee is
-    waived, the late-return fee applies, and the Return order reopens for evaluation.
+    waived, the late-return fee applies, and the Return order reopens for evaluation. A fee on a
+    Billing period that is closed, or that is being closed or regenerated just then, is not waived:
+    it stays open and is logged as an error, to settle by hand (P3 billing, ADR 0013).
 
   A receipt the lifecycle or the platform refuses answers HTTP 422 with the reason and leaves the unit
   pending return (or missing), with nothing settled, to scan again. If the unit is saved but its

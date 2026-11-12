@@ -68,6 +68,13 @@
   period by its latest generation. One that finds the lock held through `LOCK_TRIES` tries changes
   nothing and
   asks the user to try again.
+- A lost-asset fee is waived when its unit turns up at the depot (P2 after-sales). The waiver takes
+  the fee's job lock and, once the fee is on a period, that period's lock too (ADR 0013), so it
+  never lands inside a *Close period*. A fee waived before the Close leaves the period with its line
+  when the period closes. A fee whose period is closed, or whose lock or period's lock is held
+  through `LOCK_TRIES` tries (a generation billing it, a Close or Regenerate running), stays open
+  and is logged as an error (*<type> fee <sys_id> not waived: ...*): waive it by hand while its
+  period is open, or credit it once the period is closed.
 - A period's month is entered as YYYY-MM (e.g. 2026-10); a business rule refuses a period saved
   with any other month, or with a month that has not ended. The period's first and last day are set
   from its month whenever the month is saved.

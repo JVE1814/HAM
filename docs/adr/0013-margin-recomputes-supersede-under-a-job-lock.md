@@ -191,13 +191,24 @@ while it is open and on no other period, so a month generating beside a *Regener
 never bills one fee on both. The generation holds no other lock when it takes it, tries `LOCK_TRIES`
 times
 back to back, and counts a fee held through them as failed unless another period has it by then.
-Nothing is taken under it.
+A waiver (a unit declared missing is scanned in at the depot) takes the same lock, under the unit's
+`receive_asset_` lock, and reads the fee's open charges afresh there. A charge on no Billing period
+is waived at once. For a charge on a period, the waiver takes that period's `billing_period_` lock
+under the fee's, the only lock taken under a fee's, and waives the charge only while the period is
+not closed. Each of the two takes is tried `LOCK_TRIES` times back to back. A charge whose lock or
+whose period's lock is held through them, or whose period is closed, stays open and is logged as an
+error, to waive by hand or to credit.
 *Close period* and *Regenerate* of a Billing period run under `billing_period_<period sys_id>`,
 holding no other lock, and each reads the period's status afresh there. So a Regenerate never
 deletes the lines of a period Close is locking, and Close never locks a period a Regenerate has
 emptied. Each tries `LOCK_TRIES` times back to back, and one that finds the lock held through them
 changes
-nothing and asks the user to try again. Nothing is taken under it.
+nothing and asks the user to try again. A fee's waiver takes the lock too, under the fee's lock
+(above), so it lands wholly before a Close, which then takes the waived fee and its line off the
+period, or after it, when it finds the period closed and leaves the fee as the Close billed it. A
+waiver saved in the middle of a Close would otherwise stay on the closed bill (saved after the Close
+took the waived fees off) or be overwritten as billed (saved while the Close marks the fees billed).
+Nothing is taken under it.
 
 An audit's scans and *Close audit* take turns under `audit_<audit sys_id>`, each holding no other
 lock when it takes it, so a scan lands wholly before the close reads the lines, or finds the audit

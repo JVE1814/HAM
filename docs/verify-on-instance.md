@@ -653,6 +653,11 @@ service leaves it open and logs *[x_daas_ham] <serial> left service on <date>, i
 still open: ...* (error). A row named `fee_<type>_<Asset sys_id>_<Return order sys_id>` does the
 same to a line declared missing or a damaged evaluation saved: it logs *[x_daas_ham] <type> fee for
 <serial> not recorded: left to a run holding its lock ...* (warning) and records no fee.
+A row named `billing_period_<sys_id of a period ready for review>` keeps the lost fee of a missing
+unit open when the unit is scanned in at the depot while that fee is on the period: the unit is
+received as usual, and the log shows *[x_daas_ham] lost fee <sys_id> not waived: its Billing
+period's lock is held (a Close, a Regenerate or another waiver); waive it by hand, or credit it if
+its period is closed by then* (error). Delete the row and set the fee to *Waived* by hand.
 
 ### Refresh lock
 
