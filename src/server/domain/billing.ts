@@ -2,7 +2,7 @@ import { addDays, addMonths } from './calendar.ts'
 import { activeDays, currencyCode, currencyKey, divideRounded, fromCents, isMonth, previousMonth, toCents, type MonthBounds } from './money.ts'
 import { FLEET_CONDITION, fleetStagesQuery } from './fleet.ts'
 import { DEPLOYED_STAGES } from './lifecycle.ts'
-import { STAGE_FIELDS, SUBSCRIPTION_LINE_STATUS, SUBSCRIPTION_LINE_TYPE } from './vocabulary.ts'
+import { BILLING_PERIOD_STATUS, STAGE_FIELDS, SUBSCRIPTION_LINE_STATUS, SUBSCRIPTION_LINE_TYPE } from './vocabulary.ts'
 
 /**
  * Why a Billing period cannot be saved for `month` on `today`, or null. The month must be YYYY-MM and over: a new
@@ -205,7 +205,7 @@ export function decideGenerationReset(
     activityMs: ReadonlyArray<number | undefined>,
     nowMs: number,
 ): GenerationReset {
-    if (status !== 'generating') return { reset: false, why: 'only a period still generating can be reset' }
+    if (status !== BILLING_PERIOD_STATUS.generating) return { reset: false, why: 'only a period still generating can be reset' }
     const known = activityMs.filter((ms): ms is number => ms !== undefined)
     if (known.length === 0) {
         return { reset: false, why: 'when its generation was last active cannot be read, so it may still be running' }
