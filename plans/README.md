@@ -143,7 +143,7 @@ checked by reading only. Each executor still runs its own gate.
 | [029](029-raise-replacement-lock.md) | Raise a case's replacement under a job lock, so two presses raise one Order | P2 | S | none | DONE (instance check pending) |
 | [030](030-shipping-characterization.md) | Test tracking updates, label voids and label purchases on the fake Glide | P2 | M | none | DONE |
 | [031](031-ship-order-tests.md) | Test Ship and install confirmation on the fake Glide | P2 | M | none | DONE |
-| [032](032-customer-direct-insert-checks.md) | Check an Order or Return order a Customer contact inserts, whatever inserts it | P2 | M | step 1 instance check | TODO |
+| [032](032-customer-direct-insert-checks.md) | Check an Order or Return order a Customer contact inserts, whatever inserts it | P2 | M | step 1 instance check | DONE (rules added without the Step 1 probe, on the operator's word; instance check pending) |
 | [033](033-typecheck-client-tests.md) | Make `npm run typecheck` check the client tests the way the build does | P3 | S | none | TODO |
 | [034](034-adr-react-workspace.md) | Record in an ADR that the workspace is a React page, not a Fluent Workspace | P3 | S | none | DONE (Owner-to-fill paragraph in ADR 0019 awaits the owner) |
 | [035](035-go-live-from-first-sighting.md) | Start billing from the first sighting since the install, also when the go-live is put off | P3 | M | 024 (landing order) | TODO |

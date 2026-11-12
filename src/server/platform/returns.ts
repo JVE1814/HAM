@@ -36,6 +36,7 @@ import {
     type ReturnTrigger,
     TASK_STATE,
 } from '../domain/vocabulary.ts'
+import { isCustomerContact } from '../domain/visibility.ts'
 import { customerAdminIds } from './approvals.ts'
 import { clearWipeEvidence, isFleetAsset, moveAndSave, moveRefusal, readStage, transitionFacts } from './assets.ts'
 import { runTableJob } from './chunked.ts'
@@ -50,7 +51,7 @@ import { attemptLock, withLock } from './locks.ts'
 import { intProperty } from './properties.ts'
 import { PROPERTY } from '../domain/properties.ts'
 import { bool, choice, exists, findById, num, refusal, str, warnRefused } from './records.ts'
-import { creatorOf } from './session.ts'
+import { creatorOf, currentSession } from './session.ts'
 import { moveAlongPath } from './stock.ts'
 import { endSitePackageIfEmpty } from './subscriptions.ts'
 import { SITE_FIELD } from '../domain/fleet.ts'
@@ -351,6 +352,28 @@ function requestedSite(siteId: string, site: GlideRecord | null): RequestedRetur
 function returnRequester(produced: GlideRecord | undefined): ReturnRequester {
     const { permitted, scope, customerId } = creatorOf(produced ?? new GlideRecord(RETURN))
     return { mayRequest: permitted, scope, customerId }
+}
+
+/**
+ * Why the Return order `current`, about to be inserted, is refused, or null: the check of the before-insert rule
+ * (entry/returns `guardContactReturn`). In a Customer contact's session it must name the contact's own Customer and
+ * one of that Customer's Sites (domain/returns `returnRequestFindings`), whatever inserts it: the record producer, the
+ * customer page, a form or the Table API. The customer admins' create ACL cannot hold a Return to that: it passes one
+ * that names no Customer yet (domain/visibility `grantsReturnOfOwnCustomer`) and never looks at the Site.
+ *
+ * Who asks is not judged here: the create ACL and the services that raise a Return (`requestReturn`) decide that. So
+ * the app's own inserts in a contact's session pass, a site contact's too: confirming a self-install raises the
+ * swap-back of the units it replaced (`returnSwappedAssets`), for the Order's own Customer and Site. Anyone else
+ * (provider staff, the service desk, a job) raises Returns for any Customer and is not checked.
+ */
+export function contactReturnInsertRefusal(current: GlideRecord): string | null {
+    const { scope, customerId } = currentSession()
+    if (!isCustomerContact(scope)) return null
+    const siteId = str(current, 'site')
+    const asContact: ReturnRequester = { mayRequest: true, scope: 'own_customer', customerId }
+    const request = { customerId: str(current, 'customer'), site: requestedSite(siteId, findById('cmn_location', siteId)) }
+    const [finding] = returnRequestFindings(request, asContact)
+    return finding ? `Return not raised. ${finding.message}.` : null
 }
 
 /**

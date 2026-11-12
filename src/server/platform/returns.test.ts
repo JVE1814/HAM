@@ -1,10 +1,11 @@
+import type { GlideRecord } from '@servicenow/glide'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fieldsOf, type Stage } from '../domain/lifecycle.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { FEE_STATUS, RETURN_LINE_STATUS } from '../domain/vocabulary.ts'
 import { withLock } from './locks.ts'
-import { chaseOverdue, raiseReturn, requestReturn } from './returns.ts'
-import { platform, type Row } from '../test-support/fake-glide.ts'
+import { chaseOverdue, contactReturnInsertRefusal, raiseReturn, requestReturn, returnSwappedAssets } from './returns.ts'
+import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
@@ -160,5 +161,66 @@ describe('the daily chase of overdue returns', () => {
         expect(rows(RETURNS)[0]?.escalated).toBe('false')
         expect(notices()).toEqual([])
         expect(platform.logs).toContainEqual(expect.stringContaining(LOCK.overdueReturnsRun()))
+    })
+})
+
+describe('a Return order saved in a Customer contact session', () => {
+    // Users no other test of this file signs in as: a user's scope is kept for as long as the modules are loaded.
+    const ADMIN = { id: 'direct-admin', name: 'Ada', company: 'acme', roles: ['x_daas_ham.customer_admin'], interactive: true }
+    const SITE_CONTACT = { id: 'direct-contact', name: 'Sam', company: 'acme', roles: ['x_daas_ham.site_contact'], interactive: true }
+    const STAFF = { id: 'direct-staff', name: 'Max', company: 'provider', roles: ['x_daas_ham.asset_manager'], interactive: true }
+    const OWN_CUSTOMER = 'Return not raised. You can only request returns for your own customer.'
+
+    const refusalOf = (row: Row) => contactReturnInsertRefusal(recordOf<GlideRecord>(RETURNS, row, { fresh: true }))
+
+    /** Run the check on every insert of a Return order, as the platform runs the before-insert rule. */
+    function withTheRule(): void {
+        platform.refuses = (table, row, operation) => (table === RETURNS && operation === 'insert' ? (refusalOf(row) ?? '') : '')
+    }
+
+    beforeEach(() => {
+        platform.creatable = () => true
+        platform.defaults[RETURN_LINES] = () => ({ status: RETURN_LINE_STATUS.awaiting })
+        platform.references = { [`${RETURN_LINES}.return_order`]: RETURNS, [`${RETURNS}.agreement`]: 'x_daas_ham_agreement' }
+        platform.tables.cmn_location = [
+            { sys_id: 'site1', name: 'HQ', company: 'acme', x_daas_ham_is_site: 'true' },
+            { sys_id: 'site9', name: 'Elsewhere', company: 'other', x_daas_ham_is_site: 'true' },
+        ]
+        platform.tables.x_daas_ham_agreement = [{ sys_id: 'ag1', overdue_return_days: '10' }]
+        platform.tables.alm_hardware = [{ ...unit('in_service'), company: 'acme' }]
+    })
+
+    it('is refused unless it names their own Customer and one of its Sites', () => {
+        platform.user = ADMIN
+        expect(refusalOf({})).toBe(OWN_CUSTOMER)
+        expect(refusalOf({ customer: 'other', site: 'site9' })).toBe(OWN_CUSTOMER)
+        expect(refusalOf({ customer: 'acme' })).toBe("Return not raised. Choose one of the customer's sites.")
+        expect(refusalOf({ customer: 'acme', site: 'site9' })).toBe("Return not raised. The site is not one of the customer's sites.")
+        expect(refusalOf({ customer: 'acme', site: 'site1' })).toBeNull()
+    })
+
+    it('is not checked when provider staff save it: they raise Returns for any Customer', () => {
+        platform.user = STAFF
+        expect(refusalOf({})).toBeNull()
+        expect(refusalOf({ customer: 'other', site: 'site1' })).toBeNull()
+    })
+
+    it("passes the customer page's request, and refuses a Return raised for another Customer", () => {
+        withTheRule()
+        platform.user = ADMIN
+        const requested = requestReturn({ customerId: 'acme', siteId: 'site1', decommission: false, listedAssetIds: ['a1'], method: 'ship_back', describe: (site) => `Return from ${site}` })
+        expect(requested).toEqual({ raised: true, number: 'RET0002', lines: 1 })
+
+        const theirs = raiseReturn({ trigger: 'device_removal', customerId: 'other', siteId: 'site9', agreementId: '', method: 'ship_back', assetIds: [], description: 'Not theirs' })
+        expect(theirs).toBeNull()
+        expect(rows(RETURNS).map((saved) => saved.customer)).toEqual(['acme'])
+    })
+
+    it("passes the swap-back a site contact's install confirmation raises: who asks is not the rule's to judge", () => {
+        withTheRule()
+        platform.user = SITE_CONTACT
+        const order = recordOf<GlideRecord>('x_daas_ham_order', { sys_id: 'ord1', number: 'ORD0001', order_type: 'device_replace', customer: 'acme', site: 'site1', agreement: 'ag1', install_mode: 'self_install' })
+        expect(returnSwappedAssets(order, ['a1'])).toEqual({ number: 'RET0002', lines: 1 })
+        expect(rows(RETURNS).map((saved) => [saved.customer, saved.site, saved.trigger])).toEqual([['acme', 'site1', 'defective_return']])
     })
 })

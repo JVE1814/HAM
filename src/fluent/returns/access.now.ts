@@ -66,7 +66,8 @@ Acl({
 /*
  * A customer admin creates a Return of their own Customer only. One that names no Customer yet passes: the customer
  * page asks whether a Return may be raised at all (canCreate() of an empty record) before it names
- * the Customer, and a Return with none is no Customer's, which no customer contact reads.
+ * the Customer. What a Return then saved names (their own Customer, one of its Sites) is checked by the
+ * before-insert rule (returns/logic.now.ts), which an ACL check does not run.
  */
 Acl({
     $id: Now.ID['acl_return_order_create_customer'],

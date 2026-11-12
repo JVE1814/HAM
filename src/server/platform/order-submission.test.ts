@@ -4,10 +4,10 @@ import { REQUEUE } from '../domain/job-lock.ts'
 import { LOCK } from '../domain/lock-names.ts'
 import { ROLE } from '../domain/roles.ts'
 import { EVENT } from '../domain/events.ts'
-import { cancelOrder, submitOrder, submitProducedOrder, submitQueuedOrder } from './orders.ts'
+import { cancelOrder, contactOrderInsertRefusal, submitOrder, submitProducedOrder, submitQueuedOrder } from './orders.ts'
 import { sourcingRequestOf } from './sourcing-requests.ts'
 import { findById } from './records.ts'
-import { platform, type Row } from '../test-support/fake-glide.ts'
+import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 
 vi.mock('@servicenow/glide', async () => (await import('../test-support/fake-glide.ts')).glide)
 
@@ -189,5 +189,39 @@ describe('submitting an Order that only replaces Assets', () => {
 
         expect(storedOrder().stage).toBe('sourcing')
         expect(rows(LOCKS)).toEqual([theirs])
+    })
+})
+
+describe('an Order saved in a Customer contact session', () => {
+    // Users no other test of this file signs in as: a user's scope is kept for as long as the modules are loaded.
+    const ADMIN = { id: 'direct-admin', name: 'Ada', company: 'acme', roles: [ROLE.customerAdmin], interactive: true }
+    const SITE_CONTACT = { id: 'direct-contact', name: 'Sam', company: 'acme', roles: [ROLE.siteContact], interactive: true }
+
+    const refusalOf = (row: Row) => contactOrderInsertRefusal(recordOf<GlideRecord>(ORDERS, row, { fresh: true }))
+
+    beforeEach(() => {
+        rows('cmn_location').push({ sys_id: 'site9', company: 'other', x_daas_ham_is_site: 'true' })
+        rows('x_daas_ham_agreement').push({ sys_id: 'agr9', customer: 'other' })
+    })
+
+    it('is refused unless it names their own Customer with an Agreement and a Site of that Customer', () => {
+        platform.user = ADMIN
+        expect(refusalOf({ customer: 'acme', site: 'site1', agreement: 'agr1' })).toBeNull()
+        expect(refusalOf({})).toBe('Order not raised. You can only order for your own customer.')
+        expect(refusalOf({ customer: 'other', site: 'site9', agreement: 'agr9' })).toBe('Order not raised. You can only order for your own customer.')
+        expect(refusalOf({ customer: 'acme', site: 'site1' })).toBe("Order not raised. Choose one of the customer's agreements.")
+        expect(refusalOf({ customer: 'acme', site: 'site9', agreement: 'agr9' })).toBe(
+            "Order not raised. The agreement is not one of the customer's agreements. The site is not one of the customer's sites.",
+        )
+    })
+
+    it('is refused for a site contact, who raises no Orders', () => {
+        platform.user = SITE_CONTACT
+        expect(refusalOf({ customer: 'acme', site: 'site1', agreement: 'agr1' })).toBe('Order not raised. You may not raise orders.')
+    })
+
+    it('is not checked when provider staff save it: their draft stays a draft to correct', () => {
+        expect(refusalOf({})).toBeNull()
+        expect(refusalOf({ customer: 'acme', site: 'site9', agreement: 'agr9' })).toBeNull()
     })
 })

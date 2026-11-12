@@ -9,6 +9,7 @@ vi.mock('../platform/orders.ts', async (original) => ({ ...(await original<typeo
 
 function produce(submission: Submission): string[] {
     vi.mocked(submitProducedOrder).mockReturnValue(submission)
+    platform.tables.x_daas_ham_order = [{ sys_id: 'order1', number: 'ORD0001' }]
     afterOrderProduced({ devices: '' }, recordOf<GlideRecord>('x_daas_ham_order', { sys_id: 'order1', number: 'ORD0001' }))
     return platform.messages
 }
@@ -28,5 +29,12 @@ describe('afterOrderProduced', () => {
 
     it('says nothing of an Order that went ahead', () => {
         expect(produce({ submitted: true })).toEqual([])
+    })
+
+    it('does nothing for an Order that is not stored: a rule refused its insert and said why', () => {
+        vi.mocked(submitProducedOrder).mockClear()
+        afterOrderProduced({ devices: '' }, recordOf<GlideRecord>('x_daas_ham_order', { sys_id: 'order9', number: 'ORD0009' }))
+        expect(submitProducedOrder).not.toHaveBeenCalled()
+        expect(platform.messages).toEqual([])
     })
 })

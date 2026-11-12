@@ -23,6 +23,11 @@
   (except those of a Site template not offered to the Customer), to correct and submit. So does one
   missing a line the platform refused: the user is told, and its work notes say, how many order lines
   were not saved, to add them and submit.
+- A Customer contact's Order is checked before it is saved, whatever inserts it (the record
+  producer, a form or the Table API): one that fails the ownership rule above is refused with
+  *Order not raised* and the reasons, and nothing is stored (`platform/orders.ts`
+  `contactOrderInsertRefusal`). So only an Order raised by provider staff or the service desk stays
+  a draft to correct.
 
 ## Entitlement (`domain/entitlement.ts`)
 

@@ -1,6 +1,6 @@
 import '@servicenow/sdk/global'
 import { BusinessRule, Property, Record, ScheduledScript, ScriptAction, UiAction } from '@servicenow/sdk/core'
-import { onAllocatedAssetStageChange, onOrderApprovalDecision, sourceOrder, uiCancelOrder, uiRecheckApprovals, uiSubmitOrder } from '../../server/entry/orders'
+import { guardContactOrder, onAllocatedAssetStageChange, onOrderApprovalDecision, sourceOrder, uiCancelOrder, uiRecheckApprovals, uiSubmitOrder } from '../../server/entry/orders'
 import { takeBackStageAfterTransfer } from '../../server/platform/transfers'
 import { CURRENT_FLEET_STAGE_CHANGED, CURRENT_IS_FLEET } from '../../server/domain/fleet'
 import { ORDER_STAGE } from '../../server/domain/vocabulary'
@@ -10,6 +10,22 @@ import { runSparePoolTopUp } from '../../server/platform/spare-pools'
 import { EVENT } from '../../server/domain/events'
 import { PROPERTY } from '../../server/domain/properties'
 import { accountManager, admin, assetManager, commercialEditors, orderRaisers } from '../shared/roles.now'
+
+/*
+ * An Order saved in a Customer contact's session passes what Submit checks (their own Customer, with an Agreement and a
+ * Site of that Customer), whatever inserts it: the record producer, a form or the Table API (platform/orders
+ * `contactOrderInsertRefusal`). The customer admins' create ACL looks at the Customer only (orders/access.now.ts). The
+ * table is the app's own, so the script refuses with current.setAbortAction (platform/rule-api `abortWith`).
+ */
+BusinessRule({
+    $id: Now.ID['br_order_contact_insert'],
+    name: "NaaS - check a contact's Order",
+    table: 'x_daas_ham_order',
+    when: 'before',
+    action: ['insert'],
+    order: 100,
+    script: guardContactOrder,
+})
 
 BusinessRule({
     $id: Now.ID['br_order_approval_decision'],

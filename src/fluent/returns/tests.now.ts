@@ -125,7 +125,7 @@ export const customerReturnRequestTest = Test(
         $id: Now.ID['atf_customer_return_request'],
         name: 'NaaS - customer returns: admins only, own sites only, a decommission takes the whole site',
         description:
-            "Calls the customer returns handler as a site contact (HTTP 403), then as a customer admin naming another Customer's site (HTTP 400) and their own site with decommission: true listing one of its two installed fleet assets (HTTP 201); both assets then await the return, so the site's equipment was found server-side.",
+            "Calls the customer returns handler as a site contact (HTTP 403), then as a customer admin naming another Customer's site (HTTP 400) and their own site with decommission: true listing one of its two installed fleet assets (HTTP 201); both assets then await the return, so the site's equipment was found server-side. A Return order the admin then inserts by hand with no Customer, or with another Customer's site, is not saved, nor is such an Order; one for their own Customer and site is.",
         active: true,
         // The handler logs what it refuses; the scripts and validations below check the outcome.
         failOnServerError: false,
@@ -146,7 +146,7 @@ export const customerReturnRequestTest = Test(
             table: 'cmn_location',
             fieldValues: { name: 'ATF Returns Site A', x_daas_ham_is_site: true, company: customerA.record_id },
         })
-        atf.server.recordInsert({
+        const siteB = atf.server.recordInsert({
             $id: Now.ID['atf_crr_site_b'],
             table: 'cmn_location',
             fieldValues: { name: 'ATF Returns Site B', x_daas_ham_is_site: true, company: customerB.record_id },
@@ -303,6 +303,33 @@ export const customerReturnRequestTest = Test(
         return false;
     }
 })(outputs, steps, params, stepResult, assertEqual);`,
+        })
+        // Still the customer admin. A record inserted by hand (a form, the Table API) meets the create ACL and no
+        // producer: the before-insert rules hold it to the admin's Customer and its Sites. The last insert is the
+        // control: it shows the admin can insert at all, so the three refusals are the rules'.
+        atf.server.recordInsert({
+            $id: Now.ID['atf_crr_insert_no_customer'],
+            table: 'x_daas_ham_return_order',
+            fieldValues: { short_description: 'ATF returns insert with no customer' },
+            assert: 'record_not_inserted',
+        })
+        atf.server.recordInsert({
+            $id: Now.ID['atf_crr_insert_other_site'],
+            table: 'x_daas_ham_return_order',
+            fieldValues: { customer: customerA.record_id, site: siteB.record_id, short_description: 'ATF returns insert with another site' },
+            assert: 'record_not_inserted',
+        })
+        atf.server.recordInsert({
+            $id: Now.ID['atf_crr_insert_order_other_site'],
+            table: 'x_daas_ham_order',
+            fieldValues: { customer: customerA.record_id, site: siteB.record_id, short_description: 'ATF order insert with another site' },
+            assert: 'record_not_inserted',
+        })
+        atf.server.recordInsert({
+            $id: Now.ID['atf_crr_insert_own_site'],
+            table: 'x_daas_ham_return_order',
+            fieldValues: { customer: customerA.record_id, site: siteA.record_id, short_description: 'ATF returns insert with their own site' },
+            assert: 'record_successfully_inserted',
         })
         // A customer reads no Asset's stage (fleet/access.now.ts), so the provider checks the outcome.
         const manager = atf.server.createUser({

@@ -6,13 +6,15 @@ import { onLineAssetMoved } from '../platform/fulfilment.ts'
 import type { NewLine } from '../platform/order-lines.ts'
 import {
     cancelOrder,
+    contactOrderInsertRefusal,
     rollUpOrderApprovals,
     submitOrder,
     submitProducedOrder,
     submitQueuedOrder,
     type Submission,
 } from '../platform/orders.ts'
-import { str, type ForeignRecord } from '../platform/records.ts'
+import { isStored, str, type ForeignRecord } from '../platform/records.ts'
+import { abortWith } from '../platform/rule-api.ts'
 import { putBackUntransferred, runSourcingPass } from '../platform/sourcing.ts'
 import { sourcingRequestOf } from '../platform/sourcing-requests.ts'
 import { fellShortOfStagingCentre } from '../platform/transfers.ts'
@@ -27,17 +29,25 @@ interface DeviceRow {
  * (`current` is typed unknown because the SDK passes its own GlideRecord type here.)
  */
 export function afterOrderProduced(producer: Record<string, unknown>, current: unknown): void {
+    const order = current as GlideRecord
+    // A rule that refused the insert has told the requester why (`guardContactOrder`). Whether the platform still
+    // runs this script then is not known, and no line is added to an Order that is not stored.
+    if (!isStored(order)) return
     const asked = deviceRows(producer.devices)
     const devices: NewLine[] = []
     for (const row of asked.rows) {
         if (row.model) devices.push({ modelId: String(row.model), quantity: Math.max(1, Number(row.quantity) || 1) })
     }
-    const order = current as GlideRecord
     const submission = submitProducedOrder(order, devices, asked.unread)
     if (submission.submitted || !submission.queued) return tellSubmission(submission)
     // Its raiser, often a Customer admin, has no Submit action to try again with.
     const saved = `Order ${str(order, 'number')} is saved and is submitted within a few minutes: another order of the same agreement was being submitted at that moment`
     gs.addInfoMessage(`${saved}. There is no need to raise it again`)
+}
+
+/** Before-insert rule on Orders: refuses one a Customer contact may not save as it stands. */
+export function guardContactOrder(current: GlideRecord): void {
+    abortWith(current, contactOrderInsertRefusal(current))
 }
 
 /**

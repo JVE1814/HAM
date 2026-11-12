@@ -110,6 +110,17 @@ Allow-If field ACLs of its own too: provider staff read it, and asset managers a
 for `alm_asset.cost` write, one repeating `alm_asset.*`'s), so no verdict depends on how the platform matches ACLs
 across levels. The app's own logic saves through GlideRecord, which no ACL checks.
 
+What a Customer contact creates is held to their Customer by a rule as well as an ACL. A customer admin's create ACL on
+Orders and on Return orders checks the Customer the record names (`orders/access.now.ts`, `returns/access.now.ts`), and
+the Return's passes a record that names none yet, as the customer page asks `canCreate()` of an empty record. No ACL
+looks at the Site or the Agreement. So a before-insert rule on each table refuses, in a Customer contact's session, an
+Order that fails what *Submit* checks (`domain/entitlement` `ownershipFindings`) and a Return order that names another
+Customer, none, or a Site that is not its Customer's (`domain/returns` `returnRequestFindings`), whatever inserts it:
+the record producer, the customer page, a form or the Table API (`platform/orders` `contactOrderInsertRefusal`,
+`platform/returns` `contactReturnInsertRefusal`). The rule on Return orders does not judge who asks, which the create
+ACL and the services do: a site contact's confirmation of a self-install raises the swap-back Return in their own
+session. Provider staff, the service desk and jobs are not checked.
+
 ## Consequences
 
 - Whether a record is left to the platform depends on the reader (an inventory tech's hardware outside the fleet, not
@@ -143,5 +154,6 @@ across levels. The app's own logic saves through GlideRecord, which no ACL check
 - What only an instance can confirm (a Deny-Unless ACL with no role and a module function as its script, on a parent
   table, applying to its child table's records; *Applies To* on `alm_asset`; the row check on a New form; the field
   ACLs on `alm_asset` applying to an `alm_asset` list's hardware rows; a create rule's script seeing the posted values
-  on a Table API insert) is checked in
+  on a Table API insert; the before-insert rules refusing a Customer contact's insert, through a record producer too)
+  is checked in
   [docs/verify-on-instance.md](../verify-on-instance.md#access-and-visibility-adr-0005).

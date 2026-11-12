@@ -17,6 +17,7 @@ import { LONG_HOLD_LOCK_TRIES, REQUEUE, type HeldLock } from '../domain/job-lock
 import { LOCK } from '../domain/lock-names.ts'
 import { cancelledUnit, type LineExit } from '../domain/stock.ts'
 import { type EntitlementVerdict, type InstallMode, LINE_STAGE, ORDER_STAGE, type OrderType } from '../domain/vocabulary.ts'
+import { isCustomerContact } from '../domain/visibility.ts'
 import { entitlementContext } from './agreements.ts'
 import {
     cancelPendingApprovals,
@@ -32,7 +33,7 @@ import { orderShipment } from './fulfilment.ts'
 import { withLock, withLockTries } from './locks.ts'
 import { addOrderLines, saveLineStage, withOrderLineLocks, type NewLine, type RefusedLine } from './order-lines.ts'
 import { bool, findById, num, refusal, str, warnRefused } from './records.ts'
-import { creatorOf } from './session.ts'
+import { creatorOf, currentSession } from './session.ts'
 import { queueSourcing, queueSubmissionAgain } from './sourcing-requests.ts'
 import { skipOpenStagingTasks } from './staging-tasks.ts'
 import { leaveOrderLine } from './stock.ts'
@@ -116,6 +117,8 @@ function notSubmitted(why: string): Submission {
  * not its Customer's stays a draft to correct, without the lines of a Site template not offered to it, and so does one
  * missing a line the platform refused (logged), or whose devices could not be read (`devicesUnread` says why, '' when
  * they were; logged): it would be assessed and sourced short of what was asked for.
+ * A Customer contact's Order that names records not its Customer's never gets here: the before-insert rule refuses it
+ * (`contactOrderInsertRefusal`).
  */
 export function submitProducedOrder(order: GlideRecord, devices: readonly NewLine[], devicesUnread: string): Submission {
     const parties = orderParties(order)
@@ -171,6 +174,22 @@ function orderParties(order: GlideRecord): OrderParties {
         site: site && { ...site, isSite: bool(order, `site.${SITE_FIELD}`) },
         siteTemplate: named('site_template', 'x_daas_ham_site_template', 'customer'),
     }
+}
+
+/**
+ * Why the Order `current`, about to be inserted, is refused, or null: the check of the before-insert rule
+ * (entry/orders `guardContactOrder`). In a Customer contact's session it must pass what Submit checks
+ * (domain/entitlement `ownershipFindings`): their own Customer, with an Agreement and a Site of that Customer and a
+ * Site template offered to it, whatever inserts it: the record producer, a form or the Table API. The customer
+ * admins' create ACL looks at the Customer only. Whether the create rule lets the contact in is that ACL's question,
+ * and the producer's (`submitProducedOrder`); a site contact raises no Order. Anyone else (provider staff, the
+ * service desk, a job) raises Orders for any Customer, and theirs stays a draft to correct.
+ */
+export function contactOrderInsertRefusal(current: GlideRecord): string | null {
+    const { scope, customerId } = currentSession()
+    if (!isCustomerContact(scope)) return null
+    const findings = ownershipFindings(orderParties(current), { mayRaise: true, scope, customerId })
+    return findings.length > 0 ? `Order not raised. ${findings.join('. ')}.` : null
 }
 
 /**

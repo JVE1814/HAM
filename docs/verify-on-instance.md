@@ -381,6 +381,16 @@ agent (`sn_customerservice_agent` only), the order producer offers the Customer'
 Site templates, the generated Order opens with its lines and *Submit* goes ahead, and the return
 producer opens the Return it raised.
 
+The before-insert rules (`returns/logic.now.ts`, `orders/logic.now.ts`). As a customer admin,
+`POST /api/now/table/x_daas_ham_return_order` with no Customer, or with their Customer and another
+Customer's Site, is refused with *Return not raised. ...* and saves nothing; with their own
+Customer and Site it is saved. `POST /api/now/table/x_daas_ham_order` with their Customer and
+another Customer's Site or Agreement is refused with *Order not raised. ...*. Through each record
+producer, a request of theirs that names another Customer shows the refusal, opens no record and
+leaves no Order line behind. As a site contact, *Confirm installed* on a self-install Order that
+replaced a unit still raises the swap-back Return. The ATF test *NaaS - customer returns: admins
+only, own sites only, a decommission takes the whole site* covers the inserts by hand.
+
 ### REST access for customer users
 
 `shared/rest-api.now.ts`. In *System Web Services > Scripted REST APIs >

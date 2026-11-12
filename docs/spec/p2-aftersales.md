@@ -87,6 +87,11 @@ is never replaced, returned, refreshed, declared missing, charged for or dispose
   requests only for their own Customer, the others for any Customer, and site contacts never. The Site
   must be one of the Customer's Sites. Otherwise the request is removed again and the requester is
   told why (`domain/returns.ts` `returnRequestFindings`). The Site choices follow the chosen Customer.
+- A Return order saved in a Customer contact's session is checked before it is saved, whatever
+  inserts it (the record producer, the customer page, a form or the Table API): it must name the
+  contact's own Customer and one of that Customer's Sites, else it is refused with *Return not
+  raised* and the reason (`platform/returns.ts` `contactReturnInsertRefusal`). The swap-back Return
+  that a site contact's install confirmation raises passes: it is for the Order's Customer and Site.
 - From the customer page, only a Customer admin limited to their own Customer requests returns
   (`domain/visibility.ts` `actsAsCustomerAdmin`), under the record producer's rule
   (`domain/returns.ts` `returnRequestFindings`). The API answers HTTP 403 when the Return create rule
