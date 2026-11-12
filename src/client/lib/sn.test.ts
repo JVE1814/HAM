@@ -178,7 +178,9 @@ describe('listPageQuery', () => {
         const { calls, page: read } = page(120)
         await read
         expect(calls[0].pathname).toBe('/api/now/table/x_daas_ham_order')
-        expect(Object.fromEntries(calls[0].searchParams)).toMatchObject({
+        const query: Record<string, string> = {}
+        calls[0].searchParams.forEach((value, key) => (query[key] = value))
+        expect(query).toMatchObject({
             sysparm_offset: '100',
             sysparm_limit: '50',
             sysparm_fields: 'sys_id,number,company,gone',
