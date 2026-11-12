@@ -104,7 +104,7 @@ function sharedUnit(a: Placement, b: Placement): number | null {
 }
 
 /** Two devices on one face of a rack that share units; `unit` is the lowest unit they share. */
-export interface Overlap {
+interface Overlap {
     /** The two devices' keys (Placement `assetId`), in list order, to tell them apart. Messages name them by `labels`. */
     assetIds: [string, string]
     /** Their names (Placement `label`, else `assetId`), for messages. */

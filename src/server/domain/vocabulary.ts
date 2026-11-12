@@ -210,7 +210,7 @@ export const NORM_EXCEPTION_STATUS_CHOICES = {
     open: { label: 'Open', sequence: 0 },
     resolved: { label: 'Resolved', sequence: 1 },
 } as const
-export type NormExceptionStatus = keyof typeof NORM_EXCEPTION_STATUS_CHOICES
+type NormExceptionStatus = keyof typeof NORM_EXCEPTION_STATUS_CHOICES
 export const NORM_EXCEPTION_STATUS = {
     open: 'open',
     resolved: 'resolved',
@@ -247,7 +247,7 @@ export const CLOUD_ACCOUNT_VENDOR_CHOICES = {
     fortinet: { label: 'FortiZTP (FortiManager OID)', sequence: 3 },
     checkpoint: { label: 'Check Point Zero Touch (User Center account id/template id)', sequence: 4 },
 } as const
-export type CloudAccountVendor = keyof typeof CLOUD_ACCOUNT_VENDOR_CHOICES
+type CloudAccountVendor = keyof typeof CLOUD_ACCOUNT_VENDOR_CHOICES
 
 // Fluent cannot read a list written with `satisfies`, so that both lists label OEM vendors is checked here instead.
 type Holds<T extends true> = T
@@ -317,7 +317,7 @@ export const REPLACEMENT_TIER_CHOICES = {
     same_day: { label: 'Same day (8x5x4)', sequence: 1 },
     four_hour: { label: '24x7x4', sequence: 2 },
 } as const
-export type ReplacementTier = keyof typeof REPLACEMENT_TIER_CHOICES
+type ReplacementTier = keyof typeof REPLACEMENT_TIER_CHOICES
 export const REPLACEMENT_TIER = {
     nbd: 'nbd',
     same_day: 'same_day',
@@ -595,7 +595,7 @@ export const DISPOSAL_STAGE_CHOICES = {
     completed: { label: 'Completed', sequence: 3 },
     rejected: { label: 'Rejected', sequence: 4 },
 } as const
-export type DisposalStage = keyof typeof DISPOSAL_STAGE_CHOICES
+type DisposalStage = keyof typeof DISPOSAL_STAGE_CHOICES
 export const DISPOSAL_STAGE = {
     draft: 'draft',
     awaiting_approval: 'awaiting_approval',
@@ -673,7 +673,7 @@ export const EXCEPTION_STATUS_CHOICES = {
     resolved: { label: 'Resolved', sequence: 1 },
     accepted: { label: 'Accepted (no action)', sequence: 2 },
 } as const
-export type ExceptionStatus = keyof typeof EXCEPTION_STATUS_CHOICES
+type ExceptionStatus = keyof typeof EXCEPTION_STATUS_CHOICES
 export const EXCEPTION_STATUS = {
     open: 'open',
     resolved: 'resolved',
@@ -687,7 +687,7 @@ export const BILLING_PERIOD_STATUS_CHOICES = {
     ready: { label: 'Ready for review', sequence: 1 },
     closed: { label: 'Closed (locked)', sequence: 2 },
 } as const
-export type BillingPeriodStatus = keyof typeof BILLING_PERIOD_STATUS_CHOICES
+type BillingPeriodStatus = keyof typeof BILLING_PERIOD_STATUS_CHOICES
 export const BILLING_PERIOD_STATUS = {
     generating: 'generating',
     ready: 'ready',
@@ -698,7 +698,7 @@ export const BILLING_LINE_KIND_CHOICES = {
     subscription: { label: 'Subscription', sequence: 0 },
     fee: { label: 'Fee', sequence: 1 },
 } as const
-export type BillingLineKind = keyof typeof BILLING_LINE_KIND_CHOICES
+type BillingLineKind = keyof typeof BILLING_LINE_KIND_CHOICES
 export const BILLING_LINE_KIND = {
     subscription: 'subscription',
     fee: 'fee',
