@@ -103,6 +103,7 @@ export default tseslint.config(
     },
     {
         files: ['src/server/platform/**/*.ts'],
+        ignores: TEST_CODE,
         rules: {
             'no-restricted-imports': [
                 'error',

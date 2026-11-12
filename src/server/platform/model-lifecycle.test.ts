@@ -1,14 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { EVENT } from '../domain/events.ts'
 import type { GlideRecord } from '@servicenow/glide'
-import {
-    importLifecycleRow,
-    queueModelRefresh,
-    queueModelsReachingMilestone,
-    readModelLifecycle,
-    writeModelLifecycle,
-    writingModelLifecycle,
-} from './model-lifecycle.ts'
+import { onModelLifecycleChanged } from '../entry/models.ts'
+import { importLifecycleRow, queueModelRefresh, queueModelsReachingMilestone, readModelLifecycle, writeModelLifecycle } from './model-lifecycle.ts'
 import { platform, recordOf, type Row } from '../test-support/fake-glide.ts'
 
 /*
@@ -41,10 +35,7 @@ const queued = () => platform.events.map(({ name, record, parm1 }) => ({ name, r
 
 const MODEL = 'model1'
 
-/** The after rule on the table (entry/models `onModelLifecycleChanged`), which platform code may not import (ADR 0003). */
-function lifecycleRule(row: Row): void {
-    if (!writingModelLifecycle(row.model ?? '')) queueModelRefresh(row.model ?? '')
-}
+const lifecycleRule = (row: Row) => onModelLifecycleChanged(recordOf<GlideRecord>(TABLE, row), null)
 
 function stored(row: Row): void {
     const sysId = `row${rows().length + 1}`
